@@ -39,40 +39,24 @@ use winit::window::{ Window, WindowBuilder };
 
 #[derive(Default, Debug, Clone, Copy)]
 struct Vertex {
-    position: [f32; 2],
+    position: [f32; 3],
+    texture_coordinates: [f32; 2],
 }
 
 impl Vertex {
 
-    pub const fn new(x: f32, y: f32) -> Self {
+    pub const fn new(x: f32, y: f32, z: f32, u: f32, v: f32) -> Self {
         return Self {
-            position: [x, y],
+            position: [x, y, z],
+            texture_coordinates: [u, v],
         }
     }
 }
 
-vulkano::impl_vertex!(Vertex, position);
+vulkano::impl_vertex!(Vertex, position, texture_coordinates);
 
-const VERTICES: [Vertex; 3] = [ Vertex::new(-0.5, -0.25), Vertex::new(0.0, 0.5), Vertex::new(0.25, -0.1) ];
-
-/*mod cs {
-    vulkano_shaders::shader!{
-        ty: "compute",
-        src: "
-#version 450
-
-layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
-
-layout(set = 0, binding = 0) buffer Data {
-    uint data[];
-} buf;
-
-void main() {
-    uint idx = gl_GlobalInvocationID.x;
-    buf.data[idx] *= 12;
-}"
-    }
-}*/
+const VERTICES: [Vertex; 3] = [ Vertex::new(-0.8, -0.8, -0.0, 0.0, 0.0), Vertex::new(0.0, 0.8, 0.0, 0.5, 1.0), Vertex::new(0.8, -0.8, 0.0, 1.0, 0.0) ];
+const VERTICES2: [Vertex; 3] = [ Vertex::new(-0.8, 0.8, -0.0, 0.0, 1.0), Vertex::new(0.0, -0.8, 0.0, 0.5, 0.0), Vertex::new(0.8, 0.8, 0.0, 1.0, 1.0) ];
 
 mod vertex_shader {
     vulkano_shaders::shader! {
@@ -80,10 +64,13 @@ mod vertex_shader {
         src: "
 #version 450
 
-layout(location = 0) in vec2 position;
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec2 texture_coordinates;
+layout(location = 0) out vec2 texture_coordinates_out;
 
 void main() {
-				gl_Position = vec4(position, 0.0, 1.0);
+				gl_Position = vec4(position, 1.0);
+    texture_coordinates_out = texture_coordinates;
 }"
     }
 }
@@ -94,10 +81,13 @@ mod fragment_shader {
         src: "
 #version 450
 
-layout(location = 0) out vec4 f_color;
+layout(location = 0) in vec2 texture_coordinates;
+layout(location = 0) out vec4 fragment_color;
 
 void main() {
-		 	f_color = vec4(1.0, 0.0, 0.0, 1.0);
+    float red = gl_FragCoord.x / 3840.0;
+    float green = gl_FragCoord.y / 2160.0;
+		 	fragment_color = vec4(texture_coordinates.x, texture_coordinates.y, (texture_coordinates.x + texture_coordinates.x) / 2.0, 1.0);
 }"
     }
 }
@@ -118,12 +108,6 @@ fn main() {
     #[cfg(feature = "debug")]
     print_debug!("retrieved {}physical device{}", magenta(), none());
 
-    //#[cfg(feature = "debug")]
-    //print_debug!("device name is {}{}{}", magenta(), physical_device.name(), none());
-
-    //#[cfg(feature = "debug")]
-    //print_debug!("device if of type {}{:?}{}", magenta(), physical_device.ty(), none());
-
     let mut queue_families = physical_device.queue_families();
 
     #[cfg(feature = "debug")]
@@ -133,7 +117,6 @@ fn main() {
 
     let queue_family = queue_families.find(|&family| family.supports_graphics()).expect("couldn't find a graphical queue family");
     let device_extensions = DeviceExtensions {
-        //khr_storage_buffer_storage_class: true,
         khr_swapchain: true,
         ..DeviceExtensions::none()
     };
@@ -157,8 +140,7 @@ fn main() {
 
     let events_loop = EventLoop::new();
     let surface = WindowBuilder::new().build_vk_surface(&events_loop, instance.clone()).unwrap();
-    //println!("{:?}", surface.window().primary_monitor().size());
-
+ 
     #[cfg(feature = "debug")]
     print_debug!("created {}window{}", magenta(), none());
 
@@ -180,11 +162,6 @@ fn main() {
     #[cfg(feature = "debug")]
     print_debug!("created {}swapchain{}", magenta(), none());
 
-    //let (image_num, suboptimal, acquire_future) = acquire_next_image(swapchain.clone(), None).unwrap();
-
-    //#[cfg(feature = "debug")]
-    //print_debug!("acquired {}image{} from swapchain", magenta(), none());
-
     #[cfg(feature = "debug")]
     timer.stop();
 
@@ -192,6 +169,7 @@ fn main() {
     let timer = Timer::new("create resources");
 
     let vertex_buffer = CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), false, VERTICES).unwrap();
+    let vertex_buffer_2 = CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), false, VERTICES2).unwrap();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}vertex buffer{}", magenta(), none());
@@ -259,104 +237,6 @@ fn main() {
     #[cfg(feature = "debug")]
     timer.stop();
 
-    /*#[cfg(feature = "debug")]
-    let timer = Timer::new("copy buffers");
-
-    let source_content = 0 .. 64;
-    let source = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, source_content).expect("failed to create buffer");
-    
-    let dest_content = (0 .. 64).map(|_| 0);
-    let dest = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, dest_content).expect("failed to create buffer");
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}source{} and {}destination{} buffers", magenta(), none(), magenta(), none());
-
-    let mut builder = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
-    builder.copy_buffer(source.clone(), dest.clone()).unwrap();
-    let command_buffer = builder.build().unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}command buffer{}", magenta(), none());
-
-    let finished = command_buffer.execute(queue.clone()).unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("execute command buffer");
-
-    finished.then_signal_fence_and_flush().unwrap().wait(None).unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("command buffer is done");
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("compute shader");
-
-    let data_iter = 0 .. 128; //65536;
-    let data_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, data_iter).expect("failed to create buffer");
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}data buffer{}", magenta(), none());
-
-    let shader = cs::Shader::load(device.clone()).expect("failed to create shader module");
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}shader{}", magenta(), none());
-
-    let compute_pipeline = Arc::new(ComputePipeline::new(device.clone(), &shader.main_entry_point(), &()).expect("failed to create compute pipeline"));
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}compute pipeline{}", magenta(), none());
-
-    let layout = compute_pipeline.layout().descriptor_set_layout(0).unwrap();
-    let set = Arc::new(PersistentDescriptorSet::start(layout.clone())
-        .add_buffer(data_buffer.clone()).unwrap()
-        .build().unwrap()
-    );
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}descriptor set{}", magenta(), none());
-
-    let mut builder = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
-    builder.dispatch([1024, 1, 1], compute_pipeline.clone(), set.clone(), ()).unwrap();
-    let command_buffer = builder.build().unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}command buffer{}", magenta(), none());
-
-    let finished = command_buffer.execute(queue.clone()).unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("execute command buffer");
-
-    finished.then_signal_fence_and_flush().unwrap().wait(None).unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("command buffer is done");
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("image");
-
-    let image = StorageImage::new(device.clone(), Dimensions::Dim2d { width: 1024, height: 1024 }, Format::R8G8B8A8Unorm, Some(queue.family())).unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}store image{}", magenta(), none());
-
-    let mut builder = AutoCommandBufferBuilder::new(device.clone(), queue.family()).unwrap();
-    builder.clear_color_image(image.clone(), ClearValue::Float([0.0, 0.0, 1.0, 1.0])).unwrap();
-    let command_buffer = builder.build().unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("successfully {}cleared{} image", magenta(), none());
-
-    #[cfg(feature = "debug")]
-    timer.stop();*/
-
     let mut recreate_swapchain = false;
     let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
 
@@ -407,13 +287,14 @@ fn main() {
                     recreate_swapchain = true;
                 }
 
-                let clear_values = vec![[0.0, 0.0, 1.0, 1.0].into()];
+                let clear_values = vec![[0.02, 0.02, 0.02, 1.0].into()];
 
                 let mut builder = AutoCommandBufferBuilder::primary(device.clone(), queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
                 builder
                     .begin_render_pass(framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap()
                     .draw(pipeline.clone(), &dynamic_state, vertex_buffer.clone(), (), ()).unwrap()
+                    .draw(pipeline.clone(), &dynamic_state, vertex_buffer_2.clone(), (), ()).unwrap()
                     .end_render_pass().unwrap();
 
                 let command_buffer = builder.build().unwrap();

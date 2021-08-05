@@ -1,0 +1,21 @@
+[package]
+name = "korangar"
+version = "0.1.0"
+
+[dependencies]
+vulkano = { git = "https://github.com/vulkano-rs/vulkano.git" }
+vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git" }
+vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git" }
+winit = "0.25"
+
+[features]
+debug = ["lazy_static", "chrono"]
+
+[dependencies.chrono]
+version = "0.4"
+optional = true
+
+[dependencies.lazy_static]
+version = "1.4.0"
+optional = true
+

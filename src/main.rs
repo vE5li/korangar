@@ -2,6 +2,8 @@ extern crate vulkano;
 extern crate vulkano_shaders;
 extern crate vulkano_win;
 extern crate winit;
+extern crate cgmath;
+extern crate png;
 
 #[cfg(feature = "debug")]
 extern crate chrono;
@@ -11,52 +13,37 @@ extern crate chrono;
 extern crate lazy_static;
 
 #[cfg(feature = "debug")]
+#[macro_use]
 mod debug;
+
+mod graphics;
+mod managers;
 
 #[cfg(feature = "debug")]
 use debug::*;
 
-use std::sync::Arc;
+use graphics::*;
+use managers::{ ModelManager, TextureManager };
+
+use cgmath::{ Rad, Vector2, Vector3 };
+use std::io::Cursor;
+use std::time::Instant;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
-use vulkano::command_buffer::{ AutoCommandBufferBuilder, CommandBufferUsage, DynamicState, SubpassContents };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{ Device, DeviceExtensions };
 use vulkano::image::view::ImageView;
-use vulkano::image::{ ImageUsage, SwapchainImage };
+use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
 use vulkano::instance::Instance;
-use vulkano::pipeline::viewport::Viewport;
-use vulkano::pipeline::GraphicsPipeline;
-use vulkano::render_pass::{ Framebuffer, FramebufferAbstract, RenderPass, Subpass };
-use vulkano::swapchain;
-use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError };
-use vulkano::sync;
-use vulkano::sync::{ FlushError, GpuFuture };
+use vulkano::sync::GpuFuture;
+use vulkano::format::Format;
 use vulkano::Version;
 use vulkano_win::VkSurfaceBuild;
 use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
-use winit::window::{ Window, WindowBuilder };
+use winit::window::WindowBuilder;
 
-#[derive(Default, Debug, Clone, Copy)]
-struct Vertex {
-    position: [f32; 3],
-    texture_coordinates: [f32; 2],
-}
-
-impl Vertex {
-
-    pub const fn new(x: f32, y: f32, z: f32, u: f32, v: f32) -> Self {
-        return Self {
-            position: [x, y, z],
-            texture_coordinates: [u, v],
-        }
-    }
-}
-
-vulkano::impl_vertex!(Vertex, position, texture_coordinates);
-
-const VERTICES: [Vertex; 3] = [ Vertex::new(-0.8, -0.8, -0.0, 0.0, 0.0), Vertex::new(0.0, 0.8, 0.0, 0.5, 1.0), Vertex::new(0.8, -0.8, 0.0, 1.0, 0.0) ];
-const VERTICES2: [Vertex; 3] = [ Vertex::new(-0.8, 0.8, -0.0, 0.0, 1.0), Vertex::new(0.0, -0.8, 0.0, 0.5, 0.0), Vertex::new(0.8, 0.8, 0.0, 1.0, 1.0) ];
+const VERTICES: [Vertex; 6] = [ Vertex::new(-0.8, -0.8, -0.0, 0.0, 1.0), Vertex::new(0.8, 0.8, 0.0, 1.0, 0.0), Vertex::new(0.8, -0.8, 0.0, 1.0, 1.0),
+                                Vertex::new(-0.8, -0.8, -0.0, 0.0, 1.0), Vertex::new(-0.8, 0.8, -0.0, 0.0, 0.0), Vertex::new(0.8, 0.8, 0.0, 1.0, 0.0) ];
 
 mod vertex_shader {
     vulkano_shaders::shader! {
@@ -68,8 +55,19 @@ layout(location = 0) in vec3 position;
 layout(location = 1) in vec2 texture_coordinates;
 layout(location = 0) out vec2 texture_coordinates_out;
 
+layout(set = 0, binding = 1) uniform Matrices {
+    mat4 world;
+    mat4 view;
+    mat4 projection;
+} uniforms;
+
 void main() {
-				gl_Position = vec4(position, 1.0);
+
+    mat4 worldview = uniforms.view * uniforms.world;
+    gl_Position = uniforms.projection * worldview * vec4(position, 1.0);
+
+//				gl_Position = vec4(position, 1.0);
+
     texture_coordinates_out = texture_coordinates;
 }"
     }
@@ -84,12 +82,31 @@ mod fragment_shader {
 layout(location = 0) in vec2 texture_coordinates;
 layout(location = 0) out vec4 fragment_color;
 
+layout (set = 0, binding = 0) uniform sampler2D tex;
+
 void main() {
     float red = gl_FragCoord.x / 3840.0;
     float green = gl_FragCoord.y / 2160.0;
-		 	fragment_color = vec4(texture_coordinates.x, texture_coordinates.y, (texture_coordinates.x + texture_coordinates.x) / 2.0, 1.0);
+		 	vec4 color = vec4(texture_coordinates.x, texture_coordinates.y, 0.0, 1.0);
+    vec4 pixel = texture(tex, texture_coordinates);
+
+		 	//fragment_color = (pixel + pixel + color) / 3.0;
+		 	//fragment_color = min(pixel, color);
+		 	fragment_color = pixel;
 }"
     }
+}
+
+fn unique_vertex(vertex_positions: &Vec<Vector3<f32>>, texture_coordinates: &Vec<Vector2<f32>>, word: &str) -> Vertex {
+
+    let mut components = word.split("/");
+    let position_index: usize = components.next().expect("missing vertex position index").parse().expect("failed to parse vertex position index");
+    let texture_index: usize = components.next().expect("missing vertex texture index").parse().expect("failed to parse vertex texture index");
+
+    let position_entry = &vertex_positions[position_index - 1];
+    let texture_entry = &texture_coordinates[texture_index - 1];
+
+    return Vertex::new(position_entry.x, position_entry.y, position_entry.z, texture_entry.x, texture_entry.y);
 }
 
 fn main() {
@@ -139,28 +156,18 @@ fn main() {
     let timer = Timer::new("create window");
 
     let events_loop = EventLoop::new();
-    let surface = WindowBuilder::new().build_vk_surface(&events_loop, instance.clone()).unwrap();
+    let surface = WindowBuilder::new().with_title(String::from("korangar")).build_vk_surface(&events_loop, instance.clone()).unwrap();
  
     #[cfg(feature = "debug")]
     print_debug!("created {}window{}", magenta(), none());
 
-    let capabilities = surface.capabilities(physical_device).expect("failed to get surface capabilities");
-    let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
-    let format = capabilities.supported_formats[0].0;
-    let dimensions: [u32; 2] = surface.window().inner_size().into();
-
-    let (mut swapchain, images) = Swapchain::start(device.clone(), surface.clone())
-        .num_images(capabilities.min_image_count)
-        .format(format)
-        .dimensions(dimensions)
-        .usage(ImageUsage::color_attachment())
-        .sharing_mode(&queue)
-        .composite_alpha(composite_alpha)
-        .build()
-        .expect("failed to create swapchain");
+    #[cfg(feature = "debug")]
+    timer.stop();
 
     #[cfg(feature = "debug")]
-    print_debug!("created {}swapchain{}", magenta(), none());
+    let timer = Timer::new("create renderer");
+
+    let mut renderer = Renderer::new(&physical_device, device.clone(), queue.clone(), surface.clone());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -168,77 +175,93 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create resources");
 
-    let vertex_buffer = CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), false, VERTICES).unwrap();
-    let vertex_buffer_2 = CpuAccessibleBuffer::from_data(device.clone(), BufferUsage::all(), false, VERTICES2).unwrap();
+    let character_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, VERTICES.iter().cloned()).unwrap();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}vertex buffer{}", magenta(), none());
 
-    let vertex_shader = vertex_shader::Shader::load(device.clone()).unwrap();
-    let fragment_shader = fragment_shader::Shader::load(device.clone()).unwrap();
+    let mut vertex_positions: Vec<Vector3<f32>> = Vec::new();
+    let mut texture_coordinates: Vec<Vector2<f32>> = Vec::new();
+    let mut vertices: Vec<Vertex> = Vec::new();
 
-    #[cfg(feature = "debug")]
-    print_debug!("loaded {}vertex{} and {}fragment shaders{}", magenta(), none(), magenta(), none());
+    let contents = std::fs::read_to_string("/home/korangar/models/test2.obj").expect("Something went wrong reading the file");
+    let mut lines = contents.split("\n");
 
-    let render_pass = Arc::new(
-        vulkano::single_pass_renderpass!(
-            device.clone(),
-            attachments: {
-                color: {
-                    load: Clear,
-                    store: Store,
-                    format: swapchain.format(),
-                    samples: 1,
-                }
-            },
-            pass: {
-                color: [color],
-                depth_stencil: {}
+    while let Some(line) = lines.next() {
+        let mut words = line.split(" ");
+        let line_type = words.next().expect("failed to get line type");
+
+        if line_type.is_empty() {
+            continue;
+        }
+
+        match line_type {
+
+            "v" => {
+                let x = words.next().expect("failed to get x coordinate").parse().unwrap();
+                let y = words.next().expect("failed to get y coordinate").parse().unwrap();
+                let z = words.next().expect("failed to get z coordinate").parse().unwrap();
+                vertex_positions.push(Vector3::new(x, y, z));
             }
-        )
-        .unwrap(),
-    );
+
+            "vt" => {
+                let u = words.next().expect("failed to get u coordinate").parse().unwrap();
+                let v = words.next().expect("failed to get v coordinate").parse().unwrap();
+                texture_coordinates.push(Vector2::new(u, v));
+            }
+
+            "f" => {
+                let first = words.next().expect("failed to get first vertex");
+                let first_vertex = unique_vertex(&vertex_positions, &texture_coordinates, first);
+                let second = words.next().expect("failed to get second vertex");
+                let second_vertex = unique_vertex(&vertex_positions, &texture_coordinates, second);
+                let third = words.next().expect("failed to get third vertex");
+                let third_vertex = unique_vertex(&vertex_positions, &texture_coordinates, third);
+
+                vertices.push(first_vertex);
+                vertices.push(second_vertex);
+                vertices.push(third_vertex);
+            }
+
+            invalid => println!("invalid type {:?}", invalid),
+        }
+    }
+
+    let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
     #[cfg(feature = "debug")]
-    print_debug!("created {}render pass{}", magenta(), none());
+    print_debug!("loaded {}object file{}", magenta(), none());
 
-    let pipeline = Arc::new(
-        GraphicsPipeline::start()
-            .vertex_input_single_buffer::<Vertex>()
-            .vertex_shader(vertex_shader.main_entry_point(), ())
-            .triangle_list()
-            .viewports_dynamic_scissors_irrelevant(1)
-            .fragment_shader(fragment_shader.main_entry_point(), ())
-            .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
-            .build(device.clone())
-            .unwrap()
-    );
+    let (texture, tex_future) = {
+        let png_bytes = include_bytes!("/home/korangar/textures/texture5.png").to_vec();
+        let cursor = Cursor::new(png_bytes);
+        let decoder = png::Decoder::new(cursor);
+        let (info, mut reader) = decoder.read_info().unwrap();
+        let dimensions = ImageDimensions::Dim2d {
+            width: info.width,
+            height: info.height,
+            array_layers: 1,
+        };
 
-    #[cfg(feature = "debug")]
-    print_debug!("created {}pipeline{}", magenta(), none());
+        let mut image_data = Vec::new();
+        image_data.resize((info.width * info.height * 4) as usize, 0);
+        reader.next_frame(&mut image_data).unwrap();
 
-    let mut dynamic_state = DynamicState {
-        line_width: None,
-        viewports: None,
-        scissors: None,
-        compare_mask: None,
-        write_mask: None,
-        reference: None,
+        let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::One, Format::R8G8B8A8Srgb, queue.clone()).unwrap();
+        (ImageView::new(image).unwrap(), future)
     };
 
     #[cfg(feature = "debug")]
-    print_debug!("created {}dynamic state{}", magenta(), none());
-
-    let mut framebuffers = window_size_dependent_setup(&images, render_pass.clone(), &mut dynamic_state);
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}framebuffers{}", magenta(), none());
+    print_debug!("created {}texture{}", magenta(), none());
 
     #[cfg(feature = "debug")]
     timer.stop();
 
-    let mut recreate_swapchain = false;
-    let mut previous_frame_end = Some(sync::now(device.clone()).boxed());
+     // TODO:
+    tex_future.boxed().cleanup_finished();
+    let rotation_start = Instant::now();
+
+    let mut camera = Camera::new();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -248,80 +271,20 @@ fn main() {
             }
 
             Event::WindowEvent { event: WindowEvent::Resized(_), .. } => {
-                recreate_swapchain = true;
+                renderer.invalidate_swapchain();
             }
 
             Event::RedrawEventsCleared => {
-                previous_frame_end.as_mut().unwrap().cleanup_finished();
+                renderer.start_draw(&surface);
+                camera.generate_view_projection(renderer.get_dimensions());
 
-                if recreate_swapchain {
+                let elapsed = rotation_start.elapsed();
+                let rotation = elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
 
-                    #[cfg(feature = "debug")]
-                    let timer = Timer::new("recreating swapchain");
+                renderer.draw_textured(&camera, vertex_buffer.clone(), texture.clone(), &Transform::position(Vector3::new(0.0, -2.0, 0.0)));
+                renderer.draw_textured(&camera, character_vertex_buffer.clone(), texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32 * 2.0), Rad(0.0))));
 
-                    let dimensions: [u32; 2] = surface.window().inner_size().into();
-                    let (new_swapchain, new_images) =  match swapchain.recreate().dimensions(dimensions).build() {
-                        Ok(r) => r,
-                        Err(SwapchainCreationError::UnsupportedDimensions) => return,
-                        Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
-                    };
-
-                    swapchain = new_swapchain;
-                    framebuffers = window_size_dependent_setup(&new_images, render_pass.clone(), &mut dynamic_state);
-                    recreate_swapchain = false;
-
-                    #[cfg(feature = "debug")]
-                    timer.stop();
-                }
-
-                let (image_num, suboptimal, acquire_future) = match swapchain::acquire_next_image(swapchain.clone(), None) {
-                    Ok(r) => r,
-                    Err(AcquireError::OutOfDate) => {
-                        recreate_swapchain = true;
-                        return;
-                    }
-                    Err(e) => panic!("Failed to acquire next image: {:?}", e),
-                };
-
-                if suboptimal {
-                    recreate_swapchain = true;
-                }
-
-                let clear_values = vec![[0.02, 0.02, 0.02, 1.0].into()];
-
-                let mut builder = AutoCommandBufferBuilder::primary(device.clone(), queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
-
-                builder
-                    .begin_render_pass(framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap()
-                    .draw(pipeline.clone(), &dynamic_state, vertex_buffer.clone(), (), ()).unwrap()
-                    .draw(pipeline.clone(), &dynamic_state, vertex_buffer_2.clone(), (), ()).unwrap()
-                    .end_render_pass().unwrap();
-
-                let command_buffer = builder.build().unwrap();
-
-                let future = previous_frame_end
-                    .take().unwrap()
-                    .join(acquire_future)
-                    .then_execute(queue.clone(), command_buffer).unwrap()
-                    .then_swapchain_present(queue.clone(), swapchain.clone(), image_num)
-                    .then_signal_fence_and_flush();
-
-                match future {
-
-                    Ok(future) => {
-                        previous_frame_end = Some(future.boxed());
-                    }
-
-                    Err(FlushError::OutOfDate) => {
-                        recreate_swapchain = true;
-                        previous_frame_end = Some(sync::now(device.clone()).boxed());
-                    }
-
-                    Err(e) => {
-                        println!("Failed to flush future: {:?}", e);
-                        previous_frame_end = Some(sync::now(device.clone()).boxed());
-                    }
-                }
+                renderer.stop_draw();
             }
 
             _ => ()
@@ -329,31 +292,3 @@ fn main() {
     });
 }
 
-fn window_size_dependent_setup(
-    images: &[Arc<SwapchainImage<Window>>],
-    render_pass: Arc<RenderPass>,
-    dynamic_state: &mut DynamicState,
-) -> Vec<Arc<dyn FramebufferAbstract + Send + Sync>> {
-    let dimensions = images[0].dimensions();
-
-    let viewport = Viewport {
-        origin: [0.0, 0.0],
-        dimensions: [dimensions[0] as f32, dimensions[1] as f32],
-        depth_range: 0.0..1.0,
-    };
-    dynamic_state.viewports = Some(vec![viewport]);
-
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new(image.clone()).unwrap();
-            Arc::new(
-                Framebuffer::start(render_pass.clone())
-                    .add(view)
-                    .unwrap()
-                    .build()
-                    .unwrap(),
-            ) as Arc<dyn FramebufferAbstract + Send + Sync>
-        })
-        .collect::<Vec<_>>()
-}

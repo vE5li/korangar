@@ -28,13 +28,13 @@ use debug::*;
 
 use graphics::{ Vertex, Camera, Transform, VertexBuffer, Texture, MatrixBuffer, VertexShader, FragmentShader };
 
-struct Foo {
+struct CurrentFrame {
     pub builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
     pub image_num: usize,
     pub swapchain_future: SwapchainAcquireFuture<Window>,
 }
 
-impl Foo {
+impl CurrentFrame {
 
     pub fn new(builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>, image_num: usize, swapchain_future: SwapchainAcquireFuture<Window>) -> Self {
         return Self {
@@ -51,14 +51,14 @@ pub struct Renderer {
     vertex_shader: VertexShader,
     fragment_shader: FragmentShader,
     swapchain: Arc<Swapchain<Window>>,
-    images: Vec<Arc<SwapchainImage<Window>>>,
     render_pass: Arc<RenderPass>,
     pipeline: Arc<dyn GraphicsPipelineAbstract + Send + Sync>,
     framebuffers: Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
-    foo: Option<Foo>,
+    current_frame: Option<CurrentFrame>,
     matrix_buffer: MatrixBuffer,
     dimensions: [u32; 2],
     sampler: Arc<Sampler>,
+    sampler2: Arc<Sampler>,
     recreate_swapchain: bool,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
 }
@@ -143,6 +143,20 @@ impl Renderer {
             0.0,
         ).unwrap();
 
+        let sampler2 = Sampler::new(
+            device.clone(),
+            Filter::Linear,
+            Filter::Linear,
+            MipmapMode::Linear,
+            SamplerAddressMode::Repeat,
+            SamplerAddressMode::Repeat,
+            SamplerAddressMode::Repeat,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+        ).unwrap();
+
         #[cfg(feature = "debug")]
         print_debug!("created {}sampler{}", magenta(), none());
 
@@ -154,14 +168,14 @@ impl Renderer {
             vertex_shader: vertex_shader,
             fragment_shader: fragment_shader,
             swapchain: swapchain,
-            images: images,
             render_pass: render_pass,
             pipeline: pipeline,
             framebuffers: framebuffers,
             matrix_buffer: matrix_buffer,
-            foo: None,
+            current_frame: None,
             dimensions: dimensions,
             sampler: sampler,
+            sampler2: sampler2,
             recreate_swapchain: false,
             previous_frame_end: previous_frame_end,
         }
@@ -234,13 +248,7 @@ impl Renderer {
             self.dimensions = new_dimensions;
             self.swapchain = new_swapchain;
 
-            let (new_pipeline, new_framebuffers) = Self::window_size_dependent_setup(
-                self.device.clone(),
-                &self.vertex_shader,
-                &self.fragment_shader,
-                &new_images,
-                self.render_pass.clone(),
-            );
+            let (new_pipeline, new_framebuffers) = Self::window_size_dependent_setup(self.device.clone(), &self.vertex_shader, &self.fragment_shader, &new_images, self.render_pass.clone());
 
             self.pipeline = new_pipeline;
             self.framebuffers = new_framebuffers;
@@ -269,10 +277,10 @@ impl Renderer {
 
         builder.begin_render_pass(self.framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap();
 
-        self.foo = Some(Foo::new(builder, image_num, acquire_future));
+        self.current_frame = Some(CurrentFrame::new(builder, image_num, acquire_future));
     }
 
-    pub fn draw_textured(&mut self, camera: &Camera, vertex_buffer: VertexBuffer, texture: Texture, transform: &Transform) {
+    pub fn draw_textured(&mut self, camera: &Camera, vertex_buffer: VertexBuffer, texture: Texture, bump_map: Texture, specular_map: Texture, transform: &Transform) {
 
         let matrix_buffer_data = camera.matrix_buffer_data(transform);
         let matrix_subbuffer = self.matrix_buffer.next(matrix_buffer_data).unwrap();
@@ -280,28 +288,30 @@ impl Renderer {
 
         let set = Arc::new(
             PersistentDescriptorSet::start(layout.clone())
-                .add_sampled_image(texture, self.sampler.clone()).unwrap()
                 .add_buffer(matrix_subbuffer).unwrap()
+                .add_sampled_image(texture, self.sampler.clone()).unwrap()
+                .add_sampled_image(bump_map, self.sampler2.clone()).unwrap()
+                .add_sampled_image(specular_map, self.sampler2.clone()).unwrap()
                 .build().unwrap()
         );
 
-        if let Some(foo) = &mut self.foo {
-            foo.builder.draw(self.pipeline.clone(), &DynamicState::none(), vec![vertex_buffer], set, ()).unwrap();
+        if let Some(current_frame) = &mut self.current_frame {
+            current_frame.builder.draw(self.pipeline.clone(), &DynamicState::none(), vec![vertex_buffer], set, ()).unwrap();
         }
     }
 
     pub fn stop_draw(&mut self) {
 
-        if let Some(mut foo) = self.foo.take() {
-            foo.builder.end_render_pass().unwrap();
+        if let Some(mut current_frame) = self.current_frame.take() {
 
-            let command_buffer = foo.builder.build().unwrap();
+            current_frame.builder.end_render_pass().unwrap();
+            let command_buffer = current_frame.builder.build().unwrap();
 
             let future = self.previous_frame_end
                  .take().unwrap()
-                 .join(foo.swapchain_future)
+                 .join(current_frame.swapchain_future)
                  .then_execute(self.queue.clone(), command_buffer).unwrap()
-                 .then_swapchain_present(self.queue.clone(), self.swapchain.clone(), foo.image_num)
+                 .then_swapchain_present(self.queue.clone(), self.swapchain.clone(), current_frame.image_num)
                  .then_signal_fence_and_flush();
 
             match future {

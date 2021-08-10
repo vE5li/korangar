@@ -42,8 +42,8 @@ use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
 use winit::window::WindowBuilder;
 
-const VERTICES: [Vertex; 6] = [ Vertex::new(-0.8, -0.8, -0.0, 0.0, 1.0), Vertex::new(0.8, 0.8, 0.0, 1.0, 0.0), Vertex::new(0.8, -0.8, 0.0, 1.0, 1.0),
-                                Vertex::new(-0.8, -0.8, -0.0, 0.0, 1.0), Vertex::new(-0.8, 0.8, -0.0, 0.0, 0.0), Vertex::new(0.8, 0.8, 0.0, 1.0, 0.0) ];
+//const VERTICES: [Vertex; 6] = [ Vertex::new(-0.8, -0.8, -0.0, 0.0, 0.0, 0.0, 1.0, 1.0), Vertex::new(0.8, 0.8, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0), Vertex::new(0.8, -0.8, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0),
+//                                Vertex::new(-0.8, -0.8, -0.0, 0.0, 0.0, 0.0, 1.0, 1.0), Vertex::new(-0.8, 0.8, -0.0, 0.0, 0.0, 1.0, 1.0, 0.0), Vertex::new(0.8, 0.8, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0) ];
 
 mod vertex_shader {
     vulkano_shaders::shader! {
@@ -52,10 +52,16 @@ mod vertex_shader {
 #version 450
 
 layout(location = 0) in vec3 position;
-layout(location = 1) in vec2 texture_coordinates;
-layout(location = 0) out vec2 texture_coordinates_out;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec3 tangent;
+layout(location = 3) in vec3 bitangent;
+layout(location = 4) in vec2 texture_coordinates;
 
-layout(set = 0, binding = 1) uniform Matrices {
+layout(location = 0) out mat3 normal_matrix;
+layout(location = 3) out vec2 texture_coordinates_out;
+layout(location = 4) out vec4 vertex_position_viewspace;
+
+layout(set = 0, binding = 0) uniform Matrices {
     mat4 world;
     mat4 view;
     mat4 projection;
@@ -64,10 +70,13 @@ layout(set = 0, binding = 1) uniform Matrices {
 void main() {
 
     mat4 worldview = uniforms.view * uniforms.world;
-    gl_Position = uniforms.projection * worldview * vec4(position, 1.0);
 
-//				gl_Position = vec4(position, 1.0);
+    normal_matrix = mat3(worldview) * mat3(normalize(tangent), normalize(bitangent), normalize(normal));
+    
+    vec4 vertex_position_worldspace = uniforms.world * vec4(position, 1.0);
+    vertex_position_viewspace = uniforms.view * vertex_position_worldspace;
 
+    gl_Position = uniforms.projection * vertex_position_viewspace;
     texture_coordinates_out = texture_coordinates;
 }"
     }
@@ -79,34 +88,121 @@ mod fragment_shader {
         src: "
 #version 450
 
-layout(location = 0) in vec2 texture_coordinates;
+layout(location = 0) in mat3 normal_matrix;
+layout(location = 3) in vec2 texture_coordinates;
+layout(location = 4) in vec4 vertex_position_viewspace;
+
 layout(location = 0) out vec4 fragment_color;
 
-layout (set = 0, binding = 0) uniform sampler2D tex;
+layout(set = 0, binding = 0) uniform Matrices {
+    mat4 world;
+    mat4 view;
+    mat4 projection;
+} uniforms;
+
+layout (set = 0, binding = 1) uniform sampler2D tex;
+layout (set = 0, binding = 2) uniform sampler2D normal_map;
+layout (set = 0, binding = 3) uniform sampler2D specular_map;
+
+const vec4 LIGHT = vec4(0.0, 3.0, 3.0, 1.0);
 
 void main() {
-    float red = gl_FragCoord.x / 3840.0;
-    float green = gl_FragCoord.y / 2160.0;
-		 	vec4 color = vec4(texture_coordinates.x, texture_coordinates.y, 0.0, 1.0);
-    vec4 pixel = texture(tex, texture_coordinates);
 
-		 	//fragment_color = (pixel + pixel + color) / 3.0;
-		 	//fragment_color = min(pixel, color);
-		 	fragment_color = pixel;
+    vec4 diffuse_color = texture(tex, texture_coordinates);
+    vec4 normal_color = texture(normal_map, texture_coordinates);
+    float specularReflectivity = max(texture(specular_map, texture_coordinates).r / 2.0, 0.0);
+    vec3 specular_color = diffuse_color.rgb;
+
+    vec3 normal_viewspace = normal_matrix * normalize(normal_color.rgb * 2.0 - 1.0);
+
+    vec4 light_position_viewspace = uniforms.view * LIGHT;
+    vec3 light_direction_viewspace = normalize((light_position_viewspace - vertex_position_viewspace).xyz);
+    vec3 view_direction_viewspace = normalize(vertex_position_viewspace.xyz - vec3(0.0, 3.5, 3.5));
+
+    vec3 light_color_intensity = vec3(1.0, 1.0, 1.0) * 5.0;
+    float distanceFromLight = distance(vertex_position_viewspace, light_position_viewspace);
+
+    float diffuseStrength = clamp(dot(normal_viewspace, light_direction_viewspace), 0.0, 1.0);
+    vec3 diffuseLight = (light_color_intensity * diffuseStrength) / (distanceFromLight * distanceFromLight);
+
+    vec3 light_reflection_viewspace = reflect(light_direction_viewspace, normal_viewspace);
+
+    float specularLobeFactor = 5.0;
+
+    float specularStrength = clamp(dot(view_direction_viewspace, light_reflection_viewspace), 0.0, 1.0);
+    vec3 specularLight = (light_color_intensity * pow(specularStrength, specularLobeFactor)) / (distanceFromLight * distanceFromLight);
+
+    fragment_color.rgb = /*(diffuse_color.rgb * diffuseLight) +*/ (specular_color * specularReflectivity * specularLight);
+    fragment_color.a = diffuse_color.a;
+
+
+    //vec3 mapped_normal = texture(normal_map, texture_coordinates).rgb;
+    //vec3 combined_normal = normal + normalize(mapped_normal * 2.0 - 1.0);
+
+    //float brightness = dot(normalize(combined_normal), normalize(LIGHT));
+    //vec4 diffuse_color = texture(tex, texture_coordinates);
+    //vec3 dark_color = diffuse_color.rgb / 2.75;
+
+    //vec3 shaded_color = mix(dark_color, diffuse_color.rgb, brightness);
+
+    //vec3 specular_color = vec3(0.0, 1.0, 0.0);
+    //vec3 final_color = mix(shaded_color, specular_color, brightness - 1.9);
+
+    //vec3 final_color = shaded_color;
+
+		 	//fragment_color = vec4(final_color, diffuse_color.a);
 }"
     }
 }
 
-fn unique_vertex(vertex_positions: &Vec<Vector3<f32>>, texture_coordinates: &Vec<Vector2<f32>>, word: &str) -> Vertex {
+struct PartialVertex {
+    pub position: Vector3<f32>,
+    pub normal: Vector3<f32>,
+    pub texture_coordinates: Vector2<f32>,
+}
+
+impl PartialVertex {
+
+    pub fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>) -> Self {
+        return Self {
+            position: position,
+            normal: normal,
+            texture_coordinates: texture_coordinates,
+        }
+    }
+}
+
+fn partial_vertex(vertex_positions: &Vec<Vector3<f32>>, normals: &Vec<Vector3<f32>>, texture_coordinates: &Vec<Vector2<f32>>, word: &str) -> PartialVertex {
 
     let mut components = word.split("/");
     let position_index: usize = components.next().expect("missing vertex position index").parse().expect("failed to parse vertex position index");
     let texture_index: usize = components.next().expect("missing vertex texture index").parse().expect("failed to parse vertex texture index");
+    let normal_index: usize = components.next().expect("missing vertex normal index").parse().expect("failed to parse vertex normal index");
 
     let position_entry = &vertex_positions[position_index - 1];
     let texture_entry = &texture_coordinates[texture_index - 1];
+    let normal_entry = &normals[normal_index - 1];
 
-    return Vertex::new(position_entry.x, position_entry.y, position_entry.z, texture_entry.x, texture_entry.y);
+    return PartialVertex::new(*position_entry, *normal_entry, *texture_entry);
+}
+
+fn calculate_tangent_bitangent(first_partial: &PartialVertex, second_partial: &PartialVertex, third_partial: &PartialVertex) -> (Vector3<f32>, Vector3<f32>) {
+
+    let delta_position_1 = second_partial.position - first_partial.position;
+    let delta_position_2 = third_partial.position - first_partial.position;
+
+    let delta_texture_coordinates_1 = second_partial.texture_coordinates - first_partial.texture_coordinates;
+    let delta_texture_coordinates_2 = third_partial.texture_coordinates - first_partial.texture_coordinates;
+
+    let r = 1.0 / (delta_texture_coordinates_1.x * delta_texture_coordinates_2.y - delta_texture_coordinates_1.y * delta_texture_coordinates_2.x);
+    let tangent = (delta_position_1 * delta_texture_coordinates_2.y - delta_position_2 * delta_texture_coordinates_1.y) * r;
+    let bitangent = (delta_position_2 * delta_texture_coordinates_1.x - delta_position_1 * delta_texture_coordinates_2.x) * r;
+
+    return (tangent, bitangent);
+}
+
+fn vertex_from_partial(partial_vertex: PartialVertex, tangent: Vector3<f32>, bitangent: Vector3<f32>) -> Vertex {
+    return Vertex::new(partial_vertex.position, partial_vertex.normal, tangent, bitangent, partial_vertex.texture_coordinates);
 }
 
 fn main() {
@@ -175,16 +271,17 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create resources");
 
-    let character_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, VERTICES.iter().cloned()).unwrap();
+    //let character_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, VERTICES.iter().cloned()).unwrap();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}vertex buffer{}", magenta(), none());
 
     let mut vertex_positions: Vec<Vector3<f32>> = Vec::new();
+    let mut normals: Vec<Vector3<f32>> = Vec::new();
     let mut texture_coordinates: Vec<Vector2<f32>> = Vec::new();
     let mut vertices: Vec<Vertex> = Vec::new();
 
-    let contents = std::fs::read_to_string("/home/korangar/models/test2.obj").expect("Something went wrong reading the file");
+    let contents = std::fs::read_to_string("/home/korangar/models/test3.obj").expect("Something went wrong reading the file");
     let mut lines = contents.split("\n");
 
     while let Some(line) = lines.next() {
@@ -204,6 +301,13 @@ fn main() {
                 vertex_positions.push(Vector3::new(x, y, z));
             }
 
+            "vn" => {
+                let nx = words.next().expect("failed to get normal x coordinate").parse().unwrap();
+                let ny = words.next().expect("failed to get normal y coordinate").parse().unwrap();
+                let nz = words.next().expect("failed to get normal z coordinate").parse().unwrap();
+                normals.push(Vector3::new(nx, ny, nz));
+            }
+
             "vt" => {
                 let u = words.next().expect("failed to get u coordinate").parse().unwrap();
                 let v = words.next().expect("failed to get v coordinate").parse().unwrap();
@@ -212,16 +316,20 @@ fn main() {
 
             "f" => {
                 let first = words.next().expect("failed to get first vertex");
-                let first_vertex = unique_vertex(&vertex_positions, &texture_coordinates, first);
+                let first_partial = partial_vertex(&vertex_positions, &normals, &texture_coordinates, first);
                 let second = words.next().expect("failed to get second vertex");
-                let second_vertex = unique_vertex(&vertex_positions, &texture_coordinates, second);
+                let second_partial = partial_vertex(&vertex_positions, &normals, &texture_coordinates, second);
                 let third = words.next().expect("failed to get third vertex");
-                let third_vertex = unique_vertex(&vertex_positions, &texture_coordinates, third);
+                let third_partial = partial_vertex(&vertex_positions, &normals, &texture_coordinates, third);
 
-                vertices.push(first_vertex);
-                vertices.push(second_vertex);
-                vertices.push(third_vertex);
+                let (tangent, bitangent) = calculate_tangent_bitangent(&first_partial, &second_partial, &third_partial);
+
+                vertices.push(vertex_from_partial(first_partial, tangent, bitangent));
+                vertices.push(vertex_from_partial(second_partial, tangent, bitangent));
+                vertices.push(vertex_from_partial(third_partial, tangent, bitangent));
             }
+
+            "o" | "#" | "s" => continue,
 
             invalid => println!("invalid type {:?}", invalid),
         }
@@ -251,6 +359,44 @@ fn main() {
         (ImageView::new(image).unwrap(), future)
     };
 
+    let (bump_texture, bump_future) = {
+        let png_bytes = include_bytes!("/home/korangar/textures/texture5_normal.png").to_vec();
+        let cursor = Cursor::new(png_bytes);
+        let decoder = png::Decoder::new(cursor);
+        let (info, mut reader) = decoder.read_info().unwrap();
+        let dimensions = ImageDimensions::Dim2d {
+            width: info.width,
+            height: info.height,
+            array_layers: 1,
+        };
+
+        let mut image_data = Vec::new();
+        image_data.resize((info.width * info.height * 4) as usize, 0);
+        reader.next_frame(&mut image_data).unwrap();
+
+        let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::One, Format::R8G8B8A8Srgb, queue.clone()).unwrap();
+        (ImageView::new(image).unwrap(), future)
+    };
+
+    let (specular_texture, specular_future) = {
+        let png_bytes = include_bytes!("/home/korangar/textures/texture5_specular.png").to_vec();
+        let cursor = Cursor::new(png_bytes);
+        let decoder = png::Decoder::new(cursor);
+        let (info, mut reader) = decoder.read_info().unwrap();
+        let dimensions = ImageDimensions::Dim2d {
+            width: info.width,
+            height: info.height,
+            array_layers: 1,
+        };
+
+        let mut image_data = Vec::new();
+        image_data.resize((info.width * info.height * 4) as usize, 0);
+        reader.next_frame(&mut image_data).unwrap();
+
+        let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::One, Format::R8G8B8A8Srgb, queue.clone()).unwrap();
+        (ImageView::new(image).unwrap(), future)
+    };
+
     #[cfg(feature = "debug")]
     print_debug!("created {}texture{}", magenta(), none());
 
@@ -258,9 +404,9 @@ fn main() {
     timer.stop();
 
      // TODO:
-    tex_future.boxed().cleanup_finished();
-    let rotation_start = Instant::now();
+    tex_future.join(bump_future).join(specular_future).boxed().cleanup_finished();
 
+    let rotation_start = Instant::now();
     let mut camera = Camera::new();
 
     events_loop.run(move |event, _, control_flow| {
@@ -281,8 +427,8 @@ fn main() {
                 let elapsed = rotation_start.elapsed();
                 let rotation = elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
 
-                renderer.draw_textured(&camera, vertex_buffer.clone(), texture.clone(), &Transform::position(Vector3::new(0.0, -2.0, 0.0)));
-                renderer.draw_textured(&camera, character_vertex_buffer.clone(), texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32 * 2.0), Rad(0.0))));
+                renderer.draw_textured(&camera, vertex_buffer.clone(), texture.clone(), bump_texture.clone(), specular_texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32 / 2.0), Rad(0.0))));
+                //renderer.draw_textured(&camera, character_vertex_buffer.clone(), texture.clone(), bump_texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
 
                 renderer.stop_draw();
             }

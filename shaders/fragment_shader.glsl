@@ -22,18 +22,15 @@ void main() {
 
     vec4 diffuse_color = texture(tex, texture_coordinates);
     vec4 normal_color = texture(normal_map, texture_coordinates);
-    float specular_reflectivity = texture(specular_map, texture_coordinates).r / 2.0 + 0.5;
-    //vec3 specular_color = diffuse_color.rgb;
-    vec3 specular_color = vec3(1.0, 1.0, 1.0);
+    vec4 specular_value = texture(specular_map, texture_coordinates);
+
+    float specular_reflectivity = specular_value.r * 4.0;
+    vec3 specular_color = diffuse_color.rgb;
 
     vec3 light_position_tangentspace = normal_matrix_tangentspace * (uniforms.view * LIGHT).xyz;
     vec3 light_direction_tangentspace = normalize(light_position_tangentspace - vertex_position_tangentspace);
 
-    float red = -0.6 - (normal_color.x * 2.0 - 1.0);
-    float green = -0.6 - (normal_color.y * 2.0 - 1.0);
-    float blue = (normal_color.z * 2.0 - 1.0);
-
-    vec3 normal_tangentspace = normalize(vec3(red, green, blue));
+    vec3 normal_tangentspace = normalize(normal_color.xyz * vec3(-2.0, -2.0, 2.0) + vec3(0.4, 0.4, -1.0));
 
     vec3 light_color_intensity = vec3(1.0, 1.0, 1.0) * 5.0;
     float distance_from_light = distance(vertex_position_tangentspace, light_position_tangentspace);
@@ -48,7 +45,6 @@ void main() {
     float specular_strength = clamp(dot(view_direction_tangentspace, light_reflection_tangentspace), 0.0, 1.0);
     vec3 specular_light = (light_color_intensity * pow(specular_strength, specular_lobe_factor)) / (distance_from_light * distance_from_light);
 
-    //fragment_color.rgb = vec3(red + 0.5, red + 0.5, red + 0.5);
     fragment_color.rgb = (diffuse_color.rgb * diffuse_light) + (specular_color * specular_reflectivity * specular_light);
     fragment_color.a = diffuse_color.a;
 }

@@ -289,7 +289,7 @@ impl Renderer {
         let set = Arc::new(
             PersistentDescriptorSet::start(layout.clone())
                 .add_buffer(matrix_subbuffer).unwrap()
-                .add_sampled_image(texture, self.sampler.clone()).unwrap()
+                .add_sampled_image(texture, self.sampler2.clone()).unwrap()
                 .add_sampled_image(bump_map, self.sampler2.clone()).unwrap()
                 .add_sampled_image(specular_map, self.sampler2.clone()).unwrap()
                 .build().unwrap()

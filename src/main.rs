@@ -25,7 +25,9 @@ use debug::*;
 use graphics::*;
 use managers::{ ModelManager, TextureManager };
 
-use cgmath::{ Rad, Vector2, Vector3 };
+use cgmath::{ Rad, Vector2, Vector3, InnerSpace };
+use cgmath::num_traits::Float;
+
 use std::io::Cursor;
 use std::time::Instant;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
@@ -42,116 +44,17 @@ use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
 use winit::window::WindowBuilder;
 
-//const VERTICES: [Vertex; 6] = [ Vertex::new(-0.8, -0.8, -0.0, 0.0, 0.0, 0.0, 1.0, 1.0), Vertex::new(0.8, 0.8, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0), Vertex::new(0.8, -0.8, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0),
-//                                Vertex::new(-0.8, -0.8, -0.0, 0.0, 0.0, 0.0, 1.0, 1.0), Vertex::new(-0.8, 0.8, -0.0, 0.0, 0.0, 1.0, 1.0, 0.0), Vertex::new(0.8, 0.8, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0) ];
-
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        src: "
-#version 450
-
-layout(location = 0) in vec3 position;
-layout(location = 1) in vec3 normal;
-layout(location = 2) in vec3 tangent;
-layout(location = 3) in vec3 bitangent;
-layout(location = 4) in vec2 texture_coordinates;
-
-layout(location = 0) out mat3 normal_matrix;
-layout(location = 3) out vec2 texture_coordinates_out;
-layout(location = 4) out vec4 vertex_position_viewspace;
-
-layout(set = 0, binding = 0) uniform Matrices {
-    mat4 world;
-    mat4 view;
-    mat4 projection;
-} uniforms;
-
-void main() {
-
-    mat4 worldview = uniforms.view * uniforms.world;
-
-    normal_matrix = mat3(worldview) * mat3(normalize(tangent), normalize(bitangent), normalize(normal));
-    
-    vec4 vertex_position_worldspace = uniforms.world * vec4(position, 1.0);
-    vertex_position_viewspace = uniforms.view * vertex_position_worldspace;
-
-    gl_Position = uniforms.projection * vertex_position_viewspace;
-    texture_coordinates_out = texture_coordinates;
-}"
+        path: "/home/korangar/shaders/vertex_shader.glsl"
     }
 }
 
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        src: "
-#version 450
-
-layout(location = 0) in mat3 normal_matrix;
-layout(location = 3) in vec2 texture_coordinates;
-layout(location = 4) in vec4 vertex_position_viewspace;
-
-layout(location = 0) out vec4 fragment_color;
-
-layout(set = 0, binding = 0) uniform Matrices {
-    mat4 world;
-    mat4 view;
-    mat4 projection;
-} uniforms;
-
-layout (set = 0, binding = 1) uniform sampler2D tex;
-layout (set = 0, binding = 2) uniform sampler2D normal_map;
-layout (set = 0, binding = 3) uniform sampler2D specular_map;
-
-const vec4 LIGHT = vec4(0.0, 3.0, 3.0, 1.0);
-
-void main() {
-
-    vec4 diffuse_color = texture(tex, texture_coordinates);
-    vec4 normal_color = texture(normal_map, texture_coordinates);
-    float specularReflectivity = max(texture(specular_map, texture_coordinates).r / 2.0, 0.0);
-    vec3 specular_color = diffuse_color.rgb;
-
-    vec3 normal_viewspace = normal_matrix * normalize(normal_color.rgb * 2.0 - 1.0);
-
-    vec4 light_position_viewspace = uniforms.view * LIGHT;
-    vec3 light_direction_viewspace = normalize((light_position_viewspace - vertex_position_viewspace).xyz);
-    vec3 view_direction_viewspace = normalize(vertex_position_viewspace.xyz - vec3(0.0, 3.5, 3.5));
-
-    vec3 light_color_intensity = vec3(1.0, 1.0, 1.0) * 5.0;
-    float distanceFromLight = distance(vertex_position_viewspace, light_position_viewspace);
-
-    float diffuseStrength = clamp(dot(normal_viewspace, light_direction_viewspace), 0.0, 1.0);
-    vec3 diffuseLight = (light_color_intensity * diffuseStrength) / (distanceFromLight * distanceFromLight);
-
-    vec3 light_reflection_viewspace = reflect(light_direction_viewspace, normal_viewspace);
-
-    float specularLobeFactor = 5.0;
-
-    float specularStrength = clamp(dot(view_direction_viewspace, light_reflection_viewspace), 0.0, 1.0);
-    vec3 specularLight = (light_color_intensity * pow(specularStrength, specularLobeFactor)) / (distanceFromLight * distanceFromLight);
-
-    fragment_color.rgb = /*(diffuse_color.rgb * diffuseLight) +*/ (specular_color * specularReflectivity * specularLight);
-    fragment_color.a = diffuse_color.a;
-
-
-    //vec3 mapped_normal = texture(normal_map, texture_coordinates).rgb;
-    //vec3 combined_normal = normal + normalize(mapped_normal * 2.0 - 1.0);
-
-    //float brightness = dot(normalize(combined_normal), normalize(LIGHT));
-    //vec4 diffuse_color = texture(tex, texture_coordinates);
-    //vec3 dark_color = diffuse_color.rgb / 2.75;
-
-    //vec3 shaded_color = mix(dark_color, diffuse_color.rgb, brightness);
-
-    //vec3 specular_color = vec3(0.0, 1.0, 0.0);
-    //vec3 final_color = mix(shaded_color, specular_color, brightness - 1.9);
-
-    //vec3 final_color = shaded_color;
-
-		 	//fragment_color = vec4(final_color, diffuse_color.a);
-}"
+        path: "/home/korangar/shaders/fragment_shader.glsl"
     }
 }
 
@@ -190,7 +93,6 @@ fn calculate_tangent_bitangent(first_partial: &PartialVertex, second_partial: &P
 
     let delta_position_1 = second_partial.position - first_partial.position;
     let delta_position_2 = third_partial.position - first_partial.position;
-
     let delta_texture_coordinates_1 = second_partial.texture_coordinates - first_partial.texture_coordinates;
     let delta_texture_coordinates_2 = third_partial.texture_coordinates - first_partial.texture_coordinates;
 
@@ -198,7 +100,7 @@ fn calculate_tangent_bitangent(first_partial: &PartialVertex, second_partial: &P
     let tangent = (delta_position_1 * delta_texture_coordinates_2.y - delta_position_2 * delta_texture_coordinates_1.y) * r;
     let bitangent = (delta_position_2 * delta_texture_coordinates_1.x - delta_position_1 * delta_texture_coordinates_2.x) * r;
 
-    return (tangent, bitangent);
+    return (tangent.normalize(), bitangent.normalize());
 }
 
 fn vertex_from_partial(partial_vertex: PartialVertex, tangent: Vector3<f32>, bitangent: Vector3<f32>) -> Vertex {
@@ -427,7 +329,7 @@ fn main() {
                 let elapsed = rotation_start.elapsed();
                 let rotation = elapsed.as_secs() as f64 + elapsed.subsec_nanos() as f64 / 1_000_000_000.0;
 
-                renderer.draw_textured(&camera, vertex_buffer.clone(), texture.clone(), bump_texture.clone(), specular_texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32 / 2.0), Rad(0.0))));
+                renderer.draw_textured(&camera, vertex_buffer.clone(), texture.clone(), bump_texture.clone(), specular_texture.clone(), &Transform::rotation(Vector3::new(Rad(rotation as f32 / 2.36), Rad(rotation as f32 / 5.845), Rad(0.0))));
                 //renderer.draw_textured(&camera, character_vertex_buffer.clone(), texture.clone(), bump_texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
 
                 renderer.stop_draw();

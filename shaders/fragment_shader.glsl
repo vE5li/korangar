@@ -16,7 +16,9 @@ layout (set = 0, binding = 1) uniform sampler2D tex;
 layout (set = 0, binding = 2) uniform sampler2D normal_map;
 layout (set = 0, binding = 3) uniform sampler2D specular_map;
 
-const vec4 LIGHT = vec4(0.0, 3.0, 3.0, 1.0);
+const vec4 LIGHT_POSITION = vec4(0.0, 3.0, 3.0, 1.0);
+const vec3 LIGHT_COLOR = vec3(1.0, 1.0, 1.0);
+const float LIGHT_INTENSITY = 5.0;
 
 void main() {
 
@@ -24,15 +26,15 @@ void main() {
     vec4 normal_color = texture(normal_map, texture_coordinates);
     vec4 specular_value = texture(specular_map, texture_coordinates);
 
-    float specular_reflectivity = specular_value.r * 4.0;
-    vec3 specular_color = diffuse_color.rgb;
+    float specular_reflectivity = specular_value.r * 2.0;
+    vec3 specular_color = LIGHT_COLOR;
 
-    vec3 light_position_tangentspace = normal_matrix_tangentspace * (uniforms.view * LIGHT).xyz;
+    vec3 light_position_tangentspace = normal_matrix_tangentspace * (uniforms.view * LIGHT_POSITION).xyz;
     vec3 light_direction_tangentspace = normalize(light_position_tangentspace - vertex_position_tangentspace);
 
     vec3 normal_tangentspace = normalize(normal_color.xyz * vec3(-2.0, -2.0, 2.0) + vec3(0.4, 0.4, -1.0));
 
-    vec3 light_color_intensity = vec3(1.0, 1.0, 1.0) * 5.0;
+    vec3 light_color_intensity = LIGHT_COLOR * LIGHT_INTENSITY;
     float distance_from_light = distance(vertex_position_tangentspace, light_position_tangentspace);
 
     float diffuse_strength = clamp(dot(normal_tangentspace, light_direction_tangentspace), 0.0, 1.0);

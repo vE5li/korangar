@@ -26,7 +26,6 @@ use graphics::*;
 use managers::{ ModelManager, TextureManager };
 
 use cgmath::{ Rad, Vector2, Vector3, InnerSpace };
-use cgmath::num_traits::Float;
 
 use std::io::Cursor;
 use std::time::Instant;

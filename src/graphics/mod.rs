@@ -19,6 +19,10 @@ use vulkano::buffer::cpu_pool::CpuBufferPool;
 
 use vertex_shader::ty::Matrices;
 
+use fragment_shader::ty::Light;
+
+pub const NUM_LIGHTS: usize = 3;
+
 pub use vertex_shader::Shader as VertexShader;
 
 pub use fragment_shader::Shader as FragmentShader;
@@ -28,3 +32,5 @@ pub type VertexBuffer = Arc<CpuAccessibleBuffer<[Vertex]>>;
 pub type Texture = Arc<ImageView<Arc<ImmutableImage>>>;
 
 pub type MatrixBuffer = CpuBufferPool::<Matrices>;
+
+pub type LightsBuffer = CpuBufferPool::<Light>;

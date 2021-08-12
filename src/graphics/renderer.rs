@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::iter;
 
-use vulkano::instance::Instance;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, CommandBufferUsage, DynamicState, SubpassContents };
 use vulkano::device::{ Device, Queue };
@@ -26,7 +25,7 @@ use winit::window::Window;
 #[cfg(feature = "debug")]
 use debug::*;
 
-use graphics::{ Vertex, Camera, Transform, VertexBuffer, Texture, MatrixBuffer, VertexShader, FragmentShader };
+use graphics::{ Vertex, Camera, Transform, VertexBuffer, Texture, MatrixBuffer, Light, LightsBuffer, NUM_LIGHTS, VertexShader, FragmentShader };
 
 struct CurrentFrame {
     pub builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -56,6 +55,7 @@ pub struct Renderer {
     framebuffers: Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
     current_frame: Option<CurrentFrame>,
     matrix_buffer: MatrixBuffer,
+    lights_buffer: LightsBuffer,
     dimensions: [u32; 2],
     sampler: Arc<Sampler>,
     sampler2: Arc<Sampler>,
@@ -129,6 +129,11 @@ impl Renderer {
         #[cfg(feature = "debug")]
         print_debug!("created {}matrix buffer{}", magenta(), none());
 
+        let lights_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+
+        #[cfg(feature = "debug")]
+        print_debug!("created {}lights buffer{}", magenta(), none());
+
         let sampler = Sampler::new(
             device.clone(),
             Filter::Nearest,
@@ -172,6 +177,7 @@ impl Renderer {
             pipeline: pipeline,
             framebuffers: framebuffers,
             matrix_buffer: matrix_buffer,
+            lights_buffer: lights_buffer,
             current_frame: None,
             dimensions: dimensions,
             sampler: sampler,
@@ -284,11 +290,41 @@ impl Renderer {
 
         let matrix_buffer_data = camera.matrix_buffer_data(transform);
         let matrix_subbuffer = self.matrix_buffer.next(matrix_buffer_data).unwrap();
-        let layout = self.pipeline.layout().descriptor_set_layouts().get(0).unwrap();
 
+        let lights_buffer_data0 = Light {
+            position: [2.0, 3.0, 3.0],
+            color: [0.05, 1.0, 0.05],
+            intensity: 1.0,
+            _dummy0: [0; 4],
+        };
+
+        let lights_buffer_data1 = Light {
+            position: [0.0, 2.0, -2.0],
+            color: [1.0, 0.05, 0.05],
+            intensity: 1.0,
+            _dummy0: [0; 4],
+        };
+
+        let lights_buffer_data2 = Light {
+            position: [-2.0, 3.0, 3.0],
+            color: [0.05, 0.05, 1.0],
+            intensity: 1.0,
+            _dummy0: [0; 4],
+        };
+
+        let lights_subbuffer0 = self.lights_buffer.next(lights_buffer_data0).unwrap();
+        let lights_subbuffer1 = self.lights_buffer.next(lights_buffer_data1).unwrap();
+        let lights_subbuffer2 = self.lights_buffer.next(lights_buffer_data2).unwrap();
+
+        let layout = self.pipeline.layout().descriptor_set_layouts().get(0).unwrap();
         let set = Arc::new(
             PersistentDescriptorSet::start(layout.clone())
                 .add_buffer(matrix_subbuffer).unwrap()
+                .enter_array().unwrap()
+                    .add_buffer(lights_subbuffer0).unwrap()
+                    .add_buffer(lights_subbuffer1).unwrap()
+                    .add_buffer(lights_subbuffer2).unwrap()
+                .leave_array().unwrap()
                 .add_sampled_image(texture, self.sampler2.clone()).unwrap()
                 .add_sampled_image(bump_map, self.sampler2.clone()).unwrap()
                 .add_sampled_image(specular_map, self.sampler2.clone()).unwrap()

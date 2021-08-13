@@ -19,6 +19,7 @@ use vulkano::sampler::{ Filter, MipmapMode, Sampler, SamplerAddressMode };
 use vulkano::format::Format;
 use vulkano::sync;
 use vulkano::sync::{ FlushError, GpuFuture, now };
+use vulkano::buffer::BufferAccess;
 
 use winit::window::Window;
 
@@ -334,7 +335,8 @@ impl Renderer {
         );
 
         if let Some(current_frame) = &mut self.current_frame {
-            current_frame.builder.draw(self.pipeline.clone(), &DynamicState::none(), vec![vertex_buffer], set, ()).unwrap();
+            let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<Vertex>();
+            current_frame.builder.draw(vertex_count as u32, 1, 0, 0, self.pipeline.clone(), &DynamicState::none(), vec![vertex_buffer], set, ()).unwrap();
         }
     }
 

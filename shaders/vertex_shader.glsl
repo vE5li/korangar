@@ -22,7 +22,6 @@ void main() {
 
     gl_Position = uniforms.projection * vertex_position_viewspace;
     normal_matrix_tangentspace = transpose(mat3(worldview) * mat3(tangent, bitangent, normal));
-    //vertex_position_tangentspace = normalize(normal_matrix_tangentspace * vertex_position_viewspace.xyz);
     vertex_position_tangentspace = normal_matrix_tangentspace * vertex_position_viewspace.xyz;
     texture_coordinates_out = texture_coordinates;
 }

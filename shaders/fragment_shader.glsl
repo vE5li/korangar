@@ -30,9 +30,14 @@ void main() {
 
     vec3 normal_tangentspace = normalize(normal_color.xyz * vec3(-2.0, -2.0, 2.0) + vec3(0.4, 0.4, -1.0));
 
-    vec3 final_color = vec3(0.0);
+    fragment_color.rgb = vec3(0.0);
+    fragment_color.a = diffuse_color.a;
 
     for (int i = 0; i < NUM_LIGHTS; i++) {
+        if (lights[i].intensity == 0.0) {
+            break;
+        }
+
         float specular_reflectivity = specular_value.r * 2.0;
         vec3 specular_color = lights[i].color;
 
@@ -52,9 +57,6 @@ void main() {
         float specular_strength = clamp(dot(view_direction_tangentspace, light_reflection_tangentspace), 0.0, 1.0);
         vec3 specular_light = (light_color_intensity * pow(specular_strength, specular_lobe_factor)) / (distance_from_light * distance_from_light);
 
-        final_color += (diffuse_color.rgb * diffuse_light) + (specular_color * specular_reflectivity * specular_light);
+        fragment_color.rgb += (diffuse_color.rgb * diffuse_light) + (specular_color * specular_reflectivity * specular_light);
     }
-
-    fragment_color.rgb = final_color;
-    fragment_color.a = diffuse_color.a;
 }

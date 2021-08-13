@@ -18,14 +18,14 @@ use vulkano::descriptor_set::PersistentDescriptorSet;
 use vulkano::sampler::{ Filter, MipmapMode, Sampler, SamplerAddressMode };
 use vulkano::format::Format;
 use vulkano::sync;
-use vulkano::sync::{ FlushError, GpuFuture };
+use vulkano::sync::{ FlushError, GpuFuture, now };
 
 use winit::window::Window;
 
 #[cfg(feature = "debug")]
 use debug::*;
 
-use graphics::{ Vertex, Camera, Transform, VertexBuffer, Texture, MatrixBuffer, Light, LightsBuffer, NUM_LIGHTS, VertexShader, FragmentShader };
+use graphics::*;
 
 struct CurrentFrame {
     pub builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -84,7 +84,7 @@ impl Renderer {
 
         #[cfg(feature = "debug")]
         print_debug!("created {}swapchain{}", magenta(), none());
-       
+
         let vertex_shader = VertexShader::load(device.clone()).unwrap();
         let fragment_shader = FragmentShader::load(device.clone()).unwrap();
 
@@ -165,7 +165,7 @@ impl Renderer {
         #[cfg(feature = "debug")]
         print_debug!("created {}sampler{}", magenta(), none());
 
-        let previous_frame_end = Some(sync::now(device.clone()).boxed());
+        let previous_frame_end = Some(now(device.clone()).boxed());
 
         return Self {
             queue: queue,
@@ -251,11 +251,13 @@ impl Renderer {
                 Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
             };
 
-            self.dimensions = new_dimensions;
-            self.swapchain = new_swapchain;
-
             let (new_pipeline, new_framebuffers) = Self::window_size_dependent_setup(self.device.clone(), &self.vertex_shader, &self.fragment_shader, &new_images, self.render_pass.clone());
 
+            #[cfg(feature = "debug")]
+            print_debug!("recreated {}pipeline{}", magenta(), none());
+
+            self.dimensions = new_dimensions;
+            self.swapchain = new_swapchain;
             self.pipeline = new_pipeline;
             self.framebuffers = new_framebuffers;
             self.recreate_swapchain = false;
@@ -292,23 +294,23 @@ impl Renderer {
         let matrix_subbuffer = self.matrix_buffer.next(matrix_buffer_data).unwrap();
 
         let lights_buffer_data0 = Light {
-            position: [2.0, 3.0, 3.0],
-            color: [0.05, 1.0, 0.05],
-            intensity: 1.0,
+            position: [0.0, 0.5, -2.0],
+            color: [1.0, 0.05, 0.05],
+            intensity: 0.7,
             _dummy0: [0; 4],
         };
 
         let lights_buffer_data1 = Light {
-            position: [0.0, 2.0, -2.0],
-            color: [1.0, 0.05, 0.05],
-            intensity: 1.0,
+            position: [2.0, 0.5, 1.0],
+            color: [0.05, 1.0, 0.05],
+            intensity: 0.3,
             _dummy0: [0; 4],
         };
 
         let lights_buffer_data2 = Light {
-            position: [-2.0, 3.0, 3.0],
+            position: [-2.0, 0.5, 1.0],
             color: [0.05, 0.05, 1.0],
-            intensity: 1.0,
+            intensity: 0.1,
             _dummy0: [0; 4],
         };
 
@@ -358,12 +360,12 @@ impl Renderer {
 
                 Err(FlushError::OutOfDate) => {
                     self.recreate_swapchain = true;
-                    self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+                    self.previous_frame_end = Some(now(self.device.clone()).boxed());
                 }
 
                 Err(e) => {
                     println!("Failed to flush future: {:?}", e);
-                    self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+                    self.previous_frame_end = Some(now(self.device.clone()).boxed());
                 }
             }
         }

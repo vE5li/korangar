@@ -38,7 +38,7 @@ impl Object {
         }, future);
     }
 
-    pub fn render(&self, renderer: &mut Renderer, camera: &Camera) {
-        renderer.draw_textured(camera, self.vertex_buffer.clone(), self.texture.clone(), self.normal_map.clone(), self.specular_map.clone(), &self.transform);
-    }
+    //pub fn render(&self, renderer: &mut Renderer, camera: &Camera) {
+    //  renderer.draw_textured(camera, self.vertex_buffer.clone(), self.texture.clone(), self.normal_map.clone(), self.specular_map.clone(), &self.transform);
+    //}
 }

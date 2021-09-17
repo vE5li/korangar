@@ -7,12 +7,11 @@ vulkano = { git = "https://github.com/vulkano-rs/vulkano.git" }
 vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git" }
 vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git" }
 winit = "0.25"
-
 cgmath = "0.18"
 png = "0.16"
 
 [features]
-debug = ["lazy_static", "chrono"]
+debug = ["lazy_static", "chrono", "notify"]
 
 [dependencies.chrono]
 version = "0.4"
@@ -22,3 +21,6 @@ optional = true
 version = "1.4.0"
 optional = true
 
+[dependencies.notify]
+version = "*"
+optional = true

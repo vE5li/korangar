@@ -1,11 +1,10 @@
 mod stream;
 mod version;
 mod partial;
+mod shading;
 
 use std::collections::HashMap;
-use std::fs::read_to_string;
 use std::fs::read;
-use std::slice::Iter;
 use std::sync::Arc;
 
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
@@ -15,46 +14,58 @@ use vulkano::device::Device;
 use debug::*;
 
 use cgmath::{ Vector2, Vector3, InnerSpace };
-use graphics::{ VertexBuffer, Vertex };
+
+use graphics::{ VertexBuffer, Texture, Renderer, Camera, Transform };
+use managers::TextureManager;
 
 use self::version::Version;
 use self::stream::ByteStream;
-//use self::partial::PartialVertex;
 use self::partial::*;
+use self::shading::ShadingType;
 
-enum ShadingType {
-    None,
-    FlatShading,
-    SmoothShading,
-    Black,
+#[derive(Clone)]
+pub struct Node {
+    name: String,
+    parent_name: Option<String>,
+    child_nodes: Vec<Node>,
+    textures: Vec<Texture>,
+    translation: Vector3<f32>,
+    vertex_count: usize,
+    vertex_buffer: VertexBuffer,
 }
 
-impl ShadingType {
+impl Node {
 
-    pub fn from(raw: usize) -> Self {
-        match raw {
-            0 => return ShadingType::None,
-            1 => return ShadingType::FlatShading,
-            2 => return ShadingType::SmoothShading,
-            3 => return ShadingType::Black,
-            invalid => panic!("invalid shading type"), // return result ?
-        }
+    pub fn new(name: String, parent_name: Option<String>, textures: Vec<Texture>, translation: Vector3<f32>, vertex_count: usize, vertex_buffer: VertexBuffer) -> Self {
+        let child_nodes = Vec::new();
+        return Self { name, parent_name, child_nodes, textures, translation, vertex_count, vertex_buffer };
+    }
+
+    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &Camera, parent_transform: &Transform) {
+        let combined_transform = *parent_transform + Transform::position(self.translation);
+        renderer.render_geomitry(&camera, self.vertex_buffer.clone(), &self.textures, &combined_transform);
+        self.child_nodes.iter().for_each(|node| node.render_geomitry(renderer, camera, &combined_transform));
     }
 }
 
-pub struct Node {
-    name: String,
-    parent_node: Option<Arc<Node>>,
-    vertex_buffer: VertexBuffer,
-    //textures: Vec<Texture>,
+pub struct Model {
+    root_node: Node,
 }
 
-pub struct Model {
-    nodes: Vec<Arc<Node>>,
+impl Model {
+
+    pub fn new(root_node: Node) -> Self {
+        return Self { root_node };
+    }
+
+    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &Camera, root_transform: &Transform) {
+        //let root_transform = Transform::position(Vector3::new(0.0, -14.467, 0.0));
+        self.root_node.render_geomitry(renderer, camera, &root_transform);
+    }
 }
 
 pub struct ModelManager {
-    cache: HashMap<String, VertexBuffer>,
+    cache: HashMap<String, Arc<Model>>,
     device: Arc<Device>,
 }
 
@@ -67,7 +78,7 @@ impl ModelManager {
         }
     }
 
-    fn load(&mut self, path: String) -> VertexBuffer {
+    fn load(&mut self, texture_manager: &mut TextureManager, path: String) -> Arc<Model> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", magenta(), path, none()));
@@ -79,103 +90,85 @@ impl ModelManager {
         assert!(&magic == "GRSM", "failed to read magic number");
 
         let version = byte_stream.version();
-
-        println!("\nversion {:?}", version);
-
         let animation_length = byte_stream.integer(4);
-        let shade_type = byte_stream.integer(4);
+        let shading_type = ShadingType::from(byte_stream.integer(4) as usize);
 
-        println!("\nanimation length {}", animation_length);
-        println!("shade type {}", shade_type);
-
-        if version.equals_or_above(1, 4) {
-
-            let alpha = byte_stream.integer(1);
-
-            println!("\nalpha {}", alpha);
-        }
+        let alpha = match version.equals_or_above(1, 4) {
+            true => byte_stream.integer(1),
+            false => 255,
+        };
 
         byte_stream.skip(16);
 
         let texture_count = byte_stream.integer(4);
-
-        println!("\ntexture count {}", texture_count);
-
-        let mut texture_names = Vec::new();
+        let mut textures = Vec::new();
 
         for _index in 0..texture_count as usize {
             let texture_name = byte_stream.string(40);
-            texture_names.push(texture_name);
-        }
+            let texture_name_unix = texture_name.replace("\\", "/");
+            let (texture, mut future) = texture_manager.get(texture_name_unix);
 
-        println!("\ntexture names {:?}", texture_names);
+            // todo return gpu future instead
+            future.cleanup_finished();
+            textures.push(texture);
+        }
 
         let main_node_name = byte_stream.string(40);
         let node_count = byte_stream.integer(4);
 
-        println!("\nmain node name {:?}", main_node_name);
-        println!("node count {}", node_count);
+        #[cfg(feature = "debug_model")]
+        {
+            print_debug!("version {}{}{}", magenta(), version, none());
+            print_debug!("animation length {}{}{}", magenta(), animation_length, none());
+            print_debug!("shading type {}{}{}", magenta(), shading_type, none());
+            print_debug!("alpha {}{}{}", magenta(), alpha, none());
+            print_debug!("texture count {}{}{}", magenta(), texture_count, none());
+            print_debug!("texture count {}{}{}", magenta(), texture_count, none());
+            print_debug!("main node name {}{}{}", magenta(), main_node_name, none());
+            print_debug!("node count {}{}{}", magenta(), node_count, none());
+        }
 
-        //let mut nodes = Vec::new();
-
-        // TEMP: push all vertices into one buffer
-        let mut vertices = Vec::new();
+        let mut nodes = Vec::new();
 
         for _index in 0..node_count as usize {
 
             let node_name = byte_stream.string(40);
             let parent_name = byte_stream.string(40);
 
-            println!("\nnode name {:?}", node_name);
-            println!("parent name {:?}", parent_name);
+            #[cfg(feature = "debug_model")]
+            let timer = Timer::new_dynamic(format!("parse node {}{}{}", magenta(), node_name, none()));
 
             let texture_count = byte_stream.integer(4);
 
-            println!("\ntexture count {}", texture_count);
-
             let mut texture_indices = Vec::new();
+            let mut node_textures = Vec::new();
 
             for _index in 0..texture_count {
-                let texture_index = byte_stream.integer(4);
+                let texture_index = byte_stream.integer(4) as usize;
                 texture_indices.push(texture_index);
+                node_textures.push(textures[texture_index].clone());
             }
 
-            println!("\ntexture indices {:?}", texture_indices);
-
-            let offset_matrix = byte_stream.slice(36); // matrix 4x4
+            let _offset_matrix = byte_stream.slice(36); // matrix 3x3
             let offset_translation = byte_stream.vector3();
-
-            println!("\noffset matrix {:?}", offset_matrix);
-            println!("offset tranlation {:?}", offset_translation);
-
             let translation = byte_stream.vector3();
             let rotation_angle = byte_stream.float32();
             let rotation_axis = byte_stream.vector3();
             let scale = byte_stream.vector3();
 
-            println!("\ntranslation {:?}", translation);
-            println!("rotation angle {}", rotation_angle);
-            println!("rotation axis {:?}", rotation_axis);
-            println!("scale {:?}", scale);
-
-            let vertex_count = byte_stream.integer(4);
-
-            println!("\nvertex count {}", vertex_count);
+            let vertex_count = byte_stream.integer(4) as usize;
 
             let mut vertex_positions = Vec::new();
             let mut common_normals = Vec::new();
 
             for _index in 0..vertex_count {
                 let vertex_position = byte_stream.vector3();
-                let dirty = vertex_position + Vector3::new(translation.x, translation.z, -translation.y - 6.0);
-                let dirty2 = Vector3::new(dirty.x, dirty.z, dirty.y);
-                vertex_positions.push(dirty2);
+                let dirty = Vector3::new(vertex_position.x, vertex_position.z, vertex_position.y);
+                vertex_positions.push(dirty);
                 common_normals.push(Vec::new());
             }
 
             let texture_coordinate_count = byte_stream.integer(4);
-
-            println!("\ntexture coordinate count {}", texture_coordinate_count);
 
             let mut texture_coordinates = Vec::new();
 
@@ -198,9 +191,7 @@ impl ModelManager {
 
             let face_count = byte_stream.integer(4);
 
-            println!("\nface count {}", face_count);
-
-            //let mut vertices = Vec::new();
+            let mut vertices = Vec::new();
             let mut partial_vertices = Vec::new();
 
             for _index in 0..face_count {
@@ -213,11 +204,11 @@ impl ModelManager {
                 let second_texture_coordinate_index = byte_stream.integer(2);
                 let third_texture_coordinate_index = byte_stream.integer(2);
 
-                let texture_index = byte_stream.integer(2);
+                let texture_index = byte_stream.integer(2) as i32;
                 byte_stream.skip(2);
-                let double_sided = byte_stream.integer(4); // needed?
+                let _double_sided = byte_stream.integer(4);
 
-                let smooth_group = match version.equals_or_above(1, 2) {
+                let _smooth_group = match version.equals_or_above(1, 2) {
                     true => byte_stream.integer(4),
                     false => 0,
                 };
@@ -237,9 +228,21 @@ impl ModelManager {
 
                 let normal = calculate_normal(first_vertex_position, second_vertex_position, third_vertex_position);
 
-                partial_vertices.push(PartialVertex::new(first_vertex_position, normal, first_texture_coordinate));
-                partial_vertices.push(PartialVertex::new(second_vertex_position, normal, second_texture_coordinate));
-                partial_vertices.push(PartialVertex::new(third_vertex_position, normal, third_texture_coordinate));
+                partial_vertices.push(PartialVertex::new(first_vertex_position, normal, first_texture_coordinate, texture_index));
+                partial_vertices.push(PartialVertex::new(second_vertex_position, normal, second_texture_coordinate, texture_index));
+                partial_vertices.push(PartialVertex::new(third_vertex_position, normal, third_texture_coordinate, texture_index));
+            }
+
+            if version.equals_or_above(1, 5) {
+                panic!("animation key frames not implemented");
+            }
+
+            let rotation_key_frame_count = byte_stream.integer(4);
+
+            for _index in 0..rotation_key_frame_count {
+                let _time = byte_stream.integer(4);
+                let _orientation = byte_stream.slice(16); // quat
+                // push
             }
 
             for normal_group in common_normals {
@@ -269,34 +272,62 @@ impl ModelManager {
                 vertices.push(third_partial.to_vertex());
             }
 
-            if version.equals_or_above(1, 5) {
-                panic!("animation key frames not implemented");
-            }
+            let parent_name = match parent_name.is_empty() {
+                true => None,
+                false => Some(parent_name),
+            };
 
-            let rotation_key_frame_count = byte_stream.integer(4);
+            let adjusted_translation = Vector3::new(translation.x, -translation.y, translation.z);
+            let vertex_buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+            let node = Node::new(node_name.clone(), parent_name.clone(), node_textures, adjusted_translation, vertex_count, vertex_buffer);
 
-            println!("\nrotation key frame count {}", rotation_key_frame_count);
+            nodes.push(node);
 
-            for _index in 0..rotation_key_frame_count {
-                let time = byte_stream.integer(4);
-                let orientation = byte_stream.slice(16); // quat
-                // push
+            #[cfg(feature = "debug_model")]
+            {
+                parent_name.map(|name| print_debug!("parent name {}{}{}", magenta(), name, none()));
+
+                let formatted_list = texture_indices.iter().map(|index| index.to_string()).collect::<Vec<String>>().join(", ");
+                print_debug!("texture count {}{}{}", magenta(), texture_count, none());
+                print_debug!("texture indices {}{}{}", magenta(), formatted_list, none());
+
+                print_debug!("offset tranlation {}{:?}{}", magenta(), offset_translation, none());
+                print_debug!("translation {}{:?}{}", magenta(), translation, none());
+                print_debug!("rotation angle {}{}{}", magenta(), rotation_angle, none());
+                print_debug!("rotation axis {}{:?}{}", magenta(), rotation_axis, none());
+                print_debug!("scale {}{:?}{}", magenta(), scale, none());
+
+                print_debug!("vertex count {}{}{}", magenta(), vertex_count, none());
+                print_debug!("texture coordinate count {}{}{}", magenta(), texture_coordinate_count, none());
+                print_debug!("face count {}{}{}", magenta(), face_count, none());
+                print_debug!("rotation key frame count {}{}{}", magenta(), rotation_key_frame_count, none());
+
+                timer.stop();
             }
         }
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
-        self.cache.insert(path, vertex_buffer.clone());
+        for node in nodes.clone().iter() { // fix ordering issue
+            if let Some(parent_name) = &node.parent_name {
+                let parent_node = nodes.iter_mut().find(|node| node.name == *parent_name).expect("failed to find parent node");
+                parent_node.child_nodes.push(node.clone());
+            }
+        }
+
+        let root_node = nodes.iter().find(|node| node.name == *main_node_name).expect("failed to find root node").clone(); // fix cloning issue
+        let model = Arc::new(Model::new(root_node));
+
+        self.cache.insert(path, model.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();
 
-        return vertex_buffer;
+        return model;
     }
 
-    pub fn get(&mut self, path: String) -> VertexBuffer {
+    pub fn get(&mut self, texture_manager: &mut TextureManager, path: String) -> Arc<Model> {
         match self.cache.get(&path) {
             Some(model) => return model.clone(),
-            None => return self.load(path),
+            None => return self.load(texture_manager, path),
         }
     }
 }

@@ -14,7 +14,7 @@ pub fn print_indented(message: String) {
     }
 
     if indentation != 0 {
-        print!("-> ");
+        print!("- ");
     }
 
     println!("{}", message);

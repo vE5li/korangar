@@ -1,9 +1,5 @@
 use std::collections::HashMap;
-use std::io::Cursor;
 use std::sync::Arc;
-use std::io::Read;
-use std::io::BufReader;
-use std::fs::File;
 
 use vulkano::device::{ Device, Queue };
 use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
@@ -11,7 +7,7 @@ use vulkano::image::view::ImageView;
 use vulkano::format::Format;
 use vulkano::sync::{ GpuFuture, now };
 
-use png::Decoder;
+use bmp::open;
 
 use graphics::Texture;
 
@@ -39,24 +35,35 @@ impl TextureManager {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}{}{}", magenta(), path, none()));
 
-        let file = File::open(&path).expect("failed to open file");
-        let mut reader = BufReader::new(file);
-        let mut png_bytes = Vec::new();
-
-        reader.read_to_end(&mut png_bytes).expect("failed to read texture data");
-
-        let cursor = Cursor::new(png_bytes);
-        let decoder = Decoder::new(cursor);
-        let (info, mut reader) = decoder.read_info().unwrap();
-        let dimensions = ImageDimensions::Dim2d {
-            width: info.width,
-            height: info.height,
-            array_layers: 1,
-        };
+        let image = open(&path).unwrap_or_else(|e| {
+            panic!("Failed to open {}: {}", path, e); // return result ?
+        });
 
         let mut image_data = Vec::new();
-        image_data.resize((info.width * info.height * 4) as usize, 0);
-        reader.next_frame(&mut image_data).unwrap();
+
+        for column in 0..image.get_width() {
+            for line in 0..image.get_height() {
+                let pixel = image.get_pixel(line, column);
+
+                if pixel.r == 255 && pixel.g == 0 && pixel.b == 255 {
+                    image_data.push(0);
+                    image_data.push(0);
+                    image_data.push(0);
+                    image_data.push(0);
+                } else {
+                    image_data.push(pixel.r);
+                    image_data.push(pixel.g);
+                    image_data.push(pixel.b);
+                    image_data.push(255);
+                }
+            }
+        }
+
+        let dimensions = ImageDimensions::Dim2d {
+            width: image.get_width(),
+            height: image.get_height(),
+            array_layers: 1,
+        };
 
         let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
         let texture = ImageView::new(image).unwrap();

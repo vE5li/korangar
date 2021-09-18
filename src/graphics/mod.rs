@@ -1,15 +1,17 @@
 mod color;
+mod smoothed;
 mod transform;
 mod vertex;
-mod object;
+//mod object;
 mod camera;
 mod lighting;
 mod renderer;
 
 pub use self::color::Color;
+pub use self::smoothed::SmoothedValue;
 pub use self::transform::Transform;
 pub use self::vertex::Vertex;
-pub use self::object::Object;
+//pub use self::object::Object;
 pub use self::camera::Camera;
 pub use self::lighting::*;
 pub use self::renderer::Renderer;

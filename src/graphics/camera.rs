@@ -1,44 +1,6 @@
 use cgmath::{ Matrix4, Vector3, Point3, Rad, SquareMatrix };
 use std::f32::consts::FRAC_PI_2;
-use graphics::Matrices;
-
-use graphics::Transform;
-
-pub struct SmoothedValue {
-    current: f32,
-    desired: f32,
-    threshhold: f32,
-    speed: f32,
-}
-
-impl SmoothedValue {
-
-    pub fn new(value: f32, threshhold: f32, speed: f32) -> Self {
-        let current = value;
-        let desired = value;
-        return Self { current, desired, threshhold, speed };
-    }
-
-    pub fn update(&mut self, delta_time: f64) {
-        if self.desired >= self.current + self.threshhold {
-            self.current += (self.desired - self.current).sqrt() * self.speed * delta_time as f32;
-        } else if self.desired <= self.current - self.threshhold {
-            self.current -= (self.current - self.desired).sqrt() * self.speed * delta_time as f32;
-        }
-    }
-
-    pub fn set_desired(&mut self, desired: f32) {
-        self.desired = desired;
-    }
-
-    pub fn move_desired(&mut self, offset: f32) {
-        self.desired += offset;
-    }
-
-    pub fn get_current(&self) -> f32 {
-        return self.current;
-    }
-}
+use graphics::{ Matrices, Transform, SmoothedValue };
 
 pub struct Camera {
     look_at: Point3<f32>,
@@ -89,6 +51,7 @@ impl Camera {
         let transform_matrix = rotation_matrix * translation_matrix * scale_matrix;
 
         return Matrices {
+            rotation: rotation_matrix.into(),
             world: transform_matrix.into(),
             view: self.view_matrix.into(),
             projection: self.projection_matrix.into(),

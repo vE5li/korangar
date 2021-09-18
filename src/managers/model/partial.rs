@@ -1,21 +1,22 @@
-use cgmath::{ Vector2, Vector3, InnerSpace };
+use cgmath::{ Vector2, Vector3 };
 
 use graphics::Vertex;
 
 pub struct PartialVertex {
     pub position: Vector3<f32>,
-    pub texture_coordinates: Vector2<f32>,
     pub normal: Vector3<f32>,
+    pub texture_coordinates: Vector2<f32>,
+    pub texture_index: i32,
 }
 
 impl PartialVertex {
 
-    pub fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>) -> Self {
-        return Self { position, normal, texture_coordinates };
+    pub fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>, texture_index: i32) -> Self {
+        return Self { position, normal, texture_coordinates, texture_index };
     }
 
     pub fn to_vertex(self) -> Vertex {
-        return Vertex::new(self.position, self.normal, self.texture_coordinates);
+        return Vertex::new(self.position, self.normal, self.texture_coordinates, self.texture_index);
     }
 }
 

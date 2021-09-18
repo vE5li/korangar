@@ -1,6 +1,7 @@
 use cgmath::{ Vector3, Rad };
 use std::ops::Add;
 
+#[derive(Copy, Clone, Debug)]
 pub struct Transform {
     pub position: Vector3<f32>,
     pub rotation: Vector3<Rad<f32>>,
@@ -9,21 +10,21 @@ pub struct Transform {
 
 impl Transform {
 
-    pub fn new() -> Self {
-        return Self {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-            scale: Vector3::new(1.0, 1.0, 1.0),
-        }
-    }
+    //pub fn new() -> Self {
+    //  return Self {
+    //      position: Vector3::new(0.0, 0.0, 0.0),
+    //      rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
+    //      scale: Vector3::new(1.0, 1.0, 1.0),
+    //  }
+    //}
 
-    pub fn from() -> Self {
-        return Self {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-            scale: Vector3::new(1.0, 1.0, 1.0),
-        }
-    }
+    //pub fn from() -> Self {
+    //  return Self {
+    //      position: Vector3::new(0.0, 0.0, 0.0),
+    //      rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
+    //      scale: Vector3::new(1.0, 1.0, 1.0),
+    //  }
+    //}
 
     pub fn position(position: Vector3<f32>) -> Self {
         return Self {
@@ -41,13 +42,13 @@ impl Transform {
         }
     }
 
-    pub fn scale(scale: Vector3<f32>) -> Self {
-        return Self {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-            scale: scale,
-        }
-    }
+    //pub fn scale(scale: Vector3<f32>) -> Self {
+    //  return Self {
+    //      position: Vector3::new(0.0, 0.0, 0.0),
+    //      rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
+    //      scale: scale,
+    //  }
+    //}
 }
 
 impl Add for Transform {
@@ -57,7 +58,7 @@ impl Add for Transform {
         Self {
             position: self.position + other.position,
             rotation: Vector3::new(self.rotation.x + other.rotation.x, self.rotation.y + other.rotation.y, self.rotation.z + other.rotation.z),
-            scale: self.scale + other.scale,
+            scale: self.scale, // * other.scale, FIX ME
         }
     }
 }

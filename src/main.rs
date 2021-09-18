@@ -3,7 +3,7 @@ extern crate vulkano_shaders;
 extern crate vulkano_win;
 extern crate winit;
 extern crate cgmath;
-extern crate png;
+extern crate bmp;
 
 #[cfg(feature = "debug")]
 extern crate chrono;
@@ -13,7 +13,6 @@ extern crate chrono;
 extern crate lazy_static;
 
 #[cfg(feature = "debug")]
-#[macro_use]
 extern crate notify;
 
 #[cfg(feature = "debug")]
@@ -29,18 +28,12 @@ use debug::*;
 use graphics::*;
 use managers::{ ModelManager, TextureManager };
 
-use cgmath::{ Rad, Vector2, Vector3, InnerSpace };
+use cgmath::{ Rad, Vector2, Vector3 };
 
-use std::io::Cursor;
 use std::time::Instant;
-use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{ Device, DeviceExtensions };
-use vulkano::image::view::ImageView;
-use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
 use vulkano::instance::Instance;
-use vulkano::sync::GpuFuture;
-use vulkano::format::Format;
 use vulkano::Version;
 use vulkano_win::VkSurfaceBuild;
 use winit::event::{ Event, WindowEvent, MouseButton, ElementState, MouseScrollDelta };
@@ -122,14 +115,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let test_vertex_buffer = model_manager.get(String::from("models/test2.rsm"));
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}vertex buffer{}", magenta(), none());
-
-    let (test_texture, test_texture_future) = texture_manager.get(String::from("textures/test_up.png"));
-    let (test_normal_texture, test_normal_texture_future) = texture_manager.get(String::from("textures/test_up_normal.png"));
-    let (test_specular_texture, test_specular_texture_future) = texture_manager.get(String::from("textures/test_up_specular.png"));
+    let model = model_manager.get(&mut texture_manager, String::from("models/test2.rsm"));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -143,7 +129,7 @@ fn main() {
     #[cfg(feature = "debug")]
     timer.stop();
 
-    let rotation_start = Instant::now();
+    let frame_timer = Instant::now();
     let mut previous_elapsed = 0.0;
     let mut counter_update_time = 0.0;
     let mut frame_counter = 0;
@@ -154,11 +140,6 @@ fn main() {
 
     let mut camera = Camera::new();
     let mut rotation = 0.0;
-
-    test_texture_future
-        .join(test_normal_texture_future)
-        .join(test_specular_texture_future)
-        .cleanup_finished();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -196,18 +177,18 @@ fn main() {
             }
 
             Event::WindowEvent { event: WindowEvent::MouseInput{ state, button, .. }, .. } => {
+                let pressed = matches!(state, ElementState::Pressed);
 
-                if matches!(button, MouseButton::Left) {
-                    left_mouse_button_pressed = matches!(state, ElementState::Pressed);
-                }
-
-                if matches!(button, MouseButton::Right) {
-                    right_mouse_button_pressed = matches!(state, ElementState::Pressed);
+                match button {
+                    MouseButton::Left => left_mouse_button_pressed = pressed,
+                    MouseButton::Right => right_mouse_button_pressed = pressed,
+                    _ignored => { },
                 }
             }
 
             Event::RedrawEventsCleared => {
 
+                #[cfg(feature = "debug")]
                 while let Some(path) = reload_watcher.poll_event() {
                     if path.contains("/") {
                         let mut iterator = path.split("/");
@@ -219,7 +200,7 @@ fn main() {
                     }
                 }
 
-                let new_elapsed = rotation_start.elapsed().as_secs_f64();
+                let new_elapsed = frame_timer.elapsed().as_secs_f64();
                 let delta_time = new_elapsed - previous_elapsed;
                 previous_elapsed = new_elapsed;
 
@@ -237,23 +218,24 @@ fn main() {
                 renderer.start_draw(&surface);
                 camera.generate_view_projection(renderer.get_dimensions());
 
-                renderer.draw_textured_deferred(&camera, test_vertex_buffer.clone(), test_texture.clone(), test_normal_texture.clone(), test_specular_texture.clone(), &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32 / 2.845), Rad(0.0))));
+                model.render_geomitry(&mut renderer, &camera, &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
 
                 renderer.lighting_pass();
 
-                let test = (new_elapsed as f32).sin();
                 let screen_to_world_matrix = camera.screen_to_world_matrix();
 
                 renderer.ambient_light(Color::new(5, 5, 5));
                 renderer.directional_light(Vector3::new(0.0, -1.0, -0.7), Color::new(255, 255, 255));
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, test, -4.0), Color::new(10, 255, 10), 50.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, test + 5.0, -1.0), Color::new(10, 10, 255), 100.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, test + 10.0, -5.0), Color::new(255, 10, 10), 100.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 0.0, -4.0), Color::new(10, 255, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 2.0, -1.0), Color::new(10, 255, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 4.0, -1.0), Color::new(10, 10, 255), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 6.0, -3.0), Color::new(255, 10, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 9.0, -3.0), Color::new(10, 255, 10), 40.0);
 
                 renderer.stop_draw();
             }
 
-            _ => ()
+            _ignored => ()
         }
     });
 }

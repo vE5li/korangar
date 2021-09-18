@@ -5,17 +5,19 @@ pub struct Vertex {
     position: [f32; 3],
     normal: [f32; 3],
     texture_coordinates: [f32; 2],
+    texture_index: i32,
 }
 
 impl Vertex {
 
-    pub const fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>) -> Self {
+    pub const fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>, texture_index: i32) -> Self {
         return Self {
             position: [position.x, position.y, position.z],
             normal: [normal.x, normal.y, normal.z],
             texture_coordinates: [texture_coordinates.x, texture_coordinates.y],
+            texture_index: texture_index,
         }
     }
 }
 
-vulkano::impl_vertex!(Vertex, position, normal, texture_coordinates);
+vulkano::impl_vertex!(Vertex, position, normal, texture_coordinates, texture_index);

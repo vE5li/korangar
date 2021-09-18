@@ -8,10 +8,12 @@ vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git" }
 vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git" }
 winit = "0.25"
 cgmath = "0.18"
-png = "0.16"
+bmp = "*"
 
 [features]
 debug = ["lazy_static", "chrono", "notify"]
+debug_model = ["debug"]
+colors = []
 
 [dependencies.chrono]
 version = "0.4"

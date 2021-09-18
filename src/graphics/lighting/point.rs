@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::iter;
 
-use cgmath::{ Vector3, Matrix4, SquareMatrix };
+use cgmath::{ Vector3, Matrix4 };
 
 use vulkano::device::Device;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
@@ -33,8 +33,6 @@ use self::fragment_shader::ty::Constants as Constants;
 
 pub struct PointLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: VertexShader,
-    fragment_shader: FragmentShader,
 }
 
 impl PointLightRenderer {
@@ -45,7 +43,7 @@ impl PointLightRenderer {
         let fragment_shader = FragmentShader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
-        return Self { pipeline, vertex_shader, fragment_shader };
+        return Self { pipeline };
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {

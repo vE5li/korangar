@@ -45,7 +45,6 @@ impl<'b> ByteStream<'b> {
     pub fn string(&mut self, count: usize) -> String {
 
         let mut value = String::new();
-        let mut terminated = false;
 
         for index in 0..count {
             let byte = self.next();
@@ -83,7 +82,7 @@ impl<'b> ByteStream<'b> {
     pub fn slice(&mut self, count: usize) -> Vec<u8> { // replace with matrix 4x4 ?
         let mut value = Vec::new();
 
-        for index in 0..count {
+        for _index in 0..count {
             let byte = self.next();
             value.push(byte);
         }
@@ -92,12 +91,8 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn skip(&mut self, count: usize) {
-        for index in 0..count {
+        for _index in 0..count {
             self.next();
         }
-    }
-
-    pub fn position(&self) -> usize {
-        return self.counter;
     }
 }

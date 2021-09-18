@@ -12,14 +12,12 @@ use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
-use vulkano::pipeline::vertex::BuffersDefinition;
 use vulkano::render_pass::{ Framebuffer, FramebufferAbstract, RenderPass, Subpass };
 use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::PersistentDescriptorSet;
 use vulkano::sampler::{ Filter, MipmapMode, Sampler, SamplerAddressMode };
 use vulkano::format::Format;
-use vulkano::sync;
 use vulkano::sync::{ FlushError, GpuFuture, now };
 use vulkano::buffer::BufferAccess;
 
@@ -344,7 +342,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw_textured_deferred(&mut self, camera: &Camera, vertex_buffer: VertexBuffer, texture: Texture, bump_map: Texture, specular_map: Texture, transform: &Transform) {
+    pub fn render_geomitry(&mut self, camera: &Camera, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
 
         let matrix_buffer_data = camera.matrix_buffer_data(transform);
         let matrix_subbuffer = Arc::new(self.matrix_buffer.next(matrix_buffer_data).unwrap());
@@ -352,11 +350,35 @@ impl Renderer {
         let deferred_layout = self.deferred_pipeline.layout().descriptor_set_layouts().get(0).unwrap();
         let mut deferred_set_builder = PersistentDescriptorSet::start(deferred_layout.clone());
 
+        // SUPER DIRTY, PLEASE FIX
+
+        let texture0 = textures[0].clone();
+
+        let texture1 = match textures.len() > 1 {
+            true => textures[1].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture2 = match textures.len() > 2 {
+            true => textures[2].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture3 = match textures.len() > 3 {
+            true => textures[3].clone(),
+            false => texture0.clone(),
+        };
+
+        //
+
         deferred_set_builder
             .add_buffer(matrix_subbuffer).unwrap()
-            .add_sampled_image(texture, self.sampler2.clone()).unwrap()
-            .add_sampled_image(bump_map, self.sampler2.clone()).unwrap()
-            .add_sampled_image(specular_map, self.sampler2.clone()).unwrap();
+            .enter_array().unwrap()
+                .add_sampled_image(texture0, self.sampler2.clone()).unwrap()
+                .add_sampled_image(texture1, self.sampler2.clone()).unwrap()
+                .add_sampled_image(texture2, self.sampler2.clone()).unwrap()
+                .add_sampled_image(texture3, self.sampler2.clone()).unwrap()
+            .leave_array().unwrap();
 
         let deferred_set = Arc::new(deferred_set_builder.build().unwrap());
 

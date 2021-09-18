@@ -31,8 +31,6 @@ use self::fragment_shader::ty::Constants as Constants;
 
 pub struct AmbientLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: VertexShader,
-    fragment_shader: FragmentShader,
 }
 
 impl AmbientLightRenderer {
@@ -41,10 +39,9 @@ impl AmbientLightRenderer {
 
         let vertex_shader = VertexShader::load(device.clone()).unwrap();
         let fragment_shader = FragmentShader::load(device.clone()).unwrap();
-
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
-        return Self { pipeline, vertex_shader, fragment_shader };
+        return Self { pipeline };
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {

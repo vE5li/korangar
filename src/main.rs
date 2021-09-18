@@ -115,7 +115,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let model = model_manager.get(&mut texture_manager, String::from("models/test2.rsm"));
+    let model = model_manager.get(&mut texture_manager, String::from("eclage/2.rsm"));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -157,13 +157,11 @@ fn main() {
 
                 if left_mouse_button_pressed {
                     let delta = previous_mouse_position.x - new_mouse_position.x;
-
                     rotation += delta / 50.0;
                 }
 
                 if right_mouse_button_pressed {
                     let delta = previous_mouse_position.x - new_mouse_position.x;
-
                     camera.soft_rotate(delta as f32 / -50.0);
                 }
 

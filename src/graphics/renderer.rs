@@ -78,11 +78,10 @@ pub struct Renderer {
     current_frame: Option<CurrentFrame>,
     matrix_buffer: MatrixBuffer,
     dimensions: [u32; 2],
-    sampler: Arc<Sampler>,
-    sampler2: Arc<Sampler>,
+    nearest_sampler: Arc<Sampler>,
+    linear_sampler: Arc<Sampler>,
     recreate_swapchain: bool,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
-
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     point_light_renderer: PointLightRenderer,
@@ -174,13 +173,8 @@ impl Renderer {
         #[cfg(feature = "debug")]
         print_debug!("created {}matrix buffer{}", magenta(), none());
 
-//      let lights_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
-//
-//      #[cfg(feature = "debug")]
-//      print_debug!("created {}lights buffer{}", magenta(), none());
-
-        let sampler = create_sampler!(device.clone(), Nearest, Repeat);
-        let sampler2 = create_sampler!(device.clone(), Linear, Repeat);
+        let nearest_sampler = create_sampler!(device.clone(), Nearest, Repeat);
+        let linear_sampler = create_sampler!(device.clone(), Linear, Repeat);
 
         #[cfg(feature = "debug")]
         print_debug!("created {}sampler{}", magenta(), none());
@@ -205,11 +199,10 @@ impl Renderer {
             depth_buffer: depth_buffer,
             current_frame: None,
             dimensions: dimensions,
-            sampler: sampler,
-            sampler2: sampler2,
+            nearest_sampler: nearest_sampler,
+            linear_sampler: linear_sampler,
             recreate_swapchain: false,
             previous_frame_end: previous_frame_end,
-
             ambient_light_renderer: ambient_light_renderer,
             directional_light_renderer: directional_light_renderer,
             point_light_renderer: point_light_renderer,
@@ -255,7 +248,6 @@ impl Renderer {
             .viewports(iter::once(viewport.clone()))
             .fragment_shader(deferred_fragment_shader.main_entry_point(), ())
             .depth_stencil_simple_depth()
-            //.blend_alpha_blending()
             .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
             .build(device.clone())
             .unwrap());
@@ -374,10 +366,10 @@ impl Renderer {
         deferred_set_builder
             .add_buffer(matrix_subbuffer).unwrap()
             .enter_array().unwrap()
-                .add_sampled_image(texture0, self.sampler2.clone()).unwrap()
-                .add_sampled_image(texture1, self.sampler2.clone()).unwrap()
-                .add_sampled_image(texture2, self.sampler2.clone()).unwrap()
-                .add_sampled_image(texture3, self.sampler2.clone()).unwrap()
+                .add_sampled_image(texture0, self.linear_sampler.clone()).unwrap()
+                .add_sampled_image(texture1, self.linear_sampler.clone()).unwrap()
+                .add_sampled_image(texture2, self.linear_sampler.clone()).unwrap()
+                .add_sampled_image(texture3, self.linear_sampler.clone()).unwrap()
             .leave_array().unwrap();
 
         let deferred_set = Arc::new(deferred_set_builder.build().unwrap());
@@ -393,62 +385,6 @@ impl Renderer {
     }
 
     pub fn ambient_light(&mut self, color: Color) {
-
-        //let matrix_buffer_data = camera.matrix_buffer_data(transform);
-        //let matrix_subbuffer = Arc::new(self.matrix_buffer.next(matrix_buffer_data).unwrap());
-
-        /*let lights_buffer_data0 = Light {
-            position: [0.0, 8.5, -8.5],
-            color: [1.0, 1.0, 1.0],
-            intensity: 15.7,
-            _dummy0: [0; 4],
-        };
-
-        let lights_buffer_data1 = Light {
-            position: [9.0, 5.5, -3.0],
-            color: [1.00, 0.0, 0.0],
-            intensity: 8.0,
-            _dummy0: [0; 4],
-        };
-
-        let lights_buffer_data2 = Light {
-            position: [-4.0, 6.5, 3.0],
-            color: [0.05, 0.05, 1.0],
-            intensity: 0.0,
-            _dummy0: [0; 4],
-        };
-
-        let lights_subbuffer0 = Arc::new(self.lights_buffer.next(lights_buffer_data0).unwrap());
-        let lights_subbuffer1 = Arc::new(self.lights_buffer.next(lights_buffer_data1).unwrap());
-        let lights_subbuffer2 = Arc::new(self.lights_buffer.next(lights_buffer_data2).unwrap());*/
-
-        //let lighting_layout = self.lighting_pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        //let mut lighting_set_builder = PersistentDescriptorSet::start(lighting_layout.clone());
-
-        //lighting_set_builder
-        //  .add_buffer(matrix_subbuffer).unwrap()
-        //  .add_image(self.color_buffer.clone()).unwrap()
-        //  .add_image(self.normal_buffer.clone()).unwrap()
-        //  .add_image(self.depth_buffer.clone()).unwrap();
-
-        //let lighting_set = Arc::new(lighting_set_builder.build().unwrap());
-
-        /*let layout = self.pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut set_builder = PersistentDescriptorSet::start(layout.clone());
-
-        set_builder
-            .add_buffer(matrix_subbuffer).unwrap()
-            .enter_array().unwrap()
-                .add_buffer(lights_subbuffer0).unwrap()
-                .add_buffer(lights_subbuffer1).unwrap()
-                .add_buffer(lights_subbuffer2).unwrap()
-            .leave_array().unwrap()
-            .add_sampled_image(texture, self.sampler2.clone()).unwrap()
-            .add_sampled_image(bump_map, self.sampler2.clone()).unwrap()
-            .add_sampled_image(specular_map, self.sampler2.clone()).unwrap();
-
-        let set = Arc::new(set_builder.build().unwrap());*/
-
         if let Some(current_frame) = &mut self.current_frame {
             self.ambient_light_renderer.render(&mut current_frame.builder, self.color_buffer.clone(), self.screen_vertex_buffer.clone(), color);
         }

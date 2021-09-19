@@ -1,5 +1,7 @@
+mod deferred;
+mod lighting;
+
 use std::sync::Arc;
-use std::iter;
 
 use cgmath::{ Vector2, Vector3, Matrix4 };
 
@@ -11,15 +13,10 @@ use vulkano::image::{ ImageUsage, SwapchainImage };
 use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::pipeline::viewport::Viewport;
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
 use vulkano::render_pass::{ Framebuffer, FramebufferAbstract, RenderPass, Subpass };
-use vulkano::buffer::cpu_pool::CpuBufferPool;
 use vulkano::buffer::BufferUsage;
-use vulkano::descriptor_set::PersistentDescriptorSet;
-use vulkano::sampler::{ Filter, MipmapMode, Sampler, SamplerAddressMode };
 use vulkano::format::Format;
 use vulkano::sync::{ FlushError, GpuFuture, now };
-use vulkano::buffer::BufferAccess;
 
 use winit::window::Window;
 
@@ -28,23 +25,8 @@ use debug::*;
 
 use graphics::*;
 
-macro_rules! create_sampler {
-    ($device:expr, $filter_mode:ident, $address_mode:ident) => {
-        Sampler::new(
-            $device,
-            Filter::$filter_mode,
-            Filter::$filter_mode,
-            MipmapMode::$filter_mode,
-            SamplerAddressMode::$address_mode,
-            SamplerAddressMode::$address_mode,
-            SamplerAddressMode::$address_mode,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-        ).unwrap()
-    }
-}
+use self::deferred::DeferredRenderer;
+use self::lighting::*;
 
 struct CurrentFrame {
     pub builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
@@ -66,26 +48,21 @@ impl CurrentFrame {
 pub struct Renderer {
     queue: Arc<Queue>,
     device: Arc<Device>,
-    deferred_vertex_shader: DeferredVertexShader,
-    deferred_fragment_shader: DeferredFragmentShader,
+    deferred_renderer: DeferredRenderer,
+    ambient_light_renderer: AmbientLightRenderer,
+    directional_light_renderer: DirectionalLightRenderer,
+    point_light_renderer: PointLightRenderer,
     swapchain: Arc<Swapchain<Window>>,
     render_pass: Arc<RenderPass>,
-    deferred_pipeline: Arc<GraphicsPipeline>,
     framebuffers: Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
     color_buffer: Arc<ImageView<Arc<AttachmentImage>>>,
     normal_buffer: Arc<ImageView<Arc<AttachmentImage>>>,
     depth_buffer: Arc<ImageView<Arc<AttachmentImage>>>,
+    screen_vertex_buffer: ScreenVertexBuffer,
     current_frame: Option<CurrentFrame>,
-    matrix_buffer: MatrixBuffer,
     dimensions: [u32; 2],
-    nearest_sampler: Arc<Sampler>,
-    linear_sampler: Arc<Sampler>,
     recreate_swapchain: bool,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
-    ambient_light_renderer: AmbientLightRenderer,
-    directional_light_renderer: DirectionalLightRenderer,
-    point_light_renderer: PointLightRenderer,
-    screen_vertex_buffer: ScreenVertexBuffer,
 }
 
 impl Renderer {
@@ -109,12 +86,6 @@ impl Renderer {
 
         #[cfg(feature = "debug")]
         print_debug!("created {}swapchain{}", magenta(), none());
-
-        let deferred_vertex_shader = DeferredVertexShader::load(device.clone()).unwrap();
-        let deferred_fragment_shader = DeferredFragmentShader::load(device.clone()).unwrap();
-
-        #[cfg(feature = "debug")]
-        print_debug!("loaded {}vertex{} and {}fragment shaders{}", magenta(), none(), magenta(), none());
 
         let render_pass = Arc::new(
             vulkano::ordered_passes_renderpass!(device.clone(),
@@ -163,21 +134,10 @@ impl Renderer {
         #[cfg(feature = "debug")]
         print_debug!("created {}render pass{}", magenta(), none());
 
-        let (deferred_pipeline, framebuffers, color_buffer, normal_buffer, depth_buffer, ambient_light_renderer, directional_light_renderer, point_light_renderer) = Self::window_size_dependent_setup(device.clone(), &deferred_vertex_shader, &deferred_fragment_shader, &images, render_pass.clone());
+        let (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, framebuffers, color_buffer, normal_buffer, depth_buffer) = Self::window_size_dependent_setup(device.clone(), &images, render_pass.clone());
 
         #[cfg(feature = "debug")]
         print_debug!("created {}pipeline{}", magenta(), none());
-
-        let matrix_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
-
-        #[cfg(feature = "debug")]
-        print_debug!("created {}matrix buffer{}", magenta(), none());
-
-        let nearest_sampler = create_sampler!(device.clone(), Nearest, Repeat);
-        let linear_sampler = create_sampler!(device.clone(), Linear, Repeat);
-
-        #[cfg(feature = "debug")]
-        print_debug!("created {}sampler{}", magenta(), none());
 
         let vertices = vec![ScreenVertex::new(Vector2::new(-1.0, -1.0)), ScreenVertex::new(Vector2::new(-1.0, 3.0)), ScreenVertex::new(Vector2::new(3.0, -1.0))];
         let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
@@ -187,31 +147,26 @@ impl Renderer {
         return Self {
             queue: queue,
             device: device,
-            deferred_vertex_shader: deferred_vertex_shader,
-            deferred_fragment_shader: deferred_fragment_shader,
-            swapchain: swapchain,
-            render_pass: render_pass,
-            deferred_pipeline: deferred_pipeline,
-            framebuffers: framebuffers,
-            color_buffer: color_buffer,
-            normal_buffer: normal_buffer,
-            matrix_buffer: matrix_buffer,
-            depth_buffer: depth_buffer,
-            current_frame: None,
-            dimensions: dimensions,
-            nearest_sampler: nearest_sampler,
-            linear_sampler: linear_sampler,
-            recreate_swapchain: false,
-            previous_frame_end: previous_frame_end,
+            deferred_renderer: deferred_renderer,
             ambient_light_renderer: ambient_light_renderer,
             directional_light_renderer: directional_light_renderer,
             point_light_renderer: point_light_renderer,
+            swapchain: swapchain,
+            render_pass: render_pass,
+            framebuffers: framebuffers,
+            color_buffer: color_buffer,
+            normal_buffer: normal_buffer,
+            depth_buffer: depth_buffer,
             screen_vertex_buffer: screen_vertex_buffer,
+            current_frame: None,
+            dimensions: dimensions,
+            recreate_swapchain: false,
+            previous_frame_end: previous_frame_end,
         }
     }
 
-    fn window_size_dependent_setup(device: Arc<Device>, deferred_vertex_shader: &DeferredVertexShader, deferred_fragment_shader: &DeferredFragmentShader, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (
-        Arc<GraphicsPipeline>, Vec<Arc<dyn FramebufferAbstract + Send + Sync>>, ImageBuffer, ImageBuffer, ImageBuffer, AmbientLightRenderer, DirectionalLightRenderer, PointLightRenderer) {
+    fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (
+        DeferredRenderer, AmbientLightRenderer, DirectionalLightRenderer, PointLightRenderer, Vec<Arc<dyn FramebufferAbstract + Send + Sync>>, ImageBuffer, ImageBuffer, ImageBuffer) {
 
         let dimensions = images[0].dimensions();
 
@@ -240,25 +195,15 @@ impl Renderer {
             depth_range: 0.0..1.0,
         };
 
-        let deferred_pipeline = Arc::new(GraphicsPipeline::start()
-            .vertex_input_single_buffer::<Vertex>()
-            .vertex_shader(deferred_vertex_shader.main_entry_point(), ())
-            .triangle_list()
-            .viewports_dynamic_scissors_irrelevant(1)
-            .viewports(iter::once(viewport.clone()))
-            .fragment_shader(deferred_fragment_shader.main_entry_point(), ())
-            .depth_stencil_simple_depth()
-            .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
-            .build(device.clone())
-            .unwrap());
+        let deferred_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
+        let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
 
-        let subpass = Subpass::from(render_pass.clone(), 1).unwrap();
+        let deferred_renderer = DeferredRenderer::new(device.clone(), deferred_subpass, viewport.clone());
+        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass, viewport);
 
-        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let point_light_renderer = PointLightRenderer::new(device.clone(), subpass, viewport);
-
-        return (deferred_pipeline, framebuffers, color_buffer, normal_buffer, depth_buffer, ambient_light_renderer, directional_light_renderer, point_light_renderer);
+        return (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, framebuffers, color_buffer, normal_buffer, depth_buffer);
     }
 
     pub fn invalidate_swapchain(&mut self) {
@@ -284,21 +229,21 @@ impl Renderer {
                 Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
             };
 
-            let (new_deferred_pipeline, new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer, new_ambient_light_renderer, new_directional_light_renderer, new_point_light_renderer) = Self::window_size_dependent_setup(self.device.clone(), &self.deferred_vertex_shader, &self.deferred_fragment_shader, &new_images, self.render_pass.clone());
+            let (new_deferred_renderer, new_ambient_light_renderer, new_directional_light_renderer, new_point_light_renderer, new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
 
             #[cfg(feature = "debug")]
             print_debug!("recreated {}pipeline{}", magenta(), none());
 
+            self.deferred_renderer = new_deferred_renderer;
+            self.ambient_light_renderer = new_ambient_light_renderer;
+            self.directional_light_renderer = new_directional_light_renderer;
+            self.point_light_renderer = new_point_light_renderer;
             self.dimensions = new_dimensions;
             self.swapchain = new_swapchain;
-            self.deferred_pipeline = new_deferred_pipeline;
             self.color_buffer = new_color_buffer;
             self.normal_buffer = new_normal_buffer;
             self.depth_buffer = new_depth_buffer;
             self.framebuffers = new_framebuffers;
-            self.ambient_light_renderer = new_ambient_light_renderer;
-            self.directional_light_renderer = new_directional_light_renderer;
-            self.point_light_renderer = new_point_light_renderer;
             self.recreate_swapchain = false;
 
             #[cfg(feature = "debug")]
@@ -322,8 +267,7 @@ impl Renderer {
 
         let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        builder.begin_render_pass(self.framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap()
-            .bind_pipeline_graphics(self.deferred_pipeline.clone());
+        builder.begin_render_pass(self.framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap();
 
         self.current_frame = Some(CurrentFrame::new(builder, image_num, acquire_future));
     }
@@ -335,52 +279,8 @@ impl Renderer {
     }
 
     pub fn render_geomitry(&mut self, camera: &Camera, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
-
-        let matrix_buffer_data = camera.matrix_buffer_data(transform);
-        let matrix_subbuffer = Arc::new(self.matrix_buffer.next(matrix_buffer_data).unwrap());
-
-        let deferred_layout = self.deferred_pipeline.layout().descriptor_set_layouts().get(0).unwrap();
-        let mut deferred_set_builder = PersistentDescriptorSet::start(deferred_layout.clone());
-
-        // SUPER DIRTY, PLEASE FIX
-
-        let texture0 = textures[0].clone();
-
-        let texture1 = match textures.len() > 1 {
-            true => textures[1].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture2 = match textures.len() > 2 {
-            true => textures[2].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture3 = match textures.len() > 3 {
-            true => textures[3].clone(),
-            false => texture0.clone(),
-        };
-
-        //
-
-        deferred_set_builder
-            .add_buffer(matrix_subbuffer).unwrap()
-            .enter_array().unwrap()
-                .add_sampled_image(texture0, self.linear_sampler.clone()).unwrap()
-                .add_sampled_image(texture1, self.linear_sampler.clone()).unwrap()
-                .add_sampled_image(texture2, self.linear_sampler.clone()).unwrap()
-                .add_sampled_image(texture3, self.linear_sampler.clone()).unwrap()
-            .leave_array().unwrap();
-
-        let deferred_set = Arc::new(deferred_set_builder.build().unwrap());
-
         if let Some(current_frame) = &mut self.current_frame {
-            let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<Vertex>();
-
-            current_frame.builder
-                .bind_descriptor_sets(PipelineBindPoint::Graphics, self.deferred_pipeline.layout().clone(), 0, deferred_set)
-                .bind_vertex_buffers(0, vertex_buffer)
-                .draw(vertex_count as u32, 1, 0, 0).unwrap();
+            self.deferred_renderer.render_geometry(&camera, &mut current_frame.builder, vertex_buffer, textures, transform);
         }
     }
 

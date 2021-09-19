@@ -1,7 +1,19 @@
+mod vertex_shader {
+    vulkano_shaders::shader! {
+        ty: "vertex",
+        path: "shaders/ambient_light_vertex_shader.glsl"
+    }
+}
+
+mod fragment_shader {
+    vulkano_shaders::shader! {
+        ty: "fragment",
+        path: "shaders/ambient_light_fragment_shader.glsl"
+    }
+}
+
 use std::sync::Arc;
 use std::iter;
-
-use cgmath::Vector3;
 
 use vulkano::device::Device;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
@@ -11,31 +23,15 @@ use vulkano::render_pass::Subpass;
 
 use graphics::*;
 
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "shaders/directional_light_vertex_shader.glsl"
-    }
-}
-
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "shaders/directional_light_fragment_shader.glsl"
-    }
-}
-
 use self::vertex_shader::Shader as VertexShader;
-
 use self::fragment_shader::Shader as FragmentShader;
-
 use self::fragment_shader::ty::Constants as Constants;
 
-pub struct DirectionalLightRenderer {
+pub struct AmbientLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
 }
 
-impl DirectionalLightRenderer {
+impl AmbientLightRenderer {
 
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
 
@@ -63,23 +59,19 @@ impl DirectionalLightRenderer {
         return Arc::new(pipeline);
     }
 
-    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, direction: Vector3<f32>, color: Color) {
+    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, color: Color) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
         let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
 
-        set_builder
-            .add_image(diffuse_buffer).unwrap()
-            .add_image(normal_buffer).unwrap();
+        set_builder.add_image(diffuse_buffer).unwrap();
 
         let set = Arc::new(set_builder.build().unwrap());
 
         let constants = Constants {
-            direction: [direction.x, direction.y, direction.z],
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
-            _dummy0: [0; 4],
         };
 
         builder

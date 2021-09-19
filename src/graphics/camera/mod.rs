@@ -1,6 +1,10 @@
+mod smoothed;
+
 use cgmath::{ Matrix4, Vector3, Point3, Rad, SquareMatrix };
 use std::f32::consts::FRAC_PI_2;
-use graphics::{ Matrices, Transform, SmoothedValue };
+use graphics::Transform;
+
+use self::smoothed::SmoothedValue;
 
 pub struct Camera {
     look_at: Point3<f32>,
@@ -44,18 +48,13 @@ impl Camera {
         return (self.projection_matrix * self.view_matrix).invert().unwrap();
     }
 
-    pub fn matrix_buffer_data(&self, transform: &Transform) -> Matrices {
+    pub fn transform_matrices(&self, transform: &Transform) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
         let translation_matrix = Matrix4::from_translation(transform.position);
         let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);
         let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
-        let transform_matrix = rotation_matrix * translation_matrix * scale_matrix;
+        let world_matrix = rotation_matrix * translation_matrix * scale_matrix;
 
-        return Matrices {
-            rotation: rotation_matrix.into(),
-            world: transform_matrix.into(),
-            view: self.view_matrix.into(),
-            projection: self.projection_matrix.into(),
-        };
+        return (rotation_matrix, world_matrix, self.view_matrix, self.projection_matrix);
     }
 
     pub fn soft_zoom(&mut self, zoom_factor: f32) {

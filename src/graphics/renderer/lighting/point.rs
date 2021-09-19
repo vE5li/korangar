@@ -1,16 +1,3 @@
-use std::sync::Arc;
-use std::iter;
-
-use cgmath::{ Vector3, Matrix4 };
-
-use vulkano::device::Device;
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
-use vulkano::pipeline::viewport::Viewport;
-use vulkano::descriptor_set::PersistentDescriptorSet;
-use vulkano::render_pass::Subpass;
-
-use graphics::*;
-
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -25,10 +12,21 @@ mod fragment_shader {
     }
 }
 
+use std::sync::Arc;
+use std::iter;
+
+use cgmath::{ Vector3, Matrix4 };
+
+use vulkano::device::Device;
+use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
+use vulkano::pipeline::viewport::Viewport;
+use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::render_pass::Subpass;
+
+use graphics::*;
+
 use self::vertex_shader::Shader as VertexShader;
-
 use self::fragment_shader::Shader as FragmentShader;
-
 use self::fragment_shader::ty::Constants as Constants;
 
 pub struct PointLightRenderer {

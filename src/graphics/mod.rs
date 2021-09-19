@@ -1,9 +1,7 @@
 mod color;
-mod smoothed;
 mod transform;
-mod vertex;
+mod vertices;
 mod camera;
-mod lighting;
 mod renderer;
 
 use std::sync::Arc;
@@ -19,32 +17,10 @@ use vulkano::pipeline::blend::BlendFactor;
 use vulkano::pipeline::blend::BlendOp;
 
 pub use self::color::Color;
-pub use self::smoothed::SmoothedValue;
 pub use self::transform::Transform;
-pub use self::vertex::Vertex;
+pub use self::vertices::{ ScreenVertex, Vertex };
 pub use self::camera::Camera;
-pub use self::lighting::*;
 pub use self::renderer::Renderer;
-
-mod deferred_vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "shaders/deferred_vertex_shader.glsl"
-    }
-}
-
-mod deferred_fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "shaders/deferred_fragment_shader.glsl"
-    }
-}
-
-pub use self::deferred_vertex_shader::ty::Matrices;
-
-pub use self::deferred_vertex_shader::Shader as DeferredVertexShader;
-
-pub use self::deferred_fragment_shader::Shader as DeferredFragmentShader;
 
 pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
 
@@ -55,8 +31,6 @@ pub type ScreenVertexBuffer = Arc<CpuAccessibleBuffer<[ScreenVertex]>>;
 pub type Texture = Arc<ImageView<Arc<ImmutableImage>>>;
 
 pub type ImageBuffer = Arc<ImageView<Arc<AttachmentImage>>>;
-
-pub type MatrixBuffer = CpuBufferPool::<Matrices>;
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     enabled: true,

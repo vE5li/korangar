@@ -20,7 +20,7 @@ use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
 use vulkano::pipeline::viewport::Viewport;
 use vulkano::descriptor_set::PersistentDescriptorSet;
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{ Filter, MipmapMode, Sampler, SamplerAddressMode };
+use vulkano::sampler::Sampler;
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
 use graphics::*;
@@ -29,28 +29,9 @@ use self::vertex_shader::Shader as VertexShader;
 use self::fragment_shader::Shader as FragmentShader;
 use self::vertex_shader::ty::Matrices;
 
-macro_rules! create_sampler {
-    ($device:expr, $filter_mode:ident, $address_mode:ident) => {
-        Sampler::new(
-            $device,
-            Filter::$filter_mode,
-            Filter::$filter_mode,
-            MipmapMode::$filter_mode,
-            SamplerAddressMode::$address_mode,
-            SamplerAddressMode::$address_mode,
-            SamplerAddressMode::$address_mode,
-            0.0,
-            1.0,
-            0.0,
-            0.0,
-        ).unwrap()
-    }
-}
-
 pub struct DeferredRenderer {
     pipeline: Arc<GraphicsPipeline>,
     matrices_buffer: CpuBufferPool::<Matrices>,
-    nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
 }
 
@@ -64,10 +45,9 @@ impl DeferredRenderer {
 
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
 
-        let nearest_sampler = create_sampler!(device.clone(), Nearest, Repeat);
         let linear_sampler = create_sampler!(device, Linear, Repeat);
 
-        return Self { pipeline, matrices_buffer, nearest_sampler, linear_sampler };
+        return Self { pipeline, matrices_buffer, linear_sampler };
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {

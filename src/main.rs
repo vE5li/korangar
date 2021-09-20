@@ -3,6 +3,7 @@ extern crate vulkano_shaders;
 extern crate vulkano_win;
 extern crate winit;
 extern crate cgmath;
+extern crate png;
 extern crate bmp;
 
 #[cfg(feature = "debug")]
@@ -116,6 +117,7 @@ fn main() {
     let timer = Timer::new("load resources");
 
     let model = model_manager.get(&mut texture_manager, String::from("eclage/2.rsm"));
+    let (font_map, mut font_future) = texture_manager.get(String::from("assets/font.png"));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -133,6 +135,7 @@ fn main() {
     let mut previous_elapsed = 0.0;
     let mut counter_update_time = 0.0;
     let mut frame_counter = 0;
+    let mut frames_per_second = 0;
 
     let mut left_mouse_button_pressed = false;
     let mut right_mouse_button_pressed = false;
@@ -140,6 +143,9 @@ fn main() {
 
     let mut camera = Camera::new();
     let mut rotation = 0.0;
+    let mut player_position = Vector3::new(0.0, 0.0, 0.0);
+
+    font_future.cleanup_finished();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -180,8 +186,21 @@ fn main() {
                 match button {
                     MouseButton::Left => left_mouse_button_pressed = pressed,
                     MouseButton::Right => right_mouse_button_pressed = pressed,
-                    _ignored => { },
+                    _ignored => {},
                 }
+            }
+
+            Event::WindowEvent { event: WindowEvent::KeyboardInput{ input, .. }, .. } => {
+
+                match input.scancode {
+                    17 => player_position += Vector3::new(-3.0, 0.0, 0.0),
+                    31 => player_position += Vector3::new(3.0, 0.0, 0.0),
+                    30 => player_position += Vector3::new(0.0, 0.0, -3.0),
+                    32 => player_position += Vector3::new(0.0, 0.0, 3.0),
+                    _ignored => {},
+                }
+
+                camera.set_focus(player_position);
             }
 
             Event::RedrawEventsCleared => {
@@ -206,7 +225,7 @@ fn main() {
                 counter_update_time += delta_time;
 
                 if counter_update_time > 1.0 {
-                    println!("FPS: {}", frame_counter);
+                    frames_per_second = frame_counter;
                     counter_update_time = 0.0;
                     frame_counter = 0;
                 }
@@ -214,7 +233,7 @@ fn main() {
                 camera.update(delta_time);
 
                 renderer.start_draw(&surface);
-                camera.generate_view_projection(renderer.get_dimensions());
+                camera.generate_view_projection(renderer.get_window_size());
 
                 model.render_geomitry(&mut renderer, &camera, &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
 
@@ -229,6 +248,9 @@ fn main() {
                 renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 4.0, -1.0), Color::new(10, 10, 255), 40.0);
                 renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 6.0, -3.0), Color::new(255, 10, 10), 40.0);
                 renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 9.0, -3.0), Color::new(10, 255, 10), 40.0);
+
+                #[cfg(feature = "debug")]
+                renderer.render_text(font_map.clone(), &frames_per_second.to_string(), Vector2::new(20.0, 10.0), Color::new(255, 50, 10), 40.0);
 
                 renderer.stop_draw();
             }

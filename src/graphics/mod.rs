@@ -7,6 +7,7 @@ mod renderer;
 use std::sync::Arc;
 
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryAutoCommandBuffer };
+use vulkano::render_pass::FramebufferAbstract;
 use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::image::ImmutableImage;
@@ -27,6 +28,8 @@ pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
 pub type VertexBuffer = Arc<CpuAccessibleBuffer<[Vertex]>>;
 
 pub type ScreenVertexBuffer = Arc<CpuAccessibleBuffer<[ScreenVertex]>>;
+
+pub type Framebuffers = Vec<Arc<dyn FramebufferAbstract + Send + Sync>>;
 
 pub type Texture = Arc<ImageView<Arc<ImmutableImage>>>;
 

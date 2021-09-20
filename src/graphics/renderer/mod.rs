@@ -1,19 +1,22 @@
+#[macro_use]
+mod sampler;
 mod deferred;
 mod lighting;
+mod sprite;
 
 use std::sync::Arc;
 
 use cgmath::{ Vector2, Vector3, Matrix4 };
 
 use vulkano::device::physical::PhysicalDevice;
-use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, CommandBufferUsage, SubpassContents };
+use vulkano::command_buffer::{ AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents };
 use vulkano::device::{ Device, Queue };
 use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError, SwapchainAcquireFuture, Surface, acquire_next_image };
 use vulkano::image::{ ImageUsage, SwapchainImage };
 use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::pipeline::viewport::Viewport;
-use vulkano::render_pass::{ Framebuffer, FramebufferAbstract, RenderPass, Subpass };
+use vulkano::render_pass::{ Framebuffer, RenderPass, Subpass };
 use vulkano::buffer::BufferUsage;
 use vulkano::format::Format;
 use vulkano::sync::{ FlushError, GpuFuture, now };
@@ -27,16 +30,17 @@ use graphics::*;
 
 use self::deferred::DeferredRenderer;
 use self::lighting::*;
+use self::sprite::SpriteRenderer;
 
 struct CurrentFrame {
-    pub builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>,
+    pub builder: CommandBuilder,
     pub image_num: usize,
     pub swapchain_future: SwapchainAcquireFuture<Window>,
 }
 
 impl CurrentFrame {
 
-    pub fn new(builder: AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>, image_num: usize, swapchain_future: SwapchainAcquireFuture<Window>) -> Self {
+    pub fn new(builder: CommandBuilder, image_num: usize, swapchain_future: SwapchainAcquireFuture<Window>) -> Self {
         return Self {
             builder: builder,
             image_num: image_num,
@@ -52,17 +56,18 @@ pub struct Renderer {
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     point_light_renderer: PointLightRenderer,
+    sprite_renderer: SpriteRenderer,
     swapchain: Arc<Swapchain<Window>>,
     render_pass: Arc<RenderPass>,
-    framebuffers: Vec<Arc<dyn FramebufferAbstract + Send + Sync>>,
-    color_buffer: Arc<ImageView<Arc<AttachmentImage>>>,
-    normal_buffer: Arc<ImageView<Arc<AttachmentImage>>>,
-    depth_buffer: Arc<ImageView<Arc<AttachmentImage>>>,
+    framebuffers: Framebuffers,
+    diffuse_buffer: ImageBuffer,
+    normal_buffer: ImageBuffer,
+    depth_buffer: ImageBuffer,
     screen_vertex_buffer: ScreenVertexBuffer,
     current_frame: Option<CurrentFrame>,
-    dimensions: [u32; 2],
-    recreate_swapchain: bool,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
+    recreate_swapchain: bool,
+    window_size: Vector2<usize>,
 }
 
 impl Renderer {
@@ -73,6 +78,7 @@ impl Renderer {
         let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
         let format = capabilities.supported_formats[0].0;
         let dimensions: [u32; 2] = surface.window().inner_size().into();
+        let window_size = Vector2::new(dimensions[0] as usize, dimensions[1] as usize);
 
         let (swapchain, images) = Swapchain::start(device.clone(), surface)
             .num_images(capabilities.min_image_count)
@@ -96,7 +102,7 @@ impl Renderer {
                         format: swapchain.format(),
                         samples: 1,
                     },
-                    color: {
+                    diffuse: {
                         load: Clear,
                         store: DontCare,
                         format: Format::A2B10G10R10_UNORM_PACK32,
@@ -117,14 +123,14 @@ impl Renderer {
                 },
                 passes: [
                     {
-                        color: [color, normal],
+                        color: [diffuse, normal],
                         depth_stencil: {depth},
                         input: []
                     },
                     {
                         color: [output],
                         depth_stencil: {},
-                        input: [color, normal, depth]
+                        input: [diffuse, normal, depth]
                     }
                 ]
             )
@@ -134,7 +140,7 @@ impl Renderer {
         #[cfg(feature = "debug")]
         print_debug!("created {}render pass{}", magenta(), none());
 
-        let (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, framebuffers, color_buffer, normal_buffer, depth_buffer) = Self::window_size_dependent_setup(device.clone(), &images, render_pass.clone());
+        let (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, sprite_renderer, framebuffers, diffuse_buffer, normal_buffer, depth_buffer) = Self::window_size_dependent_setup(device.clone(), &images, render_pass.clone());
 
         #[cfg(feature = "debug")]
         print_debug!("created {}pipeline{}", magenta(), none());
@@ -151,26 +157,26 @@ impl Renderer {
             ambient_light_renderer: ambient_light_renderer,
             directional_light_renderer: directional_light_renderer,
             point_light_renderer: point_light_renderer,
+            sprite_renderer: sprite_renderer,
             swapchain: swapchain,
             render_pass: render_pass,
             framebuffers: framebuffers,
-            color_buffer: color_buffer,
+            diffuse_buffer: diffuse_buffer,
             normal_buffer: normal_buffer,
             depth_buffer: depth_buffer,
             screen_vertex_buffer: screen_vertex_buffer,
             current_frame: None,
-            dimensions: dimensions,
-            recreate_swapchain: false,
             previous_frame_end: previous_frame_end,
+            recreate_swapchain: false,
+            window_size: window_size,
         }
     }
 
-    fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (
-        DeferredRenderer, AmbientLightRenderer, DirectionalLightRenderer, PointLightRenderer, Vec<Arc<dyn FramebufferAbstract + Send + Sync>>, ImageBuffer, ImageBuffer, ImageBuffer) {
+    fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (DeferredRenderer, AmbientLightRenderer, DirectionalLightRenderer, PointLightRenderer, SpriteRenderer, Framebuffers, ImageBuffer, ImageBuffer, ImageBuffer) {
 
         let dimensions = images[0].dimensions();
 
-        let color_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::A2B10G10R10_UNORM_PACK32).unwrap()).unwrap();
+        let diffuse_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::A2B10G10R10_UNORM_PACK32).unwrap()).unwrap();
         let normal_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::R16G16B16A16_SFLOAT).unwrap()).unwrap();
         let depth_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::D32_SFLOAT).unwrap()).unwrap();
 
@@ -180,7 +186,7 @@ impl Renderer {
                 let image_buffer = ImageView::new(image.clone()).unwrap();
                 let framebuffer = Framebuffer::start(render_pass.clone())
                     .add(image_buffer).unwrap()
-                    .add(color_buffer.clone()).unwrap()
+                    .add(diffuse_buffer.clone()).unwrap()
                     .add(normal_buffer.clone()).unwrap()
                     .add(depth_buffer.clone()).unwrap()
                     .build().unwrap();
@@ -201,17 +207,18 @@ impl Renderer {
         let deferred_renderer = DeferredRenderer::new(device.clone(), deferred_subpass, viewport.clone());
         let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass, viewport);
+        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass, viewport);
 
-        return (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, framebuffers, color_buffer, normal_buffer, depth_buffer);
+        return (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, sprite_renderer, framebuffers, diffuse_buffer, normal_buffer, depth_buffer);
     }
 
     pub fn invalidate_swapchain(&mut self) {
         self.recreate_swapchain = true;
     }
 
-    pub fn get_dimensions(&mut self) -> [u32; 2] {
-        return self.dimensions;
+    pub fn get_window_size(&mut self) -> Vector2<usize> {
+        return self.window_size;
     }
 
     pub fn start_draw(&mut self, surface: &Arc<Surface<Window>>) {
@@ -223,13 +230,15 @@ impl Renderer {
             let timer = Timer::new("recreating swapchain");
 
             let new_dimensions: [u32; 2] = surface.window().inner_size().into();
+            let new_window_size = Vector2::new(new_dimensions[0] as usize, new_dimensions[1] as usize);
+
             let (new_swapchain, new_images) =  match self.swapchain.recreate().dimensions(new_dimensions).build() {
                 Ok(r) => r,
                 Err(SwapchainCreationError::UnsupportedDimensions) => return,
                 Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
             };
 
-            let (new_deferred_renderer, new_ambient_light_renderer, new_directional_light_renderer, new_point_light_renderer, new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
+            let (new_deferred_renderer, new_ambient_light_renderer, new_directional_light_renderer, new_point_light_renderer, new_sprite_renderer, new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
 
             #[cfg(feature = "debug")]
             print_debug!("recreated {}pipeline{}", magenta(), none());
@@ -238,13 +247,14 @@ impl Renderer {
             self.ambient_light_renderer = new_ambient_light_renderer;
             self.directional_light_renderer = new_directional_light_renderer;
             self.point_light_renderer = new_point_light_renderer;
-            self.dimensions = new_dimensions;
+            self.sprite_renderer = new_sprite_renderer;
             self.swapchain = new_swapchain;
-            self.color_buffer = new_color_buffer;
+            self.diffuse_buffer = new_color_buffer;
             self.normal_buffer = new_normal_buffer;
             self.depth_buffer = new_depth_buffer;
             self.framebuffers = new_framebuffers;
             self.recreate_swapchain = false;
+            self.window_size = new_window_size;
 
             #[cfg(feature = "debug")]
             timer.stop();
@@ -286,19 +296,38 @@ impl Renderer {
 
     pub fn ambient_light(&mut self, color: Color) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.ambient_light_renderer.render(&mut current_frame.builder, self.color_buffer.clone(), self.screen_vertex_buffer.clone(), color);
+            self.ambient_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.screen_vertex_buffer.clone(), color);
         }
     }
 
     pub fn directional_light(&mut self, direction: Vector3<f32>, color: Color) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.directional_light_renderer.render(&mut current_frame.builder, self.color_buffer.clone(), self.normal_buffer.clone(), self.screen_vertex_buffer.clone(), direction, color);
+            self.directional_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.screen_vertex_buffer.clone(), direction, color);
         }
     }
 
     pub fn point_light(&mut self, screen_to_world_matrix: Matrix4<f32>, position: Vector3<f32>, color: Color, intensity: f32) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.point_light_renderer.render(&mut current_frame.builder, self.color_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.screen_vertex_buffer.clone(), screen_to_world_matrix, position, color, intensity);
+            self.point_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.screen_vertex_buffer.clone(), screen_to_world_matrix, position, color, intensity);
+        }
+    }
+
+    pub fn render_sprite_indexed(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.sprite_renderer.render_indexed(&mut current_frame.builder, self.window_size, texture, position, size, color, column_count, cell_index, smooth);
+        }
+    }
+
+    pub fn render_text(&mut self, font_map: Texture, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
+        for character in text.as_bytes() {
+
+            let index = match (*character as usize) < 31 {
+                true => 0,
+                false => *character as usize - 31,
+            };
+
+            self.render_sprite_indexed(font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, true);
+            position.x += font_size / 2.0;
         }
     }
 

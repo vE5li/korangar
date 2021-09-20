@@ -1,6 +1,6 @@
 mod smoothed;
 
-use cgmath::{ Matrix4, Vector3, Point3, Rad, SquareMatrix };
+use cgmath::{ Matrix4, Vector2, Vector3, Point3, Rad, SquareMatrix };
 use std::f32::consts::FRAC_PI_2;
 use graphics::Transform;
 
@@ -33,13 +33,17 @@ impl Camera {
         self.view_angle.update(delta_time);
     }
 
-    pub fn generate_view_projection(&mut self, dimensions: [u32; 2]) {
-        let aspect_ratio = dimensions[0] as f32 / dimensions[1] as f32;
+    pub fn set_focus(&mut self, position: Vector3<f32>) {
+        self.look_at = Point3::new(position.x, position.y, position.z);
+    }
+
+    pub fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
+        let aspect_ratio = window_size.x as f32 / window_size.y as f32;
         self.projection_matrix = cgmath::perspective(Rad(FRAC_PI_2), aspect_ratio, 0.01, 1000.0);
 
         let zoom = self.zoom.get_current();
         let view_angle = self.view_angle.get_current();
-        let camera = Point3::new(zoom * view_angle.cos(), zoom, -zoom * view_angle.sin());
+        let camera = Point3::new(self.look_at.x + zoom * view_angle.cos(), self.look_at.y + zoom, self.look_at.z + -zoom * view_angle.sin());
 
         self.view_matrix = Matrix4::look_at_rh(camera, self.look_at, self.up) * Matrix4::from_scale(1.0);
     }

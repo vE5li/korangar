@@ -101,7 +101,7 @@ impl TextureManager {
 
         let (image_data, dimensions) = match &path[path.len() - 4..] {
             ".png" => Self::load_png_data(&path),
-            ".bmp" => Self::load_bmp_data(&path),
+            ".bmp" | ".BMP" => Self::load_bmp_data(&path),
             extension => panic!("unsupported file format {}", extension),
         };
 

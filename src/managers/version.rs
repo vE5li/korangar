@@ -13,7 +13,7 @@ impl Version {
     }
 
     pub fn equals_or_above(&self, major: u8, minor: u8) -> bool {
-        return self.major >= major && self.minor >= minor;
+        return self.major > major || (self.major == major && self.minor >= minor);
     }
 }
 

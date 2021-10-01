@@ -1,11 +1,9 @@
-mod stream;
-mod version;
 mod partial;
-mod shading;
+mod model;
 
+use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::read;
-use std::sync::Arc;
 
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
@@ -15,54 +13,11 @@ use debug::*;
 
 use cgmath::{ Vector2, Vector3, InnerSpace };
 
-use graphics::{ VertexBuffer, Texture, Renderer, Camera, Transform };
 use managers::TextureManager;
 
-use self::version::Version;
-use self::stream::ByteStream;
+use super::ByteStream;
 use self::partial::*;
-use self::shading::ShadingType;
-
-#[derive(Clone)]
-pub struct Node {
-    name: String,
-    parent_name: Option<String>,
-    child_nodes: Vec<Node>,
-    textures: Vec<Texture>,
-    translation: Vector3<f32>,
-    vertex_count: usize,
-    vertex_buffer: VertexBuffer,
-}
-
-impl Node {
-
-    pub fn new(name: String, parent_name: Option<String>, textures: Vec<Texture>, translation: Vector3<f32>, vertex_count: usize, vertex_buffer: VertexBuffer) -> Self {
-        let child_nodes = Vec::new();
-        return Self { name, parent_name, child_nodes, textures, translation, vertex_count, vertex_buffer };
-    }
-
-    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &Camera, parent_transform: &Transform) {
-        let combined_transform = *parent_transform + Transform::position(self.translation);
-        renderer.render_geomitry(&camera, self.vertex_buffer.clone(), &self.textures, &combined_transform);
-        self.child_nodes.iter().for_each(|node| node.render_geomitry(renderer, camera, &combined_transform));
-    }
-}
-
-pub struct Model {
-    root_node: Node,
-}
-
-impl Model {
-
-    pub fn new(root_node: Node) -> Self {
-        return Self { root_node };
-    }
-
-    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &Camera, root_transform: &Transform) {
-        //let root_transform = Transform::position(Vector3::new(0.0, -14.467, 0.0));
-        self.root_node.render_geomitry(renderer, camera, &root_transform);
-    }
-}
+use self::model::{ Model, Node, ShadingType };
 
 pub struct ModelManager {
     cache: HashMap<String, Arc<Model>>,

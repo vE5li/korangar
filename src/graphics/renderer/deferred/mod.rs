@@ -67,7 +67,7 @@ impl DeferredRenderer {
         return Arc::new(pipeline);
     }
 
-    pub fn render_geometry(&self, camera: &Camera, builder: &mut CommandBuilder, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
+    pub fn render_geometry(&self, camera: &dyn Camera, builder: &mut CommandBuilder, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
 
         // SUPER DIRTY, PLEASE FIX
 
@@ -88,6 +88,36 @@ impl DeferredRenderer {
             false => texture0.clone(),
         };
 
+        let texture4 = match textures.len() > 4 {
+            true => textures[4].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture5 = match textures.len() > 5 {
+            true => textures[5].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture6 = match textures.len() > 6 {
+            true => textures[6].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture7 = match textures.len() > 7 {
+            true => textures[7].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture8 = match textures.len() > 8 {
+            true => textures[8].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture9 = match textures.len() > 9 {
+            true => textures[9].clone(),
+            false => texture0.clone(),
+        };
+
         let (rotation_matrix, world_matrix, view_matrix, projection_matrix) = camera.transform_matrices(transform);
         let matrices = Matrices {
             rotation: rotation_matrix.into(),
@@ -105,11 +135,18 @@ impl DeferredRenderer {
 
         set_builder
             .add_buffer(matrices_subbuffer).unwrap()
+            .add_sampler(self.linear_sampler.clone()).unwrap()
             .enter_array().unwrap()
-                .add_sampled_image(texture0, self.linear_sampler.clone()).unwrap()
-                .add_sampled_image(texture1, self.linear_sampler.clone()).unwrap()
-                .add_sampled_image(texture2, self.linear_sampler.clone()).unwrap()
-                .add_sampled_image(texture3, self.linear_sampler.clone()).unwrap()
+                .add_image(texture0).unwrap()
+                .add_image(texture1).unwrap()
+                .add_image(texture2).unwrap()
+                .add_image(texture3).unwrap()
+                .add_image(texture4).unwrap()
+                .add_image(texture5).unwrap()
+                .add_image(texture6).unwrap()
+                .add_image(texture7).unwrap()
+                .add_image(texture8).unwrap()
+                .add_image(texture9).unwrap()
             .leave_array().unwrap();
 
         let set = Arc::new(set_builder.build().unwrap());

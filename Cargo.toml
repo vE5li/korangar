@@ -14,6 +14,7 @@ bmp = "*"
 [features]
 debug = ["lazy_static", "chrono", "notify"]
 debug_model = ["debug"]
+debug_map = ["debug"]
 colors = []
 
 [dependencies.chrono]

@@ -10,13 +10,13 @@ pub struct Transform {
 
 impl Transform {
 
-    //pub fn new() -> Self {
-    //  return Self {
-    //      position: Vector3::new(0.0, 0.0, 0.0),
-    //      rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-    //      scale: Vector3::new(1.0, 1.0, 1.0),
-    //  }
-    //}
+    pub fn new() -> Self {
+        return Self {
+            position: Vector3::new(0.0, 0.0, 0.0),
+            rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
+            scale: Vector3::new(1.0, 1.0, 1.0),
+        }
+    }
 
     //pub fn from() -> Self {
     //  return Self {

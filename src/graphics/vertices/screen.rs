@@ -2,7 +2,7 @@ use cgmath::Vector2;
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct ScreenVertex {
-    position: [f32; 2],
+    pub position: [f32; 2],
 }
 
 impl ScreenVertex {

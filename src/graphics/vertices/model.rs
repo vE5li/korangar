@@ -2,10 +2,10 @@ use cgmath::{ Vector2, Vector3 };
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Vertex {
-    position: [f32; 3],
-    normal: [f32; 3],
-    texture_coordinates: [f32; 2],
-    texture_index: i32,
+    pub position: [f32; 3],
+    pub normal: [f32; 3],
+    pub texture_coordinates: [f32; 2],
+    pub texture_index: i32,
 }
 
 impl Vertex {

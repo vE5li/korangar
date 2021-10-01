@@ -27,7 +27,7 @@ mod managers;
 use debug::*;
 
 use graphics::*;
-use managers::{ ModelManager, TextureManager };
+use managers::{ MapManager, ModelManager, TextureManager };
 
 use cgmath::{ Rad, Vector2, Vector3 };
 
@@ -109,6 +109,7 @@ fn main() {
 
     let mut model_manager = ModelManager::new(device.clone());
     let mut texture_manager = TextureManager::new(device.clone(), queue.clone());
+    let mut map_manager = MapManager::new(device.clone());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -116,8 +117,11 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let model = model_manager.get(&mut texture_manager, String::from("eclage/2.rsm"));
+    //let model = model_manager.get(&mut texture_manager, String::from("data/model/2.rsm"));
+
     let (font_map, mut font_future) = texture_manager.get(String::from("assets/font.png"));
+
+    let map = map_manager.get(&mut model_manager, &mut texture_manager, String::from("pay_dun00.gnd"));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -139,11 +143,25 @@ fn main() {
 
     let mut left_mouse_button_pressed = false;
     let mut right_mouse_button_pressed = false;
+    let mut w_button_pressed = false;
+    let mut a_button_pressed = false;
+    let mut s_button_pressed = false;
+    let mut d_button_pressed = false;
+    let mut space_pressed = false;
+    let mut shift_pressed = false;
+
     let mut previous_mouse_position = Vector2::new(0.0, 0.0);
 
-    let mut camera = Camera::new();
-    let mut rotation = 0.0;
-    let mut player_position = Vector3::new(0.0, 0.0, 0.0);
+    let mut player_camera = PlayerCamera::new();
+
+    #[cfg(feature = "debug")]
+    let mut debug_camera = DebugCamera::new();
+
+    #[cfg(feature = "debug")]
+    let mut use_debug_camera = false;
+
+    let mut player_position = Vector3::new(400.0, 0.0, 400.0);
+    player_camera.set_focus(player_position);
 
     font_future.cleanup_finished();
 
@@ -162,13 +180,12 @@ fn main() {
                 let new_mouse_position = Vector2::new(position.x, position.y);
 
                 if left_mouse_button_pressed {
-                    let delta = previous_mouse_position.x - new_mouse_position.x;
-                    rotation += delta / 50.0;
+                    let delta = previous_mouse_position.y - new_mouse_position.y;
                 }
 
                 if right_mouse_button_pressed {
                     let delta = previous_mouse_position.x - new_mouse_position.x;
-                    camera.soft_rotate(delta as f32 / -50.0);
+                    player_camera.soft_rotate(delta as f32 / -50.0);
                 }
 
                 previous_mouse_position = new_mouse_position;
@@ -176,7 +193,7 @@ fn main() {
 
             Event::WindowEvent { event: WindowEvent::MouseWheel{ delta, .. }, .. } => {
                 if let MouseScrollDelta::LineDelta(_x, y) = delta {
-                    camera.soft_zoom(y as f32 * -5.0);
+                    player_camera.soft_zoom(y as f32 * -5.0);
                 }
             }
 
@@ -191,16 +208,33 @@ fn main() {
             }
 
             Event::WindowEvent { event: WindowEvent::KeyboardInput{ input, .. }, .. } => {
+                println!("{:?}", input);
 
+                let pressed = matches!(input.state, ElementState::Pressed);
+
+                #[cfg(feature = "debug")]
                 match input.scancode {
-                    17 => player_position += Vector3::new(-3.0, 0.0, 0.0),
-                    31 => player_position += Vector3::new(3.0, 0.0, 0.0),
-                    30 => player_position += Vector3::new(0.0, 0.0, -3.0),
-                    32 => player_position += Vector3::new(0.0, 0.0, 3.0),
+
+                    17 => w_button_pressed = pressed,
+
+                    31 => s_button_pressed = pressed,
+
+                    30 => a_button_pressed = pressed,
+
+                    32 => d_button_pressed = pressed,
+
+                    57 => space_pressed = pressed,
+
+                    42 => shift_pressed = pressed,
+
+                    33 => {
+                        if pressed {
+                            use_debug_camera = !use_debug_camera;
+                        }
+                    },
+
                     _ignored => {},
                 }
-
-                camera.set_focus(player_position);
             }
 
             Event::RedrawEventsCleared => {
@@ -230,27 +264,78 @@ fn main() {
                     frame_counter = 0;
                 }
 
-                camera.update(delta_time);
-
                 renderer.start_draw(&surface);
-                camera.generate_view_projection(renderer.get_window_size());
 
-                model.render_geomitry(&mut renderer, &camera, &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
+                player_camera.update(delta_time);
+
+                #[cfg(feature = "debug")]
+                if (w_button_pressed) {
+                    debug_camera.move_forward(delta_time as f32);
+                }
+
+                #[cfg(feature = "debug")]
+                if (s_button_pressed) {
+                    debug_camera.move_backward(delta_time as f32);
+                }
+
+                #[cfg(feature = "debug")]
+                if (a_button_pressed) {
+                    debug_camera.move_left(delta_time as f32);
+                }
+
+                #[cfg(feature = "debug")]
+                if (d_button_pressed) {
+                    debug_camera.move_right(delta_time as f32);
+                }
+
+                #[cfg(feature = "debug")]
+                if (space_pressed) {
+                    debug_camera.move_up(delta_time as f32);
+                }
+
+                #[cfg(feature = "debug")]
+                if (shift_pressed) {
+                    debug_camera.move_down(delta_time as f32);
+                }
+
+                #[cfg(feature = "debug")]
+                let current_camera: &mut dyn Camera = match use_debug_camera {
+                    true => &mut debug_camera,
+                    false => &mut player_camera,
+                };
+
+                current_camera.generate_view_projection(renderer.get_window_size());
+
+                map.render_geomitry(&mut renderer, current_camera);
+    //          model.render_geomitry(&mut renderer, &camera, &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
 
                 renderer.lighting_pass();
 
-                let screen_to_world_matrix = camera.screen_to_world_matrix();
+                let screen_to_world_matrix = current_camera.screen_to_world_matrix();
 
-                renderer.ambient_light(Color::new(5, 5, 5));
-                renderer.directional_light(Vector3::new(0.0, -1.0, -0.7), Color::new(255, 255, 255));
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 0.0, -4.0), Color::new(10, 255, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 2.0, -1.0), Color::new(10, 255, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 4.0, -1.0), Color::new(10, 10, 255), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 6.0, -3.0), Color::new(255, 10, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(0.0, 9.0, -3.0), Color::new(10, 255, 10), 40.0);
+                renderer.ambient_light(Color::new(60, 60, 60));
+                //renderer.directional_light(Vector3::new(0.0, -1.0, -0.7), Color::new(100, 100, 100));
+
+                renderer.point_light(screen_to_world_matrix, Vector3::new(100.0, 10.0, 100.0), Color::new(255, 10, 10), 60.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(150.0, 10.0, 150.0), Color::new(10, 255, 10), 20.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(150.0, 10.0, 300.0), Color::new(10, 10, 255), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 110.0), Color::new(255, 255, 255), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 300.0), Color::new(255, 10, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 150.0), Color::new(10, 255, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 450.0), Color::new(10, 10, 255), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(450.0, 10.0, 300.0), Color::new(255, 255, 255), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(700.0, 10.0, 450.0), Color::new(255, 10, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(450.0, 10.0, 700.0), Color::new(10, 255, 10), 40.0);
+                renderer.point_light(screen_to_world_matrix, Vector3::new(700.0, 10.0, 700.0), Color::new(10, 10, 255), 40.0);
 
                 #[cfg(feature = "debug")]
-                renderer.render_text(font_map.clone(), &frames_per_second.to_string(), Vector2::new(20.0, 10.0), Color::new(255, 50, 10), 40.0);
+                renderer.render_text(font_map.clone(), &frames_per_second.to_string(), Vector2::new(20.0, 10.0), Color::new(55, 244, 22), 40.0);
+
+                #[cfg(feature = "debug")]
+                match use_debug_camera {
+                    true => renderer.render_text(font_map.clone(), "debug camera", Vector2::new(20.0, 60.0), Color::new(255, 255, 255), 30.0),
+                    false => renderer.render_text(font_map.clone(), "player camera", Vector2::new(20.0, 60.0), Color::new(255, 255, 255), 30.0),
+                }
 
                 renderer.stop_draw();
             }
@@ -259,4 +344,3 @@ fn main() {
         }
     });
 }
-

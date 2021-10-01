@@ -288,9 +288,9 @@ impl Renderer {
         }
     }
 
-    pub fn render_geomitry(&mut self, camera: &Camera, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
+    pub fn render_geomitry(&mut self, camera: &dyn Camera, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.deferred_renderer.render_geometry(&camera, &mut current_frame.builder, vertex_buffer, textures, transform);
+            self.deferred_renderer.render_geometry(camera, &mut current_frame.builder, vertex_buffer, textures, transform);
         }
     }
 
@@ -326,7 +326,7 @@ impl Renderer {
                 false => *character as usize - 31,
             };
 
-            self.render_sprite_indexed(font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, true);
+            self.render_sprite_indexed(font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, false);
             position.x += font_size / 2.0;
         }
     }

@@ -1,5 +1,5 @@
 use std::slice::Iter;
-use cgmath::Vector3;
+use cgmath::{ Vector2, Vector3 };
 
 use super::Version;
 
@@ -94,5 +94,9 @@ impl<'b> ByteStream<'b> {
         for _index in 0..count {
             self.next();
         }
+    }
+
+    pub fn remaining(&self, length: usize) -> usize {
+        return length - self.counter;
     }
 }

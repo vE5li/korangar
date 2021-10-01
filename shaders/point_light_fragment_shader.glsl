@@ -32,7 +32,7 @@ void main() {
     float light_percent = max(dot(light_direction, normal), 0.0);
     float light_distance = length(constants.position - pixel_position_world_space.xyz);
 
-    light_percent *= constants.intensity / exp(light_distance);
+    light_percent *= constants.intensity / (exp(light_distance / 16.0));
 
     vec3 diffuse = subpassLoad(diffuse_in).rgb;
     fragment_color.rgb = light_percent * constants.color * diffuse;

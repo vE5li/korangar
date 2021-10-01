@@ -20,7 +20,7 @@ use vulkano::pipeline::blend::BlendOp;
 pub use self::color::Color;
 pub use self::transform::Transform;
 pub use self::vertices::{ ScreenVertex, Vertex };
-pub use self::camera::Camera;
+pub use self::camera::*;
 pub use self::renderer::Renderer;
 
 pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;

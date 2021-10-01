@@ -56,8 +56,17 @@ impl DebugCamera {
         self.position -= Vector3::new(0.0, 1.0, 0.0) * self.fly_speed * delta_time;
     }
 
+    pub fn look_around(&mut self, mouse_delta: Vector2<f64>) {
+        self.pitch += Rad(mouse_delta.y as f32 / 200.0);
+        self.yaw += Rad(mouse_delta.x as f32 / 200.0);
+    }
+
     fn look_at(&self) -> Point3<f32> {
-        return Point3::new(self.position.x + 1.0, self.position.y, self.position.z);
+        let x = self.yaw.0.cos() * self.pitch.0.cos();
+        let y = self.pitch.0.sin();
+        let z = self.yaw.0.sin() * self.pitch.0.cos();
+
+        return Point3::new(self.position.x + x, self.position.y + y, self.position.z + z);
     }
 }
 

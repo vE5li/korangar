@@ -151,6 +151,7 @@ fn main() {
     let mut shift_pressed = false;
 
     let mut previous_mouse_position = Vector2::new(0.0, 0.0);
+    let mut new_mouse_position = Vector2::new(0.0, 0.0);
 
     let mut player_camera = PlayerCamera::new();
 
@@ -177,18 +178,13 @@ fn main() {
             }
 
             Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
-                let new_mouse_position = Vector2::new(position.x, position.y);
+                new_mouse_position = Vector2::new(position.x, position.y);
 
-                if left_mouse_button_pressed {
-                    let delta = previous_mouse_position.y - new_mouse_position.y;
+                #[cfg(feature = "debug")]
+                if (use_debug_camera) {
+                    //let center_position = PhysicalPosition::new(0.5, 0.5);
+                    //surface.window().set_cursor_position(center_position).unwrap();
                 }
-
-                if right_mouse_button_pressed {
-                    let delta = previous_mouse_position.x - new_mouse_position.x;
-                    player_camera.soft_rotate(delta as f32 / -50.0);
-                }
-
-                previous_mouse_position = new_mouse_position;
             }
 
             Event::WindowEvent { event: WindowEvent::MouseWheel{ delta, .. }, .. } => {
@@ -208,8 +204,6 @@ fn main() {
             }
 
             Event::WindowEvent { event: WindowEvent::KeyboardInput{ input, .. }, .. } => {
-                println!("{:?}", input);
-
                 let pressed = matches!(input.state, ElementState::Pressed);
 
                 #[cfg(feature = "debug")]
@@ -230,11 +224,15 @@ fn main() {
                     33 => {
                         if pressed {
                             use_debug_camera = !use_debug_camera;
+//                          surface.window().set_cursor_grab(use_debug_camera).unwrap();
+//                          surface.window().set_cursor_visible(!use_debug_camera);
                         }
                     },
 
                     _ignored => {},
                 }
+
+                //println!("{:?}", input);
             }
 
             Event::RedrawEventsCleared => {
@@ -263,6 +261,14 @@ fn main() {
                     counter_update_time = 0.0;
                     frame_counter = 0;
                 }
+
+                let mouse_delta = previous_mouse_position - new_mouse_position;
+
+                if right_mouse_button_pressed {
+                    player_camera.soft_rotate(mouse_delta.x as f32 / -50.0);
+                }
+
+                previous_mouse_position = new_mouse_position;
 
                 renderer.start_draw(&surface);
 
@@ -299,15 +305,23 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
+                if (use_debug_camera && left_mouse_button_pressed) {
+                    debug_camera.look_around(mouse_delta);
+                }
+
+                #[cfg(feature = "debug")]
                 let current_camera: &mut dyn Camera = match use_debug_camera {
                     true => &mut debug_camera,
                     false => &mut player_camera,
                 };
 
+                #[cfg(not(feature = "debug"))]
+                let current_camera = &mut player_camera;
+
                 current_camera.generate_view_projection(renderer.get_window_size());
 
                 map.render_geomitry(&mut renderer, current_camera);
-    //          model.render_geomitry(&mut renderer, &camera, &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
+                //model.render_geomitry(&mut renderer, &camera, &Transform::rotation(Vector3::new(Rad(0.0), Rad(rotation as f32), Rad(0.0))));
 
                 renderer.lighting_pass();
 
@@ -320,15 +334,14 @@ fn main() {
                 renderer.point_light(screen_to_world_matrix, Vector3::new(150.0, 10.0, 150.0), Color::new(10, 255, 10), 20.0);
                 renderer.point_light(screen_to_world_matrix, Vector3::new(150.0, 10.0, 300.0), Color::new(10, 10, 255), 40.0);
                 renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 110.0), Color::new(255, 255, 255), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 300.0), Color::new(255, 10, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 150.0), Color::new(10, 255, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 450.0), Color::new(10, 10, 255), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(450.0, 10.0, 300.0), Color::new(255, 255, 255), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(700.0, 10.0, 450.0), Color::new(255, 10, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(450.0, 10.0, 700.0), Color::new(10, 255, 10), 40.0);
-                renderer.point_light(screen_to_world_matrix, Vector3::new(700.0, 10.0, 700.0), Color::new(10, 10, 255), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 300.0), Color::new(255, 10, 10), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 150.0), Color::new(10, 255, 10), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(300.0, 10.0, 450.0), Color::new(10, 10, 255), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(450.0, 10.0, 300.0), Color::new(255, 255, 255), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(700.0, 10.0, 450.0), Color::new(255, 10, 10), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(450.0, 10.0, 700.0), Color::new(10, 255, 10), 40.0);
+                //renderer.point_light(screen_to_world_matrix, Vector3::new(700.0, 10.0, 700.0), Color::new(10, 10, 255), 40.0);
 
-                #[cfg(feature = "debug")]
                 renderer.render_text(font_map.clone(), &frames_per_second.to_string(), Vector2::new(20.0, 10.0), Color::new(55, 244, 22), 40.0);
 
                 #[cfg(feature = "debug")]

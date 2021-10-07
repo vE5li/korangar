@@ -245,7 +245,7 @@ impl ModelManager {
                 print_debug!("texture count {}{}{}", magenta(), texture_count, none());
                 print_debug!("texture indices {}{}{}", magenta(), formatted_list, none());
 
-                print_debug!("offset tranlation {}{:?}{}", magenta(), offset_translation, none());
+                print_debug!("offset tranlation {}{:?}{}", magenta(), _offset_translation, none());
                 print_debug!("translation {}{:?}{}", magenta(), translation, none());
                 print_debug!("rotation angle {}{}{}", magenta(), rotation_angle, none());
                 print_debug!("rotation axis {}{:?}{}", magenta(), rotation_axis, none());

@@ -259,12 +259,6 @@ impl MapManager {
             let type_index = byte_stream.integer32();
             let resource_type = ResourceType::from(type_index);
 
-            #[cfg(feature = "debug_map")]
-            println!("index ({:x}): {}", byte_stream.counter, index);
-
-            #[cfg(feature = "debug_map")]
-            print_debug!("resource type {}{:?}{}", magenta(), resource_type, none());
-
             match resource_type {
 
                 ResourceType::Object => {

@@ -1,67 +1,13 @@
+mod event;
+mod key;
+
 use cgmath::Vector2;
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 
-pub enum InputEvent {
-    CameraZoom(f32),
-    CameraRotate(f32),
-    ToggleFramesPerSecond,
-    #[cfg(feature = "debug")]
-    ToggleDebugCamera,
-    #[cfg(feature = "debug")]
-    CameraLookAround(Vector2<f32>),
-    #[cfg(feature = "debug")]
-    CameraMoveForward,
-    #[cfg(feature = "debug")]
-    CameraMoveBackward,
-    #[cfg(feature = "debug")]
-    CameraMoveLeft,
-    #[cfg(feature = "debug")]
-    CameraMoveRight,
-    #[cfg(feature = "debug")]
-    CameraMoveUp,
-    #[cfg(feature = "debug")]
-    CameraMoveDown,
-}
+pub use self::event::InputEvent;
 
-#[derive(Copy, Clone, Debug)]
-pub struct Key {
-    is_down: bool,
-    was_down: bool,
-    is_pressed: bool,
-    is_released: bool,
-}
-
-impl Key {
-
-    pub fn new() -> Self {
-
-        let is_down = false;
-        let was_down = false;
-        let is_pressed = false;
-        let is_released = false;
-
-        return Self { is_down, was_down, is_pressed, is_released };
-    }
-
-    pub fn set_down(&mut self, is_down: bool) {
-        self.is_down = is_down;
-    }
-
-    pub fn update(&mut self) {
-        self.is_pressed = self.is_down && !self.was_down;
-        self.is_released = !self.is_down && self.was_down;
-        self.was_down = self.is_down;
-    }
-
-    pub fn down(&self) -> bool {
-        return self.is_down;
-    }
-
-    pub fn pressed(&self) -> bool {
-        return self.is_pressed;
-    }
-}
+use self::key::Key;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;

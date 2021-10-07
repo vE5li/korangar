@@ -67,9 +67,9 @@ impl TextureManager {
 
         let mut image_data = Vec::new();
 
-        for column in 0..image.get_width() {
-            for line in 0..image.get_height() {
-                let pixel = image.get_pixel(line, column);
+        for line in 0..image.get_height() {
+            for column in 0..image.get_width() {
+                let pixel = image.get_pixel(column, line);
 
                 if pixel.r == 255 && pixel.g == 0 && pixel.b == 255 {
                     image_data.push(0);

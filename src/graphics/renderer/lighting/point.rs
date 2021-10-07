@@ -15,7 +15,7 @@ mod fragment_shader {
 use std::sync::Arc;
 use std::iter;
 
-use cgmath::{ Vector3, Matrix4 };
+use cgmath::Vector3;
 
 use vulkano::device::Device;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
@@ -28,6 +28,8 @@ use graphics::*;
 use self::vertex_shader::Shader as VertexShader;
 use self::fragment_shader::Shader as FragmentShader;
 use self::fragment_shader::ty::Constants as Constants;
+
+const BILLBOARD_SIZE_MULTIPLIER: f32 = 1.4142;
 
 pub struct PointLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -61,7 +63,7 @@ impl PointLightRenderer {
         return Arc::new(pipeline);
     }
 
-    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, screen_to_world_matrix: Matrix4<f32>, position: Vector3<f32>, color: Color, intensity: f32) {
+    pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, position: Vector3<f32>, color: Color, range: f32) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -75,11 +77,21 @@ impl PointLightRenderer {
 
         let set = Arc::new(set_builder.build().unwrap());
 
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, range * BILLBOARD_SIZE_MULTIPLIER);
+
+        if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 && camera.distance_to(position) > range {
+            return;
+        }
+
+        let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
+
         let constants = Constants {
-            screen_to_world_matrix: screen_to_world_matrix.into(),
+            screen_to_world_matrix: camera.get_screen_to_world_matrix().into(),
+            screen_position: [screen_position.x, screen_position.y],
+            screen_size: [screen_size.x, screen_size.y],
             position: [position.x, position.y, position.z],
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
-            intensity: intensity,
+            range: range,
             _dummy0: [0; 4],
         };
 
@@ -88,6 +100,6 @@ impl PointLightRenderer {
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, vertex_buffer)
-            .draw(3, 1, 0, 0).unwrap();
+            .draw(6, 1, 0, 0).unwrap();
     }
 }

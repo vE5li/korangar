@@ -6,7 +6,7 @@ mod sprite;
 
 use std::sync::Arc;
 
-use cgmath::{ Vector2, Vector3, Matrix4 };
+use cgmath::{ Vector3, Vector2 };
 
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents };
@@ -25,12 +25,15 @@ use winit::window::Window;
 
 #[cfg(feature = "debug")]
 use debug::*;
-
 use graphics::*;
+use managers::TextureManager;
 
 use self::deferred::DeferredRenderer;
 use self::lighting::*;
 use self::sprite::SpriteRenderer;
+
+#[cfg(feature = "debug")]
+const MARKER_SIZE: f32 = 1.25;
 
 struct CurrentFrame {
     pub builder: CommandBuilder,
@@ -64,15 +67,26 @@ pub struct Renderer {
     normal_buffer: ImageBuffer,
     depth_buffer: ImageBuffer,
     screen_vertex_buffer: ScreenVertexBuffer,
+    billboard_vertex_buffer: ScreenVertexBuffer,
     current_frame: Option<CurrentFrame>,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
     window_size: Vector2<usize>,
+    #[cfg(feature = "debug")]
+    object_texture: Texture,
+    #[cfg(feature = "debug")]
+    light_texture: Texture,
+    #[cfg(feature = "debug")]
+    sound_texture: Texture,
+    #[cfg(feature = "debug")]
+    effect_texture: Texture,
+    #[cfg(feature = "debug")]
+    particle_texture: Texture,
 }
 
 impl Renderer {
 
-    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>) -> Self {
+    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, _texture_manager: &mut TextureManager) -> Self {
 
         let capabilities = surface.capabilities(*physical_device).expect("failed to get surface capabilities");
         let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
@@ -148,7 +162,42 @@ impl Renderer {
         let vertices = vec![ScreenVertex::new(Vector2::new(-1.0, -1.0)), ScreenVertex::new(Vector2::new(-1.0, 3.0)), ScreenVertex::new(Vector2::new(3.0, -1.0))];
         let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
+        let vertices = vec![
+            ScreenVertex::new(Vector2::new(0.0, 0.0)),
+            ScreenVertex::new(Vector2::new(0.0, 1.0)),
+            ScreenVertex::new(Vector2::new(1.0, 0.0)),
+            ScreenVertex::new(Vector2::new(1.0, 0.0)),
+            ScreenVertex::new(Vector2::new(0.0, 1.0)),
+            ScreenVertex::new(Vector2::new(1.0, 1.0))
+        ];
+        let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+
         let previous_frame_end = Some(now(device.clone()).boxed());
+
+        #[cfg(feature = "debug")]
+        let (object_texture, mut future) = _texture_manager.get(String::from("assets/object.png"));
+        #[cfg(feature = "debug")]
+        future.cleanup_finished();
+
+        #[cfg(feature = "debug")]
+        let (light_texture, mut future) = _texture_manager.get(String::from("assets/light.png"));
+        #[cfg(feature = "debug")]
+        future.cleanup_finished();
+
+        #[cfg(feature = "debug")]
+        let (sound_texture, mut future) = _texture_manager.get(String::from("assets/sound.png"));
+        #[cfg(feature = "debug")]
+        future.cleanup_finished();
+
+        #[cfg(feature = "debug")]
+        let (effect_texture, mut future) = _texture_manager.get(String::from("assets/effect.png"));
+        #[cfg(feature = "debug")]
+        future.cleanup_finished();
+
+        #[cfg(feature = "debug")]
+        let (particle_texture, mut future) = _texture_manager.get(String::from("assets/particle.png"));
+        #[cfg(feature = "debug")]
+        future.cleanup_finished();
 
         return Self {
             queue: queue,
@@ -165,10 +214,21 @@ impl Renderer {
             normal_buffer: normal_buffer,
             depth_buffer: depth_buffer,
             screen_vertex_buffer: screen_vertex_buffer,
+            billboard_vertex_buffer: billboard_vertex_buffer,
             current_frame: None,
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
             window_size: window_size,
+            #[cfg(feature = "debug")]
+            object_texture: object_texture,
+            #[cfg(feature = "debug")]
+            light_texture: light_texture,
+            #[cfg(feature = "debug")]
+            sound_texture: sound_texture,
+            #[cfg(feature = "debug")]
+            effect_texture: effect_texture,
+            #[cfg(feature = "debug")]
+            particle_texture: particle_texture,
         }
     }
 
@@ -221,7 +281,7 @@ impl Renderer {
         return self.window_size;
     }
 
-    pub fn start_draw(&mut self, surface: &Arc<Surface<Window>>) {
+    pub fn start_frame(&mut self, surface: &Arc<Surface<Window>>) {
         self.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         if self.recreate_swapchain {
@@ -239,9 +299,6 @@ impl Renderer {
             };
 
             let (new_deferred_renderer, new_ambient_light_renderer, new_directional_light_renderer, new_point_light_renderer, new_sprite_renderer, new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
-
-            #[cfg(feature = "debug")]
-            print_debug!("recreated {}pipeline{}", magenta(), none());
 
             self.deferred_renderer = new_deferred_renderer;
             self.ambient_light_renderer = new_ambient_light_renderer;
@@ -306,9 +363,9 @@ impl Renderer {
         }
     }
 
-    pub fn point_light(&mut self, screen_to_world_matrix: Matrix4<f32>, position: Vector3<f32>, color: Color, intensity: f32) {
+    pub fn point_light(&mut self, camera: &dyn Camera, position: Vector3<f32>, color: Color, range: f32) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.point_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.screen_vertex_buffer.clone(), screen_to_world_matrix, position, color, intensity);
+            self.point_light_renderer.render(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.billboard_vertex_buffer.clone(), position, color, range);
         }
     }
 
@@ -331,7 +388,50 @@ impl Renderer {
         }
     }
 
-    pub fn stop_draw(&mut self) {
+    #[cfg(feature = "debug")]
+    pub fn render_debug_icon(&mut self, camera: &dyn Camera, icon: Texture, position: Vector3<f32>, color: Color) {
+
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MARKER_SIZE);
+
+        if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 {
+            return;
+        }
+
+        let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
+
+        let window_size = Vector2::new(self.window_size.x as f32, self.window_size.y as f32);
+        let scaled_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+        let scaled_size = Vector2::new(screen_size.x * window_size.x, screen_size.y * window_size.y);
+
+        self.render_sprite_indexed(icon, scaled_position, scaled_size, color, 1, 0, true);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_object_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_icon(camera, self.object_texture.clone(), position, Color::new(255, 100, 100));
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_light_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>, color: Color) {
+        self.render_debug_icon(camera, self.light_texture.clone(), position, color);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_sound_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_icon(camera, self.sound_texture.clone(), position, Color::new(150, 150, 150));
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_effect_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_icon(camera, self.effect_texture.clone(), position, Color::new(100, 255, 100));
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_particle_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_icon(camera, self.particle_texture.clone(), position, Color::new(255, 20, 20));
+    }
+
+    pub fn stop_frame(&mut self) {
         if let Some(mut current_frame) = self.current_frame.take() {
 
             current_frame.builder.end_render_pass().unwrap();

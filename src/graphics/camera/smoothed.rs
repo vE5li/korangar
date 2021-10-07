@@ -15,10 +15,10 @@ impl SmoothedValue {
 
     pub fn update(&mut self, delta_time: f64) {
         if self.desired >= self.current + self.threshhold {
-            let new_current = self.current + ((self.desired - self.current).sqrt() * self.speed * delta_time as f32);
+            let new_current = self.current + ((self.desired - self.current) * self.speed * delta_time as f32);
             self.current = self.desired.min(new_current);
         } else if self.desired <= self.current - self.threshhold {
-            let new_current = self.current - ((self.current - self.desired).sqrt() * self.speed * delta_time as f32);
+            let new_current = self.current - ((self.current - self.desired) * self.speed * delta_time as f32);
             self.current = self.desired.max(new_current);
         }
     }

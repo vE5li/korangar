@@ -12,7 +12,7 @@ png = "0.16"
 bmp = "*"
 
 [features]
-debug = ["lazy_static", "chrono", "notify"]
+debug = ["lazy_static", "chrono"]
 debug_model = ["debug"]
 debug_map = ["debug"]
 colors = []
@@ -23,8 +23,4 @@ optional = true
 
 [dependencies.lazy_static]
 version = "1.4.0"
-optional = true
-
-[dependencies.notify]
-version = "*"
 optional = true

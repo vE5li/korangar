@@ -1,23 +1,37 @@
 use std::slice::Iter;
-use cgmath::{ Vector2, Vector3 };
+use cgmath::Vector3;
+
+#[cfg(feature = "debug")]
+use debug::*;
+use graphics::Color;
 
 use super::Version;
 
 pub struct ByteStream<'b> {
     iterator: Iter<'b, u8>,
+    #[cfg(feature = "debug")]
     counter: usize,
 }
 
 impl<'b> ByteStream<'b> {
 
     pub fn new(iterator: Iter<'b, u8>) -> Self {
+
+        #[cfg(feature = "debug")]
         let counter = 0;
 
-        return Self { iterator, counter };
+        return Self {
+            iterator,
+            #[cfg(feature = "debug")]
+            counter
+        };
     }
 
     fn next(&mut self) -> u8 {
-        self.counter += 1;
+
+        #[cfg(feature = "debug")]
+        { self.counter += 1; }
+
         return *self.iterator.next().unwrap();
     }
 
@@ -29,15 +43,26 @@ impl<'b> ByteStream<'b> {
         return Version::new(major, minor);
     }
 
-    pub fn integer(&mut self, count: usize) -> u64 {
+    pub fn byte(&mut self) -> u8 {
+        return self.next();
+    }
 
-        // assert count <= 4
+    pub fn integer16(&mut self) -> i16 {
         let mut value = 0;
 
-        for index in 0..count {
-            let byte = self.next();
-            value |= (byte as u64) << (index * 8);
-        }
+        value |= self.next() as i16;
+        value |= (self.next() as i16) << 8;
+
+        return value;
+    }
+
+    pub fn integer32(&mut self) -> i32 {
+        let mut value = 0;
+
+        value |= self.next() as i32;
+        value |= (self.next() as i32) << 8;
+        value |= (self.next() as i32) << 16;
+        value |= (self.next() as i32) << 24;
 
         return value;
     }
@@ -79,6 +104,24 @@ impl<'b> ByteStream<'b> {
         return Vector3::new(x, y, z);
     }
 
+    pub fn vector3_flipped(&mut self) -> Vector3<f32> {
+
+        let x = self.float32();
+        let y = self.float32();
+        let z = self.float32();
+
+        return Vector3::new(x, -y, z);
+    }
+
+    pub fn color(&mut self) -> Color {
+
+        let red = self.float32();
+        let green = self.float32();
+        let blue = self.float32();
+
+        return Color::new((red * 255.0) as u8, (green * 255.0) as u8, (blue * 255.0) as u8);
+    }
+
     pub fn slice(&mut self, count: usize) -> Vec<u8> { // replace with matrix 4x4 ?
         let mut value = Vec::new();
 
@@ -96,7 +139,12 @@ impl<'b> ByteStream<'b> {
         }
     }
 
-    pub fn remaining(&self, length: usize) -> usize {
-        return length - self.counter;
+    #[cfg(feature = "debug")]
+    pub fn assert_empty(&self, length: usize, file_name: &str) {
+        let remaining = length - self.counter;
+
+        if remaining != 0 {
+            print_debug!("incomplete read on file {}{}{}; {}{}{} bytes remaining", magenta(), file_name, none(), yellow(), remaining, none());
+        }
     }
 }

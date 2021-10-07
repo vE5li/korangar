@@ -16,7 +16,7 @@ impl Model {
         return Self { root_node };
     }
 
-    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &dyn Camera, root_transform: &Transform) {
-        self.root_node.render_geomitry(renderer, camera, &root_transform);
+    pub fn render_geometry(&self, renderer: &mut Renderer, camera: &dyn Camera, root_transform: &Transform) {
+        self.root_node.render_geometry(renderer, camera, &root_transform);
     }
 }

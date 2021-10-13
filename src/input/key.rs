@@ -35,4 +35,8 @@ impl Key {
     pub fn pressed(&self) -> bool {
         return self.is_pressed;
     }
+
+    pub fn released(&self) -> bool {
+        return self.is_released;
+    }
 }

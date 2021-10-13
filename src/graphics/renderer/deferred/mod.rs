@@ -45,7 +45,7 @@ impl DeferredRenderer {
 
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
 
-        let linear_sampler = create_sampler!(device, Linear, Repeat);
+        let linear_sampler = create_sampler!(device, Linear, ClampToEdge);
 
         return Self { pipeline, matrices_buffer, linear_sampler };
     }

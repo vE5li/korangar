@@ -14,7 +14,7 @@ layout(push_constant) uniform Constants {
 } constants;
 
 void main() {
-    vec2 vertex_position = position * constants.screen_size - vec2(1.0) + constants.screen_position;
+    vec2 vertex_position = constants.screen_position - vec2(1.0) + position * constants.screen_size;
     gl_Position = vec4(vertex_position, 0.0, 1.0);
     position_out = vertex_position;
 }

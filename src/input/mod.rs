@@ -1,12 +1,16 @@
 mod event;
 mod key;
+mod mode;
 
 use cgmath::Vector2;
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 
-pub use self::event::InputEvent;
+use interface::Interface;
 
+pub use self::event::UserEvent;
+
+use self::mode::MouseInputMode;
 use self::key::Key;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
@@ -19,9 +23,10 @@ pub struct InputSystem {
     previous_scroll_position: f32,
     new_scroll_position: f32,
     scroll_delta: f32,
-    left_mouse_button_pressed: bool,
-    right_mouse_button_pressed: bool,
+    left_mouse_button: Key,
+    right_mouse_button: Key,
     keys: [Key; KEY_COUNT],
+    mouse_input_mode: MouseInputMode,
 }
 
 impl InputSystem {
@@ -36,20 +41,20 @@ impl InputSystem {
         let new_scroll_position = 0.0;
         let scroll_delta = 0.0;
 
-        let left_mouse_button_pressed = false;
-        let right_mouse_button_pressed = false;
-
+        let left_mouse_button = Key::new();
+        let right_mouse_button = Key::new();
         let keys = [Key::new(); KEY_COUNT];
 
-        return Self { previous_mouse_position, new_mouse_position, mouse_delta, previous_scroll_position, new_scroll_position, scroll_delta, left_mouse_button_pressed, right_mouse_button_pressed, keys };
+        let mouse_input_mode = MouseInputMode::None;
+
+        return Self { previous_mouse_position, new_mouse_position, mouse_delta, previous_scroll_position, new_scroll_position, scroll_delta, left_mouse_button, right_mouse_button, keys, mouse_input_mode };
     }
 
     pub fn reset(&mut self) {
-
-        self.left_mouse_button_pressed = false;
-        self.right_mouse_button_pressed = false;
-
+        self.left_mouse_button = Key::new();
+        self.right_mouse_button = Key::new();
         self.keys.iter_mut().for_each(|key| *key = Key::new());
+        self.mouse_input_mode = MouseInputMode::None;
     }
 
     pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
@@ -60,8 +65,8 @@ impl InputSystem {
         let pressed = matches!(state, ElementState::Pressed);
 
         match button {
-            MouseButton::Left => self.left_mouse_button_pressed = pressed,
-            MouseButton::Right => self.right_mouse_button_pressed = pressed,
+            MouseButton::Left => self.left_mouse_button.set_down(pressed),
+            MouseButton::Right => self.right_mouse_button.set_down(pressed),
             _ignored => {},
         }
     }
@@ -80,70 +85,101 @@ impl InputSystem {
 
     pub fn update_delta(&mut self) {
 
-        self.mouse_delta = self.previous_mouse_position - self.new_mouse_position;
+        self.mouse_delta = self.new_mouse_position - self.previous_mouse_position;
         self.previous_mouse_position = self.new_mouse_position;
 
-        self.scroll_delta = self.previous_scroll_position - self.new_scroll_position;
+        self.scroll_delta = self.new_scroll_position - self.previous_scroll_position;
         self.previous_scroll_position = self.new_scroll_position;
 
+        self.left_mouse_button.update();
+        self.right_mouse_button.update();
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn input_events(&self) -> Vec<InputEvent> {
+    pub fn user_events(&mut self, interface: &Interface) -> (Vec<UserEvent>, usize) {
+
         let mut events = Vec::new();
 
-        if self.scroll_delta != 0.0 {
-            events.push(InputEvent::CameraZoom(self.scroll_delta));
+        let element = interface.hovered_element(self.new_mouse_position);
+
+        if let Some(element) = element {
+            if self.left_mouse_button.pressed() {
+
+                if let Some(clickable) = element.clickable() {
+                    events.push(clickable.click());
+                    self.mouse_input_mode = MouseInputMode::Click;
+                }
+
+                if let Some(draggable) = element.draggable() {
+                    let identifier = draggable.get_identifier();
+                    self.mouse_input_mode = MouseInputMode::MoveInterface(identifier);
+                }
+            }
         }
 
-        if self.right_mouse_button_pressed && self.mouse_delta.x != 0.0 {
-            events.push(InputEvent::CameraRotate(-self.mouse_delta.x));
+        if self.left_mouse_button.released() {
+            self.mouse_input_mode = MouseInputMode::None;
+        }
+
+        if let MouseInputMode::MoveInterface(identifier) = &self.mouse_input_mode {
+            if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                events.push(UserEvent::MoveInterface(*identifier, self.mouse_delta));
+            }
+        }
+
+        if self.scroll_delta != 0.0 {
+            events.push(UserEvent::CameraZoom(-self.scroll_delta));
+        }
+
+        if self.right_mouse_button.down() && self.mouse_delta.x != 0.0 {
+            events.push(UserEvent::CameraRotate(self.mouse_delta.x));
         }
 
         if self.keys[46].pressed() {
-            events.push(InputEvent::ToggleFramesPerSecond);
+            events.push(UserEvent::ToggleShowFramesPerSecond);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[33].pressed() {
-            events.push(InputEvent::ToggleDebugCamera);
+            events.push(UserEvent::ToggleUseDebugCamera);
         }
 
         #[cfg(feature = "debug")]
-        if self.left_mouse_button_pressed {
-            events.push(InputEvent::CameraLookAround(self.mouse_delta));
+        if self.left_mouse_button.down() && self.mouse_input_mode.is_none() {
+            events.push(UserEvent::CameraLookAround(-self.mouse_delta));
         }
 
         #[cfg(feature = "debug")]
         if self.keys[17].down() {
-            events.push(InputEvent::CameraMoveForward);
+            events.push(UserEvent::CameraMoveForward);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[31].down() {
-            events.push(InputEvent::CameraMoveBackward);
+            events.push(UserEvent::CameraMoveBackward);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[30].down() {
-            events.push(InputEvent::CameraMoveLeft);
+            events.push(UserEvent::CameraMoveLeft);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[32].down() {
-            events.push(InputEvent::CameraMoveRight);
+            events.push(UserEvent::CameraMoveRight);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[57].down() {
-            events.push(InputEvent::CameraMoveUp);
+            events.push(UserEvent::CameraMoveUp);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[42].down() {
-            events.push(InputEvent::CameraMoveDown);
+            events.push(UserEvent::CameraMoveDown);
         }
 
-        return events;
+        let element_index = element.map(|element| element.index()).unwrap_or(255); // usize.MAX
+        return (events, element_index);
     }
 }

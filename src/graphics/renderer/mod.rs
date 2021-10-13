@@ -1,3 +1,4 @@
+mod settings;
 #[macro_use]
 mod sampler;
 mod deferred;
@@ -26,11 +27,13 @@ use winit::window::Window;
 #[cfg(feature = "debug")]
 use debug::*;
 use graphics::*;
-use managers::TextureManager;
+use loaders::TextureLoader;
 
 use self::deferred::DeferredRenderer;
 use self::lighting::*;
 use self::sprite::SpriteRenderer;
+
+pub use self::settings::RenderSettings;
 
 #[cfg(feature = "debug")]
 const MARKER_SIZE: f32 = 1.25;
@@ -72,6 +75,10 @@ pub struct Renderer {
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     recreate_swapchain: bool,
     window_size: Vector2<usize>,
+    font_map: Texture,
+    background_texture: Texture,
+    checked_box_texture: Texture,
+    unchecked_box_texture: Texture,
     #[cfg(feature = "debug")]
     object_texture: Texture,
     #[cfg(feature = "debug")]
@@ -82,11 +89,13 @@ pub struct Renderer {
     effect_texture: Texture,
     #[cfg(feature = "debug")]
     particle_texture: Texture,
+    #[cfg(feature = "debug")]
+    tile_textures: Vec<Texture>,
 }
 
 impl Renderer {
 
-    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, _texture_manager: &mut TextureManager) -> Self {
+    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, texture_loader: &mut TextureLoader) -> Self {
 
         let capabilities = surface.capabilities(*physical_device).expect("failed to get surface capabilities");
         let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
@@ -174,30 +183,49 @@ impl Renderer {
 
         let previous_frame_end = Some(now(device.clone()).boxed());
 
+        let (font_map, mut font_future) = texture_loader.get(String::from("assets/font.png"));
+        font_future.cleanup_finished();
+
+        let (background_texture, mut background_future) = texture_loader.get(String::from("assets/background.bmp"));
+        background_future.cleanup_finished();
+
+        let (checked_box_texture, mut checked_box_future) = texture_loader.get(String::from("assets/checked_box.png"));
+        checked_box_future.cleanup_finished();
+
+        let (unchecked_box_texture, mut unchecked_box_future) = texture_loader.get(String::from("assets/unchecked_box.png"));
+        unchecked_box_future.cleanup_finished();
+
         #[cfg(feature = "debug")]
-        let (object_texture, mut future) = _texture_manager.get(String::from("assets/object.png"));
+        let (object_texture, mut future) = texture_loader.get(String::from("assets/object.png"));
         #[cfg(feature = "debug")]
         future.cleanup_finished();
 
         #[cfg(feature = "debug")]
-        let (light_texture, mut future) = _texture_manager.get(String::from("assets/light.png"));
+        let (light_texture, mut future) = texture_loader.get(String::from("assets/light.png"));
         #[cfg(feature = "debug")]
         future.cleanup_finished();
 
         #[cfg(feature = "debug")]
-        let (sound_texture, mut future) = _texture_manager.get(String::from("assets/sound.png"));
+        let (sound_texture, mut future) = texture_loader.get(String::from("assets/sound.png"));
         #[cfg(feature = "debug")]
         future.cleanup_finished();
 
         #[cfg(feature = "debug")]
-        let (effect_texture, mut future) = _texture_manager.get(String::from("assets/effect.png"));
+        let (effect_texture, mut future) = texture_loader.get(String::from("assets/effect.png"));
         #[cfg(feature = "debug")]
         future.cleanup_finished();
 
         #[cfg(feature = "debug")]
-        let (particle_texture, mut future) = _texture_manager.get(String::from("assets/particle.png"));
+        let (particle_texture, mut future) = texture_loader.get(String::from("assets/particle.png"));
         #[cfg(feature = "debug")]
         future.cleanup_finished();
+
+        #[cfg(feature = "debug")]
+        let tile_textures = (0..7_i32).map(|index| {
+            let (texture, mut future) = texture_loader.get(format!("assets/{}.png", index));
+            future.cleanup_finished();
+            texture
+        }).collect();
 
         return Self {
             queue: queue,
@@ -219,6 +247,10 @@ impl Renderer {
             previous_frame_end: previous_frame_end,
             recreate_swapchain: false,
             window_size: window_size,
+            font_map: font_map,
+            background_texture: background_texture,
+            checked_box_texture: checked_box_texture,
+            unchecked_box_texture: unchecked_box_texture,
             #[cfg(feature = "debug")]
             object_texture: object_texture,
             #[cfg(feature = "debug")]
@@ -229,6 +261,8 @@ impl Renderer {
             effect_texture: effect_texture,
             #[cfg(feature = "debug")]
             particle_texture: particle_texture,
+            #[cfg(feature = "debug")]
+            tile_textures: tile_textures,
         }
     }
 
@@ -369,13 +403,36 @@ impl Renderer {
         }
     }
 
+    pub fn render_sprite(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, smooth: bool) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.sprite_renderer.render(&mut current_frame.builder, self.window_size, texture, position, size, color, smooth);
+        }
+    }
+
     pub fn render_sprite_indexed(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
         if let Some(current_frame) = &mut self.current_frame {
             self.sprite_renderer.render_indexed(&mut current_frame.builder, self.window_size, texture, position, size, color, column_count, cell_index, smooth);
         }
     }
 
-    pub fn render_text(&mut self, font_map: Texture, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
+    pub fn render_sprite_direct(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, smooth: bool) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.sprite_renderer.render_direct(&mut current_frame.builder, texture, position, size, color, smooth);
+        }
+    }
+
+    pub fn render_background(&mut self, position: Vector2<f32>, size: Vector2<f32>, color: Color) {
+        self.render_sprite(self.background_texture.clone(), position, size, color, false);
+    }
+
+    pub fn render_checkbox(&mut self, position: Vector2<f32>, size: Vector2<f32>, color: Color, checked: bool) {
+        match checked {
+            true => self.render_sprite(self.checked_box_texture.clone(), position, size, color, true),
+            false => self.render_sprite(self.unchecked_box_texture.clone(), position, size, color, true),
+        }
+    }
+
+    pub fn render_text(&mut self, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
         for character in text.as_bytes() {
 
             let index = match (*character as usize) < 31 {
@@ -383,9 +440,15 @@ impl Renderer {
                 false => *character as usize - 31,
             };
 
-            self.render_sprite_indexed(font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, false);
+            self.render_sprite_indexed(self.font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, true);
             position.x += font_size / 2.0;
         }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_map_tiles(&mut self, camera: &dyn Camera, vertex_buffer: VertexBuffer, transform: &Transform) {
+        let tile_textures = self.tile_textures.clone();
+        self.render_geomitry(camera, vertex_buffer, &tile_textures, transform);
     }
 
     #[cfg(feature = "debug")]
@@ -399,11 +462,7 @@ impl Renderer {
 
         let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
 
-        let window_size = Vector2::new(self.window_size.x as f32, self.window_size.y as f32);
-        let scaled_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
-        let scaled_size = Vector2::new(screen_size.x * window_size.x, screen_size.y * window_size.y);
-
-        self.render_sprite_indexed(icon, scaled_position, scaled_size, color, 1, 0, true);
+        self.render_sprite_direct(icon, screen_position, screen_size, color, true);
     }
 
     #[cfg(feature = "debug")]

@@ -57,8 +57,8 @@ impl SpriteRenderer {
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
-        let nearest_sampler = create_sampler!(device.clone(), Nearest, Repeat);
-        let linear_sampler = create_sampler!(device, Linear, Repeat);
+        let nearest_sampler = create_sampler!(device.clone(), Nearest, MirroredRepeat);
+        let linear_sampler = create_sampler!(device, Linear, MirroredRepeat);
 
         return Self { pipeline, vertex_buffer, nearest_sampler, linear_sampler };
     }
@@ -80,7 +80,7 @@ impl SpriteRenderer {
         return Arc::new(pipeline);
     }
 
-    pub fn render_indexed(&self, builder: &mut CommandBuilder, window_size: Vector2<usize>, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
+    fn build(&self, builder: &mut CommandBuilder, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, texture_position: Vector2<f32>, texture_size: Vector2<f32>, color: Color, smooth: bool) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -94,15 +94,11 @@ impl SpriteRenderer {
 
         let set = Arc::new(set_builder.build().unwrap());
 
-        let unit = 1.0 / column_count as f32;
-        let offset_x = unit * (cell_index % column_count) as f32;
-        let offset_y = unit * (cell_index / column_count) as f32;
-
         let constants = Constants {
-            screen_position: [screen_position.x / window_size.x as f32, screen_position.y / window_size.y as f32],
-            screen_size: [screen_size.x / window_size.x as f32, screen_size.y / window_size.y as f32],
-            texture_position: [offset_x, offset_y],
-            texture_size: [unit, unit],
+            screen_position: [screen_position.x, screen_position.y],
+            screen_size: [screen_size.x, screen_size.y],
+            texture_position: [texture_position.x, texture_position.y],
+            texture_size: [texture_size.x, texture_size.y],
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
         };
 
@@ -112,5 +108,31 @@ impl SpriteRenderer {
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .draw(6, 1, 0, 0).unwrap();
+    }
+
+    pub fn render(&self, builder: &mut CommandBuilder, window_size: Vector2<usize>, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, smooth: bool) {
+
+        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
+        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
+        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
+
+        self.build(builder, texture, screen_position, screen_size, Vector2::new(0.0, 0.0), Vector2::new(1.0, 1.0), color, smooth);
+    }
+
+    pub fn render_indexed(&self, builder: &mut CommandBuilder, window_size: Vector2<usize>, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
+
+        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
+        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
+        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
+
+        let unit = 1.0 / column_count as f32;
+        let offset_x = unit * (cell_index % column_count) as f32;
+        let offset_y = unit * (cell_index / column_count) as f32;
+
+        self.build(builder, texture, screen_position, screen_size, Vector2::new(offset_x, offset_y), Vector2::new(unit, unit), color, smooth);
+    }
+
+    pub fn render_direct(&self, builder: &mut CommandBuilder, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, smooth: bool) {
+        self.build(builder, texture, screen_position, screen_size, Vector2::new(0.0, 0.0), Vector2::new(1.0, 1.0), color, smooth);
     }
 }

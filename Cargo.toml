@@ -3,13 +3,14 @@ name = "korangar"
 version = "0.1.0"
 
 [dependencies]
-vulkano = { git = "https://github.com/vulkano-rs/vulkano.git" }
-vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git" }
-vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git" }
+vulkano = "0.26"
+vulkano-shaders = "0.26"
+vulkano-win = "0.26"
 winit = "0.25"
 cgmath = "0.18"
 png = "0.16"
 bmp = "*"
+pnet = "*"
 
 [features]
 debug = ["lazy_static", "chrono"]

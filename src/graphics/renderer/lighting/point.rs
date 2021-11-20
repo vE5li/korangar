@@ -27,12 +27,14 @@ use graphics::*;
 
 use self::vertex_shader::Shader as VertexShader;
 use self::fragment_shader::Shader as FragmentShader;
-use self::fragment_shader::ty::Constants as Constants;
+use self::fragment_shader::ty::Constants;
 
 const BILLBOARD_SIZE_MULTIPLIER: f32 = 1.4142;
 
 pub struct PointLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
+    vertex_shader: VertexShader,
+    fragment_shader: FragmentShader,
 }
 
 impl PointLightRenderer {
@@ -43,7 +45,11 @@ impl PointLightRenderer {
         let fragment_shader = FragmentShader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
-        return Self { pipeline };
+        return Self { pipeline, vertex_shader, fragment_shader };
+    }
+
+    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
+        self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {

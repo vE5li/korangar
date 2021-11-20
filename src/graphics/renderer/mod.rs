@@ -1,18 +1,21 @@
+#[macro_use]
+mod workaround;
 mod settings;
 #[macro_use]
 mod sampler;
 mod deferred;
 mod lighting;
 mod sprite;
+mod interface;
+#[cfg(feature = "debug")]
+mod debug;
 
 use std::sync::Arc;
-
-use cgmath::{ Vector3, Vector2 };
-
+use cgmath::{ Vector4, Vector3, Vector2 };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, CommandBufferUsage, SubpassContents };
 use vulkano::device::{ Device, Queue };
-use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError, SwapchainAcquireFuture, Surface, acquire_next_image };
+use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError, SwapchainAcquireFuture, Surface, ColorSpace, acquire_next_image };
 use vulkano::image::{ ImageUsage, SwapchainImage };
 use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
@@ -21,17 +24,20 @@ use vulkano::render_pass::{ Framebuffer, RenderPass, Subpass };
 use vulkano::buffer::BufferUsage;
 use vulkano::format::Format;
 use vulkano::sync::{ FlushError, GpuFuture, now };
-
 use winit::window::Window;
 
 #[cfg(feature = "debug")]
 use debug::*;
 use graphics::*;
 use loaders::TextureLoader;
+use map::model::Node;
 
-use self::deferred::DeferredRenderer;
+use self::deferred::*;
 use self::lighting::*;
 use self::sprite::SpriteRenderer;
+use self::interface::*;
+#[cfg(feature = "debug")]
+use self::debug::*;
 
 pub use self::settings::RenderSettings;
 
@@ -58,11 +64,17 @@ impl CurrentFrame {
 pub struct Renderer {
     queue: Arc<Queue>,
     device: Arc<Device>,
-    deferred_renderer: DeferredRenderer,
+    geometry_renderer: GeometryRenderer,
+    entity_renderer: EntityRenderer,
+    #[cfg(feature = "debug")]
+    area_renderer: AreaRenderer,
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     point_light_renderer: PointLightRenderer,
     sprite_renderer: SpriteRenderer,
+    rectangle_renderer: RectangleRenderer,
+    #[cfg(feature = "debug")]
+    debug_renderer: DebugRenderer,
     swapchain: Arc<Swapchain<Window>>,
     render_pass: Arc<RenderPass>,
     framebuffers: Framebuffers,
@@ -79,23 +91,13 @@ pub struct Renderer {
     background_texture: Texture,
     checked_box_texture: Texture,
     unchecked_box_texture: Texture,
-    #[cfg(feature = "debug")]
-    object_texture: Texture,
-    #[cfg(feature = "debug")]
-    light_texture: Texture,
-    #[cfg(feature = "debug")]
-    sound_texture: Texture,
-    #[cfg(feature = "debug")]
-    effect_texture: Texture,
-    #[cfg(feature = "debug")]
-    particle_texture: Texture,
-    #[cfg(feature = "debug")]
-    tile_textures: Vec<Texture>,
 }
 
 impl Renderer {
 
     pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, texture_loader: &mut TextureLoader) -> Self {
+
+        let mut texture_future = now(device.clone()).boxed();
 
         let capabilities = surface.capabilities(*physical_device).expect("failed to get surface capabilities");
         let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
@@ -110,6 +112,7 @@ impl Renderer {
             .usage(ImageUsage::color_attachment())
             .sharing_mode(&queue)
             .composite_alpha(composite_alpha)
+            .color_space(ColorSpace::SrgbNonLinear)
             .build()
             .expect("failed to create swapchain");
 
@@ -117,7 +120,7 @@ impl Renderer {
         print_debug!("created {}swapchain{}", magenta(), none());
 
         let render_pass = Arc::new(
-            vulkano::ordered_passes_renderpass!(device.clone(),
+            ordered_passes_renderpass_korangar!(device.clone(),
                 attachments: {
                     output: {
                         load: Clear,
@@ -128,7 +131,7 @@ impl Renderer {
                     diffuse: {
                         load: Clear,
                         store: DontCare,
-                        format: Format::A2B10G10R10_UNORM_PACK32,
+                        format: Format::R32G32B32A32_SFLOAT,
                         samples: 1,
                     },
                     normal: {
@@ -159,14 +162,31 @@ impl Renderer {
             )
             .unwrap(),
         );
+        let deferred_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
+        let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
 
         #[cfg(feature = "debug")]
         print_debug!("created {}render pass{}", magenta(), none());
 
-        let (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, sprite_renderer, framebuffers, diffuse_buffer, normal_buffer, depth_buffer) = Self::window_size_dependent_setup(device.clone(), &images, render_pass.clone());
+        let (framebuffers, diffuse_buffer, normal_buffer, depth_buffer, viewport) = Self::window_size_dependent_setup(device.clone(), &images, render_pass.clone());
 
         #[cfg(feature = "debug")]
         print_debug!("created {}pipeline{}", magenta(), none());
+
+        let geometry_renderer = GeometryRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
+        let entity_renderer = EntityRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
+        let area_renderer = AreaRenderer::new(device.clone(), deferred_subpass, viewport.clone());
+        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let rectangle_renderer = RectangleRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
+        let debug_renderer = DebugRenderer::new(device.clone(), lighting_subpass, viewport, texture_loader, &mut texture_future);
+
+        #[cfg(feature = "debug")]
+        print_debug!("created {}renderers{}", magenta(), none());
 
         let vertices = vec![ScreenVertex::new(Vector2::new(-1.0, -1.0)), ScreenVertex::new(Vector2::new(-1.0, 3.0)), ScreenVertex::new(Vector2::new(3.0, -1.0))];
         let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
@@ -181,96 +201,56 @@ impl Renderer {
         ];
         let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
+        let font_map = texture_loader.get(String::from("assets/font.png"), &mut texture_future);
+        let background_texture = texture_loader.get(String::from("assets/background.png"), &mut texture_future);
+        let checked_box_texture = texture_loader.get(String::from("assets/checked_box.png"), &mut texture_future);
+        let unchecked_box_texture = texture_loader.get(String::from("assets/unchecked_box.png"), &mut texture_future);
+
+        texture_future.flush().unwrap();
+        texture_future.cleanup_finished();
+
         let previous_frame_end = Some(now(device.clone()).boxed());
-
-        let (font_map, mut font_future) = texture_loader.get(String::from("assets/font.png"));
-        font_future.cleanup_finished();
-
-        let (background_texture, mut background_future) = texture_loader.get(String::from("assets/background.bmp"));
-        background_future.cleanup_finished();
-
-        let (checked_box_texture, mut checked_box_future) = texture_loader.get(String::from("assets/checked_box.png"));
-        checked_box_future.cleanup_finished();
-
-        let (unchecked_box_texture, mut unchecked_box_future) = texture_loader.get(String::from("assets/unchecked_box.png"));
-        unchecked_box_future.cleanup_finished();
-
-        #[cfg(feature = "debug")]
-        let (object_texture, mut future) = texture_loader.get(String::from("assets/object.png"));
-        #[cfg(feature = "debug")]
-        future.cleanup_finished();
-
-        #[cfg(feature = "debug")]
-        let (light_texture, mut future) = texture_loader.get(String::from("assets/light.png"));
-        #[cfg(feature = "debug")]
-        future.cleanup_finished();
-
-        #[cfg(feature = "debug")]
-        let (sound_texture, mut future) = texture_loader.get(String::from("assets/sound.png"));
-        #[cfg(feature = "debug")]
-        future.cleanup_finished();
-
-        #[cfg(feature = "debug")]
-        let (effect_texture, mut future) = texture_loader.get(String::from("assets/effect.png"));
-        #[cfg(feature = "debug")]
-        future.cleanup_finished();
-
-        #[cfg(feature = "debug")]
-        let (particle_texture, mut future) = texture_loader.get(String::from("assets/particle.png"));
-        #[cfg(feature = "debug")]
-        future.cleanup_finished();
-
-        #[cfg(feature = "debug")]
-        let tile_textures = (0..7_i32).map(|index| {
-            let (texture, mut future) = texture_loader.get(format!("assets/{}.png", index));
-            future.cleanup_finished();
-            texture
-        }).collect();
+        let current_frame = None;
+        let recreate_swapchain = false;
 
         return Self {
-            queue: queue,
-            device: device,
-            deferred_renderer: deferred_renderer,
-            ambient_light_renderer: ambient_light_renderer,
-            directional_light_renderer: directional_light_renderer,
-            point_light_renderer: point_light_renderer,
-            sprite_renderer: sprite_renderer,
-            swapchain: swapchain,
-            render_pass: render_pass,
-            framebuffers: framebuffers,
-            diffuse_buffer: diffuse_buffer,
-            normal_buffer: normal_buffer,
-            depth_buffer: depth_buffer,
-            screen_vertex_buffer: screen_vertex_buffer,
-            billboard_vertex_buffer: billboard_vertex_buffer,
-            current_frame: None,
-            previous_frame_end: previous_frame_end,
-            recreate_swapchain: false,
-            window_size: window_size,
-            font_map: font_map,
-            background_texture: background_texture,
-            checked_box_texture: checked_box_texture,
-            unchecked_box_texture: unchecked_box_texture,
+            queue,
+            device,
+            geometry_renderer,
+            entity_renderer,
             #[cfg(feature = "debug")]
-            object_texture: object_texture,
+            area_renderer,
+            ambient_light_renderer,
+            directional_light_renderer,
+            point_light_renderer,
+            sprite_renderer,
+            rectangle_renderer,
             #[cfg(feature = "debug")]
-            light_texture: light_texture,
-            #[cfg(feature = "debug")]
-            sound_texture: sound_texture,
-            #[cfg(feature = "debug")]
-            effect_texture: effect_texture,
-            #[cfg(feature = "debug")]
-            particle_texture: particle_texture,
-            #[cfg(feature = "debug")]
-            tile_textures: tile_textures,
+            debug_renderer,
+            swapchain,
+            render_pass,
+            framebuffers,
+            diffuse_buffer,
+            normal_buffer,
+            depth_buffer,
+            screen_vertex_buffer,
+            billboard_vertex_buffer,
+            current_frame,
+            previous_frame_end,
+            recreate_swapchain,
+            window_size,
+            font_map,
+            background_texture,
+            checked_box_texture,
+            unchecked_box_texture,
         }
     }
 
-    fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (DeferredRenderer, AmbientLightRenderer, DirectionalLightRenderer, PointLightRenderer, SpriteRenderer, Framebuffers, ImageBuffer, ImageBuffer, ImageBuffer) {
+    fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Framebuffers, ImageBuffer, ImageBuffer, ImageBuffer, Viewport) {
 
         let dimensions = images[0].dimensions();
 
-        let diffuse_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::A2B10G10R10_UNORM_PACK32).unwrap()).unwrap();
+        let diffuse_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::R32G32B32A32_SFLOAT).unwrap()).unwrap();
         let normal_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::R16G16B16A16_SFLOAT).unwrap()).unwrap();
         let depth_buffer = ImageView::new(AttachmentImage::transient_input_attachment(device.clone(), dimensions, Format::D32_SFLOAT).unwrap()).unwrap();
 
@@ -295,16 +275,7 @@ impl Renderer {
             depth_range: 0.0..1.0,
         };
 
-        let deferred_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-        let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
-
-        let deferred_renderer = DeferredRenderer::new(device.clone(), deferred_subpass, viewport.clone());
-        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass, viewport);
-
-        return (deferred_renderer, ambient_light_renderer, directional_light_renderer, point_light_renderer, sprite_renderer, framebuffers, diffuse_buffer, normal_buffer, depth_buffer);
+        return (framebuffers, diffuse_buffer, normal_buffer, depth_buffer, viewport);
     }
 
     pub fn invalidate_swapchain(&mut self) {
@@ -332,20 +303,30 @@ impl Renderer {
                 Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
             };
 
-            let (new_deferred_renderer, new_ambient_light_renderer, new_directional_light_renderer, new_point_light_renderer, new_sprite_renderer, new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
+            let (new_framebuffers, new_color_buffer, new_normal_buffer, new_depth_buffer, new_viewport) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
 
-            self.deferred_renderer = new_deferred_renderer;
-            self.ambient_light_renderer = new_ambient_light_renderer;
-            self.directional_light_renderer = new_directional_light_renderer;
-            self.point_light_renderer = new_point_light_renderer;
-            self.sprite_renderer = new_sprite_renderer;
+            let deferred_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
+            let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
+
+            self.geometry_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
+            self.entity_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
+            #[cfg(feature = "debug")]
+            self.area_renderer.recreate_pipeline(self.device.clone(), deferred_subpass, new_viewport.clone());
+            self.ambient_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+            self.directional_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+            self.point_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+            self.sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+            self.rectangle_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+            #[cfg(feature = "debug")]
+            self.debug_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport);
+
             self.swapchain = new_swapchain;
             self.diffuse_buffer = new_color_buffer;
             self.normal_buffer = new_normal_buffer;
             self.depth_buffer = new_depth_buffer;
             self.framebuffers = new_framebuffers;
-            self.recreate_swapchain = false;
             self.window_size = new_window_size;
+            self.recreate_swapchain = false;
 
             #[cfg(feature = "debug")]
             timer.stop();
@@ -367,9 +348,7 @@ impl Renderer {
         let clear_values = vec![[0.0, 0.0, 0.0, 1.0].into(), [0.0, 0.0, 0.0, 1.0].into(), [0.0, 0.0, 0.0, 1.0].into(), 1f32.into()];
 
         let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
-
         builder.begin_render_pass(self.framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap();
-
         self.current_frame = Some(CurrentFrame::new(builder, image_num, acquire_future));
     }
 
@@ -379,9 +358,21 @@ impl Renderer {
         }
     }
 
-    pub fn render_geomitry(&mut self, camera: &dyn Camera, vertex_buffer: VertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
+    pub fn render_geomitry(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.deferred_renderer.render_geometry(camera, &mut current_frame.builder, vertex_buffer, textures, transform);
+            self.geometry_renderer.render(camera, &mut current_frame.builder, vertex_buffer, textures, transform);
+        }
+    }
+
+    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node, transform: &Transform) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.geometry_renderer.render_node(camera, &mut current_frame.builder, node, transform);
+        }
+    }
+
+    pub fn render_entity(&mut self, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.entity_renderer.render(camera, &mut current_frame.builder, texture, position, origin, size, cell_count, cell_position);
         }
     }
 
@@ -421,8 +412,10 @@ impl Renderer {
         }
     }
 
-    pub fn render_background(&mut self, position: Vector2<f32>, size: Vector2<f32>, color: Color) {
-        self.render_sprite(self.background_texture.clone(), position, size, color, false);
+    pub fn render_rectangle(&mut self, position: Vector2<f32>, size: Vector2<f32>, corner_radius: Vector4<f32>, color: Color) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.rectangle_renderer.render(&mut current_frame.builder, self.window_size, position, size, corner_radius, color);
+        }
     }
 
     pub fn render_checkbox(&mut self, position: Vector2<f32>, size: Vector2<f32>, color: Color, checked: bool) {
@@ -434,60 +427,87 @@ impl Renderer {
 
     pub fn render_text(&mut self, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
         for character in text.as_bytes() {
-
-            let index = match (*character as usize) < 31 {
-                true => 0,
-                false => *character as usize - 31,
-            };
-
+            let index = (*character as usize).saturating_sub(31);
             self.render_sprite_indexed(self.font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, true);
             position.x += font_size / 2.0;
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_map_tiles(&mut self, camera: &dyn Camera, vertex_buffer: VertexBuffer, transform: &Transform) {
-        let tile_textures = self.tile_textures.clone();
+    pub fn render_map_tiles(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, transform: &Transform) { // remove transform
+        let tile_textures = self.debug_renderer.tile_textures.clone();
         self.render_geomitry(camera, vertex_buffer, &tile_textures, transform);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_debug_icon(&mut self, camera: &dyn Camera, icon: Texture, position: Vector3<f32>, color: Color) {
+    pub fn render_pathing(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, transform: &Transform) { // remove transform
+        let step_textures = self.debug_renderer.step_textures.clone();
+        self.render_geomitry(camera, vertex_buffer, &step_textures, transform);
+    }
 
+    #[cfg(feature = "debug")]
+    pub fn render_bounding_box(&mut self, camera: &dyn Camera, transform: &Transform) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.area_renderer.render(&mut current_frame.builder, camera, transform);
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn marker_hovered(&self, camera: &dyn Camera, position: Vector3<f32>, mouse_position: Vector2<f32>) -> bool {
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MARKER_SIZE);
 
         if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 {
-            return;
+            return false;
         }
 
-        let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
+        let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THERE INVERTED ???
+        let half_screen = Vector2::new(self.window_size.x as f32 / 2.0, self.window_size.y as f32 / 2.0);
+        let mouse_position = Vector2::new(mouse_position.x / half_screen.x, mouse_position.y / half_screen.y);
 
-        self.render_sprite_direct(icon, screen_position, screen_size, color, true);
+        return mouse_position.x >= screen_position.x && mouse_position.y >= screen_position.y &&
+            mouse_position.x <= screen_position.x + screen_size.x && mouse_position.y <= screen_position.y + screen_size.y;
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_object_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
-        self.render_debug_icon(camera, self.object_texture.clone(), position, Color::new(255, 100, 100));
+    pub fn render_debug_marker(&mut self, camera: &dyn Camera, icon: Texture, position: Vector3<f32>, color: Color) {
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MARKER_SIZE);
+
+        if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
+            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THERE INVERTED ???
+            self.render_sprite_direct(icon, screen_position, screen_size, color, true);
+        }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_light_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>, color: Color) {
-        self.render_debug_icon(camera, self.light_texture.clone(), position, color);
+    pub fn render_object_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_marker(camera, self.debug_renderer.object_texture.clone(), position, Color::new(255, 100, 100));
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_sound_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
-        self.render_debug_icon(camera, self.sound_texture.clone(), position, Color::new(150, 150, 150));
+    pub fn render_light_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, color: Color) {
+        self.render_debug_marker(camera, self.debug_renderer.light_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_effect_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
-        self.render_debug_icon(camera, self.effect_texture.clone(), position, Color::new(100, 255, 100));
+    pub fn render_sound_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_marker(camera, self.debug_renderer.sound_texture.clone(), position, Color::new(150, 150, 150));
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_particle_icon(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
-        self.render_debug_icon(camera, self.particle_texture.clone(), position, Color::new(255, 20, 20));
+    pub fn render_effect_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_marker(camera, self.debug_renderer.effect_texture.clone(), position, Color::new(100, 255, 100));
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_particle_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>) {
+        self.render_debug_marker(camera, self.debug_renderer.particle_texture.clone(), position, Color::new(255, 20, 20));
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_buffers(&mut self, camera: &dyn Camera, render_settings: &RenderSettings) {
+        if let Some(current_frame) = &mut self.current_frame {
+            self.debug_renderer.render_buffers(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.screen_vertex_buffer.clone(), render_settings);
+        }
     }
 
     pub fn stop_frame(&mut self) {

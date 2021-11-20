@@ -29,10 +29,12 @@ use graphics::*;
 
 use self::vertex_shader::Shader as VertexShader;
 use self::fragment_shader::Shader as FragmentShader;
-use self::vertex_shader::ty::Constants as Constants;
+use self::vertex_shader::ty::Constants;
 
 pub struct SpriteRenderer {
     pipeline: Arc<GraphicsPipeline>,
+    vertex_shader: VertexShader,
+    fragment_shader: FragmentShader,
     vertex_buffer: ScreenVertexBuffer,
     nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
@@ -60,7 +62,11 @@ impl SpriteRenderer {
         let nearest_sampler = create_sampler!(device.clone(), Nearest, MirroredRepeat);
         let linear_sampler = create_sampler!(device, Linear, MirroredRepeat);
 
-        return Self { pipeline, vertex_buffer, nearest_sampler, linear_sampler };
+        return Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, nearest_sampler, linear_sampler };
+    }
+
+    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
+        self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {
@@ -130,6 +136,18 @@ impl SpriteRenderer {
         let offset_y = unit * (cell_index / column_count) as f32;
 
         self.build(builder, texture, screen_position, screen_size, Vector2::new(offset_x, offset_y), Vector2::new(unit, unit), color, smooth);
+    }
+
+    pub fn render_sheet(&self, builder: &mut CommandBuilder, window_size: Vector2<usize>, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, cell_count: Vector2<usize>, cell_position: Vector2<usize>, smooth: bool) {
+
+        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
+        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
+        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
+
+        let unit = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
+        let offset = Vector2::new(unit.x * cell_position.x as f32, unit.y * cell_position.y as f32);
+
+        self.build(builder, texture, screen_position, screen_size, offset, unit, color, smooth);
     }
 
     pub fn render_direct(&self, builder: &mut CommandBuilder, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, smooth: bool) {

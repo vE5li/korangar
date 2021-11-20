@@ -7,7 +7,9 @@ pub struct Color {
 
 impl Color {
 
-    pub fn new(red: u8, green: u8, blue: u8) -> Self {
+    pub const WHITE: Color = Color::new(255, 255, 255);
+
+    pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         return Self { red, green, blue };
     }
 

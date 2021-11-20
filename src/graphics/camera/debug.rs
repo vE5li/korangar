@@ -5,6 +5,8 @@ use graphics::Transform;
 use super::Camera;
 
 const LOOK_AROUND_SPEED: f32 = 0.005;
+const FLY_SPEED_FAST: f32 = 1000.0;
+const FLY_SPEED_SLOW: f32 = 100.0;
 
 pub struct DebugCamera {
     camera_position: Point3<f32>,
@@ -63,8 +65,12 @@ impl DebugCamera {
         self.camera_position += Vector3::new(0.0, 1.0, 0.0) * self.fly_speed * delta_time;
     }
 
-    pub fn move_down(&mut self, delta_time: f32) {
-        self.camera_position -= Vector3::new(0.0, 1.0, 0.0) * self.fly_speed * delta_time;
+    pub fn accelerate(&mut self) {
+        self.fly_speed = FLY_SPEED_FAST;
+    }
+
+    pub fn decelerate(&mut self) {
+        self.fly_speed = FLY_SPEED_SLOW;
     }
 
     fn focus_position(&self) -> Point3<f32> {
@@ -101,13 +107,40 @@ impl Camera for DebugCamera {
         self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();
     }
 
-    fn transform_matrices(&self, transform: &Transform) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
+    fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
+        return (self.view_matrix, self.projection_matrix);
+    }
+
+    fn transform_matrix(&self, transform: &Transform) -> (Matrix4<f32>, Matrix4<f32>) {
+
         let translation_matrix = Matrix4::from_translation(transform.position);
         let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);
         let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
-        let world_matrix = rotation_matrix * translation_matrix * scale_matrix;
 
-        return (rotation_matrix, world_matrix, self.view_matrix, self.projection_matrix);
+        let world_matrix = /*transform.node_translation */ transform.node_scale; // * transform.offset_translation;
+
+        // SEEMS MORE RIGHT CURRENTLY
+        //let world_matrix = translation_matrix * rotation_matrix * scale_matrix * transform.offset_translation * transform.node_translation * transform.rotation_matrix * transform.offset_matrix * transform.node_scale;
+
+        // RIGHT INITIALLY
+        //let world_matrix = translation_matrix * rotation_matrix * scale_matrix * transform.offset_translation * transform.offset_matrix * transform.node_translation * transform.rotation_matrix * transform.node_scale;
+
+        return (rotation_matrix, world_matrix);
+    }
+
+    fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
+
+        let direction = self.view_direction();
+        let right_vector = self.look_up_vector.cross(direction).normalize();
+        let up_vector = direction.cross(right_vector).normalize();
+
+        let rotation_matrix = Matrix4::new(right_vector.x, right_vector.y, right_vector.z, 0.0, up_vector.x, up_vector.y, up_vector.z, 0.0, direction.x, direction.y, direction.z, 0.0, 0.0, 0.0, 0.0, 1.0);
+        let translation_matrix = Matrix4::from_translation(position);
+        let origin_matrix = Matrix4::from_translation(origin);
+        let scale_matrix = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
+        let world_matrix = translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix;
+
+        return world_matrix;
     }
 
     fn billboard_coordinates(&self, position: Vector3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {

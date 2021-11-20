@@ -1,23 +1,19 @@
-mod partial;
-
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::read;
 
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
-
-use cgmath::{ Vector2, Vector3, Rad, InnerSpace };
+use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use debug::*;
-use map::model::{ Model, Node, ShadingType };
-use graphics::Transform;
+use maths::*;
+use map::model::{ Model, Node, BoundingBox, ShadingType };
+use graphics::{ Transform, NativeModelVertex };
 use loaders::TextureLoader;
 
 use super::ByteStream;
-
-use self::partial::*;
 
 pub struct ModelLoader {
     cache: HashMap<String, Arc<Model>>,
@@ -33,7 +29,55 @@ impl ModelLoader {
         }
     }
 
-    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: String) -> Arc<Model> {
+    fn calculate_bounding_box(nodes: &Vec<Node>) -> BoundingBox {
+
+        let mut smallest: Vector3<f32> = vector3!(999999.0);
+        let mut biggest: Vector3<f32> = vector3!(-999999.0);
+
+        for node in nodes {
+            smallest.x = smallest.x.min(node.bounding_box.smallest.x);
+            smallest.y = smallest.y.min(node.bounding_box.smallest.y);
+            smallest.z = smallest.z.min(node.bounding_box.smallest.z);
+
+            biggest.x = biggest.x.max(node.bounding_box.biggest.x);
+            biggest.y = biggest.y.max(node.bounding_box.biggest.y);
+            biggest.z = biggest.z.max(node.bounding_box.biggest.z);
+        }
+
+        let offset = (biggest + smallest).map(|component| component / 2.0);
+        let range = (biggest - smallest).map(|component| component / 2.0);
+
+        return BoundingBox::new(smallest, biggest, offset, range);
+    }
+
+    fn calculate_node_bounding_box(vertices: &Vec<NativeModelVertex>, offset_matrix: Matrix3<f32>, offset_translation: Vector3<f32>, is_only: bool) -> BoundingBox {
+
+        let mut smallest: Vector3<f32> = vector3!(999999.0);
+        let mut biggest: Vector3<f32> = vector3!(-999999.0);
+
+        for vertex in vertices {
+            let mut vv = offset_matrix * vertex.position;
+
+            if !is_only {
+                vv += offset_translation;
+            }
+
+            smallest.x = smallest.x.min(vv.x);
+            smallest.y = smallest.y.min(vv.y);
+            smallest.z = smallest.z.min(vv.z);
+
+            biggest.x = biggest.x.max(vv.x);
+            biggest.y = biggest.y.max(vv.y);
+            biggest.z = biggest.z.max(vv.z);
+        }
+
+        let offset = (biggest + smallest).map(|component| component / 2.0);
+        let range = (biggest - smallest).map(|component| component / 2.0);
+
+        return BoundingBox::new(smallest, biggest, offset, range);
+    }
+
+    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Arc<Model> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", magenta(), model_file, none()));
@@ -61,10 +105,7 @@ impl ModelLoader {
         for _index in 0..texture_count as usize {
             let texture_name = byte_stream.string(40);
             let texture_name_unix = texture_name.replace("\\", "/");
-            let (texture, mut future) = texture_loader.get(format!("data/texture/{}", texture_name_unix));
-
-            // todo return gpu future instead
-            future.cleanup_finished();
+            let texture = texture_loader.get(format!("data/texture/{}", texture_name_unix), texture_future);
             textures.push(texture);
         }
 
@@ -103,9 +144,9 @@ impl ModelLoader {
                 node_textures.push(textures[texture_index].clone());
             }
 
-            let _offset_matrix = byte_stream.slice(36); // matrix 3x3
-            let _offset_translation = byte_stream.vector3();
-            let translation = byte_stream.vector3();
+            let offset_matrix = byte_stream.matrix3();
+            let offset_translation = byte_stream.vector3();
+            let position = byte_stream.vector3();
             let rotation_angle = byte_stream.float32();
             let rotation_axis = byte_stream.vector3();
             let scale = byte_stream.vector3();
@@ -117,7 +158,7 @@ impl ModelLoader {
 
             for _index in 0..vertex_count {
                 let vertex_position = byte_stream.vector3();
-                let dirty = Vector3::new(vertex_position.x, vertex_position.z, vertex_position.y);
+                let dirty = Vector3::new(vertex_position.x, vertex_position.y, -vertex_position.z);
                 vertex_positions.push(dirty);
                 common_normals.push(Vec::new());
             }
@@ -132,21 +173,19 @@ impl ModelLoader {
                     let _color = byte_stream.integer32();
                     let u = byte_stream.float32();
                     let v = byte_stream.float32();
-
                     texture_coordinates.push(Vector2::new(u, v)); // color
                 } else {
 
                     let u = byte_stream.float32();
                     let v = byte_stream.float32();
-
                     texture_coordinates.push(Vector2::new(u, v));
                 }
             }
 
             let face_count = byte_stream.integer32();
 
-            let mut vertices = Vec::new();
-            let mut partial_vertices = Vec::new();
+            //let mut vertices = Vec::new();
+            let mut native_vertices = Vec::new();
 
             for _index in 0..face_count {
 
@@ -167,7 +206,7 @@ impl ModelLoader {
                     false => 0,
                 };
 
-                let offset = partial_vertices.len();
+                let offset = native_vertices.len();
                 common_normals[first_vertex_position_index as usize].push(offset);
                 common_normals[second_vertex_position_index as usize].push(offset + 1);
                 common_normals[third_vertex_position_index as usize].push(offset + 2);
@@ -180,11 +219,11 @@ impl ModelLoader {
                 let second_texture_coordinate = texture_coordinates[second_texture_coordinate_index as usize];
                 let third_texture_coordinate = texture_coordinates[third_texture_coordinate_index as usize];
 
-                let normal = calculate_normal(first_vertex_position, second_vertex_position, third_vertex_position);
+                let normal = NativeModelVertex::calculate_normal(first_vertex_position, second_vertex_position, third_vertex_position);
 
-                partial_vertices.push(PartialVertex::new(first_vertex_position, normal, first_texture_coordinate, texture_index));
-                partial_vertices.push(PartialVertex::new(second_vertex_position, normal, second_texture_coordinate, texture_index));
-                partial_vertices.push(PartialVertex::new(third_vertex_position, normal, third_texture_coordinate, texture_index));
+                native_vertices.push(NativeModelVertex::new(first_vertex_position, normal, first_texture_coordinate, texture_index));
+                native_vertices.push(NativeModelVertex::new(second_vertex_position, normal, second_texture_coordinate, texture_index));
+                native_vertices.push(NativeModelVertex::new(third_vertex_position, normal, third_texture_coordinate, texture_index));
             }
 
             if version.equals_or_above(1, 5) {
@@ -205,25 +244,10 @@ impl ModelLoader {
                 }
 
                 let new_normal = normal_group.iter()
-                    .map(|index| partial_vertices[*index].normal)
+                    .map(|index| native_vertices[*index].normal)
                     .fold(Vector3::new(0.0, 0.0, 0.0), |output, normal| output + normal);
 
-                normal_group.iter().for_each(|index| partial_vertices[*index].normal = new_normal);
-            }
-
-            while !partial_vertices.is_empty() {
-
-                let mut first_partial = partial_vertices.remove(0);
-                let mut second_partial = partial_vertices.remove(0);
-                let mut third_partial = partial_vertices.remove(0);
-
-                first_partial.normal = first_partial.normal.normalize();
-                second_partial.normal = second_partial.normal.normalize();
-                third_partial.normal = third_partial.normal.normalize();
-
-                vertices.push(first_partial.to_vertex());
-                vertices.push(second_partial.to_vertex());
-                vertices.push(third_partial.to_vertex());
+                normal_group.iter().for_each(|index| native_vertices[*index].normal = new_normal);
             }
 
             let parent_name = match parent_name.is_empty() {
@@ -231,11 +255,17 @@ impl ModelLoader {
                 false => Some(parent_name),
             };
 
-            let vertex_buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
-            let adjusted_translation = Vector3::new(translation.x, -translation.y, translation.z);
-            let transform = Transform::position(adjusted_translation) + Transform::rotation_around_axis(rotation_axis, Rad(rotation_angle)) + Transform::scale(scale);
+            let bounding_box = Self::calculate_node_bounding_box(&native_vertices, offset_matrix, offset_translation, true);
 
-            nodes.push(Node::new(node_name.clone(), parent_name.clone(), node_textures, transform, vertex_count, vertex_buffer));
+            let rotation = vector3!(Rad(0.0)); // get from axis and angle
+
+            //let scale = scale.map(|c| c.abs());
+
+            let vertices = NativeModelVertex::to_vertices(native_vertices);
+            let vertex_buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+            let transform = Transform::offset(-offset_translation) + Transform::offset_matrix(offset_matrix.into());
+
+            nodes.push(Node::new(node_name.clone(), parent_name.clone(), node_textures, transform, vertex_buffer, bounding_box, offset_matrix, offset_translation, position, rotation, scale));
 
             #[cfg(feature = "debug_model")]
             {
@@ -245,13 +275,14 @@ impl ModelLoader {
                 print_debug!("texture count {}{}{}", magenta(), texture_count, none());
                 print_debug!("texture indices {}{}{}", magenta(), formatted_list, none());
 
-                print_debug!("offset tranlation {}{:?}{}", magenta(), _offset_translation, none());
-                print_debug!("translation {}{:?}{}", magenta(), translation, none());
+                print_debug!("offset matrix {}{:?}{}", magenta(), offset_matrix, none());
+                print_debug!("offset tranlation {}{:?}{}", magenta(), offset_translation, none());
+                print_debug!("position {}{:?}{}", magenta(), position, none());
                 print_debug!("rotation angle {}{}{}", magenta(), rotation_angle, none());
                 print_debug!("rotation axis {}{:?}{}", magenta(), rotation_axis, none());
                 print_debug!("scale {}{:?}{}", magenta(), scale, none());
 
-                print_debug!("vertex count {}{}{}", magenta(), vertex_count, none());
+                print_debug!("ModelVertex count {}{}{}", magenta(), vertex_count, none());
                 print_debug!("texture coordinate count {}{}{}", magenta(), texture_coordinate_count, none());
                 print_debug!("face count {}{}{}", magenta(), face_count, none());
                 print_debug!("rotation key frame count {}{}{}", magenta(), rotation_key_frame_count, none());
@@ -266,6 +297,9 @@ impl ModelLoader {
         #[cfg(feature = "debug")]
         byte_stream.assert_empty(bytes.len(), &model_file);
 
+        let bounding_box = Self::calculate_bounding_box(&nodes);
+        println!("FINAL: {:?}", bounding_box);
+
         for node in nodes.clone().iter() { // fix ordering issue
             if let Some(parent_name) = &node.parent_name {
                 let parent_node = nodes.iter_mut().find(|node| node.name == *parent_name).expect("failed to find parent node");
@@ -274,7 +308,7 @@ impl ModelLoader {
         }
 
         let root_node = nodes.iter().find(|node| node.name == *main_node_name).expect("failed to find root node").clone(); // fix cloning issue
-        let model = Arc::new(Model::new(root_node));
+        let model = Arc::new(Model::new(root_node, bounding_box));
 
         self.cache.insert(model_file, model.clone());
 
@@ -284,10 +318,10 @@ impl ModelLoader {
         return model;
     }
 
-    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: String) -> Arc<Model> {
+    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Arc<Model> {
         match self.cache.get(&model_file) {
             Some(model) => return model.clone(),
-            None => return self.load(texture_loader, model_file),
+            None => return self.load(texture_loader, model_file, texture_future),
         }
     }
 }

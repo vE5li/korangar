@@ -1,5 +1,7 @@
+mod text;
 mod button;
 mod checkbutton;
+mod bar;
 
 use cgmath::Vector2;
 
@@ -7,8 +9,10 @@ use graphics::Renderer;
 
 use super::*;
 
+pub use self::text::text;
 pub use self::button::button;
 pub use self::checkbutton::checkbutton;
+pub use self::bar::bar;
 
 macro_rules! get_component {
     ($element:expr, $name:ident) => ({
@@ -90,7 +94,9 @@ impl Element {
         for component in &self.components {
             match component {
                 Component::Text(text) => text.render(renderer, position),
+                Component::DynamicText(dynamic_text) => dynamic_text.render(renderer, state_provider, position),
                 Component::Rectangle(rectangle) => rectangle.render(renderer, position, focused),
+                Component::Stretch(stretch) => stretch.render(renderer, state_provider, position),
                 Component::Checkbox(checkbox) => checkbox.render(renderer, state_provider, position),
                 Component::Container(container) => container.render(renderer, interface_state, state_provider, position, hovered_index),
                 _invisible => { },

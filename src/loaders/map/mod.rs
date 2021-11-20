@@ -4,15 +4,16 @@ use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::read;
 
-use cgmath::{ Vector3, Vector2, InnerSpace, Rad };
+use cgmath::{ Vector3, Vector2, Rad, Deg };
 
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
+use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
 use debug::*;
-use map::{ Map, Object, LightSource, SoundSource, EffectSource };
-use graphics::{ Color, Vertex, Transform };
+use map::{ Map, Tile, TileType, Object, LightSource, SoundSource, EffectSource };
+use graphics::{ Color, ModelVertex, Transform, NativeModelVertex };
 use loaders::{ ModelLoader, TextureLoader };
 
 use super::ByteStream;
@@ -21,6 +22,13 @@ use self::resource::ResourceType;
 
 const MAP_OFFSET: f32 = 5.0;
 const TILE_SIZE: f32 = 10.0;
+
+#[derive(Copy, Clone, Debug)]
+pub enum SurfaceType {
+    Front,
+    Right,
+    Top
+}
 
 pub struct Surface {
     u: [f32; 4],
@@ -33,15 +41,25 @@ pub struct Surface {
 impl Surface {
 
     pub fn new(u: [f32; 4], v: [f32; 4], texture_index: i32, light_map_index: i32, color: Color) -> Self {
-        return Self { u, v, texture_index, _light_map_index: light_map_index, _color: color };
+        return Self { u, v, texture_index: texture_index % 10, _light_map_index: light_map_index, _color: color }; // TODO: remove %10 !
     }
 }
 
-#[derive(Copy, Clone, Debug)]
-pub enum SurfaceType {
-    Front,
-    Right,
-    Top
+pub struct GroundTile {
+    pub upper_left_height: f32,
+    pub upper_right_height: f32,
+    pub lower_left_height: f32,
+    pub lower_right_height: f32,
+    pub top_surface_index: i32,
+    pub front_surface_index: i32,
+    pub right_surface_index: i32,
+}
+
+impl GroundTile {
+
+    pub fn new(upper_left_height: f32, upper_right_height: f32, lower_left_height: f32, lower_right_height: f32, top_surface_index: i32, front_surface_index: i32, right_surface_index: i32) -> Self {
+        return Self { upper_left_height, upper_right_height, lower_left_height, lower_right_height, top_surface_index, front_surface_index, right_surface_index };
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -52,87 +70,55 @@ pub enum Heights {
     LowerRight
 }
 
-//pub struct TileType(u8);
-//
-//impl TileType {
-//
-//    pub fn walkable(&self) -> bool {
-//        self.tile_type
-//    }
-//}
-
-pub struct Tile {
-    pub upper_left_height: f32,
-    pub upper_right_height: f32,
-    pub lower_left_height: f32,
-    pub lower_right_height: f32,
-    pub top_surface_index: i32,
-    pub front_surface_index: i32,
-    pub right_surface_index: i32,
-}
-
-impl Tile {
-
-    pub fn new(upper_left_height: f32, upper_right_height: f32, lower_left_height: f32, lower_right_height: f32, top_surface_index: i32, front_surface_index: i32, right_surface_index: i32) -> Self {
-        return Self { upper_left_height, upper_right_height, lower_left_height, lower_right_height, top_surface_index, front_surface_index, right_surface_index };
-    }
-
-    pub fn surface_index(&self, surface_type: SurfaceType) -> i32 {
-        match surface_type {
-            SurfaceType::Front => return self.front_surface_index,
-            SurfaceType::Right => return self.right_surface_index,
-            SurfaceType::Top => return self.top_surface_index,
-        }
-    }
-
-    pub fn get_height_at(&self, point: Heights) -> f32 {
-        match point {
-            Heights::UpperLeft => return self.upper_left_height,
-            Heights::UpperRight => return self.upper_right_height,
-            Heights::LowerLeft => return self.lower_left_height,
-            Heights::LowerRight => return self.lower_right_height,
-        }
-    }
-
-    pub fn surface_alignment(surface_type: SurfaceType) -> [(Vector2<usize>, Heights); 4] {
-        match surface_type {
-
-            SurfaceType::Front => [
-                (Vector2::new(0, 1), Heights::LowerLeft),
-                (Vector2::new(1, 1), Heights::LowerRight),
-                (Vector2::new(1, 1), Heights::UpperRight),
-                (Vector2::new(0, 1), Heights::UpperLeft),
-            ],
-
-            SurfaceType::Right => [
-                (Vector2::new(1, 1), Heights::LowerRight),
-                (Vector2::new(1, 0), Heights::UpperRight),
-                (Vector2::new(1, 0), Heights::UpperLeft),
-                (Vector2::new(1, 1), Heights::LowerLeft),
-            ],
-
-            SurfaceType::Top => [
-                (Vector2::new(0, 0), Heights::UpperLeft),
-                (Vector2::new(1, 0), Heights::UpperRight),
-                (Vector2::new(1, 1), Heights::LowerRight),
-                (Vector2::new(0, 1), Heights::LowerLeft),
-            ],
-        }
-    }
-
-    pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
-        match surface_type {
-            SurfaceType::Front => return Vector2::new(0, 1),
-            SurfaceType::Right => return Vector2::new(1, 0),
-            SurfaceType::Top => return Vector2::new(0, 0),
-        }
+pub fn tile_surface_index(tile: &GroundTile, surface_type: SurfaceType) -> i32 {
+    match surface_type {
+        SurfaceType::Front => return tile.front_surface_index,
+        SurfaceType::Right => return tile.right_surface_index,
+        SurfaceType::Top => return tile.top_surface_index,
     }
 }
 
-pub fn calculate_normal(first_position: Vector3<f32>, second_position: Vector3<f32>, third_position: Vector3<f32>) -> Vector3<f32> {
-    let delta_position_1 = second_position - first_position;
-    let delta_position_2 = third_position - first_position;
-    return delta_position_1.cross(delta_position_2);
+pub fn get_tile_height_at(tile: &GroundTile, point: Heights) -> f32 {
+    match point {
+        Heights::UpperLeft => return tile.upper_left_height,
+        Heights::UpperRight => return tile.upper_right_height,
+        Heights::LowerLeft => return tile.lower_left_height,
+        Heights::LowerRight => return tile.lower_right_height,
+    }
+}
+
+pub fn tile_surface_alignment(surface_type: SurfaceType) -> [(Vector2<usize>, Heights); 4] {
+    match surface_type {
+
+        SurfaceType::Front => [
+            (Vector2::new(0, 1), Heights::LowerLeft),
+            (Vector2::new(1, 1), Heights::LowerRight),
+            (Vector2::new(1, 1), Heights::UpperRight),
+            (Vector2::new(0, 1), Heights::UpperLeft),
+        ],
+
+        SurfaceType::Right => [
+            (Vector2::new(1, 1), Heights::LowerRight),
+            (Vector2::new(1, 0), Heights::UpperRight),
+            (Vector2::new(1, 0), Heights::UpperLeft),
+            (Vector2::new(1, 1), Heights::LowerLeft),
+        ],
+
+        SurfaceType::Top => [
+            (Vector2::new(0, 0), Heights::UpperLeft),
+            (Vector2::new(1, 0), Heights::UpperRight),
+            (Vector2::new(1, 1), Heights::LowerRight),
+            (Vector2::new(0, 1), Heights::LowerLeft),
+        ],
+    }
+}
+
+pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
+    match surface_type {
+        SurfaceType::Front => return Vector2::new(0, 1),
+        SurfaceType::Right => return Vector2::new(1, 0),
+        SurfaceType::Top => return Vector2::new(0, 0),
+    }
 }
 
 pub struct MapLoader {
@@ -153,6 +139,8 @@ impl MapLoader {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}{}{}", magenta(), resource_file, none()));
+
+        let mut texture_future = now(self.device.clone()).boxed();
 
         let bytes = read(resource_file.clone()).expect("u r very stupid");
         let mut byte_stream = ByteStream::new(bytes.iter());
@@ -218,12 +206,16 @@ impl MapLoader {
             print_debug!("water animation speed {}{}{}", magenta(), _water_animation_speed, none());
         }
 
+        let mut ambient_light_color = Color::new(255, 255, 255);
+
         if version.equals_or_above(1, 5) {
 
             let _light_longitude = byte_stream.integer32();
             let _light_latitude = byte_stream.integer32();
             let _diffuse_color = byte_stream.color();
             let _ambient_color = byte_stream.color();
+
+            ambient_light_color = _ambient_color;
 
             #[cfg(feature = "debug_map")]
             {
@@ -285,9 +277,9 @@ impl MapLoader {
                         let scale = byte_stream.vector3();
 
                         let model_name_unix = model_name.replace("\\", "/");
-                        let model = model_loader.get(texture_loader, format!("data/model/{}", model_name_unix));
+                        let model = model_loader.get(texture_loader, format!("data/model/{}", model_name_unix), &mut texture_future);
 
-                        let transform = Transform::from(position, rotation.map(|value| Rad(value)), scale);
+                        let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
 
                         let object = Object::new(model, transform);
                         objects.push(object);
@@ -313,9 +305,9 @@ impl MapLoader {
                         let scale = byte_stream.vector3();
 
                         let model_name_unix = model_name.replace("\\", "/");
-                        let model = model_loader.get(texture_loader, format!("data/model/{}", model_name_unix));
+                        let model = model_loader.get(texture_loader, format!("data/model/{}", model_name_unix), &mut texture_future);
 
-                        let transform = Transform::from(position, rotation.map(|value| Rad(value)), scale);
+                        let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
 
                         objects.push(Object::new(model, transform));
 
@@ -439,10 +431,7 @@ impl MapLoader {
             let texture_name = byte_stream.string(texture_name_length as usize);
             let texture_name_unix = texture_name.replace("\\", "/");
             let full_name = format!("data/texture/{}", texture_name_unix);
-            let (texture, mut future) = texture_loader.get(full_name);
-
-            // todo return gpu future instead
-            future.cleanup_finished();
+            let texture = texture_loader.get(full_name, &mut texture_future);
             textures.push(texture);
         }
 
@@ -475,7 +464,7 @@ impl MapLoader {
             surfaces.push(Surface::new(u, v, texture_index, light_map_index, color));
         }
 
-        let mut tiles = Vec::new();
+        let mut ground_tiles = Vec::new();
 
         for _index in 0..dimensions {
 
@@ -499,12 +488,15 @@ impl MapLoader {
                 false => byte_stream.integer16() as i32,
             };
 
-            tiles.push(Tile::new(upper_left_height, upper_right_height, lower_left_height, lower_right_height, top_surface_index, front_surface_index, right_surface_index));
+            ground_tiles.push(GroundTile::new(upper_left_height, upper_right_height, lower_left_height, lower_right_height, top_surface_index, front_surface_index, right_surface_index));
         }
 
         #[cfg(feature = "debug")]
         byte_stream.assert_empty(bytes.len(), &ground_file);
 
+        let mut map_width = width;
+        let mut map_height = height;
+        let mut tiles = Vec::new();
         let mut tile_vertex_buffer = None;
 
         if let Some(gat_file) = gat_file {
@@ -521,49 +513,52 @@ impl MapLoader {
                 panic!("invalid gat version");
             }
 
-            let width = byte_stream.integer32() as usize; // todo: unsigned
-            let height = byte_stream.integer32() as usize; // todo: unsigned
+            map_width = byte_stream.integer32() as usize; // todo: unsigned
+            map_height = byte_stream.integer32() as usize; // todo: unsigned
 
             let mut tile_vertices = Vec::new();
 
-            for x in 0..width {
-                for y in 0..height {
+            for y in 0..map_height {
+                for x in 0..map_width {
 
                     let upper_left_height = byte_stream.float32();
                     let upper_right_height = byte_stream.float32();
                     let lower_left_height = byte_stream.float32();
                     let lower_right_height = byte_stream.float32();
-                    let tile_type = byte_stream.byte();
+                    let tile_type_index = byte_stream.byte();
+                    let tile_type = TileType::new(tile_type_index);
 
                     // unknown
                     byte_stream.skip(3);
 
-                    if tile_type == 1 {
+                    tiles.push(Tile::new(upper_left_height, upper_right_height, lower_left_height, lower_right_height, tile_type));
+
+                    if tile_type.is_none() {
                         continue;
                     }
 
-                    let offset = Vector2::new(y as f32 * 5.0, x as f32 * 5.0);
+                    let offset = Vector2::new(x as f32 * 5.0, y as f32 * 5.0);
 
                     let first_position = Vector3::new(offset.x, -upper_left_height + 1.0, offset.y);
                     let second_position = Vector3::new(offset.x + 5.0, -upper_right_height + 1.0, offset.y);
                     let third_position = Vector3::new(offset.x + 5.0, -lower_right_height + 1.0, offset.y + 5.0);
                     let fourth_position = Vector3::new(offset.x, -lower_left_height + 1.0, offset.y + 5.0);
 
-                    let first_normal = calculate_normal(first_position, second_position, third_position);
-                    let second_normal = calculate_normal(fourth_position, first_position, third_position);
+                    let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
+                    let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
                     let first_texture_coordinates = Vector2::new(0.0, 0.0);
                     let second_texture_coordinates = Vector2::new(0.0, 1.0);
                     let third_texture_coordinates = Vector2::new(1.0, 1.0);
                     let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
 
-                    tile_vertices.push(Vertex::new(first_position, first_normal, first_texture_coordinates, tile_type as i32));
-                    tile_vertices.push(Vertex::new(second_position, first_normal, second_texture_coordinates, tile_type as i32));
-                    tile_vertices.push(Vertex::new(third_position, first_normal, third_texture_coordinates, tile_type as i32));
+                    tile_vertices.push(ModelVertex::new(first_position, first_normal, first_texture_coordinates, tile_type_index as i32));
+                    tile_vertices.push(ModelVertex::new(second_position, first_normal, second_texture_coordinates, tile_type_index as i32));
+                    tile_vertices.push(ModelVertex::new(third_position, first_normal, third_texture_coordinates, tile_type_index as i32));
 
-                    tile_vertices.push(Vertex::new(first_position, second_normal, first_texture_coordinates, tile_type as i32));
-                    tile_vertices.push(Vertex::new(third_position, second_normal, third_texture_coordinates, tile_type as i32));
-                    tile_vertices.push(Vertex::new(fourth_position, second_normal, fourth_texture_coordinates, tile_type as i32));
+                    tile_vertices.push(ModelVertex::new(first_position, second_normal, first_texture_coordinates, tile_type_index as i32));
+                    tile_vertices.push(ModelVertex::new(third_position, second_normal, third_texture_coordinates, tile_type_index as i32));
+                    tile_vertices.push(ModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, tile_type_index as i32));
                 }
             }
 
@@ -574,42 +569,42 @@ impl MapLoader {
             tile_vertex_buffer = Some(vertex_buffer);
         }
 
-        let mut ground_vertices = Vec::new();
+        let mut native_ground_vertices = Vec::new();
 
         for x in 0..width {
             for y in 0..height {
-                let current_tile = &tiles[x + y * width];
+                let current_tile = &ground_tiles[x + y * width];
 
                 for surface_type in [SurfaceType::Front, SurfaceType::Right, SurfaceType::Top].iter() {
-                    let surface_index = current_tile.surface_index(*surface_type);
+                    let surface_index = tile_surface_index(current_tile, *surface_type);
 
                     if surface_index > -1 {
 
-                        let surface_alignment = Tile::surface_alignment(*surface_type);
-                        let neighbor_tile_index = Tile::neighbor_tile_index(*surface_type);
+                        let surface_alignment = tile_surface_alignment(*surface_type);
+                        let neighbor_tile_index = neighbor_tile_index(*surface_type);
 
                         let neighbor_x = x + neighbor_tile_index.x;
                         let neighbor_y = y + neighbor_tile_index.y;
-                        let neighbor_tile = &tiles[neighbor_x + neighbor_y * width];
+                        let neighbor_tile = &ground_tiles[neighbor_x + neighbor_y * width];
 
                         let (surface_offset, surface_height) = surface_alignment[0];
-                        let height = current_tile.get_height_at(surface_height);
+                        let height = get_tile_height_at(&current_tile, surface_height);
                         let first_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let (surface_offset, surface_height) = surface_alignment[1];
-                        let height = current_tile.get_height_at(surface_height);
+                        let height = get_tile_height_at(&current_tile, surface_height);
                         let second_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let (surface_offset, surface_height) = surface_alignment[2];
-                        let height = neighbor_tile.get_height_at(surface_height);
+                        let height = get_tile_height_at(&neighbor_tile, surface_height);
                         let third_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let (surface_offset, surface_height) = surface_alignment[3];
-                        let height = neighbor_tile.get_height_at(surface_height);
+                        let height = get_tile_height_at(&neighbor_tile, surface_height);
                         let fourth_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
-                        let first_normal = calculate_normal(first_position, second_position, third_position);
-                        let second_normal = calculate_normal(fourth_position, first_position, third_position);
+                        let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
+                        let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
                         let ground_surface = &surfaces[surface_index as usize];
 
@@ -618,13 +613,13 @@ impl MapLoader {
                         let third_texture_coordinates = Vector2::new(ground_surface.u[3], ground_surface.v[3]);
                         let fourth_texture_coordinates = Vector2::new(ground_surface.u[2], ground_surface.v[2]);
 
-                        ground_vertices.push(Vertex::new(first_position, first_normal, first_texture_coordinates, ground_surface.texture_index));
-                        ground_vertices.push(Vertex::new(second_position, first_normal, second_texture_coordinates, ground_surface.texture_index));
-                        ground_vertices.push(Vertex::new(third_position, first_normal, third_texture_coordinates, ground_surface.texture_index));
+                        native_ground_vertices.push(NativeModelVertex::new(first_position, first_normal, first_texture_coordinates, ground_surface.texture_index));
+                        native_ground_vertices.push(NativeModelVertex::new(second_position, first_normal, second_texture_coordinates, ground_surface.texture_index));
+                        native_ground_vertices.push(NativeModelVertex::new(third_position, first_normal, third_texture_coordinates, ground_surface.texture_index));
 
-                        ground_vertices.push(Vertex::new(first_position, second_normal, first_texture_coordinates, ground_surface.texture_index));
-                        ground_vertices.push(Vertex::new(third_position, second_normal, third_texture_coordinates, ground_surface.texture_index));
-                        ground_vertices.push(Vertex::new(fourth_position, second_normal, fourth_texture_coordinates, ground_surface.texture_index));
+                        native_ground_vertices.push(NativeModelVertex::new(first_position, second_normal, first_texture_coordinates, ground_surface.texture_index));
+                        native_ground_vertices.push(NativeModelVertex::new(third_position, second_normal, third_texture_coordinates, ground_surface.texture_index));
+                        native_ground_vertices.push(NativeModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, ground_surface.texture_index));
                     }
                 }
             }
@@ -632,12 +627,12 @@ impl MapLoader {
 
         let row_size = width * 6;
 
-        for index in 0..ground_vertices.len() / 6 {
+        for index in 0..native_ground_vertices.len() / 6 {
 
             let base_index = index * 6;
             let mut indices = vec![base_index + 5];
 
-            if base_index + 6 < ground_vertices.len() {
+            if base_index + 6 < native_ground_vertices.len() {
                 indices.push(base_index + 6);
                 indices.push(base_index + 9);
             }
@@ -652,19 +647,19 @@ impl MapLoader {
             }
 
             let new_normal = indices.iter()
-                .map(|index| ground_vertices[*index].normal)
-                .map(|array| Vector3::new(array[0], array[1], array[2]))
+                .map(|index| native_ground_vertices[*index].normal)
                 .fold(Vector3::new(0.0, 0.0, 0.0), |sum, normal| sum + normal);
 
-            indices.iter().for_each(|index| ground_vertices[*index].normal = [new_normal.x, new_normal.y, new_normal.z]);
+            indices.iter().for_each(|index| native_ground_vertices[*index].normal = new_normal);
         }
 
-        for vertex in &mut ground_vertices {
-            let array = &vertex.normal;
-            let new_normal = Vector3::new(array[0], array[1], array[2]).normalize();
-            vertex.normal = [new_normal.x, new_normal.y, new_normal.z];
-        }
+        //for ModelVertex in &mut native_ground_vertices {
+        //    let array = &ModelVertex.normal;
+        //    let new_normal = Vector3::new(array[0], array[1], array[2]).normalize();
+        //    ModelVertex.normal = [new_normal.x, new_normal.y, new_normal.z];
+        //}
 
+        let ground_vertices = NativeModelVertex::to_vertices(native_ground_vertices);
         let ground_vertex_buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, ground_vertices.into_iter()).unwrap();
 
         #[cfg(feature = "debug_map")]
@@ -690,9 +685,12 @@ impl MapLoader {
         sound_sources.iter_mut().for_each(|sound_source| sound_source.offset(offset));
         effect_sources.iter_mut().for_each(|effect_source| effect_source.offset(offset));
 
-        let map = Arc::new(Map::new(ground_vertex_buffer, textures, objects, light_sources, sound_sources, effect_sources, tile_vertex_buffer));
+        let map = Arc::new(Map::new(map_width, map_height, tiles, ground_vertex_buffer, textures, objects, light_sources, sound_sources, effect_sources, tile_vertex_buffer, ambient_light_color));
 
         self.cache.insert(resource_file, map.clone());
+
+        texture_future.flush().unwrap();
+        texture_future.cleanup_finished();
 
         #[cfg(feature = "debug")]
         timer.stop();

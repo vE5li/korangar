@@ -1,7 +1,9 @@
+#[derive(Copy, Clone, Debug)]
 pub enum StateKey {
     ShowFramesPerSecond,
     ShowMap,
     ShowObjects,
+    ShowEntities,
     ShowAmbientLight,
     ShowDirectionalLight,
     ShowPointLights,
@@ -20,4 +22,18 @@ pub enum StateKey {
     ShowParticleMarkers,
     #[cfg(feature = "debug")]
     ShowMapTiles,
+    #[cfg(feature = "debug")]
+    ShowPathing,
+    #[cfg(feature = "debug")]
+    ShowDiffuseBuffer,
+    #[cfg(feature = "debug")]
+    ShowNormalBuffer,
+    #[cfg(feature = "debug")]
+    ShowDepthBuffer,
+    PlayerMaximumHealthPoints,
+    PlayerCurrentHealthPoints,
+    PlayerMaximumSpellPoints,
+    PlayerCurrentSpellPoints,
+    PlayerMaximumActivityPoints,
+    PlayerCurrentActivityPoints,
 }

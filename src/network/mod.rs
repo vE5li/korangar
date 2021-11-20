@@ -14,6 +14,8 @@ use pnet::packet::Packet;
 #[derive(Clone, Debug)]
 pub enum NetworkEvent {
     PlayerMove(/*Timestamp?, */Vector2<usize>, Vector2<usize>),
+    EntityAppear(/*EntityType*/ usize, /*EntityId*/ usize, /*CharId*/ usize), // ... walk speed, opt1, opt2, option
+    //EntityDisappear(/*Timestamp?, */),
 }
 
 fn handle_tcp_packet(interface_name: &str, packet_data: &[u8]) -> Option<NetworkEvent> {
@@ -28,9 +30,12 @@ fn handle_tcp_packet(interface_name: &str, packet_data: &[u8]) -> Option<Network
 
         if payload[0] == 0x87 && payload[1] == 0x00 {
 
-            // let timestamp = 4 bytes
+            let timestamp = &payload[2..6];
             let coordinates = &payload[6..11];
             // let orientation = 1 byte (always 88)
+
+            //timestamp[1] + 5 per sec
+            //println!("timestamp: {:?}", timestamp);
 
             let y_position_to = (coordinates[4] as usize) | (((coordinates[3] as usize) & 0b11) << 8);
             let x_position_to = ((coordinates[3] as usize) >> 2) | (((coordinates[2] as usize) & 0b1111) << 6);
@@ -41,6 +46,17 @@ fn handle_tcp_packet(interface_name: &str, packet_data: &[u8]) -> Option<Network
             let position_to = Vector2::new(x_position_to, y_position_to);
 
             let event = NetworkEvent::PlayerMove(position_from, position_to);
+            return Some(event);
+        }
+
+        if payload[0] == 0xff && payload[1] == 0x09 {
+
+            let length = payload[2] as usize | (payload[3] as usize) << 8;
+            let entity_type = payload[4] as usize;
+            let entity_id = payload[5] as usize | (payload[6] as usize) << 8 | (payload[7] as usize) << 16 | (payload[8] as usize) << 24; // some other id?
+            let character_id = payload[9] as usize | (payload[10] as usize) << 8 | (payload[11] as usize) << 16 | (payload[12] as usize) << 24;
+
+            let event = NetworkEvent::EntityAppear(entity_type, entity_id, character_id);
             return Some(event);
         }
     } else {
@@ -113,7 +129,7 @@ impl NetworkingSystem {
 
         use pnet::datalink::Channel::Ethernet;
 
-        let interface_names_match = |interface: &NetworkInterface| interface.name == "enp0s31f6";
+        let interface_names_match = |interface: &NetworkInterface| interface.name == "enp5s0";
 
         let interfaces = datalink::interfaces();
         let interface = interfaces

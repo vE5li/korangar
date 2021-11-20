@@ -1,8 +1,8 @@
 use std::slice::Iter;
-use cgmath::Vector3;
 
 #[cfg(feature = "debug")]
 use debug::*;
+use maths::*;
 use graphics::Color;
 
 use super::Version;
@@ -111,6 +111,23 @@ impl<'b> ByteStream<'b> {
         let z = self.float32();
 
         return Vector3::new(x, -y, z);
+    }
+
+    pub fn matrix3(&mut self) -> Matrix3<f32> {
+
+        let c0r0 = self.float32();
+        let c0r1 = self.float32();
+        let c0r2 = self.float32();
+
+        let c1r0 = self.float32();
+        let c1r1 = self.float32();
+        let c1r2 = self.float32();
+
+        let c2r0 = self.float32();
+        let c2r1 = self.float32();
+        let c2r2 = self.float32();
+
+        return Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2);
     }
 
     pub fn color(&mut self) -> Color {

@@ -18,6 +18,11 @@ impl Key {
         return Self { is_down, was_down, is_pressed, is_released };
     }
 
+    pub fn reset(&mut self) {
+        self.update();
+        self.is_down = false;
+    }
+
     pub fn set_down(&mut self, is_down: bool) {
         self.is_down = is_down;
     }

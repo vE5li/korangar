@@ -11,6 +11,7 @@ cgmath = "0.18"
 png = "0.16"
 bmp = "*"
 pnet = "*"
+pathfinding = "2.2.2"
 
 [features]
 debug = ["lazy_static", "chrono"]

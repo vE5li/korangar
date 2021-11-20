@@ -19,13 +19,13 @@ use vulkano::pipeline::blend::BlendOp;
 
 pub use self::color::Color;
 pub use self::transform::Transform;
-pub use self::vertices::{ ScreenVertex, Vertex };
+pub use self::vertices::{ ScreenVertex, NativeModelVertex, ModelVertex };
 pub use self::camera::*;
 pub use self::renderer::{ Renderer, RenderSettings };
 
 pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
 
-pub type VertexBuffer = Arc<CpuAccessibleBuffer<[Vertex]>>;
+pub type ModelVertexBuffer = Arc<CpuAccessibleBuffer<[ModelVertex]>>;
 
 pub type ScreenVertexBuffer = Arc<CpuAccessibleBuffer<[ScreenVertex]>>;
 

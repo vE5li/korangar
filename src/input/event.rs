@@ -7,6 +7,7 @@ pub enum UserEvent {
     ToggleShowFramesPerSecond,
     ToggleShowMap,
     ToggleShowObjects,
+    ToggleShowEntities,
     ToggleShowAmbientLight,
     ToggleShowDirectionalLight,
     ToggleShowPointLights,
@@ -27,7 +28,9 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     CameraMoveUp,
     #[cfg(feature = "debug")]
-    CameraMoveDown,
+    CameraAccelerate,
+    #[cfg(feature = "debug")]
+    CameraDecelerate,
     #[cfg(feature = "debug")]
     ToggleShowObjectMarkers,
     #[cfg(feature = "debug")]
@@ -40,4 +43,12 @@ pub enum UserEvent {
     ToggleShowParticleMarkers,
     #[cfg(feature = "debug")]
     ToggleShowMapTiles,
+    #[cfg(feature = "debug")]
+    ToggleShowPathing,
+    #[cfg(feature = "debug")]
+    ToggleShowDiffuseBuffer,
+    #[cfg(feature = "debug")]
+    ToggleShowNormalBuffer,
+    #[cfg(feature = "debug")]
+    ToggleShowDepthBuffer,
 }

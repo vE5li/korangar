@@ -51,9 +51,9 @@ impl InputSystem {
     }
 
     pub fn reset(&mut self) {
-        self.left_mouse_button = Key::new();
-        self.right_mouse_button = Key::new();
-        self.keys.iter_mut().for_each(|key| *key = Key::new());
+        self.left_mouse_button.reset();
+        self.right_mouse_button.reset();
+        self.keys.iter_mut().for_each(|key| key.reset());
         self.mouse_input_mode = MouseInputMode::None;
     }
 
@@ -140,6 +140,16 @@ impl InputSystem {
         }
 
         #[cfg(feature = "debug")]
+        if self.keys[42].pressed() {
+            events.push(UserEvent::CameraAccelerate);
+        }
+
+        #[cfg(feature = "debug")]
+        if self.keys[42].released() {
+            events.push(UserEvent::CameraDecelerate);
+        }
+
+        #[cfg(feature = "debug")]
         if self.keys[33].pressed() {
             events.push(UserEvent::ToggleUseDebugCamera);
         }
@@ -174,12 +184,11 @@ impl InputSystem {
             events.push(UserEvent::CameraMoveUp);
         }
 
-        #[cfg(feature = "debug")]
-        if self.keys[42].down() {
-            events.push(UserEvent::CameraMoveDown);
-        }
-
         let element_index = element.map(|element| element.index()).unwrap_or(255); // usize.MAX
         return (events, element_index);
+    }
+
+    pub fn mouse_position(&self) -> Vector2<f32> {
+        return self.new_mouse_position;
     }
 }

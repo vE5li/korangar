@@ -94,7 +94,7 @@ impl TextureLoader {
         return (image_data, dimensions);
     }
 
-    fn load(&mut self, path: String) -> (Texture, Box<dyn GpuFuture + 'static>) {
+    fn load(&mut self, path: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Texture {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}{}{}", magenta(), path, none()));
@@ -106,22 +106,24 @@ impl TextureLoader {
         };
 
         let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
+
+        let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
+        let combined_future = inner_future.join(future).boxed();
+        *texture_future = combined_future;
+
         let texture = ImageView::new(image).unwrap();
         self.cache.insert(path, texture.clone());
-
-        // temp (?)
-        future.flush().unwrap();
 
         #[cfg(feature = "debug")]
         timer.stop();
 
-        return (texture, future.boxed());
+        return texture;
     }
 
-    pub fn get(&mut self, path: String) -> (Texture, Box<dyn GpuFuture + 'static>) {
+    pub fn get(&mut self, path: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Texture {
         match self.cache.get(&path) {
-            Some(texture) => return (texture.clone(), now(self.device.clone()).boxed()),
-            None => return self.load(path),
+            Some(texture) => return texture.clone(),
+            None => return self.load(path, texture_future),
         }
     }
 }

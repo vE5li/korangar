@@ -212,7 +212,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize networking");
 
-    let mut networking_system = NetworkingSystem::new();
+    //let mut networking_system = NetworkingSystem::new();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -266,26 +266,26 @@ fn main() {
 
                 let delta_time = frame_timer.update();
 
-                let network_events = networking_system.network_events();
+                //let network_events = networking_system.network_events();
                 let (user_events, element_index) = input_system.user_events(&interface);
 
-                for event in network_events {
-                    match event {
+                //for event in network_events {
+                //    match event {
 
-                        NetworkEvent::PlayerMove(position_from, position_to) => {
-                            let focus_point = entities[0].move_from_to(&map, position_from, position_to);
-                            player_camera.set_focus(focus_point);
+                //        NetworkEvent::PlayerMove(position_from, position_to) => {
+                //            let focus_point = entities[0].move_from_to(&map, position_from, position_to);
+                //            player_camera.set_focus(focus_point);
 
-                            #[cfg(feature = "debug")]
-                            entities[0].generate_steps_vertex_buffer(device.clone(), &map);
-                        }
+                //            #[cfg(feature = "debug")]
+                //            entities[0].generate_steps_vertex_buffer(device.clone(), &map);
+                //        }
 
-                        NetworkEvent::EntityAppear(entity_type, entity_id, character_id) => {
-                            entities.push(Entity::new(&mut texture_loader, &mut texture_future));
-                            println!("{} : {} : {}", entity_type, entity_id, character_id);
-                        }
-                    }
-                }
+                //        NetworkEvent::EntityAppear(entity_type, entity_id, character_id) => {
+                //            entities.push(Entity::new(&mut texture_loader, &mut texture_future));
+                //            println!("{} : {} : {}", entity_type, entity_id, character_id);
+                //        }
+                //    }
+                //}
 
                 for event in user_events {
                     match event {

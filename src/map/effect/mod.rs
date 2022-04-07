@@ -32,7 +32,7 @@ impl EffectSource {
         mut_self.spawn_timer += delta_time;
 
         if mut_self.spawn_timer > 0.3 {
-            mut_self.particles.push(Particle::new(self.position, Color::new(255, 50, 50), 50.0));
+            mut_self.particles.push(Particle::new(self.position, Color::new(255, 50, 50), 10.0));
             mut_self.spawn_timer -= 1.0;
         }
 

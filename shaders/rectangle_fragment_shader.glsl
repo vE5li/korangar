@@ -41,7 +41,7 @@ void main() {
 
     fragment_color = vec4(constants.color, 1.0);
 
-    fragment_color.r = pow(fragment_color.r, 1.75);
-    fragment_color.g = pow(fragment_color.g, 1.75);
-    fragment_color.b = pow(fragment_color.b, 1.75);
+    //fragment_color.r = pow(fragment_color.r, 0.2);
+    //fragment_color.g = pow(fragment_color.g, 0.2);
+    //fragment_color.b = pow(fragment_color.b, 0.2);
 }

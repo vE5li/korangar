@@ -35,6 +35,7 @@ impl TextureLoader {
 
     fn load_png_data(path: &str) -> (Vec<u8>, ImageDimensions) {
 
+        println!("{}", path);
         let file = File::open(path).expect("failed to open file");
 
         let mut reader = BufReader::new(file);

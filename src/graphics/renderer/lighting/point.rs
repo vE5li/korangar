@@ -83,7 +83,7 @@ impl PointLightRenderer {
 
         let set = Arc::new(set_builder.build().unwrap());
 
-        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, range * BILLBOARD_SIZE_MULTIPLIER);
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, 10.0 * (range / 0.05).ln());
 
         if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 && camera.distance_to(position) > range {
             return;

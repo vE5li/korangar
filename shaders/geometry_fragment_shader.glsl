@@ -30,7 +30,12 @@ void main() {
 
     //vec4 normal_color = texture(normal_map, texture_coordinates);
     //vec4 specular_value = texture(specular_map, texture_coordinates);
-
+    
     fragment_color = diffuse_color;
+
+    fragment_color.r = pow(fragment_color.r, 1.0 / 1.8);
+    fragment_color.g = pow(fragment_color.g, 1.0 / 1.8);
+    fragment_color.b = pow(fragment_color.b, 1.0 / 1.8);
+
     fragment_normal = normal; //normal_color.xyz;
 }

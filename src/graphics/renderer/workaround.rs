@@ -57,13 +57,13 @@ macro_rules! ordered_passes_renderpass_korangar {
                             }),*
                         ],
                         depth_stencil: {
-                            let depth: Option<(usize, ImageLayout)> = None;
+                            let mut depth: Option<(usize, ImageLayout)> = None;
                             $(
                                 let layout = &mut layouts[$depth_atch];
                                 layout.1 = Some(ImageLayout::DepthStencilAttachmentOptimal);
                                 layout.0 = layout.0.or(layout.1);
 
-                                let depth = Some(($depth_atch, ImageLayout::DepthStencilAttachmentOptimal));
+                                depth = Some(($depth_atch, ImageLayout::DepthStencilAttachmentOptimal));
                             )*
                             depth
                         },

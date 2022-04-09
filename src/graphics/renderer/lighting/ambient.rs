@@ -65,7 +65,7 @@ impl AmbientLightRenderer {
         return Arc::new(pipeline);
     }
 
-    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, color: Color) {
+    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, color: Color) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -73,6 +73,7 @@ impl AmbientLightRenderer {
         let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
 
         set_builder.add_image(diffuse_buffer).unwrap();
+        set_builder.add_image(normal_buffer).unwrap();
 
         let set = Arc::new(set_builder.build().unwrap());
 

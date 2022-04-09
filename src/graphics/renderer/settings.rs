@@ -1,104 +1,59 @@
-pub struct RenderSettings {
+use derive_new::new;
+
+#[derive(new)]
+pub struct RenderSettings { 
+    #[new(value = "true")]
     pub show_frames_per_second: bool,
+    #[new(value = "true")]
     pub show_map: bool,
+    #[new(value = "true")]
     pub show_objects: bool,
+    #[new(value = "true")]
     pub show_entities: bool,
+    #[new(value = "true")]
     pub show_ambient_light: bool,
+    #[new(value = "true")]
     pub show_directional_light: bool,
+    #[new(value = "true")]
     pub show_point_lights: bool,
+    #[new(value = "true")]
     pub show_particle_lights: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub use_debug_camera: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_object_markers: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_light_markers: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_sound_markers: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_effect_markers: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_particle_markers: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_map_tiles: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_pathing: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_diffuse_buffer: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_normal_buffer: bool,
     #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_depth_buffer: bool,
 }
 
 impl RenderSettings {
-
-    pub fn new() -> Self {
-
-        let show_frames_per_second = false;
-        let show_map = true;
-        let show_objects = true;
-        let show_entities = true;
-        let show_ambient_light = true;
-        let show_directional_light = true;
-        let show_point_lights = true;
-        let show_particle_lights = true;
-        #[cfg(feature = "debug")]
-        let use_debug_camera = false;
-        #[cfg(feature = "debug")]
-        let show_object_markers = false;
-        #[cfg(feature = "debug")]
-        let show_light_markers = false;
-        #[cfg(feature = "debug")]
-        let show_sound_markers = false;
-        #[cfg(feature = "debug")]
-        let show_effect_markers = false;
-        #[cfg(feature = "debug")]
-        let show_particle_markers = false;
-        #[cfg(feature = "debug")]
-        let show_map_tiles = false;
-        #[cfg(feature = "debug")]
-        let show_pathing = false;
-        #[cfg(feature = "debug")]
-        let show_diffuse_buffer = false;
-        #[cfg(feature = "debug")]
-        let show_normal_buffer = false;
-        #[cfg(feature = "debug")]
-        let show_depth_buffer = false;
-
-        return Self {
-            show_frames_per_second,
-            show_map,
-            show_objects,
-            show_entities,
-            show_ambient_light,
-            show_directional_light,
-            show_point_lights,
-            show_particle_lights,
-            #[cfg(feature = "debug")]
-            use_debug_camera,
-            #[cfg(feature = "debug")]
-            show_object_markers,
-            #[cfg(feature = "debug")]
-            show_light_markers,
-            #[cfg(feature = "debug")]
-            show_sound_markers,
-            #[cfg(feature = "debug")]
-            show_effect_markers,
-            #[cfg(feature = "debug")]
-            show_particle_markers,
-            #[cfg(feature = "debug")]
-            show_map_tiles,
-            #[cfg(feature = "debug")]
-            show_pathing,
-            #[cfg(feature = "debug")]
-            show_diffuse_buffer,
-            #[cfg(feature = "debug")]
-            show_normal_buffer,
-            #[cfg(feature = "debug")]
-            show_depth_buffer,
-        };
-    }
 
     pub fn toggle_show_frames_per_second(&mut self) {
         self.show_frames_per_second = !self.show_frames_per_second;

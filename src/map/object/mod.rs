@@ -1,5 +1,6 @@
 pub mod model;
 
+use derive_new::new;
 use std::sync::Arc;
 use cgmath::{ Vector3, Vector2 };
 
@@ -7,16 +8,13 @@ use graphics::{ Renderer, Camera, Transform };
 
 use self::model::*;
 
+#[derive(Clone, new)]
 pub struct Object {
-    model: Arc<Model>,
-    transform: Transform,
+    pub model: Arc<Model>,
+    pub transform: Transform,
 }
 
 impl Object {
-
-    pub fn new(model: Arc<Model>, transform: Transform) -> Self {
-        return Self { model, transform };
-    }
 
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.transform.position += offset;

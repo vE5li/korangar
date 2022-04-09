@@ -6,7 +6,9 @@ use cgmath::Vector2;
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 
-use interface::Interface;
+use interface::{ Interface, HoverInformation };
+
+use crate::interface::StateProvider;
 
 pub use self::event::UserEvent;
 
@@ -47,7 +49,18 @@ impl InputSystem {
 
         let mouse_input_mode = MouseInputMode::None;
 
-        return Self { previous_mouse_position, new_mouse_position, mouse_delta, previous_scroll_position, new_scroll_position, scroll_delta, left_mouse_button, right_mouse_button, keys, mouse_input_mode };
+        return Self {
+            previous_mouse_position,
+            new_mouse_position,
+            mouse_delta,
+            previous_scroll_position,
+            new_scroll_position,
+            scroll_delta,
+            left_mouse_button,
+            right_mouse_button,
+            keys,
+            mouse_input_mode,
+        };
     }
 
     pub fn reset(&mut self) {
@@ -96,51 +109,85 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, interface: &Interface) -> (Vec<UserEvent>, usize) {
+    pub fn user_events(&mut self, interface: &mut Interface, state_provider: &mut StateProvider) -> (Vec<UserEvent>, usize) {
 
         let mut events = Vec::new();
 
-        let element = interface.hovered_element(self.new_mouse_position);
+        let shift_pressed = self.keys[42].down();
+        let mut hover_information = interface.hovered_element(self.new_mouse_position);
 
-        if let Some(element) = element {
+        if shift_pressed {
+
+            if let HoverInformation::Element(window_index, _element_index) = hover_information  {
+
+                if self.left_mouse_button.pressed() {
+                    self.mouse_input_mode = MouseInputMode::MoveInterface(window_index);
+                }
+
+                if self.right_mouse_button.pressed() {
+                    self.mouse_input_mode = MouseInputMode::ResizeInterface(window_index);
+                }
+            }
+        }
+
+        if shift_pressed || !self.mouse_input_mode.is_none() {
+            hover_information = HoverInformation::Missed;
+        } else if let HoverInformation::Element(window_index, element_index) = hover_information {
+            
             if self.left_mouse_button.pressed() {
-
-                if let Some(clickable) = element.clickable() {
-                    events.push(clickable.click());
-                    self.mouse_input_mode = MouseInputMode::Click;
+                if let Some(event) = interface.left_click(window_index, element_index, state_provider) {
+                    events.push(event);
                 }
-
-                if let Some(draggable) = element.draggable() {
-                    let identifier = draggable.get_identifier();
-                    self.mouse_input_mode = MouseInputMode::MoveInterface(identifier);
-                }
+                self.mouse_input_mode = MouseInputMode::ClickInterface;
             }
         }
 
         if self.left_mouse_button.released() {
-            self.mouse_input_mode = MouseInputMode::None;
+            if let MouseInputMode::MoveInterface(identifier) = self.mouse_input_mode {
+                match self.right_mouse_button.down() && !self.right_mouse_button.released() {
+                    true => self.mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
+                    false => self.mouse_input_mode = MouseInputMode::None,
+                }
+            } else {
+                self.mouse_input_mode = MouseInputMode::None;
+            }
+        }
+
+        if self.right_mouse_button.released() {
+            if let MouseInputMode::ResizeInterface(identifier) = self.mouse_input_mode {
+                match self.left_mouse_button.down() && !self.left_mouse_button.released() {
+                    true => self.mouse_input_mode = MouseInputMode::MoveInterface(identifier),
+                    false => self.mouse_input_mode = MouseInputMode::None,
+                }
+            }
         }
 
         if let MouseInputMode::MoveInterface(identifier) = &self.mouse_input_mode {
             if self.mouse_delta != Vector2::new(0.0, 0.0) {
-                events.push(UserEvent::MoveInterface(*identifier, self.mouse_delta));
+                interface.move_window(*identifier, self.mouse_delta);
             }
+        }
+
+        if let MouseInputMode::ResizeInterface(identifier) = &self.mouse_input_mode {
+            if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                interface.resize_window(*identifier, self.mouse_delta);
+            }
+        }
+
+        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && self.mouse_input_mode.is_none() && self.mouse_delta.x != 0.0 {
+            events.push(UserEvent::CameraRotate(self.mouse_delta.x));
         }
 
         if self.scroll_delta != 0.0 {
             events.push(UserEvent::CameraZoom(-self.scroll_delta));
         }
 
-        if self.right_mouse_button.down() && self.mouse_delta.x != 0.0 {
-            events.push(UserEvent::CameraRotate(self.mouse_delta.x));
-        }
-
-        if self.keys[46].pressed() {
-            events.push(UserEvent::ToggleShowFramesPerSecond);
-        }
+        //if self.keys[46].pressed() {
+        //    events.push(UserEvent::ToggleShowFramesPerSecond);
+        //}
 
         #[cfg(feature = "debug")]
-        if self.keys[42].pressed() {
+        if shift_pressed {
             events.push(UserEvent::CameraAccelerate);
         }
 
@@ -155,7 +202,7 @@ impl InputSystem {
         }
 
         #[cfg(feature = "debug")]
-        if self.left_mouse_button.down() && self.mouse_input_mode.is_none() {
+        if self.left_mouse_button.down() && !self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
             events.push(UserEvent::CameraLookAround(-self.mouse_delta));
         }
 
@@ -184,11 +231,19 @@ impl InputSystem {
             events.push(UserEvent::CameraMoveUp);
         }
 
-        let element_index = element.map(|element| element.index()).unwrap_or(255); // usize.MAX
+        let element_index = hover_information.to_element_identifier(); 
         return (events, element_index);
+    }
+    
+    pub fn unused_left_click(&self) -> bool {
+        self.left_mouse_button.pressed() && self.mouse_input_mode.is_none()
+    }
+    
+    pub fn set_interface_clicked(&mut self) {
+        self.mouse_input_mode = MouseInputMode::ClickInterface;
     }
 
     pub fn mouse_position(&self) -> Vector2<f32> {
-        return self.new_mouse_position;
+        self.new_mouse_position
     }
 }

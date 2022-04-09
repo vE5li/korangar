@@ -1,7 +1,8 @@
+use derive_new::new;
 use maths::*;
 use graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, new)]
 pub struct BoundingBox {
     pub smallest: Vector3<f32>,
     pub biggest: Vector3<f32>,
@@ -9,17 +10,11 @@ pub struct BoundingBox {
     pub range: Vector3<f32>,
 }
 
-impl BoundingBox {
-
-    pub fn new(smallest: Vector3<f32>, biggest: Vector3<f32>, offset: Vector3<f32>, range: Vector3<f32>) -> Self {
-        return Self { smallest, biggest, offset, range };
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, new)]
 pub struct Node {
     pub name: String,
     pub parent_name: Option<String>,
+    #[new(default)]
     pub child_nodes: Vec<Node>,
     pub textures: Vec<Texture>,
     pub transform: Transform,
@@ -33,25 +28,6 @@ pub struct Node {
 }
 
 impl Node {
-
-    pub fn new(name: String, parent_name: Option<String>, textures: Vec<Texture>, transform: Transform, vertex_buffer: ModelVertexBuffer, bounding_box: BoundingBox,
-        offset_matrix: Matrix3<f32>,
-        offset_translation: Vector3<f32>,
-        position: Vector3<f32>,
-        rotation: Vector3<Rad<f32>>,
-        scale: Vector3<f32>,
-    ) -> Self {
-
-        let child_nodes = Vec::new();
-
-        return Self { name, parent_name, child_nodes, textures, transform, vertex_buffer, bounding_box,
-            offset_matrix,
-            offset_translation,
-            position,
-            rotation,
-            scale,
-         };
-    }
 
     #[cfg(feature = "debug")]
     pub fn information(&self) -> String {

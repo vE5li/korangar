@@ -3,6 +3,8 @@ name = "korangar"
 version = "0.1.0"
 
 [dependencies]
+derive-new = "0.5"
+proc-gui = { path = "/home/proc-gui" }
 vulkano = "0.26"
 vulkano-shaders = "0.26"
 vulkano-win = "0.26"
@@ -12,11 +14,18 @@ png = "0.16"
 bmp = "*"
 pnet = "*"
 pathfinding = "2.2.2"
+#libz-sys = "1.1.5"
+yazi = "0.1.4"
+imgui = "0.8.2"
+imgui-winit-support = "0.8.2"
+imgui-vulkano-renderer = { path = "/home/imgui-vulkano-renderer" }
 
 [features]
 debug = ["lazy_static", "chrono"]
+debug_gamefiles = ["debug"]
 debug_model = ["debug"]
 debug_map = ["debug"]
+unicode = []
 colors = []
 
 [dependencies.chrono]

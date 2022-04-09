@@ -1,6 +1,7 @@
 pub enum MouseInputMode {
     MoveInterface(usize),
-    Click,
+    ResizeInterface(usize),
+    ClickInterface,
     None,
 }
 

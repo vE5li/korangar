@@ -4,13 +4,13 @@ use Entity;
 use super::{ StateKey, StateValue };
 
 pub struct StateProvider<'t> {
-    render_settings: &'t RenderSettings,
-    player: &'t Entity,
+    pub render_settings: &'t mut RenderSettings,
+    pub player: &'t mut Entity,
 }
 
 impl<'t> StateProvider<'t>{
 
-    pub fn new(render_settings: &'t RenderSettings, player: &'t Entity) -> Self {
+    pub fn new(render_settings: &'t mut RenderSettings, player: &'t mut Entity) -> Self {
         return Self { render_settings, player };
     }
 

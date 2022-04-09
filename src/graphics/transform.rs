@@ -37,7 +37,7 @@ impl Transform {
 
     pub fn position(position: Vector3<f32>) -> Self {
         return Self {
-            position: position,
+            position,
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
             node_translation: Matrix4::identity(),
@@ -63,10 +63,10 @@ impl Transform {
 
     pub fn rotation_around_axis(axis: Vector3<f32>, angle: Rad<f32>) -> Self {
 
-        let rotation_matrix = Matrix3::from_axis_angle(axis, angle);
-        let x = rotation_matrix[1][2].atan2(rotation_matrix[2][2]);
-        let y = rotation_matrix[0][2].atan2((rotation_matrix[1][2].powf(2.0) + rotation_matrix[2][2].powf(2.0)).sqrt());
-        let z = rotation_matrix[0][1].atan2(rotation_matrix[0][0]);
+        //let rotation_matrix = Matrix3::from_axis_angle(axis, angle);
+        //let x = rotation_matrix[1][2].atan2(rotation_matrix[2][2]);
+        //let y = rotation_matrix[0][2].atan2((rotation_matrix[1][2].powf(2.0) + rotation_matrix[2][2].powf(2.0)).sqrt());
+        //let z = rotation_matrix[0][1].atan2(rotation_matrix[0][0]);
 
         return Self {
             position: Vector3::new(0.0, 0.0, 0.0),
@@ -94,7 +94,7 @@ impl Transform {
         return Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-            scale: scale,
+            scale,
             node_translation: Matrix4::identity(),
             offset_translation: Matrix4::identity(),
             offset_matrix: Matrix4::identity(),
@@ -136,7 +136,7 @@ impl Transform {
             scale: Vector3::new(1.0, 1.0, 1.0),
             node_translation: Matrix4::identity(),
             offset_translation: Matrix4::identity(),
-            offset_matrix: offset_matrix,
+            offset_matrix,
             rotation_matrix: Matrix4::identity(),
             node_scale: Matrix4::identity(),
         }

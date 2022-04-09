@@ -1,14 +1,13 @@
+use derive_new::new;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::fs::File;
 use std::io::{ Cursor, Read, BufReader };
-
 use vulkano::device::{ Device, Queue };
 use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
 use vulkano::image::view::ImageView;
 use vulkano::format::Format;
 use vulkano::sync::{ GpuFuture, now };
-
 use png::Decoder;
 use bmp::open;
 
@@ -17,7 +16,9 @@ use graphics::Texture;
 #[cfg(feature = "debug")]
 use debug::*;
 
+#[derive(new)]
 pub struct TextureLoader {
+    #[new(default)]
     cache: HashMap<String, Texture>,
     device: Arc<Device>,
     queue: Arc<Queue>,
@@ -25,17 +26,8 @@ pub struct TextureLoader {
 
 impl TextureLoader {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
-        return Self {
-            cache: HashMap::new(),
-            device: device,
-            queue: queue,
-        }
-    }
-
     fn load_png_data(path: &str) -> (Vec<u8>, ImageDimensions) {
 
-        println!("{}", path);
         let file = File::open(path).expect("failed to open file");
 
         let mut reader = BufReader::new(file);

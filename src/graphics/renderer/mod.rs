@@ -10,6 +10,7 @@ mod interface;
 #[cfg(feature = "debug")]
 mod debug;
 
+use derive_new::new;
 use std::sync::Arc;
 use cgmath::{ Vector4, Vector3, Vector2 };
 use vulkano::device::physical::PhysicalDevice;
@@ -25,6 +26,8 @@ use vulkano::buffer::BufferUsage;
 use vulkano::format::Format;
 use vulkano::sync::{ FlushError, GpuFuture, now };
 use winit::window::Window;
+use imgui_winit_support::{ HiDpiMode, WinitPlatform };
+use imgui::Context;
 
 #[cfg(feature = "debug")]
 use debug::*;
@@ -44,21 +47,11 @@ pub use self::settings::RenderSettings;
 #[cfg(feature = "debug")]
 const MARKER_SIZE: f32 = 1.25;
 
+#[derive(new)]
 struct CurrentFrame {
     pub builder: CommandBuilder,
     pub image_num: usize,
     pub swapchain_future: SwapchainAcquireFuture<Window>,
-}
-
-impl CurrentFrame {
-
-    pub fn new(builder: CommandBuilder, image_num: usize, swapchain_future: SwapchainAcquireFuture<Window>) -> Self {
-        return Self {
-            builder: builder,
-            image_num: image_num,
-            swapchain_future: swapchain_future,
-        }
-    }
 }
 
 pub struct Renderer {
@@ -91,6 +84,11 @@ pub struct Renderer {
     background_texture: Texture,
     checked_box_texture: Texture,
     unchecked_box_texture: Texture,
+
+    surface: Arc<Surface<Window>>,
+    platform: WinitPlatform,
+    imgui_context: Context,
+    imgui_renderer: imgui_vulkano_renderer::Renderer,
 }
 
 impl Renderer {
@@ -105,7 +103,7 @@ impl Renderer {
         let dimensions: [u32; 2] = surface.window().inner_size().into();
         let window_size = Vector2::new(dimensions[0] as usize, dimensions[1] as usize);
 
-        let (swapchain, images) = Swapchain::start(device.clone(), surface)
+        let (swapchain, images) = Swapchain::start(device.clone(), surface.clone())
             .num_images(capabilities.min_image_count)
             .format(format)
             .dimensions(dimensions)
@@ -183,7 +181,7 @@ impl Renderer {
         let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let rectangle_renderer = RectangleRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let debug_renderer = DebugRenderer::new(device.clone(), lighting_subpass, viewport, texture_loader, &mut texture_future);
+        let debug_renderer = DebugRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone(), texture_loader, &mut texture_future);
 
         #[cfg(feature = "debug")]
         print_debug!("created {}renderers{}", magenta(), none());
@@ -212,6 +210,13 @@ impl Renderer {
         let previous_frame_end = Some(now(device.clone()).boxed());
         let current_frame = None;
         let recreate_swapchain = false;
+
+        let mut imgui_context = Context::create();
+        let mut platform = WinitPlatform::init(&mut imgui_context);
+        platform.attach_window(imgui_context.io_mut(), &surface.window(), HiDpiMode::Rounded);
+
+        let imgui_renderer = imgui_vulkano_renderer::Renderer::init(&mut imgui_context, device.clone(), queue.clone(), lighting_subpass, Format::R8G8B8A8_SRGB, viewport).unwrap();
+
 
         return Self {
             queue,
@@ -243,6 +248,11 @@ impl Renderer {
             background_texture,
             checked_box_texture,
             unchecked_box_texture,
+
+            surface,
+            platform,
+            imgui_context,
+            imgui_renderer,
         }
     }
 
@@ -318,7 +328,9 @@ impl Renderer {
             self.sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             self.rectangle_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             #[cfg(feature = "debug")]
-            self.debug_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport);
+            self.debug_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+
+            self.imgui_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport).unwrap();
 
             self.swapchain = new_swapchain;
             self.diffuse_buffer = new_color_buffer;
@@ -378,7 +390,7 @@ impl Renderer {
 
     pub fn ambient_light(&mut self, color: Color) {
         if let Some(current_frame) = &mut self.current_frame {
-            self.ambient_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.screen_vertex_buffer.clone(), color);
+            self.ambient_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.screen_vertex_buffer.clone(), color);
         }
     }
 
@@ -460,7 +472,7 @@ impl Renderer {
             return false;
         }
 
-        let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THERE INVERTED ???
+        let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
         let half_screen = Vector2::new(self.window_size.x as f32 / 2.0, self.window_size.y as f32 / 2.0);
         let mouse_position = Vector2::new(mouse_position.x / half_screen.x, mouse_position.y / half_screen.y);
 
@@ -473,7 +485,7 @@ impl Renderer {
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MARKER_SIZE);
 
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
-            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THERE INVERTED ???
+            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
             self.render_sprite_direct(icon, screen_position, screen_size, color, true);
         }
     }
@@ -510,8 +522,51 @@ impl Renderer {
         }
     }
 
+    pub fn prepare_frame(&mut self) {
+        self.platform
+            .prepare_frame(self.imgui_context.io_mut(), &self.surface.window())
+            .expect("Failed to prepare frame");
+    }
+
+    pub fn handle_event<T>(&mut self, event: winit::event::Event<T>) {
+        self.platform.handle_event(self.imgui_context.io_mut(), self.surface.window(), &event);
+    }
+
     pub fn stop_frame(&mut self) {
         if let Some(mut current_frame) = self.current_frame.take() {
+
+
+
+
+
+         
+            let ui = self.imgui_context.frame();
+            use imgui::*;
+             
+            Window::new(im_str!("Hello world"))
+                .size([300.0, 110.0], Condition::FirstUseEver)
+                .build(&ui, || {
+                    ui.text(im_str!("Hello world!"));
+                    ui.text(im_str!("こんにちは世界！"));
+                    ui.text(im_str!("This...is...imgui-rs!"));
+                    ui.separator();
+                    let mouse_pos = ui.io().mouse_pos;
+                    ui.text(format!(
+                        "Mouse Position: ({:.1},{:.1})",
+                        mouse_pos[0], mouse_pos[1]
+                    ));
+                });
+
+            self.platform.prepare_render(&ui, self.surface.window());
+            let draw_data = ui.render();
+
+
+
+            self.imgui_renderer
+                    .draw_commands(&mut current_frame.builder, self.queue.clone(), draw_data)
+                    .expect("Rendering failed");
+
+
 
             current_frame.builder.end_render_pass().unwrap();
             let command_buffer = current_frame.builder.build().unwrap();
@@ -528,6 +583,9 @@ impl Renderer {
                 Ok(future) => {
                     self.previous_frame_end = Some(future.boxed());
                 }
+
+
+
 
                 Err(FlushError::OutOfDate) => {
                     self.recreate_swapchain = true;

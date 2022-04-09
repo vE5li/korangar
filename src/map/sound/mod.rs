@@ -1,18 +1,16 @@
+use derive_new::new;
 use cgmath::{ Vector3, Vector2 };
 
 #[cfg(feature = "debug")]
 use graphics::{ Renderer, Camera };
 
+#[derive(Clone, new)]
 pub struct SoundSource {
-    position: Vector3<f32>,
-    _range: f32,
+    pub position: Vector3<f32>,
+    pub range: f32,
 }
 
 impl SoundSource {
-
-    pub fn new(position: Vector3<f32>, range: f32) -> Self {
-        return Self { position, _range: range };
-    }
 
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.position += offset;

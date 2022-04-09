@@ -1,11 +1,10 @@
 mod resource;
 
+use derive_new::new;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::read;
-
 use cgmath::{ Vector3, Vector2, Rad, Deg };
-
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
 use vulkano::sync::{ GpuFuture, now };
@@ -41,10 +40,17 @@ pub struct Surface {
 impl Surface {
 
     pub fn new(u: [f32; 4], v: [f32; 4], texture_index: i32, light_map_index: i32, color: Color) -> Self {
-        return Self { u, v, texture_index: texture_index % 10, _light_map_index: light_map_index, _color: color }; // TODO: remove %10 !
+        return Self {
+            u,
+            v,
+            texture_index: texture_index % 10, // TODO: remove % 10 and derive new
+            _light_map_index: light_map_index,
+            _color: color
+        };
     }
 }
 
+#[derive(new)]
 pub struct GroundTile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,
@@ -53,13 +59,6 @@ pub struct GroundTile {
     pub top_surface_index: i32,
     pub front_surface_index: i32,
     pub right_surface_index: i32,
-}
-
-impl GroundTile {
-
-    pub fn new(upper_left_height: f32, upper_right_height: f32, lower_left_height: f32, lower_right_height: f32, top_surface_index: i32, front_surface_index: i32, right_surface_index: i32) -> Self {
-        return Self { upper_left_height, upper_right_height, lower_left_height, lower_right_height, top_surface_index, front_surface_index, right_surface_index };
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -121,19 +120,14 @@ pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
     }
 }
 
+#[derive(new)]
 pub struct MapLoader {
+    #[new(default)]
     cache: HashMap<String, Arc<Map>>,
     device: Arc<Device>,
 }
 
 impl MapLoader {
-
-    pub fn new(device: Arc<Device>) -> Self {
-        return Self {
-            cache: HashMap::new(),
-            device: device,
-        }
-    }
 
     fn load(&mut self, model_loader: &mut ModelLoader, texture_loader: &mut TextureLoader, resource_file: String) -> Arc<Map> {
 
@@ -518,6 +512,12 @@ impl MapLoader {
 
             let mut tile_vertices = Vec::new();
 
+            /* */
+            let mut vertex_offset = 1;
+            let mut obj_file_vertices = String::new();
+            let mut obj_file_faces = String::new();
+            /* */
+
             for y in 0..map_height {
                 for x in 0..map_width {
 
@@ -544,6 +544,13 @@ impl MapLoader {
                     let third_position = Vector3::new(offset.x + 5.0, -lower_right_height + 1.0, offset.y + 5.0);
                     let fourth_position = Vector3::new(offset.x, -lower_left_height + 1.0, offset.y + 5.0);
 
+                    /*  */
+                    obj_file_vertices.push_str(&format!("v {} {} {}\n", first_position.x, first_position.y, first_position.z));
+                    obj_file_vertices.push_str(&format!("v {} {} {}\n", second_position.x, second_position.y, second_position.z));
+                    obj_file_vertices.push_str(&format!("v {} {} {}\n", third_position.x, third_position.y, third_position.z));
+                    obj_file_vertices.push_str(&format!("v {} {} {}\n", fourth_position.x, fourth_position.y, fourth_position.z));
+                    /*  */
+
                     let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
                     let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
@@ -559,8 +566,22 @@ impl MapLoader {
                     tile_vertices.push(ModelVertex::new(first_position, second_normal, first_texture_coordinates, tile_type_index as i32));
                     tile_vertices.push(ModelVertex::new(third_position, second_normal, third_texture_coordinates, tile_type_index as i32));
                     tile_vertices.push(ModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, tile_type_index as i32));
+
+                    /*  */
+                    obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 1, vertex_offset + 2));
+                    obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 2, vertex_offset + 3));
+                    vertex_offset += 4;
+                    /*  */
                 }
             }
+
+            /* */
+            use std::fs::File;
+            use std::io::prelude::*;
+            let mut file = File::create(&format!("{}.obj", gat_file.clone())).unwrap();
+            file.write_all(obj_file_vertices.as_bytes()).unwrap();
+            file.write_all(obj_file_faces.as_bytes()).unwrap();
+            /* */
 
             #[cfg(feature = "debug")]
             byte_stream.assert_empty(bytes.len(), &gat_file);
@@ -570,6 +591,12 @@ impl MapLoader {
         }
 
         let mut native_ground_vertices = Vec::new();
+
+        /* */
+        let mut vertex_offset = 1;
+        let mut obj_file_vertices = String::new();
+        let mut obj_file_faces = String::new();
+        /* */
 
         for x in 0..width {
             for y in 0..height {
@@ -603,6 +630,13 @@ impl MapLoader {
                         let height = get_tile_height_at(&neighbor_tile, surface_height);
                         let fourth_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
+                        /*  */
+                        obj_file_vertices.push_str(&format!("v {} {} {}\n", first_position.x, first_position.y, first_position.z));
+                        obj_file_vertices.push_str(&format!("v {} {} {}\n", second_position.x, second_position.y, second_position.z));
+                        obj_file_vertices.push_str(&format!("v {} {} {}\n", third_position.x, third_position.y, third_position.z));
+                        obj_file_vertices.push_str(&format!("v {} {} {}\n", fourth_position.x, fourth_position.y, fourth_position.z));
+                        /*  */
+
                         let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
                         let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
@@ -620,10 +654,24 @@ impl MapLoader {
                         native_ground_vertices.push(NativeModelVertex::new(first_position, second_normal, first_texture_coordinates, ground_surface.texture_index));
                         native_ground_vertices.push(NativeModelVertex::new(third_position, second_normal, third_texture_coordinates, ground_surface.texture_index));
                         native_ground_vertices.push(NativeModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, ground_surface.texture_index));
+
+                        /*  */
+                        obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 1, vertex_offset + 2));
+                        obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 2, vertex_offset + 3));
+                        vertex_offset += 4;
+                        /*  */
                     }
                 }
             }
         }
+
+        /* */
+        use std::fs::File;
+        use std::io::prelude::*;
+        let mut file = File::create(&format!("{}.obj", resource_file.clone())).unwrap();
+        file.write_all(obj_file_vertices.as_bytes()).unwrap();
+        file.write_all(obj_file_faces.as_bytes()).unwrap();
+        /* */
 
         let row_size = width * 6;
 

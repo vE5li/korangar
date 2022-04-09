@@ -1,3 +1,5 @@
+extern crate derive_new;
+extern crate proc_gui;
 extern crate vulkano;
 extern crate vulkano_shaders;
 extern crate vulkano_win;
@@ -12,6 +14,10 @@ extern crate chrono;
 #[macro_use]
 extern crate lazy_static;
 extern crate pnet;
+extern crate yazi;
+extern crate imgui;
+extern crate imgui_winit_support;
+extern crate imgui_vulkano_renderer;
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -32,6 +38,7 @@ use vulkano::device::{ Device, DeviceExtensions };
 use vulkano::instance::Instance;
 use vulkano::instance::debug::{ MessageSeverity, MessageType };
 use vulkano::Version;
+use vulkano::pipeline::viewport::Viewport;
 use vulkano::sync::{ GpuFuture, now };
 use vulkano_win::VkSurfaceBuild;
 use winit::event::{ Event, WindowEvent };
@@ -45,20 +52,42 @@ use system::FrameTimer;
 use maths::Vector2;
 use entity::Entity;
 use graphics::*;
-use loaders::{ MapLoader, ModelLoader, TextureLoader };
+use loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader };
 use interface::{ Interface, StateProvider };
 use network::{ NetworkingSystem, NetworkEvent };
+use crate::map::MarkerIdentifier;
 
 fn get_layers<'a>(desired_layers: Vec<&'a str>) -> Vec<&'a str> {
     let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
-    println!("Available layers:");
-    for l in &available_layers {
-        println!("\t{}", l.name());
+
+    #[cfg(feature = "debug")]
+    let timer = Timer::new_dynamic(format!("available layers"));
+
+    #[cfg(feature = "debug")]
+    for layer in &available_layers {
+        print_debug!("{}{}{}", magenta(), layer.name(), none());
     }
-    desired_layers
+
+    #[cfg(feature = "debug")]
+    timer.stop();
+
+    let used_layers = desired_layers
         .into_iter()
         .filter(|&l| available_layers.iter().any(|li| li.name() == l))
-        .collect()
+        .collect();
+
+    #[cfg(feature = "debug")]
+    let timer = Timer::new_dynamic(format!("used layers"));
+
+    #[cfg(feature = "debug")]
+    for layer in &used_layers {
+        print_debug!("{}{}{}", magenta(), layer, none());
+    }
+
+    #[cfg(feature = "debug")]
+    timer.stop();
+
+    return used_layers;
 }
 
 fn print_message_callback(message: &vulkano::instance::debug::Message) {
@@ -87,7 +116,6 @@ fn main() {
     };
 
     let layers = get_layers(vec!["VK_LAYER_KHRONOS_validation"]);
-    println!("Using layers: {:?}", layers);
 
     //let required_extensions = vulkano_win::required_extensions();
     let instance = Instance::new(None, Version::V1_1, &extensions, layers).expect("failed to create instance");
@@ -158,9 +186,12 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create resource managers");
 
+    let mut game_file_loader = GameFileLoader::new();
     let mut model_loader = ModelLoader::new(device.clone());
     let mut texture_loader = TextureLoader::new(device.clone(), queue.clone());
     let mut map_loader = MapLoader::new(device.clone());
+
+    //game_file_loader.get(String::from("data.grf"));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -236,38 +267,49 @@ fn main() {
 
             Event::WindowEvent { event: WindowEvent::Resized(_), .. } => {
                 renderer.invalidate_swapchain();
+                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::Focused(focused), .. } => {
                 if !focused {
                     input_system.reset();
                 }
+                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
                 input_system.update_mouse_position(position);
+                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::MouseInput{ button, state, .. }, .. } => {
                 input_system.update_mouse_buttons(button, state);
+                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::MouseWheel{ delta, .. }, .. } => {
                 input_system.update_mouse_wheel(delta);
+                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::KeyboardInput{ input, .. }, .. } => {
                 input_system.update_keyboard(input.scancode as usize, input.state);
+                renderer.handle_event(event);
             }
 
             Event::RedrawEventsCleared => {
+
+                renderer.prepare_frame();
 
                 input_system.update_delta();
 
                 let delta_time = frame_timer.update();
 
                 //let network_events = networking_system.network_events();
-                let (user_events, element_index) = input_system.user_events(&interface);
+                let (user_events, element_index) = {
+                    let mut state_provider = StateProvider::new(&mut render_settings, &mut entities[0]);
+                    input_system.user_events(&mut interface, &mut state_provider)
+                };
 
                 //for event in network_events {
                 //    match event {
@@ -291,15 +333,7 @@ fn main() {
                     match event {
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
-                        UserEvent::ToggleShowFramesPerSecond => render_settings.toggle_show_frames_per_second(),
-                        UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
-                        UserEvent::ToggleShowObjects => render_settings.toggle_show_objects(),
-                        UserEvent::ToggleShowEntities => render_settings.toggle_show_entities(),
-                        UserEvent::ToggleShowAmbientLight => render_settings.toggle_show_ambient_light(),
-                        UserEvent::ToggleShowDirectionalLight => render_settings.toggle_show_directional_light(),
-                        UserEvent::ToggleShowPointLights => render_settings.toggle_show_point_lights(),
-                        UserEvent::ToggleShowParticleLights => render_settings.toggle_show_particle_lights(),
-                        UserEvent::MoveInterface(index, offset) => interface.move_hovered(index, offset),
+                        UserEvent::CloseWindow(window_index) => interface.close_window(window_index),
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
                         #[cfg(feature = "debug")]
@@ -365,7 +399,16 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 if let Some(marker) = &hovered_marker {
-                    println!("{:?} : {}", marker, map.marker_information(marker));
+                    if input_system.unused_left_click() {
+                        match *marker {
+                            MarkerIdentifier::Object(index) => interface.open_object_window(map.get_object(index), index),
+                            MarkerIdentifier::LightSource(index) => interface.open_light_source_window(map.get_light_source(index), index),
+                            MarkerIdentifier::SoundSource(index) => interface.open_sound_source_window(map.get_sound_source(index), index),
+                            MarkerIdentifier::EffectSource(index) => interface.open_effect_source_window(map.get_effect_source(index), index),
+                            MarkerIdentifier::Particle(index, particle_index) => interface.open_particle_window(map.get_particle(index, particle_index), index, particle_index),
+                        }
+                        input_system.set_interface_clicked();
+                    }
                 }
 
                 map.render_geomitry(&mut renderer, current_camera, &render_settings);
@@ -393,7 +436,7 @@ fn main() {
                 #[cfg(feature = "debug")]
                 map.render_markers(&mut renderer, current_camera, &render_settings);
 
-                let state_provider = StateProvider::new(&render_settings, &entities[0]);
+                let state_provider = StateProvider::new(&mut render_settings, &mut entities[0]);
                 interface.render(&mut renderer, &state_provider, element_index);
 
                 if render_settings.show_frames_per_second {
@@ -403,7 +446,10 @@ fn main() {
                 renderer.stop_frame();
             }
 
-            _ignored => ()
+            //_ignored => ()
+            event => {
+                renderer.handle_event(event);
+            }
         }
     });
 }

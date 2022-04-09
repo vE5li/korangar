@@ -1,3 +1,5 @@
+use derive_new::new;
+
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;
 const WATER: u8 = 0b00000010;
@@ -31,6 +33,7 @@ impl TileType {
     }
 }
 
+#[derive(new)]
 pub struct Tile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,
@@ -40,10 +43,6 @@ pub struct Tile {
 }
 
 impl Tile {
-
-    pub fn new(upper_left_height: f32, upper_right_height: f32, lower_left_height: f32, lower_right_height: f32, tile_type: TileType) -> Self {
-        return Self { upper_left_height, upper_right_height, lower_left_height, lower_right_height, tile_type };
-    }
 
     pub fn is_walkable(&self) -> bool {
         return self.tile_type.is_walkable();

@@ -4,15 +4,7 @@ use cgmath::Vector2;
 pub enum UserEvent {
     CameraZoom(f32),
     CameraRotate(f32),
-    ToggleShowFramesPerSecond,
-    ToggleShowMap,
-    ToggleShowObjects,
-    ToggleShowEntities,
-    ToggleShowAmbientLight,
-    ToggleShowDirectionalLight,
-    ToggleShowPointLights,
-    ToggleShowParticleLights,
-    MoveInterface(usize, Vector2<f32>),
+    CloseWindow(usize),
     #[cfg(feature = "debug")]
     ToggleUseDebugCamera,
     #[cfg(feature = "debug")]

@@ -1,25 +1,21 @@
 use std::time::Instant;
+use derive_new::new;
 
+#[derive(new)]
 pub struct FrameTimer {
+    #[new(value = "Instant::now()")]
     global_timer: Instant,
+    #[new(default)]
     previous_elapsed: f64,
+    #[new(default)]
     accumulate_second: f64,
+    #[new(default)]
     frame_counter: usize,
+    #[new(default)]
     frames_per_second: usize
 }
 
 impl FrameTimer {
-
-    pub fn new() -> Self {
-
-        let global_timer = Instant::now();
-        let previous_elapsed = 0.0;
-        let accumulate_second = 0.0;
-        let frame_counter = 0;
-        let frames_per_second = 0;
-
-        return Self { global_timer, previous_elapsed, accumulate_second, frame_counter, frames_per_second };
-    }
 
     pub fn update(&mut self) -> f64 {
 

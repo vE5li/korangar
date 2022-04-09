@@ -1,26 +1,21 @@
 mod particle;
 
+use derive_new::new;
 use cgmath::{ Vector3, Vector2 };
-
 use graphics::{ Renderer, Camera, Color };
 
-use self::particle::Particle;
+pub use self::particle::Particle;
 
+#[derive(Clone, new)]
 pub struct EffectSource {
-    position: Vector3<f32>,
-    particles: Vec<Particle>,
-    spawn_timer: f32,
+    pub position: Vector3<f32>,
+    #[new(default)]
+    pub particles: Vec<Particle>,
+    #[new(default)]
+    pub spawn_timer: f32,
 }
 
 impl EffectSource {
-
-    pub fn new(position: Vector3<f32>) -> Self {
-
-        let particles = Vec::new();
-        let spawn_timer = 0.0;
-
-        return Self { position, particles, spawn_timer };
-    }
 
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.position += offset;

@@ -1,3 +1,4 @@
+use derive_new::new;
 use std::slice::Iter;
 
 #[cfg(feature = "debug")]
@@ -7,25 +8,15 @@ use graphics::Color;
 
 use super::Version;
 
+#[derive(new)]
 pub struct ByteStream<'b> {
     iterator: Iter<'b, u8>,
     #[cfg(feature = "debug")]
+    #[new(default)]
     counter: usize,
 }
 
 impl<'b> ByteStream<'b> {
-
-    pub fn new(iterator: Iter<'b, u8>) -> Self {
-
-        #[cfg(feature = "debug")]
-        let counter = 0;
-
-        return Self {
-            iterator,
-            #[cfg(feature = "debug")]
-            counter
-        };
-    }
 
     fn next(&mut self) -> u8 {
 

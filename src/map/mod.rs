@@ -4,6 +4,7 @@ mod light;
 mod sound;
 mod effect;
 
+use derive_new::new;
 use cgmath::Vector2;
 
 use graphics::{ Renderer, RenderSettings, Camera, ModelVertexBuffer, Texture, Transform, Color };
@@ -13,7 +14,7 @@ pub use self::object::model;
 pub use self::object::Object;
 pub use self::light::LightSource;
 pub use self::sound::SoundSource;
-pub use self::effect::EffectSource;
+pub use self::effect::{ EffectSource, Particle };
 
 #[derive(Copy, Clone, Debug)]
 pub enum MarkerIdentifier {
@@ -24,6 +25,7 @@ pub enum MarkerIdentifier {
     Particle(usize, usize),
 }
 
+#[derive(new)]
 pub struct Map {
     width: usize,
     height: usize,
@@ -39,10 +41,6 @@ pub struct Map {
 }
 
 impl Map {
-
-    pub fn new(width: usize, height: usize, tiles: Vec<Tile>, ground_vertex_buffer: ModelVertexBuffer, ground_textures: Vec<Texture>, objects: Vec<Object>, light_sources: Vec<LightSource>, sound_sources: Vec<SoundSource>, effect_sources: Vec<EffectSource>, tile_vertex_buffer: Option<ModelVertexBuffer>, ambient_light_color: Color) -> Self {
-        return Self { width, height, tiles, ground_vertex_buffer, ground_textures, objects, light_sources, sound_sources, effect_sources, tile_vertex_buffer, ambient_light_color };
-    }
 
     pub fn update(&self, delta_time: f32) {
         self.effect_sources.iter().for_each(|effect_source| effect_source.update(delta_time));
@@ -153,14 +151,28 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn marker_information(&self, marker_identifier: &MarkerIdentifier) -> String {
-        match marker_identifier {
-            MarkerIdentifier::Object(index) => return self.objects[*index].information(),
-            MarkerIdentifier::LightSource(index) => panic!(), //return self.light_sources[index].information(),
-            MarkerIdentifier::SoundSource(index) => panic!(), //return self.sound_sources[index].information(),
-            MarkerIdentifier::EffectSource(index) => panic!(), //return self.effect_sources[index].information(),
-            MarkerIdentifier::Particle(index, particle_index) => panic!(),
-        }
+    pub fn get_object(&self, index: usize) -> Object {
+        self.objects[index].clone()
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_light_source(&self, index: usize) -> LightSource {
+        self.light_sources[index].clone()
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_sound_source(&self, index: usize) -> SoundSource {
+        self.sound_sources[index].clone()
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_effect_source(&self, index: usize) -> EffectSource {
+        self.effect_sources[index].clone()
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_particle(&self, index: usize, particle_index: usize) -> Particle {
+        self.effect_sources[index].particles[particle_index].clone()
     }
 
     #[cfg(feature = "debug")]

@@ -227,7 +227,7 @@ impl Entity {
     }
 
     pub fn render(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.render_entity(camera, self.texture.clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0));
+        renderer.render_entity(camera, self.texture.clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(16, 8), Vector2::new(0, 0));
     }
 
     #[cfg(feature = "debug")]

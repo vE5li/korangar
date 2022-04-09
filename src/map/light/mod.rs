@@ -1,18 +1,16 @@
+use derive_new::new;
 use cgmath::{ Vector3, Vector2 };
 
 use graphics::{ Renderer, Camera, Color };
 
+#[derive(Clone, new)]
 pub struct LightSource {
-    position: Vector3<f32>,
-    color: Color,
-    range: f32,
+    pub position: Vector3<f32>,
+    pub color: Color,
+    pub range: f32,
 }
 
 impl LightSource {
-
-    pub fn new(position: Vector3<f32>, color: Color, range: f32) -> Self {
-        return Self { position, color, range };
-    }
 
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.position += offset;

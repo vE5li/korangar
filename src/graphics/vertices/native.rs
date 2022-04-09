@@ -1,7 +1,9 @@
+use derive_new::new;
 use cgmath::{ Vector2, Vector3, InnerSpace };
 
 use graphics::ModelVertex;
 
+#[derive(new)]
 pub struct NativeModelVertex {
     pub position: Vector3<f32>,
     pub normal: Vector3<f32>,
@@ -10,10 +12,6 @@ pub struct NativeModelVertex {
 }
 
 impl NativeModelVertex {
-
-    pub fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>, texture_index: i32) -> Self {
-        return Self { position, normal, texture_coordinates, texture_index };
-    }
 
     fn to_vertex(self) -> ModelVertex {
         return ModelVertex::new(self.position, self.normal, self.texture_coordinates, self.texture_index);

@@ -1,22 +1,18 @@
-#[derive(Copy, Clone, Debug)]
+use derive_new::new;
+
+#[derive(Copy, Clone, Debug, new)]
 pub struct Key {
+    #[new(default)]
     is_down: bool,
+    #[new(default)]
     was_down: bool,
+    #[new(default)]
     is_pressed: bool,
+    #[new(default)]
     is_released: bool,
 }
 
 impl Key {
-
-    pub fn new() -> Self {
-
-        let is_down = false;
-        let was_down = false;
-        let is_pressed = false;
-        let is_released = false;
-
-        return Self { is_down, was_down, is_pressed, is_released };
-    }
 
     pub fn reset(&mut self) {
         self.update();

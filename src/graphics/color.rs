@@ -7,9 +7,7 @@ pub struct Color {
 
 impl Color {
 
-    pub const WHITE: Color = Color::new(255, 255, 255);
-
-    pub const fn new(red: u8, green: u8, blue: u8) -> Self {
+    pub const fn new(red: u8, green: u8, blue: u8) -> Self { // replace with derive new when const fn becomes an option
         return Self { red, green, blue };
     }
 

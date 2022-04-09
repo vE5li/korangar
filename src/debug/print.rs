@@ -1,21 +1,40 @@
-use super::stack_size;
+use super::*;
 
 #[macro_export]
 macro_rules! print_debug {
-    ($format:expr) => (print_indented(String::from($format)));
-    ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*)));
+    ($format:expr) => (print_indented(String::from($format), true));
+    ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), true));
 }
 
-pub fn print_indented(message: String) {
-    let indentation = stack_size();
+#[macro_export]
+macro_rules! print_debug_prefix { 
+    ($format:expr) => (print_indented(String::from($format), false));
+    ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), false));
+}
 
-    for _ in 0..indentation {
-        print!("  ");
+pub fn print_indented(message: String, newline: bool) {
+    let offset = message_offset();
+
+    if stack_size() > 0 {
+
+        if get_message_count() == 0 {
+            println!(" {} started", arrow_symbol());
+        }
+
+        increment_message_count();
     }
 
-    if indentation != 0 {
-        print!("- ");
+    for _ in 0..offset {
+        print!(" ");
     }
 
-    println!("{}", message);
+    if offset != 0 {
+        print!("{} ", newline_symbol());
+    }
+
+    print!("{}", message);
+
+    if newline {
+        println!();
+    }
 }

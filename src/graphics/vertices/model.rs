@@ -15,7 +15,7 @@ impl ModelVertex {
             position: [position.x, position.y, position.z],
             normal: [normal.x, normal.y, normal.z],
             texture_coordinates: [texture_coordinates.x, texture_coordinates.y],
-            texture_index: texture_index,
+            texture_index,
         }
     }
 }

@@ -3,6 +3,8 @@ use derive_new::new;
 #[derive(new)]
 pub struct RenderSettings { 
     #[new(value = "true")]
+    pub frame_limit: bool,
+    #[new(value = "true")]
     pub show_frames_per_second: bool,
     #[new(value = "true")]
     pub show_map: bool,
@@ -57,6 +59,10 @@ impl RenderSettings {
 
     pub fn toggle_show_frames_per_second(&mut self) {
         self.show_frames_per_second = !self.show_frames_per_second;
+    }
+
+    pub fn toggle_frame_limit(&mut self) {
+        self.frame_limit = !self.frame_limit;
     }
 
     pub fn toggle_show_map(&mut self) {

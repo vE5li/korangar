@@ -14,31 +14,32 @@ mod fragment_shader {
 
 use std::sync::Arc;
 use std::iter;
-
 use vulkano::device::Device;
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
-use vulkano::pipeline::viewport::Viewport;
+use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
+use vulkano::pipeline::graphics::color_blend::ColorBlendState;
+use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
+use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
 use vulkano::descriptor_set::PersistentDescriptorSet;
 use vulkano::render_pass::Subpass;
+use vulkano::shader::ShaderModule;
 
 use graphics::*;
 
-use self::vertex_shader::Shader as VertexShader;
-use self::fragment_shader::Shader as FragmentShader;
 use self::fragment_shader::ty::Constants;
 
 pub struct AmbientLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: VertexShader,
-    fragment_shader: FragmentShader,
+    vertex_shader: Arc<ShaderModule>,
+    fragment_shader: Arc<ShaderModule>,
 }
 
 impl AmbientLightRenderer {
 
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
 
-        let vertex_shader = VertexShader::load(device.clone()).unwrap();
-        let fragment_shader = FragmentShader::load(device.clone()).unwrap();
+        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
+        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         return Self { pipeline, vertex_shader, fragment_shader };
@@ -48,21 +49,20 @@ impl AmbientLightRenderer {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
 
-    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {
+    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
 
         let pipeline = GraphicsPipeline::start()
-            .vertex_input_single_buffer::<ScreenVertex>()
-            .vertex_shader(vertex_shader.main_entry_point(), ())
-            .triangle_list()
-            .viewports_dynamic_scissors_irrelevant(1)
-            .viewports(iter::once(viewport))
-            .fragment_shader(fragment_shader.main_entry_point(), ())
-            .blend_collective(LIGHT_ATTACHMENT_BLEND)
+            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
+            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
+            .input_assembly_state(InputAssemblyState::new())
+            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
+            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
+            .color_blend_state(ColorBlendState::new(1).blend(LIGHT_ATTACHMENT_BLEND))
             .render_pass(subpass)
             .build(device)
             .unwrap();
 
-        return Arc::new(pipeline);
+        return pipeline;
     }
 
     pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, color: Color) {
@@ -75,7 +75,7 @@ impl AmbientLightRenderer {
         set_builder.add_image(diffuse_buffer).unwrap();
         set_builder.add_image(normal_buffer).unwrap();
 
-        let set = Arc::new(set_builder.build().unwrap());
+        let set = set_builder.build().unwrap();
 
         let constants = Constants {
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],

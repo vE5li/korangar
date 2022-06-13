@@ -1,0 +1,55 @@
+use super::*;
+
+#[macro_export]
+macro_rules! print_debug {
+    ($format:expr) => (print_indented(String::from($format), true));
+    ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), true));
+}
+
+#[macro_export]
+macro_rules! print_debug_prefix { 
+    ($format:expr) => (print_indented(String::from($format), false));
+    ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), false));
+}
+
+pub fn print_indented(message: String, newline: bool) {
+    let offset = message_offset();
+
+    if stack_size() > 0 {
+
+        if get_message_count() == 0 {
+            println!(" {} started", arrow_symbol());
+        }
+
+        increment_message_count();
+    }
+
+    for _ in 0..offset {
+        print!(" ");
+    }
+
+    if offset != 0 {
+        print!("{} ", newline_symbol());
+    }
+
+    print!("{}", message);
+
+    if newline {
+        println!();
+    }
+}
+
+pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
+
+    let message_type = if message.ty.general {
+        "general"
+    } else if message.ty.validation {
+        "validation"
+    } else if message.ty.performance {
+        "performance"
+    } else {
+        "vulkano message type not implemented"
+    };
+
+    print_debug!("{}{:?}{} [{}{}{}] : {}", magenta(), message.layer_prefix, none(), yellow(), message_type, none(), message.description);
+}

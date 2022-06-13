@@ -2,18 +2,17 @@ mod event;
 mod key;
 mod mode;
 
+use std::rc::Rc;
 use cgmath::Vector2;
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 
-use interface::{ Interface, HoverInformation };
-
-use crate::interface::StateProvider;
+use interface::types::ElementCell;
+use interface::{ Interface, ClickAction };
 
 pub use self::event::UserEvent;
-
-use self::mode::MouseInputMode;
-use self::key::Key;
+pub use self::mode::MouseInputMode;
+pub use self::key::Key;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;
@@ -29,6 +28,7 @@ pub struct InputSystem {
     right_mouse_button: Key,
     keys: [Key; KEY_COUNT],
     mouse_input_mode: MouseInputMode,
+    previous_hovered_element: Option<(ElementCell, usize)>,
 }
 
 impl InputSystem {
@@ -48,6 +48,7 @@ impl InputSystem {
         let keys = [Key::new(); KEY_COUNT];
 
         let mouse_input_mode = MouseInputMode::None;
+        let previous_hovered_element = None;
 
         return Self {
             previous_mouse_position,
@@ -60,6 +61,7 @@ impl InputSystem {
             right_mouse_button,
             keys,
             mouse_input_mode,
+            previous_hovered_element,
         };
     }
 
@@ -109,36 +111,57 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, interface: &mut Interface, state_provider: &mut StateProvider) -> (Vec<UserEvent>, usize) {
+    pub fn user_events(&mut self, interface: &mut Interface) -> (Vec<UserEvent>, Option<ElementCell>) {
 
         let mut events = Vec::new();
+        let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {         
+            true => interface.hovered_element(self.new_mouse_position),
+            false => (None, None),
+        };
 
         let shift_pressed = self.keys[42].down();
-        let mut hover_information = interface.hovered_element(self.new_mouse_position);
 
         if shift_pressed {
 
-            if let HoverInformation::Element(window_index, _element_index) = hover_information  {
+            if let Some(window_index) = &mut window_index {
 
                 if self.left_mouse_button.pressed() {
-                    self.mouse_input_mode = MouseInputMode::MoveInterface(window_index);
+                    *window_index = interface.move_window_to_top(*window_index);
+                    self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
                 }
 
                 if self.right_mouse_button.pressed() {
-                    self.mouse_input_mode = MouseInputMode::ResizeInterface(window_index);
+                    *window_index = interface.move_window_to_top(*window_index);
+                    self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
             }
+            
+            hovered_element = None;
         }
 
-        if shift_pressed || !self.mouse_input_mode.is_none() {
-            hover_information = HoverInformation::Missed;
-        } else if let HoverInformation::Element(window_index, element_index) = hover_information {
-            
-            if self.left_mouse_button.pressed() {
-                if let Some(event) = interface.left_click(window_index, element_index, state_provider) {
-                    events.push(event);
-                }
+        if let Some(window_index) = &mut window_index {
+            if (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_pressed {
+
+                *window_index = interface.move_window_to_top(*window_index);
                 self.mouse_input_mode = MouseInputMode::ClickInterface;
+
+                if let Some(hovered_element) = &hovered_element {
+
+                    let action = match self.left_mouse_button.pressed() {
+                        true => interface.left_click_element(hovered_element, *window_index),
+                        false => interface.right_click_element(hovered_element, *window_index),
+                    };
+
+                    if let Some(action) = action {
+                        match action {
+                            ClickAction::Event(event) => events.push(event),
+                            ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
+                            ClickAction::DragElement => self.mouse_input_mode = MouseInputMode::DragElement((Rc::clone(hovered_element), *window_index)),
+                            ClickAction::OpenWindow(prototype_window) => interface.open_window(prototype_window.as_ref()),
+                            ClickAction::CloseWindow => interface.close_window(*window_index),
+                        }
+                    }
+                }
             }
         }
 
@@ -159,6 +182,14 @@ impl InputSystem {
                     true => self.mouse_input_mode = MouseInputMode::MoveInterface(identifier),
                     false => self.mouse_input_mode = MouseInputMode::None,
                 }
+            } else {
+                self.mouse_input_mode = MouseInputMode::None;
+            }
+        }
+
+        if let MouseInputMode::DragElement((element, window_index)) = &self.mouse_input_mode {
+            if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                interface.drag_element(element, *window_index, self.mouse_delta);
             }
         }
 
@@ -179,12 +210,16 @@ impl InputSystem {
         }
 
         if self.scroll_delta != 0.0 {
-            events.push(UserEvent::CameraZoom(-self.scroll_delta));
+            if let Some(_window_index) = window_index {
+                // TODO: scroll window
+            } else {
+                events.push(UserEvent::CameraZoom(-self.scroll_delta));
+            }
         }
 
-        //if self.keys[46].pressed() {
-        //    events.push(UserEvent::ToggleShowFramesPerSecond);
-        //}
+        if self.keys[46].pressed() {
+            events.push(UserEvent::OpenMenuWindow);
+        }
 
         #[cfg(feature = "debug")]
         if shift_pressed {
@@ -231,8 +266,26 @@ impl InputSystem {
             events.push(UserEvent::CameraMoveUp);
         }
 
-        let element_index = hover_information.to_element_identifier(); 
-        return (events, element_index);
+        let update = self.previous_hovered_element
+            .as_ref()
+            .zip(hovered_element.as_ref())
+            .map(|(previous, current)| !Rc::ptr_eq(&previous.0, current))
+            .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some());
+
+        if update {
+
+            if let Some((_element, window_index)) = &self.previous_hovered_element {
+                interface.schedule_rerender_window(*window_index);
+            }
+            
+            if let Some(window_index) = window_index {
+                interface.schedule_rerender_window(window_index);
+            }
+        }
+
+        self.previous_hovered_element = hovered_element.clone().zip(window_index);
+
+        return (events, hovered_element);
     }
     
     pub fn unused_left_click(&self) -> bool {

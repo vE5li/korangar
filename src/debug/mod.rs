@@ -1,12 +1,6 @@
-mod symbols;
-mod colors;
-mod stack;
 #[macro_use]
-mod print;
-mod timer;
+mod logging;
+mod profiling;
 
-pub use self::symbols::*;
-pub use self::colors::*;
-pub use self::stack::*;
-pub use self::print::*;
-pub use self::timer::*;
+pub use self::logging::*;
+pub use self::profiling::*;

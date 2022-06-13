@@ -2,14 +2,14 @@ use derive_new::new;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::read;
-use maths::*;
+use types::maths::*;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
 use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use debug::*;
-use map::model::{ Model, Node, BoundingBox, ShadingType };
+use types::map::model::{ Model, Node, BoundingBox, ShadingType };
 use graphics::{ Transform, NativeModelVertex };
 use loaders::TextureLoader;
 
@@ -120,12 +120,6 @@ impl ModelLoader {
 
         let mut nodes = Vec::new();
 
-        /* */
-        let mut vertex_offset = 1;
-        let mut obj_file_vertices = String::new();
-        let mut obj_file_faces = String::new();
-        /* */
-
         for _index in 0..node_count as usize {
 
             let node_name = byte_stream.string(40);
@@ -161,10 +155,6 @@ impl ModelLoader {
                 let vertex_position = byte_stream.vector3();
                 let dirty = Vector3::new(vertex_position.x, vertex_position.y, -vertex_position.z);
 
-                /*  */
-                obj_file_vertices.push_str(&format!("v {} {} {}\n", vertex_position.x, vertex_position.y, -vertex_position.z));
-                /*  */
-
                 vertex_positions.push(dirty);
                 common_normals.push(Vec::new());
             }
@@ -199,10 +189,6 @@ impl ModelLoader {
                 let second_vertex_position_index = byte_stream.integer16();
                 let third_vertex_position_index = byte_stream.integer16();
 
-                /*  */
-                obj_file_faces.push_str(&format!("f {} {} {}\n", first_vertex_position_index as usize + vertex_offset, second_vertex_position_index as usize + vertex_offset, third_vertex_position_index as usize + vertex_offset));
-                /*  */
-
                 let first_texture_coordinate_index = byte_stream.integer16();
                 let second_texture_coordinate_index = byte_stream.integer16();
                 let third_texture_coordinate_index = byte_stream.integer16();
@@ -235,10 +221,6 @@ impl ModelLoader {
                 native_vertices.push(NativeModelVertex::new(second_vertex_position, normal, second_texture_coordinate, texture_index));
                 native_vertices.push(NativeModelVertex::new(third_vertex_position, normal, third_texture_coordinate, texture_index));
             }
-
-            /**/
-            vertex_offset += vertex_count;
-            /**/
 
             if version.equals_or_above(1, 5) {
                 panic!("animation key frames not implemented");
@@ -304,14 +286,6 @@ impl ModelLoader {
                 timer.stop();
             }
         }
-
-        /* */
-        use std::fs::File;
-        use std::io::prelude::*;
-        let mut file = File::create(&format!("{}.obj", model_file)).unwrap();
-        file.write_all(obj_file_vertices.as_bytes()).unwrap();
-        file.write_all(obj_file_faces.as_bytes()).unwrap();
-        /* */
 
         // always 8 x 0x0 ?
         let _unknown = byte_stream.slice(8);

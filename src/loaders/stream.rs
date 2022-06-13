@@ -3,10 +3,10 @@ use std::slice::Iter;
 
 #[cfg(feature = "debug")]
 use debug::*;
-use maths::*;
+use types::maths::*;
 use graphics::Color;
 
-use super::Version;
+use types::Version;
 
 #[derive(new)]
 pub struct ByteStream<'b> {
@@ -127,7 +127,7 @@ impl<'b> ByteStream<'b> {
         let green = self.float32();
         let blue = self.float32();
 
-        return Color::new((red * 255.0) as u8, (green * 255.0) as u8, (blue * 255.0) as u8);
+        return Color::rgb((red * 255.0) as u8, (green * 255.0) as u8, (blue * 255.0) as u8);
     }
 
     pub fn slice(&mut self, count: usize) -> Vec<u8> { // replace with matrix 4x4 ?

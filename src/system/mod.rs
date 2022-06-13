@@ -1,3 +1,6 @@
 mod timer;
+#[macro_use]
+mod vulkan;
 
 pub use self::timer::FrameTimer;
+pub use self::vulkan::{ get_instance_extensions, get_layers, get_device_extensions };

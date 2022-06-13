@@ -1,6 +1,9 @@
+use interface::types::ElementCell;
+
 pub enum MouseInputMode {
     MoveInterface(usize),
     ResizeInterface(usize),
+    DragElement((ElementCell, usize)),
     ClickInterface,
     None,
 }

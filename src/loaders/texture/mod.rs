@@ -18,7 +18,7 @@ use debug::*;
 
 #[derive(new)]
 pub struct TextureLoader {
-    #[new(default)]
+    #[new(value = "HashMap::new()")]
     cache: HashMap<String, Texture>,
     device: Arc<Device>,
     queue: Arc<Queue>,
@@ -98,13 +98,13 @@ impl TextureLoader {
             extension => panic!("unsupported file format {}", extension),
         };
 
-        let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
+        let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::Log2, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
 
         let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
         let combined_future = inner_future.join(future).boxed();
         *texture_future = combined_future;
 
-        let texture = ImageView::new(image).unwrap();
+        let texture = ImageView::new(Arc::new(image)).unwrap();
         self.cache.insert(path, texture.clone());
 
         #[cfg(feature = "debug")]

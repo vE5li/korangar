@@ -3,22 +3,21 @@ name = "korangar"
 version = "0.1.0"
 
 [dependencies]
+korangar_procedural = { path = "procedural" }
 derive-new = "0.5"
-proc-gui = { path = "/home/proc-gui" }
-vulkano = "0.26"
-vulkano-shaders = "0.26"
-vulkano-win = "0.26"
+vulkano = "0.27"
+vulkano-shaders = "0.27"
+vulkano-win = "0.27"
 winit = "0.25"
-cgmath = "0.18"
+num = "*"
+cgmath = { version = "0.18", features = ["serde"] }
+serde = "1.0.137"
+serde_json = "1.0"
 png = "0.16"
 bmp = "*"
 pnet = "*"
 pathfinding = "2.2.2"
-#libz-sys = "1.1.5"
 yazi = "0.1.4"
-imgui = "0.8.2"
-imgui-winit-support = "0.8.2"
-imgui-vulkano-renderer = { path = "/home/imgui-vulkano-renderer" }
 
 [features]
 debug = ["lazy_static", "chrono"]

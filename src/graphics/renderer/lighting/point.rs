@@ -14,35 +14,33 @@ mod fragment_shader {
 
 use std::sync::Arc;
 use std::iter;
-
-use cgmath::Vector3;
-
 use vulkano::device::Device;
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint };
-use vulkano::pipeline::viewport::Viewport;
+use vulkano::pipeline::graphics::color_blend::ColorBlendState;
+use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
+use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
+use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
 use vulkano::descriptor_set::PersistentDescriptorSet;
 use vulkano::render_pass::Subpass;
+use vulkano::shader::ShaderModule;
+use cgmath::Vector3;
 
 use graphics::*;
 
-use self::vertex_shader::Shader as VertexShader;
-use self::fragment_shader::Shader as FragmentShader;
 use self::fragment_shader::ty::Constants;
-
-const BILLBOARD_SIZE_MULTIPLIER: f32 = 1.4142;
 
 pub struct PointLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: VertexShader,
-    fragment_shader: FragmentShader,
+    vertex_shader: Arc<ShaderModule>,
+    fragment_shader: Arc<ShaderModule>,
 }
 
 impl PointLightRenderer {
 
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
 
-        let vertex_shader = VertexShader::load(device.clone()).unwrap();
-        let fragment_shader = FragmentShader::load(device.clone()).unwrap();
+        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
+        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         return Self { pipeline, vertex_shader, fragment_shader };
@@ -52,21 +50,25 @@ impl PointLightRenderer {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
 
-    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &VertexShader, fragment_shader: &FragmentShader) -> Arc<GraphicsPipeline> {
+    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
 
         let pipeline = GraphicsPipeline::start()
-            .vertex_input_single_buffer::<ScreenVertex>()
-            .vertex_shader(vertex_shader.main_entry_point(), ())
-            .triangle_list()
-            .viewports_dynamic_scissors_irrelevant(1)
-            .viewports(iter::once(viewport))
-            .fragment_shader(fragment_shader.main_entry_point(), ())
-            .blend_collective(LIGHT_ATTACHMENT_BLEND)
+            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
+            //.vertex_input_single_buffer::<ScreenVertex>()
+            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
+            .input_assembly_state(InputAssemblyState::new())
+            //.triangle_list()
+            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
+            //.viewports_dynamic_scissors_irrelevant(1)
+            //.viewports(iter::once(viewport))
+            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
+            .color_blend_state(ColorBlendState::new(1).blend(LIGHT_ATTACHMENT_BLEND))
+            //.blend_collective(LIGHT_ATTACHMENT_BLEND)
             .render_pass(subpass)
             .build(device)
             .unwrap();
 
-        return Arc::new(pipeline);
+        return pipeline;
     }
 
     pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, position: Vector3<f32>, color: Color, range: f32) {
@@ -81,7 +83,7 @@ impl PointLightRenderer {
             .add_image(normal_buffer).unwrap()
             .add_image(depth_buffer).unwrap();
 
-        let set = Arc::new(set_builder.build().unwrap());
+        let set = set_builder.build().unwrap();
 
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, 10.0 * (range / 0.05).ln());
 
@@ -97,7 +99,7 @@ impl PointLightRenderer {
             screen_size: [screen_size.x, screen_size.y],
             position: [position.x, position.y, position.z],
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
-            range: range,
+            range,
             _dummy0: [0; 4],
         };
 

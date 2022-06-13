@@ -1,10 +1,17 @@
+#![feature(unzip_option)]
+#![feature(let_else)]
+
+#[macro_use]
+extern crate korangar_procedural;
 extern crate derive_new;
-extern crate proc_gui;
 extern crate vulkano;
 extern crate vulkano_shaders;
 extern crate vulkano_win;
 extern crate winit;
+extern crate num;
 extern crate cgmath;
+extern crate serde;
+extern crate serde_json;
 extern crate png;
 extern crate bmp;
 extern crate pathfinding;
@@ -15,30 +22,24 @@ extern crate chrono;
 extern crate lazy_static;
 extern crate pnet;
 extern crate yazi;
-extern crate imgui;
-extern crate imgui_winit_support;
-extern crate imgui_vulkano_renderer;
 
 #[cfg(feature = "debug")]
 #[macro_use]
 mod debug;
-mod input;
-mod system;
 #[macro_use]
-mod maths;
-mod map;
-mod entity;
+mod types;
+mod input;
+#[macro_use]
+mod system;
 mod graphics;
 mod loaders;
 mod interface;
-mod network;
+//mod network;
 
-use vulkano::device::physical::{ PhysicalDevice, PhysicalDeviceType };
-use vulkano::device::{ Device, DeviceExtensions };
+use vulkano::device::Device;
 use vulkano::instance::Instance;
 use vulkano::instance::debug::{ MessageSeverity, MessageType };
 use vulkano::Version;
-use vulkano::pipeline::viewport::Viewport;
 use vulkano::sync::{ GpuFuture, now };
 use vulkano_win::VkSurfaceBuild;
 use winit::event::{ Event, WindowEvent };
@@ -47,85 +48,24 @@ use winit::window::WindowBuilder;
 
 #[cfg(feature = "debug")]
 use debug::*;
+use types::Entity;
 use input::{ InputSystem, UserEvent };
-use system::FrameTimer;
-use maths::Vector2;
-use entity::Entity;
-use graphics::*;
+use system::{ FrameTimer, get_instance_extensions, get_layers, get_device_extensions };
 use loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader };
-use interface::{ Interface, StateProvider };
-use network::{ NetworkingSystem, NetworkEvent };
-use crate::map::MarkerIdentifier;
-
-fn get_layers<'a>(desired_layers: Vec<&'a str>) -> Vec<&'a str> {
-    let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new_dynamic(format!("available layers"));
-
-    #[cfg(feature = "debug")]
-    for layer in &available_layers {
-        print_debug!("{}{}{}", magenta(), layer.name(), none());
-    }
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    let used_layers = desired_layers
-        .into_iter()
-        .filter(|&l| available_layers.iter().any(|li| li.name() == l))
-        .collect();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new_dynamic(format!("used layers"));
-
-    #[cfg(feature = "debug")]
-    for layer in &used_layers {
-        print_debug!("{}{}{}", magenta(), layer, none());
-    }
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    return used_layers;
-}
-
-fn print_message_callback(message: &vulkano::instance::debug::Message) {
-
-    let message_type = if message.ty.general {
-        "general"
-    } else if message.ty.validation {
-        "validation"
-    } else if message.ty.performance {
-        "performance"
-    } else {
-        panic!("not implemented");
-    };
-
-    println!("{:?} [{}] : {}", message.layer_prefix, message_type, message.description);
-}
+use graphics::{ Renderer, RenderSettings };
+use graphics::camera::*;
+use interface::*;
+//use network::{ NetworkingSystem, NetworkEvent };
 
 fn main() {
 
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    let extensions = vulkano::instance::InstanceExtensions {
-        ext_debug_report: true,
-        ..vulkano_win::required_extensions()
-    };
+    let instance = Instance::new(None, Version::V1_1, &get_instance_extensions(), get_layers()).expect("failed to create instance");
 
-    let layers = get_layers(vec!["VK_LAYER_KHRONOS_validation"]);
-
-    //let required_extensions = vulkano_win::required_extensions();
-    let instance = Instance::new(None, Version::V1_1, &extensions, layers).expect("failed to create instance");
-
-    let _debug_callback = vulkano::instance::debug::DebugCallback::new(
-        &instance,
-        MessageSeverity::all(),
-        MessageType::all(),
-        print_message_callback,
-    ).ok();
+    #[cfg(feature = "debug")]
+    let _debug_callback = vulkano::instance::debug::DebugCallback::new(&instance, MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}instance{}", magenta(), none());
@@ -146,31 +86,19 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
+    let timer = Timer::new("choose physical device");
+
+    let desired_device_extensions = get_device_extensions();
+    let (physical_device, queue_family) = choose_physical_device!(&instance, surface, &desired_device_extensions);
+    let required_device_extensions = physical_device.required_extensions().union(&desired_device_extensions);
+
+    #[cfg(feature = "debug")]
+    timer.stop();
+
+    #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    let device_extensions = DeviceExtensions {
-        khr_swapchain: true,
-        ..DeviceExtensions::none()
-    };
-
-    let (physical_device, queue_family) = PhysicalDevice::enumerate(&instance)
-        .filter(|&p| p.supported_extensions().is_superset_of(&device_extensions))
-        .filter_map(|p| {
-            p.queue_families()
-                .find(|&q| q.supports_graphics() && surface.is_supported(q).unwrap_or(false))
-                .map(|q| (p, q))
-        })
-        .min_by_key(|(p, _)| match p.properties().device_type {
-            PhysicalDeviceType::DiscreteGpu => 0,
-            PhysicalDeviceType::IntegratedGpu => 1,
-            PhysicalDeviceType::VirtualGpu => 2,
-            PhysicalDeviceType::Cpu => 3,
-            PhysicalDeviceType::Other => 4,
-        })
-        .unwrap();
-
-    let device_extensions = physical_device.required_extensions().union(&device_extensions);
-    let (device, mut queues) = Device::new(physical_device, physical_device.supported_features(), &device_extensions, [(queue_family, 0.5)].iter().cloned()).expect("failed to create device");
+    let (device, mut queues) = Device::new(physical_device, physical_device.supported_features(), &required_device_extensions, [(queue_family, 0.5)].iter().cloned()).expect("failed to create device");
 
     #[cfg(feature = "debug")]
     print_debug!("created {}vulkan device{}", magenta(), none());
@@ -215,7 +143,8 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let mut interface = Interface::new();
+    let window_size = Size::from(renderer.get_window_size().map(|c| c as f32));
+    let mut interface = Interface::new(window_size);
     let mut input_system = InputSystem::new();
     let mut render_settings = RenderSettings::new();
 
@@ -266,50 +195,42 @@ fn main() {
             }
 
             Event::WindowEvent { event: WindowEvent::Resized(_), .. } => {
+                let window_size = surface.window().inner_size();
+                let window_size = Size::new(window_size.width as f32, window_size.height as f32);
+                interface.update_window_size(window_size);
                 renderer.invalidate_swapchain();
-                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::Focused(focused), .. } => {
                 if !focused {
                     input_system.reset();
                 }
-                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
                 input_system.update_mouse_position(position);
-                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::MouseInput{ button, state, .. }, .. } => {
                 input_system.update_mouse_buttons(button, state);
-                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::MouseWheel{ delta, .. }, .. } => {
                 input_system.update_mouse_wheel(delta);
-                renderer.handle_event(event);
             }
 
             Event::WindowEvent { event: WindowEvent::KeyboardInput{ input, .. }, .. } => {
                 input_system.update_keyboard(input.scancode as usize, input.state);
-                renderer.handle_event(event);
             }
 
             Event::RedrawEventsCleared => {
-
-                renderer.prepare_frame();
 
                 input_system.update_delta();
 
                 let delta_time = frame_timer.update();
 
                 //let network_events = networking_system.network_events();
-                let (user_events, element_index) = {
-                    let mut state_provider = StateProvider::new(&mut render_settings, &mut entities[0]);
-                    input_system.user_events(&mut interface, &mut state_provider)
-                };
+                let (user_events, hovered_element) = input_system.user_events(&mut interface);
 
                 //for event in network_events {
                 //    match event {
@@ -331,9 +252,27 @@ fn main() {
 
                 for event in user_events {
                     match event {
+                        UserEvent::Exit => *control_flow = ControlFlow::Exit,
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
-                        UserEvent::CloseWindow(window_index) => interface.close_window(window_index),
+                        UserEvent::ToggleFrameLimit => {
+                            render_settings.toggle_frame_limit();
+                            renderer.set_frame_limit(render_settings.frame_limit);
+                            interface.schedule_rerender();
+                        },
+                        UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
+                        UserEvent::OpenGraphicsSettingsWindow => interface.open_window(&GraphicsSettingsWindow::default()),
+                        UserEvent::OpenAudioSettingsWindow => interface.open_window(&AudioSettingsWindow::default()),
+                        UserEvent::ReloadTheme => interface.reload_theme(),
+                        UserEvent::SaveTheme => interface.save_theme(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
+                        #[cfg(feature = "debug")]
+                        UserEvent::OpenMapDataWindow => interface.open_window(std::ops::Deref::deref(&map)),
+                        #[cfg(feature = "debug")]
+                        UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::OpenProfilerWindow => interface.open_window(&ProfilerWindow::default()),
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
                         #[cfg(feature = "debug")]
@@ -352,6 +291,22 @@ fn main() {
                         UserEvent::CameraAccelerate => debug_camera.accelerate(),
                         #[cfg(feature = "debug")]
                         UserEvent::CameraDecelerate => debug_camera.decelerate(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowFramesPerSecond => render_settings.toggle_show_frames_per_second(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowObjects => render_settings.toggle_show_objects(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowEntities => render_settings.toggle_show_entities(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowAmbientLight => render_settings.toggle_show_ambient_light(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowDirectionalLight => render_settings.toggle_show_directional_light(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowPointLights => render_settings.toggle_show_point_lights(),
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowParticleLights => render_settings.toggle_show_particle_lights(),
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowObjectMarkers => render_settings.toggle_show_object_markers(),
                         #[cfg(feature = "debug")]
@@ -381,7 +336,8 @@ fn main() {
 
                 map.update(delta_time as f32);
 
-                renderer.start_frame(&surface);
+                let renderer_interface = interface.update();
+                renderer.start_frame(&surface, renderer_interface);
 
                 #[cfg(feature = "debug")]
                 let current_camera: &mut dyn Camera = match render_settings.use_debug_camera {
@@ -398,15 +354,10 @@ fn main() {
                 let hovered_marker = map.hovered_marker(&mut renderer, current_camera, &render_settings, input_system.mouse_position());
 
                 #[cfg(feature = "debug")]
-                if let Some(marker) = &hovered_marker {
+                if let Some(marker) = hovered_marker {
                     if input_system.unused_left_click() {
-                        match *marker {
-                            MarkerIdentifier::Object(index) => interface.open_object_window(map.get_object(index), index),
-                            MarkerIdentifier::LightSource(index) => interface.open_light_source_window(map.get_light_source(index), index),
-                            MarkerIdentifier::SoundSource(index) => interface.open_sound_source_window(map.get_sound_source(index), index),
-                            MarkerIdentifier::EffectSource(index) => interface.open_effect_source_window(map.get_effect_source(index), index),
-                            MarkerIdentifier::Particle(index, particle_index) => interface.open_particle_window(map.get_particle(index, particle_index), index, particle_index),
-                        }
+                        let prototype_window = map.resolve_marker(marker);
+                        interface.open_window(prototype_window);
                         input_system.set_interface_clicked();
                     }
                 }
@@ -422,6 +373,9 @@ fn main() {
                     entities.iter().for_each(|entity| entity.render_pathing(&mut renderer, current_camera));
                 }
 
+                let state_provider = StateProvider::new(&render_settings, &entities[0]);
+                interface.render(&mut renderer, &state_provider, hovered_element);
+
                 renderer.lighting_pass();
 
                 #[cfg(feature = "debug")]
@@ -434,22 +388,18 @@ fn main() {
                 map.render_lights(&mut renderer, current_camera, &render_settings);
 
                 #[cfg(feature = "debug")]
-                map.render_markers(&mut renderer, current_camera, &render_settings);
+                map.render_markers(&mut renderer, current_camera, &render_settings, hovered_marker);
 
-                let state_provider = StateProvider::new(&mut render_settings, &mut entities[0]);
-                interface.render(&mut renderer, &state_provider, element_index);
+                renderer.render_interface(&render_settings);
 
                 if render_settings.show_frames_per_second {
-                    renderer.render_text(&frame_timer.last_frames_per_second().to_string(), Vector2::new(10.0, 5.0), Color::new(150, 150, 150), 20.0);
+                    interface.render_frames_per_second(&mut renderer, frame_timer.last_frames_per_second());
                 }
 
                 renderer.stop_frame();
             }
 
-            //_ignored => ()
-            event => {
-                renderer.handle_event(event);
-            }
+            _ignored => ()
         }
     });
 }

@@ -1,7 +1,11 @@
-mod builder;
-mod basic_information;
-mod render_settings;
+mod framed;
+mod menu;
+mod settings;
+mod mutable;
+mod profiler;
 
-pub use self::builder::WindowBuilder;
-pub use self::basic_information::basic_information_window;
-pub use self::render_settings::render_settings_window;
+pub use self::framed::FramedWindow;
+pub use self::menu::MenuWindow;
+pub use self::settings::*;
+pub use self::mutable::*;
+pub use self::profiler::ProfilerWindow;

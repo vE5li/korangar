@@ -4,14 +4,14 @@ use derive_new::new;
 use std::sync::Arc;
 use std::collections::HashMap;
 use std::fs::read;
-use cgmath::{ Vector3, Vector2, Rad, Deg };
+use cgmath::{ Vector3, Vector2, Deg };
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
 use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
 use debug::*;
-use map::{ Map, Tile, TileType, Object, LightSource, SoundSource, EffectSource };
+use types::map::{ Map, Tile, TileType, WaterSettings, LightSettings, Object, LightSource, SoundSource, EffectSource };
 use graphics::{ Color, ModelVertex, Transform, NativeModelVertex };
 use loaders::{ ModelLoader, TextureLoader };
 
@@ -136,20 +136,20 @@ impl MapLoader {
 
         let mut texture_future = now(self.device.clone()).boxed();
 
-        let bytes = read(resource_file.clone()).expect("u r very stupid");
+        let bytes = read(resource_file.clone()).expect(&format!("failed to open resource file {}", resource_file));
         let mut byte_stream = ByteStream::new(bytes.iter());
 
         let magic = byte_stream.string(4);
         assert!(&magic == "GRSW", "failed to read magic number");
 
-        let version = byte_stream.version();
+        let resource_version = byte_stream.version();
 
-        if !version.equals_or_above(1, 2) {
+        if !resource_version .equals_or_above(1, 2) {
             panic!("failed to read resource version");
         }
 
         #[cfg(feature = "debug_map")]
-        print_debug!("version {}{}{}", magenta(), version, none());
+        print_debug!("resource version {}{}{}", magenta(), resource_version, none());
 
         // INI file
         byte_stream.skip(40);
@@ -159,7 +159,7 @@ impl MapLoader {
         #[cfg(feature = "debug_map")]
         print_debug!("ground file {}{}{}", magenta(), ground_file, none());
 
-        let gat_file = match version.equals_or_above(1, 4) {
+        let gat_file = match resource_version.equals_or_above(1, 4) {
             true => Some(byte_stream.string(40)),
             false => None,
         };
@@ -170,61 +170,75 @@ impl MapLoader {
         // SRC file
         byte_stream.skip(40);
 
-        if version.equals_or_above(1, 3) {
-            let _water_level = byte_stream.float32();
+        let mut water_settings = WaterSettings::new();
+
+        if resource_version.equals_or_above(1, 3) {
+            let water_level = byte_stream.float32();
 
             #[cfg(feature = "debug_map")]
-            print_debug!("water level {}{}{}", magenta(), _water_level, none());
+            print_debug!("water level {}{}{}", magenta(), water_level, none());
+
+            water_settings.water_level = water_level;
         }
 
-        if version.equals_or_above(1, 8) {
+        if resource_version.equals_or_above(1, 8) {
 
-            let _water_type = byte_stream.integer32();
-            let _wave_height = byte_stream.float32();
-            let _wave_speed = byte_stream.float32();
-            let _wave_pitch = byte_stream.float32();
-
-            #[cfg(feature = "debug_map")]
-            {
-                print_debug!("water type {}{}{}", magenta(), _water_type, none());
-                print_debug!("wave height {}{}{}", magenta(), _wave_height, none());
-                print_debug!("wave speed {}{}{}", magenta(), _wave_speed, none());
-                print_debug!("wave pitch {}{}{}", magenta(), _wave_pitch, none());
-            }
-        }
-
-        if version.equals_or_above(1, 9) {
-            let _water_animation_speed = byte_stream.integer32();
-
-            #[cfg(feature = "debug_map")]
-            print_debug!("water animation speed {}{}{}", magenta(), _water_animation_speed, none());
-        }
-
-        let mut ambient_light_color = Color::new(255, 255, 255);
-
-        if version.equals_or_above(1, 5) {
-
-            let _light_longitude = byte_stream.integer32();
-            let _light_latitude = byte_stream.integer32();
-            let _diffuse_color = byte_stream.color();
-            let _ambient_color = byte_stream.color();
-
-            ambient_light_color = _ambient_color;
+            let water_type = byte_stream.integer32();
+            let wave_height = byte_stream.float32();
+            let wave_speed = byte_stream.float32();
+            let wave_pitch = byte_stream.float32();
 
             #[cfg(feature = "debug_map")]
             {
-                print_debug!("light longitude {}{}{}", magenta(), _light_longitude, none());
-                print_debug!("light latitude {}{}{}", magenta(), _light_latitude, none());
-                print_debug!("diffuse color {}{:?}{}", magenta(), _diffuse_color, none());
-                print_debug!("ambient color {}{:?}{}", magenta(), _ambient_color, none());
+                print_debug!("water type {}{}{}", magenta(), water_type, none());
+                print_debug!("wave height {}{}{}", magenta(), wave_height, none());
+                print_debug!("wave speed {}{}{}", magenta(), wave_speed, none());
+                print_debug!("wave pitch {}{}{}", magenta(), wave_pitch, none());
             }
+
+            water_settings.water_type = water_type as usize;
+            water_settings.wave_height = wave_height;
+            water_settings.wave_speed = wave_speed;
+            water_settings.wave_pitch = wave_pitch;
         }
 
-        if version.equals_or_above(1, 7) {
+        if resource_version.equals_or_above(1, 9) {
+            let water_animation_speed = byte_stream.integer32();
+
+            #[cfg(feature = "debug_map")]
+            print_debug!("water animation speed {}{}{}", magenta(), water_animation_speed, none());
+
+            water_settings.water_animation_speed = water_animation_speed as usize;
+        }
+
+        let mut light_settings = LightSettings::new();
+
+        if resource_version.equals_or_above(1, 5) {
+
+            let light_longitude = byte_stream.integer32();
+            let light_latitude = byte_stream.integer32();
+            let diffuse_color = byte_stream.color();
+            let ambient_color = byte_stream.color();
+
+            #[cfg(feature = "debug_map")]
+            {
+                print_debug!("light longitude {}{}{}", magenta(), light_longitude, none());
+                print_debug!("light latitude {}{}{}", magenta(), light_latitude, none());
+                print_debug!("diffuse color {}{:?}{}", magenta(), diffuse_color, none());
+                print_debug!("ambient color {}{:?}{}", magenta(), ambient_color, none());
+            }
+
+            light_settings.light_longitude = light_longitude as isize;
+            light_settings.light_latitude = light_latitude as isize;
+            light_settings.diffuse_color = diffuse_color;
+            light_settings.ambient_color = ambient_color;
+        }
+
+        if resource_version.equals_or_above(1, 7) {
             let _unknown = byte_stream.float32();
         }
 
-        if version.equals_or_above(1, 6) {
+        if resource_version.equals_or_above(1, 6) {
 
             let _ground_top = byte_stream.integer32();
             let _ground_bottom = byte_stream.integer32();
@@ -258,9 +272,9 @@ impl MapLoader {
 
                 ResourceType::Object => {
 
-                    if version.equals_or_above(1, 6) {
+                    if resource_version.equals_or_above(1, 6) {
 
-                        let _name = byte_stream.string(40);
+                        let name = byte_stream.string(40);
                         let _animation_type = byte_stream.integer32();
                         let _animation_speed = byte_stream.float32();
                         let _block_type = byte_stream.integer32();
@@ -275,12 +289,9 @@ impl MapLoader {
 
                         let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
 
-                        let object = Object::new(model, transform);
-                        objects.push(object);
-
                         #[cfg(feature = "debug_map")]
                         {
-                            print_debug!("name {}{}{}", magenta(), _name, none());
+                            print_debug!("name {}{}{}", magenta(), name, none());
                             print_debug!("animation_type {}{}{}", magenta(), _animation_type, none());
                             print_debug!("animation_speed {}{}{}", magenta(), _animation_speed, none());
                             print_debug!("block type {}{}{}", magenta(), _block_type, none());
@@ -290,6 +301,9 @@ impl MapLoader {
                             print_debug!("rotation {}{:?}{}", magenta(), rotation, none());
                             print_debug!("scale {}{:?}{}", magenta(), scale, none());
                         }
+
+                        let object = Object::new(Some(name), model_name, model, transform);
+                        objects.push(object);
                     } else {
 
                         let model_name = byte_stream.string(80);
@@ -303,8 +317,6 @@ impl MapLoader {
 
                         let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
 
-                        objects.push(Object::new(model, transform));
-
                         #[cfg(feature = "debug_map")]
                         {
                             print_debug!("model name {}{}{}", magenta(), model_name, none());
@@ -313,88 +325,90 @@ impl MapLoader {
                             print_debug!("rotation {}{:?}{}", magenta(), rotation, none());
                             print_debug!("scale {}{:?}{}", magenta(), scale, none());
                         }
+
+                        let object = Object::new(None, model_name, model, transform);
+                        objects.push(object);
                     }
                 },
 
                 ResourceType::LightSource => {
 
-                    let _name = byte_stream.string(80);
+                    let name = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
 
                     let red = byte_stream.integer32() as u8;
                     let green = byte_stream.integer32() as u8;
                     let blue = byte_stream.integer32() as u8;
-                    let color = Color::new(red, green, blue);
+                    let color = Color::rgb(red, green, blue);
 
                     let range = byte_stream.float32();
 
                     #[cfg(feature = "debug_map")]
                     {
-                        print_debug!("name {}{}{}", magenta(), _name, none());
+                        print_debug!("name {}{}{}", magenta(), name, none());
                         print_debug!("position {}{:?}{}", magenta(), position, none());
                         print_debug!("color {}{:?}{}", magenta(), color, none());
                         print_debug!("range {}{}{}", magenta(), range, none());
                     }
 
-                    light_sources.push(LightSource::new(position, color, range));
+                    light_sources.push(LightSource::new(name, position, color, range));
                 },
 
                 ResourceType::SoundSource => {
 
-                    let _name = byte_stream.string(80);
-                    let _wave_name = byte_stream.string(80);
+                    let name = byte_stream.string(80);
+                    let sound_file = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
-                    let _volume = byte_stream.float32();
-                    let _width = byte_stream.integer32();
-                    let _height = byte_stream.integer32();
+                    let volume = byte_stream.float32();
+                    let width = byte_stream.integer32();
+                    let height = byte_stream.integer32();
                     let range = byte_stream.float32();
 
-                    let _cycle = match version.equals_or_above(2, 0) {
+                    let cycle = match resource_version.equals_or_above(2, 0) {
                         true => byte_stream.float32(),
                         false => 4.0,
                     };
 
-                    sound_sources.push(SoundSource::new(position, range));
-
                     #[cfg(feature = "debug_map")]
                     {
-                        print_debug!("name {}{}{}", magenta(), _name, none());
-                        print_debug!("wave name {}{}{}", magenta(), _wave_name, none());
+                        print_debug!("name {}{}{}", magenta(), name, none());
+                        print_debug!("sound file {}{}{}", magenta(), sound_file, none());
                         print_debug!("position {}{:?}{}", magenta(), position, none());
-                        print_debug!("volume {}{}{}", magenta(), _volume, none());
-                        print_debug!("width {}{}{}", magenta(), _width, none());
-                        print_debug!("height {}{}{}", magenta(), _height, none());
+                        print_debug!("volume {}{}{}", magenta(), volume, none());
+                        print_debug!("width {}{}{}", magenta(), width, none());
+                        print_debug!("height {}{}{}", magenta(), height, none());
                         print_debug!("range {}{}{}", magenta(), range, none());
-                        print_debug!("cycle {}{}{}", magenta(), _cycle, none());
+                        print_debug!("cycle {}{}{}", magenta(), cycle, none());
                     }
 
+                    sound_sources.push(SoundSource::new(name, sound_file, position, volume, width as usize, height as usize, range, cycle));
                 },
 
                 ResourceType::EffectSource => {
 
-                    let _name = byte_stream.string(80);
+                    let name = byte_stream.string(80);
                     let position = byte_stream.vector3();
-                    let _effect_type = byte_stream.integer32();
-                    let _emit_speed = byte_stream.float32();
+                    let effect_type = byte_stream.integer32();
+                    let emit_speed = byte_stream.float32();
 
                     let _param0 = byte_stream.float32();
                     let _param1 = byte_stream.float32();
                     let _param2 = byte_stream.float32();
                     let _param3 = byte_stream.float32();
 
-                    effect_sources.push(EffectSource::new(position));
-
                     #[cfg(feature = "debug_map")]
                     {
-                        print_debug!("name {}{}{}", magenta(), _name, none());
+                        print_debug!("name {}{}{}", magenta(), name, none());
                         print_debug!("position {}{:?}{}", magenta(), position, none());
-                        print_debug!("effect type {}{}{}", magenta(), _effect_type, none());
-                        print_debug!("emit speed {}{}{}", magenta(), _emit_speed, none());
+                        print_debug!("effect type {}{}{}", magenta(), effect_type, none());
+                        print_debug!("emit speed {}{}{}", magenta(), emit_speed, none());
                         print_debug!("param0 {}{}{}", magenta(), _param0, none());
                         print_debug!("param1 {}{}{}", magenta(), _param1, none());
                         print_debug!("param2 {}{}{}", magenta(), _param2, none());
                         print_debug!("param3 {}{}{}", magenta(), _param3, none());
                     }
+
+                    effect_sources.push(EffectSource::new(name, position, effect_type as usize, emit_speed));
                 },
             }
         }
@@ -402,14 +416,14 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         byte_stream.assert_empty(bytes.len(), &resource_file);
 
-        let bytes = read(ground_file.clone()).expect("u r stupid");
+        let bytes = read(ground_file.clone()).expect(&format!("failed to open ground file {}", ground_file));
         let mut byte_stream = ByteStream::new(bytes.iter());
 
         let magic = byte_stream.string(4);
         assert!(&magic == "GRGN", "failed to read magic number");
-        let version = byte_stream.version();
+        let ground_version = byte_stream.version();
 
-        if !version.equals_or_above(1, 6) {
+        if !ground_version .equals_or_above(1, 6) {
             panic!("failed to read ground version");
         }
 
@@ -437,7 +451,7 @@ impl MapLoader {
         let dimensions = width * height;
         let light_map_dimensions = light_map_width * light_map_height;
 
-        match version.equals_or_above(1, 7) {
+        match ground_version.equals_or_above(1, 7) {
             true => byte_stream.skip(light_map_count * light_map_dimensions * 4),
             false => byte_stream.skip(light_map_count * 16),
         }
@@ -454,7 +468,7 @@ impl MapLoader {
             let light_map_index = byte_stream.integer16() as i32;
             let color_bgra = byte_stream.slice(4);
 
-            let color = Color::new(color_bgra[2], color_bgra[1], color_bgra[0]);
+            let color = Color::rgb(color_bgra[2], color_bgra[1], color_bgra[0]);
             surfaces.push(Surface::new(u, v, texture_index, light_map_index, color));
         }
 
@@ -467,17 +481,17 @@ impl MapLoader {
             let lower_left_height = byte_stream.float32();
             let lower_right_height = byte_stream.float32();
 
-            let top_surface_index = match version.equals_or_above(1, 7) {
+            let top_surface_index = match ground_version.equals_or_above(1, 7) {
                 true => byte_stream.integer32(),
                 false => byte_stream.integer16() as i32,
             };
 
-            let front_surface_index = match version.equals_or_above(1, 7) {
+            let front_surface_index = match ground_version.equals_or_above(1, 7) {
                 true => byte_stream.integer32(),
                 false => byte_stream.integer16() as i32,
             };
 
-            let right_surface_index = match version.equals_or_above(1, 7) {
+            let right_surface_index = match ground_version.equals_or_above(1, 7) {
                 true => byte_stream.integer32(),
                 false => byte_stream.integer16() as i32,
             };
@@ -495,15 +509,15 @@ impl MapLoader {
 
         if let Some(gat_file) = gat_file {
 
-            let bytes = read(gat_file.clone()).expect("u r very very stupid");
+            let bytes = read(gat_file.clone()).expect(&format!("failed to open gat file {}", gat_file));
             let mut byte_stream = ByteStream::new(bytes.iter());
 
             let magic = byte_stream.string(4);
             assert!(&magic == "GRAT", "failed to read magic number");
 
-            let version = byte_stream.version();
+            let gat_version = byte_stream.version();
 
-            if !version.equals(1, 2) {
+            if !gat_version.equals(1, 2) {
                 panic!("invalid gat version");
             }
 
@@ -511,12 +525,6 @@ impl MapLoader {
             map_height = byte_stream.integer32() as usize; // todo: unsigned
 
             let mut tile_vertices = Vec::new();
-
-            /* */
-            let mut vertex_offset = 1;
-            let mut obj_file_vertices = String::new();
-            let mut obj_file_faces = String::new();
-            /* */
 
             for y in 0..map_height {
                 for x in 0..map_width {
@@ -544,13 +552,6 @@ impl MapLoader {
                     let third_position = Vector3::new(offset.x + 5.0, -lower_right_height + 1.0, offset.y + 5.0);
                     let fourth_position = Vector3::new(offset.x, -lower_left_height + 1.0, offset.y + 5.0);
 
-                    /*  */
-                    obj_file_vertices.push_str(&format!("v {} {} {}\n", first_position.x, first_position.y, first_position.z));
-                    obj_file_vertices.push_str(&format!("v {} {} {}\n", second_position.x, second_position.y, second_position.z));
-                    obj_file_vertices.push_str(&format!("v {} {} {}\n", third_position.x, third_position.y, third_position.z));
-                    obj_file_vertices.push_str(&format!("v {} {} {}\n", fourth_position.x, fourth_position.y, fourth_position.z));
-                    /*  */
-
                     let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
                     let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
@@ -566,22 +567,8 @@ impl MapLoader {
                     tile_vertices.push(ModelVertex::new(first_position, second_normal, first_texture_coordinates, tile_type_index as i32));
                     tile_vertices.push(ModelVertex::new(third_position, second_normal, third_texture_coordinates, tile_type_index as i32));
                     tile_vertices.push(ModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, tile_type_index as i32));
-
-                    /*  */
-                    obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 1, vertex_offset + 2));
-                    obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 2, vertex_offset + 3));
-                    vertex_offset += 4;
-                    /*  */
                 }
             }
-
-            /* */
-            use std::fs::File;
-            use std::io::prelude::*;
-            let mut file = File::create(&format!("{}.obj", gat_file.clone())).unwrap();
-            file.write_all(obj_file_vertices.as_bytes()).unwrap();
-            file.write_all(obj_file_faces.as_bytes()).unwrap();
-            /* */
 
             #[cfg(feature = "debug")]
             byte_stream.assert_empty(bytes.len(), &gat_file);
@@ -591,12 +578,6 @@ impl MapLoader {
         }
 
         let mut native_ground_vertices = Vec::new();
-
-        /* */
-        let mut vertex_offset = 1;
-        let mut obj_file_vertices = String::new();
-        let mut obj_file_faces = String::new();
-        /* */
 
         for x in 0..width {
             for y in 0..height {
@@ -630,13 +611,6 @@ impl MapLoader {
                         let height = get_tile_height_at(&neighbor_tile, surface_height);
                         let fourth_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
-                        /*  */
-                        obj_file_vertices.push_str(&format!("v {} {} {}\n", first_position.x, first_position.y, first_position.z));
-                        obj_file_vertices.push_str(&format!("v {} {} {}\n", second_position.x, second_position.y, second_position.z));
-                        obj_file_vertices.push_str(&format!("v {} {} {}\n", third_position.x, third_position.y, third_position.z));
-                        obj_file_vertices.push_str(&format!("v {} {} {}\n", fourth_position.x, fourth_position.y, fourth_position.z));
-                        /*  */
-
                         let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
                         let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
@@ -654,24 +628,10 @@ impl MapLoader {
                         native_ground_vertices.push(NativeModelVertex::new(first_position, second_normal, first_texture_coordinates, ground_surface.texture_index));
                         native_ground_vertices.push(NativeModelVertex::new(third_position, second_normal, third_texture_coordinates, ground_surface.texture_index));
                         native_ground_vertices.push(NativeModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, ground_surface.texture_index));
-
-                        /*  */
-                        obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 1, vertex_offset + 2));
-                        obj_file_faces.push_str(&format!("f {} {} {}\n", vertex_offset, vertex_offset + 2, vertex_offset + 3));
-                        vertex_offset += 4;
-                        /*  */
                     }
                 }
             }
         }
-
-        /* */
-        use std::fs::File;
-        use std::io::prelude::*;
-        let mut file = File::create(&format!("{}.obj", resource_file.clone())).unwrap();
-        file.write_all(obj_file_vertices.as_bytes()).unwrap();
-        file.write_all(obj_file_faces.as_bytes()).unwrap();
-        /* */
 
         let row_size = width * 6;
 
@@ -701,18 +661,12 @@ impl MapLoader {
             indices.iter().for_each(|index| native_ground_vertices[*index].normal = new_normal);
         }
 
-        //for ModelVertex in &mut native_ground_vertices {
-        //    let array = &ModelVertex.normal;
-        //    let new_normal = Vector3::new(array[0], array[1], array[2]).normalize();
-        //    ModelVertex.normal = [new_normal.x, new_normal.y, new_normal.z];
-        //}
-
         let ground_vertices = NativeModelVertex::to_vertices(native_ground_vertices);
         let ground_vertex_buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, ground_vertices.into_iter()).unwrap();
 
         #[cfg(feature = "debug_map")]
         {
-            print_debug!("version {}{}{}", magenta(), version, none());
+            print_debug!("ground version {}{}{}", magenta(), ground_version, none());
             print_debug!("width {}{}{}", magenta(), width, none());
             print_debug!("height {}{}{}", magenta(), height, none());
             print_debug!("zoom {}{}{}", magenta(), _zoom, none());
@@ -733,7 +687,7 @@ impl MapLoader {
         sound_sources.iter_mut().for_each(|sound_source| sound_source.offset(offset));
         effect_sources.iter_mut().for_each(|effect_source| effect_source.offset(offset));
 
-        let map = Arc::new(Map::new(map_width, map_height, tiles, ground_vertex_buffer, textures, objects, light_sources, sound_sources, effect_sources, tile_vertex_buffer, ambient_light_color));
+        let map = Arc::new(Map::new(resource_version, ground_version, map_width, map_height, water_settings, light_settings, tiles, ground_vertex_buffer, textures, objects, light_sources, sound_sources, effect_sources, tile_vertex_buffer));
 
         self.cache.insert(resource_file, map.clone());
 

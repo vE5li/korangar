@@ -1,9 +1,5 @@
 #version 450
 
-#define DIFFUSE 0b001
-#define NORMAL 0b010
-#define DEPTH 0b100
-
 layout(location = 0) in vec2 position;
 
 layout(location = 0) out vec4 fragment_color;

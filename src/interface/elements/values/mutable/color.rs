@@ -10,6 +10,7 @@ use interface::types::*;
 pub struct MutableColorValue {
     name: String,
     color_pointer: *const Color,
+    change_event: Option<ChangeEvent>,
     #[new(default)]
     cached_color: Color,
     #[new(default)]
@@ -22,13 +23,25 @@ pub struct MutableColorValue {
 
 impl Element for MutableColorValue {
 
-    fn update(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
         let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
 
-        self.cached_color = unsafe { *self.color_pointer };
-        self.cached_values = format!("{}, {}, {}", self.cached_color.red, self.cached_color.green, self.cached_color.blue);
+        //self.cached_color = unsafe { *self.color_pointer };
+        //self.cached_values = format!("{}, {}, {}", self.cached_color.red, self.cached_color.green, self.cached_color.blue);
+    }
+
+    fn update(&mut self) -> Option<ChangeEvent> {
+        let current_color = unsafe { *self.color_pointer };
+
+        if self.cached_color != current_color {
+            self.cached_color = current_color;
+            self.cached_values = format!("{}, {}, {}", self.cached_color.red, self.cached_color.green, self.cached_color.blue);
+            return Some(ChangeEvent::RerenderWindow);
+        }
+
+        None
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
@@ -42,7 +55,7 @@ impl Element for MutableColorValue {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(self.name.clone(), self.color_pointer))))
+        Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(self.name.clone(), self.color_pointer, self.change_event.clone()))))
     }
 
     fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {

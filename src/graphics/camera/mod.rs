@@ -15,7 +15,7 @@ pub trait Camera {
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);
 
-    fn transform_matrix(&self, transform: &Transform) -> (Matrix4<f32>, Matrix4<f32>);
+    fn transform_matrix(&self, transform: &Transform) -> Matrix4<f32>;
 
     fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32>;
 
@@ -26,4 +26,6 @@ pub trait Camera {
     fn distance_to(&self, position: Vector3<f32>) -> f32;
 
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32>;
+
+    fn get_light_matrix(&self) -> Matrix4<f32>;
 }

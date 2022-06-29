@@ -16,23 +16,29 @@ use std::sync::Arc;
 use std::iter;
 use vulkano::device::Device;
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
+use vulkano::pipeline::graphics::depth_stencil::CompareOp;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
+use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
+use vulkano::buffer::{ BufferUsage, BufferAccess };
 use cgmath::Vector3;
 
 use graphics::*;
 
 use self::fragment_shader::ty::Constants;
+use self::fragment_shader::ty::Matrices;
 
 pub struct DirectionalLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
+    matrices_buffer: CpuBufferPool<Matrices>,
+    linear_sampler: Arc<Sampler>,
 }
 
 impl DirectionalLightRenderer {
@@ -41,9 +47,19 @@ impl DirectionalLightRenderer {
 
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
+        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
+        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+ 
+        let linear_sampler = Sampler::start(device.clone())
+            .filter(Filter::Linear)
+            .address_mode(SamplerAddressMode::MirroredRepeat)
+            //.compare(Some(CompareOp::Less))
+            //.mip_lod_bias(1.0)
+            //.lod(0.0..=100.0)
+            .build()
+            .unwrap();
 
-        return Self { pipeline, vertex_shader, fragment_shader };
+        Self { pipeline, vertex_shader, fragment_shader, matrices_buffer, linear_sampler }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -51,8 +67,7 @@ impl DirectionalLightRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -61,28 +76,34 @@ impl DirectionalLightRenderer {
             .color_blend_state(ColorBlendState::new(1).blend(LIGHT_ATTACHMENT_BLEND))
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
-    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, direction: Vector3<f32>, color: Color) {
+    pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, shadow_map: ImageBuffer, vertex_buffer: ScreenVertexBuffer, direction: Vector3<f32>, color: Color) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
-
-        set_builder
-            .add_image(diffuse_buffer).unwrap()
-            .add_image(normal_buffer).unwrap();
-
-        let set = set_builder.build().unwrap();
+        let matrices = Matrices {
+            screen_to_world: camera.get_screen_to_world_matrix().into(),
+            light: camera.get_light_matrix().into(),
+        };
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view(0, diffuse_buffer),
+            WriteDescriptorSet::image_view(1, normal_buffer),
+            WriteDescriptorSet::image_view(2, depth_buffer),
+            WriteDescriptorSet::image_view_sampler(3, shadow_map, self.linear_sampler.clone()),
+            WriteDescriptorSet::buffer(4, matrices_subbuffer),
+        ]).unwrap();
 
         let constants = Constants {
+            //screen_to_world_matrix: camera.get_screen_to_world_matrix().into(),
+            //light_matrix: camera.get_light_matrix().into(),
             direction: [direction.x, direction.y, direction.z],
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
-            _dummy0: [0; 4],
+            _dummy0: Default::default(),
         };
 
         builder

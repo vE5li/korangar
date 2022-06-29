@@ -53,21 +53,21 @@ impl PlayerCamera {
     fn camera_position(&self) -> Point3<f32> {
         let zoom = self.zoom.get_current();
         let view_angle = self.view_angle.get_current();
-        return Point3::new(self.focus_position.x + zoom * view_angle.cos(), self.focus_position.y + zoom, self.focus_position.z + -zoom * view_angle.sin());
+        Point3::new(self.focus_position.x + zoom * view_angle.cos(), self.focus_position.y + zoom, self.focus_position.z + -zoom * view_angle.sin())  
     }
 
     fn view_direction(&self) -> Vector3<f32> {
         let camera_position = self.camera_position();
-        return Vector3::new(self.focus_position.x - camera_position.x, self.focus_position.y - camera_position.y, self.focus_position.z - camera_position.z).normalize();
+        Vector3::new(self.focus_position.x - camera_position.x, self.focus_position.y - camera_position.y, self.focus_position.z - camera_position.z).normalize()  
     }
 
     fn world_to_clip_space(&self, world_space_position: Vector3<f32>) -> Vector4<f32> {
         let position = Vector4::new(world_space_position.x, world_space_position.y, world_space_position.z, 1.0);
-        return self.world_to_screen_matrix * position;
+        self.world_to_screen_matrix * position  
     }
 
     fn clip_to_screen_space(&self, clip_space_position: Vector4<f32>) -> Vector2<f32> {
-        return Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
+        Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0)  
     }
 }
 
@@ -85,16 +85,16 @@ impl Camera for PlayerCamera {
     }
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
-        return (self.view_matrix, self.projection_matrix);
+        (self.view_matrix, self.projection_matrix)  
     }
 
-    fn transform_matrix(&self, transform: &Transform) -> (Matrix4<f32>, Matrix4<f32>) {
+    fn transform_matrix(&self, transform: &Transform) -> Matrix4<f32> {
         let translation_matrix = Matrix4::from_translation(transform.position);
         let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);
         let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
         let world_matrix = translation_matrix * rotation_matrix * scale_matrix * transform.offset_translation * transform.offset_matrix;
 
-        return (rotation_matrix, world_matrix);
+        world_matrix 
     }
 
     fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
@@ -109,7 +109,7 @@ impl Camera for PlayerCamera {
         let scale_matrix = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
         let world_matrix = translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix;
 
-        return world_matrix;
+        world_matrix  
     }
 
     fn billboard_coordinates(&self, position: Vector3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {
@@ -121,7 +121,7 @@ impl Camera for PlayerCamera {
         let top_left_position = self.world_to_clip_space(position + (up_vector - right_vector) * size);
         let bottom_right_position = self.world_to_clip_space(position + (right_vector - up_vector) * size);
 
-        return (top_left_position, bottom_right_position);
+        (top_left_position, bottom_right_position)  
     }
 
     fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (Vector2<f32>, Vector2<f32>) {
@@ -131,15 +131,29 @@ impl Camera for PlayerCamera {
         let screen_position = top_left_position;
         let screen_size = bottom_right_position - top_left_position;
 
-        return (screen_position, screen_size);
+        (screen_position, screen_size)  
     }
 
     fn distance_to(&self, position: Vector3<f32>) -> f32 {
         let delta = self.camera_position() - position;
-        return delta.map(|component| component * component).sum().sqrt();
+        delta.map(|component| component * component).sum().sqrt()  
     }
 
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32> {
-        return self.screen_to_world_matrix;
+        self.screen_to_world_matrix  
+    }
+
+    fn get_light_matrix(&self) -> Matrix4<f32> {
+
+        let bounds = vector4!(-600.0, 600.0, -600.0, 600.0);
+        let z_near = 0.01;
+        let z_far = 1000.0;
+        let position = vector3!(500.0, 500.0, -100.0);
+        let look_at = vector3!(500.0, 400.0, 0.0);
+
+        let projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, z_near, z_far);
+        let view_matrix = Matrix4::look_at_rh(Point3::new(position.x, position.y, position.z), Point3::new(look_at.x, look_at.y, look_at.z), vector3!(0.0, -1.0, 0.0));
+
+        projection_matrix * view_matrix        
     }
 }

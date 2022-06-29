@@ -13,6 +13,8 @@ pub struct RenderSettings {
     #[new(value = "true")]
     pub show_entities: bool,
     #[new(value = "true")]
+    pub show_water: bool,
+    #[new(value = "true")]
     pub show_ambient_light: bool,
     #[new(value = "true")]
     pub show_directional_light: bool,
@@ -20,6 +22,8 @@ pub struct RenderSettings {
     pub show_point_lights: bool,
     #[new(value = "true")]
     pub show_particle_lights: bool,
+    #[new(value = "true")]
+    pub show_directional_shadows: bool,
     #[cfg(feature = "debug")]
     #[new(default)]
     pub use_debug_camera: bool,
@@ -40,6 +44,9 @@ pub struct RenderSettings {
     pub show_particle_markers: bool,
     #[cfg(feature = "debug")]
     #[new(default)]
+    pub show_entity_markers: bool,
+    #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_map_tiles: bool,
     #[cfg(feature = "debug")]
     #[new(default)]
@@ -52,7 +59,13 @@ pub struct RenderSettings {
     pub show_normal_buffer: bool,
     #[cfg(feature = "debug")]
     #[new(default)]
+    pub show_water_buffer: bool,
+    #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_depth_buffer: bool,
+    #[cfg(feature = "debug")]
+    #[new(default)]
+    pub show_picker_buffer: bool,
 }
 
 impl RenderSettings {
@@ -77,6 +90,10 @@ impl RenderSettings {
         self.show_entities = !self.show_entities;
     }
 
+    pub fn toggle_show_water(&mut self) {
+        self.show_water = !self.show_water;
+    }
+
     pub fn toggle_show_ambient_light(&mut self) {
         self.show_ambient_light = !self.show_ambient_light;
     }
@@ -91,6 +108,10 @@ impl RenderSettings {
 
     pub fn toggle_show_particle_lights(&mut self) {
         self.show_particle_lights = !self.show_particle_lights;
+    }
+
+    pub fn toggle_show_directional_shadows(&mut self) {
+        self.show_directional_shadows = !self.show_directional_shadows;
     }
 
     #[cfg(feature = "debug")]
@@ -124,6 +145,11 @@ impl RenderSettings {
     }
 
     #[cfg(feature = "debug")]
+    pub fn toggle_show_entity_markers(&mut self) {
+        self.show_entity_markers = !self.show_entity_markers;
+    }
+
+    #[cfg(feature = "debug")]
     pub fn toggle_show_map_tiles(&mut self) {
         self.show_map_tiles = !self.show_map_tiles;
     }
@@ -144,12 +170,22 @@ impl RenderSettings {
     }
 
     #[cfg(feature = "debug")]
+    pub fn toggle_show_water_buffer(&mut self) {
+        self.show_water_buffer = !self.show_water_buffer;
+    }
+
+    #[cfg(feature = "debug")]
     pub fn toggle_show_depth_buffer(&mut self) {
         self.show_depth_buffer = !self.show_depth_buffer;
     }
 
     #[cfg(feature = "debug")]
+    pub fn toggle_show_picker_buffer(&mut self) {
+        self.show_picker_buffer = !self.show_picker_buffer;
+    }
+
+    #[cfg(feature = "debug")]
     pub fn show_buffers(&self) -> bool {
-        return self.show_diffuse_buffer || self.show_normal_buffer || self.show_depth_buffer;
+        self.show_diffuse_buffer || self.show_normal_buffer || self.show_water_buffer || self.show_depth_buffer || self.show_picker_buffer
     }
 }

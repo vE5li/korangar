@@ -1,7 +1,8 @@
 use derive_new::new;
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::fs::read;
 use types::maths::*;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
@@ -9,17 +10,17 @@ use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use debug::*;
+use types::ByteStream;
 use types::map::model::{ Model, Node, BoundingBox, ShadingType };
 use graphics::{ Transform, NativeModelVertex };
-use loaders::TextureLoader;
-
-use super::ByteStream;
+use loaders::{ TextureLoader, GameFileLoader };
 
 #[derive(new)]
 pub struct ModelLoader {
+    game_file_loader: Rc<RefCell<GameFileLoader>>,
+    device: Arc<Device>,
     #[new(default)]
     cache: HashMap<String, Arc<Model>>,
-    device: Arc<Device>,
 }
 
 impl ModelLoader {
@@ -42,7 +43,7 @@ impl ModelLoader {
         let offset = (biggest + smallest).map(|component| component / 2.0);
         let range = (biggest - smallest).map(|component| component / 2.0);
 
-        return BoundingBox::new(smallest, biggest, offset, range);
+        BoundingBox::new(smallest, biggest, offset, range)
     }
 
     fn calculate_node_bounding_box(vertices: &Vec<NativeModelVertex>, offset_matrix: Matrix3<f32>, offset_translation: Vector3<f32>, is_only: bool) -> BoundingBox {
@@ -69,19 +70,22 @@ impl ModelLoader {
         let offset = (biggest + smallest).map(|component| component / 2.0);
         let range = (biggest - smallest).map(|component| component / 2.0);
 
-        return BoundingBox::new(smallest, biggest, offset, range);
+        BoundingBox::new(smallest, biggest, offset, range)
     }
 
-    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Arc<Model> {
+    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Model>, String> {
 
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", magenta(), model_file, none()));
+        let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", MAGENTA, model_file, NONE));
 
-        let bytes = read(model_file.clone()).expect("u r stupid");
-        let mut byte_stream = ByteStream::new(bytes.iter());
+        let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\model\\{}", model_file))?;
+        let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(4);
-        assert!(&magic == "GRSM", "failed to read magic number");
+        
+        if &magic != "GRSM" {
+            return Err(format!("failed to read magic number from {}{}{}", MAGENTA, model_file, NONE));
+        }
 
         let version = byte_stream.version();
         let _animation_length = byte_stream.integer32();
@@ -99,8 +103,8 @@ impl ModelLoader {
 
         for _index in 0..texture_count as usize {
             let texture_name = byte_stream.string(40);
-            let texture_name_unix = texture_name.replace("\\", "/");
-            let texture = texture_loader.get(format!("data/texture/{}", texture_name_unix), texture_future);
+            //let texture_name_unix = texture_name.replace("\\", "/");
+            let texture = texture_loader.get(&texture_name, texture_future)?;
             textures.push(texture);
         }
 
@@ -109,13 +113,13 @@ impl ModelLoader {
 
         #[cfg(feature = "debug_model")]
         {
-            print_debug!("version {}{}{}", magenta(), version, none());
-            print_debug!("animation length {}{}{}", magenta(), _animation_length, none());
-            print_debug!("shading type {}{}{}", magenta(), _shading_type, none());
-            print_debug!("alpha {}{}{}", magenta(), _alpha, none());
-            print_debug!("texture count {}{}{}", magenta(), texture_count, none());
-            print_debug!("main node name {}{}{}", magenta(), main_node_name, none());
-            print_debug!("node count {}{}{}", magenta(), node_count, none());
+            print_debug!("version {}{}{}", MAGENTA, version, NONE);
+            print_debug!("animation length {}{}{}", MAGENTA, _animation_length, NONE);
+            print_debug!("shading type {}{}{}", MAGENTA, _shading_type, NONE);
+            print_debug!("alpha {}{}{}", MAGENTA, _alpha, NONE);
+            print_debug!("texture count {}{}{}", MAGENTA, texture_count, NONE);
+            print_debug!("main node name {}{}{}", MAGENTA, main_node_name, NONE);
+            print_debug!("node count {}{}{}", MAGENTA, node_count, NONE);
         }
 
         let mut nodes = Vec::new();
@@ -126,7 +130,7 @@ impl ModelLoader {
             let parent_name = byte_stream.string(40);
 
             #[cfg(feature = "debug_model")]
-            let timer = Timer::new_dynamic(format!("parse node {}{}{}", magenta(), node_name, none()));
+            let timer = Timer::new_dynamic(format!("parse node {}{}{}", MAGENTA, node_name, NONE));
 
             let texture_count = byte_stream.integer32();
 
@@ -234,17 +238,17 @@ impl ModelLoader {
                 // push
             }
 
-            for normal_group in common_normals {
-                if normal_group.len() < 2 {
-                    continue;
-                }
+            //for normal_group in common_normals {
+            //    if normal_group.len() < 2 {
+            //        continue;
+            //    }
 
-                let new_normal = normal_group.iter()
-                    .map(|index| native_vertices[*index].normal)
-                    .fold(Vector3::new(0.0, 0.0, 0.0), |output, normal| output + normal);
+            //    let new_normal = normal_group.iter()
+            //        .map(|index| native_vertices[*index].normal)
+            //        .fold(Vector3::new(0.0, 0.0, 0.0), |output, normal| output + normal);
 
-                normal_group.iter().for_each(|index| native_vertices[*index].normal = new_normal);
-            }
+            //    normal_group.iter().for_each(|index| native_vertices[*index].normal = new_normal);
+            //}
 
             let parent_name = match parent_name.is_empty() {
                 true => None,
@@ -265,23 +269,23 @@ impl ModelLoader {
 
             #[cfg(feature = "debug_model")]
             {
-                parent_name.map(|name| print_debug!("parent name {}{}{}", magenta(), name, none()));
+                parent_name.map(|name| print_debug!("parent name {}{}{}", MAGENTA, name, NONE));
 
                 let formatted_list = texture_indices.iter().map(|index| index.to_string()).collect::<Vec<String>>().join(", ");
-                print_debug!("texture count {}{}{}", magenta(), texture_count, none());
-                print_debug!("texture indices {}{}{}", magenta(), formatted_list, none());
+                print_debug!("texture count {}{}{}", MAGENTA, texture_count, NONE);
+                print_debug!("texture indices {}{}{}", MAGENTA, formatted_list, NONE);
 
-                print_debug!("offset matrix {}{:?}{}", magenta(), offset_matrix, none());
-                print_debug!("offset tranlation {}{:?}{}", magenta(), offset_translation, none());
-                print_debug!("position {}{:?}{}", magenta(), position, none());
-                print_debug!("rotation angle {}{}{}", magenta(), rotation_angle, none());
-                print_debug!("rotation axis {}{:?}{}", magenta(), rotation_axis, none());
-                print_debug!("scale {}{:?}{}", magenta(), scale, none());
+                print_debug!("offset matrix {}{:?}{}", MAGENTA, offset_matrix, NONE);
+                print_debug!("offset tranlation {}{:?}{}", MAGENTA, offset_translation, NONE);
+                print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
+                print_debug!("rotation angle {}{}{}", MAGENTA, rotation_angle, NONE);
+                print_debug!("rotation axis {}{:?}{}", MAGENTA, rotation_axis, NONE);
+                print_debug!("scale {}{:?}{}", MAGENTA, scale, NONE);
 
-                print_debug!("ModelVertex count {}{}{}", magenta(), vertex_count, none());
-                print_debug!("texture coordinate count {}{}{}", magenta(), texture_coordinate_count, none());
-                print_debug!("face count {}{}{}", magenta(), face_count, none());
-                print_debug!("rotation key frame count {}{}{}", magenta(), rotation_key_frame_count, none());
+                print_debug!("ModelVertex count {}{}{}", MAGENTA, vertex_count, NONE);
+                print_debug!("texture coordinate count {}{}{}", MAGENTA, texture_coordinate_count, NONE);
+                print_debug!("face count {}{}{}", MAGENTA, face_count, NONE);
+                print_debug!("rotation key frame count {}{}{}", MAGENTA, rotation_key_frame_count, NONE);
 
                 timer.stop();
             }
@@ -291,7 +295,7 @@ impl ModelLoader {
         let _unknown = byte_stream.slice(8);
 
         #[cfg(feature = "debug")]
-        byte_stream.assert_empty(bytes.len(), &model_file);
+        byte_stream.assert_empty(&model_file);
 
         let bounding_box = Self::calculate_bounding_box(&nodes);
 
@@ -305,18 +309,18 @@ impl ModelLoader {
         let root_node = nodes.iter().find(|node| node.name == *main_node_name).expect("failed to find root node").clone(); // fix cloning issue
         let model = Arc::new(Model::new(root_node, bounding_box));
 
-        self.cache.insert(model_file, model.clone());
+        self.cache.insert(model_file.to_string(), model.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();
 
-        return model;
+        Ok(model)
     }
 
-    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Arc<Model> {
-        match self.cache.get(&model_file) {
-            Some(model) => return model.clone(),
-            None => return self.load(texture_loader, model_file, texture_future),
+    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Model>, String> {
+        match self.cache.get(model_file) {
+            Some(model) => Ok(model.clone()),
+            None => self.load(texture_loader, model_file, texture_future),
         }
     }
 }

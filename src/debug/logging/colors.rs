@@ -1,53 +1,13 @@
-pub fn green() -> &'static str {
-
-    #[cfg(feature = "colors")]
-    return "\x1B[32m";
-
-    #[cfg(not(feature = "colors"))]
-    return "";
+const fn color(enabled: &'static str) -> &'static str {
+    match cfg!(feature = "colors") {
+        true => enabled,
+        false => "",
+    }
 }
 
-pub fn red() -> &'static str {
-
-    #[cfg(feature = "colors")]
-    return "\x1B[31m";
-
-    #[cfg(not(feature = "colors"))]
-    return "";
-}
-
-pub fn cyan() -> &'static str {
-
-    #[cfg(feature = "colors")]
-    return "\x1B[36m";
-
-    #[cfg(not(feature = "colors"))]
-    return "";
-}
-
-pub fn yellow() -> &'static str {
-
-    #[cfg(feature = "colors")]
-    return "\x1B[33m";
-
-    #[cfg(not(feature = "colors"))]
-    return "";
-}
-
-pub fn magenta() -> &'static str {
-
-    #[cfg(feature = "colors")]
-    return "\x1B[35m";
-
-    #[cfg(not(feature = "colors"))]
-    return "";
-}
-
-pub fn none() -> &'static str {
-
-    #[cfg(feature = "colors")]
-    return "\x1B[0m";
-
-    #[cfg(not(feature = "colors"))]
-    return "";
-}
+pub const GREEN: &'static str = color("\x1B[32m");
+pub const RED: &'static str = color("\x1B[31m");
+pub const CYAN: &'static str = color("\x1B[36m");
+pub const YELLOW: &'static str = color("\x1B[33m");
+pub const MAGENTA: &'static str = color("\x1B[35m");
+pub const NONE: &'static str = color("\x1B[0m");

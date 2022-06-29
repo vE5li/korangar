@@ -4,11 +4,13 @@ mod mode;
 
 use std::rc::Rc;
 use cgmath::Vector2;
+use vulkano::buffer::CpuAccessibleBuffer;
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 
 use interface::types::ElementCell;
 use interface::{ Interface, ClickAction };
+use crate::graphics::Renderer;
 
 pub use self::event::UserEvent;
 pub use self::mode::MouseInputMode;
@@ -50,7 +52,7 @@ impl InputSystem {
         let mouse_input_mode = MouseInputMode::None;
         let previous_hovered_element = None;
 
-        return Self {
+        Self {
             previous_mouse_position,
             new_mouse_position,
             mouse_delta,
@@ -62,7 +64,7 @@ impl InputSystem {
             keys,
             mouse_input_mode,
             previous_hovered_element,
-        };
+        }
     }
 
     pub fn reset(&mut self) {
@@ -96,6 +98,7 @@ impl InputSystem {
     pub fn update_keyboard(&mut self, code: usize, state: ElementState) {
         let pressed = matches!(state, ElementState::Pressed);
         self.keys[code].set_down(pressed);
+        //println!("code: {}", code);
     }
 
     pub fn update_delta(&mut self) {
@@ -111,7 +114,7 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, interface: &mut Interface) -> (Vec<UserEvent>, Option<ElementCell>) {
+    pub fn user_events(&mut self, renderer: &mut Renderer, interface: &mut Interface) -> (Vec<UserEvent>, Option<ElementCell>) {
 
         let mut events = Vec::new();
         let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {         
@@ -217,8 +220,28 @@ impl InputSystem {
             }
         }
 
-        if self.keys[46].pressed() {
+        if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
+            let window_size = renderer.get_window_size();
+            let picker_buffer = renderer.get_picker_buffer();
+            let pixel = picker_buffer.read().unwrap()[self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x];
+
+            if pixel != 0 {
+                let x = (pixel & 0xff) - 1;
+                let y = (pixel >> 16) - 1;
+                events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize)));
+            }
+        }
+
+        if self.keys[1].pressed() {
             events.push(UserEvent::OpenMenuWindow);
+        }
+
+        if self.keys[50].pressed() {
+            events.push(UserEvent::OpenMapsWindow);
+        }
+
+        if self.keys[19].pressed() {
+            events.push(UserEvent::OpenRenderSettingsWindow);
         }
 
         #[cfg(feature = "debug")]
@@ -266,13 +289,18 @@ impl InputSystem {
             events.push(UserEvent::CameraMoveUp);
         }
 
-        let update = self.previous_hovered_element
+        // to fix redrawing twice when clicking on elements
+        if !self.mouse_input_mode.is_none() {
+            hovered_element = None;
+        }
+
+        let rerender = self.previous_hovered_element
             .as_ref()
             .zip(hovered_element.as_ref())
             .map(|(previous, current)| !Rc::ptr_eq(&previous.0, current))
             .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some());
 
-        if update {
+        if rerender {
 
             if let Some((_element, window_index)) = &self.previous_hovered_element {
                 interface.schedule_rerender_window(*window_index);
@@ -285,7 +313,7 @@ impl InputSystem {
 
         self.previous_hovered_element = hovered_element.clone().zip(window_index);
 
-        return (events, hovered_element);
+        (events, hovered_element)
     }
     
     pub fn unused_left_click(&self) -> bool {

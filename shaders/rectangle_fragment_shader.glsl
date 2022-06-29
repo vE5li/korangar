@@ -2,8 +2,7 @@
 
 layout(location = 0) in vec2 fragment_position;
 
-//layout(location = 0) out vec4 fragment_color;
-layout(location = 2) out vec4 fragment_color;
+layout(location = 3) out vec4 fragment_color;
 
 layout(push_constant) uniform Constants {
     vec2 screen_position;

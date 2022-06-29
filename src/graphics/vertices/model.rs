@@ -11,7 +11,7 @@ pub struct ModelVertex {
 impl ModelVertex {
 
     pub const fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>, texture_index: i32) -> Self {
-        return Self {
+        Self {
             position: [position.x, position.y, position.z],
             normal: [normal.x, normal.y, normal.z],
             texture_coordinates: [texture_coordinates.x, texture_coordinates.y],

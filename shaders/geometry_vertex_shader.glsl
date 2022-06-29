@@ -15,13 +15,12 @@ layout(set = 0, binding = 0) uniform Matrices {
 } matrices;
 
 layout(push_constant) uniform Constants {
-    mat4 rotation;
     mat4 world;
 } constants;
 
 void main() {
     gl_Position = matrices.projection * matrices.view * constants.world * vec4(position, 1.0);
-    normal_out = vec4(constants.rotation * vec4(normal, 1.0)).xyz;
+    normal_out = transpose(inverse(mat3(constants.world))) * normal;
     texture_coordinates_out = texture_coordinates;
     texture_index_out = texture_index;
 }

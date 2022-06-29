@@ -57,7 +57,7 @@ impl RectangleRenderer {
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
-        return Self { pipeline, vertex_shader, fragment_shader, vertex_buffer };
+        Self { pipeline, vertex_shader, fragment_shader, vertex_buffer }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -65,8 +65,7 @@ impl RectangleRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -75,9 +74,7 @@ impl RectangleRenderer {
             .color_blend_state(ColorBlendState::new(1).blend_alpha())
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
     pub fn render(&self, builder: &mut CommandBuilder, window_size: Vector2<usize>, screen_position: Vector2<f32>, screen_size: Vector2<f32>, clip_size: Vector2<f32>, corner_radius: Vector4<f32>, color: Color) {

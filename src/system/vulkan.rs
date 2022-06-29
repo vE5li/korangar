@@ -6,7 +6,8 @@ use debug::*;
 
 pub fn get_instance_extensions() -> InstanceExtensions {
     InstanceExtensions {
-        ext_debug_report: true,
+        ext_debug_utils: true,
+        //khr_get_physical_device_properties2: true,
         ..vulkano_win::required_extensions()
     }
 }
@@ -14,14 +15,14 @@ pub fn get_instance_extensions() -> InstanceExtensions {
 pub fn get_layers() -> Vec<&'static str> {
 
     let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
-    let desired_layers = vec![];// vec!["VK_LAYER_KHRONOS_validation"];
+    let desired_layers = Vec::new();// vec!["VK_LAYER_KHRONOS_validation"];
 
     #[cfg(feature = "debug")]
     let timer = Timer::new_dynamic(format!("available layers"));
 
     #[cfg(feature = "debug")]
     for layer in &available_layers {
-        print_debug!("{}{}{}", magenta(), layer.name(), none());
+        print_debug!("{}{}{}", MAGENTA, layer.name(), NONE);
     }
 
     #[cfg(feature = "debug")]
@@ -37,18 +38,23 @@ pub fn get_layers() -> Vec<&'static str> {
 
     #[cfg(feature = "debug")]
     for layer in &used_layers {
-        print_debug!("{}{}{}", magenta(), layer, none());
+        print_debug!("{}{}{}", MAGENTA, layer, NONE);
     }
 
     #[cfg(feature = "debug")]
     timer.stop();
 
-    return used_layers;
+    used_layers
 }
 
 pub fn get_device_extensions() -> DeviceExtensions {
     DeviceExtensions {
         khr_swapchain: true,
+        //ext_sample_locations: true,
+        amd_mixed_attachment_samples: true,
+        //ext_filter_cubic: true,
+        //ext_extended_dynamic_state: true,
+        //ext_extended_dynamic_state2: true,
         ..DeviceExtensions::none()
     }
 }

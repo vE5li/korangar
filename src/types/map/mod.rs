@@ -8,7 +8,7 @@ use derive_new::new;
 use cgmath::Vector2;
 
 use crate::types::Version;
-use graphics::{ Renderer, RenderSettings, Camera, ModelVertexBuffer, Texture, Transform, Color };
+use graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::traits::PrototypeWindow;
 
@@ -70,13 +70,17 @@ pub struct Map {
     #[hidden_element]
     ground_vertex_buffer: ModelVertexBuffer,
     #[hidden_element]
+    water_vertex_buffer: Option<WaterVertexBuffer>,
+    #[hidden_element]
     ground_textures: Vec<Texture>,
     objects: Vec<Object>,
     light_sources: Vec<LightSource>,
     sound_sources: Vec<SoundSource>,
     effect_sources: Vec<EffectSource>,
     #[hidden_element]
-    tile_vertex_buffer: Option<ModelVertexBuffer>, // make debug only
+    tile_picker_vertex_buffer: TileVertexBuffer,
+    #[hidden_element]
+    tile_vertex_buffer: ModelVertexBuffer, // make debug only
 }
 
 impl Map {
@@ -86,15 +90,23 @@ impl Map {
     }
 
     pub fn x_in_bounds(&self, x: usize) -> bool {
-        return x <= self.width;
+        x <= self.width
     }
 
     pub fn y_in_bounds(&self, y: usize) -> bool {
-        return y <= self.height;
+        y <= self.height
     }
 
-    pub fn get_tile(&self, position: &Vector2<usize>) -> &Tile {
-        return &self.tiles[position.x + position.y * self.width];
+    pub fn get_height_at(&self, position: Vector2<usize>) -> f32 {
+        self.get_tile(position).average_height()
+    }
+
+    pub fn get_tile(&self, position: Vector2<usize>) -> &Tile {
+        &self.tiles[position.x + position.y * self.width]
+    }
+
+    pub fn render_picker(&self, renderer: &mut Renderer, camera: &dyn Camera) {
+        renderer.render_tiles(camera, self.tile_picker_vertex_buffer.clone());
     }
 
     pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings) {
@@ -107,11 +119,13 @@ impl Map {
             self.objects.iter().for_each(|object| object.render_geometry(renderer, camera));
         }
 
+        if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
+            renderer.render_water(camera, water_vertex_buffer.clone());
+        }
+
         #[cfg(feature = "debug")]
         if render_settings.show_map_tiles {
-            if let Some(vertex_buffer) = self.tile_vertex_buffer.clone() {
-                renderer.render_map_tiles(camera, vertex_buffer, &Transform::new());
-            }
+            renderer.render_map_tiles(camera, self.tile_vertex_buffer.clone(), &Transform::new());
         }
     }
 
@@ -122,7 +136,7 @@ impl Map {
         }
 
         if render_settings.show_directional_light {
-            //renderer.directional_light(Vector3::new(0.0, -1.0, -0.7), Color::monochrome(100));
+            renderer.directional_light(camera, cgmath::Vector3::new(0.0, -1.0, 1.0), self.light_settings.diffuse_color);
         }
 
         if render_settings.show_point_lights {
@@ -131,6 +145,10 @@ impl Map {
 
         if render_settings.show_particle_lights {
             self.effect_sources.iter().for_each(|effect_source| effect_source.render_lights(renderer, camera));
+        }
+
+        if render_settings.show_water {
+            renderer.water_light(camera, self.water_settings.water_level);
         }
     }
 

@@ -2,6 +2,8 @@ use derive_new::new;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::fs::File;
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::io::{ Cursor, Read, BufReader };
 use vulkano::device::{ Device, Queue };
 use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
@@ -9,24 +11,25 @@ use vulkano::image::view::ImageView;
 use vulkano::format::Format;
 use vulkano::sync::{ GpuFuture, now };
 use png::Decoder;
-use bmp::open;
-
-use graphics::Texture;
+use bmp::from_reader;
 
 #[cfg(feature = "debug")]
 use debug::*;
+use graphics::Texture;
+use loaders::GameFileLoader;
 
 #[derive(new)]
 pub struct TextureLoader {
-    #[new(value = "HashMap::new()")]
-    cache: HashMap<String, Texture>,
+    game_file_loader: Rc<RefCell<GameFileLoader>>,
     device: Arc<Device>,
     queue: Arc<Queue>,
+    #[new(value = "HashMap::new()")]
+    cache: HashMap<String, Texture>,
 }
 
 impl TextureLoader {
 
-    fn load_png_data(path: &str) -> (Vec<u8>, ImageDimensions) {
+    fn load_png_data(&self, path: &str) -> Result<(Vec<u8>, ImageDimensions), String> {
 
         let file = File::open(path).expect("failed to open file");
 
@@ -49,14 +52,15 @@ impl TextureLoader {
         image_data.resize((info.width * info.height * 4) as usize, 0);
         reader.next_frame(&mut image_data).unwrap();
 
-        return (image_data, dimensions);
+        Ok((image_data, dimensions))
     }
 
-    fn load_bmp_data(path: &str) -> (Vec<u8>, ImageDimensions) {
+    fn load_bmp_data(&self, path: &str) -> Result<(Vec<u8>, ImageDimensions), String> {
 
-        let image = open(&path).unwrap_or_else(|e| {
-            panic!("Failed to open {}: {}", path, e); // return result ?
-        });
+        let bmp_bytes = self.game_file_loader.borrow_mut().get(&format!("data\\texture\\{}", path))?;
+        let mut slice = bmp_bytes.as_slice();
+
+        let image = from_reader(&mut slice).map_err(|error| error.to_string())?;
 
         let mut image_data = Vec::new();
 
@@ -84,19 +88,19 @@ impl TextureLoader {
             array_layers: 1,
         };
 
-        return (image_data, dimensions);
+        Ok((image_data, dimensions))
     }
 
-    fn load(&mut self, path: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Texture {
+    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Texture, String> {
 
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load texture from {}{}{}", magenta(), path, none()));
+        let timer = Timer::new_dynamic(format!("load texture from {}{}{}", MAGENTA, path, NONE));
 
         let (image_data, dimensions) = match &path[path.len() - 4..] {
-            ".png" => Self::load_png_data(&path),
-            ".bmp" | ".BMP" => Self::load_bmp_data(&path),
-            extension => panic!("unsupported file format {}", extension),
-        };
+            ".png" => self.load_png_data(&path),
+            ".bmp" | ".BMP" => self.load_bmp_data(&path),
+            extension => Err(format!("unsupported file format {}", extension)),
+        }?;
 
         let (image, future) = ImmutableImage::from_iter(image_data.iter().cloned(), dimensions, MipmapsCount::Log2, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
 
@@ -105,18 +109,18 @@ impl TextureLoader {
         *texture_future = combined_future;
 
         let texture = ImageView::new(Arc::new(image)).unwrap();
-        self.cache.insert(path, texture.clone());
+        self.cache.insert(path.to_string(), texture.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();
 
-        return texture;
+        Ok(texture)
     }
 
-    pub fn get(&mut self, path: String, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Texture {
-        match self.cache.get(&path) {
-            Some(texture) => return texture.clone(),
-            None => return self.load(path, texture_future),
+    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Texture, String> {
+        match self.cache.get(path) {
+            Some(texture) => Ok(texture.clone()),
+            None => self.load(path, texture_future),
         }
     }
 }

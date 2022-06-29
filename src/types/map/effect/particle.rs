@@ -15,7 +15,7 @@ impl Particle {
     pub fn update(&mut self, delta_time: f32) -> bool {
         self.position.y += 10.0 * delta_time;
 
-        return self.position.y < 30.0;
+        self.position.y < 30.0
     }
 
     #[cfg(feature = "debug")]

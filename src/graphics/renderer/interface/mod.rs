@@ -23,7 +23,7 @@ use vulkano::pipeline::{ GraphicsPipeline, Pipeline, PipelineBindPoint };
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
@@ -46,7 +46,7 @@ impl InterfaceRenderer {
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
-        return Self { pipeline, vertex_shader, fragment_shader };
+        Self { pipeline, vertex_shader, fragment_shader }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -54,8 +54,7 @@ impl InterfaceRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -64,9 +63,7 @@ impl InterfaceRenderer {
             .color_blend_state(ColorBlendState::new(1).blend_alpha())
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
      
     pub fn render(&self, builder: &mut CommandBuilder, interface_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, _render_settings: &RenderSettings) { // add render_settings.show_interface
@@ -74,11 +71,9 @@ impl InterfaceRenderer {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
-
-        set_builder.add_image(interface_buffer).unwrap();
-
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view(0, interface_buffer),
+        ]).unwrap(); 
 
         builder
             .bind_pipeline_graphics(self.pipeline.clone())

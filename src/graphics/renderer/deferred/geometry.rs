@@ -16,15 +16,16 @@ use std::sync::Arc;
 use std::iter;
 
 use vulkano::device::Device;
+use vulkano::image::ImageViewAbstract;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::shader::ShaderModule;
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::Sampler;
+use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
 use types::maths::*;
@@ -49,12 +50,16 @@ impl GeometryRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+        
+        let linear_sampler = Sampler::start(device.clone())
+            .filter(Filter::Linear)
+            .address_mode(SamplerAddressMode::ClampToEdge)
+            .lod(0.0..=100.0)
+            .build()
+            .unwrap();
 
-        let linear_sampler = create_sampler!(device, Linear, ClampToEdge);
-
-        return Self { pipeline, vertex_shader, fragment_shader, matrices_buffer, linear_sampler };
+        Self { pipeline, vertex_shader, fragment_shader, matrices_buffer, linear_sampler }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -62,8 +67,7 @@ impl GeometryRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-        
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -72,9 +76,7 @@ impl GeometryRenderer {
             .depth_stencil_state(DepthStencilState::simple_depth_test())
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
     pub fn render(&self, camera: &dyn Camera, builder: &mut CommandBuilder, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
@@ -138,29 +140,26 @@ impl GeometryRenderer {
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::buffer(0, matrices_subbuffer),
+            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
+            WriteDescriptorSet::image_view_array(2, 0, [
+                texture0 as Arc<dyn ImageViewAbstract + 'static>,
+                texture1 as Arc<dyn ImageViewAbstract + 'static>,
+                texture2 as Arc<dyn ImageViewAbstract + 'static>,
+                texture3 as Arc<dyn ImageViewAbstract + 'static>,
+                texture4 as Arc<dyn ImageViewAbstract + 'static>,
+                texture5 as Arc<dyn ImageViewAbstract + 'static>,
+                texture6 as Arc<dyn ImageViewAbstract + 'static>,
+                texture7 as Arc<dyn ImageViewAbstract + 'static>,
+                texture8 as Arc<dyn ImageViewAbstract + 'static>,
+                texture9 as Arc<dyn ImageViewAbstract + 'static>,
+            ])
+        ]).unwrap(); 
 
-        set_builder
-            .add_buffer(matrices_subbuffer).unwrap()
-            .add_sampler(self.linear_sampler.clone()).unwrap()
-            .enter_array().unwrap()
-                .add_image(texture0).unwrap()
-                .add_image(texture1).unwrap()
-                .add_image(texture2).unwrap()
-                .add_image(texture3).unwrap()
-                .add_image(texture4).unwrap()
-                .add_image(texture5).unwrap()
-                .add_image(texture6).unwrap()
-                .add_image(texture7).unwrap()
-                .add_image(texture8).unwrap()
-                .add_image(texture9).unwrap()
-            .leave_array().unwrap();
-
-        let set = set_builder.build().unwrap();
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
-        let (rotation_matrix, world_matrix) = camera.transform_matrix(transform);
+        let world_matrix = camera.transform_matrix(transform);
         let constants = Constants {
-            rotation: rotation_matrix.into(),
             world: world_matrix.into(),
         };
 
@@ -233,25 +232,23 @@ impl GeometryRenderer {
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::buffer(0, matrices_subbuffer),
+            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
+            WriteDescriptorSet::image_view_array(2, 0, [
+                texture0 as Arc<dyn ImageViewAbstract + 'static>,
+                texture1 as Arc<dyn ImageViewAbstract + 'static>,
+                texture2 as Arc<dyn ImageViewAbstract + 'static>,
+                texture3 as Arc<dyn ImageViewAbstract + 'static>,
+                texture4 as Arc<dyn ImageViewAbstract + 'static>,
+                texture5 as Arc<dyn ImageViewAbstract + 'static>,
+                texture6 as Arc<dyn ImageViewAbstract + 'static>,
+                texture7 as Arc<dyn ImageViewAbstract + 'static>,
+                texture8 as Arc<dyn ImageViewAbstract + 'static>,
+                texture9 as Arc<dyn ImageViewAbstract + 'static>,
+            ])
+        ]).unwrap(); 
 
-        set_builder
-            .add_buffer(matrices_subbuffer).unwrap()
-            .add_sampler(self.linear_sampler.clone()).unwrap()
-            .enter_array().unwrap()
-                .add_image(texture0).unwrap()
-                .add_image(texture1).unwrap()
-                .add_image(texture2).unwrap()
-                .add_image(texture3).unwrap()
-                .add_image(texture4).unwrap()
-                .add_image(texture5).unwrap()
-                .add_image(texture6).unwrap()
-                .add_image(texture7).unwrap()
-                .add_image(texture8).unwrap()
-                .add_image(texture9).unwrap()
-            .leave_array().unwrap();
-
-        let set = set_builder.build().unwrap();
         let vertex_count = node.vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
 
         let mut world_matrix = Matrix4::from_translation(transform.position);
@@ -283,7 +280,6 @@ impl GeometryRenderer {
 
         //let (rotation_matrix, world_matrix) = camera.transform_matrix(transform);
         let constants = Constants {
-            rotation: rotation_matrix.into(),
             world: world_matrix.into(),
         };
 

@@ -3,12 +3,12 @@ use std::rc::Rc;
 use types::maths::Vector2;
 use graphics::Renderer;
 use interface::traits::{ Element, Window };
-use interface::types::{ PlacementResolver, Theme, HoverInformation, InterfaceSettings };
+use interface::types::*;
 use interface::elements::{ DragButton, CloseButton };
 use interface::{ StateProvider, WindowCache, ElementCell, SizeConstraint, Size, PartialSize, Position };
 
 pub struct FramedWindow {
-    identifier: Option<String>,
+    window_class: Option<String>,
     position: Vector2<f32>,
     size_constraint: SizeConstraint,
     size: Vector2<f32>,
@@ -17,33 +17,29 @@ pub struct FramedWindow {
 
 impl FramedWindow {
 
-    pub fn new(window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size, window_title: String, identifier: Option<String>, mut elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
+    pub fn new(window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size, window_title: String, window_class: Option<String>, mut elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
 
         let drag_button = cell!(DragButton::new(window_title));
         let close_button = cell!(CloseButton::new());
         elements.insert(0, close_button);
         elements.insert(0, drag_button);
 
-        let (position, size) = if let Some(identifier) = &identifier {
-            let (cached_position, cached_size) = window_cache.get_window_state(identifier.as_str()).unzip();
+        let (cached_position, cached_size) = window_class
+            .as_ref()
+            .map(|window_class| window_cache.get_window_state(window_class))
+            .flatten()
+            .unzip();
 
-            let position = cached_position
-                // validate position
-                .unwrap_or(Vector2::new(100.0, 300.0));
+        let size = cached_size
+            .map(|size| size_constraint.validated_size(size, avalible_space, *interface_settings.scaling))
+            .unwrap_or_else(|| size_constraint.resolve(avalible_space, avalible_space, *interface_settings.scaling).finalize_or(0.0));
 
-            let size = cached_size
-                .map(|size| size_constraint.validated_size(size, avalible_space, *interface_settings.scaling))
-                .unwrap_or(size_constraint.resolve(avalible_space, avalible_space, *interface_settings.scaling).finalize_or(0.0));
-
-            (position, size)
-        } else {
-            let position = Vector2::new(100.0, 300.0);
-            let size = size_constraint.resolve(avalible_space, avalible_space, *interface_settings.scaling).finalize_or(0.0);
-            (position, size)
-        };
+        let position = cached_position
+            .map(|position| size_constraint.validated_position(position, size, avalible_space))
+            .unwrap_or((avalible_space - size) / 2.0);
 
         Self {
-            identifier,
+            window_class,
             position,
             size_constraint,
             size,
@@ -54,11 +50,11 @@ impl FramedWindow {
 
 impl Window for FramedWindow {
 
-    fn identifier_matches(&self, other_identifier: &str) -> bool {
-        self.identifier.as_ref().map_or(false, |identifier| identifier == other_identifier)
+    fn window_class_matches(&self, other_window_class: &str) -> bool {
+        self.window_class.as_ref().map_or(false, |window_class| window_class == other_window_class)
     }
 
-    fn update(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size) -> (Option<&str>, Vector2<f32>, Size) {
+    fn resolve(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size) -> (Option<&str>, Vector2<f32>, Size) {
 
         let height = match self.size_constraint.height.is_flexible() {
             true => None,
@@ -66,7 +62,7 @@ impl Window for FramedWindow {
         };
         let mut placement_resolver = PlacementResolver::new(PartialSize::new(self.size.x, height), Vector2::new(0.0, 0.0), *theme.window.border_size, *theme.window.gaps, *interface_settings.scaling);
 
-        self.elements.iter_mut().for_each(|element| element.borrow_mut().update(&mut placement_resolver, interface_settings, theme));
+        self.elements.iter_mut().for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
 
         if self.size_constraint.height.is_flexible() {
             let final_height = theme.window.border_size.y + placement_resolver.final_height();
@@ -75,7 +71,16 @@ impl Window for FramedWindow {
             self.validate_size(interface_settings, avalible_space);
         }
 
-        (self.identifier.as_ref().map(|identifier| identifier.as_str()), self.position, self.size)
+        self.validate_position(avalible_space);
+
+        (self.window_class.as_ref().map(|window_class| window_class.as_str()), self.position, self.size)
+    }
+
+    fn update(&mut self) -> Option<ChangeEvent> {
+        self.elements
+            .iter_mut()
+            .map(|element| element.borrow_mut().update())
+            .fold(None, |current, other| current.zip_with(other, ChangeEvent::combine).or(current).or(other))
     }
 
     fn hovered_element(&self, mouse_position: Vector2<f32>) -> HoverInformation {
@@ -110,16 +115,20 @@ impl Window for FramedWindow {
         self_combined.x > position.x && self.position.x < area_combined.x && self_combined.y > position.y && self.position.y < area_combined.y
     }
 
-    fn offset(&mut self, offset: Position) -> Option<(&str, Position)> {
+    fn offset(&mut self, avalible_space: Size, offset: Position) -> Option<(&str, Position)> {
         self.position += offset;
-        self.identifier.as_ref().map(|identifier| (identifier.as_str(), self.position))
+        self.validate_position(avalible_space);
+        self.window_class.as_ref().map(|window_class| (window_class.as_str(), self.position))
     }
 
-    fn resize(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size, growth: Size) -> (Option<&str>, Size) {
+    fn validate_position(&mut self, avalible_space: Size) {
+        self.position = self.size_constraint.validated_position(self.position, self.size, avalible_space);
+    }
+
+    fn resize(&mut self, interface_settings: &InterfaceSettings, _theme: &Theme, avalible_space: Size, growth: Size) -> (Option<&str>, Size) {
         self.size += growth;
         self.validate_size(interface_settings, avalible_space);
-        self.update(interface_settings, theme, avalible_space);
-        (self.identifier.as_ref().map(|identifier| identifier.as_str()), self.size)
+        (self.window_class.as_ref().map(|window_class| window_class.as_str()), self.size)
     }
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {
@@ -127,7 +136,7 @@ impl Window for FramedWindow {
     }
 
     fn render(&self, renderer: &mut Renderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, hovered_element: Option<&dyn Element>) {
-        renderer.render_rectangle(self.position, self.size, self.position + self.size, *theme.window.border_radius, theme.window.background_color);
+        renderer.render_rectangle(self.position, self.size, self.position + self.size, *theme.window.border_radius, *theme.window.background_color);
         self.elements.iter().for_each(|element| element.borrow().render(renderer, state_provider, interface_settings, theme, self.position, self.position + self.size, hovered_element, false));
     }
 }

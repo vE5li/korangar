@@ -6,5 +6,5 @@ use Entity;
 #[derive(new)]
 pub struct StateProvider<'t> {
     pub render_settings: &'t RenderSettings,
-    pub player: &'t Entity,
+    //pub player: &'t Entity,
 }

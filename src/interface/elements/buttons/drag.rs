@@ -16,7 +16,7 @@ pub struct DragButton {
 
 impl Element for DragButton {
 
-    fn update(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
         let (size, position) = placement_resolver.allocate(&theme.window.title_size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
@@ -41,9 +41,9 @@ impl Element for DragButton {
         let clip_size = vector2!(f32::min(clip_size.x, absolute_position.x + self.cached_size.x), clip_size.y /* f32::min(clip_size.y, absolute_position.y + self.cached_size.y)*/);
 
         if matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.window.title_border_radius * *interface_settings.scaling, theme.window.title_background_color);
+            renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.window.title_border_radius * *interface_settings.scaling, *theme.window.title_background_color);
         }
 
-        renderer.render_text(&self.window_title, absolute_position + *theme.window.text_offset * *interface_settings.scaling, clip_size, theme.window.foreground_color, *theme.window.font_size * *interface_settings.scaling);
+        renderer.render_text(&self.window_title, absolute_position + *theme.window.text_offset * *interface_settings.scaling, clip_size, *theme.window.foreground_color, *theme.window.font_size * *interface_settings.scaling);
     }
 }

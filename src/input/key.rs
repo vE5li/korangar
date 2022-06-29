@@ -30,14 +30,14 @@ impl Key {
     }
 
     pub fn down(&self) -> bool {
-        return self.is_down;
+        self.is_down
     }
 
     pub fn pressed(&self) -> bool {
-        return self.is_pressed;
+        self.is_pressed
     }
 
     pub fn released(&self) -> bool {
-        return self.is_released;
+        self.is_released
     }
 }

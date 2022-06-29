@@ -32,10 +32,10 @@ impl FrameTimer {
             self.frame_counter = 0;
         }
 
-        return delta_time;
+        delta_time
     }
 
     pub fn last_frames_per_second(&self) -> usize {
-        return self.frames_per_second;
+        self.frames_per_second
     }
 }

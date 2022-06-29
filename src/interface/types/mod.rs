@@ -1,6 +1,7 @@
 mod layout;
 mod hover;
 mod action;
+mod event;
 mod provider;
 mod theme;
 mod cache;
@@ -10,6 +11,7 @@ mod settings;
 pub use self::layout::*;
 pub use self::hover::HoverInformation;
 pub use self::action::ClickAction;
+pub use self::event::*;
 pub use self::provider::StateProvider;
 pub use self::theme::Theme;
 pub use self::cache::WindowCache;

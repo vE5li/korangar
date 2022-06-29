@@ -34,7 +34,7 @@ impl Expandable {
 
 impl Element for Expandable {
 
-    fn update(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let closed_size = self.closed_size_constraint.resolve_partial(placement_resolver.get_avalible(), placement_resolver.get_remaining(), *interface_settings.scaling).finalize();
 
@@ -47,7 +47,7 @@ impl Element for Expandable {
             let mut inner_placement_resolver = placement_resolver.derive(Position::new(0.0, closed_size.y) + *theme.expandable.element_offset * *interface_settings.scaling, *theme.expandable.border_size);
             inner_placement_resolver.set_gaps(*theme.expandable.gaps);
 
-            self.elements.iter_mut().for_each(|element| element.borrow_mut().update(&mut inner_placement_resolver, interface_settings, theme));
+            self.elements.iter_mut().for_each(|element| element.borrow_mut().resolve(&mut inner_placement_resolver, interface_settings, theme));
 
             if self.open_size_constraint.height.is_flexible() {
                 let final_height = inner_placement_resolver.final_height() + closed_size.y + theme.expandable.element_offset.y * *interface_settings.scaling + theme.expandable.border_size.y * *interface_settings.scaling * 2.0;
@@ -60,6 +60,18 @@ impl Element for Expandable {
         self.cached_size = size.finalize();
         self.cached_closed_size = closed_size;
         self.cached_position = position;
+    }
+
+    fn update(&mut self) -> Option<ChangeEvent> {
+
+        if !self.expanded {
+            return None;
+        }
+
+        self.elements
+            .iter_mut()
+            .map(|element| element.borrow_mut().update())
+            .fold(None, |current, event| current.zip_with(event, ChangeEvent::combine).or(current).or(event))
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
@@ -97,16 +109,16 @@ impl Element for Expandable {
         let clip_size = vector2!(f32::min(clip_size.x, absolute_position.x + self.cached_size.x), f32::min(clip_size.y, absolute_position.y + self.cached_size.y));
 
         let background_color = match second_theme {
-            true => theme.expandable.second_background_color,
-            false => theme.expandable.background_color,
+            true => *theme.expandable.second_background_color,
+            false => *theme.expandable.background_color,
         };
 
         renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.expandable.border_radius * *interface_settings.scaling, background_color);
-        renderer.render_expand_arrow(absolute_position + *theme.expandable.icon_offset * *interface_settings.scaling, *theme.expandable.icon_size * *interface_settings.scaling, clip_size, theme.expandable.foreground_color, self.expanded);
+        renderer.render_expand_arrow(absolute_position + *theme.expandable.icon_offset * *interface_settings.scaling, *theme.expandable.icon_size * *interface_settings.scaling, clip_size, *theme.expandable.foreground_color, self.expanded);
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            true => renderer.render_text(&self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, theme.expandable.hovered_foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
-            false => renderer.render_text(&self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, theme.expandable.foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
+            true => renderer.render_text(&self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, *theme.expandable.hovered_foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
+            false => renderer.render_text(&self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, *theme.expandable.foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
         }
 
         if self.expanded {

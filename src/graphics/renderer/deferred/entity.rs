@@ -18,15 +18,16 @@ use std::iter;
 use cgmath::{ Vector3, Vector2 };
 
 use vulkano::device::Device;
+use vulkano::image::ImageViewAbstract;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::shader::ShaderModule;
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::Sampler;
+use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::BufferUsage;
 
 use graphics::*;
@@ -62,10 +63,15 @@ impl EntityRenderer {
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+ 
+        let nearest_sampler = Sampler::start(device.clone())
+            .filter(Filter::Nearest)
+            .address_mode(SamplerAddressMode::MirroredRepeat)
+            //.lod(0.0..=100.0)
+            .build()
+            .unwrap();
 
-        let nearest_sampler = create_sampler!(device, Nearest, MirroredRepeat);
-
-        return Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, matrices_buffer, nearest_sampler };
+        Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, matrices_buffer, nearest_sampler }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -73,8 +79,7 @@ impl EntityRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -83,17 +88,13 @@ impl EntityRenderer {
             .depth_stencil_state(DepthStencilState::simple_depth_test())
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
     pub fn render(&self, camera: &dyn Camera, builder: &mut CommandBuilder, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
-
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
@@ -102,11 +103,11 @@ impl EntityRenderer {
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 
-        set_builder
-            .add_buffer(matrices_subbuffer).unwrap()
-            .add_sampled_image(texture, self.nearest_sampler.clone()).unwrap();
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::buffer(0, matrices_subbuffer),
+            WriteDescriptorSet::image_view_sampler(1, texture, self.nearest_sampler.clone()),
+        ]).unwrap(); 
 
-        let set = set_builder.build().unwrap();
         let world_matrix = camera.billboard_matrix(position, origin, size);
         let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
         let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);

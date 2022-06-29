@@ -20,10 +20,10 @@ use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::shader::ShaderModule;
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::Sampler;
+use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::BufferUsage;
 use cgmath::Vector2;
 
@@ -58,11 +58,20 @@ impl SpriteRenderer {
         ];
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        
+        let nearest_sampler = Sampler::start(device.clone())
+            .filter(Filter::Nearest)
+            .address_mode(SamplerAddressMode::MirroredRepeat)
+            .build()
+            .unwrap();
+        
+        let linear_sampler = Sampler::start(device.clone())
+            .filter(Filter::Linear)
+            .address_mode(SamplerAddressMode::MirroredRepeat)
+            .build()
+            .unwrap();
 
-        let nearest_sampler = create_sampler!(device.clone(), Nearest, MirroredRepeat);
-        let linear_sampler = create_sampler!(device, Linear, MirroredRepeat);
-
-        return Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, nearest_sampler, linear_sampler };
+        Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, nearest_sampler, linear_sampler }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -70,8 +79,7 @@ impl SpriteRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -80,24 +88,22 @@ impl SpriteRenderer {
             .color_blend_state(ColorBlendState::new(1).blend_alpha())
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
     fn build(&self, builder: &mut CommandBuilder, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, clip_size: Vector2<f32>, texture_position: Vector2<f32>, texture_size: Vector2<f32>, color: Color, smooth: bool) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
-
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
-
-        match smooth {
-            true => set_builder.add_sampled_image(texture, self.linear_sampler.clone()).unwrap(),
-            false => set_builder.add_sampled_image(texture, self.nearest_sampler.clone()).unwrap(),
+ 
+        let sampler = match smooth {
+            true => self.linear_sampler.clone(),
+            false => self.nearest_sampler.clone(),
         };
 
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view_sampler(0, texture, sampler),
+        ]).unwrap(); 
 
         let constants = Constants {
             screen_position: screen_position.into(),

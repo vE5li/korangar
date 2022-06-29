@@ -1,5 +1,4 @@
 use derive_new::new;
-use std::slice::Iter;
 
 #[cfg(feature = "debug")]
 use debug::*;
@@ -10,20 +9,42 @@ use types::Version;
 
 #[derive(new)]
 pub struct ByteStream<'b> {
-    iterator: Iter<'b, u8>,
-    #[cfg(feature = "debug")]
+    data: &'b [u8],
     #[new(default)]
     counter: usize,
 }
 
 impl<'b> ByteStream<'b> {
 
-    fn next(&mut self) -> u8 {
+    pub fn next(&mut self) -> u8 {
+        assert!(self.counter < self.data.len(), "byte stream is shorter than expected");
+        let byte = self.data[self.counter];
+        self.counter += 1;
+        byte
+    }
 
-        #[cfg(feature = "debug")]
-        { self.counter += 1; }
+    pub fn peek(&self, index: usize) -> u8 {
+        assert!(self.counter + index < self.data.len(), "byte stream is shorter than expected");
+        self.data[self.counter + index]
+    }
 
-        return *self.iterator.next().unwrap();
+    pub fn is_empty(&self) -> bool {
+        self.counter >= self.data.len()
+    }
+
+    pub fn match_signature(&mut self, signature: [u8; 2]) -> bool {
+
+        if self.data.len() - self.counter < 2 {
+            return false;
+        }
+
+        let signature_matches = self.data[self.counter] == signature[0] && self.data[self.counter + 1] == signature[1];
+        
+        if signature_matches {
+            self.counter += 2;
+        }
+
+        signature_matches
     }
 
     pub fn version(&mut self) -> Version {
@@ -31,11 +52,11 @@ impl<'b> ByteStream<'b> {
         let major = self.next();
         let minor = self.next();
 
-        return Version::new(major, minor);
+        Version::new(major, minor)
     }
 
     pub fn byte(&mut self) -> u8 {
-        return self.next();
+        self.next()
     }
 
     pub fn integer16(&mut self) -> i16 {
@@ -44,7 +65,7 @@ impl<'b> ByteStream<'b> {
         value |= self.next() as i16;
         value |= (self.next() as i16) << 8;
 
-        return value;
+        value
     }
 
     pub fn integer32(&mut self) -> i32 {
@@ -55,7 +76,7 @@ impl<'b> ByteStream<'b> {
         value |= (self.next() as i32) << 16;
         value |= (self.next() as i32) << 24;
 
-        return value;
+        value
     }
 
     pub fn string(&mut self, count: usize) -> String {
@@ -73,7 +94,7 @@ impl<'b> ByteStream<'b> {
             value.push(byte as char);
         }
 
-        return value;
+        value
     }
 
     pub fn float32(&mut self) -> f32 {
@@ -83,7 +104,7 @@ impl<'b> ByteStream<'b> {
         let third = self.next();
         let fourth = self.next();
 
-        return f32::from_le_bytes([first, second, third, fourth]);
+        f32::from_le_bytes([first, second, third, fourth])
     }
 
     pub fn vector3(&mut self) -> Vector3<f32> {
@@ -92,7 +113,7 @@ impl<'b> ByteStream<'b> {
         let y = self.float32();
         let z = self.float32();
 
-        return Vector3::new(x, y, z);
+        Vector3::new(x, y, z)
     }
 
     pub fn vector3_flipped(&mut self) -> Vector3<f32> {
@@ -101,7 +122,7 @@ impl<'b> ByteStream<'b> {
         let y = self.float32();
         let z = self.float32();
 
-        return Vector3::new(x, -y, z);
+        Vector3::new(x, -y, z)
     }
 
     pub fn matrix3(&mut self) -> Matrix3<f32> {
@@ -118,7 +139,7 @@ impl<'b> ByteStream<'b> {
         let c2r1 = self.float32();
         let c2r2 = self.float32();
 
-        return Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2);
+        Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2)
     }
 
     pub fn color(&mut self) -> Color {
@@ -127,10 +148,10 @@ impl<'b> ByteStream<'b> {
         let green = self.float32();
         let blue = self.float32();
 
-        return Color::rgb((red * 255.0) as u8, (green * 255.0) as u8, (blue * 255.0) as u8);
+        Color::rgb((red * 255.0) as u8, (green * 255.0) as u8, (blue * 255.0) as u8)
     }
 
-    pub fn slice(&mut self, count: usize) -> Vec<u8> { // replace with matrix 4x4 ?
+    pub fn slice(&mut self, count: usize) -> Vec<u8> {
         let mut value = Vec::new();
 
         for _index in 0..count {
@@ -138,21 +159,23 @@ impl<'b> ByteStream<'b> {
             value.push(byte);
         }
 
-        return value;
+        value
+    }
+
+    pub fn remaining(&mut self) -> Vec<u8> { // temporary ?
+        self.slice(self.data.len() - self.counter)
     }
 
     pub fn skip(&mut self, count: usize) {
-        for _index in 0..count {
-            self.next();
-        }
+        self.counter += count;
     }
 
     #[cfg(feature = "debug")]
-    pub fn assert_empty(&self, length: usize, file_name: &str) {
-        let remaining = length - self.counter;
+    pub fn assert_empty(&self, file_name: &str) {
+        let remaining = self.data.len() - self.counter;
 
         if remaining != 0 {
-            print_debug!("incomplete read on file {}{}{}; {}{}{} bytes remaining", magenta(), file_name, none(), yellow(), remaining, none());
+            print_debug!("incomplete read on file {}{}{}; {}{}{} bytes remaining", MAGENTA, file_name, NONE, YELLOW, remaining, NONE);
         }
     }
 }

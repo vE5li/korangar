@@ -22,7 +22,7 @@ pub struct Transform {
 impl Transform {
 
     pub fn new() -> Self {
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
@@ -38,11 +38,11 @@ impl Transform {
 
         let rotation = rotation.map(|degrees| degrees.into());
 
-        return Self { position, rotation, scale, node_translation: Matrix4::identity(), offset_translation: Matrix4::identity(), offset_matrix: Matrix4::identity(), rotation_matrix: Matrix4::identity(), node_scale: Matrix4::identity() };
+        Self { position, rotation, scale, node_translation: Matrix4::identity(), offset_translation: Matrix4::identity(), offset_matrix: Matrix4::identity(), rotation_matrix: Matrix4::identity(), node_scale: Matrix4::identity() }
     }
 
     pub fn position(position: Vector3<f32>) -> Self {
-        return Self {
+        Self {
             position,
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
@@ -55,7 +55,7 @@ impl Transform {
     }
 
     pub fn node_translation(node_translation: Vector3<f32>) -> Self {
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
@@ -74,7 +74,7 @@ impl Transform {
         //let y = rotation_matrix[0][2].atan2((rotation_matrix[1][2].powf(2.0) + rotation_matrix[2][2].powf(2.0)).sqrt());
         //let z = rotation_matrix[0][1].atan2(rotation_matrix[0][0]);
 
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             //rotation: Vector3::new(Rad(x), Rad(y), Rad(z)),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
@@ -89,7 +89,7 @@ impl Transform {
     }
 
     //pub fn rotation(rotation: Vector3<Rad<f32>>) -> Self {
-    //    return Self {
+    //    Self {
     //        position: Vector3::new(0.0, 0.0, 0.0),
     //        rotation: rotation,
     //        scale: Vector3::new(1.0, 1.0, 1.0),
@@ -97,7 +97,7 @@ impl Transform {
     //}
 
     pub fn scale(scale: Vector3<f32>) -> Self {
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale,
@@ -110,7 +110,7 @@ impl Transform {
     }
 
     pub fn node_scale(scale: Vector3<f32>) -> Self {
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
@@ -123,7 +123,7 @@ impl Transform {
     }
 
     pub fn offset(offset: Vector3<f32>) -> Self {
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
@@ -136,7 +136,7 @@ impl Transform {
     }
 
     pub fn offset_matrix(offset_matrix: Matrix4<f32>) -> Self {
-        return Self {
+        Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),

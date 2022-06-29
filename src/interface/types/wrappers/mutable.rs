@@ -1,33 +1,34 @@
+use derive_new::new;
 use serde::{ Serialize, Deserialize };
 
 use interface::traits::{ PrototypeElement, PrototypeMutableElement };
-use interface::ElementCell;
+use interface::{ ElementCell, ChangeEvent };
 
-#[derive(Serialize, Deserialize)]
-pub struct Mutable<T: PrototypeMutableElement>(pub T);
+#[derive(Serialize, Deserialize, new)]
+pub struct Mutable<T: PrototypeMutableElement, const E: Option<ChangeEvent>>(pub T);
 
-impl<T: PrototypeMutableElement + Default> Default for Mutable<T> {
+//impl<T: PrototypeMutableElement + Default> Default for Mutable<T> {
+//
+//    fn default() -> Self {
+//        Self(T::default(), None)
+//    } 
+//}
 
-    fn default() -> Self {
-        Self(T::default())
-    } 
-}
-
-impl<T: PrototypeMutableElement> PrototypeElement for Mutable<T> {
+impl<T: PrototypeMutableElement, const E: Option<ChangeEvent>> PrototypeElement for Mutable<T, E> {
 
     fn to_element(&self, display: String) -> ElementCell {
-        self.0.to_mutable_element(display)
+        self.0.to_mutable_element(display, E)
     }
 }
 
-impl<T: PrototypeMutableElement> PrototypeMutableElement for Mutable<T> {
+impl<T: PrototypeMutableElement, const E: Option<ChangeEvent>> PrototypeMutableElement for Mutable<T, E> {
 
-    fn to_mutable_element(&self, display: String) -> ElementCell {
-        self.0.to_mutable_element(display)
+    fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
+        self.0.to_mutable_element(display, E)
     }
 }
 
-impl<T: PrototypeMutableElement> std::ops::Deref for Mutable<T> {
+impl<T: PrototypeMutableElement, const E: Option<ChangeEvent>> std::ops::Deref for Mutable<T, E> {
 
     type Target = T;
    

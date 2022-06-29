@@ -37,8 +37,8 @@ impl Object {
         let distance = camera.distance_to(self.transform.position);
 
         match distance < smallest_distance && renderer.marker_hovered(camera, self.transform.position, mouse_position) {
-            true => return Some(distance),
-            false => return None,
+            true => Some(distance),
+            false => None,
         }
     }
 

@@ -25,11 +25,11 @@ impl TileType {
     }
 
     pub fn is_none(&self) -> bool {
-        return self.0 == 0;
+        self.0 == 0
     }
 
     pub fn is_walkable(&self) -> bool {
-        return self.0 & WALKABLE != 0;
+        self.0 & WALKABLE != 0
     }
 }
 
@@ -45,6 +45,10 @@ pub struct Tile {
 impl Tile {
 
     pub fn is_walkable(&self) -> bool {
-        return self.tile_type.is_walkable();
+        self.tile_type.is_walkable()
+    }
+
+    pub fn average_height(&self) -> f32 {
+        (self.upper_left_height + self.upper_right_height + self.lower_left_height + self.lower_right_height) / 4.0
     }
 }

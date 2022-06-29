@@ -1,7 +1,3 @@
-use std::rc::Rc;
-use std::cell::RefCell;
-use derive_new::new;
-
 use input::UserEvent;
 use interface::traits::{ Window, PrototypeWindow };
 use interface::types::InterfaceSettings;
@@ -24,7 +20,7 @@ fn general_expandable() -> ElementCell {
         render_state_button!("show fps", UserEvent::ToggleShowFramesPerSecond, show_frames_per_second),
     ];
 
-    Rc::new(RefCell::new(Expandable::new("general".to_string(), buttons, true)))
+    cell!(Expandable::new("general".to_string(), buttons, true))
 }
 
 fn map_expandable() -> ElementCell {
@@ -33,9 +29,10 @@ fn map_expandable() -> ElementCell {
         render_state_button!("show map", UserEvent::ToggleShowMap, show_map),
         render_state_button!("show objects", UserEvent::ToggleShowObjects, show_objects),
         render_state_button!("show entities", UserEvent::ToggleShowEntities, show_entities),
+        render_state_button!("show water", UserEvent::ToggleShowWater, show_water),
     ];
 
-    Rc::new(RefCell::new(Expandable::new("map".to_string(), buttons, true)))
+    cell!(Expandable::new("map".to_string(), buttons, true))
 }
 
 fn lighting_expandable() -> ElementCell {
@@ -47,7 +44,16 @@ fn lighting_expandable() -> ElementCell {
         render_state_button!("particle lights", UserEvent::ToggleShowParticleLights, show_particle_lights),
     ];
 
-    Rc::new(RefCell::new(Expandable::new("lighting".to_string(), buttons, true)))
+    cell!(Expandable::new("lighting".to_string(), buttons, true))
+}
+
+fn shadows_expandable() -> ElementCell {
+
+    let buttons: Vec<ElementCell> = vec![
+        render_state_button!("directional shadows", UserEvent::ToggleShowDirectionalShadows, show_directional_shadows),
+    ];
+
+    cell!(Expandable::new("shadows".to_string(), buttons, true))
 }
 
 fn markers_expandable() -> ElementCell {
@@ -58,9 +64,10 @@ fn markers_expandable() -> ElementCell {
         render_state_button!("sound markers", UserEvent::ToggleShowSoundMarkers, show_sound_markers),
         render_state_button!("effect markers", UserEvent::ToggleShowEffectMarkers, show_effect_markers),
         render_state_button!("particle markers", UserEvent::ToggleShowParticleMarkers, show_particle_markers),
+        render_state_button!("entity markers", UserEvent::ToggleShowEntityMarkers, show_entity_markers),
     ];
 
-    Rc::new(RefCell::new(Expandable::new("markers".to_string(), buttons, true)))
+    cell!(Expandable::new("markers".to_string(), buttons, true))
 }
 
 fn grid_expandable() -> ElementCell {
@@ -70,7 +77,7 @@ fn grid_expandable() -> ElementCell {
         render_state_button!("pathing", UserEvent::ToggleShowPathing, show_pathing),
     ];
 
-    Rc::new(RefCell::new(Expandable::new("grid".to_string(), buttons, true)))
+    cell!(Expandable::new("grid".to_string(), buttons, true))
 }
 
 fn buffers_expandable() -> ElementCell {
@@ -78,10 +85,12 @@ fn buffers_expandable() -> ElementCell {
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("diffuse buffer", UserEvent::ToggleShowDiffuseBuffer, show_diffuse_buffer),
         render_state_button!("normal buffer", UserEvent::ToggleShowNormalBuffer, show_normal_buffer),
+        render_state_button!("water buffer", UserEvent::ToggleShowWaterBuffer, show_water_buffer),
         render_state_button!("depth buffer", UserEvent::ToggleShowDepthBuffer, show_depth_buffer),
+        render_state_button!("picker buffer", UserEvent::ToggleShowPickerBuffer, show_picker_buffer),
     ];
 
-    Rc::new(RefCell::new(Expandable::new("buffers".to_string(), buttons, true)))
+    cell!(Expandable::new("buffers".to_string(), buttons, true))
 }
 
 pub struct RenderSettingsWindow {
@@ -107,6 +116,7 @@ impl PrototypeWindow for RenderSettingsWindow {
             general_expandable(),
             map_expandable(),
             lighting_expandable(),
+            shadows_expandable(),
             markers_expandable(),
             grid_expandable(),
             buffers_expandable(),

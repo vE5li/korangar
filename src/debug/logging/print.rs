@@ -18,7 +18,7 @@ pub fn print_indented(message: String, newline: bool) {
     if stack_size() > 0 {
 
         if get_message_count() == 0 {
-            println!(" {} started", arrow_symbol());
+            println!(" {} started", ARROW);
         }
 
         increment_message_count();
@@ -29,7 +29,7 @@ pub fn print_indented(message: String, newline: bool) {
     }
 
     if offset != 0 {
-        print!("{} ", newline_symbol());
+        print!("{} ", NEWLINE);
     }
 
     print!("{}", message);
@@ -51,5 +51,5 @@ pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
         "vulkano message type not implemented"
     };
 
-    print_debug!("{}{:?}{} [{}{}{}] : {}", magenta(), message.layer_prefix, none(), yellow(), message_type, none(), message.description);
+    print_debug!("{}{:?}{} [{}{}{}] : {}", MAGENTA, message.layer_prefix, NONE, YELLOW, message_type, NONE, message.description);
 }

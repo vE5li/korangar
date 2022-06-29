@@ -11,6 +11,6 @@ pub enum MouseInputMode {
 impl MouseInputMode {
 
     pub fn is_none(&self) -> bool {
-        return matches!(self, MouseInputMode::None);
+        matches!(self, MouseInputMode::None)
     }
 }

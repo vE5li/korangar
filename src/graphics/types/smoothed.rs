@@ -10,7 +10,7 @@ impl SmoothedValue {
     pub fn new(value: f32, threshhold: f32, speed: f32) -> Self {
         let current = value;
         let desired = value;
-        return Self { current, desired, threshhold, speed };
+        Self { current, desired, threshhold, speed }
     }
 
     pub fn update(&mut self, delta_time: f64) {
@@ -28,6 +28,6 @@ impl SmoothedValue {
     }
 
     pub fn get_current(&self) -> f32 {
-        return self.current;
+        self.current
     }
 }

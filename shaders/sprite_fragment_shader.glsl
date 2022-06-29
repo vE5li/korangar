@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec2 texture_coordinates;
 
-layout(location = 2) out vec4 fragment_color;
+layout(location = 3) out vec4 fragment_color;
 
 layout (set = 0, binding = 0) uniform sampler2D sprite_texture;
 

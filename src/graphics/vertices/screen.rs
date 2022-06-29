@@ -8,7 +8,7 @@ pub struct ScreenVertex {
 impl ScreenVertex {
 
     pub const fn new(position: Vector2<f32>) -> Self { // replace with derive new when const fn becomes an option
-        return Self { position: [position.x, position.y] }
+        Self { position: [position.x, position.y] }
     }
 }
 

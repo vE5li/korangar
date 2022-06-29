@@ -18,7 +18,7 @@ pub struct Interface {
     interface_settings: InterfaceSettings,
     avalible_space: Size,
     theme: Theme,
-    update: bool,
+    reresolve: bool,
     rerender: bool,
 }
 
@@ -36,14 +36,14 @@ impl Interface {
             interface_settings,
             avalible_space,
             theme,
-            update: false,
+            reresolve: false,
             rerender: true, // set to true initially to clear the interface buffer
         };
     }
 
     pub fn reload_theme(&mut self) {
         if self.theme.reload(&self.interface_settings.theme_file) {
-            self.update = true;
+            self.reresolve = true;
         }
     }
 
@@ -63,12 +63,22 @@ impl Interface {
 
     pub fn update(&mut self) -> bool {
 
-        for (window, update, rerender) in &mut self.windows {
+        for (window, _reresolve, rerender) in &mut self.windows {
+            if let Some(change_event) = window.update() {
+                match change_event {
+                    ChangeEvent::Reresolve => self.reresolve = true,
+                    ChangeEvent::Rerender => self.rerender = true,
+                    ChangeEvent::RerenderWindow => *rerender = true,
+                }
+            }
+        }
 
-            if self.update || *update {
+        for (window, reresolve, rerender) in &mut self.windows {
+
+            if self.reresolve || *reresolve {
 
                 let (_position, previous_size) = window.get_area();
-                let (window_class, new_position, new_size) = window.update(&self.interface_settings, &self.theme, self.avalible_space);
+                let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.avalible_space);
 
                 if previous_size != new_size {
 
@@ -79,25 +89,25 @@ impl Interface {
                     self.rerender |= previous_size.x > new_size.x || previous_size.y > new_size.y;
                 }
 
-                *rerender |= *update;
-                *update = false;
+                *rerender |= *reresolve;
+                *reresolve = false;
             }
         }
 
-        self.rerender |= self.update;
-        self.update = false;
+        self.rerender |= self.reresolve;
+        self.reresolve = false;
 
         self.rerender
     }
 
     pub fn update_window_size(&mut self, screen_size: Size) {
         self.avalible_space = screen_size;
-        self.update = true;
+        self.reresolve = true;
     }
 
     pub fn hovered_element(&self, mouse_position: Position) -> (Option<ElementCell>, Option<usize>) {
 
-        for (window_index, (window, _update, _rerender)) in self.windows.iter().enumerate().rev() {
+        for (window_index, (window, _reresolve, _rerender)) in self.windows.iter().enumerate().rev() {
             match window.hovered_element(mouse_position) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
                 HoverInformation::Hovered | HoverInformation::Ignored => return (None, Some(window_index)),
@@ -109,32 +119,39 @@ impl Interface {
     }
 
     pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
-        let (window, update, _rerender) = self.windows.remove(window_index);
+        let (window, reresolve, _rerender) = self.windows.remove(window_index);
         let new_window_index = self.windows.len();
 
-        self.windows.push((window, update, true));
+        self.windows.push((window, reresolve, true));
 
         new_window_index
     }
 
     pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
-        let (_window, update, _rerender) = &mut self.windows[window_index];
-        hovered_element.borrow_mut().left_click(update)
+        let (_window, reresolve, _rerender) = &mut self.windows[window_index];
+        hovered_element.borrow_mut().left_click(reresolve)
     }
 
     pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
-        let (_window, update, _rerender) = &mut self.windows[window_index];
-        hovered_element.borrow_mut().right_click(update)
+        let (_window, reresolve, _rerender) = &mut self.windows[window_index];
+        hovered_element.borrow_mut().right_click(reresolve)
     }
 
-    pub fn drag_element(&mut self, element: &ElementCell, window_index: usize, mouse_delta: Position) {
-        let (_window, update, _rerender) = &mut self.windows[window_index];
-        self.update |= element.borrow_mut().drag(mouse_delta, update);
+    pub fn drag_element(&mut self, element: &ElementCell, _window_index: usize, mouse_delta: Position) {
+        //let (_window, _reresolve, _rerender) = &mut self.windows[window_index];
+        
+        if let Some(change_event) = element.borrow_mut().drag(mouse_delta) {
+            match change_event {
+                ChangeEvent::Reresolve => self.reresolve = true,
+                ChangeEvent::Rerender => self.rerender = true,
+                ChangeEvent::RerenderWindow => panic!(),
+            }
+        }
     }
 
     pub fn move_window(&mut self, window_index: usize, offset: Position) {
 
-        if let Some((window_class, position)) = self.windows[window_index].0.offset(offset) {
+        if let Some((window_class, position)) = self.windows[window_index].0.offset(self.avalible_space, offset) {
             self.window_cache.update_position(window_class, position);
         }
 
@@ -142,7 +159,7 @@ impl Interface {
     }
 
     pub fn resize_window(&mut self, window_index: usize, growth: Size) {
-        let (window, update, _rerender) = &mut self.windows[window_index];
+        let (window, reresolve, _rerender) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
         let (window_class, new_size) = window.resize(&self.interface_settings, &self.theme, self.avalible_space, growth);
@@ -153,7 +170,7 @@ impl Interface {
                 self.window_cache.update_size(window_class, new_size);
             }
 
-            *update = true;
+            *reresolve = true;
             self.rerender |= previous_size.x > new_size.x || previous_size.y > new_size.y;
         }
     }
@@ -168,7 +185,7 @@ impl Interface {
             if rerender || area.map(is_hovering).unwrap_or(false) {
 
                 let (position, scale) = {
-                    let (window, _update, rerender) = &mut self.windows[window_index];
+                    let (window, _reresolve, rerender) = &mut self.windows[window_index];
                     *rerender = true;
                     window.get_area()
                 };
@@ -186,7 +203,7 @@ impl Interface {
             self.flag_rerender_windows(0, None);
         }
 
-        for (window, _update, rerender) in &mut self.windows {
+        for (window, _reresolve, rerender) in &mut self.windows {
             if self.rerender || *rerender {
                 window.render(renderer, state_provider, &self.interface_settings, &self.theme, hovered_element);
                 *rerender = false;
@@ -197,18 +214,17 @@ impl Interface {
     }
 
     pub fn render_frames_per_second(&self, renderer: &mut Renderer, frames_per_second: usize) {
-        renderer.render_dynamic_text(&frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
+        renderer.render_dynamic_text(&frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
     }
 
-    fn window_exists(&self, identifier: Option<&str>) -> bool {
-        match identifier {
-            Some(identifier) => self.windows.iter().find(|window| window.0.identifier_matches(&identifier)).is_some(),
+    fn window_exists(&self, window_class: Option<&str>) -> bool {
+        match window_class {
+            Some(window_class) => self.windows.iter().find(|window| window.0.window_class_matches(&window_class)).is_some(),
             None => false,
         }
     }
 
-    fn open_new_window(&mut self, mut window: Box<dyn Window + 'static>) {
-        window.validate_size(&self.interface_settings, self.avalible_space);
+    fn open_new_window(&mut self, window: Box<dyn Window + 'static>) {
         self.windows.push((window, true, true));
     }
 
@@ -229,6 +245,11 @@ impl Interface {
 
     pub fn close_window(&mut self, window_index: usize) {
         self.windows.remove(window_index);
+        self.rerender = true;
+    }
+
+    pub fn close_window_with_class(&mut self, window_class: &str) {
+        self.windows.retain(|window| !window.0.window_class_matches(window_class));
         self.rerender = true;
     }
 }

@@ -73,15 +73,16 @@ impl PlacementResolver {
 
     pub fn allocate(&mut self, size_constraint: &SizeConstraint) -> (PartialSize, Position) {
 
-        let remaining = self.get_remaining();
+        let mut remaining = self.get_remaining();
         let mut size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
         let mut gaps_subtract = 0.0;
 
         if remaining.x < size.x - REMAINDER_THRESHHOLD { // should probably scale this
             self.newline();
+            remaining = self.get_remaining();
 
             if size_constraint.width.is_remaining() || size_constraint.height.is_remaining() {
-                size = size_constraint.resolve_partial(self.avalible_space, self.get_remaining(), self.scaling);
+                size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
             }
 
             size.x = f32::min(size.x, self.avalible_space.x);
@@ -109,14 +110,15 @@ impl PlacementResolver {
 
     pub fn allocate_right(&mut self, size_constraint: &SizeConstraint) -> (PartialSize, Position) {
 
-        let remaining = self.get_remaining();
+        let mut remaining = self.get_remaining();
         let mut size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
 
         if remaining.x < size.x - REMAINDER_THRESHHOLD + self.gaps.x * self.scaling {
             self.newline();
+            remaining = self.get_remaining();
 
             if size_constraint.width.is_remaining() || size_constraint.height.is_remaining() {
-                size = size_constraint.resolve_partial(self.avalible_space, self.get_remaining(), self.scaling);
+                size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
             }
         }
 

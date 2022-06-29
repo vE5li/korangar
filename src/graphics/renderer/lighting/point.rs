@@ -20,7 +20,7 @@ use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use cgmath::Vector3;
@@ -43,7 +43,7 @@ impl PointLightRenderer {
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
-        return Self { pipeline, vertex_shader, fragment_shader };
+        Self { pipeline, vertex_shader, fragment_shader }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -51,45 +51,34 @@ impl PointLightRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
-            //.vertex_input_single_buffer::<ScreenVertex>()
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
-            //.triangle_list()
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            //.viewports_dynamic_scissors_irrelevant(1)
-            //.viewports(iter::once(viewport))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .color_blend_state(ColorBlendState::new(1).blend(LIGHT_ATTACHMENT_BLEND))
-            //.blend_collective(LIGHT_ATTACHMENT_BLEND)
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
     pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, position: Vector3<f32>, color: Color, range: f32) {
-
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
-
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
-
-        set_builder
-            .add_image(diffuse_buffer).unwrap()
-            .add_image(normal_buffer).unwrap()
-            .add_image(depth_buffer).unwrap();
-
-        let set = set_builder.build().unwrap();
 
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, 10.0 * (range / 0.05).ln());
 
         if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 && camera.distance_to(position) > range {
             return;
         }
+
+        let layout = self.pipeline.layout().clone();
+        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view(0, diffuse_buffer),
+            WriteDescriptorSet::image_view(1, normal_buffer),
+            WriteDescriptorSet::image_view(2, depth_buffer),
+        ]).unwrap();
 
         let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
 

@@ -11,10 +11,10 @@ impl ShadingType {
 
     pub fn from(raw: usize) -> Self {
         match raw {
-            0 => return ShadingType::None,
-            1 => return ShadingType::FlatShading,
-            2 => return ShadingType::SmoothShading,
-            3 => return ShadingType::Black,
+            0 => ShadingType::None,
+            1 => ShadingType::FlatShading,
+            2 => ShadingType::SmoothShading,
+            3 => ShadingType::Black,
             invalid => panic!("invalid shading type {}", invalid), // return result ?
         }
     }
@@ -32,6 +32,6 @@ impl ShadingType {
 impl Display for ShadingType {
 
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
-        return write!(formatter, "{}", self.display_name());
+        write!(formatter, "{}", self.display_name())
     }
 }

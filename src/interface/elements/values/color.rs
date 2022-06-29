@@ -18,7 +18,7 @@ pub struct ColorValue {
 
 impl Element for ColorValue {
 
-    fn update(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
         let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;

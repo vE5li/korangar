@@ -1,164 +1,1732 @@
+use derive_new::new;
 use cgmath::Vector2;
 
-use std::net::{ IpAddr, Ipv4Addr, Ipv6Addr };
+use std::rc::Rc;
+use std::cell::RefCell;
+use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
 use std::time::Duration;
 
-use pnet::datalink::{ self, NetworkInterface, DataLinkReceiver, Config };
-use pnet::packet::ethernet::{ EtherTypes, EthernetPacket };
-use pnet::packet::ip::{ IpNextHeaderProtocol, IpNextHeaderProtocols };
-use pnet::packet::ipv4::Ipv4Packet;
-use pnet::packet::ipv6::Ipv6Packet;
-use pnet::packet::tcp::TcpPacket;
-use pnet::packet::Packet;
+#[cfg(feature = "debug")]
+use debug::*;
 
 #[derive(Clone, Debug)]
 pub enum NetworkEvent {
-    PlayerMove(/*Timestamp?, */Vector2<usize>, Vector2<usize>),
-    EntityAppear(/*EntityType*/ usize, /*EntityId*/ usize, /*CharId*/ usize), // ... walk speed, opt1, opt2, option
-    //EntityDisappear(/*Timestamp?, */),
+    AddEntity(usize, Vector2<usize>, usize),
+    RemoveEntity(usize),
+    PlayerMove(Vector2<usize>, Vector2<usize>, u32),
+    EntityMove(usize, Vector2<usize>, Vector2<usize>, u32),
+    ChangeMap(String, Vector2<usize>),
 }
 
-fn handle_tcp_packet(interface_name: &str, packet_data: &[u8]) -> Option<NetworkEvent> {
+use std::net::TcpStream;
+use std::io::prelude::*;
 
-    if let Some(packet) = TcpPacket::new(packet_data) {
+use crate::interface::windows::CharacterSelectionWindow;
+use crate::traits::ByteConvertable;
+use crate::types::ByteStream;
 
-        let payload = packet.payload();
+#[derive(Copy, Clone, Debug)]
+pub enum Sex {
+    Male,
+    Female,
+    Both,
+    Server,
+}
 
-        if payload.is_empty() {
-            return None;
+impl ByteConvertable for Sex {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match byte_stream.byte() {
+            0 => Self::Male,
+            1 => Self::Female,
+            2 => Self::Both,
+            3 => Self::Server,
+            invalid => panic!("invalid sex {}", invalid),
         }
-
-        if payload[0] == 0x87 && payload[1] == 0x00 {
-
-            let timestamp = &payload[2..6];
-            let coordinates = &payload[6..11];
-            // let orientation = 1 byte (always 88)
-
-            //timestamp[1] + 5 per sec
-            //println!("timestamp: {:?}", timestamp);
-
-            let y_position_to = (coordinates[4] as usize) | (((coordinates[3] as usize) & 0b11) << 8);
-            let x_position_to = ((coordinates[3] as usize) >> 2) | (((coordinates[2] as usize) & 0b1111) << 6);
-            let y_position_from = ((coordinates[2] as usize) >> 4) | (((coordinates[1] as usize) & 0b111111) << 4);
-            let x_position_from = ((coordinates[1] as usize) >> 6) | ((coordinates[0] as usize) << 2);
-
-            let position_from = Vector2::new(x_position_from, y_position_from);
-            let position_to = Vector2::new(x_position_to, y_position_to);
-
-            let event = NetworkEvent::PlayerMove(position_from, position_to);
-            return Some(event);
-        }
-
-        if payload[0] == 0xff && payload[1] == 0x09 {
-
-            let length = payload[2] as usize | (payload[3] as usize) << 8;
-            let entity_type = payload[4] as usize;
-            let entity_id = payload[5] as usize | (payload[6] as usize) << 8 | (payload[7] as usize) << 16 | (payload[8] as usize) << 24; // some other id?
-            let character_id = payload[9] as usize | (payload[10] as usize) << 8 | (payload[11] as usize) << 16 | (payload[12] as usize) << 24;
-
-            let event = NetworkEvent::EntityAppear(entity_type, entity_id, character_id);
-            return Some(event);
-        }
-    } else {
-        println!("[{}]: Malformed TCP Packet", interface_name);
     }
-
-    return None;
-}
-
-fn handle_transport_protocol(interface_name: &str, protocol: IpNextHeaderProtocol, packet: &[u8]) -> Option<NetworkEvent> {
-    match protocol {
-        IpNextHeaderProtocols::Tcp => return handle_tcp_packet(interface_name, packet),
-        _ignored => return None,
+    
+    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+        assert!(length_hint.is_none());     
+        let data = match *self {
+            Self::Male => 0,
+            Self::Female => 1,
+            Self::Both => 2,
+            Self::Server => 3,
+        };
+        vec![data]
     }
 }
 
-fn handle_ipv4_packet(interface_name: &str, ethernet: &EthernetPacket) -> Option<NetworkEvent> {
+pub trait Packet {
 
-    if let Some(header) = Ipv4Packet::new(ethernet.payload()) {
-
-        let ipv4_source = IpAddr::V4(header.get_source());
-
-        if ipv4_source != Ipv4Addr::new(51, 222, 245, 10) {
-            return None;
-        }
-
-        return handle_transport_protocol(interface_name, header.get_next_level_protocol(), header.payload());
-    } else {
-        println!("[{}]: Malformed IPv4 Packet", interface_name);
-    }
-
-    return None;
+    fn header() -> [u8; 2];
+    
+    fn to_bytes(&self) -> Vec<u8>;
 }
 
-fn handle_ipv6_packet(interface_name: &str, ethernet: &EthernetPacket) -> Option<NetworkEvent> {
-    let header = Ipv6Packet::new(ethernet.payload());
-
-    if let Some(header) = header {
-
-        let ipv6_source = IpAddr::V6(header.get_source());
-
-        if ipv6_source != Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0) {
-            return None;
-        }
-
-        return handle_transport_protocol(interface_name, header.get_next_header(), header.payload());
-    } else {
-        println!("[{}]: Malformed IPv6 Packet", interface_name);
-    }
-
-    return None;
+#[derive(Debug, Packet, new)]
+#[header(0x64, 0x00)]
+struct LoginServerLoginPacket {
+    #[new(default)]
+    pub version: [u8; 4], // unused ?
+    #[length_hint(24)]
+    pub name: String, 
+    #[length_hint(24)]
+    pub password: String, 
+    #[new(default)]
+    pub client_type: u8, // also unused ?
 }
 
-fn handle_ethernet_frame(interface: &NetworkInterface, ethernet: &EthernetPacket) -> Option<NetworkEvent> {
-    match ethernet.get_ethertype() {
-        EtherTypes::Ipv4 => return handle_ipv4_packet(&interface.name, ethernet),
-        EtherTypes::Ipv6 => return handle_ipv6_packet(&interface.name, ethernet),
-        _other => return None,
+#[allow(dead_code)]
+#[derive(Debug, Packet)]
+#[header(0xc4, 0x0a)]
+struct LoginServerLoginSuccessPacket {
+    pub packet_length: u16,
+    pub login_id1: u32,
+    pub account_id: u32,
+    pub login_id2: u32,
+    pub ip_address: u32, // deprecated and always 0
+    pub name: [u8; 24], // deprecated and always 0
+    pub unknown: u16, // always 0
+    pub sex: Sex,
+    pub auth_token: [u8; 17],
+}
+
+impl LoginServerLoginSuccessPacket {
+    
+    pub fn character_server_count(&self) -> usize {
+        const HEADER_LENGTH: usize = 64;
+        const CHARACTER_SERVER_INFORMATION_SIZE: usize = 160;
+        (self.packet_length as usize - HEADER_LENGTH) / CHARACTER_SERVER_INFORMATION_SIZE
     }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Packet)]
+#[header(0x2d, 0x08)]
+struct CharacterServerLoginSuccessPacket {
+    pub unknown: u16, // always 29 on rAthena
+    pub normal_slot_count: u8,
+    pub vip_slot_count: u8,
+    pub billing_slot_count: u8,
+    pub poducilble_slot_count: u8,
+    pub vaild_slot: u8,
+    pub unused: [u8; 20],
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Packet)]
+#[header(0x6b, 0x00)]
+struct Packet6b00 {
+    pub unused: u16,
+    pub maximum_slot_count: u8,
+    pub avalible_slot_count: u8,
+    pub vip_slot_count: u8,
+    pub unknown: [u8; 20],
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Packet)]
+#[header(0x18, 0x0b)]
+struct Packet180b {
+    pub unknown: u16, // possibly inventory related
+}
+
+#[derive(Debug, new)]
+pub struct WorldPosition { // make this a wrapper for Vector3 ?
+    pub x: usize,
+    pub y: usize,
+    //pub z: usize,
+}
+
+impl WorldPosition {
+    
+    pub fn to_vector(&self) -> Vector2<usize> {
+        Vector2::new(self.x, self.y)
+    }
+}
+
+impl ByteConvertable for WorldPosition {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        let coordinates = byte_stream.slice(3);
+
+        let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
+        let y = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
+        //let direction = ...
+
+        Self { x: x as usize, y: y as usize }
+    }
+
+    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+        assert!(length_hint.is_none()); 
+        let mut coordinates = vec![0, 0, 0];
+
+        coordinates[0] = (self.x >> 2) as u8;
+        coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3f) as u8);
+        coordinates[2] = (self.y << 4) as u8;
+
+        coordinates
+    }
+}
+
+#[derive(Debug, new)]
+pub struct WorldPosition2 {
+    pub x1: usize,
+    pub y1: usize,
+    pub x2: usize,
+    pub y2: usize,
+}
+
+impl WorldPosition2 {
+    
+    pub fn to_vectors(&self) -> (Vector2<usize>, Vector2<usize>) {
+        (Vector2::new(self.x1, self.y1), Vector2::new(self.x2, self.y2))
+    }
+}
+
+impl ByteConvertable for WorldPosition2 {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        let coordinates: Vec<usize> = byte_stream.slice(6).into_iter().map(|byte| byte as usize).collect();
+
+        let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
+        let y1 = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
+        let x2 = (coordinates[3] >> 2) | ((coordinates[2] & 0b1111) << 6);
+        let y2 = coordinates[4] | ((coordinates[3] & 0b11) << 8);
+        //let direction = ...
+
+        Self { x1, y1, x2, y2 }
+    }
+
+    //fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+    //    assert!(length_hint.is_none()); 
+    //    let mut coordinates = vec![0, 0, 0];
+
+    //    coordinates[0] = (self.x >> 2) as u8;
+    //    coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3f) as u8);
+    //    coordinates[2] = (self.y << 4) as u8;
+
+    //    coordinates
+    //}
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Packet)]
+#[header(0xeb, 0x02)]
+struct MapServerLoginSuccessPacket {
+    pub client_tick: u32,
+    pub position: WorldPosition,
+    pub ignored: [u8; 2], // always [5, 5] ?
+    pub font: u16,
+}
+
+pub enum LoginFailedReason {
+    ServerClosed,
+    AlreadyLoggedIn,
+    AlreadyOnline,
+}
+
+impl ByteConvertable for LoginFailedReason {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match byte_stream.byte() {
+            1 => Self::ServerClosed,
+            2 => Self::AlreadyLoggedIn,
+            8 => Self::AlreadyOnline,
+            invalid => panic!("invalid response code {}", invalid),
+        }
+    }
+}
+
+#[derive(Packet)]
+#[header(0x81, 0x00)]
+struct LoginFailedPacket {
+    pub reason: LoginFailedReason,
+}
+
+pub enum CharacterSelectionFailedReason {
+    RejectedFromServer,
+}
+
+impl ByteConvertable for CharacterSelectionFailedReason {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match byte_stream.byte() {
+            0 => Self::RejectedFromServer,
+            invalid => panic!("invalid response code {}", invalid),
+        }
+    }
+}
+
+#[derive(Packet)]
+#[header(0x6c, 0x00)]
+struct CharacterSelectionFailedPacket {
+    pub reason: CharacterSelectionFailedReason,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xc5, 0x0a)]
+struct CharacterSelectionSuccessPacket {
+    pub character_id: u32,
+    #[length_hint(16)]
+    pub map_name: String,
+    pub map_server_ip: Ipv4Addr,
+    pub map_server_port: u16,
+    pub unknown: [u8; 128],
+}
+
+pub enum CharacterCreationFailedReason {
+    CharacterNameAlreadyUsed,
+    NotOldEnough,
+    NotAllowedToUseSlot,
+    CharacterCerationFailed,
+}
+
+impl ByteConvertable for CharacterCreationFailedReason {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match byte_stream.byte() {
+            0x00 => Self::CharacterNameAlreadyUsed,
+            0x01 => Self::NotOldEnough,
+            0x03 => Self::NotAllowedToUseSlot,
+            0xff => Self::CharacterCerationFailed,
+            invalid => panic!("invalid response code {}", invalid),
+        }
+    }
+}
+
+#[derive(Packet)]
+#[header(0x6e, 0x00)]
+struct CharacterCreationFailedPacket {
+    pub reason: CharacterCreationFailedReason,
+}
+
+#[derive(Default, Packet)]
+#[header(0x00, 0x02)]
+struct LoginServerKeepalivePacket {
+    pub user_id: [u8; 24],
+}
+
+impl ByteConvertable for Ipv4Addr {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        Ipv4Addr::new(byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next())
+    }
+}
+
+#[derive(Debug, ByteConvertable)]
+struct CharacterServerInformation {
+    pub server_ip: Ipv4Addr,
+    pub server_port: u16,
+    pub server_name: [u8; 20],
+    pub user_count: u16,
+    pub server_type: u8, // ServerType
+    pub display_new: u16, // bool16 ?
+    pub unknown: [u8; 128],
+}
+
+#[derive(Packet, new)]
+#[header(0x65, 0x00)]
+struct CharacterServerLoginPacket {
+    pub account_id: u32,
+    pub login_id1: u32,
+    pub login_id2: u32,
+    #[new(default)]
+    pub unknown: u16,
+    pub sex: Sex,
+}
+
+#[derive(Packet, new)]
+#[header(0x36, 0x04)]
+struct MapServerLoginPacket {
+    pub account_id: u32,
+    pub character_id: u32,
+    pub login_id1: u32,
+    pub client_tick: u32,
+    pub sex: Sex,
+    #[new(default)]
+    pub unknown: [u8; 4],
+}
+
+#[derive(Debug, Packet)]
+#[header(0x83, 0x02)]
+struct Packet8302 {
+    pub entity_id: u32,
+}
+
+#[derive(Packet, new)]
+#[header(0x39, 0x0a)]
+struct CreateCharacterPacket {
+    #[length_hint(24)]
+    pub name: String,
+    pub slot: u8,
+    pub hair_color: u16, // TODO: HairColor
+    pub hair_style: u16, // TODO: HairStyle
+    pub start_job: u16, // TODO: Job
+    #[new(default)]
+    pub unknown: [u8; 2],
+    pub sex: Sex,
+}
+
+#[derive(Debug, ByteConvertable)]
+pub struct CharacterInformation {
+    pub character_id: u32,
+    pub experience: i64,
+    pub money: i32,
+    pub job_experience: i64,
+    pub jop_level: i32,
+    pub body_state: i32,
+    pub health_state: i32,
+    pub effect_state: i32,
+    pub virtue: i32,
+    pub honor: i32,
+    pub jobpoint: i16,
+    pub health: i64,
+    pub maximum_health: i64,
+    pub spell_points: i64,
+    pub maximum_spell_points: i64,
+    pub speed: i16,
+    pub job: i16,
+    pub head: i16,
+    pub body: i16,
+    pub weapon: i16,
+    pub level: i16,
+    pub sp_point: i16,
+    pub accessory: i16,
+    pub shield: i16,
+    pub accessory2: i16,
+    pub accessory3: i16,
+    pub head_palette: i16,
+    pub body_palette: i16,
+    #[length_hint(24)]
+    pub name: String,
+    pub strength: u8,
+    pub agility: u8,
+    pub vit: u8,
+    pub intelligence: u8,
+    pub dexterity: u8,
+    pub luck: u8,
+    pub character_number: u8,
+    pub hair_color: u8,
+    pub b_is_changed_char: i16,
+    #[length_hint(16)]
+    pub map_name: String,
+    pub deletion_reverse_date: i32,
+    pub robe_palette: i32,
+    pub character_slot_change_count: i32,
+    pub character_name_change_count: i32,
+    pub sex: Sex,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x6f, 0x0b)]
+struct CreateCharacterSuccessPacket {
+    pub character_information: CharacterInformation,
+}
+
+#[derive(Default, Packet)]
+#[header(0xa1, 0x09)]
+struct RequestCharacterListPacket {}
+
+#[derive(Debug, Packet)]
+#[header(0x72, 0x0b)]
+struct RequestCharacterListSuccessPacket {
+    pub packet_length: u16,
+}
+
+#[derive(Packet, new)]
+#[header(0x81, 0x08)]
+struct RequestPlayerMovePacket {
+    pub position: WorldPosition,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x86, 0x00)]
+struct EntityMovePacket {
+    pub entity_id: u32,
+    pub from_to: WorldPosition2,
+    pub timestamp: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x87, 0x00)]
+struct PlayerMovePacket {
+    pub timestamp: u32,
+    pub from_to: WorldPosition2,
+}
+
+#[derive(Packet, new)]
+#[header(0xfb, 0x01)]
+struct DeleteCharacterPacket {
+    character_id: u32,
+    #[length_hint(40)]
+    pub email: String,
+    #[new(default)]
+    pub unknown: [u8; 10],
+}
+
+pub enum CharacterDeletionFailedReason {
+    NotAllowed,
+    CharacterNotFound,
+    NotEligible,
+}
+
+impl ByteConvertable for CharacterDeletionFailedReason {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match byte_stream.byte() {
+            0 => Self::NotAllowed,
+            1 => Self::CharacterNotFound,
+            2 => Self::NotEligible,
+            invalid => panic!("invalid response code {}", invalid),
+        }
+    }
+}
+
+#[derive(Packet)]
+#[header(0x70, 0x00)]
+struct CharacterDeletionFailedPacket {
+    pub reason: CharacterDeletionFailedReason,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x6f, 0x00)]
+struct CharacterDeletionSuccessPacket {}
+
+#[derive(Packet, new)]
+#[header(0x66, 0x00)]
+struct SelectCharacterPacket {
+    pub selected_slot: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x8e, 0x00)]
+struct ServerMessagePacket {
+    pub packet_length: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xe7, 0x09)]
+struct NewMailStatusPacket {
+    pub new_avalible: u8,
+}
+
+#[derive(Debug, ByteConvertable)]
+struct AchievementData {
+    pub acheivement_id: u32,
+    pub is_completed: u8,
+    pub objectives: [u32; 10],
+    pub completion_timestamp: u32,
+    pub got_rewarded: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x24, 0x0a)]
+struct AchievementUpdatePacket {
+    pub total_score: u32,
+    pub level: u16,
+    pub acheivement_experience: u32,
+    pub acheivement_experience_tnl: u32, // ?
+    pub acheivement_data: AchievementData,
+    //pub acheivement_id: u32,
+    //pub is_completed: u8,
+    //pub objectives: [u32; 10],
+    //pub completion_timestamp: u32,
+    //pub got_rewarded: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x23, 0x0a)]
+struct AchievementListPacket {
+    pub packet_length: u16,
+    pub acheivement_count: u32,
+    pub total_score: u32,
+    pub level: u16,
+    pub acheivement_experience: u32,
+    pub acheivement_experience_tnl: u32, // ?
+}
+
+#[derive(Debug, Packet)]
+#[header(0xde, 0x0a)]
+struct CriticalWeightUpdatePacket {
+    pub packet_length: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xd7, 0x01)]
+struct SpriteChangePacket {
+    pub entity_id: u32,
+    pub sprite_type: u8, // is it actually sprite_ ?
+    pub value: u32,
+    pub value2: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x08, 0x0b)]
+struct InventoyStartPacket {
+    pub packet_length: u16,
+    pub inventory_type: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x0b, 0x0b)]
+struct InventoyEndPacket {
+    pub inventory_type: u8,
+    pub flag: u8, // maybe char ?
+}
+
+#[derive(Copy, Clone, Debug, Default, ByteConvertable)]
+struct ItemOptions {
+    pub index: u16,
+    pub value: u16,
+    pub parameter: u8,
+}
+
+#[derive(Debug, ByteConvertable)]
+struct EquippableItemInformation {
+    pub index: u16,
+    pub item_id: u32,
+    pub item_type: u8,
+    pub location: u32, // 11
+    pub wear_state: u32,
+    pub slot: [u32; 4], // card ?
+    pub hire_expiration_date: i32, // 35
+    pub bind_on_equip_type: u16,
+    pub w_item_sprite_number: u16,
+    pub option_count: u8, // 40
+    pub option_data: [ItemOptions; 5], // fix count
+    pub refinement_level: u8,
+    pub enchantment_level: u8,
+    pub fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
+}
+
+#[derive(Debug, Packet)]
+#[header(0x39, 0x0b)]
+struct EquippableItemListPacket {
+    pub packet_length: u16,
+    pub inventory_type: u8,
+}
+
+impl EquippableItemListPacket {
+    
+    pub fn item_count(&self) -> usize {
+        (self.packet_length as usize - 5) / 68
+    }
+}
+
+#[derive(Debug, ByteConvertable)]
+struct EquippableSwitchItemInformation {
+    pub index: u16, // is actually index + 2
+    pub position: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x9b, 0x0a)]
+struct EquippableSwitchItemListPacket {
+    pub packet_length: u16,
+}
+
+impl EquippableSwitchItemListPacket {
+    
+    pub fn item_count(&self) -> usize {
+        (self.packet_length as usize - 4) / 6
+    }
+}
+
+#[derive(Debug, Packet)]
+#[header(0x9b, 0x09)]
+struct MapTypePacket {
+    pub map_type: u16,
+    pub flags: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xc3, 0x01)]
+struct BroadcastMessagePacket {
+    pub packet_length: u16,
+    pub font_color: u32,
+    pub font_type: u16,
+    pub font_size: u16,
+    pub font_alignment: u16,
+    pub font_y: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xc1, 0x02)]
+struct EntityMessagePacket {
+    pub packet_length: u16,
+    pub entity_id: u32,
+    pub color: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xc0, 0x00)]
+struct DisplayEmotionPacket {
+    pub entity_id: u32,
+    pub emotion: u8,
+}
+
+#[derive(Debug)]
+enum StatusType {
+	SP_WEIGHT(u32),
+	SP_MAXWEIGHT(u32),
+	SP_SPEED(u32),
+	SP_BASELEVEL(u32),
+	SP_JOBLEVEL(u32),
+	SP_KARMA(u32),
+	SP_MANNER(u32),
+	SP_STATUSPOINT(u32),
+	SP_SKILLPOINT(u32),
+	SP_HIT(u32),
+	SP_FLEE1(u32),
+	SP_FLEE2(u32),
+	SP_MAXHP(u32),
+	SP_MAXSP(u32),
+	SP_HP(u32),
+	SP_SP(u32),
+	SP_ASPD(u32),
+	SP_ATK1(u32),
+	SP_DEF1(u32),
+	SP_MDEF1(u32),
+	SP_ATK2(u32),
+	SP_DEF2(u32),
+	SP_MDEF2(u32),
+	SP_CRITICAL(u32),
+	SP_MATK1(u32),
+	SP_MATK2(u32),
+	SP_ZENY(u32),
+	SP_BASEEXP(u64),
+	SP_JOBEXP(u64),
+	SP_NEXTBASEEXP(u64),
+	SP_NEXTJOBEXP(u64),
+	SP_USTR(u8),
+	SP_UAGI(u8),
+	SP_UVIT(u8),
+	SP_UINT(u8),
+	SP_UDEX(u8),
+	SP_ULUK(u8),
+	SP_STR(u32, u32),
+	SP_AGI(u32, u32),
+	SP_VIT(u32, u32),
+	SP_INT(u32, u32),
+	SP_DEX(u32, u32),
+	SP_LUK(u32, u32),
+	SP_CARTINFO(u16, u32, u32),
+	SP_AP(u32),
+	SP_TRAITPOINT(u32),
+	SP_MAXAP(u32),
+	SP_POW(u32, u32),
+	SP_STA(u32, u32),
+	SP_WIS(u32, u32),
+	SP_SPL(u32, u32),
+	SP_CON(u32, u32),
+	SP_CRT(u32, u32),
+	SP_UPOW(u8),
+	SP_USTA(u8),
+	SP_UWIS(u8),
+	SP_USPL(u8),
+	SP_UCON(u8),
+	SP_UCRT(u8),
+	SP_PATK(u32),
+	SP_SMATK(u32),
+	SP_RES(u32),
+	SP_MRES(u32),
+	SP_HPLUS(u32),
+	SP_CRATE(u32),
+}
+
+impl ByteConvertable for StatusType {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        let data = byte_stream.slice(length_hint.unwrap());
+        let mut byte_stream = ByteStream::new(&data);
+
+        match u16::from_bytes(&mut byte_stream, None) {
+            0 => Self::SP_SPEED(u32::from_bytes(&mut byte_stream, None)),
+            1 => Self::SP_BASEEXP(u64::from_bytes(&mut byte_stream, None)),
+            2 => Self::SP_JOBEXP(u64::from_bytes(&mut byte_stream, None)),
+            3 => Self::SP_KARMA(u32::from_bytes(&mut byte_stream, None)),
+            4 => Self::SP_MANNER(u32::from_bytes(&mut byte_stream, None)),
+            5 => Self::SP_HP(u32::from_bytes(&mut byte_stream, None)),
+            6 => Self::SP_MAXHP(u32::from_bytes(&mut byte_stream, None)),
+            7 => Self::SP_SP(u32::from_bytes(&mut byte_stream, None)),
+            8 => Self::SP_MAXSP(u32::from_bytes(&mut byte_stream, None)),
+            9 => Self::SP_STATUSPOINT(u32::from_bytes(&mut byte_stream, None)),
+            11 => Self::SP_BASELEVEL(u32::from_bytes(&mut byte_stream, None)),
+            12 => Self::SP_SKILLPOINT(u32::from_bytes(&mut byte_stream, None)),
+            13 => Self::SP_STR(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            14 => Self::SP_AGI(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            15 => Self::SP_VIT(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            16 => Self::SP_INT(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            17 => Self::SP_DEX(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            18 => Self::SP_LUK(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            20 => Self::SP_ZENY(u32::from_bytes(&mut byte_stream, None)),
+            22 => Self::SP_NEXTBASEEXP(u64::from_bytes(&mut byte_stream, None)),
+            23 => Self::SP_NEXTJOBEXP(u64::from_bytes(&mut byte_stream, None)),
+            24 => Self::SP_WEIGHT(u32::from_bytes(&mut byte_stream, None)),
+            25 => Self::SP_MAXWEIGHT(u32::from_bytes(&mut byte_stream, None)),
+            32 => Self::SP_USTR(u8::from_bytes(&mut byte_stream, None)),
+            33 => Self::SP_UAGI(u8::from_bytes(&mut byte_stream, None)),
+            34 => Self::SP_UVIT(u8::from_bytes(&mut byte_stream, None)),
+            35 => Self::SP_UINT(u8::from_bytes(&mut byte_stream, None)),
+            36 => Self::SP_UDEX(u8::from_bytes(&mut byte_stream, None)),
+            37 => Self::SP_ULUK(u8::from_bytes(&mut byte_stream, None)),
+            41 => Self::SP_ATK1(u32::from_bytes(&mut byte_stream, None)),
+            42 => Self::SP_ATK2(u32::from_bytes(&mut byte_stream, None)),
+            43 => Self::SP_MATK1(u32::from_bytes(&mut byte_stream, None)),
+            44 => Self::SP_MATK2(u32::from_bytes(&mut byte_stream, None)),
+            45 => Self::SP_DEF1(u32::from_bytes(&mut byte_stream, None)),
+            46 => Self::SP_DEF2(u32::from_bytes(&mut byte_stream, None)),
+            47 => Self::SP_MDEF1(u32::from_bytes(&mut byte_stream, None)),
+            48 => Self::SP_MDEF2(u32::from_bytes(&mut byte_stream, None)),
+            49 => Self::SP_HIT(u32::from_bytes(&mut byte_stream, None)),
+            50 => Self::SP_FLEE1(u32::from_bytes(&mut byte_stream, None)),
+            51 => Self::SP_FLEE2(u32::from_bytes(&mut byte_stream, None)),
+            52 => Self::SP_CRITICAL(u32::from_bytes(&mut byte_stream, None)),
+            53 => Self::SP_ASPD(u32::from_bytes(&mut byte_stream, None)),
+            55 => Self::SP_JOBLEVEL(u32::from_bytes(&mut byte_stream, None)),
+            99 => Self::SP_CARTINFO(u16::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+	    219 => Self::SP_POW(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)), 
+            220 => Self::SP_STA(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            221 => Self::SP_WIS(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            222 => Self::SP_SPL(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            223 => Self::SP_CON(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            224 => Self::SP_CRT(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            225 => Self::SP_PATK(u32::from_bytes(&mut byte_stream, None)),
+            226 => Self::SP_SMATK(u32::from_bytes(&mut byte_stream, None)),
+            227 => Self::SP_RES(u32::from_bytes(&mut byte_stream, None)),
+            228 => Self::SP_MRES(u32::from_bytes(&mut byte_stream, None)),
+            229 => Self::SP_HPLUS(u32::from_bytes(&mut byte_stream, None)),
+            230 => Self::SP_CRATE(u32::from_bytes(&mut byte_stream, None)),
+            231 => Self::SP_TRAITPOINT(u32::from_bytes(&mut byte_stream, None)),
+            232 => Self::SP_AP(u32::from_bytes(&mut byte_stream, None)),
+            233 => Self::SP_MAXAP(u32::from_bytes(&mut byte_stream, None)),
+            247 => Self::SP_UPOW(u8::from_bytes(&mut byte_stream, None)),
+            248 => Self::SP_USTA(u8::from_bytes(&mut byte_stream, None)),
+            249 => Self::SP_UWIS(u8::from_bytes(&mut byte_stream, None)),
+            250 => Self::SP_USPL(u8::from_bytes(&mut byte_stream, None)),
+            251 => Self::SP_UCON(u8::from_bytes(&mut byte_stream, None)),
+            252 => Self::SP_UCRT(u8::from_bytes(&mut byte_stream, None)),
+            invalid => panic!("invalid status code {}", invalid),
+        }
+    }
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb0, 0x00)]
+struct UpdateStatusPacket {
+    #[length_hint(6)]
+    pub status_type: StatusType,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xbd, 0x00)]
+struct InitialStatusPacket {
+    pub status_points: u16,
+    pub strength: u8,
+    pub required_strength: u8,
+    pub agility: u8,
+    pub required_agility: u8,
+    pub vitatity: u8,
+    pub required_vitatity: u8,
+    pub intelligence: u8,
+    pub required_intelligence: u8,
+    pub dexterity: u8,
+    pub required_dexterity: u8,
+    pub luck: u8,
+    pub required_luck: u8,
+    pub left_attack: u16,
+    pub rigth_attack: u16,
+    pub rigth_magic_attack: u16,
+    pub left_magic_attack: u16,
+    pub left_defense: u16,
+    pub rigth_defense: u16,
+    pub rigth_magic_defense: u16,
+    pub left_magic_defense: u16,
+    pub hit: u16, // ?
+    pub flee: u16,
+    pub flee2: u16,
+    pub crit: u16,
+    pub attack_speed: u16,
+    pub bonus_attack_speed: u16, // always 0
+}
+
+#[derive(Debug, Packet)]
+#[header(0x41, 0x01)]
+struct UpdateStatusPacket1 {
+    #[length_hint(12)]
+    pub status_type: StatusType,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xcb, 0x0a)]
+struct UpdateStatusPacket2 {
+    #[length_hint(10)]
+    pub status_type: StatusType,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xbe, 0x00)]
+struct UpdateStatusPacket3 {
+    #[length_hint(3)]
+    pub status_type: StatusType,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x3a, 0x01)]
+struct UpdateAttackRangePacket {
+    pub attack_range: u16,
+}
+
+#[derive(Packet, new)]
+#[header(0xd4, 0x08)]
+struct SwitchCharacterSlotPacket {
+    pub origin_slot: u16,
+    pub destination_slot: u16,
+    #[new(value = "1")]
+    pub remaining_moves: u16, // 1 instead of default, just in case the sever actually uses this value (rAthena does not)
+}
+
+#[derive(Debug, PartialEq)]
+pub enum SwitchCharacterSlotResponseStatus {
+    //#[byte_value(0)]
+    Success,
+    //#[byte_value(1)]
+    Error,
+}
+
+impl ByteConvertable for SwitchCharacterSlotResponseStatus {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match u16::from_bytes(byte_stream, None) {
+            0 => Self::Success,
+            1 => Self::Error,
+            invalid => panic!("invalid response code {}", invalid),
+        }
+    }
+}
+
+#[derive(Debug, Packet)]
+#[header(0x70, 0x0b)]
+struct SwitchCharacterSlotResponsePacket {
+    pub unknown: u16, // is always 8 ?
+    pub status: SwitchCharacterSlotResponseStatus,
+    pub remaining_moves: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x91, 0x00)]
+struct ChangeMapPacket {
+    #[length_hint(16)]
+    pub map_name: String,
+    pub x: u16,
+    pub y: u16,
+}
+
+#[derive(Debug)]
+enum DissapearanceReason {
+    OutOfSight,
+	Died,
+	LoggedOut,
+	Teleported,
+	TrickDead,
+}
+
+impl ByteConvertable for DissapearanceReason {
+    
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+        match byte_stream.byte() {
+            0 => Self::OutOfSight,
+            1 => Self::Died,
+            2 => Self::LoggedOut,
+            3 => Self::Teleported,
+            4 => Self::TrickDead,
+            invalid => panic!("invalid response code {}", invalid),
+        } 
+    }
+}
+
+#[derive(Debug, Packet)]
+#[header(0x80, 0x00)]
+struct EntityDisappearedPacket {
+    pub entity_id: u32,
+    pub reason: DissapearanceReason,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xfd, 0x09)]
+struct MovingEntityAppearedPacket {
+    pub packet_length: u16,
+    pub object_type: u8,
+    pub entity_id: u32,
+    pub group_id: u32, // may be reversed - or completely wrong
+    pub speed: u16,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub job: u16,
+    pub head: u16,
+    pub weapon: u32,
+    pub shield: u32,
+    pub accessory: u16,
+    pub move_start_time: u32,
+    pub accessory2: u16,
+    pub accessory3: u16,
+    pub head_palette: u16,
+    pub body_palette: u16,
+    pub head_dir: u16,
+    pub robe: u16,
+    pub guild_id: u32, // may be reversed - or completely wrong
+    pub emblem_version: u16,
+    pub honor: u16,
+    pub virtue: u32,
+    pub is_pk_mode_on: u8,
+    pub sex: Sex,
+    pub position: WorldPosition2,
+    pub x_size: u8,
+    pub y_size: u8,
+    pub c_level: u16,
+    pub font: u16,
+    pub maximum_health_points: i32,
+    pub health_points: i32,
+    pub is_boss: u8,
+    pub body: u16,
+    #[length_hint(24)]
+    pub name: String,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xff, 0x09)]
+struct EntityAppearedPacket {
+    pub packet_length: u16,
+    pub object_type: u8,
+    pub entity_id: u32,
+    pub group_id: u32, // may be reversed - or completely wrong
+    pub speed: u16,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub job: u16,
+    pub head: u16,
+    pub weapon: u32,
+    pub shield: u32,
+    pub accessory: u16,
+    pub accessory2: u16,
+    pub accessory3: u16,
+    pub head_palette: u16,
+    pub body_palette: u16,
+    pub head_dir: u16,
+    pub robe: u16,
+    pub guild_id: u32, // may be reversed - or completely wrong
+    pub emblem_version: u16,
+    pub honor: u16,
+    pub virtue: u32,
+    pub is_pk_mode_on: u8,
+    pub sex: Sex,
+    pub position: WorldPosition,
+    pub x_size: u8,
+    pub y_size: u8,
+    pub state: u8,
+    pub c_level: u16,
+    pub font: u16,
+    pub maximum_health_points: i32,
+    pub health_points: i32,
+    pub is_boss: u8,
+    pub body: u16,
+    #[length_hint(24)]
+    pub name: String,
+}
+
+#[derive(Debug, ByteConvertable)]
+struct SkillInformation {
+    pub skill_id: u16,
+    pub skill_type: u32,
+    pub skill_level: u16,
+    pub spell_point_cost: u16,
+    pub attack_range: u16,
+    #[length_hint(24)]
+    pub skill_name: String,
+    pub upgraded: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x0f, 0x01)]
+struct UpdateSkillTreePacket {
+    pub packet_length: u16,
+}
+
+impl UpdateSkillTreePacket  {
+    
+    pub fn skill_count(&self) -> usize {
+        (self.packet_length as usize - 4) / 37
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default, ByteConvertable)]
+struct HotkeyData {
+    pub is_skill: u8,
+    pub skill_id: u32,
+    pub quantity_or_skill_level: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x20, 0x0b)]
+struct UpdateHotkeysPacket {
+    pub rotate: u8,
+    pub tab: u16,
+    pub hotkeys: [HotkeyData; 38],
+}
+
+#[derive(Debug, Packet)]
+#[header(0xc9, 0x02)]
+struct UpdatePartyInvitationStatePacket {
+    pub allowed: u8, // always 0 on rAthena
+}
+
+#[derive(Debug, Packet)]
+#[header(0xda, 0x02)]
+struct UpdateShowEquipPacket {
+    pub open_equip_window: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xd9, 0x02)]
+struct UpdateConfigurationPacket {
+    pub config_type: u32,
+    pub value: u32, // only enabled and disabled ?
+}
+
+#[derive(Debug, Packet)]
+#[header(0xe2, 0x08)]
+struct NavigateToMonsterPacket {
+    pub target_type: u8, // 3 - entity; 0 - coordinates; 1 - coordinates but fails if you're alweady on the map
+    pub flags: u8,
+    pub hide_window: u8,
+    #[length_hint(16)]
+    pub map_name: String,
+    pub target_x: u16,
+    pub target_y: u16,
+    pub target_monster_id: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb6, 0x00)]
+struct CloseScriptPacket {
+    pub entity_id: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x46, 0x04)]
+struct QuestNotificatonPacket {
+    pub entity_id: u32,
+    pub position_x: u16,
+    pub position_y: u16,
+    pub effect: u16, // 0 - none; 1 - exclamation mark; 2 - question mark 
+    pub color: u16, // 0 - yellow; 1 - orange; 2 - green; 3 - purple
+}
+
+#[derive(Default, Packet)]
+#[header(0x7d, 0x00)]
+struct MapLoadedPacket {}
+
+#[derive(Default, Packet)]
+#[header(0x87, 0x01)]
+struct CharacterServerKeepalivePacket {
+    pub account_id: u32,
+}
+
+#[derive(new)]
+struct Timer {
+    period: Duration,
+    #[new(default)]
+    accumulator: Duration,
+}
+
+impl Timer {
+    
+    pub fn update(&mut self, elapsed_time: f64) -> bool {
+        self.accumulator += Duration::from_secs_f64(elapsed_time);
+        let reset = self.accumulator > self.period;
+
+        if reset {
+            self.accumulator -= self.period;
+        }
+
+        reset
+    }
+}
+
+#[derive(new)]
+struct LoginData {
+    pub account_id: u32,
+    pub login_id1: u32,
+    pub sex: Sex,
 }
 
 pub struct NetworkingSystem {
-    interface: NetworkInterface,
-    rx: Box<dyn DataLinkReceiver>,
+    login_stream: TcpStream,
+    character_stream: Option<TcpStream>,
+    map_stream: Option<TcpStream>,
+    login_data: Option<LoginData>,
+    //character_information: Option<CharacterInformation>,
+    characters: Rc<RefCell<Vec<CharacterInformation>>>,
+    move_request: Rc<RefCell<Option<usize>>>,
+    changed: Rc<RefCell<bool>>,
+    login_keep_alive_timer: Timer,
+    character_keep_alive_timer: Timer,
+    tick: u32,
 }
 
 impl NetworkingSystem {
 
     pub fn new() -> Self {
 
-        use pnet::datalink::Channel::Ethernet;
+        //let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
+        let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
+        
+        let character_stream = None;
+        let map_stream = None;
+        let login_data = None;
+        //let character_information = None;
+        let characters = Rc::new(RefCell::new(Vec::new()));
+        let move_request = Rc::new(RefCell::new(None));
+        let changed = Rc::new(RefCell::new(false));
+        let login_keep_alive_timer = Timer::new(Duration::from_secs(58));
+        let character_keep_alive_timer = Timer::new(Duration::from_secs(10));
+        let tick = 0;
 
-        let interface_names_match = |interface: &NetworkInterface| interface.name == "enp5s0";
+        login_stream.set_read_timeout(Duration::from_secs(20).into()).unwrap();
 
-        let interfaces = datalink::interfaces();
-        let interface = interfaces
-            .into_iter()
-            .filter(interface_names_match)
-            .next()
-            .unwrap_or_else(|| panic!("No such network interface: {}", "enp0s31f6"));
+        Self {
+            login_stream,
+            character_stream,
+            move_request,
+            login_data,
+            //character_information,
+            changed,
+            map_stream,
+            characters,
+            login_keep_alive_timer,
+            character_keep_alive_timer,
+            tick,
+        }
+    }
 
-        let mut config: Config = Default::default();
-        config.read_timeout = Some(Duration::from_millis(1));
+    pub fn login(&mut self) -> Result<CharacterSelectionWindow, String> {
 
-        let (_, rx) = match datalink::channel(&interface, config) {
-            Ok(Ethernet(tx, rx)) => (tx, rx),
-            Ok(_) => panic!("packetdump: unhandled channel type"),
-            Err(e) => panic!("packetdump: unable to create channel: {}", e),
-        };
+        self.send_packet_to_login_server(LoginServerLoginPacket::new("test_user".to_string(), "password".to_string()));
 
-        return Self { interface, rx };
+        let response = self.get_data_from_login_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
+            match login_failed_packet.reason {
+                LoginFailedReason::ServerClosed => return Err(format!("server closed")),
+                LoginFailedReason::AlreadyLoggedIn => return Err(format!("someone has already logged in with this id")),
+                LoginFailedReason::AlreadyOnline => return Err(format!("already online")),
+            }
+        }
+
+        let login_server_login_success_packet = LoginServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+        self.login_data = LoginData::new(login_server_login_success_packet.account_id, login_server_login_success_packet.login_id1, login_server_login_success_packet.sex).into();
+        println!("payload: {:?}", login_server_login_success_packet);
+
+        for index in 0..login_server_login_success_packet.character_server_count() {
+            let server_information = CharacterServerInformation::from_bytes(&mut byte_stream, None);
+            println!("#{}: {:?}", index, server_information);
+
+            if self.character_stream.is_none() {
+                let server_ip = IpAddr::V4(server_information.server_ip);
+                let socket_address = SocketAddr::new(server_ip, server_information.server_port);
+                self.character_stream = TcpStream::connect(socket_address)
+                    .expect("failed to connect to character server")
+                    .into();
+            }
+        }
+
+        let maybe_padding = byte_stream.next();
+        println!("padding / list terminator : {}", maybe_padding);
+        byte_stream.assert_empty("login packet");
+
+        let character_server_login_packet = CharacterServerLoginPacket::new(
+            login_server_login_success_packet.account_id,
+            login_server_login_success_packet.login_id1,
+            login_server_login_success_packet.login_id2,
+            login_server_login_success_packet.sex,
+        );
+
+        let character_stream = self.character_stream.as_mut().expect("no character server connection");
+        character_stream.write(&character_server_login_packet.to_bytes()).expect("failed to send packet to character server");
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        let account_id = u32::from_bytes(&mut byte_stream, None);
+        assert!(account_id == login_server_login_success_packet.account_id);
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
+            match login_failed_packet.reason {
+                LoginFailedReason::ServerClosed => return Err(format!("server closed")),
+                LoginFailedReason::AlreadyLoggedIn => return Err(format!("someone has already logged in with this id")),
+                LoginFailedReason::AlreadyOnline => return Err(format!("already online")),
+            }
+        }
+
+        let character_server_login_success_packet = CharacterServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        println!("{:?}", character_server_login_success_packet);
+
+        self.send_packet_to_character_server(RequestCharacterListPacket::default());
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        RequestCharacterListSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        {
+            let mut characters = self.characters.borrow_mut();
+            characters.clear();
+
+            while !byte_stream.is_empty() {
+
+                if RequestCharacterListSuccessPacket::try_from_bytes(&mut byte_stream).is_ok() {
+                    break;
+                }
+
+                let character_information = CharacterInformation::from_bytes(&mut byte_stream, None);
+                characters.push(character_information);
+            }
+        }
+
+        Ok(CharacterSelectionWindow::new(Rc::clone(&self.characters), Rc::clone(&self.move_request), Rc::clone(&self.changed), character_server_login_success_packet.normal_slot_count as usize))
+    }
+
+    fn send_packet_to_login_server(&mut self, packet: impl Packet) {
+        let packet_bytes = packet.to_bytes();
+        self.login_stream.write(&packet_bytes).expect("failed to send packet to login server");
+    }
+
+    fn send_packet_to_character_server(&mut self, packet: impl Packet) {
+        let packet_bytes = packet.to_bytes();
+        let character_stream = self.character_stream.as_mut().expect("no character server connection");
+        character_stream.write(&packet_bytes).expect("failed to send packet to character server");
+    }
+
+    fn send_packet_to_map_server(&mut self, packet: impl Packet) {
+        let packet_bytes = packet.to_bytes();
+        let map_stream = self.map_stream.as_mut().expect("no map server connection");
+        map_stream.write(&packet_bytes).expect("failed to send packet to map server");
+    }
+
+    fn get_data_from_login_server(&mut self) -> Vec<u8> {
+        let mut buffer = [0; 4096];
+        let response_lenght = self.login_stream.read(&mut buffer).expect("failed to get response from login server");
+        buffer[..response_lenght].to_vec()
+    }
+
+    fn get_data_from_character_server(&mut self) -> Vec<u8> {
+        let mut buffer = [0; 4096];
+        let character_stream = self.character_stream.as_mut().expect("no character server connection");
+        let response_lenght = character_stream.read(&mut buffer).expect("failed to get response from character server");
+        buffer[..response_lenght].to_vec()
+    }
+
+    fn get_data_from_map_server(&mut self) -> Vec<u8> {
+        let mut buffer = [0; 4096];
+        let map_stream = self.map_stream.as_mut().expect("no map server connection");
+        let response_lenght = map_stream.read(&mut buffer).expect("failed to get response from map server");
+        buffer[..response_lenght].to_vec()
+    }
+
+    fn try_get_data_from_map_server(&mut self) -> Option<Vec<u8>> {
+        let mut buffer = [0; 4096];
+        let map_stream = self.map_stream.as_mut()?;
+        map_stream.set_read_timeout(Duration::from_micros(1).into()).unwrap();
+        let response_lenght = map_stream.read(&mut buffer).ok()?;
+        buffer[..response_lenght].to_vec().into()
+    }
+
+    pub fn keep_alive(&mut self, delta_time: f64) {
+
+        if self.login_keep_alive_timer.update(delta_time) {
+            //println!("login keep_alive sent"); // add feature flag debug_network
+            self.send_packet_to_login_server(LoginServerKeepalivePacket::default());
+        }
+
+        if self.character_keep_alive_timer.update(delta_time) {
+            //println!("character keep_alive sent");
+            self.send_packet_to_character_server(CharacterServerKeepalivePacket::default());
+        }
+
+        self.tick += (delta_time * 1000.0) as u32;
+    }
+
+    pub fn crate_character(&mut self, slot: usize, /* TODO: */) -> Result<(), String> {
+
+        let name = [
+            "lucas",
+            "warlock dude",
+            "t3st CH4R",
+            "Seemon",
+            "Pretty Long Name",
+            "xXdarkshadowXx",
+            "nvidia fanboy",
+            "AMD Enjoyer",
+            "Slutty eGirl",
+            "NULL",
+            "bitwise or",
+            "im out of names",
+            "someone help me",
+            "seriously",
+            "Ron Howard",
+        ][slot].to_string();
+
+        let hair_color = 0;
+        let hair_style = 0;
+        let start_job = 0;
+        let sex = Sex::Male;
+
+        self.send_packet_to_character_server(CreateCharacterPacket::new(name, slot as u8, hair_color, hair_style, start_job, sex));
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        if let Ok(character_creation_failed_packet) = CharacterCreationFailedPacket::try_from_bytes(&mut byte_stream) {
+            match character_creation_failed_packet.reason {
+                CharacterCreationFailedReason::CharacterNameAlreadyUsed => return Err(format!("character name is already used")),
+                CharacterCreationFailedReason::NotOldEnough => return Err(format!("you are not old enough to create a character")),
+                CharacterCreationFailedReason::NotAllowedToUseSlot => return Err(format!("you are not allowed to use that character slot")),
+                CharacterCreationFailedReason::CharacterCerationFailed => return Err(format!("character creation failed")),
+            }
+        }
+
+        let create_character_success_packet = CreateCharacterSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        println!("{:?}", create_character_success_packet);
+
+        self.characters.borrow_mut().push(create_character_success_packet.character_information);
+        *self.changed.borrow_mut() = true;
+        Ok(())
+    }
+
+    pub fn delete_character(&mut self, character_id: usize) -> Result<(), String> {
+
+        let email = "a@a.com".to_string();
+
+        self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id as u32, email));
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        if let Ok(character_creation_failed_packet) = CharacterDeletionFailedPacket::try_from_bytes(&mut byte_stream) {
+            match character_creation_failed_packet.reason {
+                CharacterDeletionFailedReason::NotAllowed => return Err(format!("you are not allowed to delete this character")),
+                CharacterDeletionFailedReason::CharacterNotFound => return Err(format!("character was not found")),
+                CharacterDeletionFailedReason::NotEligible => return Err(format!("character is not eligible for deletion")),
+            }
+        }
+
+        CharacterDeletionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        self.characters.borrow_mut().retain(|character| character.character_id as usize != character_id);
+        *self.changed.borrow_mut() = true;
+        Ok(())
+    }
+
+    pub fn select_character(&mut self, slot: usize) -> Result<(String, Vector2<usize>, usize, usize), String> {
+
+        self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        if let Ok(character_selection_failed_packet) = CharacterSelectionFailedPacket::try_from_bytes(&mut byte_stream) {
+            match character_selection_failed_packet.reason {
+                CharacterSelectionFailedReason::RejectedFromServer => return Err(format!("rejected from server")),
+            }
+        }
+
+        if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
+            match login_failed_packet.reason {
+                LoginFailedReason::ServerClosed => return Err(format!("server closed")),
+                LoginFailedReason::AlreadyLoggedIn => return Err(format!("someone has already logged in with this id")),
+                LoginFailedReason::AlreadyOnline => return Err(format!("already online")),
+            }
+        }
+
+        let select_character_success_packet = CharacterSelectionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        let server_ip = IpAddr::V4(select_character_success_packet.map_server_ip);
+        let socket_address = SocketAddr::new(server_ip, select_character_success_packet.map_server_port);
+        self.map_stream = TcpStream::connect(socket_address)
+            .expect("failed to connect to map server")
+            .into();
+
+        let login_data = self.login_data.as_ref().unwrap();
+        self.send_packet_to_map_server(MapServerLoginPacket::new(login_data.account_id, select_character_success_packet.character_id, login_data.login_id1, 100, login_data.sex));
+
+        let response = self.get_data_from_map_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        let _packet8302 = Packet8302::try_from_bytes(&mut byte_stream).unwrap();
+
+        let response = self.get_data_from_map_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        let _packet_180b = Packet180b::try_from_bytes(&mut byte_stream).unwrap();
+        let map_server_login_success_packet = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        self.tick = map_server_login_success_packet.client_tick;
+
+        while let Ok(server_message_packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
+            let server_message = String::from_bytes(&mut byte_stream, Some(server_message_packet.packet_length as usize - 4));
+            println!("message from server: {}", server_message);
+        }
+
+        let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        Ok((change_map_packet.map_name.replace(".gat", "").to_string(), Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize), select_character_success_packet.character_id as usize, 200)) // set 200 to 0 as soon as stats are properly updated
+    }
+
+    pub fn request_switch_character_slot(&mut self, origin_slot: usize) {
+        *self.move_request.borrow_mut() = Some(origin_slot);
+        *self.changed.borrow_mut() = true;
+    }
+
+    pub fn cancel_switch_character_slot(&mut self) {
+        *self.move_request.borrow_mut() = None;
+        *self.changed.borrow_mut() = true;
+    }
+
+    pub fn switch_character_slot(&mut self, destination_slot: usize) -> Result<(), String> {
+
+        let origin_slot = self.move_request
+            .borrow_mut()
+            .take()
+            .unwrap();
+
+        self.send_packet_to_character_server(SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16));
+
+        let response = self.get_data_from_character_server();
+        let mut byte_stream = ByteStream::new(&response);
+
+        let switch_character_slot_response_packet = SwitchCharacterSlotResponsePacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        match switch_character_slot_response_packet.status {
+
+            SwitchCharacterSlotResponseStatus::Success => {
+
+                let _character_server_login_success_packet = CharacterServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+                let _packet_006b = Packet6b00::try_from_bytes(&mut byte_stream).unwrap();
+
+                let mut characters = self.characters.borrow_mut();
+                let character_count = characters.len();
+                characters.clear();
+
+                for _index in 0..character_count {
+                    let character_information = CharacterInformation::from_bytes(&mut byte_stream, None);
+                    characters.push(character_information);
+                }
+
+                // packet_length and packet 0xa0 0x09 are left unread because we don't need them 
+            },
+
+            SwitchCharacterSlotResponseStatus::Error => return Err("failed to move character to a different slot".to_string()),
+        }
+
+        *self.move_request.borrow_mut() = None;
+        *self.changed.borrow_mut() = true;
+        Ok(())
+    }
+
+    pub fn request_player_move(&mut self, destination: Vector2<usize>) {
+        self.send_packet_to_map_server(RequestPlayerMovePacket::new(WorldPosition::new(destination.x, destination.y)));
+    }
+
+    pub fn map_loaded(&mut self) {
+        self.send_packet_to_map_server(MapLoadedPacket::default());
+    }
+
+    pub fn changes_applied(&mut self) {
+        *self.changed.borrow_mut() = false;
     }
 
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
 
-        while let Ok(packet) = self.rx.next() {
-            if let Some(event) = handle_ethernet_frame(&self.interface, &EthernetPacket::new(packet).unwrap()) {
-                events.push(event);
+        while let Some(data) = self.try_get_data_from_map_server() {
+            let mut byte_stream = ByteStream::new(&data);
+
+            while !byte_stream.is_empty() {
+                
+                if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
+                    let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 16));
+                    //println!("{:?}", packet);
+                    println!("{}broadcast message{}: {}", GREEN, NONE, message);
+
+                } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
+                    let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 4));
+                    //println!("{:?}", packet);
+                    println!("{}server message{}: {}", GREEN, NONE, message);
+
+                } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
+                    let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 12));
+                    //println!("{:?}", packet);
+                    println!("{}entity message{}: {}", GREEN, NONE, message);
+
+                } else if let Ok(packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+                    let (origin, destination) = packet.from_to.to_vectors();
+                    events.push(NetworkEvent::EntityMove(packet.entity_id as usize, origin, destination, packet.timestamp));
+                    //println!("{}FOLLOWING{}: {:x?}", RED, NONE, byte_stream.remaining());
+
+                } else if let Ok(packet) = PlayerMovePacket::try_from_bytes(&mut byte_stream) {
+                    println!("{:#?}", packet); 
+                    let (origin, destination) = packet.from_to.to_vectors();
+                    events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
+
+                } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:#?}", packet); 
+                    events.push(NetworkEvent::ChangeMap(packet.map_name.replace(".gat", "").to_string(), Vector2::new(packet.x as usize, packet.y as usize)));
+
+                } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:#?}", packet); 
+                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.position.to_vector(), packet.speed as usize));
+
+                } else if let Ok(packet) = MovingEntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{}", self.tick); 
+                    println!("{:#?}", packet); 
+                    let (_origin, destination) = packet.position.to_vectors();
+                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, destination, packet.speed as usize));
+
+                } else if let Ok(packet) = EntityDisappearedPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:#?}", packet); 
+                    events.push(NetworkEvent::RemoveEntity(packet.entity_id as usize));
+
+                } else if let Ok(packet) = UpdateStatusPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateStatusPacket1::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) { 
+
+                    let acheivements = (0..packet.acheivement_count)
+                        .map(|_index| AchievementData::from_bytes(&mut byte_stream, None))
+                        .collect::<Vec<AchievementData>>();
+
+                    println!("{:?}", packet); 
+                    println!("{:?}", acheivements);
+
+                } else if let Ok(packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) { 
+                    let name = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 5));
+                    println!("inventory name: {}", name);
+                    println!("{:?}", packet); 
+
+                    while InventoyEndPacket::try_from_bytes(&mut byte_stream).is_err() {
+                        if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
+                            println!("{:?}", packet);
+
+                            for _item_index in 0..packet.item_count() {
+                                let item_information = EquippableItemInformation::from_bytes(&mut byte_stream, None);
+                                println!("{:#?}", item_information);
+                            }
+                        } else {
+                            panic!();
+                        }
+                    }
+
+                } else if let Ok(packet) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) { 
+
+                    for _item_index in 0..packet.item_count() {
+                        let item_information = EquippableSwitchItemInformation::from_bytes(&mut byte_stream, None);
+                        println!("{:?}", item_information); 
+                    }
+
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = MapTypePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) { 
+
+                    for _skill_index in 0..packet.skill_count() {
+                        let skill_information = SkillInformation::from_bytes(&mut byte_stream, None);
+                        println!("{:?}", skill_information); 
+                    }
+
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:#?}", packet); 
+
+                } else if let Ok(packet) = InitialStatusPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:#?}", packet); 
+
+                } else if let Ok(packet) = UpdatePartyInvitationStatePacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateShowEquipPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = UpdateConfigurationPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = NavigateToMonsterPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = CloseScriptPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else if let Ok(packet) = QuestNotificatonPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet); 
+
+                } else {
+                    println!("{}unhandled{}: {:x?}", RED, NONE, byte_stream.remaining());
+                    break;
+                }
             }
+
+            //byte_stream.assert_empty("event loop");
         }
 
-        return events;
+        events
     }
 }

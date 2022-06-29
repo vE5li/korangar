@@ -1,17 +1,9 @@
-pub fn newline_symbol() -> &'static str {
-
-    #[cfg(feature = "unicode")]
-    return "⮎";
-
-    #[cfg(not(feature = "unicode"))]
-    return ">";
+const fn symbol(enabled: &'static str, disabled: &'static str) -> &'static str {
+    match cfg!(feature = "unicode") {
+        true => enabled,
+        false => disabled,
+    }
 }
 
-pub fn arrow_symbol() -> &'static str {
-
-    #[cfg(feature = "unicode")]
-    return "→";
-
-    #[cfg(not(feature = "unicode"))]
-    return "->";
-}
+pub const NEWLINE: &'static str = symbol("⮎", ">");
+pub const ARROW: &'static str = symbol("→", "->");

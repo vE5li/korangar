@@ -10,17 +10,17 @@ pub struct Version {
 impl Version {
 
     pub fn equals(&self, major: u8, minor: u8) -> bool {
-        return self.major == major && self.minor >= minor;
+        self.major == major && self.minor >= minor
     }
 
     pub fn equals_or_above(&self, major: u8, minor: u8) -> bool {
-        return self.major > major || (self.major == major && self.minor >= minor);
+        self.major > major || (self.major == major && self.minor >= minor)
     }
 }
 
 impl Display for Version {
 
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
-        return write!(formatter, "{}.{}", self.major, self.minor);
+        write!(formatter, "{}.{}", self.major, self.minor)
     }
 }

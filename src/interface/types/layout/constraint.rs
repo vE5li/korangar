@@ -1,7 +1,7 @@
 use derive_new::new;
 use serde::{ Serialize, Deserialize };
 
-use interface::types::{ Dimension, Size, PartialSize };
+use interface::types::{ Dimension, Size, Position, PartialSize };
 
 #[derive(Copy, Clone, Serialize, Deserialize, new)]
 pub struct SizeConstraint {
@@ -75,5 +75,12 @@ impl SizeConstraint {
         let width = self.validated_width(size.x, avalible.x, avalible.x, scaling);
         let height = self.validated_height(size.y, avalible.y.into(), avalible.y.into(), scaling);
         Size::new(width, height)
+    }
+
+    pub fn validated_position(&self, position: Position, size: Size, avalible: Size) -> Position {
+        let half_size = size / 2.0;
+        let x = f32::clamp(position.x, -half_size.x, avalible.x - half_size.x);
+        let y = f32::clamp(position.y, 0.0, avalible.y - 30.0);
+        Position::new(x, y)
     }
 }

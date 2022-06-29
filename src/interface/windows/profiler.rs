@@ -1,5 +1,3 @@
-use derive_new::new;
-
 use interface::traits::{ Window, PrototypeWindow };
 use interface::types::InterfaceSettings;
 use interface::{ WindowCache, Size };

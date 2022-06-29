@@ -1,5 +1,3 @@
-use derive_new::new;
-
 use input::UserEvent;
 use interface::traits::{ Window, PrototypeWindow, PrototypeElement };
 use interface::types::InterfaceSettings;

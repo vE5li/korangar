@@ -1,5 +1,3 @@
-use derive_new::new;
-
 use input::UserEvent;
 use interface::traits::{ Window, PrototypeWindow };
 use interface::types::InterfaceSettings;
@@ -30,6 +28,7 @@ impl PrototypeWindow for MenuWindow {
             cell!(Button::new("audio settings", UserEvent::OpenAudioSettingsWindow, true)),
             cell!(DebugButton::new("render settings", UserEvent::OpenRenderSettingsWindow, true)),
             cell!(DebugButton::new("map viewer", UserEvent::OpenMapDataWindow, true)),
+            cell!(DebugButton::new("maps", UserEvent::OpenMapsWindow, true)),
             cell!(DebugButton::new("theme viewer", UserEvent::OpenThemeViewerWindow, true)),
             cell!(DebugButton::new("profiler", UserEvent::OpenProfilerWindow, true)),
             cell!(Button::new("exit korangar", UserEvent::Exit, true)),
@@ -38,4 +37,3 @@ impl PrototypeWindow for MenuWindow {
         Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "menu".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
     }
 }
-

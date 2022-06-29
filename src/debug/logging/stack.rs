@@ -13,23 +13,23 @@ lazy_static! {
 
 pub fn stack_size() -> usize {
     match STACK.try_lock() {
-        Ok(ref mut mutex) => return mutex.len(),
+        Ok(ref mut mutex) => mutex.len(),
         Err(..) => panic!(),
-    };
+    }
 } 
 
 pub fn message_offset() -> usize {
     match STACK.try_lock() {
-        Ok(ref mut mutex) => return mutex.iter().map(|item| item.size).sum(),
+        Ok(ref mut mutex) => mutex.iter().map(|item| item.size).sum(),
         Err(..) => panic!(),
-    };
+    }
 } 
 
 pub fn increment_stack(size: usize) {
     match STACK.try_lock() {
         Ok(ref mut mutex) => mutex.push(StackItem::new(0, size)),
         Err(..) => panic!(),
-    };
+    }
 }
 
 pub fn decrement_stack() {
@@ -43,12 +43,12 @@ pub fn increment_message_count() {
     match STACK.try_lock() {
         Ok(ref mut mutex) => mutex.last_mut().unwrap().message_count += 1,
         Err(..) => panic!(),
-    };
+    }
 }
 
 pub fn get_message_count() -> usize {
     match STACK.try_lock() {
-        Ok(ref mut mutex) => return mutex.last_mut().unwrap().message_count,
+        Ok(ref mut mutex) => mutex.last_mut().unwrap().message_count,
         Err(..) => panic!(),
-    };
+    }
 }

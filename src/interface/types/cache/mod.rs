@@ -21,7 +21,7 @@ impl WindowCache {
         Self::load().unwrap_or_else(|| {
 
             #[cfg(feature = "debug")]
-            print_debug!("failed to load window cache from {}filename{}. creating empty cache", magenta(), none());
+            print_debug!("failed to load window cache from {}filename{}. creating empty cache", MAGENTA, NONE);
             
             Default::default()
         })
@@ -30,7 +30,7 @@ impl WindowCache {
     pub fn load() -> Option<Self> {
 
         #[cfg(feature = "debug")]
-        print_debug!("loading window cache from {}filename{}", magenta(), none());
+        print_debug!("loading window cache from {}filename{}", MAGENTA, NONE);
 
         std::fs::read_to_string("client/window_cache.json")
             .ok()
@@ -42,7 +42,7 @@ impl WindowCache {
     pub fn save(&self) {
 
         #[cfg(feature = "debug")]
-        print_debug!("saving window cache to {}filename{}", magenta(), none());
+        print_debug!("saving window cache to {}filename{}", MAGENTA, NONE);
 
         let data = serde_json::to_string_pretty(&self.entries).unwrap();
         std::fs::write("client/window_cache.json", data).expect("unable to write file");

@@ -21,7 +21,7 @@ use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::PersistentDescriptorSet;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::buffer::BufferUsage;
@@ -73,7 +73,7 @@ impl AreaRenderer {
         let index_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, indices.into_iter()).unwrap();
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
 
-        return Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, index_buffer, matrices_buffer };
+        Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, index_buffer, matrices_buffer }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -81,8 +81,7 @@ impl AreaRenderer {
     }
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
-
-        let pipeline = GraphicsPipeline::start()
+        GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
@@ -91,9 +90,7 @@ impl AreaRenderer {
             .depth_stencil_state(DepthStencilState::simple_depth_test())
             .render_pass(subpass)
             .build(device)
-            .unwrap();
-
-        return pipeline;
+            .unwrap()
     }
 
     pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, transform: &Transform) {
@@ -110,12 +107,9 @@ impl AreaRenderer {
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
         //
 
-        let mut set_builder = PersistentDescriptorSet::start(descriptor_layout);
-
-        set_builder
-            .add_buffer(matrices_subbuffer).unwrap();
-
-        let set = set_builder.build().unwrap();
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::buffer(0, matrices_subbuffer),
+        ]).unwrap(); 
 
         //let translation_matrix = Matrix4::from_translation(transform.position);
         //let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);

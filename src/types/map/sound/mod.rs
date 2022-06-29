@@ -28,8 +28,8 @@ impl SoundSource {
         let distance = camera.distance_to(self.position);
 
         match distance < smallest_distance && renderer.marker_hovered(camera, self.position, mouse_position) {
-            true => return Some(distance),
-            false => return None,
+            true => Some(distance),
+            false => None,
         }
     }
 

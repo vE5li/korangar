@@ -1,6 +1,6 @@
 use serde::{ Serialize, Deserialize };
 
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Color {
     pub red: u8,
     pub blue: u8,
@@ -10,23 +10,23 @@ pub struct Color {
 impl Color {
 
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
-        return Self { red, green, blue };
+        Self { red, green, blue }
     }
 
     pub const fn monochrome(brightness: u8) -> Self {
-        return Self { red: brightness, green: brightness, blue: brightness };
+        Self { red: brightness, green: brightness, blue: brightness }
     }
 
     pub fn red_f32(&self) -> f32 {
-        return self.red as f32 / 255.0;
+        self.red as f32 / 255.0
     }
 
     pub fn green_f32(&self) -> f32 {
-        return self.green as f32 / 255.0;
+        self.green as f32 / 255.0
     }
 
     pub fn blue_f32(&self) -> f32 {
-        return self.blue as f32 / 255.0;
+        self.blue as f32 / 255.0
     }
 
     pub fn invert(&self) -> Self {

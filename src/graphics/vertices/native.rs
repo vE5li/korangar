@@ -14,7 +14,7 @@ pub struct NativeModelVertex {
 impl NativeModelVertex {
 
     fn to_vertex(self) -> ModelVertex {
-        return ModelVertex::new(self.position, self.normal, self.texture_coordinates, self.texture_index);
+        ModelVertex::new(self.position, self.normal, self.texture_coordinates, self.texture_index)
     }
 
     pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
@@ -35,12 +35,12 @@ impl NativeModelVertex {
             vertices.push(third_partial.to_vertex());
         }
 
-        return vertices;
+        vertices
     }
 
     pub fn calculate_normal(first_position: Vector3<f32>, second_position: Vector3<f32>, third_position: Vector3<f32>) -> Vector3<f32> {
         let delta_position_1 = second_position - first_position;
         let delta_position_2 = third_position - first_position;
-        return delta_position_1.cross(delta_position_2);
+        delta_position_1.cross(delta_position_2)
     }
 }

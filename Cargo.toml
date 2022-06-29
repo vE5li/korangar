@@ -5,17 +5,16 @@ version = "0.1.0"
 [dependencies]
 korangar_procedural = { path = "procedural" }
 derive-new = "0.5"
-vulkano = "0.27"
-vulkano-shaders = "0.27"
-vulkano-win = "0.27"
-winit = "0.25"
+vulkano = "0.28"
+vulkano-shaders = "0.28"
+vulkano-win = "0.28"
+winit = "0.26"
 num = "*"
 cgmath = { version = "0.18", features = ["serde"] }
 serde = "1.0.137"
 serde_json = "1.0"
 png = "0.16"
 bmp = "*"
-pnet = "*"
 pathfinding = "2.2.2"
 yazi = "0.1.4"
 

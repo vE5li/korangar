@@ -23,13 +23,13 @@ impl Container {
 
 impl Element for Container {
 
-    fn update(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let (mut size, position) = placement_resolver.allocate(&self.size_constraint);
         let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::zero());
         inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
 
-        self.elements.iter_mut().for_each(|element| element.borrow_mut().update(&mut inner_placement_resolver, interface_settings, theme));
+        self.elements.iter_mut().for_each(|element| element.borrow_mut().resolve(&mut inner_placement_resolver, interface_settings, theme));
 
         if self.size_constraint.height.is_flexible() {
             let final_height = inner_placement_resolver.final_height();
@@ -40,6 +40,13 @@ impl Element for Container {
 
         self.cached_size = size.finalize();
         self.cached_position = position;
+    }
+
+    fn update(&mut self) -> Option<ChangeEvent> {
+        self.elements
+            .iter_mut()
+            .map(|element| element.borrow_mut().update())
+            .fold(None, |current, other| current.zip_with(other, ChangeEvent::combine).or(current).or(other))
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {

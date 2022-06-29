@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum UserEvent {
     Exit,
     CameraZoom(f32),
@@ -11,10 +11,20 @@ pub enum UserEvent {
     OpenAudioSettingsWindow,
     ReloadTheme,
     SaveTheme,
+    LoadNewMap(String),
+    SelectCharacter(usize),
+    CreateCharacter(usize),
+    DeleteCharacter(usize),
+    RequestSwitchCharacterSlot(usize),
+    CancelSwitchCharacterSlot,
+    SwitchCharacterSlot(usize),
+    RequestPlayerMove(Vector2<usize>),
     #[cfg(feature = "debug")]
     OpenRenderSettingsWindow,
     #[cfg(feature = "debug")]
     OpenMapDataWindow,
+    #[cfg(feature = "debug")]
+    OpenMapsWindow,
     #[cfg(feature = "debug")]
     OpenThemeViewerWindow,
     #[cfg(feature = "debug")]
@@ -46,6 +56,8 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     ToggleShowEntities,
     #[cfg(feature = "debug")]
+    ToggleShowWater,
+    #[cfg(feature = "debug")]
     ToggleShowAmbientLight,
     #[cfg(feature = "debug")]
     ToggleShowDirectionalLight,
@@ -53,6 +65,8 @@ pub enum UserEvent {
     ToggleShowPointLights,
     #[cfg(feature = "debug")]
     ToggleShowParticleLights,
+    #[cfg(feature = "debug")]
+    ToggleShowDirectionalShadows,
     #[cfg(feature = "debug")]
     ToggleShowObjectMarkers,
     #[cfg(feature = "debug")]
@@ -64,6 +78,8 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     ToggleShowParticleMarkers,
     #[cfg(feature = "debug")]
+    ToggleShowEntityMarkers,
+    #[cfg(feature = "debug")]
     ToggleShowMapTiles,
     #[cfg(feature = "debug")]
     ToggleShowPathing,
@@ -72,5 +88,9 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     ToggleShowNormalBuffer,
     #[cfg(feature = "debug")]
+    ToggleShowWaterBuffer,
+    #[cfg(feature = "debug")]
     ToggleShowDepthBuffer,
+    #[cfg(feature = "debug")]
+    ToggleShowPickerBuffer,
 }

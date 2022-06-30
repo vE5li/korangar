@@ -15,7 +15,7 @@ pub fn get_instance_extensions() -> InstanceExtensions {
 pub fn get_layers() -> Vec<&'static str> {
 
     let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
-    let desired_layers = Vec::new();// vec!["VK_LAYER_KHRONOS_validation"];
+    let desired_layers = Vec::new(); // vec!["VK_LAYER_KHRONOS_validation"];
 
     #[cfg(feature = "debug")]
     let timer = Timer::new_dynamic(format!("available layers"));
@@ -50,11 +50,7 @@ pub fn get_layers() -> Vec<&'static str> {
 pub fn get_device_extensions() -> DeviceExtensions {
     DeviceExtensions {
         khr_swapchain: true,
-        //ext_sample_locations: true,
         amd_mixed_attachment_samples: true,
-        //ext_filter_cubic: true,
-        //ext_extended_dynamic_state: true,
-        //ext_extended_dynamic_state2: true,
         ..DeviceExtensions::none()
     }
 }

@@ -2,7 +2,7 @@ use std::time::Instant;
 use derive_new::new;
 
 #[derive(new)]
-pub struct FrameTimer {
+pub struct GameTimer {
     #[new(value = "Instant::now()")]
     global_timer: Instant,
     #[new(default)]
@@ -12,10 +12,20 @@ pub struct FrameTimer {
     #[new(default)]
     frame_counter: usize,
     #[new(default)]
-    frames_per_second: usize
+    frames_per_second: usize,
+    #[new(default)]
+    client_tick: u32,
 }
 
-impl FrameTimer {
+impl GameTimer {
+
+    pub fn set_client_tick(&mut self, client_tick: u32) {
+        self.client_tick = client_tick;
+    }
+
+    pub fn get_client_tick(&self) -> u32 {
+        self.client_tick
+    }
 
     pub fn update(&mut self) -> f64 {
 
@@ -31,6 +41,8 @@ impl FrameTimer {
             self.accumulate_second -= 1.0;
             self.frame_counter = 0;
         }
+
+        self.client_tick += (delta_time * 1075.0) as u32;
 
         delta_time
     }

@@ -1,5 +1,3 @@
-#[macro_use]
-mod workaround;
 mod settings;
 mod picker;
 mod deferred;
@@ -9,20 +7,15 @@ mod sprite;
 mod interface;
 #[cfg(feature = "debug")]
 mod debug;
-//mod resolve;
 
 use derive_new::new;
-use vulkano::command_buffer::pool::standard::StandardCommandPoolBuilder;
-use vulkano::command_buffer::synced::SyncCommandBufferBuilder;
-use std::sync::Arc;
+
 use cgmath::{ Vector4, Vector3, Vector2 };
-use vulkano::device::physical::{PhysicalDevice, QueueFamily};
-use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryCommandBuffer, CommandBufferUsage, SubpassContents, self };
-use vulkano::command_buffer::CommandBufferLevel;
-use vulkano::OomError;
+use vulkano::device::physical::PhysicalDevice;
+use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryCommandBuffer, CommandBufferUsage, SubpassContents };
 use vulkano::device::{ Device, Queue };
 use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError, SwapchainAcquireFuture, Surface, ColorSpace, PresentMode, acquire_next_image };
-use vulkano::image::{ ImageUsage, SwapchainImage, ImageAccess, SampleCount };
+use vulkano::image::{ ImageUsage, SwapchainImage, ImageAccess, SampleCount, ImageLayout };
 use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -30,6 +23,7 @@ use vulkano::render_pass::{ Framebuffer, RenderPass, Subpass };
 use vulkano::buffer::BufferUsage;
 use vulkano::format::{ Format, ClearValue };
 use vulkano::sync::{ FlushError, GpuFuture, now, FenceSignalFuture };
+use vulkano::ordered_passes_renderpass;
 use winit::window::Window;
 
 #[cfg(feature = "debug")]
@@ -46,7 +40,6 @@ use self::sprite::DynamicSpriteRenderer;
 use self::interface::*;
 #[cfg(feature = "debug")]
 use self::debug::*;
-//use self::resolve::Resolver;
 
 pub use self::settings::RenderSettings;
 
@@ -83,11 +76,9 @@ pub struct Renderer {
     dynamic_sprite_renderer: DynamicSpriteRenderer,
     #[cfg(feature = "debug")]
     debug_renderer: DebugRenderer,
-    //resolver: Resolver,
     swapchain: Arc<Swapchain<Window>>,
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
-    //output_buffer: ImageBuffer,
     diffuse_buffer: ImageBuffer,
     normal_buffer: ImageBuffer,
     water_buffer: ImageBuffer,
@@ -97,7 +88,6 @@ pub struct Renderer {
     screen_vertex_buffer: ScreenVertexBuffer,
     billboard_vertex_buffer: ScreenVertexBuffer,
     current_frame: Option<CurrentFrame>,
-    semaphore: Option<Box<dyn GpuFuture>>,
     previous_frame_end: Option<Box<dyn GpuFuture>>,
     picker_fence: Option<FenceSignalFuture<Box<dyn GpuFuture>>>,
     recreate_swapchain: bool,
@@ -110,7 +100,6 @@ pub struct Renderer {
     expanded_arrow_texture: Texture,
     collapsed_arrow_texture: Texture,
 
-    shadow_render_pass: Arc<RenderPass>,
     shadow_framebuffers: Vec<Arc<Framebuffer>>,
     directional_shadow_maps: Vec<ImageBuffer>,
     geometry_shadow_renderer: GeometryShadowRenderer,
@@ -151,29 +140,29 @@ impl Renderer {
         #[cfg(feature = "debug")]
         print_debug!("created {}swapchain{}", MAGENTA, NONE);
 
-        let render_pass = ordered_passes_renderpass_korangar!(device.clone(),
+        let render_pass = ordered_passes_renderpass!(device.clone(),
             attachments: {
                 output: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: swapchain.format(),
                     samples: 1,
                 },
                 diffuse: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: Format::R32G32B32A32_SFLOAT,
                     samples: 4,
                 },
                 normal: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: Format::R16G16B16A16_SFLOAT,
                     samples: 4,
                 },
                 water: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: Format::R8_SRGB,
                     samples: 4,
                 },
@@ -185,7 +174,7 @@ impl Renderer {
                 },
                 depth: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: Format::D32_SFLOAT,
                     samples: 4,
                 }
@@ -210,7 +199,7 @@ impl Renderer {
             attachments: {
                 depth: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: Format::D32_SFLOAT,
                     samples: 1,
                 }
@@ -227,7 +216,7 @@ impl Renderer {
             attachments: {
                 color: {
                     load: Clear,
-                    store: DontCare,
+                    store: Store,
                     format: Format::R32_UINT,
                     samples: 1,
                 }
@@ -304,7 +293,6 @@ impl Renderer {
         texture_future.cleanup_finished();
 
         let previous_frame_end = now(device.clone()).boxed().into();
-        let semaphore = now(device.clone()).boxed().into();
         let picker_fence = None;
         let current_frame = None;
         let recreate_swapchain = false;
@@ -344,7 +332,6 @@ impl Renderer {
             current_frame,
             previous_frame_end,
             picker_fence,
-            semaphore,
             recreate_swapchain,
             window_size,
             font_map,
@@ -356,7 +343,6 @@ impl Renderer {
             collapsed_arrow_texture,
 
             geometry_shadow_renderer,
-            shadow_render_pass,
             shadow_framebuffers,
             directional_shadow_maps,
 
@@ -372,24 +358,34 @@ impl Renderer {
     fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Vec<Arc<Framebuffer>>, ImageBuffer, ImageBuffer, ImageBuffer, ImageBuffer, ImageBuffer, Viewport) {
 
         let dimensions = images[0].dimensions().width_height();
- 
-        let diffuse_buffer = ImageView::new(Arc::new(AttachmentImage::transient_multisampled_input_attachment(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT).unwrap())).unwrap();
-        let normal_buffer = ImageView::new(Arc::new(AttachmentImage::transient_multisampled_input_attachment(device.clone(), dimensions, SampleCount::Sample4, Format::R16G16B16A16_SFLOAT).unwrap())).unwrap();
-        let water_buffer = ImageView::new(Arc::new(AttachmentImage::transient_multisampled_input_attachment(device.clone(), dimensions, SampleCount::Sample4, Format::R8_SRGB).unwrap())).unwrap();
 
-        let image_usage = ImageUsage {
-            transfer_source: false,
-            transfer_destination: true,
+        let color_buffer_usage = ImageUsage {
             sampled: true,
-            storage: false,
             color_attachment: true,
-            depth_stencil_attachment: false,
-            transient_attachment: false,
             input_attachment: true, 
+            ..ImageUsage::none()
         };
 
-        let interface_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, image_usage).unwrap())).unwrap();
-        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::transient_multisampled_input_attachment(device.clone(), dimensions, SampleCount::Sample4, Format::D32_SFLOAT).unwrap())).unwrap();
+        let interface_image_usage = ImageUsage {
+            sampled: true,
+            transfer_destination: true,
+            color_attachment: true,
+            input_attachment: true,
+            ..ImageUsage::none()
+        };
+
+        let depth_buffer_usage = ImageUsage {
+            sampled: true,
+            depth_stencil_attachment: true,
+            input_attachment: true,
+            ..ImageUsage::none()
+        };
+
+        let diffuse_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, color_buffer_usage).unwrap())).unwrap();
+        let normal_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R16G16B16A16_SFLOAT, color_buffer_usage).unwrap())).unwrap();
+        let water_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R8_SRGB, color_buffer_usage).unwrap())).unwrap();
+        let interface_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, interface_image_usage).unwrap())).unwrap();
+        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::D32_SFLOAT, depth_buffer_usage).unwrap())).unwrap();
 
         let framebuffers = images
             .iter()
@@ -419,7 +415,13 @@ impl Renderer {
     fn window_size_dependent_shadow_setup(device: Arc<Device>, render_pass: Arc<RenderPass>, framebuffer_count: usize) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>) {
         
         let dimensions = [8092, 8096];
-        let directional_shadow_maps: Vec<ImageBuffer> = (0..framebuffer_count).map(|_| ImageView::new(Arc::new(AttachmentImage::sampled_input_attachment(device.clone(), dimensions, Format::D32_SFLOAT).unwrap())).unwrap()).collect();
+        let buffer_usage = ImageUsage {
+            sampled: true,
+            depth_stencil_attachment: true,
+            ..ImageUsage::none()
+        };
+
+        let directional_shadow_maps: Vec<ImageBuffer> = (0..framebuffer_count).map(|_| ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D32_SFLOAT, buffer_usage).unwrap())).unwrap()).collect();
 
         let framebuffers = directional_shadow_maps.iter().map(|image| {
             Framebuffer::start(render_pass.clone())
@@ -433,10 +435,12 @@ impl Renderer {
     fn window_size_dependent_picker_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>, Vec<Arc<CpuAccessibleBuffer<[u32]>>>) {
         
         let dimensions = images[0].dimensions().width_height();
-
-        let mut image_usage = ImageUsage::color_attachment();
-        image_usage.transfer_source = true;
-        image_usage.sampled = true;
+        let image_usage = ImageUsage {
+            sampled: true,
+            transfer_source: true,
+            color_attachment: true,
+            ..ImageUsage::none()
+        };
 
         let picker_images: Vec<ImageBuffer> = (0..images.len())
             .map(|_| ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::R32_UINT, image_usage).unwrap())).unwrap())

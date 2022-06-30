@@ -43,7 +43,7 @@ impl Surface {
         return Self {
             u,
             v,
-            texture_index: texture_index % 10, // TODO: remove % 10 and derive new
+            texture_index: texture_index % 14, // TODO: remove % 14 and derive new
             _light_map_index: light_map_index,
             _color: color
         };

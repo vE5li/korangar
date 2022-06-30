@@ -16,6 +16,7 @@ pub enum NetworkEvent {
     PlayerMove(Vector2<usize>, Vector2<usize>, u32),
     EntityMove(usize, Vector2<usize>, Vector2<usize>, u32),
     ChangeMap(String, Vector2<usize>),
+    UpdataClientTick(u32),
 }
 
 use std::net::TcpStream;
@@ -895,6 +896,18 @@ struct SwitchCharacterSlotPacket {
     pub remaining_moves: u16, // 1 instead of default, just in case the sever actually uses this value (rAthena does not)
 }
 
+#[derive(Debug, Packet)]
+#[header(0x7f, 0x00)]
+struct ServerTickPacket {
+    pub client_tick: u32,
+}
+
+#[derive(Packet, new)]
+#[header(0x60, 0x03)]
+struct RequestServerTickPacket {
+    pub client_tick: u32,
+}
+
 #[derive(Debug, PartialEq)]
 pub enum SwitchCharacterSlotResponseStatus {
     //#[byte_value(0)]
@@ -1184,7 +1197,7 @@ pub struct NetworkingSystem {
     changed: Rc<RefCell<bool>>,
     login_keep_alive_timer: Timer,
     character_keep_alive_timer: Timer,
-    tick: u32,
+    map_keep_alive_timer: Timer,
 }
 
 impl NetworkingSystem {
@@ -1203,7 +1216,7 @@ impl NetworkingSystem {
         let changed = Rc::new(RefCell::new(false));
         let login_keep_alive_timer = Timer::new(Duration::from_secs(58));
         let character_keep_alive_timer = Timer::new(Duration::from_secs(10));
-        let tick = 0;
+        let map_keep_alive_timer = Timer::new(Duration::from_secs(4));
 
         login_stream.set_read_timeout(Duration::from_secs(20).into()).unwrap();
 
@@ -1218,7 +1231,7 @@ impl NetworkingSystem {
             characters,
             login_keep_alive_timer,
             character_keep_alive_timer,
-            tick,
+            map_keep_alive_timer,
         }
     }
 
@@ -1359,19 +1372,22 @@ impl NetworkingSystem {
         buffer[..response_lenght].to_vec().into()
     }
 
-    pub fn keep_alive(&mut self, delta_time: f64) {
+    pub fn keep_alive(&mut self, delta_time: f64, client_tick: u32) {
 
         if self.login_keep_alive_timer.update(delta_time) {
             //println!("login keep_alive sent"); // add feature flag debug_network
             self.send_packet_to_login_server(LoginServerKeepalivePacket::default());
         }
 
-        if self.character_keep_alive_timer.update(delta_time) {
+        if self.character_keep_alive_timer.update(delta_time) && self.character_stream.is_some() {
             //println!("character keep_alive sent");
             self.send_packet_to_character_server(CharacterServerKeepalivePacket::default());
         }
 
-        self.tick += (delta_time * 1000.0) as u32;
+        if self.map_keep_alive_timer.update(delta_time) && self.map_stream.is_some() {
+            //println!("character keep_alive sent");
+            self.send_packet_to_map_server(RequestServerTickPacket::new(client_tick));
+        }
     }
 
     pub fn crate_character(&mut self, slot: usize, /* TODO: */) -> Result<(), String> {
@@ -1446,7 +1462,7 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn select_character(&mut self, slot: usize) -> Result<(String, Vector2<usize>, usize, usize), String> {
+    pub fn select_character(&mut self, slot: usize) -> Result<(String, Vector2<usize>, usize, usize, u32), String> {
 
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
@@ -1489,7 +1505,6 @@ impl NetworkingSystem {
         let _packet_180b = Packet180b::try_from_bytes(&mut byte_stream).unwrap();
         let map_server_login_success_packet = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
-        self.tick = map_server_login_success_packet.client_tick;
 
         while let Ok(server_message_packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
             let server_message = String::from_bytes(&mut byte_stream, Some(server_message_packet.packet_length as usize - 4));
@@ -1498,7 +1513,13 @@ impl NetworkingSystem {
 
         let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
 
-        Ok((change_map_packet.map_name.replace(".gat", "").to_string(), Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize), select_character_success_packet.character_id as usize, 200)) // set 200 to 0 as soon as stats are properly updated
+        Ok((
+                change_map_packet.map_name.replace(".gat", "").to_string(),
+                Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
+                select_character_success_packet.character_id as usize,
+                200,
+                map_server_login_success_packet.client_tick
+        )) // set 200 to 0 as soon as stats are properly updated
     }
 
     pub fn request_switch_character_slot(&mut self, origin_slot: usize) {
@@ -1610,7 +1631,6 @@ impl NetworkingSystem {
                     events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.position.to_vector(), packet.speed as usize));
 
                 } else if let Ok(packet) = MovingEntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{}", self.tick); 
                     println!("{:#?}", packet); 
                     let (_origin, destination) = packet.position.to_vectors();
                     events.push(NetworkEvent::AddEntity(packet.entity_id as usize, destination, packet.speed as usize));
@@ -1717,6 +1737,10 @@ impl NetworkingSystem {
 
                 } else if let Ok(packet) = QuestNotificatonPacket::try_from_bytes(&mut byte_stream) { 
                     println!("{:?}", packet); 
+
+                } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) { 
+                    println!("{:?}", packet);
+                    events.push(NetworkEvent::UpdataClientTick(packet.client_tick));
 
                 } else {
                     println!("{}unhandled{}: {:x?}", RED, NONE, byte_stream.remaining());

@@ -1,6 +1,6 @@
 use derive_new::new;
 use std::sync::Arc;
-use cgmath::{ Vector3, Vector2 };
+use cgmath::{ Vector3, Vector2, VectorSpace };
 use vulkano::device::Device;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::sync::GpuFuture;
@@ -11,9 +11,8 @@ use loaders::TextureLoader;
 
 #[derive(new)]
 struct Movement {
-    steps: Vec<Vector2<usize>>,
+    steps: Vec<(Vector2<usize>, u32)>,
     starting_timestamp: u32,
-    arrival_timestamp: u32,
     #[cfg(feature = "debug")]
     #[new(default)]
     pub steps_vertex_buffer: Option<ModelVertexBuffer>,
@@ -25,13 +24,6 @@ pub struct Entity {
 
     active_movement: Option<Movement>,
     movement_speed: usize,
-
-    //steps: Vec<Vector2<usize>>,
-    //position: Vector2<f32>,
-
-    //#[cfg(feature = "debug")]
-    //pub steps_vertex_buffer: Option<ModelVertexBuffer>,
-    //
 
     pub maximum_health_points: usize,
     pub maximum_spell_points: usize,
@@ -58,8 +50,6 @@ impl Entity {
         let current_spell_points = 50;
         let current_activity_points = 0;
 
-        let timer = 0.0;
-
         let texture = texture_loader.get("assets/player.png", texture_future).unwrap(); // 8 x 14
 
         Self {
@@ -79,9 +69,10 @@ impl Entity {
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
         self.position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
+        self.active_movement = None;
     }
 
-    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) -> Vector3<f32> {
+    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
 
         use pathfinding::prelude::bfs;
 
@@ -150,26 +141,23 @@ impl Entity {
         let result = bfs(&Pos(from.x, from.y), |p| p.successors(map), |p| *p == Pos(to.x, to.y));
 
         if let Some(path) = result {
-            let steps: Vec<Vector2<usize>> = path.into_iter().map(|pos| pos.to_vector()).collect();
+            let steps: Vec<(Vector2<usize>, u32)> = path.into_iter().enumerate().map(|(index, pos)| {
+                let arrival_timestamp = starting_timestamp + index as u32 * (self.movement_speed as u32 / 2);
+                (pos.to_vector(), arrival_timestamp)
+            }).collect();
 
-            let arrival_timestamp = starting_timestamp + ((steps.len() as u32) / (self.movement_speed as u32) * 10);
-
-            self.active_movement = Movement::new(steps, starting_timestamp, arrival_timestamp).into();
+            self.active_movement = Movement::new(steps, starting_timestamp).into();
         }
-
-        self.set_position(map, Vector2::new(to.x, to.y));
-
-        self.position
     }
 
     #[cfg(feature = "debug")]
-    fn generate_step_texture_coordinates(steps: &Vec<Vector2<usize>>, step: Vector2<usize>, index: usize) -> ([Vector2<f32>; 4], i32) {
+    fn generate_step_texture_coordinates(steps: &Vec<(Vector2<usize>, u32)>, step: Vector2<usize>, index: usize) -> ([Vector2<f32>; 4], i32) {
 
         if steps.len() - 1 == index {
             return ([Vector2::new(0.0, 1.0), Vector2::new(1.0, 1.0), Vector2::new(1.0, 0.0), Vector2::new(0.0, 0.0)], 0);
         }
 
-        let delta = steps[index + 1].map(|component| component as isize) - step.map(|component| component as isize);
+        let delta = steps[index + 1].0.map(|component| component as isize) - step.map(|component| component as isize);
 
         match delta {
             Vector2 { x: 1, y: 0 } => ([Vector2::new(0.0, 0.0), Vector2::new(1.0, 0.0), Vector2::new(1.0, 1.0), Vector2::new(0.0, 1.0)], 1),
@@ -190,7 +178,7 @@ impl Entity {
         let mut native_steps_vertices = Vec::new();
         let mut active_movement = self.active_movement.as_mut().unwrap();
 
-        for (index, step) in active_movement.steps.iter().cloned().enumerate() {
+        for (index, (step, _)) in active_movement.steps.iter().cloned().enumerate() {
 
             let tile = map.get_tile(step);
             let offset = Vector2::new(step.x as f32 * 5.0, step.y as f32 * 5.0);
@@ -219,7 +207,38 @@ impl Entity {
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
     }
 
-    pub fn update(&mut self, delta_time: f32) {
+    pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: u32) {
+
+        if let Some(active_movement) = self.active_movement.take() {
+
+            let last_step = active_movement.steps.last().unwrap();
+
+            if client_tick > last_step.1 {
+                self.set_position(map, Vector2::new(last_step.0.x, last_step.0.y));
+            } else {
+
+                let mut last_step_index = 0;
+                while active_movement.steps[last_step_index + 1].1 < client_tick { 
+                    last_step_index += 1;
+                }
+
+                let last_step = active_movement.steps[last_step_index];
+                let next_step = active_movement.steps[last_step_index + 1];
+
+                let last_step_position = Vector3::new(last_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(last_step.0), last_step.0.y as f32 * 5.0 + 2.5);
+                let next_step_position = Vector3::new(next_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(next_step.0), next_step.0.y as f32 * 5.0 + 2.5);
+
+                let clamped_tick = u32::max(last_step.1, client_tick);
+                let total = next_step.1 - last_step.1;
+                let offset = clamped_tick - last_step.1;
+
+                let movement_elapsed = (1.0 / total as f32) * offset as f32;
+                let current_position = last_step_position.lerp(next_step_position, movement_elapsed);
+
+                self.position = current_position;
+                self.active_movement = active_movement.into();
+            }
+        }
     }
 
     pub fn render(&self, renderer: &mut Renderer, camera: &dyn Camera) {

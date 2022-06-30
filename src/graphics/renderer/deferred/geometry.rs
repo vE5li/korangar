@@ -133,6 +133,31 @@ impl GeometryRenderer {
             false => texture0.clone(),
         };
 
+        let texture10 = match textures.len() > 10 {
+            true => textures[10].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture11 = match textures.len() > 11 {
+            true => textures[11].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture12 = match textures.len() > 12 {
+            true => textures[12].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture13 = match textures.len() > 13 {
+            true => textures[13].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture14 = match textures.len() > 14 {
+            true => textures[14].clone(),
+            false => texture0.clone(),
+        };
+
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view: view_matrix.into(),
@@ -142,18 +167,22 @@ impl GeometryRenderer {
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::buffer(0, matrices_subbuffer),
-            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
-            WriteDescriptorSet::image_view_array(2, 0, [
-                texture0 as Arc<dyn ImageViewAbstract + 'static>,
-                texture1 as Arc<dyn ImageViewAbstract + 'static>,
-                texture2 as Arc<dyn ImageViewAbstract + 'static>,
-                texture3 as Arc<dyn ImageViewAbstract + 'static>,
-                texture4 as Arc<dyn ImageViewAbstract + 'static>,
-                texture5 as Arc<dyn ImageViewAbstract + 'static>,
-                texture6 as Arc<dyn ImageViewAbstract + 'static>,
-                texture7 as Arc<dyn ImageViewAbstract + 'static>,
-                texture8 as Arc<dyn ImageViewAbstract + 'static>,
-                texture9 as Arc<dyn ImageViewAbstract + 'static>,
+            WriteDescriptorSet::image_view_sampler_array(1, 0, [
+                (texture0 as _, self.linear_sampler.clone()),
+                (texture1 as _, self.linear_sampler.clone()),
+                (texture2 as _, self.linear_sampler.clone()),
+                (texture3 as _, self.linear_sampler.clone()),
+                (texture4 as _, self.linear_sampler.clone()),
+                (texture5 as _, self.linear_sampler.clone()),
+                (texture6 as _, self.linear_sampler.clone()),
+                (texture7 as _, self.linear_sampler.clone()),
+                (texture8 as _, self.linear_sampler.clone()),
+                (texture9 as _, self.linear_sampler.clone()),
+                (texture10 as _, self.linear_sampler.clone()),
+                (texture11 as _, self.linear_sampler.clone()),
+                (texture12 as _, self.linear_sampler.clone()),
+                (texture13 as _, self.linear_sampler.clone()),
+                (texture14 as _, self.linear_sampler.clone()),
             ])
         ]).unwrap(); 
 
@@ -225,6 +254,31 @@ impl GeometryRenderer {
             false => texture0.clone(),
         };
 
+        let texture10 = match node.textures.len() > 10 {
+            true => node.textures[10].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture11 = match node.textures.len() > 11 {
+            true => node.textures[11].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture12 = match node.textures.len() > 12 {
+            true => node.textures[12].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture13 = match node.textures.len() > 13 {
+            true => node.textures[13].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture14 = match node.textures.len() > 14 {
+            true => node.textures[14].clone(),
+            false => texture0.clone(),
+        };
+
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view: view_matrix.into(),
@@ -234,18 +288,22 @@ impl GeometryRenderer {
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::buffer(0, matrices_subbuffer),
-            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
-            WriteDescriptorSet::image_view_array(2, 0, [
-                texture0 as Arc<dyn ImageViewAbstract + 'static>,
-                texture1 as Arc<dyn ImageViewAbstract + 'static>,
-                texture2 as Arc<dyn ImageViewAbstract + 'static>,
-                texture3 as Arc<dyn ImageViewAbstract + 'static>,
-                texture4 as Arc<dyn ImageViewAbstract + 'static>,
-                texture5 as Arc<dyn ImageViewAbstract + 'static>,
-                texture6 as Arc<dyn ImageViewAbstract + 'static>,
-                texture7 as Arc<dyn ImageViewAbstract + 'static>,
-                texture8 as Arc<dyn ImageViewAbstract + 'static>,
-                texture9 as Arc<dyn ImageViewAbstract + 'static>,
+            WriteDescriptorSet::image_view_sampler_array(1, 0, [
+                (texture0 as _, self.linear_sampler.clone()),
+                (texture1 as _, self.linear_sampler.clone()),
+                (texture2 as _, self.linear_sampler.clone()),
+                (texture3 as _, self.linear_sampler.clone()),
+                (texture4 as _, self.linear_sampler.clone()),
+                (texture5 as _, self.linear_sampler.clone()),
+                (texture6 as _, self.linear_sampler.clone()),
+                (texture7 as _, self.linear_sampler.clone()),
+                (texture8 as _, self.linear_sampler.clone()),
+                (texture9 as _, self.linear_sampler.clone()),
+                (texture10 as _, self.linear_sampler.clone()),
+                (texture11 as _, self.linear_sampler.clone()),
+                (texture12 as _, self.linear_sampler.clone()),
+                (texture13 as _, self.linear_sampler.clone()),
+                (texture14 as _, self.linear_sampler.clone()),
             ])
         ]).unwrap(); 
 

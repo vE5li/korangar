@@ -54,7 +54,7 @@ use winit::window::WindowBuilder;
 use debug::*;
 use types::Entity;
 use input::{ InputSystem, UserEvent };
-use system::{ FrameTimer, get_instance_extensions, get_layers, get_device_extensions };
+use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
 use loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader };
 use graphics::{ Renderer, RenderSettings };
 use graphics::camera::*;
@@ -66,7 +66,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    let instance = Instance::new(None, Version::V1_1, &get_instance_extensions(), get_layers()).expect("failed to create instance");
+    let instance = Instance::new(None, Version::V1_2, &get_instance_extensions(), get_layers()).expect("failed to create instance");
 
     #[cfg(feature = "debug")]
     let _debug_callback = vulkano::instance::debug::DebugCallback::new(&instance, MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
@@ -101,6 +101,15 @@ fn main() {
 
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
+
+    //let features = Features {
+    //    descriptor_indexing: true,
+    //    shader_uniform_buffer_array_non_uniform_indexing: true,
+    //    runtime_descriptor_array: true,
+    //    descriptor_binding_variable_descriptor_count: true,
+    //    descriptor_binding_partially_bound: true,
+    //    ..Features::none()
+    //};
 
     let (device, mut queues) = Device::new(physical_device, physical_device.supported_features(), &required_device_extensions, [(queue_family, 0.5)].iter().cloned()).expect("failed to create device");
 
@@ -161,7 +170,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize timer");
 
-    let mut frame_timer = FrameTimer::new();
+    let mut game_timer = GameTimer::new();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -196,8 +205,7 @@ fn main() {
     texture_future.flush().unwrap();
     texture_future.cleanup_finished();
 
-    // TEMP
-    //player_camera.set_focus(entities[0].position);
+    //panic!();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -239,12 +247,12 @@ fn main() {
 
                 input_system.update_delta();
 
-                let delta_time = frame_timer.update();
+                let delta_time = game_timer.update();
 
-                networking_system.keep_alive(delta_time);
+                networking_system.keep_alive(delta_time, game_timer.get_client_tick());
 
                 let network_events = networking_system.network_events();
-                let (user_events, hovered_element) = input_system.user_events(&mut renderer, &mut interface);
+                let (user_events, hovered_element) = input_system.user_events(&mut renderer, &mut interface, &render_settings);
 
                 let mut texture_future = now(device.clone()).boxed();
 
@@ -268,25 +276,31 @@ fn main() {
                         }
 
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
-                            let focus_point = entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
-                            player_camera.set_focus(focus_point);
+                            entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
 
                             #[cfg(feature = "debug")]
                             entities[0].generate_steps_vertex_buffer(device.clone(), &map);
                         }
 
                         NetworkEvent::ChangeMap(map_name, player_position) => {
+
+                            while entities.len() > 1 {
+                                entities.pop(); 
+                            }
+
                             match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
                                 Ok(new_map) => map = new_map,
                                 Err(message) => print_debug!("failed to load new map: {}", message),
                             }
 
                             entities[0].set_position(&map, player_position);
-                            player_camera.set_focus(entities[0].position);
+                            player_camera.set_focus_point(entities[0].position);
                             networking_system.map_loaded();
                         }
 
-                        _ignored => {},
+                        NetworkEvent::UpdataClientTick(client_tick) => {
+                            game_timer.set_client_tick(client_tick);
+                        }
                     }
                 }
 
@@ -306,21 +320,23 @@ fn main() {
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&AudioSettingsWindow::default()),
                         UserEvent::ReloadTheme => interface.reload_theme(),
                         UserEvent::SaveTheme => interface.save_theme(),
-                        UserEvent::LoadNewMap(map_name) => {
 
-                            while entities.len() > 1 {
-                                entities.pop(); 
-                            }
-
+                        UserEvent::LoadNewMap(map_name) => { // MAKE THIS DEBUG ONLY
                             match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
-                                Ok(new_map) => map = new_map,
+
+                                Ok(new_map) => {
+                                    map = new_map;
+                                    entities.clear();
+                                    render_settings.use_debug_camera = true;
+                                },
+
                                 Err(message) => print_debug!("failed to load new map: {}", message),
                             }
                         },
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot) {
 
-                                Ok((map_name, player_position, character_id, movement_speed)) => {
+                                Ok((map_name, player_position, character_id, movement_speed, client_tick)) => {
 
                                     interface.close_window_with_class("character_selection"); // FIND A NICER WAY TO GET THE CLASS NAME
 
@@ -331,10 +347,11 @@ fn main() {
 
                                     let player = Entity::new(&mut texture_loader, &mut texture_future, &map, character_id, player_position, movement_speed);
 
-                                    player_camera.set_focus(player.position);
+                                    player_camera.set_focus_point(player.position);
                                     entities.push(player);
 
                                     networking_system.map_loaded();
+                                    game_timer.set_client_tick(client_tick);
                                 }
 
                                 Err(message) => interface.open_window(&ErrorWindow::new(message)),
@@ -440,7 +457,11 @@ fn main() {
                     .map(|_| texture_future.then_signal_fence_and_flush().unwrap().into())
                     .unwrap_or_default();
 
-                entities.iter_mut().for_each(|entity| entity.update(delta_time as f32));
+                entities.iter_mut().for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
+
+                if !entities.is_empty() {
+                    player_camera.set_focus_point(entities[0].position);
+                }
 
                 player_camera.update(delta_time);
 
@@ -521,7 +542,7 @@ fn main() {
                 renderer.render_interface(&render_settings);
 
                 if render_settings.show_frames_per_second {
-                    interface.render_frames_per_second(&mut renderer, frame_timer.last_frames_per_second());
+                    interface.render_frames_per_second(&mut renderer, game_timer.last_frames_per_second());
                 }
 
                 renderer.stop_frame();

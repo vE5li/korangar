@@ -10,7 +10,7 @@ use winit::dpi::PhysicalPosition;
 
 use interface::types::ElementCell;
 use interface::{ Interface, ClickAction };
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, RenderSettings};
 
 pub use self::event::UserEvent;
 pub use self::mode::MouseInputMode;
@@ -114,7 +114,7 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, renderer: &mut Renderer, interface: &mut Interface) -> (Vec<UserEvent>, Option<ElementCell>) {
+    pub fn user_events(&mut self, renderer: &mut Renderer, interface: &mut Interface, render_settings: &RenderSettings) -> (Vec<UserEvent>, Option<ElementCell>) {
 
         let mut events = Vec::new();
         let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {         
@@ -122,9 +122,9 @@ impl InputSystem {
             false => (None, None),
         };
 
-        let shift_pressed = self.keys[42].down();
+        let shift_down = self.keys[42].down();
 
-        if shift_pressed {
+        if shift_down {
 
             if let Some(window_index) = &mut window_index {
 
@@ -143,7 +143,7 @@ impl InputSystem {
         }
 
         if let Some(window_index) = &mut window_index {
-            if (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_pressed {
+            if (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down {
 
                 *window_index = interface.move_window_to_top(*window_index);
                 self.mouse_input_mode = MouseInputMode::ClickInterface;
@@ -208,19 +208,19 @@ impl InputSystem {
             }
         }
 
-        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && self.mouse_input_mode.is_none() && self.mouse_delta.x != 0.0 {
+        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && self.mouse_input_mode.is_none() && self.mouse_delta.x != 0.0 && !render_settings.use_debug_camera {
             events.push(UserEvent::CameraRotate(self.mouse_delta.x));
         }
 
         if self.scroll_delta != 0.0 {
             if let Some(_window_index) = window_index {
                 // TODO: scroll window
-            } else {
+            } else if !render_settings.use_debug_camera {
                 events.push(UserEvent::CameraZoom(-self.scroll_delta));
             }
         }
 
-        if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
+        if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !render_settings.use_debug_camera {
             let window_size = renderer.get_window_size();
             let picker_buffer = renderer.get_picker_buffer();
             let pixel = picker_buffer.read().unwrap()[self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x];
@@ -245,47 +245,48 @@ impl InputSystem {
         }
 
         #[cfg(feature = "debug")]
-        if shift_pressed {
+        if self.keys[42].pressed() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraAccelerate);
         }
 
         #[cfg(feature = "debug")]
-        if self.keys[42].released() {
+        if self.keys[42].released() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraDecelerate);
         }
 
         #[cfg(feature = "debug")]
         if self.keys[33].pressed() {
             events.push(UserEvent::ToggleUseDebugCamera);
+            events.push(UserEvent::CameraDecelerate);
         }
 
         #[cfg(feature = "debug")]
-        if self.left_mouse_button.down() && !self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
+        if self.left_mouse_button.down() && !self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraLookAround(-self.mouse_delta));
         }
 
         #[cfg(feature = "debug")]
-        if self.keys[17].down() {
+        if self.keys[17].down() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraMoveForward);
         }
 
         #[cfg(feature = "debug")]
-        if self.keys[31].down() {
+        if self.keys[31].down() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraMoveBackward);
         }
 
         #[cfg(feature = "debug")]
-        if self.keys[30].down() {
+        if self.keys[30].down() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraMoveLeft);
         }
 
         #[cfg(feature = "debug")]
-        if self.keys[32].down() {
+        if self.keys[32].down() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraMoveRight);
         }
 
         #[cfg(feature = "debug")]
-        if self.keys[57].down() {
+        if self.keys[57].down() && render_settings.use_debug_camera {
             events.push(UserEvent::CameraMoveUp);
         }
 

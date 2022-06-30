@@ -32,7 +32,7 @@ impl PlayerCamera {
         }
     }
 
-    pub fn set_focus(&mut self, position: Vector3<f32>) {
+    pub fn set_focus_point(&mut self, position: Vector3<f32>) {
         self.focus_position = Point3::new(position.x, position.y, position.z);
     }
 

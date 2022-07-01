@@ -150,12 +150,15 @@ impl GameFileLoader {
             .ok_or(format!("failed to find file {}", path));
 
         if result.is_err() { // TEMP
+
+            #[cfg(feature = "debug")]
             print_debug!("failed to find file {}; tying to replace it with placeholder", path);
 
             let delimiter = path.len() - 4;
             match &path[delimiter..] {
                 ".bmp" | ".BMP" => return self.get("data\\texture\\BLACK.BMP"),
                 ".rsm" => return self.get("data\\model\\abyss\\coin_j_01.rsm"),
+                ".spr" => return self.get("data\\sprite\\npc\\1_f_maria.spr"),
                 _other => {},
             }
         }

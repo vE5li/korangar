@@ -123,6 +123,11 @@ impl InputSystem {
         };
 
         let shift_down = self.keys[42].down();
+  
+        #[cfg(feature = "debug")]
+        let lock_actions = render_settings.use_debug_camera;
+        #[cfg(not(feature = "debug"))]
+        let lock_actions = false;
 
         if shift_down {
 
@@ -208,19 +213,19 @@ impl InputSystem {
             }
         }
 
-        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && self.mouse_input_mode.is_none() && self.mouse_delta.x != 0.0 && !render_settings.use_debug_camera {
+        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && self.mouse_input_mode.is_none() && self.mouse_delta.x != 0.0 && !lock_actions {
             events.push(UserEvent::CameraRotate(self.mouse_delta.x));
         }
 
         if self.scroll_delta != 0.0 {
             if let Some(_window_index) = window_index {
                 // TODO: scroll window
-            } else if !render_settings.use_debug_camera {
+            } else if !lock_actions {
                 events.push(UserEvent::CameraZoom(-self.scroll_delta));
             }
         }
 
-        if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !render_settings.use_debug_camera {
+        if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
             let window_size = renderer.get_window_size();
             let picker_buffer = renderer.get_picker_buffer();
             let pixel = picker_buffer.read().unwrap()[self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x];
@@ -236,10 +241,12 @@ impl InputSystem {
             events.push(UserEvent::OpenMenuWindow);
         }
 
+        #[cfg(feature = "debug")]
         if self.keys[50].pressed() {
             events.push(UserEvent::OpenMapsWindow);
         }
 
+        #[cfg(feature = "debug")]
         if self.keys[19].pressed() {
             events.push(UserEvent::OpenRenderSettingsWindow);
         }

@@ -26,10 +26,15 @@ impl PrototypeWindow for MenuWindow {
         let elements: Vec<ElementCell> = vec![
             cell!(Button::new("graphics settings", UserEvent::OpenGraphicsSettingsWindow, true)),
             cell!(Button::new("audio settings", UserEvent::OpenAudioSettingsWindow, true)),
+            #[cfg(feature = "debug")]
             cell!(DebugButton::new("render settings", UserEvent::OpenRenderSettingsWindow, true)),
+            #[cfg(feature = "debug")]
             cell!(DebugButton::new("map viewer", UserEvent::OpenMapDataWindow, true)),
+            #[cfg(feature = "debug")]
             cell!(DebugButton::new("maps", UserEvent::OpenMapsWindow, true)),
+            #[cfg(feature = "debug")]
             cell!(DebugButton::new("theme viewer", UserEvent::OpenThemeViewerWindow, true)),
+            #[cfg(feature = "debug")]
             cell!(DebugButton::new("profiler", UserEvent::OpenProfilerWindow, true)),
             cell!(Button::new("exit korangar", UserEvent::Exit, true)),
         ];

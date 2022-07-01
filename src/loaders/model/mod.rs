@@ -84,7 +84,7 @@ impl ModelLoader {
         let magic = byte_stream.string(4);
         
         if &magic != "GRSM" {
-            return Err(format!("failed to read magic number from {}{}{}", MAGENTA, model_file, NONE));
+            return Err(format!("failed to read magic number from {}", model_file));
         }
 
         let version = byte_stream.version();
@@ -111,26 +111,12 @@ impl ModelLoader {
         let main_node_name = byte_stream.string(40);
         let node_count = byte_stream.integer32();
 
-        #[cfg(feature = "debug_model")]
-        {
-            print_debug!("version {}{}{}", MAGENTA, version, NONE);
-            print_debug!("animation length {}{}{}", MAGENTA, _animation_length, NONE);
-            print_debug!("shading type {}{}{}", MAGENTA, _shading_type, NONE);
-            print_debug!("alpha {}{}{}", MAGENTA, _alpha, NONE);
-            print_debug!("texture count {}{}{}", MAGENTA, texture_count, NONE);
-            print_debug!("main node name {}{}{}", MAGENTA, main_node_name, NONE);
-            print_debug!("node count {}{}{}", MAGENTA, node_count, NONE);
-        }
-
         let mut nodes = Vec::new();
 
         for _index in 0..node_count as usize {
 
             let node_name = byte_stream.string(40);
             let parent_name = byte_stream.string(40);
-
-            #[cfg(feature = "debug_model")]
-            let timer = Timer::new_dynamic(format!("parse node {}{}{}", MAGENTA, node_name, NONE));
 
             let texture_count = byte_stream.integer32();
 
@@ -146,8 +132,8 @@ impl ModelLoader {
             let offset_matrix = byte_stream.matrix3();
             let offset_translation = byte_stream.vector3();
             let position = byte_stream.vector3();
-            let rotation_angle = byte_stream.float32();
-            let rotation_axis = byte_stream.vector3();
+            let _rotation_angle = byte_stream.float32();
+            let _rotation_axis = byte_stream.vector3();
             let scale = byte_stream.vector3();
 
             let vertex_count = byte_stream.integer32() as usize;
@@ -266,29 +252,6 @@ impl ModelLoader {
             let transform = Transform::offset(-offset_translation) + Transform::offset_matrix(offset_matrix.into());
 
             nodes.push(Node::new(node_name.clone(), parent_name.clone(), node_textures, transform, vertex_buffer, bounding_box, offset_matrix, offset_translation, position, rotation, scale));
-
-            #[cfg(feature = "debug_model")]
-            {
-                parent_name.map(|name| print_debug!("parent name {}{}{}", MAGENTA, name, NONE));
-
-                let formatted_list = texture_indices.iter().map(|index| index.to_string()).collect::<Vec<String>>().join(", ");
-                print_debug!("texture count {}{}{}", MAGENTA, texture_count, NONE);
-                print_debug!("texture indices {}{}{}", MAGENTA, formatted_list, NONE);
-
-                print_debug!("offset matrix {}{:?}{}", MAGENTA, offset_matrix, NONE);
-                print_debug!("offset tranlation {}{:?}{}", MAGENTA, offset_translation, NONE);
-                print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
-                print_debug!("rotation angle {}{}{}", MAGENTA, rotation_angle, NONE);
-                print_debug!("rotation axis {}{:?}{}", MAGENTA, rotation_axis, NONE);
-                print_debug!("scale {}{:?}{}", MAGENTA, scale, NONE);
-
-                print_debug!("ModelVertex count {}{}{}", MAGENTA, vertex_count, NONE);
-                print_debug!("texture coordinate count {}{}{}", MAGENTA, texture_coordinate_count, NONE);
-                print_debug!("face count {}{}{}", MAGENTA, face_count, NONE);
-                print_debug!("rotation key frame count {}{}{}", MAGENTA, rotation_key_frame_count, NONE);
-
-                timer.stop();
-            }
         }
 
         // always 8 x 0x0 ?

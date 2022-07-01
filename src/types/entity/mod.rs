@@ -7,7 +7,8 @@ use vulkano::sync::GpuFuture;
 
 use graphics::{ Renderer, Camera, ModelVertexBuffer, NativeModelVertex, Texture, Transform };
 use types::map::Map;
-use loaders::TextureLoader;
+use loaders::{ TextureLoader, GameFileLoader };
+use crate::database::Database;
 
 #[derive(new)]
 struct Movement {
@@ -37,7 +38,7 @@ pub struct Entity {
 
 impl Entity {
 
-    pub fn new(texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, entity_id: usize, position: Vector2<usize>, movement_speed: usize) -> Self {
+    pub fn new(game_file_loader: &mut GameFileLoader, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, movement_speed: usize) -> Self {
 
         let position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
         let active_movement = None;
@@ -49,6 +50,11 @@ impl Entity {
         let current_health_points = 100;
         let current_spell_points = 50;
         let current_activity_points = 0;
+
+        let file_name = database.actor_of(job_id);
+        let file_path = format!("data\\sprite\\npc\\{}.spr", file_name);
+
+        game_file_loader.get(&file_path).unwrap();
 
         let texture = texture_loader.get("assets/player.png", texture_future).unwrap(); // 8 x 14
 

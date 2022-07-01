@@ -1,4 +1,5 @@
 use cgmath::Zero;
+use ron::ser::PrettyConfig;
 use serde::{ Serialize, Deserialize };
 
 #[cfg(feature = "debug")]
@@ -260,7 +261,7 @@ impl Theme {
 
         std::fs::read_to_string(theme_file)
             .ok()
-            .map(|data| serde_json::from_str(&data).ok())
+            .map(|data| ron::from_str(&data).ok())
             .flatten()
     }
 
@@ -283,7 +284,7 @@ impl Theme {
         #[cfg(feature = "debug")]
         print_debug!("saving theme to {}{}{}", MAGENTA, theme_file, NONE);
 
-        let data = serde_json::to_string_pretty(self).unwrap();
+        let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(theme_file, data).expect("unable to write file");
     }
 }

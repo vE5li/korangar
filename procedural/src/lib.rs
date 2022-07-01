@@ -454,10 +454,17 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
         impl #name {
 
             fn try_from_bytes(byte_stream: &mut crate::types::ByteStream) -> Result<Self, String> {
-                match byte_stream.match_signature(Self::header()) {
+                let result = match byte_stream.match_signature(Self::header()) {
                     true => Ok(Self { #(#from_bytes_initializers),* }),
                     false => Err(format!("invalid signature 0x{:02x} 0x{:02x}", byte_stream.peek(0), byte_stream.peek(1))),
-                } 
+                };
+
+                #[cfg(feature = "debug_network")]
+                if let Ok(packet) = &result {
+                    print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, packet);
+                }
+ 
+                result
             }
         }
     };

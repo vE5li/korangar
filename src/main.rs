@@ -13,7 +13,7 @@ extern crate winit;
 extern crate num;
 extern crate cgmath;
 extern crate serde;
-extern crate serde_json;
+extern crate ron;
 extern crate png;
 extern crate bmp;
 extern crate pathfinding;
@@ -23,6 +23,7 @@ extern crate chrono;
 #[macro_use]
 extern crate lazy_static;
 extern crate yazi;
+extern crate rusqlite;
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -37,6 +38,7 @@ mod graphics;
 mod loaders;
 mod interface;
 mod network;
+mod database;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -49,6 +51,7 @@ use vulkano_win::VkSurfaceBuild;
 use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
 use winit::window::WindowBuilder;
+use database::Database;
 
 #[cfg(feature = "debug")]
 use debug::*;
@@ -102,15 +105,6 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    //let features = Features {
-    //    descriptor_indexing: true,
-    //    shader_uniform_buffer_array_non_uniform_indexing: true,
-    //    runtime_descriptor_array: true,
-    //    descriptor_binding_variable_descriptor_count: true,
-    //    descriptor_binding_partially_bound: true,
-    //    ..Features::none()
-    //};
-
     let (device, mut queues) = Device::new(physical_device, physical_device.supported_features(), &required_device_extensions, [(queue_family, 0.5)].iter().cloned()).expect("failed to create device");
 
     #[cfg(feature = "debug")]
@@ -129,6 +123,9 @@ fn main() {
 
     let mut game_file_loader = GameFileLoader::default();
     game_file_loader.add_archive("data3.grf".to_string());
+    game_file_loader.add_archive("data.grf".to_string());
+    game_file_loader.add_archive("rdata.grf".to_string()); 
+
     let game_file_loader = Rc::new(RefCell::new(game_file_loader));
 
     let mut model_loader = ModelLoader::new(Rc::clone(&game_file_loader), device.clone());
@@ -200,12 +197,12 @@ fn main() {
 
     let mut texture_future = now(device.clone()).boxed();
 
-    let mut entities: Vec<Entity> = vec![/*Entity::new(&mut texture_loader, &mut texture_future, 0)*/];
+    let mut entities: Vec<Entity> = Vec::new();
+
+    let database = Database::new();
 
     texture_future.flush().unwrap();
     texture_future.cleanup_finished();
-
-    //panic!();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -259,8 +256,8 @@ fn main() {
                 for event in network_events {
                     match event {
 
-                        NetworkEvent::AddEntity(entity_id, position, movement_speed) => {
-                            entities.push(Entity::new(&mut texture_loader, &mut texture_future, &map, entity_id, position, movement_speed));
+                        NetworkEvent::AddEntity(entity_id, job_id, position, movement_speed) => {
+                            entities.push(Entity::new(&mut game_file_loader.borrow_mut(), &mut texture_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed));
                         }
 
                         NetworkEvent::RemoveEntity(entity_id) => {
@@ -288,10 +285,7 @@ fn main() {
                                 entities.pop(); 
                             }
 
-                            match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
-                                Ok(new_map) => map = new_map,
-                                Err(message) => print_debug!("failed to load new map: {}", message),
-                            }
+                            map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
                             entities[0].set_position(&map, player_position);
                             player_camera.set_focus_point(entities[0].position);
@@ -306,46 +300,39 @@ fn main() {
 
                 for event in user_events {
                     match event {
+
                         UserEvent::Exit => *control_flow = ControlFlow::Exit,
+
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
+
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
+
                         UserEvent::ToggleFrameLimit => {
                             render_settings.toggle_frame_limit();
                             renderer.set_frame_limit(render_settings.frame_limit);
                             interface.schedule_rerender();
-                            interface.open_window(&debug_camera.light_variables);
                         },
+
                         UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
+
                         UserEvent::OpenGraphicsSettingsWindow => interface.open_window(&GraphicsSettingsWindow::default()),
+
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&AudioSettingsWindow::default()),
+
                         UserEvent::ReloadTheme => interface.reload_theme(),
+
                         UserEvent::SaveTheme => interface.save_theme(),
 
-                        UserEvent::LoadNewMap(map_name) => { // MAKE THIS DEBUG ONLY
-                            match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
-
-                                Ok(new_map) => {
-                                    map = new_map;
-                                    entities.clear();
-                                    render_settings.use_debug_camera = true;
-                                },
-
-                                Err(message) => print_debug!("failed to load new map: {}", message),
-                            }
-                        },
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot) {
 
-                                Ok((map_name, player_position, character_id, movement_speed, client_tick)) => {
+                                Ok((map_name, player_position, character_id, job_id, movement_speed, client_tick)) => {
 
                                     interface.close_window_with_class("character_selection"); // FIND A NICER WAY TO GET THE CLASS NAME
 
-                                    match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
-                                        Ok(new_map) => map = new_map,
-                                        Err(message) => print_debug!("failed to load new map: {}", message),
-                                    }
+                                    map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
-                                    let player = Entity::new(&mut texture_loader, &mut texture_future, &map, character_id, player_position, movement_speed);
+                                    let player = Entity::new(&mut game_file_loader.borrow_mut(), &mut texture_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
 
                                     player_camera.set_focus_point(player.position);
                                     entities.push(player);
@@ -357,96 +344,153 @@ fn main() {
                                 Err(message) => interface.open_window(&ErrorWindow::new(message)),
                             }
                         },
+
                         UserEvent::CreateCharacter(character_slot) => {
                             if let Err(message) = networking_system.crate_character(character_slot) {
                                 interface.open_window(&ErrorWindow::new(message));
                             } 
                         },
+
                         UserEvent::DeleteCharacter(character_id) => {
                             if let Err(message) = networking_system.delete_character(character_id) {
                                 interface.open_window(&ErrorWindow::new(message));
                             }
                         },
+
                         UserEvent::RequestSwitchCharacterSlot(origin_slot) => networking_system.request_switch_character_slot(origin_slot),
+
                         UserEvent::CancelSwitchCharacterSlot => networking_system.cancel_switch_character_slot(),
+
                         UserEvent::SwitchCharacterSlot(destination_slot) => {
                             if let Err(message) = networking_system.switch_character_slot(destination_slot) {
                                 interface.open_window(&ErrorWindow::new(message));
                             }
                         },
+
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::LoadNewMap(map_name) => {
+                            match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
+
+                                Ok(new_map) => {
+                                    map = new_map;
+                                    entities.clear();
+                                    render_settings.use_debug_camera = true;
+                                },
+
+                                Err(message) => print_debug!("failed to load new map: {}", message),
+                            }
+                        },
+
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
+
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapDataWindow => interface.open_window(std::ops::Deref::deref(&map)),
+
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::new(game_file_loader.borrow().get_maps())),
+
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::OpenProfilerWindow => interface.open_window(&ProfilerWindow::default()),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraLookAround(offset) => debug_camera.look_around(offset),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveForward => debug_camera.move_forward(delta_time as f32),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveBackward => debug_camera.move_backward(delta_time as f32),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveLeft => debug_camera.move_left(delta_time as f32),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveRight => debug_camera.move_right(delta_time as f32),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveUp => debug_camera.move_up(delta_time as f32),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraAccelerate => debug_camera.accelerate(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::CameraDecelerate => debug_camera.decelerate(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowFramesPerSecond => render_settings.toggle_show_frames_per_second(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowObjects => render_settings.toggle_show_objects(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowEntities => render_settings.toggle_show_entities(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWater => render_settings.toggle_show_water(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowAmbientLight => render_settings.toggle_show_ambient_light(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDirectionalLight => render_settings.toggle_show_directional_light(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPointLights => render_settings.toggle_show_point_lights(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowParticleLights => render_settings.toggle_show_particle_lights(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDirectionalShadows => render_settings.toggle_show_directional_shadows(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowObjectMarkers => render_settings.toggle_show_object_markers(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowLightMarkers => render_settings.toggle_show_light_markers(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowSoundMarkers => render_settings.toggle_show_sound_markers(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowEffectMarkers => render_settings.toggle_show_effect_markers(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowParticleMarkers => render_settings.toggle_show_particle_markers(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowEntityMarkers => render_settings.toggle_show_entity_markers(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMapTiles => render_settings.toggle_show_map_tiles(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPathing => render_settings.toggle_show_pathing(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDiffuseBuffer => render_settings.toggle_show_diffuse_buffer(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowNormalBuffer => render_settings.toggle_show_normal_buffer(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWaterBuffer => render_settings.toggle_show_water_buffer(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDepthBuffer => render_settings.toggle_show_depth_buffer(),
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPickerBuffer => render_settings.toggle_show_picker_buffer(),
                     }

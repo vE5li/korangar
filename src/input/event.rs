@@ -11,7 +11,6 @@ pub enum UserEvent {
     OpenAudioSettingsWindow,
     ReloadTheme,
     SaveTheme,
-    LoadNewMap(String),
     SelectCharacter(usize),
     CreateCharacter(usize),
     DeleteCharacter(usize),
@@ -19,6 +18,8 @@ pub enum UserEvent {
     CancelSwitchCharacterSlot,
     SwitchCharacterSlot(usize),
     RequestPlayerMove(Vector2<usize>),
+    #[cfg(feature = "debug")]
+    LoadNewMap(String),
     #[cfg(feature = "debug")]
     OpenRenderSettingsWindow,
     #[cfg(feature = "debug")]

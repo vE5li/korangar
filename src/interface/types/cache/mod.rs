@@ -3,6 +3,7 @@ mod state;
 use std::collections::HashMap;
 use cgmath::Vector2;
 use serde::{ Serialize, Deserialize };
+use ron::ser::PrettyConfig;
 
 #[cfg(feature = "debug")]
 use debug::*;
@@ -32,9 +33,9 @@ impl WindowCache {
         #[cfg(feature = "debug")]
         print_debug!("loading window cache from {}filename{}", MAGENTA, NONE);
 
-        std::fs::read_to_string("client/window_cache.json")
+        std::fs::read_to_string("client/window_cache.ron")
             .ok()
-            .map(|data| serde_json::from_str(&data).ok())
+            .map(|data| ron::from_str(&data).ok())
             .flatten()
             .map(|entries| Self { entries })
     }
@@ -44,8 +45,8 @@ impl WindowCache {
         #[cfg(feature = "debug")]
         print_debug!("saving window cache to {}filename{}", MAGENTA, NONE);
 
-        let data = serde_json::to_string_pretty(&self.entries).unwrap();
-        std::fs::write("client/window_cache.json", data).expect("unable to write file");
+        let data = ron::ser::to_string_pretty(&self.entries, PrettyConfig::new()).unwrap();
+        std::fs::write("client/window_cache.ron", data).expect("unable to write file");
     }
 
     pub fn register_window(&mut self, identifier: &str, position: Position, size: Size) {

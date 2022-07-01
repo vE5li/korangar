@@ -140,7 +140,7 @@ impl MapLoader {
     fn load(&mut self, model_loader: &mut ModelLoader, texture_loader: &mut TextureLoader, resource_file: &str) -> Result<Arc<Map>, String> {
 
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load map from {}{}{}", MAGENTA, resource_file, NONE));
+        let timer = Timer::new_dynamic(format!("load map from {}", resource_file));
 
         let mut texture_future = now(self.device.clone()).boxed();
 
@@ -150,33 +150,24 @@ impl MapLoader {
         let magic = byte_stream.string(4);
         
         if &magic != "GRSW" {
-            return Err(format!("failed to read magic number from {}{}{}", MAGENTA, resource_file, NONE));
+            return Err(format!("failed to read magic number from {}", resource_file));
         }
 
         let resource_version = byte_stream.version();
  
         if !resource_version.equals_or_above(1, 2) {
-            return Err(format!("invalid {}resource version{}", MAGENTA, NONE));
+            return Err(format!("invalid resource version {}", resource_version));
         }
-
-        #[cfg(feature = "debug_map")]
-        print_debug!("resource version {}{}{}", MAGENTA, resource_version, NONE);
 
         // INI file
         byte_stream.skip(40);
 
         let ground_file = byte_stream.string(40);
 
-        #[cfg(feature = "debug_map")]
-        print_debug!("ground file {}{}{}", MAGENTA, ground_file, NONE);
-
         let gat_file = match resource_version.equals_or_above(1, 4) {
             true => Some(byte_stream.string(40)),
             false => None,
         };
-
-        #[cfg(feature = "debug_map")]
-        print_debug!("gat file {}{:?}{}", MAGENTA, gat_file, NONE);
 
         // SRC file
         byte_stream.skip(40);
@@ -185,10 +176,6 @@ impl MapLoader {
 
         if resource_version.equals_or_above(1, 3) {
             let water_level = byte_stream.float32();
-
-            #[cfg(feature = "debug_map")]
-            print_debug!("water level {}{}{}", MAGENTA, water_level, NONE);
-
             water_settings.water_level = -water_level;
         }
 
@@ -199,14 +186,6 @@ impl MapLoader {
             let wave_speed = byte_stream.float32();
             let wave_pitch = byte_stream.float32();
 
-            #[cfg(feature = "debug_map")]
-            {
-                print_debug!("water type {}{}{}", MAGENTA, water_type, NONE);
-                print_debug!("wave height {}{}{}", MAGENTA, wave_height, NONE);
-                print_debug!("wave speed {}{}{}", MAGENTA, wave_speed, NONE);
-                print_debug!("wave pitch {}{}{}", MAGENTA, wave_pitch, NONE);
-            }
-
             water_settings.water_type = water_type as usize;
             water_settings.wave_height = wave_height;
             water_settings.wave_speed = wave_speed;
@@ -215,10 +194,6 @@ impl MapLoader {
 
         if resource_version.equals_or_above(1, 9) {
             let water_animation_speed = byte_stream.integer32();
-
-            #[cfg(feature = "debug_map")]
-            print_debug!("water animation speed {}{}{}", MAGENTA, water_animation_speed, NONE);
-
             water_settings.water_animation_speed = water_animation_speed as usize;
         }
 
@@ -230,14 +205,6 @@ impl MapLoader {
             let light_latitude = byte_stream.integer32();
             let diffuse_color = byte_stream.color();
             let ambient_color = byte_stream.color();
-
-            #[cfg(feature = "debug_map")]
-            {
-                print_debug!("light longitude {}{}{}", MAGENTA, light_longitude, NONE);
-                print_debug!("light latitude {}{}{}", MAGENTA, light_latitude, NONE);
-                print_debug!("diffuse color {}{:?}{}", MAGENTA, diffuse_color, NONE);
-                print_debug!("ambient color {}{:?}{}", MAGENTA, ambient_color, NONE);
-            }
 
             light_settings.light_longitude = light_longitude as isize;
             light_settings.light_latitude = light_latitude as isize;
@@ -255,27 +222,16 @@ impl MapLoader {
             let _ground_bottom = byte_stream.integer32();
             let _ground_left = byte_stream.integer32();
             let _ground_right = byte_stream.integer32();
-
-            #[cfg(feature = "debug_map")]
-            {
-                print_debug!("ground top {}{}{}", MAGENTA, _ground_right, NONE);
-                print_debug!("ground bottom {}{}{}", MAGENTA, _ground_left, NONE);
-                print_debug!("ground left {}{}{}", MAGENTA, _ground_bottom, NONE);
-                print_debug!("ground right {}{}{}", MAGENTA, _ground_top, NONE);
-            }
         }
 
         let object_count = byte_stream.integer32() as usize;
-
-        #[cfg(feature = "debug_map")]
-        print_debug!("object count {}{}{}", MAGENTA, object_count, NONE);
 
         let mut objects = Vec::new();
         let mut light_sources = Vec::new();
         let mut sound_sources = Vec::new();
         let mut effect_sources = Vec::new();
 
-        for _index in 0..object_count {
+        for index in 0..object_count {
             let type_index = byte_stream.integer32();
             let resource_type = ResourceType::from(type_index);
 
@@ -296,22 +252,7 @@ impl MapLoader {
                         let scale = byte_stream.vector3();
 
                         let model = model_loader.get(texture_loader, &model_name, &mut texture_future)?;
-
                         let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
-
-                        #[cfg(feature = "debug_map")]
-                        {
-                            print_debug!("name {}{}{}", MAGENTA, name, NONE);
-                            print_debug!("animation_type {}{}{}", MAGENTA, _animation_type, NONE);
-                            print_debug!("animation_speed {}{}{}", MAGENTA, _animation_speed, NONE);
-                            print_debug!("block type {}{}{}", MAGENTA, _block_type, NONE);
-                            print_debug!("model name {}{}{}", MAGENTA, model_name, NONE);
-                            print_debug!("node name {}{}{}", MAGENTA, _node_name, NONE);
-                            print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
-                            print_debug!("rotation {}{:?}{}", MAGENTA, rotation, NONE);
-                            print_debug!("scale {}{:?}{}", MAGENTA, scale, NONE);
-                        }
-
                         let object = Object::new(Some(name), model_name, model, transform);
                         objects.push(object);
                     } else {
@@ -323,18 +264,7 @@ impl MapLoader {
                         let scale = byte_stream.vector3();
 
                         let model = model_loader.get(texture_loader, &model_name, &mut texture_future)?;
-
                         let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
-
-                        #[cfg(feature = "debug_map")]
-                        {
-                            print_debug!("model name {}{}{}", MAGENTA, model_name, NONE);
-                            print_debug!("node name {}{}{}", MAGENTA, _node_name, NONE);
-                            print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
-                            print_debug!("rotation {}{:?}{}", MAGENTA, rotation, NONE);
-                            print_debug!("scale {}{:?}{}", MAGENTA, scale, NONE);
-                        }
-
                         let object = Object::new(None, model_name, model, transform);
                         objects.push(object);
                     }
@@ -344,21 +274,11 @@ impl MapLoader {
 
                     let name = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
-
                     let red = byte_stream.integer32() as u8;
                     let green = byte_stream.integer32() as u8;
                     let blue = byte_stream.integer32() as u8;
                     let color = Color::rgb(red, green, blue);
-
                     let range = byte_stream.float32();
-
-                    #[cfg(feature = "debug_map")]
-                    {
-                        print_debug!("name {}{}{}", MAGENTA, name, NONE);
-                        print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
-                        print_debug!("color {}{:?}{}", MAGENTA, color, NONE);
-                        print_debug!("range {}{}{}", MAGENTA, range, NONE);
-                    }
 
                     light_sources.push(LightSource::new(name, position, color, range));
                 },
@@ -378,18 +298,6 @@ impl MapLoader {
                         false => 4.0,
                     };
 
-                    #[cfg(feature = "debug_map")]
-                    {
-                        print_debug!("name {}{}{}", MAGENTA, name, NONE);
-                        print_debug!("sound file {}{}{}", MAGENTA, sound_file, NONE);
-                        print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
-                        print_debug!("volume {}{}{}", MAGENTA, volume, NONE);
-                        print_debug!("width {}{}{}", MAGENTA, width, NONE);
-                        print_debug!("height {}{}{}", MAGENTA, height, NONE);
-                        print_debug!("range {}{}{}", MAGENTA, range, NONE);
-                        print_debug!("cycle {}{}{}", MAGENTA, cycle, NONE);
-                    }
-
                     sound_sources.push(SoundSource::new(name, sound_file, position, volume, width as usize, height as usize, range, cycle));
                 },
 
@@ -404,18 +312,6 @@ impl MapLoader {
                     let _param1 = byte_stream.float32();
                     let _param2 = byte_stream.float32();
                     let _param3 = byte_stream.float32();
-
-                    #[cfg(feature = "debug_map")]
-                    {
-                        print_debug!("name {}{}{}", MAGENTA, name, NONE);
-                        print_debug!("position {}{:?}{}", MAGENTA, position, NONE);
-                        print_debug!("effect type {}{}{}", MAGENTA, effect_type, NONE);
-                        print_debug!("emit speed {}{}{}", MAGENTA, emit_speed, NONE);
-                        print_debug!("param0 {}{}{}", MAGENTA, _param0, NONE);
-                        print_debug!("param1 {}{}{}", MAGENTA, _param1, NONE);
-                        print_debug!("param2 {}{}{}", MAGENTA, _param2, NONE);
-                        print_debug!("param3 {}{}{}", MAGENTA, _param3, NONE);
-                    }
 
                     effect_sources.push(EffectSource::new(name, position, effect_type as usize, emit_speed));
                 },
@@ -432,13 +328,13 @@ impl MapLoader {
 
         let magic = byte_stream.string(4);
         if &magic != "GRGN" {
-            return Err(format!("failed to read magic number from {}{}{}", MAGENTA, ground_file, NONE));
+            return Err(format!("failed to read magic number from {}", ground_file));
         }
 
         let ground_version = byte_stream.version();
 
         if !ground_version.equals_or_above(1, 6) {
-            return Err(format!("invalid {}ground version{}", MAGENTA, NONE));
+            return Err(format!("invalid ground version {}", ground_version));
         }
 
         let width = byte_stream.integer32() as usize;
@@ -527,13 +423,13 @@ impl MapLoader {
 
             let magic = byte_stream.string(4);
             if &magic != "GRAT" {
-                return Err(format!("failed to read magic number from {}{}{}", MAGENTA, gat_file, NONE));
+                return Err(format!("failed to read magic number from {}", gat_file));
             }
 
             let gat_version = byte_stream.version();
 
             if !gat_version.equals(1, 2) {
-                return Err(format!("invalid {}gat version{}", MAGENTA, NONE));
+                return Err(format!("invalid gat version {}", gat_version));
             }
 
             map_width = byte_stream.integer32() as usize; // todo: unsigned
@@ -713,23 +609,6 @@ impl MapLoader {
             true => CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, water_vertices.into_iter()).unwrap().into(),
             false => None,
         };
-
-        #[cfg(feature = "debug_map")]
-        {
-            print_debug!("ground version {}{}{}", MAGENTA, ground_version, NONE);
-            print_debug!("width {}{}{}", MAGENTA, width, NONE);
-            print_debug!("height {}{}{}", MAGENTA, height, NONE);
-            print_debug!("zoom {}{}{}", MAGENTA, _zoom, NONE);
-            print_debug!("texture count {}{}{}", MAGENTA, texture_count, NONE);
-            print_debug!("texture name length {}{}{}", MAGENTA, texture_name_length, NONE);
-
-            print_debug!("light map count {}{}{}", MAGENTA, light_map_count, NONE);
-            print_debug!("light map width {}{}{}", MAGENTA, light_map_width, NONE);
-            print_debug!("light map height {}{}{}", MAGENTA, light_map_height, NONE);
-            print_debug!("light map cells per grid {}{}{}", MAGENTA, _light_map_cells_per_grid, NONE);
-
-            print_debug!("surface count {}{}{}", MAGENTA, surface_count, NONE);
-        }
 
         let offset = Vector3::new(width as f32 * MAP_OFFSET, 0.0, height as f32 * MAP_OFFSET);
         objects.iter_mut().for_each(|object| object.offset(offset));

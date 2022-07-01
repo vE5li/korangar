@@ -1,30 +1,28 @@
 use derive_new::new;
 use cgmath::Vector2;
-
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
 use std::time::Duration;
+use std::fmt::Debug;
+use std::net::TcpStream;
+use std::io::prelude::*;
 
 #[cfg(feature = "debug")]
 use debug::*;
+use crate::interface::windows::CharacterSelectionWindow;
+use crate::traits::ByteConvertable;
+use crate::types::ByteStream;
 
 #[derive(Clone, Debug)]
 pub enum NetworkEvent {
-    AddEntity(usize, Vector2<usize>, usize),
+    AddEntity(usize, usize, Vector2<usize>, usize),
     RemoveEntity(usize),
     PlayerMove(Vector2<usize>, Vector2<usize>, u32),
     EntityMove(usize, Vector2<usize>, Vector2<usize>, u32),
     ChangeMap(String, Vector2<usize>),
     UpdataClientTick(u32),
 }
-
-use std::net::TcpStream;
-use std::io::prelude::*;
-
-use crate::interface::windows::CharacterSelectionWindow;
-use crate::traits::ByteConvertable;
-use crate::types::ByteStream;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Sex {
@@ -224,6 +222,7 @@ struct MapServerLoginSuccessPacket {
     pub font: u16,
 }
 
+#[derive(Debug)]
 pub enum LoginFailedReason {
     ServerClosed,
     AlreadyLoggedIn,
@@ -243,12 +242,13 @@ impl ByteConvertable for LoginFailedReason {
     }
 }
 
-#[derive(Packet)]
+#[derive(Debug, Packet)]
 #[header(0x81, 0x00)]
 struct LoginFailedPacket {
     pub reason: LoginFailedReason,
 }
 
+#[derive(Debug)]
 pub enum CharacterSelectionFailedReason {
     RejectedFromServer,
 }
@@ -264,7 +264,7 @@ impl ByteConvertable for CharacterSelectionFailedReason {
     }
 }
 
-#[derive(Packet)]
+#[derive(Debug, Packet)]
 #[header(0x6c, 0x00)]
 struct CharacterSelectionFailedPacket {
     pub reason: CharacterSelectionFailedReason,
@@ -281,6 +281,7 @@ struct CharacterSelectionSuccessPacket {
     pub unknown: [u8; 128],
 }
 
+#[derive(Debug)]
 pub enum CharacterCreationFailedReason {
     CharacterNameAlreadyUsed,
     NotOldEnough,
@@ -302,13 +303,13 @@ impl ByteConvertable for CharacterCreationFailedReason {
     }
 }
 
-#[derive(Packet)]
+#[derive(Debug, Packet)]
 #[header(0x6e, 0x00)]
 struct CharacterCreationFailedPacket {
     pub reason: CharacterCreationFailedReason,
 }
 
-#[derive(Default, Packet)]
+#[derive(Debug, Default, Packet)]
 #[header(0x00, 0x02)]
 struct LoginServerKeepalivePacket {
     pub user_id: [u8; 24],
@@ -328,12 +329,12 @@ struct CharacterServerInformation {
     pub server_port: u16,
     pub server_name: [u8; 20],
     pub user_count: u16,
-    pub server_type: u8, // ServerType
+    pub server_type: u16, // ServerType
     pub display_new: u16, // bool16 ?
     pub unknown: [u8; 128],
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0x65, 0x00)]
 struct CharacterServerLoginPacket {
     pub account_id: u32,
@@ -344,7 +345,7 @@ struct CharacterServerLoginPacket {
     pub sex: Sex,
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0x36, 0x04)]
 struct MapServerLoginPacket {
     pub account_id: u32,
@@ -362,7 +363,7 @@ struct Packet8302 {
     pub entity_id: u32,
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0x39, 0x0a)]
 struct CreateCharacterPacket {
     #[length_hint(24)]
@@ -432,7 +433,7 @@ struct CreateCharacterSuccessPacket {
     pub character_information: CharacterInformation,
 }
 
-#[derive(Default, Packet)]
+#[derive(Debug, Default, Packet)]
 #[header(0xa1, 0x09)]
 struct RequestCharacterListPacket {}
 
@@ -442,7 +443,7 @@ struct RequestCharacterListSuccessPacket {
     pub packet_length: u16,
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0x81, 0x08)]
 struct RequestPlayerMovePacket {
     pub position: WorldPosition,
@@ -463,7 +464,7 @@ struct PlayerMovePacket {
     pub from_to: WorldPosition2,
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0xfb, 0x01)]
 struct DeleteCharacterPacket {
     character_id: u32,
@@ -473,6 +474,7 @@ struct DeleteCharacterPacket {
     pub unknown: [u8; 10],
 }
 
+#[derive(Debug)]
 pub enum CharacterDeletionFailedReason {
     NotAllowed,
     CharacterNotFound,
@@ -492,7 +494,7 @@ impl ByteConvertable for CharacterDeletionFailedReason {
     }
 }
 
-#[derive(Packet)]
+#[derive(Debug, Packet)]
 #[header(0x70, 0x00)]
 struct CharacterDeletionFailedPacket {
     pub reason: CharacterDeletionFailedReason,
@@ -502,7 +504,7 @@ struct CharacterDeletionFailedPacket {
 #[header(0x6f, 0x00)]
 struct CharacterDeletionSuccessPacket {}
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0x66, 0x00)]
 struct SelectCharacterPacket {
     pub selected_slot: u8,
@@ -537,11 +539,6 @@ struct AchievementUpdatePacket {
     pub acheivement_experience: u32,
     pub acheivement_experience_tnl: u32, // ?
     pub acheivement_data: AchievementData,
-    //pub acheivement_id: u32,
-    //pub is_completed: u8,
-    //pub objectives: [u32; 10],
-    //pub completion_timestamp: u32,
-    //pub got_rewarded: u8,
 }
 
 #[derive(Debug, Packet)]
@@ -887,7 +884,7 @@ struct UpdateAttackRangePacket {
     pub attack_range: u16,
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0xd4, 0x08)]
 struct SwitchCharacterSlotPacket {
     pub origin_slot: u16,
@@ -902,7 +899,7 @@ struct ServerTickPacket {
     pub client_tick: u32,
 }
 
-#[derive(Packet, new)]
+#[derive(Debug, Packet, new)]
 #[header(0x60, 0x03)]
 struct RequestServerTickPacket {
     pub client_tick: u32,
@@ -1148,24 +1145,24 @@ struct QuestNotificatonPacket {
     pub color: u16, // 0 - yellow; 1 - orange; 2 - green; 3 - purple
 }
 
-#[derive(Default, Packet)]
+#[derive(Debug, Default, Packet)]
 #[header(0x7d, 0x00)]
 struct MapLoadedPacket {}
 
-#[derive(Default, Packet)]
+#[derive(Debug, Default, Packet)]
 #[header(0x87, 0x01)]
 struct CharacterServerKeepalivePacket {
     pub account_id: u32,
 }
 
 #[derive(new)]
-struct Timer {
+struct NetworkTimer {
     period: Duration,
     #[new(default)]
     accumulator: Duration,
 }
 
-impl Timer {
+impl NetworkTimer {
     
     pub fn update(&mut self, elapsed_time: f64) -> bool {
         self.accumulator += Duration::from_secs_f64(elapsed_time);
@@ -1191,13 +1188,12 @@ pub struct NetworkingSystem {
     character_stream: Option<TcpStream>,
     map_stream: Option<TcpStream>,
     login_data: Option<LoginData>,
-    //character_information: Option<CharacterInformation>,
     characters: Rc<RefCell<Vec<CharacterInformation>>>,
     move_request: Rc<RefCell<Option<usize>>>,
     changed: Rc<RefCell<bool>>,
-    login_keep_alive_timer: Timer,
-    character_keep_alive_timer: Timer,
-    map_keep_alive_timer: Timer,
+    login_keep_alive_timer: NetworkTimer,
+    character_keep_alive_timer: NetworkTimer,
+    map_keep_alive_timer: NetworkTimer,
 }
 
 impl NetworkingSystem {
@@ -1210,13 +1206,12 @@ impl NetworkingSystem {
         let character_stream = None;
         let map_stream = None;
         let login_data = None;
-        //let character_information = None;
         let characters = Rc::new(RefCell::new(Vec::new()));
         let move_request = Rc::new(RefCell::new(None));
         let changed = Rc::new(RefCell::new(false));
-        let login_keep_alive_timer = Timer::new(Duration::from_secs(58));
-        let character_keep_alive_timer = Timer::new(Duration::from_secs(10));
-        let map_keep_alive_timer = Timer::new(Duration::from_secs(4));
+        let login_keep_alive_timer = NetworkTimer::new(Duration::from_secs(58));
+        let character_keep_alive_timer = NetworkTimer::new(Duration::from_secs(10));
+        let map_keep_alive_timer = NetworkTimer::new(Duration::from_secs(4));
 
         login_stream.set_read_timeout(Duration::from_secs(20).into()).unwrap();
 
@@ -1225,7 +1220,6 @@ impl NetworkingSystem {
             character_stream,
             move_request,
             login_data,
-            //character_information,
             changed,
             map_stream,
             characters,
@@ -1236,6 +1230,9 @@ impl NetworkingSystem {
     }
 
     pub fn login(&mut self) -> Result<CharacterSelectionWindow, String> {
+
+        #[cfg(feature = "debug_network")]
+        let timer = Timer::new("login");
 
         self.send_packet_to_login_server(LoginServerLoginPacket::new("test_user".to_string(), "password".to_string()));
 
@@ -1252,11 +1249,12 @@ impl NetworkingSystem {
 
         let login_server_login_success_packet = LoginServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
         self.login_data = LoginData::new(login_server_login_success_packet.account_id, login_server_login_success_packet.login_id1, login_server_login_success_packet.sex).into();
-        println!("payload: {:?}", login_server_login_success_packet);
 
-        for index in 0..login_server_login_success_packet.character_server_count() {
+        for _index in 0..login_server_login_success_packet.character_server_count() {
             let server_information = CharacterServerInformation::from_bytes(&mut byte_stream, None);
-            println!("#{}: {:?}", index, server_information);
+
+            #[cfg(feature = "debug_network")]
+            print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, server_information);
 
             if self.character_stream.is_none() {
                 let server_ip = IpAddr::V4(server_information.server_ip);
@@ -1266,10 +1264,6 @@ impl NetworkingSystem {
                     .into();
             }
         }
-
-        let maybe_padding = byte_stream.next();
-        println!("padding / list terminator : {}", maybe_padding);
-        byte_stream.assert_empty("login packet");
 
         let character_server_login_packet = CharacterServerLoginPacket::new(
             login_server_login_success_packet.account_id,
@@ -1300,8 +1294,6 @@ impl NetworkingSystem {
 
         let character_server_login_success_packet = CharacterServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
-        println!("{:?}", character_server_login_success_packet);
-
         self.send_packet_to_character_server(RequestCharacterListPacket::default());
 
         let response = self.get_data_from_character_server();
@@ -1324,21 +1316,36 @@ impl NetworkingSystem {
             }
         }
 
+        #[cfg(feature = "debug_network")]
+        timer.stop();
+
         Ok(CharacterSelectionWindow::new(Rc::clone(&self.characters), Rc::clone(&self.move_request), Rc::clone(&self.changed), character_server_login_success_packet.normal_slot_count as usize))
     }
 
-    fn send_packet_to_login_server(&mut self, packet: impl Packet) {
+    fn send_packet_to_login_server(&mut self, packet: impl Packet + Debug) {
+
+        #[cfg(feature = "debug_network")]
+        print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
+
         let packet_bytes = packet.to_bytes();
         self.login_stream.write(&packet_bytes).expect("failed to send packet to login server");
     }
 
-    fn send_packet_to_character_server(&mut self, packet: impl Packet) {
+    fn send_packet_to_character_server(&mut self, packet: impl Packet + Debug) {
+
+        #[cfg(feature = "debug_network")]
+        print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
+
         let packet_bytes = packet.to_bytes();
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
         character_stream.write(&packet_bytes).expect("failed to send packet to character server");
     }
 
-    fn send_packet_to_map_server(&mut self, packet: impl Packet) {
+    fn send_packet_to_map_server(&mut self, packet: impl Packet + Debug) {
+
+        #[cfg(feature = "debug_network")]
+        print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
+
         let packet_bytes = packet.to_bytes();
         let map_stream = self.map_stream.as_mut().expect("no map server connection");
         map_stream.write(&packet_bytes).expect("failed to send packet to map server");
@@ -1375,17 +1382,14 @@ impl NetworkingSystem {
     pub fn keep_alive(&mut self, delta_time: f64, client_tick: u32) {
 
         if self.login_keep_alive_timer.update(delta_time) {
-            //println!("login keep_alive sent"); // add feature flag debug_network
             self.send_packet_to_login_server(LoginServerKeepalivePacket::default());
         }
 
         if self.character_keep_alive_timer.update(delta_time) && self.character_stream.is_some() {
-            //println!("character keep_alive sent");
             self.send_packet_to_character_server(CharacterServerKeepalivePacket::default());
         }
 
         if self.map_keep_alive_timer.update(delta_time) && self.map_stream.is_some() {
-            //println!("character keep_alive sent");
             self.send_packet_to_map_server(RequestServerTickPacket::new(client_tick));
         }
     }
@@ -1462,7 +1466,7 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn select_character(&mut self, slot: usize) -> Result<(String, Vector2<usize>, usize, usize, u32), String> {
+    pub fn select_character(&mut self, slot: usize) -> Result<(String, Vector2<usize>, usize, usize, usize, u32), String> {
 
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
@@ -1505,7 +1509,6 @@ impl NetworkingSystem {
         let _packet_180b = Packet180b::try_from_bytes(&mut byte_stream).unwrap();
         let map_server_login_success_packet = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
-
         while let Ok(server_message_packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
             let server_message = String::from_bytes(&mut byte_stream, Some(server_message_packet.packet_length as usize - 4));
             println!("message from server: {}", server_message);
@@ -1517,7 +1520,8 @@ impl NetworkingSystem {
                 change_map_packet.map_name.replace(".gat", "").to_string(),
                 Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
                 select_character_success_packet.character_id as usize,
-                200,
+                45, // how do we get this ?
+                200, // how do we get this ?
                 map_server_login_success_packet.client_tick
         )) // set 200 to 0 as soon as stats are properly updated
     }
@@ -1559,6 +1563,10 @@ impl NetworkingSystem {
 
                 for _index in 0..character_count {
                     let character_information = CharacterInformation::from_bytes(&mut byte_stream, None);
+
+                    #[cfg(feature = "debug_network")]
+                    print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, character_information);
+
                     characters.push(character_information);
                 }
 
@@ -1595,70 +1603,52 @@ impl NetworkingSystem {
                 
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
                     let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 16));
-                    //println!("{:?}", packet);
-                    println!("{}broadcast message{}: {}", GREEN, NONE, message);
+                    println!("broadcast message: {}", message);
 
                 } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
                     let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 4));
-                    //println!("{:?}", packet);
-                    println!("{}server message{}: {}", GREEN, NONE, message);
+                    println!("server message: {}", message);
 
                 } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
                     let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 12));
-                    //println!("{:?}", packet);
-                    println!("{}entity message{}: {}", GREEN, NONE, message);
+                    println!("entity message: {}", message);
 
-                } else if let Ok(packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::EntityMove(packet.entity_id as usize, origin, destination, packet.timestamp));
-                    //println!("{}FOLLOWING{}: {:x?}", RED, NONE, byte_stream.remaining());
 
                 } else if let Ok(packet) = PlayerMovePacket::try_from_bytes(&mut byte_stream) {
-                    println!("{:#?}", packet); 
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
 
                 } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:#?}", packet); 
                     events.push(NetworkEvent::ChangeMap(packet.map_name.replace(".gat", "").to_string(), Vector2::new(packet.x as usize, packet.y as usize)));
 
                 } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:#?}", packet); 
-                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.position.to_vector(), packet.speed as usize));
+                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.job as usize, packet.position.to_vector(), packet.speed as usize));
 
                 } else if let Ok(packet) = MovingEntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:#?}", packet); 
                     let (_origin, destination) = packet.position.to_vectors();
-                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, destination, packet.speed as usize));
+                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.job as usize, destination, packet.speed as usize));
 
                 } else if let Ok(packet) = EntityDisappearedPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:#?}", packet); 
                     events.push(NetworkEvent::RemoveEntity(packet.entity_id as usize));
 
-                } else if let Ok(packet) = UpdateStatusPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateStatusPacket::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = UpdateStatusPacket1::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateStatusPacket1::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) { 
 
                 } else if let Ok(packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) { 
 
@@ -1666,27 +1656,24 @@ impl NetworkingSystem {
                         .map(|_index| AchievementData::from_bytes(&mut byte_stream, None))
                         .collect::<Vec<AchievementData>>();
 
-                    println!("{:?}", packet); 
                     println!("{:?}", acheivements);
 
-                } else if let Ok(packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) { 
 
                 } else if let Ok(packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) { 
                     let name = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 5));
                     println!("inventory name: {}", name);
-                    println!("{:?}", packet); 
 
                     while InventoyEndPacket::try_from_bytes(&mut byte_stream).is_err() {
                         if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
-                            println!("{:?}", packet);
 
                             for _item_index in 0..packet.item_count() {
-                                let item_information = EquippableItemInformation::from_bytes(&mut byte_stream, None);
-                                println!("{:#?}", item_information);
+                                let item_information = EquippableItemInformation::from_bytes(&mut byte_stream, None); 
+
+                                #[cfg(feature = "debug_network")]
+                                print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, item_information);
                             }
                         } else {
                             panic!();
@@ -1697,58 +1684,49 @@ impl NetworkingSystem {
 
                     for _item_index in 0..packet.item_count() {
                         let item_information = EquippableSwitchItemInformation::from_bytes(&mut byte_stream, None);
-                        println!("{:?}", item_information); 
+
+                        #[cfg(feature = "debug_network")]
+                        print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, item_information);
                     }
 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = MapTypePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = MapTypePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
-
-                } else if let Ok(packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
 
                     for _skill_index in 0..packet.skill_count() {
                         let skill_information = SkillInformation::from_bytes(&mut byte_stream, None);
-                        println!("{:?}", skill_information); 
+ 
+                        #[cfg(feature = "debug_network")]
+                        print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, skill_information);
                     }
 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:#?}", packet); 
+                } else if let Ok(_packet) = InitialStatusPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = InitialStatusPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:#?}", packet); 
+                } else if let Ok(_packet) = UpdatePartyInvitationStatePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = UpdatePartyInvitationStatePacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateShowEquipPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = UpdateShowEquipPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = UpdateConfigurationPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = UpdateConfigurationPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = NavigateToMonsterPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = NavigateToMonsterPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = CloseScriptPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = CloseScriptPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
+                } else if let Ok(_packet) = QuestNotificatonPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = QuestNotificatonPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet); 
-
-                } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) { 
-                    println!("{:?}", packet);
+                } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdataClientTick(packet.client_tick));
 
                 } else {
+
+                    #[cfg(feature = "debug_network")]
                     println!("{}unhandled{}: {:x?}", RED, NONE, byte_stream.remaining());
+
                     break;
                 }
             }
-
-            //byte_stream.assert_empty("event loop");
         }
 
         events

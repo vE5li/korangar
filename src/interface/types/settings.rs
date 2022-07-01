@@ -1,4 +1,5 @@
 use serde::{ Serialize, Deserialize };
+use ron::ser::PrettyConfig;
 
 #[cfg(feature = "debug")]
 use debug::*;
@@ -15,7 +16,7 @@ impl Default for InterfaceSettings {
     
     fn default() -> Self {
         let scaling = MutableRange::new(1.0, 0.7, 1.7);
-        let theme_file = "client/themes/theme.json".to_string();
+        let theme_file = "client/themes/theme.ron".to_string();
         Self { scaling, theme_file }
     }
 }
@@ -37,9 +38,9 @@ impl InterfaceSettings {
         #[cfg(feature = "debug")]
         print_debug!("loading interface settings from {}filename{}", MAGENTA, NONE);
 
-        std::fs::read_to_string("client/interface_settings.json")
+        std::fs::read_to_string("client/interface_settings.ron")
             .ok()
-            .map(|data| serde_json::from_str(&data).ok())
+            .map(|data| ron::from_str(&data).ok())
             .flatten()
     }
     
@@ -48,8 +49,8 @@ impl InterfaceSettings {
         #[cfg(feature = "debug")]
         print_debug!("saving interface settings to {}filename{}", MAGENTA, NONE);
 
-        let data = serde_json::to_string_pretty(&self).unwrap();
-        std::fs::write("client/interface_settings.json", data).expect("unable to write file");
+        let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
+        std::fs::write("client/interface_settings.ron", data).expect("unable to write file");
     }
 }
 

@@ -5,8 +5,8 @@ use graphics::{ Renderer, Camera };
 use types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
+#[window_title("sound source")]
 pub struct SoundSource {
-    #[window_title("sound source")]
     pub name: String,
     pub sound_file: String,
     pub position: Vector3<f32>,

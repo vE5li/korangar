@@ -1,10 +1,24 @@
 use derive_new::new;
 use std::fmt::{ Display, Formatter, Result };
 
+use crate::traits::ByteConvertable;
+
 #[derive(Copy, Clone, Debug, new)]
 pub struct Version {
     pub major: u8,
     pub minor: u8,
+}
+
+impl ByteConvertable for Version {
+
+    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none());
+
+        let major = byte_stream.next();
+        let minor = byte_stream.next();
+
+        Self::new(major, minor)
+    }
 }
 
 impl Version {

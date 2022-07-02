@@ -72,15 +72,8 @@ struct LoginServerLoginSuccessPacket {
     pub unknown: u16, // always 0
     pub sex: Sex,
     pub auth_token: [u8; 17],
-}
-
-impl LoginServerLoginSuccessPacket {
-    
-    pub fn character_server_count(&self) -> usize {
-        const HEADER_LENGTH: usize = 64;
-        const CHARACTER_SERVER_INFORMATION_SIZE: usize = 160;
-        (self.packet_length as usize - HEADER_LENGTH) / CHARACTER_SERVER_INFORMATION_SIZE
-    }
+    #[repeating((self.packet_length - 64) / 160)]
+    pub character_server_information: Vec<CharacterServerInformation>,
 }
 
 #[allow(dead_code)]
@@ -115,7 +108,7 @@ struct Packet180b {
 }
 
 #[derive(Debug, new)]
-pub struct WorldPosition { // make this a wrapper for Vector3 ?
+pub struct WorldPosition {
     pub x: usize,
     pub y: usize,
 }
@@ -181,17 +174,6 @@ impl ByteConvertable for WorldPosition2 {
 
         Self { x1, y1, x2, y2 }
     }
-
-    //fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-    //    assert!(length_hint.is_none()); 
-    //    let mut coordinates = vec![0, 0, 0];
-
-    //    coordinates[0] = (self.x >> 2) as u8;
-    //    coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3f) as u8);
-    //    coordinates[2] = (self.y << 4) as u8;
-
-    //    coordinates
-    //}
 }
 
 #[allow(dead_code)]
@@ -390,6 +372,8 @@ struct RequestCharacterListPacket {}
 #[header(0x72, 0x0b)]
 struct RequestCharacterListSuccessPacket {
     pub packet_length: u16,
+    #[repeating((self.packet_length - 4) / 175)]
+    pub character_information: Vec<CharacterInformation>,
 }
 
 #[derive(Debug, Packet, new)]
@@ -450,6 +434,8 @@ struct SelectCharacterPacket {
 #[header(0x8e, 0x00)]
 struct ServerMessagePacket {
     pub packet_length: u16,
+    #[length_hint(self.packet_length - 4)]
+    pub message: String,
 }
 
 #[derive(Debug, Packet)]
@@ -486,6 +472,8 @@ struct AchievementListPacket {
     pub level: u16,
     pub acheivement_experience: u32,
     pub acheivement_experience_tnl: u32, // ?
+    #[repeating(self.acheivement_count)]
+    pub acheivement_data: Vec<AchievementData>,
 }
 
 #[derive(Debug, Packet)]
@@ -508,6 +496,8 @@ struct SpriteChangePacket {
 struct InventoyStartPacket {
     pub packet_length: u16,
     pub inventory_type: u8,
+    #[length_hint(self.packet_length - 5)]
+    pub inventory_name: String,
 }
 
 #[derive(Debug, Packet)]
@@ -547,13 +537,8 @@ struct EquippableItemInformation {
 struct EquippableItemListPacket {
     pub packet_length: u16,
     pub inventory_type: u8,
-}
-
-impl EquippableItemListPacket {
-    
-    pub fn item_count(&self) -> usize {
-        (self.packet_length as usize - 5) / 68
-    }
+    #[repeating((self.packet_length - 5) / 68)]
+    pub item_information: Vec<EquippableItemInformation>,
 }
 
 #[derive(Debug, ByteConvertable)]
@@ -566,13 +551,8 @@ struct EquippableSwitchItemInformation {
 #[header(0x9b, 0x0a)]
 struct EquippableSwitchItemListPacket {
     pub packet_length: u16,
-}
-
-impl EquippableSwitchItemListPacket {
-    
-    pub fn item_count(&self) -> usize {
-        (self.packet_length as usize - 4) / 6
-    }
+    #[repeating((self.packet_length - 4) / 6)]
+    pub item_information: Vec<EquippableSwitchItemInformation>,
 }
 
 #[derive(Debug, Packet)]
@@ -591,6 +571,8 @@ struct BroadcastMessagePacket {
     pub font_size: u16,
     pub font_alignment: u16,
     pub font_y: u16,
+    #[length_hint(self.packet_length - 16)]
+    pub message: String,
 }
 
 #[derive(Debug, Packet)]
@@ -599,6 +581,8 @@ struct EntityMessagePacket {
     pub packet_length: u16,
     pub entity_id: u32,
     pub color: u32,
+    #[length_hint(self.packet_length - 12)]
+    pub message: String,
 }
 
 #[derive(Debug, Packet)]
@@ -981,13 +965,8 @@ struct SkillInformation {
 #[header(0x0f, 0x01)]
 struct UpdateSkillTreePacket {
     pub packet_length: u16,
-}
-
-impl UpdateSkillTreePacket  {
-    
-    pub fn skill_count(&self) -> usize {
-        (self.packet_length as usize - 4) / 37
-    }
+    #[repeating((self.packet_length - 4) / 37)]
+    pub skill_information: Vec<SkillInformation>,
 }
 
 #[derive(Copy, Clone, Debug, Default, ByteConvertable)]
@@ -1158,20 +1137,16 @@ impl NetworkingSystem {
         let login_server_login_success_packet = LoginServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
         self.login_data = LoginData::new(login_server_login_success_packet.account_id, login_server_login_success_packet.login_id1, login_server_login_success_packet.sex).into();
 
-        for _index in 0..login_server_login_success_packet.character_server_count() {
-            let server_information = CharacterServerInformation::from_bytes(&mut byte_stream, None);
+        let character_server_information = login_server_login_success_packet.character_server_information
+            .into_iter()
+            .next()
+            .expect("no character server available");
 
-            #[cfg(feature = "debug_network")]
-            print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, server_information);
-
-            if self.character_stream.is_none() {
-                let server_ip = IpAddr::V4(server_information.server_ip);
-                let socket_address = SocketAddr::new(server_ip, server_information.server_port);
-                self.character_stream = TcpStream::connect(socket_address)
-                    .expect("failed to connect to character server")
-                    .into();
-            }
-        }
+        let server_ip = IpAddr::V4(character_server_information.server_ip);
+        let socket_address = SocketAddr::new(server_ip, character_server_information.server_port);
+        self.character_stream = TcpStream::connect(socket_address)
+            .expect("failed to connect to character server")
+            .into();
 
         let character_server_login_packet = CharacterServerLoginPacket::new(
             login_server_login_success_packet.account_id,
@@ -1207,22 +1182,8 @@ impl NetworkingSystem {
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
-        RequestCharacterListSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
-
-        {
-            let mut characters = self.characters.borrow_mut();
-            characters.clear();
-
-            while !byte_stream.is_empty() {
-
-                if RequestCharacterListSuccessPacket::try_from_bytes(&mut byte_stream).is_ok() {
-                    break;
-                }
-
-                let character_information = CharacterInformation::from_bytes(&mut byte_stream, None);
-                characters.push(character_information);
-            }
-        }
+        let request_character_list_success_packet = RequestCharacterListSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+        *self.characters.borrow_mut() = request_character_list_success_packet.character_information;
 
         #[cfg(feature = "debug_network")]
         timer.stop();
@@ -1343,8 +1304,6 @@ impl NetworkingSystem {
 
         let create_character_success_packet = CreateCharacterSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
-        println!("{:?}", create_character_success_packet);
-
         self.characters.borrow_mut().push(create_character_success_packet.character_information);
         *self.changed.borrow_mut() = true;
         Ok(())
@@ -1418,20 +1377,19 @@ impl NetworkingSystem {
         let map_server_login_success_packet = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
         while let Ok(server_message_packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
-            let server_message = String::from_bytes(&mut byte_stream, Some(server_message_packet.packet_length as usize - 4));
-            println!("message from server: {}", server_message);
+            println!("message from server: {}", server_message_packet.message);
         }
 
         let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
 
         Ok((
-                change_map_packet.map_name.replace(".gat", ""),
-                Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
-                select_character_success_packet.character_id as usize,
-                45, // how do we get this ?
-                200, // how do we get this ?
-                map_server_login_success_packet.client_tick
-        )) // set 200 to 0 as soon as stats are properly updated
+            change_map_packet.map_name.replace(".gat", ""),
+            Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
+            select_character_success_packet.character_id as usize,
+            45, // how do we get this ?
+            200, // set 200 to 0 as soon as stats are properly updated
+            map_server_login_success_packet.client_tick
+        ))
     }
 
     pub fn request_switch_character_slot(&mut self, origin_slot: usize) {
@@ -1510,16 +1468,13 @@ impl NetworkingSystem {
             while !byte_stream.is_empty() {
                 
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
-                    let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 16));
-                    println!("broadcast message: {}", message);
+                    println!("broadcast message: {}", packet.message);
 
                 } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
-                    let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 4));
-                    println!("server message: {}", message);
+                    println!("server message: {}", packet.message);
 
                 } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
-                    let message = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 12));
-                    println!("entity message: {}", message);
+                    println!("entity message: {}", packet.message);
 
                 } else if let Ok(_packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
 
@@ -1558,55 +1513,26 @@ impl NetworkingSystem {
 
                 } else if let Ok(_packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) { 
-
-                    let acheivements = (0..packet.acheivement_count)
-                        .map(|_index| AchievementData::from_bytes(&mut byte_stream, None))
-                        .collect::<Vec<AchievementData>>();
-
-                    println!("{:?}", acheivements);
+                } else if let Ok(_packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) { 
 
                 } else if let Ok(_packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) { 
 
                 } else if let Ok(_packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) { 
 
-                } else if let Ok(packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) { 
-                    let name = String::from_bytes(&mut byte_stream, Some(packet.packet_length as usize - 5));
-                    println!("inventory name: {}", name);
+                } else if let Ok(_packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) { 
 
                     while InventoyEndPacket::try_from_bytes(&mut byte_stream).is_err() {
-                        if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
-
-                            for _item_index in 0..packet.item_count() {
-                                let item_information = EquippableItemInformation::from_bytes(&mut byte_stream, None); 
-
-                                #[cfg(feature = "debug_network")]
-                                print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, item_information);
-                            }
+                        if let Ok(_packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
                         } else {
                             panic!();
                         }
                     }
 
-                } else if let Ok(packet) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) { 
-
-                    for _item_index in 0..packet.item_count() {
-                        let item_information = EquippableSwitchItemInformation::from_bytes(&mut byte_stream, None);
-
-                        #[cfg(feature = "debug_network")]
-                        print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, item_information);
-                    }
+                } else if let Ok(_packet) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) { 
 
                 } else if let Ok(_packet) = MapTypePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
-
-                    for _skill_index in 0..packet.skill_count() {
-                        let skill_information = SkillInformation::from_bytes(&mut byte_stream, None);
- 
-                        #[cfg(feature = "debug_network")]
-                        print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, skill_information);
-                    }
+                } else if let Ok(_packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(_packet) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) {
 

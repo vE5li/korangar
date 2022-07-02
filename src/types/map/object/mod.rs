@@ -9,8 +9,8 @@ use types::maths::*;
 use self::model::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
+#[window_title("object")]
 pub struct Object {
-    #[window_title("object")]
     pub name: Option<String>,
     pub model_name: String,
     pub model: Arc<Model>,

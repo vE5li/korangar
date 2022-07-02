@@ -8,8 +8,8 @@ use types::maths::*;
 pub use self::particle::Particle;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
+#[window_title("effect source")]
 pub struct EffectSource {
-    #[window_title("effect source")]
     pub name: String,
     pub position: Vector3<f32>,
     pub effect_type: usize, // TODO: fix this

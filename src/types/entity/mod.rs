@@ -12,7 +12,7 @@ use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 use graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
 use graphics::{ Renderer, Camera, Texture };
 use types::map::Map;
-use loaders::{ TextureLoader, GameFileLoader };
+use loaders::{ TextureLoader, SpriteLoader };
 use crate::database::Database;
 
 #[derive(new)]
@@ -38,12 +38,13 @@ pub struct Entity {
     pub current_spell_points: usize,
     pub current_activity_points: usize,
 
+    //sprite: Sprite,
     texture: Texture,
 }
 
 impl Entity {
 
-    pub fn new(game_file_loader: &mut GameFileLoader, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, _movement_speed: usize) -> Self {
+    pub fn new(sprite_loader: &mut SpriteLoader, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, _movement_speed: usize) -> Self {
 
         let position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
         let active_movement = None;
@@ -56,10 +57,8 @@ impl Entity {
         let current_spell_points = 50;
         let current_activity_points = 0;
 
-        let file_name = database.actor_of(job_id);
-        let file_path = format!("data\\sprite\\npc\\{}.spr", file_name);
-
-        game_file_loader.get(&file_path).unwrap();
+        let file_path = format!("npc\\{}.spr", database.job_name_from_id(job_id));
+        sprite_loader.get(&file_path, texture_future).unwrap();
 
         let texture = texture_loader.get("assets/player.png", texture_future).unwrap(); // 8 x 14
 

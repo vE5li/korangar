@@ -4,8 +4,8 @@ use graphics::{ Renderer, Camera, Color };
 use types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
+#[window_title("light source")]
 pub struct LightSource {
-    #[window_title("light source")]
     pub name: String,
     pub position: Vector3<f32>,
     pub color: Color,

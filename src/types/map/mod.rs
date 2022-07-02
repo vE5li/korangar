@@ -56,9 +56,9 @@ pub enum MarkerIdentifier {
 }
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
+#[window_title("map viewer")]
+#[window_class("map_viewer")]
 pub struct Map {
-    #[window_title("map viewer")]
-    #[window_class("map_viewer")]
     resource_version: Version,
     ground_version: Version,
     width: usize,

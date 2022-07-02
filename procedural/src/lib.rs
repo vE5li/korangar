@@ -1,4 +1,5 @@
 #![feature(let_else)]
+#![feature(extend_one)]
 
 extern crate proc_macro;
 extern crate proc_macro2;
@@ -6,7 +7,7 @@ extern crate syn;
 extern crate quote;
 
 use syn::{ Ident, Data, Fields, LitFloat, DeriveInput, DataStruct, DataEnum, Attribute, LitInt };
-use proc_macro2::TokenStream;
+use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 
 struct ButtonArguments {
@@ -25,12 +26,8 @@ impl syn::parse::Parse for ButtonArguments {
 
 fn parse_common(item: proc_macro::TokenStream) -> (Ident, Vec<TokenStream>, String, Option<String>) {
 
-    let ast: syn::DeriveInput = syn::parse(item).expect("Couldn't parse item");
+    let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
     let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
-
-    let mut window_title = ast.ident.to_string();
-    let mut window_class = None;
-    let mut initializers = vec![];
 
     let Data::Struct(data_struct) = ast.data else {
         panic!("only structs may be derived");
@@ -39,6 +36,30 @@ fn parse_common(item: proc_macro::TokenStream) -> (Ident, Vec<TokenStream>, Stri
     let Fields::Named(named_fields) = data_struct.fields else {
         panic!("only named fields may be derived");
     };
+
+    let mut window_title = ast.ident.to_string();
+    let mut window_class = None;
+    let mut initializers = vec![];
+
+    for attribute in ast.attrs {
+        let attribute_name = attribute.path.segments[0].ident.to_string();
+
+        if &attribute_name == "window_title" {
+            let arguments: syn::Lit = attribute.parse_args().unwrap();
+            let syn::Lit::Str(new_window_title) = arguments else {
+                panic!("window title must be a literal string");
+            };
+            window_title = new_window_title.value();
+        }
+
+        if &attribute_name == "window_class" {
+            let arguments: syn::Lit = attribute.parse_args().unwrap();
+            let syn::Lit::Str(new_window_class) = arguments else {
+                panic!("window class must be a literal string");
+            };
+            window_class = Some(new_window_class.value());
+        }
+    }
 
     'fields: for field in named_fields.named {
 
@@ -58,22 +79,6 @@ fn parse_common(item: proc_macro::TokenStream) -> (Ident, Vec<TokenStream>, Stri
                     panic!("name must be a literal string");
                 };
                 display_name = new_name_string.value();
-            }
-
-            if &attribute_name == "window_title" {
-                let arguments: syn::Lit = attribute.parse_args().unwrap();
-                let syn::Lit::Str(new_window_title) = arguments else {
-                    panic!("window title must be a literal string");
-                };
-                window_title = new_window_title.value();
-            }
-
-            if &attribute_name == "window_class" {
-                let arguments: syn::Lit = attribute.parse_args().unwrap();
-                let syn::Lit::Str(new_window_class) = arguments else {
-                    panic!("window class must be a literal string");
-                };
-                window_class = Some(new_window_class.value());
             }
 
             if &attribute_name == "event_button" {
@@ -181,10 +186,10 @@ pub fn derive_prototype_window(item: proc_macro::TokenStream) -> proc_macro::Tok
 //    proc_macro::TokenStream::from(expanded)
 //}
 
-#[proc_macro_derive(ByteConvertable, attributes(length_hint, base_type, variant_value))]
+#[proc_macro_derive(ByteConvertable, attributes(length_hint, repeating, base_type, variant_value))]
 pub fn derive_byte_convertable(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
-    let ast: syn::DeriveInput = syn::parse(item).expect("Couldn't parse item");
+    let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
     let attributes = ast.attrs;
     let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
 
@@ -202,30 +207,61 @@ fn derive_byte_convertable_struct(data_struct: DataStruct, name: Ident) -> proc_
     };
 
     let mut from_bytes_initializers = vec![];
+    let mut from_fields = vec![];
     let mut to_bytes_initializers = vec![];
 
     for field in named_fields.named {
 
         let field_name = field.ident.unwrap();
         let mut length_hint = None;
+        let mut repeating = None;
 
         for attribute in field.attrs {
             let attribute_name = attribute.path.segments[0].ident.to_string();
 
             if &attribute_name == "length_hint" {
                 assert!(length_hint.is_none(), "length hint may only be given once");
-                let length: syn::LitInt = attribute.parse_args().unwrap();
-                length_hint = length.into();
+                length_hint = attribute.tokens.clone().into();
+            }
+
+            if &attribute_name == "repeating" {
+                assert!(repeating.is_none(), "repeating may only be given once");
+                repeating = remove_self_from_stream(attribute.tokens.clone()).into();
             }
         }
 
-        let length_hint_option = match length_hint {
-            Some(length) => quote!(#length.into()),
+        let from_length_hint_option = match length_hint.clone() {
+            Some(length_stream) => {
+                let cleaned_stream = remove_self_from_stream(length_stream);
+                quote!(((#cleaned_stream) as usize).into())
+            },
             None => quote!(None),
         };
 
-        from_bytes_initializers.push(quote!(#field_name: crate::traits::ByteConvertable::from_bytes(byte_stream, #length_hint_option)));
-        to_bytes_initializers.push(quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()));
+        let length_hint_option = match length_hint {
+            Some(length) => quote!(((#length) as usize).into()),
+            None => quote!(None),
+        };
+
+        from_fields.push(quote!(#field_name));
+
+        let is_repeating = repeating.is_some();
+
+        let initializer = match repeating {
+            Some(repeat_count) => quote!(
+                let #field_name = (0..(#repeat_count))
+                    .map(|_| crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option))
+                    .collect();
+            ),
+            None => quote!(let #field_name = crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option);),
+        };
+        from_bytes_initializers.push(initializer);
+ 
+        let initializer = match is_repeating {
+            true => quote!(panic!()),
+            false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()),
+        };
+        to_bytes_initializers.push(initializer);
     }
 
     let expanded = quote! {
@@ -233,7 +269,8 @@ fn derive_byte_convertable_struct(data_struct: DataStruct, name: Ident) -> proc_
 
             fn from_bytes(byte_stream: &mut crate::types::ByteStream, length_hint: Option<usize>) -> Self {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
-                Self { #(#from_bytes_initializers),* }
+                #(#from_bytes_initializers)*
+                Self { #(#from_fields),* }
             }
 
             fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
@@ -445,7 +482,32 @@ pub fn constraint(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
 
 
+fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
+    let mut new_stream = TokenStream::new();
+    let mut iterator = token_stream.into_iter();
 
+    while let Some(token) = iterator.next() {
+
+        if let TokenTree::Group(group) = &token {
+            let delimiter = group.delimiter();
+            let new_group_stream = remove_self_from_stream(group.stream());
+            let new_group = proc_macro2::Group::new(delimiter, new_group_stream);
+            new_stream.extend_one(TokenTree::Group(new_group));
+            continue;
+        }
+
+        if let TokenTree::Ident(ident) = &token {
+            if ident == &Ident::new("self", token.span()) { // get proper span ?
+                let _burn_punktuation = iterator.next().unwrap();
+                continue;
+            }
+        }
+
+        new_stream.extend_one(token);
+    }
+
+    new_stream
+}
 
 struct PacketSignature {
     first: syn::LitInt,
@@ -462,13 +524,14 @@ impl syn::parse::Parse for PacketSignature {
     }
 }
 
-#[proc_macro_derive(Packet, attributes(header, length_hint))]
+#[proc_macro_derive(Packet, attributes(header, length_hint, repeating))]
 pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
-    let ast: syn::DeriveInput = syn::parse(item).expect("Couldn't parse item");
+    let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
     let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
 
     let mut from_bytes_initializers = vec![];
+    let mut from_fields = vec![];
     let mut to_bytes_initializers = vec![];
     let mut has_fields = false;
 
@@ -495,26 +558,57 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let (first, second) = (packet_signature.first, packet_signature.second);
 
     for field in named_fields.named {
+
         let field_name = field.ident.unwrap();
         let mut length_hint = None;
+        let mut repeating = None;
 
         for attribute in field.attrs {
             let attribute_name = attribute.path.segments[0].ident.to_string();
 
             if &attribute_name == "length_hint" {
                 assert!(length_hint.is_none(), "length hint may only be given once");
-                let length: syn::LitInt = attribute.parse_args().unwrap();
-                length_hint = length.into();
+                length_hint = attribute.tokens.clone().into();
+            }
+
+            if &attribute_name == "repeating" {
+                assert!(repeating.is_none(), "repeating may only be given once");
+                repeating = remove_self_from_stream(attribute.tokens.clone()).into();
             }
         }
 
-        let length_hint_option = match length_hint {
-            Some(length) => quote!(#length.into()),
+        let from_length_hint_option = match length_hint.clone() {
+            Some(length_stream) => {
+                let cleaned_stream = remove_self_from_stream(length_stream);
+                quote!(((#cleaned_stream) as usize).into())
+            },
             None => quote!(None),
         };
 
-        from_bytes_initializers.push(quote!(#field_name: crate::traits::ByteConvertable::from_bytes(byte_stream, #length_hint_option)));
-        to_bytes_initializers.push(quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()));
+        let length_hint_option = match length_hint {
+            Some(length) => quote!(((#length) as usize).into()),
+            None => quote!(None),
+        };
+
+        from_fields.push(quote!(#field_name));
+
+        let is_repeating = repeating.is_some();
+
+        let initializer = match repeating {
+            Some(repeat_count) => quote!(
+                let #field_name = (0..(#repeat_count))
+                    .map(|_| crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option))
+                    .collect();
+            ),
+            None => quote!(let #field_name = crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option);),
+        };
+        from_bytes_initializers.push(initializer);
+
+        let initializer = match is_repeating {
+            true => quote!(panic!()),
+            false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()),
+        };
+        to_bytes_initializers.push(initializer);
 
         has_fields = true;
     }
@@ -540,7 +634,10 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             fn try_from_bytes(byte_stream: &mut crate::types::ByteStream) -> Result<Self, String> {
                 let result = match byte_stream.match_signature(Self::header()) {
-                    true => Ok(Self { #(#from_bytes_initializers),* }),
+                    true => {
+                        #(#from_bytes_initializers)*
+                        Ok(Self { #(#from_fields),* })
+                    },
                     false => Err(format!("invalid signature 0x{:02x} 0x{:02x}", byte_stream.peek(0), byte_stream.peek(1))),
                 };
 
@@ -560,7 +657,7 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[proc_macro_derive(toggle, attributes(toggle))]
 pub fn derive_toggle(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
-    let ast: syn::DeriveInput = syn::parse(item).expect("Couldn't parse item");
+    let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
     let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
 
     let Data::Struct(data_struct) = ast.data else {

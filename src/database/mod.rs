@@ -1,6 +1,5 @@
 use rusqlite::{Connection, Result};
 
-
 //use serde::{ Serialize, Deserialize };
 //use std::collections::HashMap;
 
@@ -70,7 +69,7 @@ impl Database {
         Self { connection }
     }
 
-    pub fn actor_of(&self, id: usize) -> String {
+    pub fn job_name_from_id(&self, id: usize) -> String {
 
         let mut statement = self.connection.prepare("SELECT * FROM actors WHERE id = ?;").unwrap();
         let mut result = statement.query_map([id], |row| row.get("name")).unwrap();

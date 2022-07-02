@@ -227,9 +227,9 @@ impl Default for SliderTheme {
 }
 
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
+#[window_title("theme viewer")]
+#[window_class("theme_viewer")]
 pub struct Theme {
-    #[window_title("theme viewer")]
-    #[window_class("theme_viewer")]
     #[event_button("reload theme", ReloadTheme)]
     #[event_button("save theme", SaveTheme)]
     pub button: ButtonTheme,

@@ -103,8 +103,7 @@ impl GameFileLoader {
         let bytes = read(path.clone()).unwrap_or_else(|_| panic!("failed to load archive from {}", path));
         let mut byte_stream = ByteStream::new(&bytes);
 
-        let magic = byte_stream.string(16);
-        assert!(&magic == "Master of Magic", "failed to read magic number"); // TODO: change failed to invalid
+        assert!(byte_stream.string(16).as_str() == "Master of Magic", "failed to read magic number"); // TODO: change failed to invalid
 
         let file_header = FileHeader::from_bytes(&mut byte_stream, None);
         file_header.validate_version();

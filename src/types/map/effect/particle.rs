@@ -6,8 +6,8 @@ use graphics::{ Renderer, Camera };
 use graphics::Color;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
+#[window_title("particle")]
 pub struct Particle {
-    #[window_title("particle")]
     pub position: Vector3<f32>,
     pub light_color: Color,
     pub light_range: f32,

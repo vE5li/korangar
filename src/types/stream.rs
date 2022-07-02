@@ -11,37 +11,37 @@ use types::Version;
 pub struct ByteStream<'b> {
     data: &'b [u8],
     #[new(default)]
-    counter: usize,
+    offset: usize,
 }
 
 impl<'b> ByteStream<'b> {
 
     pub fn next(&mut self) -> u8 {
-        assert!(self.counter < self.data.len(), "byte stream is shorter than expected");
-        let byte = self.data[self.counter];
-        self.counter += 1;
+        assert!(self.offset < self.data.len(), "byte stream is shorter than expected");
+        let byte = self.data[self.offset];
+        self.offset += 1;
         byte
     }
 
     pub fn peek(&self, index: usize) -> u8 {
-        assert!(self.counter + index < self.data.len(), "byte stream is shorter than expected");
-        self.data[self.counter + index]
+        assert!(self.offset + index < self.data.len(), "byte stream is shorter than expected");
+        self.data[self.offset + index]
     }
 
     pub fn is_empty(&self) -> bool {
-        self.counter >= self.data.len()
+        self.offset >= self.data.len()
     }
 
     pub fn match_signature(&mut self, signature: [u8; 2]) -> bool {
 
-        if self.data.len() - self.counter < 2 {
+        if self.data.len() - self.offset < 2 {
             return false;
         }
 
-        let signature_matches = self.data[self.counter] == signature[0] && self.data[self.counter + 1] == signature[1];
+        let signature_matches = self.data[self.offset] == signature[0] && self.data[self.offset + 1] == signature[1];
         
         if signature_matches {
-            self.counter += 2;
+            self.offset += 2;
         }
 
         signature_matches
@@ -163,16 +163,16 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn remaining(&mut self) -> Vec<u8> { // temporary ?
-        self.slice(self.data.len() - self.counter)
+        self.slice(self.data.len() - self.offset)
     }
 
     pub fn skip(&mut self, count: usize) {
-        self.counter += count;
+        self.offset += count;
     }
 
     #[cfg(feature = "debug")]
     pub fn assert_empty(&self, file_name: &str) {
-        let remaining = self.data.len() - self.counter;
+        let remaining = self.data.len() - self.offset;
 
         if remaining != 0 {
             print_debug!("incomplete read on file {}{}{}; {}{}{} bytes remaining", MAGENTA, file_name, NONE, YELLOW, remaining, NONE);

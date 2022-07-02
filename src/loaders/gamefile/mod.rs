@@ -166,6 +166,7 @@ impl GameFileLoader {
         result
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_maps(&self) -> &Vec<String> {
         &self.maps
     }

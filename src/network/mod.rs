@@ -14,54 +14,36 @@ use crate::interface::windows::CharacterSelectionWindow;
 use crate::traits::ByteConvertable;
 use crate::types::ByteStream;
 
+pub trait Packet {
+
+    fn header() -> [u8; 2];
+
+    fn to_bytes(&self) -> Vec<u8>;
+}
+
+/// An event triggered by the character server
 #[derive(Clone, Debug)]
 pub enum NetworkEvent {
+    /// Add an entity to the list of entities that the client is aware of
     AddEntity(usize, usize, Vector2<usize>, usize),
+    /// Remove an entity from the list of entities that the client is aware of by its id
     RemoveEntity(usize),
+    /// The player is pathing to a new position
     PlayerMove(Vector2<usize>, Vector2<usize>, u32),
+    /// An Entity nearby is pathing to a new position
     EntityMove(usize, Vector2<usize>, Vector2<usize>, u32),
+    /// Player was moved to a new position on a different map or the current map
     ChangeMap(String, Vector2<usize>),
+    /// Update the client side [tick counter](crate::system::GameTimer::client_tick) to keep server and client synchronized
     UpdataClientTick(u32),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, ByteConvertable)]
 pub enum Sex {
     Male,
     Female,
     Both,
     Server,
-}
-
-impl ByteConvertable for Sex {
-
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match byte_stream.byte() {
-            0 => Self::Male,
-            1 => Self::Female,
-            2 => Self::Both,
-            3 => Self::Server,
-            invalid => panic!("invalid sex {}", invalid),
-        }
-    }
-    
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        assert!(length_hint.is_none());     
-        let data = match *self {
-            Self::Male => 0,
-            Self::Female => 1,
-            Self::Both => 2,
-            Self::Server => 3,
-        };
-        vec![data]
-    }
-}
-
-pub trait Packet {
-
-    fn header() -> [u8; 2];
-    
-    fn to_bytes(&self) -> Vec<u8>;
 }
 
 #[derive(Debug, Packet, new)]
@@ -136,7 +118,6 @@ struct Packet180b {
 pub struct WorldPosition { // make this a wrapper for Vector3 ?
     pub x: usize,
     pub y: usize,
-    //pub z: usize,
 }
 
 impl WorldPosition {
@@ -222,24 +203,14 @@ struct MapServerLoginSuccessPacket {
     pub font: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, ByteConvertable)]
 pub enum LoginFailedReason {
+    #[variant_value(1)]
     ServerClosed,
+    #[variant_value(2)]
     AlreadyLoggedIn,
+    #[variant_value(8)]
     AlreadyOnline,
-}
-
-impl ByteConvertable for LoginFailedReason {
-    
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match byte_stream.byte() {
-            1 => Self::ServerClosed,
-            2 => Self::AlreadyLoggedIn,
-            8 => Self::AlreadyOnline,
-            invalid => panic!("invalid response code {}", invalid),
-        }
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -248,20 +219,9 @@ struct LoginFailedPacket {
     pub reason: LoginFailedReason,
 }
 
-#[derive(Debug)]
+#[derive(Debug, ByteConvertable)]
 pub enum CharacterSelectionFailedReason {
     RejectedFromServer,
-}
-
-impl ByteConvertable for CharacterSelectionFailedReason {
-    
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match byte_stream.byte() {
-            0 => Self::RejectedFromServer,
-            invalid => panic!("invalid response code {}", invalid),
-        }
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -281,26 +241,14 @@ struct CharacterSelectionSuccessPacket {
     pub unknown: [u8; 128],
 }
 
-#[derive(Debug)]
+#[derive(Debug, ByteConvertable)]
 pub enum CharacterCreationFailedReason {
     CharacterNameAlreadyUsed,
     NotOldEnough,
+    #[variant_value(3)]
     NotAllowedToUseSlot,
+    #[variant_value(255)]
     CharacterCerationFailed,
-}
-
-impl ByteConvertable for CharacterCreationFailedReason {
-    
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match byte_stream.byte() {
-            0x00 => Self::CharacterNameAlreadyUsed,
-            0x01 => Self::NotOldEnough,
-            0x03 => Self::NotAllowedToUseSlot,
-            0xff => Self::CharacterCerationFailed,
-            invalid => panic!("invalid response code {}", invalid),
-        }
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -474,24 +422,11 @@ struct DeleteCharacterPacket {
     pub unknown: [u8; 10],
 }
 
-#[derive(Debug)]
+#[derive(Debug, ByteConvertable)]
 pub enum CharacterDeletionFailedReason {
     NotAllowed,
     CharacterNotFound,
     NotEligible,
-}
-
-impl ByteConvertable for CharacterDeletionFailedReason {
-    
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match byte_stream.byte() {
-            0 => Self::NotAllowed,
-            1 => Self::CharacterNotFound,
-            2 => Self::NotEligible,
-            invalid => panic!("invalid response code {}", invalid),
-        }
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -674,71 +609,71 @@ struct DisplayEmotionPacket {
 
 #[derive(Debug)]
 enum StatusType {
-	SP_WEIGHT(u32),
-	SP_MAXWEIGHT(u32),
-	SP_SPEED(u32),
-	SP_BASELEVEL(u32),
-	SP_JOBLEVEL(u32),
-	SP_KARMA(u32),
-	SP_MANNER(u32),
-	SP_STATUSPOINT(u32),
-	SP_SKILLPOINT(u32),
-	SP_HIT(u32),
-	SP_FLEE1(u32),
-	SP_FLEE2(u32),
-	SP_MAXHP(u32),
-	SP_MAXSP(u32),
-	SP_HP(u32),
-	SP_SP(u32),
-	SP_ASPD(u32),
-	SP_ATK1(u32),
-	SP_DEF1(u32),
-	SP_MDEF1(u32),
-	SP_ATK2(u32),
-	SP_DEF2(u32),
-	SP_MDEF2(u32),
-	SP_CRITICAL(u32),
-	SP_MATK1(u32),
-	SP_MATK2(u32),
-	SP_ZENY(u32),
-	SP_BASEEXP(u64),
-	SP_JOBEXP(u64),
-	SP_NEXTBASEEXP(u64),
-	SP_NEXTJOBEXP(u64),
-	SP_USTR(u8),
-	SP_UAGI(u8),
-	SP_UVIT(u8),
-	SP_UINT(u8),
-	SP_UDEX(u8),
-	SP_ULUK(u8),
-	SP_STR(u32, u32),
-	SP_AGI(u32, u32),
-	SP_VIT(u32, u32),
-	SP_INT(u32, u32),
-	SP_DEX(u32, u32),
-	SP_LUK(u32, u32),
-	SP_CARTINFO(u16, u32, u32),
-	SP_AP(u32),
-	SP_TRAITPOINT(u32),
-	SP_MAXAP(u32),
-	SP_POW(u32, u32),
-	SP_STA(u32, u32),
-	SP_WIS(u32, u32),
-	SP_SPL(u32, u32),
-	SP_CON(u32, u32),
-	SP_CRT(u32, u32),
-	SP_UPOW(u8),
-	SP_USTA(u8),
-	SP_UWIS(u8),
-	SP_USPL(u8),
-	SP_UCON(u8),
-	SP_UCRT(u8),
-	SP_PATK(u32),
-	SP_SMATK(u32),
-	SP_RES(u32),
-	SP_MRES(u32),
-	SP_HPLUS(u32),
-	SP_CRATE(u32),
+    SP_WEIGHT(u32),
+    SP_MAXWEIGHT(u32),
+    SP_SPEED(u32),
+    SP_BASELEVEL(u32),
+    SP_JOBLEVEL(u32),
+    SP_KARMA(u32),
+    SP_MANNER(u32),
+    SP_STATUSPOINT(u32),
+    SP_SKILLPOINT(u32),
+    SP_HIT(u32),
+    SP_FLEE1(u32),
+    SP_FLEE2(u32),
+    SP_MAXHP(u32),
+    SP_MAXSP(u32),
+    SP_HP(u32),
+    SP_SP(u32),
+    SP_ASPD(u32),
+    SP_ATK1(u32),
+    SP_DEF1(u32),
+    SP_MDEF1(u32),
+    SP_ATK2(u32),
+    SP_DEF2(u32),
+    SP_MDEF2(u32),
+    SP_CRITICAL(u32),
+    SP_MATK1(u32),
+    SP_MATK2(u32),
+    SP_ZENY(u32),
+    SP_BASEEXP(u64),
+    SP_JOBEXP(u64),
+    SP_NEXTBASEEXP(u64),
+    SP_NEXTJOBEXP(u64),
+    SP_USTR(u8),
+    SP_UAGI(u8),
+    SP_UVIT(u8),
+    SP_UINT(u8),
+    SP_UDEX(u8),
+    SP_ULUK(u8),
+    SP_STR(u32, u32),
+    SP_AGI(u32, u32),
+    SP_VIT(u32, u32),
+    SP_INT(u32, u32),
+    SP_DEX(u32, u32),
+    SP_LUK(u32, u32),
+    SP_CARTINFO(u16, u32, u32),
+    SP_AP(u32),
+    SP_TRAITPOINT(u32),
+    SP_MAXAP(u32),
+    SP_POW(u32, u32),
+    SP_STA(u32, u32),
+    SP_WIS(u32, u32),
+    SP_SPL(u32, u32),
+    SP_CON(u32, u32),
+    SP_CRT(u32, u32),
+    SP_UPOW(u8),
+    SP_USTA(u8),
+    SP_UWIS(u8),
+    SP_USPL(u8),
+    SP_UCON(u8),
+    SP_UCRT(u8),
+    SP_PATK(u32),
+    SP_SMATK(u32),
+    SP_RES(u32),
+    SP_MRES(u32),
+    SP_HPLUS(u32),
+    SP_CRATE(u32),
 }
 
 impl ByteConvertable for StatusType {
@@ -905,24 +840,11 @@ struct RequestServerTickPacket {
     pub client_tick: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, ByteConvertable)]
+#[base_type(u16)]
 pub enum SwitchCharacterSlotResponseStatus {
-    //#[byte_value(0)]
     Success,
-    //#[byte_value(1)]
     Error,
-}
-
-impl ByteConvertable for SwitchCharacterSlotResponseStatus {
-    
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match u16::from_bytes(byte_stream, None) {
-            0 => Self::Success,
-            1 => Self::Error,
-            invalid => panic!("invalid response code {}", invalid),
-        }
-    }
 }
 
 #[derive(Debug, Packet)]
@@ -942,28 +864,13 @@ struct ChangeMapPacket {
     pub y: u16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, ByteConvertable)]
 enum DissapearanceReason {
     OutOfSight,
-	Died,
-	LoggedOut,
-	Teleported,
-	TrickDead,
-}
-
-impl ByteConvertable for DissapearanceReason {
-    
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
-        match byte_stream.byte() {
-            0 => Self::OutOfSight,
-            1 => Self::Died,
-            2 => Self::LoggedOut,
-            3 => Self::Teleported,
-            4 => Self::TrickDead,
-            invalid => panic!("invalid response code {}", invalid),
-        } 
-    }
+    Died,
+    LoggedOut,
+    Teleported,
+    TrickDead,
 }
 
 #[derive(Debug, Packet)]

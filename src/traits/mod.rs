@@ -4,7 +4,7 @@ pub trait ByteConvertable {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self;
 
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+    fn to_bytes(&self, _length_hint: Option<usize>) -> Vec<u8> {
         panic!()
     }
 }
@@ -169,7 +169,7 @@ impl<T: Copy + Default + ByteConvertable, const SIZE: usize> ByteConvertable for
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "array may not have a length hint");
- 
+
         let mut value = [T::default(); SIZE];
 
         for index in 0..SIZE {
@@ -217,7 +217,7 @@ impl ByteConvertable for String {
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         use std::iter;
- 
+
         match length_hint {
 
             Some(length) => {
@@ -228,5 +228,142 @@ impl ByteConvertable for String {
 
             None => self.bytes().chain(iter::once(0)).collect(), 
         }
+    }
+}
+
+#[cfg(test)]
+mod default_string {
+
+    use types::ByteStream;
+    use traits::ByteConvertable; 
+
+    #[test]
+    fn serialization_test() {
+        let test_value = String::from("test");
+        let data = test_value.to_bytes(None);
+        assert_eq!(data, vec![116, 101, 115, 116, 0]);
+    }
+
+    #[test]
+    fn deserialization_test() {
+        let data = [116, 101, 115, 116, 0];
+        let mut byte_stream = ByteStream::new(&data);
+        let test_value = String::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.as_str(), "test");
+    }
+}
+
+#[cfg(test)]
+mod length_hint_string {
+
+    use types::ByteStream;
+    use traits::ByteConvertable; 
+
+    #[test]
+    fn serialization_test() {
+        let test_value = String::from("test");
+        let data = test_value.to_bytes(Some(8));
+        assert_eq!(data, vec![116, 101, 115, 116, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn deserialization_test() {
+        let data = [116, 101, 115, 116, 0, 0, 0, 0];
+        let mut byte_stream = ByteStream::new(&data);
+        let test_value = String::from_bytes(&mut byte_stream, Some(8));
+        assert_eq!(test_value.as_str(), "test");
+        assert!(byte_stream.remaining().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod default_enum {
+
+    use types::ByteStream;
+    use traits::ByteConvertable; 
+
+    #[derive(ByteConvertable)]
+    enum TestEnum {
+        First,
+        Second,
+        Third,
+    }
+
+    #[test]
+    fn serialization_test() {
+        let test_value = TestEnum::Second;
+        let data = test_value.to_bytes(None);
+        assert_eq!(data, vec![1]);
+    }
+
+    #[test]
+    fn deserialization_test() {
+        let data = [1];
+        let mut byte_stream = ByteStream::new(&data);
+        let test_value = TestEnum::from_bytes(&mut byte_stream, None);
+        assert!(matches!(test_value, TestEnum::Second));
+    }
+}
+
+#[cfg(test)]
+mod variant_value_enum {
+
+    use types::ByteStream;
+    use traits::ByteConvertable;
+
+    #[derive(ByteConvertable)]
+    enum TestEnum {
+        #[variant_value(2)]
+        First,
+        #[variant_value(10)]
+        Second,
+        #[variant_value(255)]
+        Third,
+    }
+
+    #[test]
+    fn serialization_test() {
+        let test_value = TestEnum::Second;
+        let data = test_value.to_bytes(None);
+        assert_eq!(data, vec![10]);
+    }
+
+    #[test]
+    fn deserialization_test() {
+        let data = [10];
+        let mut byte_stream = ByteStream::new(&data);
+        let test_value = TestEnum::from_bytes(&mut byte_stream, None);
+        assert!(matches!(test_value, TestEnum::Second));
+    }
+}
+
+#[cfg(test)]
+mod base_type_enum {
+
+    use types::ByteStream;
+    use traits::ByteConvertable;
+
+    #[derive(ByteConvertable)]
+    #[base_type(u16)]
+    enum TestEnum {
+        First,
+        Second,
+        Third,
+    }
+
+    #[test]
+    fn serialization_test() {
+        let test_value = TestEnum::Second;
+        let data = test_value.to_bytes(None);
+        assert_eq!(data, vec![1, 0]);
+    }
+
+    #[test]
+    fn deserialization_test() {
+        let data = [1, 0];
+        let mut byte_stream = ByteStream::new(&data);
+        let test_value = TestEnum::from_bytes(&mut byte_stream, None);
+        assert!(matches!(test_value, TestEnum::Second));
+        assert!(byte_stream.remaining().is_empty());
     }
 }

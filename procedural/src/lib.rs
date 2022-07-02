@@ -5,7 +5,7 @@ extern crate proc_macro2;
 extern crate syn;
 extern crate quote;
 
-use syn::{ Ident, Data, Fields, LitFloat };
+use syn::{ Ident, Data, Fields, LitFloat, DeriveInput, DataStruct, DataEnum, Attribute, LitInt };
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -181,15 +181,21 @@ pub fn derive_prototype_window(item: proc_macro::TokenStream) -> proc_macro::Tok
 //    proc_macro::TokenStream::from(expanded)
 //}
 
-#[proc_macro_derive(ByteConvertable, attributes(version_equals_above, length_hint))]
+#[proc_macro_derive(ByteConvertable, attributes(length_hint, base_type, variant_value))]
 pub fn derive_byte_convertable(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let ast: syn::DeriveInput = syn::parse(item).expect("Couldn't parse item");
+    let attributes = ast.attrs;
     let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
 
-    let Data::Struct(data_struct) = ast.data else {
-        panic!("only structs may be derived");
-    };
+    match ast.data {
+        Data::Struct(data_struct) => derive_byte_convertable_struct(data_struct, name),
+        Data::Enum(data_enum) => derive_byte_convertable_enum(data_enum, attributes, name),
+        Data::Union(..) => panic!("union types may not be derived"),
+    }
+}
+
+fn derive_byte_convertable_struct(data_struct: DataStruct, name: Ident) -> proc_macro::TokenStream {
 
     let Fields::Named(named_fields) = data_struct.fields else {
         panic!("only named fields may be derived");
@@ -239,6 +245,85 @@ pub fn derive_byte_convertable(item: proc_macro::TokenStream) -> proc_macro::Tok
 
     proc_macro::TokenStream::from(expanded)
 }
+
+fn derive_byte_convertable_enum(data_enum: DataEnum, attributes: Vec<Attribute>, name: Ident) -> proc_macro::TokenStream {
+
+    let mut base_type = Ident::new("u8", name.span()); // get a correct span
+    let mut base_type_set = false;
+    //let mut length_hint = None;
+
+    for attribute in attributes {
+
+        let identifier = attribute.path.segments[0].ident.to_string();
+
+        if identifier.as_str() == "base_type" {
+            assert!(!base_type_set, "base type may only be set once per enum");
+            base_type = attribute.parse_args::<Ident>().unwrap();
+            base_type_set = true;
+        }
+
+        //if identifier.as_str() == "length_hint" {
+        //    assert!(length_hint.is_none(), "length hint may only be set once per enum");
+        //    let length = attribute.parse_args::<LitInt>().unwrap();
+
+        //    length_hint = Some(quote!({
+        //        let data = byte_stream.slice(#length);
+        //        let mut byte_stream = ByteStream::new(&data);
+        //    }));
+        //}
+    }
+
+    //let length_hint = length_hint.unwrap_or_default();
+
+    let mut current_index = 0usize;
+    let mut indices = Vec::new();
+    let mut values = Vec::new();
+
+    for variant in data_enum.variants.into_iter() {
+        let mut index_set = false;
+
+        for attribute in variant.attrs {
+            let attribute_name = attribute.path.segments[0].ident.to_string();
+
+            if &attribute_name == "variant_value" {
+                assert!(!index_set, "variant value may only be set once per variant");
+                current_index = attribute.parse_args::<syn::LitInt>().unwrap().base10_parse().unwrap();
+                index_set = true;
+            }
+        }
+
+        indices.push(current_index);
+        values.push(variant.ident);
+        current_index += 1;
+    }
+
+    let expanded = quote! {
+
+        impl ByteConvertable for #name {
+
+            fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+                assert!(length_hint.is_none(), "length hint may not be given to enums");
+
+                //#length_hint
+
+                match #base_type::from_bytes(byte_stream, None) as usize {
+                    #( #indices => Self::#values, )*
+                    invalid => panic!("invalid value {}", invalid),
+                }
+            }
+
+            fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+                assert!(length_hint.is_none(), "length hint may not be given to enums");
+                match self {
+                    #( #name::#values => (#indices as #base_type).to_bytes(None), )*
+                }
+            }
+        }
+    };
+
+    proc_macro::TokenStream::from(expanded)
+}
+
 
 #[derive(Debug)]
 struct Dimension {
@@ -463,7 +548,7 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 if let Ok(packet) = &result {
                     print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, packet);
                 }
- 
+   
                 result
             }
         }

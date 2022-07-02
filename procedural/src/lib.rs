@@ -556,3 +556,47 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     proc_macro::TokenStream::from(expanded)
 }
+
+#[proc_macro_derive(toggle, attributes(toggle))]
+pub fn derive_toggle(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+
+    let ast: syn::DeriveInput = syn::parse(item).expect("Couldn't parse item");
+    let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
+
+    let Data::Struct(data_struct) = ast.data else {
+        panic!("only structs may be derived");
+    };
+
+    let Fields::Named(named_fields) = data_struct.fields else {
+        panic!("only named fields may be derived");
+    };
+
+    let mut function_names = Vec::new();
+    let mut fields = Vec::new();
+
+    for field in named_fields.named {
+        let field_name = field.ident.unwrap();
+
+        for attribute in field.attrs {
+            let attribute_name = attribute.path.segments[0].ident.to_string();
+
+            if &attribute_name == "toggle" {
+                function_names.push(Ident::new(&format!("toggle_{}", field_name), field_name.span()));
+                fields.push(field_name);
+                break;
+            }
+        }
+    }
+
+    let expanded = quote! {
+
+        impl #name {
+
+            #( pub fn #function_names(&mut self) {
+                self.#fields = !self.#fields;
+            })*
+        }
+    };
+
+    proc_macro::TokenStream::from(expanded)
+}

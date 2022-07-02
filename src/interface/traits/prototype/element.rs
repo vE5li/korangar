@@ -16,7 +16,7 @@ impl PrototypeElement for SizeConstraint {
     fn to_element(&self, display: String) -> ElementCell {
 
         let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
+            cell!(StaticLabel::new(display)),
         ];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
@@ -28,7 +28,7 @@ impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Vector
     fn to_element(&self, display: String) -> ElementCell {
 
         let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
+            cell!(StaticLabel::new(display)),
             cell!(Vector2Value::new(*self)),
         ];
 
@@ -41,7 +41,7 @@ impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Vector
     fn to_element(&self, display: String) -> ElementCell {
 
         let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
+            cell!(StaticLabel::new(display)),
             cell!(Vector3Value::new(*self)),
         ];
 
@@ -72,7 +72,7 @@ impl<T: PrototypeElement> PrototypeElement for Option<T> {
         }
 
         let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
+            cell!(StaticLabel::new(display)),
             cell!(StringValue::new("none".to_string())),
         ];
 

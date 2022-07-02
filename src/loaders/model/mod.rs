@@ -258,7 +258,7 @@ impl ModelLoader {
         let _unknown = byte_stream.slice(8);
 
         #[cfg(feature = "debug")]
-        byte_stream.assert_empty(&model_file);
+        byte_stream.assert_empty(model_file);
 
         let bounding_box = Self::calculate_bounding_box(&nodes);
 

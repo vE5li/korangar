@@ -15,7 +15,7 @@ use vulkano::device::physical::PhysicalDevice;
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryCommandBuffer, CommandBufferUsage, SubpassContents };
 use vulkano::device::{ Device, Queue };
 use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError, SwapchainAcquireFuture, Surface, ColorSpace, PresentMode, acquire_next_image };
-use vulkano::image::{ ImageUsage, SwapchainImage, ImageAccess, SampleCount, ImageLayout };
+use vulkano::image::{ ImageUsage, SwapchainImage, ImageAccess, SampleCount };
 use vulkano::image::view::ImageView;
 use vulkano::image::attachment::AttachmentImage;
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -125,7 +125,7 @@ impl Renderer {
         let window_size = Vector2::new(dimensions[0] as usize, dimensions[1] as usize);
         let present_mode = PresentMode::Fifo;
 
-        let (swapchain, images) = Swapchain::start(device.clone(), surface.clone())
+        let (swapchain, images) = Swapchain::start(device.clone(), surface)
             .num_images(capabilities.min_image_count)
             .format(format)
             .dimensions(dimensions)
@@ -262,8 +262,8 @@ impl Renderer {
         let interface_renderer = InterfaceRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let dynamic_sprite_renderer = DynamicSpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let debug_renderer = DebugRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone(), texture_loader, &mut texture_future);
-        let geometry_shadow_renderer = GeometryShadowRenderer::new(device.clone(), shadow_render_pass.clone().first_subpass(), shadow_viewport.clone());
+        let debug_renderer = DebugRenderer::new(device.clone(), lighting_subpass, viewport, texture_loader, &mut texture_future);
+        let geometry_shadow_renderer = GeometryShadowRenderer::new(device.clone(), shadow_render_pass.first_subpass(), shadow_viewport);
 
         #[cfg(feature = "debug")]
         print_debug!("created {}renderers{}", MAGENTA, NONE);
@@ -299,7 +299,7 @@ impl Renderer {
 
         let last_image_num = 0;
 
-        return Self {
+        Self {
             queue,
             device,
             picker_renderer,
@@ -385,7 +385,7 @@ impl Renderer {
         let normal_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R16G16B16A16_SFLOAT, color_buffer_usage).unwrap())).unwrap();
         let water_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R8_SRGB, color_buffer_usage).unwrap())).unwrap();
         let interface_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, interface_image_usage).unwrap())).unwrap();
-        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::D32_SFLOAT, depth_buffer_usage).unwrap())).unwrap();
+        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device, dimensions, SampleCount::Sample4, Format::D32_SFLOAT, depth_buffer_usage).unwrap())).unwrap();
 
         let framebuffers = images
             .iter()
@@ -409,7 +409,7 @@ impl Renderer {
             depth_range: 0.0..1.0,
         };
 
-        return (framebuffers, diffuse_buffer, normal_buffer, water_buffer, interface_buffer, depth_buffer, viewport);
+        (framebuffers, diffuse_buffer, normal_buffer, water_buffer, interface_buffer, depth_buffer, viewport)
     }
 
     fn window_size_dependent_shadow_setup(device: Arc<Device>, render_pass: Arc<RenderPass>, framebuffer_count: usize) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>) {
@@ -476,7 +476,9 @@ impl Renderer {
     }
 
     pub fn get_picker_buffer(&mut self) -> &CpuAccessibleBuffer<[u32]> {
-        self.picker_fence.take().map(|fence| fence.wait(None).unwrap());
+        if let Some(fence) = self.picker_fence.take() {
+            fence.wait(None).unwrap()
+        }
         &self.picker_buffers[self.last_image_num]
     }
 
@@ -531,7 +533,7 @@ impl Renderer {
             self.interface_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             self.dynamic_sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             #[cfg(feature = "debug")]
-            self.debug_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
+            self.debug_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport);
 
             self.swapchain = new_swapchain;
             self.diffuse_buffer = new_diffuse_buffer;
@@ -772,8 +774,8 @@ impl Renderer {
         let half_screen = Vector2::new(self.window_size.x as f32 / 2.0, self.window_size.y as f32 / 2.0);
         let mouse_position = Vector2::new(mouse_position.x / half_screen.x, mouse_position.y / half_screen.y);
 
-        return mouse_position.x >= screen_position.x && mouse_position.y >= screen_position.y &&
-            mouse_position.x <= screen_position.x + screen_size.x && mouse_position.y <= screen_position.y + screen_size.y;
+        mouse_position.x >= screen_position.x && mouse_position.y >= screen_position.y &&
+            mouse_position.x <= screen_position.x + screen_size.x && mouse_position.y <= screen_position.y + screen_size.y
     }
 
     #[cfg(feature = "debug")]
@@ -842,8 +844,12 @@ impl Renderer {
 
     #[cfg(feature = "debug")]
     pub fn render_buffers(&mut self, camera: &dyn Camera, render_settings: &RenderSettings) {
+
+        if let Some(fence) = self.picker_fence.take() {
+            fence.wait(None).unwrap()
+        }
+
         let current_frame = self.current_frame.as_mut().unwrap();
-        self.picker_fence.take().map(|fence| fence.wait(None).unwrap());
         self.debug_renderer.render_buffers(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.water_buffer.clone(), self.depth_buffer.clone(), self.picker_images[current_frame.image_num].clone(), self.screen_vertex_buffer.clone(), render_settings);
     }
 

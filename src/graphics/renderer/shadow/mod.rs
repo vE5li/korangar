@@ -52,7 +52,7 @@ impl GeometryShadowRenderer {
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
-        let linear_sampler = Sampler::start(device.clone())
+        let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::ClampToEdge)
             //.mip_lod_bias(1.0)

@@ -44,7 +44,7 @@ impl InterfaceRenderer {
 
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
+        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self { pipeline, vertex_shader, fragment_shader }
     }
@@ -77,7 +77,7 @@ impl InterfaceRenderer {
 
         builder
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set)
             .bind_vertex_buffers(0, vertex_buffer)
             .draw(3, 1, 0, 0).unwrap();
     }

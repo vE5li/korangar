@@ -16,13 +16,13 @@ impl PartialSize {
     pub fn finalize(self) -> Vector2<f32> {
         let x = self.x;
         let y = self.y.expect("element cannot have flexible height");
-        return Vector2::new(x, y);
+        Vector2::new(x, y)
     }
 
     pub fn finalize_or(self, y: f32) -> Vector2<f32> {
         let x = self.x;
         let y = self.y.unwrap_or(y);
-        return Vector2::new(x, y);
+        Vector2::new(x, y)
     }
 }
 

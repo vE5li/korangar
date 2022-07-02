@@ -1,6 +1,9 @@
 use derive_new::new;
 use cgmath::Vector3;
-use graphics::{ Renderer, Camera, Color };
+
+#[cfg(feature = "debug")]
+use graphics::{ Renderer, Camera };
+use graphics::Color;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 pub struct Particle {

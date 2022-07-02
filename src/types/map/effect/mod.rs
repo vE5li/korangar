@@ -1,8 +1,9 @@
 mod particle;
 
 use derive_new::new;
-use cgmath::{ Vector3, Vector2 };
+
 use graphics::{ Renderer, Camera, Color };
+use types::maths::*;
 
 pub use self::particle::Particle;
 

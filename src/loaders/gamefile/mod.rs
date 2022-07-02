@@ -100,7 +100,7 @@ impl GameFileLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {}{}{}", MAGENTA, path, NONE));
 
-        let bytes = read(path.clone()).expect(&format!("failed to load archive from {}", path));
+        let bytes = read(path.clone()).unwrap_or_else(|_| panic!("failed to load archive from {}", path));
         let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(16);
@@ -146,7 +146,7 @@ impl GameFileLoader {
 
         let result = self.archives
             .values_mut() // convert this to a multithreaded iter ?
-            .find_map(|archive| archive.get(&path))
+            .find_map(|archive| archive.get(path))
             .ok_or(format!("failed to find file {}", path));
 
         if result.is_err() { // TEMP

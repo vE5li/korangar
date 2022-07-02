@@ -30,7 +30,7 @@ impl Interface {
         let interface_settings = InterfaceSettings::new();
         let theme = Theme::new(&interface_settings.theme_file);
 
-        return Self {
+        Self {
             windows: Vec::new(),
             window_cache,
             interface_settings,
@@ -38,7 +38,7 @@ impl Interface {
             theme,
             reresolve: false,
             rerender: true, // set to true initially to clear the interface buffer
-        };
+        }
     }
 
     pub fn reload_theme(&mut self) {
@@ -219,7 +219,7 @@ impl Interface {
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
-            Some(window_class) => self.windows.iter().find(|window| window.0.window_class_matches(&window_class)).is_some(),
+            Some(window_class) => self.windows.iter().any(|window| window.0.window_class_matches(window_class)),
             None => false,
         }
     }

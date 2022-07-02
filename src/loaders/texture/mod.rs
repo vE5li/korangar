@@ -97,8 +97,8 @@ impl TextureLoader {
         let timer = Timer::new_dynamic(format!("load texture from {}{}{}", MAGENTA, path, NONE));
 
         let (image_data, dimensions) = match &path[path.len() - 4..] {
-            ".png" => self.load_png_data(&path),
-            ".bmp" | ".BMP" => self.load_bmp_data(&path),
+            ".png" => self.load_png_data(path),
+            ".bmp" | ".BMP" => self.load_bmp_data(path),
             extension => Err(format!("unsupported file format {}", extension)),
         }?;
 

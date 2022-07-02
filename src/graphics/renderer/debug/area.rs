@@ -71,7 +71,7 @@ impl AreaRenderer {
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
         let index_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, indices.into_iter()).unwrap();
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
 
         Self { pipeline, vertex_shader, fragment_shader, vertex_buffer, index_buffer, matrices_buffer }
     }

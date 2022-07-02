@@ -63,7 +63,7 @@ impl DebugRenderer {
         let tile_textures = (0..7_i32).map(|index| texture_loader.get(&format!("assets/{}.png", index), texture_future).unwrap()).collect();
         let step_textures = ["goal", "straight", "diagonal"].iter().map(|index| texture_loader.get(&format!("assets/{}.png", index), texture_future).unwrap()).collect();
  
-        let nearest_sampler = Sampler::start(device.clone())
+        let nearest_sampler = Sampler::start(device)
             .filter(Filter::Nearest)
             .address_mode(SamplerAddressMode::ClampToEdge)
             .build()

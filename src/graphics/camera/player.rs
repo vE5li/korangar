@@ -92,9 +92,9 @@ impl Camera for PlayerCamera {
         let translation_matrix = Matrix4::from_translation(transform.position);
         let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);
         let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
-        let world_matrix = translation_matrix * rotation_matrix * scale_matrix * transform.offset_translation * transform.offset_matrix;
+        
 
-        world_matrix 
+        translation_matrix * rotation_matrix * scale_matrix * transform.offset_translation * transform.offset_matrix 
     }
 
     fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
@@ -107,9 +107,8 @@ impl Camera for PlayerCamera {
         let translation_matrix = Matrix4::from_translation(position);
         let origin_matrix = Matrix4::from_translation(origin);
         let scale_matrix = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
-        let world_matrix = translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix;
 
-        world_matrix  
+        translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix  
     }
 
     fn billboard_coordinates(&self, position: Vector3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {

@@ -4,7 +4,7 @@ mod mode;
 
 use std::rc::Rc;
 use cgmath::Vector2;
-use vulkano::buffer::CpuAccessibleBuffer;
+
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 

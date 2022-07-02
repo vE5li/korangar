@@ -18,7 +18,7 @@ use std::iter;
 use cgmath::{ Vector3, Vector2 };
 
 use vulkano::device::Device;
-use vulkano::image::ImageViewAbstract;
+
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -64,7 +64,7 @@ impl EntityRenderer {
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
  
-        let nearest_sampler = Sampler::start(device.clone())
+        let nearest_sampler = Sampler::start(device)
             .filter(Filter::Nearest)
             .address_mode(SamplerAddressMode::MirroredRepeat)
             //.lod(0.0..=100.0)

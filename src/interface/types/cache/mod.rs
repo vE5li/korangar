@@ -35,8 +35,7 @@ impl WindowCache {
 
         std::fs::read_to_string("client/window_cache.ron")
             .ok()
-            .map(|data| ron::from_str(&data).ok())
-            .flatten()
+            .and_then(|data| ron::from_str(&data).ok())
             .map(|entries| Self { entries })
     }
     

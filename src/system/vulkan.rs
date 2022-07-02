@@ -18,7 +18,7 @@ pub fn get_layers() -> Vec<&'static str> {
     let desired_layers = Vec::new(); // vec!["VK_LAYER_KHRONOS_validation"];
 
     #[cfg(feature = "debug")]
-    let timer = Timer::new_dynamic(format!("available layers"));
+    let timer = Timer::new("available layers");
 
     #[cfg(feature = "debug")]
     for layer in &available_layers {
@@ -26,25 +26,23 @@ pub fn get_layers() -> Vec<&'static str> {
     }
 
     #[cfg(feature = "debug")]
-    timer.stop();
-
-    let used_layers = desired_layers
-        .into_iter()
-        .filter(|&l| available_layers.iter().any(|li| li.name() == l))
-        .collect();
+    timer.stop(); 
 
     #[cfg(feature = "debug")]
-    let timer = Timer::new_dynamic(format!("used layers"));
-
-    #[cfg(feature = "debug")]
-    for layer in &used_layers {
+    for layer in &desired_layers {
         print_debug!("{}{}{}", MAGENTA, layer, NONE);
     }
 
     #[cfg(feature = "debug")]
+    let timer = Timer::new("used layers");
+
+    #[cfg(feature = "debug")]
     timer.stop();
 
-    used_layers
+    desired_layers
+        .into_iter()
+        .filter(|&l| available_layers.iter().any(|li| li.name() == l))
+        .collect()
 }
 
 pub fn get_device_extensions() -> DeviceExtensions {

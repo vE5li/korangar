@@ -35,7 +35,7 @@ pub struct Model {
 impl Model {
 
     pub fn render_geometry(&self, renderer: &mut Renderer, camera: &dyn Camera, root_transform: &Transform) {
-        self.root_node.render_geometry(renderer, camera, &root_transform);
+        self.root_node.render_geometry(renderer, camera, root_transform);
     }
 
     #[cfg(feature = "debug")]

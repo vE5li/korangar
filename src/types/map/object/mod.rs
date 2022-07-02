@@ -2,9 +2,9 @@ pub mod model;
 
 use derive_new::new;
 use std::sync::Arc;
-use cgmath::{ Vector3, Vector2 };
 
 use graphics::{ Renderer, Camera, Transform };
+use types::maths::*;
 
 use self::model::*;
 

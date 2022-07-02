@@ -44,6 +44,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use vulkano::device::Device;
 use vulkano::instance::Instance;
+#[cfg(feature = "debug")]
 use vulkano::instance::debug::{ MessageSeverity, MessageType };
 use vulkano::Version;
 use vulkano::sync::{ GpuFuture, now };
@@ -148,7 +149,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create renderer");
 
-    let mut renderer = Renderer::new(&physical_device, device.clone(), queue.clone(), surface.clone(), &mut texture_loader);
+    let mut renderer = Renderer::new(&physical_device, device.clone(), queue, surface.clone(), &mut texture_loader);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -156,7 +157,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let window_size = Size::from(renderer.get_window_size().map(|c| c as f32));
+    let window_size = renderer.get_window_size().map(|c| c as f32);
     let mut interface = Interface::new(window_size);
     let mut input_system = InputSystem::new();
     let mut render_settings = RenderSettings::new();

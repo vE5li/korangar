@@ -32,7 +32,7 @@ impl PlacementResolver {
 
     pub fn derive(&self, offset: Position, border: Size) -> Self {
 
-        let mut avalible_space = self.avalible_space.clone();
+        let mut avalible_space = self.avalible_space;
         avalible_space.x -= offset.x + border.x * self.scaling * 2.0;
         avalible_space.y = avalible_space.y.map(|height| height - border.y * self.scaling * 2.0);
 
@@ -105,7 +105,7 @@ impl PlacementResolver {
         }
 
         size.x -= gaps_subtract;
-        return (size, position);
+        (size, position)
     }
 
     pub fn allocate_right(&mut self, size_constraint: &SizeConstraint) -> (PartialSize, Position) {
@@ -130,7 +130,7 @@ impl PlacementResolver {
             self.register_height(height);
         }
 
-        return (size, position);
+        (size, position)
     }
 
     pub fn final_height(self) -> f32 {

@@ -40,13 +40,13 @@ pub struct Surface {
 impl Surface {
 
     pub fn new(u: [f32; 4], v: [f32; 4], texture_index: i32, light_map_index: i32, color: Color) -> Self {
-        return Self {
+        Self {
             u,
             v,
             texture_index: texture_index % 14, // TODO: remove % 14 and derive new
             _light_map_index: light_map_index,
             _color: color
-        };
+        }
     }
 }
 
@@ -231,7 +231,7 @@ impl MapLoader {
         let mut sound_sources = Vec::new();
         let mut effect_sources = Vec::new();
 
-        for index in 0..object_count {
+        for _index in 0..object_count {
             let type_index = byte_stream.integer32();
             let resource_type = ResourceType::from(type_index);
 
@@ -252,7 +252,7 @@ impl MapLoader {
                         let scale = byte_stream.vector3();
 
                         let model = model_loader.get(texture_loader, &model_name, &mut texture_future)?;
-                        let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
+                        let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, model, transform);
                         objects.push(object);
                     } else {
@@ -264,7 +264,7 @@ impl MapLoader {
                         let scale = byte_stream.vector3();
 
                         let model = model_loader.get(texture_loader, &model_name, &mut texture_future)?;
-                        let transform = Transform::from(position, rotation.map(|value| Deg(value)), scale);
+                        let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(None, model_name, model, transform);
                         objects.push(object);
                     }
@@ -321,7 +321,7 @@ impl MapLoader {
         // TODO;
 
         #[cfg(feature = "debug")]
-        byte_stream.assert_empty(&resource_file);
+        byte_stream.assert_empty(resource_file);
 
         let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\{}", ground_file))?;
         let mut byte_stream = ByteStream::new(&bytes);
@@ -521,19 +521,19 @@ impl MapLoader {
                         let neighbor_tile = &ground_tiles[neighbor_x + neighbor_y * width];
 
                         let (surface_offset, surface_height) = surface_alignment[0];
-                        let height = get_tile_height_at(&current_tile, surface_height);
+                        let height = get_tile_height_at(current_tile, surface_height);
                         let first_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let (surface_offset, surface_height) = surface_alignment[1];
-                        let height = get_tile_height_at(&current_tile, surface_height);
+                        let height = get_tile_height_at(current_tile, surface_height);
                         let second_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let (surface_offset, surface_height) = surface_alignment[2];
-                        let height = get_tile_height_at(&neighbor_tile, surface_height);
+                        let height = get_tile_height_at(neighbor_tile, surface_height);
                         let third_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let (surface_offset, surface_height) = surface_alignment[3];
-                        let height = get_tile_height_at(&neighbor_tile, surface_height);
+                        let height = get_tile_height_at(neighbor_tile, surface_height);
                         let fourth_position = Vector3::new((x + surface_offset.x) as f32 * TILE_SIZE, -height, (y + surface_offset.y) as f32 * TILE_SIZE);
 
                         let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);

@@ -36,7 +36,7 @@ impl Element for StateButton {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        return Some(ClickAction::Event(self.event.clone()));
+        Some(ClickAction::Event(self.event.clone()))
     }
 
     fn render(&self, renderer: &mut Renderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
@@ -49,6 +49,6 @@ impl Element for StateButton {
         }
 
         renderer.render_checkbox(absolute_position + *theme.button.icon_offset * *interface_settings.scaling, *theme.button.icon_size * *interface_settings.scaling, clip_size, *theme.button.foreground_color, (self.selector)(state_provider));
-        renderer.render_text(&self.text, absolute_position + *theme.button.icon_text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
+        renderer.render_text(self.text, absolute_position + *theme.button.icon_text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
     }
 }

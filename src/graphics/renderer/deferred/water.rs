@@ -47,7 +47,7 @@ impl WaterRenderer {
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
 
         Self { pipeline, vertex_shader, fragment_shader, matrices_buffer, wave_offset: 0.0 }
     }

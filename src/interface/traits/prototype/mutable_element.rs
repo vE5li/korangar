@@ -25,7 +25,7 @@ impl PrototypeMutableElement for SizeConstraint {
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
 
         let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
+            cell!(StaticLabel::new(display)),
         ];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))

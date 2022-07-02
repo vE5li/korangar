@@ -23,7 +23,7 @@ use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
-use cgmath::Vector3;
+
 
 use graphics::*;
 

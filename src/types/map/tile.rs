@@ -13,13 +13,13 @@ impl TileType {
 
     pub fn new(type_index: u8) -> Self {
         match type_index {
-            0 => return Self(WALKABLE),
-            1 => return Self(NONE),
-            2 => return Self(WATER),
-            3 => return Self(WATER | WALKABLE),
-            4 => return Self(WATER | SNIPABLE),
-            5 => return Self(CLIFF | SNIPABLE),
-            6 => return Self(CLIFF),
+            0 => Self(WALKABLE),
+            1 => Self(NONE),
+            2 => Self(WATER),
+            3 => Self(WATER | WALKABLE),
+            4 => Self(WATER | SNIPABLE),
+            5 => Self(CLIFF | SNIPABLE),
+            6 => Self(CLIFF),
             invalid => panic!("invalid tile type {}", invalid),
         }
     }

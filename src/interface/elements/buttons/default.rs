@@ -55,6 +55,6 @@ impl Element for Button {
         }
 
         let offset = vector2!(0.0, (self.cached_size.y - *theme.button.font_size * *interface_settings.scaling) / 2.0); 
-        renderer.render_text(&self.text, absolute_position + offset + *theme.button.text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
+        renderer.render_text(self.text, absolute_position + offset + *theme.button.text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
     }
 }

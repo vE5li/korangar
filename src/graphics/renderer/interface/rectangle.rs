@@ -55,7 +55,7 @@ impl RectangleRenderer {
             ScreenVertex::new(Vector2::new(1.0, 1.0))
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
         Self { pipeline, vertex_shader, fragment_shader, vertex_buffer }
     }

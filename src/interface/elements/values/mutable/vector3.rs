@@ -49,7 +49,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::OpenWindow(Box::new(Vector3Window::new(self.name.clone(), self.inner_pointer, self.minimum_value, self.maximum_value, self.change_event.clone()))))
+        Some(ClickAction::OpenWindow(Box::new(Vector3Window::new(self.name.clone(), self.inner_pointer, self.minimum_value, self.maximum_value, self.change_event))))
     }
 
     fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {

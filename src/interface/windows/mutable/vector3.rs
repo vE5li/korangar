@@ -25,11 +25,11 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
 
         let elements: Vec<ElementCell> = vec![
             cell!(Headline::new("x".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(unsafe { &(*self.inner_pointer).x as *const T }, self.minimum_value.x, self.maximum_value.x, self.change_event.clone())),
+            cell!(Slider::new(unsafe { &(*self.inner_pointer).x as *const T }, self.minimum_value.x, self.maximum_value.x, self.change_event)),
             cell!(Headline::new("y".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(unsafe { &(*self.inner_pointer).y as *const T }, self.minimum_value.y, self.maximum_value.y, self.change_event.clone())),
+            cell!(Slider::new(unsafe { &(*self.inner_pointer).y as *const T }, self.minimum_value.y, self.maximum_value.y, self.change_event)),
             cell!(Headline::new("z".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(unsafe { &(*self.inner_pointer).z as *const T }, self.minimum_value.z, self.maximum_value.z, self.change_event.clone())),
+            cell!(Slider::new(unsafe { &(*self.inner_pointer).z as *const T }, self.minimum_value.z, self.maximum_value.z, self.change_event)),
         ];
 
         Box::new(FramedWindow::new(window_cache, interface_settings, avalible_space, self.name.clone(), None, elements, constraint!(200.0 > 250.0 < 300.0, ?)))

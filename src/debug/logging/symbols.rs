@@ -5,5 +5,5 @@ const fn symbol(enabled: &'static str, disabled: &'static str) -> &'static str {
     }
 }
 
-pub const NEWLINE: &'static str = symbol("⮎", ">");
-pub const ARROW: &'static str = symbol("→", "->");
+pub const NEWLINE: &str = symbol("⮎", ">");
+pub const ARROW: &str = symbol("→", "->");

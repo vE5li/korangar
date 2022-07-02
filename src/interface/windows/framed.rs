@@ -26,8 +26,7 @@ impl FramedWindow {
 
         let (cached_position, cached_size) = window_class
             .as_ref()
-            .map(|window_class| window_cache.get_window_state(window_class))
-            .flatten()
+            .and_then(|window_class| window_cache.get_window_state(window_class))
             .unzip();
 
         let size = cached_size
@@ -73,7 +72,7 @@ impl Window for FramedWindow {
 
         self.validate_position(avalible_space);
 
-        (self.window_class.as_ref().map(|window_class| window_class.as_str()), self.position, self.size)
+        (self.window_class.as_deref(), self.position, self.size)
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -128,7 +127,7 @@ impl Window for FramedWindow {
     fn resize(&mut self, interface_settings: &InterfaceSettings, _theme: &Theme, avalible_space: Size, growth: Size) -> (Option<&str>, Size) {
         self.size += growth;
         self.validate_size(interface_settings, avalible_space);
-        (self.window_class.as_ref().map(|window_class| window_class.as_str()), self.size)
+        (self.window_class.as_deref(), self.size)
     }
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {

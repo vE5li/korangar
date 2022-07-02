@@ -56,6 +56,6 @@ impl Element for DebugButton {
 
         let offset = vector2!(0.0, (self.cached_size.y - *theme.button.font_size * *interface_settings.scaling) / 2.0); 
         renderer.render_debug_icon(absolute_position + offset + *theme.button.icon_offset * *interface_settings.scaling, *theme.button.icon_size * *interface_settings.scaling, clip_size, *theme.button.debug_foreground_color);
-        renderer.render_text(&self.text, absolute_position + offset + *theme.button.icon_text_offset * *interface_settings.scaling, clip_size, *theme.button.debug_foreground_color, *theme.button.font_size * *interface_settings.scaling);
+        renderer.render_text(self.text, absolute_position + offset + *theme.button.icon_text_offset * *interface_settings.scaling, clip_size, *theme.button.debug_foreground_color, *theme.button.font_size * *interface_settings.scaling);
     }
 }

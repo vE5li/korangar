@@ -261,8 +261,7 @@ impl Theme {
 
         std::fs::read_to_string(theme_file)
             .ok()
-            .map(|data| ron::from_str(&data).ok())
-            .flatten()
+            .and_then(|data| ron::from_str(&data).ok())
     }
 
     pub fn reload(&mut self, theme_file: &str) -> bool {

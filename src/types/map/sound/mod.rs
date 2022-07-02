@@ -1,8 +1,8 @@
 use derive_new::new;
-use cgmath::{ Vector3, Vector2 };
 
 #[cfg(feature = "debug")]
 use graphics::{ Renderer, Camera };
+use types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 pub struct SoundSource {

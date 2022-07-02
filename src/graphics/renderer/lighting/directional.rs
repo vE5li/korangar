@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::iter;
 use vulkano::device::Device;
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::depth_stencil::CompareOp;
+
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
@@ -25,7 +25,7 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
-use vulkano::buffer::{ BufferUsage, BufferAccess };
+use vulkano::buffer::{ BufferUsage };
 use cgmath::Vector3;
 
 use graphics::*;
@@ -50,7 +50,7 @@ impl DirectionalLightRenderer {
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
  
-        let linear_sampler = Sampler::start(device.clone())
+        let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::MirroredRepeat)
             //.compare(Some(CompareOp::Less))

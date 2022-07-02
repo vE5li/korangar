@@ -20,11 +20,11 @@ impl PrototypeWindow for ColorWindow {
 
         let rgb_elements: Vec<ElementCell> = vec![
             cell!(Headline::new("red".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(unsafe { &(*self.color_pointer).red as *const u8 }, 0, 255, self.change_event.clone())),
+            cell!(Slider::new(unsafe { &(*self.color_pointer).red as *const u8 }, 0, 255, self.change_event)),
             cell!(Headline::new("green".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(unsafe { &(*self.color_pointer).green as *const u8 }, 0, 255, self.change_event.clone())),
+            cell!(Slider::new(unsafe { &(*self.color_pointer).green as *const u8 }, 0, 255, self.change_event)),
             cell!(Headline::new("blue".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(unsafe { &(*self.color_pointer).blue as *const u8 }, 0, 255, self.change_event.clone())),
+            cell!(Slider::new(unsafe { &(*self.color_pointer).blue as *const u8 }, 0, 255, self.change_event)),
         ];
 
         let elements: Vec<ElementCell> = vec![

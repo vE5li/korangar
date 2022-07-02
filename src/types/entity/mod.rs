@@ -1,11 +1,16 @@
 use derive_new::new;
+#[cfg(feature = "debug")]
 use std::sync::Arc;
 use cgmath::{ Vector3, Vector2, VectorSpace };
-use vulkano::device::Device;
-use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::sync::GpuFuture;
+#[cfg(feature = "debug")]
+use vulkano::device::Device;
+#[cfg(feature = "debug")]
+use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 
-use graphics::{ Renderer, Camera, ModelVertexBuffer, NativeModelVertex, Texture, Transform };
+#[cfg(feature = "debug")]
+use graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
+use graphics::{ Renderer, Camera, Texture };
 use types::map::Map;
 use loaders::{ TextureLoader, GameFileLoader };
 use crate::database::Database;
@@ -38,7 +43,7 @@ pub struct Entity {
 
 impl Entity {
 
-    pub fn new(game_file_loader: &mut GameFileLoader, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, movement_speed: usize) -> Self {
+    pub fn new(game_file_loader: &mut GameFileLoader, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, _movement_speed: usize) -> Self {
 
         let position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
         let active_movement = None;
@@ -108,28 +113,20 @@ impl Entity {
                     successors.push(Pos(x, y - 1));
                 }
 
-                if map.x_in_bounds(x + 1) && map.y_in_bounds(y + 1) {
-                    if map.get_tile(Vector2::new(x + 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y + 1)).is_walkable() {
-                        successors.push(Pos(x + 1, y + 1));
-                    }
+                if map.x_in_bounds(x + 1) && map.y_in_bounds(y + 1) && map.get_tile(Vector2::new(x + 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y + 1)).is_walkable() {
+                    successors.push(Pos(x + 1, y + 1));
                 }
 
-                if x > 0 && map.y_in_bounds(y + 1) {
-                    if map.get_tile(Vector2::new(x - 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y + 1)).is_walkable() {
-                        successors.push(Pos(x - 1, y + 1));
-                    }
+                if x > 0 && map.y_in_bounds(y + 1) && map.get_tile(Vector2::new(x - 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y + 1)).is_walkable() {
+                    successors.push(Pos(x - 1, y + 1));
                 }
 
-                if map.x_in_bounds(x + 1) && y > 0 {
-                    if map.get_tile(Vector2::new(x + 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y - 1)).is_walkable() {
-                        successors.push(Pos(x + 1, y - 1));
-                    }
+                if map.x_in_bounds(x + 1) && y > 0 && map.get_tile(Vector2::new(x + 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y - 1)).is_walkable() {
+                    successors.push(Pos(x + 1, y - 1));
                 }
 
-                if x > 0 && y > 0 {
-                    if map.get_tile(Vector2::new(x - 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y - 1)).is_walkable() {
-                        successors.push(Pos(x - 1, y - 1));
-                    }
+                if x > 0 && y > 0 && map.get_tile(Vector2::new(x - 1, y)).is_walkable() && map.get_tile(Vector2::new(x, y - 1)).is_walkable() {
+                    successors.push(Pos(x - 1, y - 1));
                 }
 
                 let successors = successors.drain(..)

@@ -55,7 +55,7 @@ impl Element for MutableColorValue {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(self.name.clone(), self.color_pointer, self.change_event.clone()))))
+        Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(self.name.clone(), self.color_pointer, self.change_event))))
     }
 
     fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {

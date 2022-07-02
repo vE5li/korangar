@@ -170,6 +170,7 @@ impl WorldPosition2 {
 impl ByteConvertable for WorldPosition2 {
     
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none()); 
         let coordinates: Vec<usize> = byte_stream.slice(6).into_iter().map(|byte| byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -840,7 +841,7 @@ struct RequestServerTickPacket {
     pub client_tick: u32,
 }
 
-#[derive(Debug, PartialEq, ByteConvertable)]
+#[derive(Debug, PartialEq, Eq, ByteConvertable)]
 #[base_type(u16)]
 pub enum SwitchCharacterSlotResponseStatus {
     Success,
@@ -1148,9 +1149,9 @@ impl NetworkingSystem {
 
         if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
             match login_failed_packet.reason {
-                LoginFailedReason::ServerClosed => return Err(format!("server closed")),
-                LoginFailedReason::AlreadyLoggedIn => return Err(format!("someone has already logged in with this id")),
-                LoginFailedReason::AlreadyOnline => return Err(format!("already online")),
+                LoginFailedReason::ServerClosed => return Err("server closed".to_string()),
+                LoginFailedReason::AlreadyLoggedIn => return Err("someone has already logged in with this id".to_string()),
+                LoginFailedReason::AlreadyOnline => return Err("already online".to_string()),
             }
         }
 
@@ -1193,9 +1194,9 @@ impl NetworkingSystem {
 
         if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
             match login_failed_packet.reason {
-                LoginFailedReason::ServerClosed => return Err(format!("server closed")),
-                LoginFailedReason::AlreadyLoggedIn => return Err(format!("someone has already logged in with this id")),
-                LoginFailedReason::AlreadyOnline => return Err(format!("already online")),
+                LoginFailedReason::ServerClosed => return Err("server closed".to_string()),
+                LoginFailedReason::AlreadyLoggedIn => return Err("someone has already logged in with this id".to_string()),
+                LoginFailedReason::AlreadyOnline => return Err("already online".to_string()),
             }
         }
 
@@ -1333,10 +1334,10 @@ impl NetworkingSystem {
 
         if let Ok(character_creation_failed_packet) = CharacterCreationFailedPacket::try_from_bytes(&mut byte_stream) {
             match character_creation_failed_packet.reason {
-                CharacterCreationFailedReason::CharacterNameAlreadyUsed => return Err(format!("character name is already used")),
-                CharacterCreationFailedReason::NotOldEnough => return Err(format!("you are not old enough to create a character")),
-                CharacterCreationFailedReason::NotAllowedToUseSlot => return Err(format!("you are not allowed to use that character slot")),
-                CharacterCreationFailedReason::CharacterCerationFailed => return Err(format!("character creation failed")),
+                CharacterCreationFailedReason::CharacterNameAlreadyUsed => return Err("character name is already used".to_string()),
+                CharacterCreationFailedReason::NotOldEnough => return Err("you are not old enough to create a character".to_string()),
+                CharacterCreationFailedReason::NotAllowedToUseSlot => return Err("you are not allowed to use that character slot".to_string()),
+                CharacterCreationFailedReason::CharacterCerationFailed => return Err("character creation failed".to_string()),
             }
         }
 
@@ -1360,9 +1361,9 @@ impl NetworkingSystem {
 
         if let Ok(character_creation_failed_packet) = CharacterDeletionFailedPacket::try_from_bytes(&mut byte_stream) {
             match character_creation_failed_packet.reason {
-                CharacterDeletionFailedReason::NotAllowed => return Err(format!("you are not allowed to delete this character")),
-                CharacterDeletionFailedReason::CharacterNotFound => return Err(format!("character was not found")),
-                CharacterDeletionFailedReason::NotEligible => return Err(format!("character is not eligible for deletion")),
+                CharacterDeletionFailedReason::NotAllowed => return Err("you are not allowed to delete this character".to_string()),
+                CharacterDeletionFailedReason::CharacterNotFound => return Err("character was not found".to_string()),
+                CharacterDeletionFailedReason::NotEligible => return Err("character is not eligible for deletion".to_string()),
             }
         }
 
@@ -1382,15 +1383,15 @@ impl NetworkingSystem {
 
         if let Ok(character_selection_failed_packet) = CharacterSelectionFailedPacket::try_from_bytes(&mut byte_stream) {
             match character_selection_failed_packet.reason {
-                CharacterSelectionFailedReason::RejectedFromServer => return Err(format!("rejected from server")),
+                CharacterSelectionFailedReason::RejectedFromServer => return Err("rejected from server".to_string()),
             }
         }
 
         if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
             match login_failed_packet.reason {
-                LoginFailedReason::ServerClosed => return Err(format!("server closed")),
-                LoginFailedReason::AlreadyLoggedIn => return Err(format!("someone has already logged in with this id")),
-                LoginFailedReason::AlreadyOnline => return Err(format!("already online")),
+                LoginFailedReason::ServerClosed => return Err("server closed".to_string()),
+                LoginFailedReason::AlreadyLoggedIn => return Err("someone has already logged in with this id".to_string()),
+                LoginFailedReason::AlreadyOnline => return Err("already online".to_string()),
             }
         }
 
@@ -1424,7 +1425,7 @@ impl NetworkingSystem {
         let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
 
         Ok((
-                change_map_packet.map_name.replace(".gat", "").to_string(),
+                change_map_packet.map_name.replace(".gat", ""),
                 Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
                 select_character_success_packet.character_id as usize,
                 45, // how do we get this ?

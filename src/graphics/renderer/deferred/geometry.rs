@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::iter;
 
 use vulkano::device::Device;
-use vulkano::image::ImageViewAbstract;
+
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -52,7 +52,7 @@ impl GeometryRenderer {
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
         
-        let linear_sampler = Sampler::start(device.clone())
+        let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::ClampToEdge)
             .lod(0.0..=100.0)

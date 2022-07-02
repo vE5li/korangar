@@ -10,10 +10,10 @@ impl ResourceType {
 
     pub fn from(index: i32) -> Self {
         match index {
-            1 => return ResourceType::Object,
-            2 => return ResourceType::LightSource,
-            3 => return ResourceType::SoundSource,
-            4 => return ResourceType::EffectSource,
+            1 => ResourceType::Object,
+            2 => ResourceType::LightSource,
+            3 => ResourceType::SoundSource,
+            4 => ResourceType::EffectSource,
             invalid => panic!("invalid object type {}", invalid),
         }
     }

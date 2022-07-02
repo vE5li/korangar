@@ -5,9 +5,9 @@ const fn color(enabled: &'static str) -> &'static str {
     }
 }
 
-pub const GREEN: &'static str = color("\x1B[32m");
-pub const RED: &'static str = color("\x1B[31m");
-pub const CYAN: &'static str = color("\x1B[36m");
-pub const YELLOW: &'static str = color("\x1B[33m");
-pub const MAGENTA: &'static str = color("\x1B[35m");
-pub const NONE: &'static str = color("\x1B[0m");
+pub const GREEN: &str = color("\x1B[32m");
+pub const RED: &str = color("\x1B[31m");
+pub const CYAN: &str = color("\x1B[36m");
+pub const YELLOW: &str = color("\x1B[33m");
+pub const MAGENTA: &str = color("\x1B[35m");
+pub const NONE: &str = color("\x1B[0m");

@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::iter;
 
 use vulkano::device::Device;
-use vulkano::image::ImageViewAbstract;
+
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -25,11 +25,11 @@ use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::shader::ShaderModule;
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
+
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
-use types::maths::*;
-use types::map::model::Node;
+
+
 use graphics::*;
 
 //use self::vertex_shader::ty::Constants;
@@ -49,7 +49,7 @@ impl PickerRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
 
         Self { pipeline, vertex_shader, fragment_shader, matrices_buffer }
     }
@@ -91,7 +91,7 @@ impl PickerRenderer {
 
         builder
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set)
             .bind_vertex_buffers(0, vertex_buffer)
             .draw(vertex_count as u32, 1, 0, 0).unwrap();
     }

@@ -25,7 +25,7 @@ impl SizeConstraint {
             *height = self.validated_height(*height, avalible.y.into(), remaining.y.into(), scaling);
         }
 
-        return PartialSize::new(width, height);
+        PartialSize::new(width, height)
     }
 
     pub fn resolve_partial(&self, avalible: PartialSize, remaining: PartialSize, scaling: f32) -> PartialSize {
@@ -38,7 +38,7 @@ impl SizeConstraint {
             *height = self.validated_height(*height, avalible.y, remaining.y, scaling);
         }
 
-        return PartialSize::new(width, height);
+        PartialSize::new(width, height)
     }
 
     fn validated_width(&self, mut width: f32, avalible: f32, remaining: f32, scaling: f32) -> f32 {

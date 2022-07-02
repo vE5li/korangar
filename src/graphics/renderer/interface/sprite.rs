@@ -65,7 +65,7 @@ impl SpriteRenderer {
             .build()
             .unwrap();
         
-        let linear_sampler = Sampler::start(device.clone())
+        let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::MirroredRepeat)
             .build()

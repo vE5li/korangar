@@ -63,7 +63,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         let new_value = clamp(raw_value, self.minimum_value.to_f32().unwrap(), self.maximum_value.to_f32().unwrap());
 
         unsafe { std::ptr::write(self.value_pointer as *mut T, T::from(new_value).unwrap()); }
-        self.change_event.clone()
+        self.change_event
     }
 
     fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {

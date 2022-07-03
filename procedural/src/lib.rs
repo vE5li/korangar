@@ -6,7 +6,7 @@ extern crate proc_macro2;
 extern crate syn;
 extern crate quote;
 
-use syn::{ Ident, Data, Fields, LitFloat, DeriveInput, DataStruct, DataEnum, Attribute, LitInt };
+use syn::{ Ident, Data, Fields, LitFloat, DeriveInput, DataStruct, DataEnum, Attribute, LitInt, FieldsNamed };
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;
 
@@ -186,7 +186,7 @@ pub fn derive_prototype_window(item: proc_macro::TokenStream) -> proc_macro::Tok
 //    proc_macro::TokenStream::from(expanded)
 //}
 
-#[proc_macro_derive(ByteConvertable, attributes(length_hint, repeating, base_type, variant_value))]
+#[proc_macro_derive(ByteConvertable, attributes(length_hint, repeating, base_type, variant_value, version, version_smaller, version_equals_or_above))]
 pub fn derive_byte_convertable(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
@@ -206,63 +206,7 @@ fn derive_byte_convertable_struct(data_struct: DataStruct, name: Ident) -> proc_
         panic!("only named fields may be derived");
     };
 
-    let mut from_bytes_initializers = vec![];
-    let mut from_fields = vec![];
-    let mut to_bytes_initializers = vec![];
-
-    for field in named_fields.named {
-
-        let field_name = field.ident.unwrap();
-        let mut length_hint = None;
-        let mut repeating = None;
-
-        for attribute in field.attrs {
-            let attribute_name = attribute.path.segments[0].ident.to_string();
-
-            if &attribute_name == "length_hint" {
-                assert!(length_hint.is_none(), "length hint may only be given once");
-                length_hint = attribute.tokens.clone().into();
-            }
-
-            if &attribute_name == "repeating" {
-                assert!(repeating.is_none(), "repeating may only be given once");
-                repeating = remove_self_from_stream(attribute.tokens.clone()).into();
-            }
-        }
-
-        let from_length_hint_option = match length_hint.clone() {
-            Some(length_stream) => {
-                let cleaned_stream = remove_self_from_stream(length_stream);
-                quote!(((#cleaned_stream) as usize).into())
-            },
-            None => quote!(None),
-        };
-
-        let length_hint_option = match length_hint {
-            Some(length) => quote!(((#length) as usize).into()),
-            None => quote!(None),
-        };
-
-        from_fields.push(quote!(#field_name));
-
-        let is_repeating = repeating.is_some();
-
-        let initializer = match repeating {
-            Some(repeat_count) => quote!(
-                let #field_name = (0..(#repeat_count))
-                    .map(|_| crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option))
-                    .collect();
-            ),
-            None => quote!(let #field_name = crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option);),
-        };
-        from_bytes_initializers.push(initializer);
- 
-        let initializer = match is_repeating {
-            true => quote!(panic!()),
-            false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()),
-        };
-        to_bytes_initializers.push(initializer);
-    }
+    let (from_bytes_initializers, from_fields, to_bytes_initializers, _has_fields) = byte_convertable_helper(named_fields);
 
     let expanded = quote! {
         impl crate::traits::ByteConvertable for #name {
@@ -509,6 +453,130 @@ fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
     new_stream
 }
 
+#[derive(Clone)]
+enum VersionRestriction {
+    Smaller(PacketSignature),
+    BiggerOrEquals(PacketSignature),
+}
+
+fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, bool) {
+
+    let mut from_bytes_initializers = vec![];
+    let mut from_fields = vec![];
+    let mut to_bytes_initializers = vec![];
+    let mut has_fields = false;
+
+    for field in named_fields.named {
+
+        let field_name = field.ident.unwrap();
+        let mut length_hint = None;
+        let mut repeating = None;
+        let mut version = false;
+        let mut version_restriction = None;
+
+        for attribute in field.attrs {
+            let attribute_name = attribute.path.segments[0].ident.to_string();
+
+            if &attribute_name == "length_hint" {
+                assert!(length_hint.is_none(), "length hint may only be given once");
+                length_hint = attribute.tokens.clone().into();
+            }
+
+            if &attribute_name == "repeating" {
+                assert!(repeating.is_none(), "repeating may only be given once");
+                repeating = remove_self_from_stream(attribute.tokens.clone()).into();
+            }
+
+            if &attribute_name == "version" {
+                assert!(!version, "version may only be given once");
+                version = true;
+            }
+
+            if &attribute_name == "version_smaller" {
+                assert!(version_restriction.is_none() , "version restriction may only be specified once");
+                version_restriction = VersionRestriction::Smaller(attribute.parse_args().unwrap()).into();
+            }
+
+            if &attribute_name == "version_equals_or_above" {
+                assert!(version_restriction.is_none() , "version restriction may only be specified once");
+                version_restriction = VersionRestriction::BiggerOrEquals(attribute.parse_args().unwrap()).into();
+            }
+        }
+
+        let from_length_hint_option = match length_hint.clone() {
+            Some(length_stream) => {
+                let cleaned_stream = remove_self_from_stream(length_stream);
+                quote!(((#cleaned_stream) as usize).into())
+            },
+            None => quote!(None),
+        };
+
+        let length_hint_option = match length_hint {
+            Some(length) => quote!(((#length) as usize).into()),
+            None => quote!(None),
+        };
+
+        from_fields.push(quote!(#field_name));
+
+        let is_repeating = repeating.is_some();
+        let version_restricted = version_restriction.is_some();
+
+        let initializer = match repeating {
+            Some(repeat_count) => quote!{
+                (0..(#repeat_count))
+                    .map(|_| crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option))
+                    .collect()
+            },
+            None => quote!(crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option)),
+        };
+
+        let initializer = match &version_restriction {
+
+            Some(restriction) => {
+
+                let function = match restriction.clone() {
+
+                    VersionRestriction::Smaller(version) => {
+                        let (major, minor) = (version.first, version.second);
+                        quote!(smaller(#major, #minor))
+                    }
+
+                    VersionRestriction::BiggerOrEquals(version) => {
+                        let (major, minor) = (version.first, version.second);
+                        quote!(equals_or_above(#major, #minor))
+                    }
+                };
+
+                quote!{
+                    let #field_name = match byte_stream.get_version().#function {
+                        true => Some(#initializer),
+                        false => None,
+                    };
+                }
+            }
+
+            None => quote!(let #field_name = #initializer;),
+        };
+
+        from_bytes_initializers.push(initializer);
+
+        if version {
+            from_bytes_initializers.push(quote!(byte_stream.set_version(#field_name);));
+        }
+
+        let initializer = match is_repeating || version_restricted {
+            true => quote!(panic!("implement for to_bytes aswell")),
+            false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()),
+        };
+        to_bytes_initializers.push(initializer);
+
+        has_fields = true;
+    }
+
+    (from_bytes_initializers, from_fields, to_bytes_initializers, has_fields)
+}
+
+#[derive(Clone)]
 struct PacketSignature {
     first: syn::LitInt,
     second: syn::LitInt,
@@ -529,11 +597,6 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
     let name = Ident::new(&ast.ident.to_string(), ast.ident.span());
-
-    let mut from_bytes_initializers = vec![];
-    let mut from_fields = vec![];
-    let mut to_bytes_initializers = vec![];
-    let mut has_fields = false;
 
     let Data::Struct(data_struct) = ast.data else {
         panic!("only structs may be derived");
@@ -557,61 +620,7 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let packet_signature = packet_signature.expect("packet needs to specify a signature");
     let (first, second) = (packet_signature.first, packet_signature.second);
 
-    for field in named_fields.named {
-
-        let field_name = field.ident.unwrap();
-        let mut length_hint = None;
-        let mut repeating = None;
-
-        for attribute in field.attrs {
-            let attribute_name = attribute.path.segments[0].ident.to_string();
-
-            if &attribute_name == "length_hint" {
-                assert!(length_hint.is_none(), "length hint may only be given once");
-                length_hint = attribute.tokens.clone().into();
-            }
-
-            if &attribute_name == "repeating" {
-                assert!(repeating.is_none(), "repeating may only be given once");
-                repeating = remove_self_from_stream(attribute.tokens.clone()).into();
-            }
-        }
-
-        let from_length_hint_option = match length_hint.clone() {
-            Some(length_stream) => {
-                let cleaned_stream = remove_self_from_stream(length_stream);
-                quote!(((#cleaned_stream) as usize).into())
-            },
-            None => quote!(None),
-        };
-
-        let length_hint_option = match length_hint {
-            Some(length) => quote!(((#length) as usize).into()),
-            None => quote!(None),
-        };
-
-        from_fields.push(quote!(#field_name));
-
-        let is_repeating = repeating.is_some();
-
-        let initializer = match repeating {
-            Some(repeat_count) => quote!(
-                let #field_name = (0..(#repeat_count))
-                    .map(|_| crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option))
-                    .collect();
-            ),
-            None => quote!(let #field_name = crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint_option);),
-        };
-        from_bytes_initializers.push(initializer);
-
-        let initializer = match is_repeating {
-            true => quote!(panic!()),
-            false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()),
-        };
-        to_bytes_initializers.push(initializer);
-
-        has_fields = true;
-    }
+    let (from_bytes_initializers, from_fields, to_bytes_initializers, has_fields) = byte_convertable_helper(named_fields);
 
     let to_bytes = match has_fields {
         true => quote!([&[#first, #second], #(#to_bytes_initializers),*].concat()),
@@ -624,7 +633,7 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
             fn header() -> [u8; 2] {
                 [#first, #second]
             }
-    
+
             fn to_bytes(&self) -> Vec<u8> {
                 #to_bytes
             }
@@ -645,7 +654,7 @@ pub fn derive_packet(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 if let Ok(packet) = &result {
                     print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, packet);
                 }
-   
+
                 result
             }
         }

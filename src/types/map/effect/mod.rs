@@ -2,8 +2,8 @@ mod particle;
 
 use derive_new::new;
 
-use graphics::{ Renderer, Camera, Color };
-use types::maths::*;
+use crate::graphics::{ Renderer, Camera, Color };
+use crate::types::maths::*;
 
 pub use self::particle::Particle;
 

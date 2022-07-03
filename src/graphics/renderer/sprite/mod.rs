@@ -27,7 +27,7 @@ use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::BufferUsage;
 use cgmath::Vector2;
 
-use graphics::*;
+use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
 

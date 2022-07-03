@@ -1,4 +1,4 @@
-use interface::ElementCell;
+use crate::interface::ElementCell;
 
 pub enum HoverInformation {
     Element(ElementCell),

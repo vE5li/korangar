@@ -2,7 +2,7 @@ use vulkano::instance::InstanceExtensions;
 use vulkano::device::DeviceExtensions;
 
 #[cfg(feature = "debug")]
-use debug::*;
+use crate::debug::*;
 
 pub fn get_instance_extensions() -> InstanceExtensions {
     InstanceExtensions {

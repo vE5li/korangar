@@ -1,5 +1,5 @@
 use cgmath::{ Matrix4, Vector4, Vector3, Vector2, Point3, Rad, InnerSpace, SquareMatrix, Array };
-use graphics::Transform;
+use crate::graphics::Transform;
 
 use super::{ Camera, SmoothedValue };
 

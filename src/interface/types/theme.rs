@@ -3,10 +3,10 @@ use ron::ser::PrettyConfig;
 use serde::{ Serialize, Deserialize };
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::maths::*;
-use graphics::Color;
-use interface::types::*;
+use crate::debug::*;
+use crate::types::maths::*;
+use crate::graphics::Color;
+use crate::interface::types::*;
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ButtonTheme  {

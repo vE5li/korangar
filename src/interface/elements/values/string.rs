@@ -1,9 +1,9 @@
 use derive_new::new;
 use num::Zero;
 
-use graphics::Renderer;
-use interface::traits::Element;
-use interface::types::*;
+use crate::graphics::Renderer;
+use crate::interface::traits::Element;
+use crate::interface::types::*;
 
 #[derive(new)]
 pub struct StringValue {

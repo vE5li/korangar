@@ -1,6 +1,6 @@
 use derive_new::new;
 
-use types::maths::*;
+use crate::types::maths::*;
 
 pub type Size = Vector2<f32>;
 pub type Position = Vector2<f32>;

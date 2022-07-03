@@ -4,10 +4,10 @@ use num::traits::NumOps;
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use graphics::Renderer;
-use interface::traits::Element;
-use interface::windows::NumberWindow;
-use interface::types::*;
+use crate::graphics::Renderer;
+use crate::interface::traits::Element;
+use crate::interface::windows::NumberWindow;
+use crate::interface::types::*;
 
 #[derive(new)]
 pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> {

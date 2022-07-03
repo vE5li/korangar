@@ -4,11 +4,11 @@ use num::traits::NumOps;
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use types::maths::*;
-use graphics::Renderer;
-use interface::traits::Element;
-use interface::windows::Vector3Window;
-use interface::types::*;
+use crate::types::maths::*;
+use crate::graphics::Renderer;
+use crate::interface::traits::Element;
+use crate::interface::windows::Vector3Window;
+use crate::interface::types::*;
 
 #[derive(new)]
 pub struct MutableVector3Value<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> {

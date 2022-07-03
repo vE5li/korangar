@@ -1,5 +1,4 @@
 use derive_new::new;
-#[cfg(feature = "debug")]
 use std::sync::Arc;
 use cgmath::{ Vector3, Vector2, VectorSpace };
 use vulkano::sync::GpuFuture;
@@ -9,10 +8,10 @@ use vulkano::device::Device;
 use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 
 #[cfg(feature = "debug")]
-use graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
-use graphics::{ Renderer, Camera, Texture };
-use types::map::Map;
-use loaders::{ TextureLoader, SpriteLoader };
+use crate::graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
+use crate::graphics::{ Renderer, Camera, Texture };
+use crate::types::map::Map;
+use crate::loaders::{ TextureLoader, SpriteLoader, ActionLoader };
 use crate::database::Database;
 
 #[derive(new)]
@@ -44,7 +43,7 @@ pub struct Entity {
 
 impl Entity {
 
-    pub fn new(sprite_loader: &mut SpriteLoader, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, _movement_speed: usize) -> Self {
+    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, _movement_speed: usize) -> Self {
 
         let position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
         let active_movement = None;
@@ -57,10 +56,11 @@ impl Entity {
         let current_spell_points = 50;
         let current_activity_points = 0;
 
-        let file_path = format!("npc\\{}.spr", database.job_name_from_id(job_id));
-        sprite_loader.get(&file_path, texture_future).unwrap();
+        let file_path = format!("npc\\{}", database.job_name_from_id(job_id));
+        let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
+        let actions = action_loader.get(&format!("{}.act", file_path));
 
-        let texture = texture_loader.get("assets/player.png", texture_future).unwrap(); // 8 x 14
+        let texture = Arc::clone(&sprite.textures[0]);
 
         Self {
             position,
@@ -244,7 +244,7 @@ impl Entity {
     }
 
     pub fn render(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.render_entity(camera, self.texture.clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(16, 8), Vector2::new(0, 0));
+        renderer.render_entity(camera, self.texture.clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0));
     }
 
     #[cfg(feature = "debug")]

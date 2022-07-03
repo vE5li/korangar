@@ -1,4 +1,4 @@
-use types::ByteStream;
+use crate::types::ByteStream;
 
 pub trait ByteConvertable {
 
@@ -247,11 +247,30 @@ impl<T: ByteConvertable> ByteConvertable for Vec<T> {
     }
 }
 
+impl ByteConvertable for f32 {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none(), "i32 may not have a length hint");
+
+        let first = byte_stream.next();
+        let second = byte_stream.next();
+        let third = byte_stream.next();
+        let fourth = byte_stream.next();
+
+        f32::from_le_bytes([first, second, third, fourth])
+    }
+
+    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+        assert!(length_hint.is_none(), "i32 may not have a length hint");
+        self.to_ne_bytes().to_vec()
+    }
+}
+
 #[cfg(test)]
 mod default_string {
 
-    use types::ByteStream;
-    use traits::ByteConvertable; 
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
     #[test]
     fn serialization_test() {
@@ -265,14 +284,15 @@ mod default_string {
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0]);
         let test_value = String::from_bytes(&mut byte_stream, None);
         assert_eq!(test_value.as_str(), "test");
+        assert!(byte_stream.is_empty());
     }
 }
 
 #[cfg(test)]
 mod length_hint_string {
 
-    use types::ByteStream;
-    use traits::ByteConvertable; 
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
     #[test]
     fn serialization_test() {
@@ -286,7 +306,7 @@ mod length_hint_string {
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = String::from_bytes(&mut byte_stream, Some(8));
         assert_eq!(test_value.as_str(), "test");
-        assert!(byte_stream.remaining().is_empty());
+        assert!(byte_stream.is_empty());
     }
 }
 
@@ -294,8 +314,8 @@ mod length_hint_string {
 mod const_length_hint_string {
 
     use derive_new::new;
-    use types::ByteStream;
-    use traits::ByteConvertable; 
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
     const LENGTH: usize = 8;
 
@@ -317,7 +337,7 @@ mod const_length_hint_string {
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream, None);
         assert_eq!(test_value.string.as_str(), "test");
-        assert!(byte_stream.remaining().is_empty());
+        assert!(byte_stream.is_empty());
     }
 }
 
@@ -325,10 +345,10 @@ mod const_length_hint_string {
 mod dynamic_length_hint_string {
 
     use derive_new::new;
-    use types::ByteStream;
-    use traits::ByteConvertable; 
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
-    #[derive(ByteConvertable, new)]
+    #[derive(Debug, PartialEq, ByteConvertable, new)]
     struct TestStruct {
         pub length: u8,
         #[length_hint(self.length * 2)]
@@ -346,17 +366,125 @@ mod dynamic_length_hint_string {
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[4, 116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream, None);
-        assert_eq!(test_value.length, 4);
-        assert_eq!(test_value.string.as_str(), "test");
-        assert!(byte_stream.remaining().is_empty());
+        assert_eq!(test_value, TestStruct::new(4, "test".to_string()));
+        assert!(byte_stream.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod default_struct {
+
+    use derive_new::new;
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
+
+    #[derive(Debug, PartialEq, ByteConvertable, new)]
+    struct TestStruct {
+        pub field1: u8,
+        pub field2: u16,
+        pub field3: i32,
+    }
+
+    #[test]
+    fn serialization_test() {
+        let test_value = TestStruct::new(16, 3000, -1);
+        let data = test_value.to_bytes(None);
+        assert_eq!(data, vec![16, 184, 11, 255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn deserialization_test() {
+        let mut byte_stream = ByteStream::new(&[16, 184, 11, 255, 255, 255, 255]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value, TestStruct::new(16, 3000, -1));
+        assert!(byte_stream.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod version_struct_smaller {
+
+    use derive_new::new;
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
+    use crate::types::Version;
+
+    #[derive(ByteConvertable, new)]
+    struct TestStruct {
+        #[version]
+        pub version: Version,
+        #[version_smaller(1, 1)]
+        pub maybe_value: Option<u32>,
+    }
+
+    #[test]
+    fn deserialize_smaller() {
+        let mut byte_stream = ByteStream::new(&[1, 0, 16, 0, 0, 0]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.maybe_value, Some(16));
+        assert!(byte_stream.is_empty());
+    }
+
+    #[test]
+    fn deserialize_equals() {
+        let mut byte_stream = ByteStream::new(&[1, 1, 16, 0, 0, 0]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.maybe_value, None);
+    }
+
+    #[test]
+    fn deserialize_bigger() {
+        let mut byte_stream = ByteStream::new(&[1, 6, 16, 0, 0, 0]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.maybe_value, None);
+    }
+}
+
+#[cfg(test)]
+mod version_struct_bigger {
+
+    use derive_new::new;
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
+    use crate::types::Version;
+
+    #[derive(ByteConvertable, new)]
+    struct TestStruct {
+        #[version]
+        pub version: Version,
+        #[version_equals_or_above(1, 1)]
+        pub maybe_value: Option<u32>,
+    }
+
+    #[test]
+    fn deserialize_smaller() {
+        let mut byte_stream = ByteStream::new(&[1, 0, 16, 0, 0, 0]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.maybe_value, None);
+    }
+
+    #[test]
+    fn deserialize_equals() {
+        let mut byte_stream = ByteStream::new(&[1, 1, 16, 0, 0, 0]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.maybe_value, Some(16));
+        assert!(byte_stream.is_empty());
+    }
+
+    #[test]
+    fn deserialize_bigger() {
+        let mut byte_stream = ByteStream::new(&[1, 6, 16, 0, 0, 0]);
+        let test_value = TestStruct::from_bytes(&mut byte_stream, None);
+        assert_eq!(test_value.maybe_value, Some(16));
+        assert!(byte_stream.is_empty());
     }
 }
 
 #[cfg(test)]
 mod default_enum {
 
-    use types::ByteStream;
-    use traits::ByteConvertable; 
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
     #[derive(ByteConvertable)]
     enum TestEnum {
@@ -377,14 +505,15 @@ mod default_enum {
         let mut byte_stream = ByteStream::new(&[1]);
         let test_value = TestEnum::from_bytes(&mut byte_stream, None);
         assert!(matches!(test_value, TestEnum::Second));
+        assert!(byte_stream.is_empty());
     }
 }
 
 #[cfg(test)]
 mod variant_value_enum {
 
-    use types::ByteStream;
-    use traits::ByteConvertable;
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
     #[derive(ByteConvertable)]
     enum TestEnum {
@@ -408,14 +537,15 @@ mod variant_value_enum {
         let mut byte_stream = ByteStream::new(&[10]);
         let test_value = TestEnum::from_bytes(&mut byte_stream, None);
         assert!(matches!(test_value, TestEnum::Second));
+        assert!(byte_stream.is_empty());
     }
 }
 
 #[cfg(test)]
 mod base_type_enum {
 
-    use types::ByteStream;
-    use traits::ByteConvertable;
+    use crate::types::ByteStream;
+    use crate::traits::ByteConvertable;
 
     #[derive(ByteConvertable)]
     #[base_type(u16)]
@@ -437,6 +567,6 @@ mod base_type_enum {
         let mut byte_stream = ByteStream::new(&[1, 0]);
         let test_value = TestEnum::from_bytes(&mut byte_stream, None);
         assert!(matches!(test_value, TestEnum::Second));
-        assert!(byte_stream.remaining().is_empty());
+        assert!(byte_stream.is_empty());
     }
 }

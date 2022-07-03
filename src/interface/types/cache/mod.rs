@@ -6,8 +6,8 @@ use serde::{ Serialize, Deserialize };
 use ron::ser::PrettyConfig;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use interface::types::{ Position, Size };
+use crate::debug::*;
+use crate::interface::types::{ Position, Size };
 
 use self::state::WindowState;
 

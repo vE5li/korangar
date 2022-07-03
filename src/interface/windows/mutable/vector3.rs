@@ -3,12 +3,12 @@ use num::{ Zero, NumCast };
 use num::traits::NumOps;
 use std::cmp::PartialOrd;
 
-use types::maths::*;
-use interface::traits::{ Window, PrototypeWindow };
-use interface::types::{ InterfaceSettings, ChangeEvent };
-use interface::{ WindowCache, ElementCell, Size };
-use interface::elements::*;
-use interface::FramedWindow;
+use crate::types::maths::*;
+use crate::interface::traits::{ Window, PrototypeWindow };
+use crate::interface::types::{ InterfaceSettings, ChangeEvent };
+use crate::interface::{ WindowCache, ElementCell, Size };
+use crate::interface::elements::*;
+use crate::interface::FramedWindow;
 
 #[derive(new)]
 pub struct Vector3Window<T> {

@@ -9,7 +9,7 @@ use std::net::TcpStream;
 use std::io::prelude::*;
 
 #[cfg(feature = "debug")]
-use debug::*;
+use crate::debug::*;
 use crate::interface::windows::CharacterSelectionWindow;
 use crate::traits::ByteConvertable;
 use crate::types::ByteStream;

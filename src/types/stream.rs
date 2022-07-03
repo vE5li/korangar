@@ -1,17 +1,19 @@
 use derive_new::new;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::maths::*;
-use graphics::Color;
+use crate::debug::*;
+use crate::types::maths::*;
+use crate::graphics::Color;
 
-use types::Version;
+use crate::types::Version;
 
 #[derive(new)]
 pub struct ByteStream<'b> {
     data: &'b [u8],
     #[new(default)]
     offset: usize,
+    #[new(default)]
+    version: Option<Version>,
 }
 
 impl<'b> ByteStream<'b> {
@@ -30,6 +32,14 @@ impl<'b> ByteStream<'b> {
 
     pub fn is_empty(&self) -> bool {
         self.offset >= self.data.len()
+    }
+
+    pub fn set_version(&mut self, version: Version) {
+        self.version = version.into();
+    }
+
+    pub fn get_version(&mut self) -> Version {
+        self.version.unwrap()
     }
 
     pub fn match_signature(&mut self, signature: [u8; 2]) -> bool {

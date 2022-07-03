@@ -1,7 +1,7 @@
 use derive_new::new;
 
-use graphics::{ Renderer, Camera, Color };
-use types::maths::*;
+use crate::graphics::{ Renderer, Camera, Color };
+use crate::types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 #[window_title("light source")]

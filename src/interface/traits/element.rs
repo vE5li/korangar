@@ -1,6 +1,6 @@
-use types::maths::Vector2;
-use graphics::Renderer;
-use interface::types::*;
+use crate::types::maths::Vector2;
+use crate::graphics::Renderer;
+use crate::interface::types::*;
 
 pub trait Element {
 

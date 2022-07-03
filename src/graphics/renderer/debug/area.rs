@@ -26,8 +26,8 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::buffer::BufferUsage;
 
-use types::maths::*;
-use graphics::*;
+use crate::types::maths::*;
+use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
 use self::vertex_shader::ty::Matrices;

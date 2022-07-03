@@ -1,11 +1,11 @@
 use std::rc::Rc;
 
-use types::maths::Vector2;
-use graphics::Renderer;
-use interface::traits::{ Element, Window };
-use interface::types::*;
-use interface::elements::{ DragButton, CloseButton };
-use interface::{ StateProvider, WindowCache, ElementCell, SizeConstraint, Size, PartialSize, Position };
+use crate::types::maths::Vector2;
+use crate::graphics::Renderer;
+use crate::interface::traits::{ Element, Window };
+use crate::interface::types::*;
+use crate::interface::elements::{ DragButton, CloseButton };
+use crate::interface::{ StateProvider, WindowCache, ElementCell, SizeConstraint, Size, PartialSize, Position };
 
 pub struct FramedWindow {
     window_class: Option<String>,

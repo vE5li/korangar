@@ -1,9 +1,9 @@
 use derive_new::new;
 use num::Zero;
 
-use interface::traits::Element;
-use interface::types::*;
-use graphics::Renderer;
+use crate::interface::traits::Element;
+use crate::interface::types::*;
+use crate::graphics::Renderer;
 
 #[derive(new)]
 pub struct Headline {

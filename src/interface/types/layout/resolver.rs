@@ -1,5 +1,5 @@
-use types::maths::*;
-use interface::types::{ SizeConstraint, Size, PartialSize, Position };
+use crate::types::maths::*;
+use crate::interface::types::{ SizeConstraint, Size, PartialSize, Position };
 
 const ELEMENT_THRESHHOLD: f32 = 1.0000;
 const REMAINDER_THRESHHOLD: f32 = 0.0001;

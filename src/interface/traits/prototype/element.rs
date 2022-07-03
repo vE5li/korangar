@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
-use types::Version;
-use graphics::Color;
-use types::maths::*;
-use interface::elements::*;
-use interface::types::{ ElementCell, SizeConstraint };
+use crate::types::Version;
+use crate::graphics::Color;
+use crate::types::maths::*;
+use crate::interface::elements::*;
+use crate::interface::types::{ ElementCell, SizeConstraint };
 
 pub trait PrototypeElement {
 

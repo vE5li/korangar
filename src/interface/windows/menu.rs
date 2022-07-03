@@ -1,8 +1,8 @@
-use input::UserEvent;
-use interface::traits::{ Window, PrototypeWindow };
-use interface::types::InterfaceSettings;
-use interface::elements::*;
-use interface::{ WindowCache, FramedWindow, ElementCell, Size };
+use crate::input::UserEvent;
+use crate::interface::traits::{ Window, PrototypeWindow };
+use crate::interface::types::InterfaceSettings;
+use crate::interface::elements::*;
+use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
 
 pub struct MenuWindow {
     window_class: String,

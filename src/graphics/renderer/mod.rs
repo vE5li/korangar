@@ -27,10 +27,10 @@ use vulkano::ordered_passes_renderpass;
 use winit::window::Window;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use graphics::*;
-use loaders::TextureLoader;
-use types::map::model::Node;
+use crate::debug::*;
+use crate::graphics::*;
+use crate::loaders::TextureLoader;
+use crate::types::map::model::Node;
 
 use self::picker::PickerRenderer;
 use self::deferred::*;

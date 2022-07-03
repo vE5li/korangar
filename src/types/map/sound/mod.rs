@@ -1,8 +1,8 @@
 use derive_new::new;
 
 #[cfg(feature = "debug")]
-use graphics::{ Renderer, Camera };
-use types::maths::*;
+use crate::graphics::{ Renderer, Camera };
+use crate::types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 #[window_title("sound source")]

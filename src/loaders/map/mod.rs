@@ -11,11 +11,11 @@ use vulkano::device::Device;
 use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::ByteStream;
-use types::map::{ Map, Tile, TileType, WaterSettings, LightSettings, Object, LightSource, SoundSource, EffectSource };
-use graphics::{ Color, ModelVertex, Transform, NativeModelVertex, WaterVertex, TileVertex };
-use loaders::{ ModelLoader, TextureLoader, GameFileLoader };
+use crate::debug::*;
+use crate::types::ByteStream;
+use crate::types::map::{ Map, Tile, TileType, WaterSettings, LightSettings, Object, LightSource, SoundSource, EffectSource };
+use crate::graphics::{ Color, ModelVertex, Transform, NativeModelVertex, WaterVertex, TileVertex };
+use crate::loaders::{ ModelLoader, TextureLoader, GameFileLoader };
 
 use self::resource::ResourceType;
 

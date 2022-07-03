@@ -2,8 +2,8 @@ use derive_new::new;
 use cgmath::Vector3;
 
 #[cfg(feature = "debug")]
-use graphics::{ Renderer, Camera };
-use graphics::Color;
+use crate::graphics::{ Renderer, Camera };
+use crate::graphics::Color;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 #[window_title("particle")]

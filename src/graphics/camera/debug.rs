@@ -1,6 +1,6 @@
 use cgmath::{ Matrix4, Vector4, Vector3, Vector2, Point3, Rad, InnerSpace, SquareMatrix, Array };
 use std::f32::consts::FRAC_PI_4;
-use graphics::Transform;
+use crate::graphics::Transform;
 use crate::interface::types::*;
 
 use super::Camera;

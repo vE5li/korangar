@@ -1,7 +1,7 @@
 use derive_new::new;
 use cgmath::{ Vector2, Vector3, InnerSpace };
 
-use graphics::ModelVertex;
+use crate::graphics::ModelVertex;
 
 #[derive(new)]
 pub struct NativeModelVertex {

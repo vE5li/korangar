@@ -1,7 +1,7 @@
 use derive_new::new;
 use serde::{ Serialize, Deserialize };
 
-use interface::types::{ Dimension, Size, Position, PartialSize };
+use crate::interface::types::{ Dimension, Size, Position, PartialSize };
 
 #[derive(Copy, Clone, Serialize, Deserialize, new)]
 pub struct SizeConstraint {

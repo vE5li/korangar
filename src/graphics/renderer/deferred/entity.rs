@@ -30,7 +30,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::BufferUsage;
 
-use graphics::*;
+use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
 use self::vertex_shader::ty::Matrices;

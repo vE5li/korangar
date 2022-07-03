@@ -2,9 +2,9 @@ use num::{ Zero, NumCast };
 use num::traits::NumOps;
 use std::fmt::Display;
 
-use types::maths::*;
-use interface::elements::*;
-use interface::types::{ ElementCell, ChangeEvent };
+use crate::types::maths::*;
+use crate::interface::elements::*;
+use crate::interface::types::{ ElementCell, ChangeEvent };
 
 pub trait PrototypeMutableRangeElement<T> {
 

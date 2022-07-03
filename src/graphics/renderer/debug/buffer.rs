@@ -26,8 +26,8 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::sync::GpuFuture;
 
-use graphics::*;
-use loaders::TextureLoader;
+use crate::graphics::*;
+use crate::loaders::TextureLoader;
 
 use self::fragment_shader::ty::Constants;
 

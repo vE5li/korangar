@@ -27,7 +27,7 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
-use graphics::*;
+use crate::graphics::*;
 
 pub use self::rectangle::RectangleRenderer;
 pub use self::sprite::SpriteRenderer;

@@ -1,6 +1,6 @@
 use derive_new::new;
 
-use graphics::RenderSettings;
+use crate::graphics::RenderSettings;
 
 
 #[derive(new)]

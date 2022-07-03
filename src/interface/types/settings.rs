@@ -2,8 +2,8 @@ use serde::{ Serialize, Deserialize };
 use ron::ser::PrettyConfig;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use interface::types::*;
+use crate::debug::*;
+use crate::interface::types::*;
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct InterfaceSettings {

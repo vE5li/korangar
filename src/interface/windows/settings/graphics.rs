@@ -1,8 +1,8 @@
-use input::UserEvent;
-use interface::traits::{ Window, PrototypeWindow, PrototypeElement };
-use interface::types::InterfaceSettings;
-use interface::{ StateProvider, WindowCache, FramedWindow, ElementCell, Size };
-use interface::elements::StateButton;
+use crate::input::UserEvent;
+use crate::interface::traits::{ Window, PrototypeWindow, PrototypeElement };
+use crate::interface::types::InterfaceSettings;
+use crate::interface::{ StateProvider, WindowCache, FramedWindow, ElementCell, Size };
+use crate::interface::elements::StateButton;
 
 pub struct GraphicsSettingsWindow {
     window_class: String,

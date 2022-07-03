@@ -3,17 +3,17 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::collections::HashMap;
-use types::maths::*;
+use crate::types::maths::*;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
 use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::ByteStream;
-use types::map::model::{ Model, Node, BoundingBox, ShadingType };
-use graphics::{ Transform, NativeModelVertex };
-use loaders::{ TextureLoader, GameFileLoader };
+use crate::debug::*;
+use crate::types::ByteStream;
+use crate::types::map::model::{ Model, Node, BoundingBox, ShadingType };
+use crate::graphics::{ Transform, NativeModelVertex };
+use crate::loaders::{ TextureLoader, GameFileLoader };
 
 #[derive(new)]
 pub struct ModelLoader {

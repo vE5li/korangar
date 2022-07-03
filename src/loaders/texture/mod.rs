@@ -14,9 +14,9 @@ use png::Decoder;
 use bmp::from_reader;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use graphics::Texture;
-use loaders::GameFileLoader;
+use crate::debug::*;
+use crate::graphics::Texture;
+use crate::loaders::GameFileLoader;
 
 #[derive(new)]
 pub struct TextureLoader {

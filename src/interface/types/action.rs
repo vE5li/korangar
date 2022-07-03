@@ -1,5 +1,5 @@
-use input::UserEvent;
-use interface::PrototypeWindow;
+use crate::input::UserEvent;
+use crate::interface::PrototypeWindow;
 
 pub enum ClickAction {
     Event(UserEvent),

@@ -3,9 +3,9 @@ use num::{ Zero, NumCast, clamp };
 use num::traits::NumOps;
 use std::cmp::PartialOrd;
 
-use interface::traits::Element;
-use interface::types::*;
-use graphics::Renderer;
+use crate::interface::traits::Element;
+use crate::interface::types::*;
+use crate::graphics::Renderer;
 
 #[derive(new)]
 pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {

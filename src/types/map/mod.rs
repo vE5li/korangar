@@ -8,7 +8,7 @@ use derive_new::new;
 use cgmath::Vector2;
 
 use crate::types::Version;
-use graphics::*;
+use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::traits::PrototypeWindow;
 
@@ -119,13 +119,16 @@ impl Map {
             self.objects.iter().for_each(|object| object.render_geometry(renderer, camera));
         }
 
-        if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
-            renderer.render_water(camera, water_vertex_buffer.clone());
-        }
-
         #[cfg(feature = "debug")]
         if render_settings.show_map_tiles {
             renderer.render_map_tiles(camera, self.tile_vertex_buffer.clone(), &Transform::new());
+        }
+    }
+
+    pub fn render_water(&self, renderer: &mut Renderer, camera: &dyn Camera) {
+
+        if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
+            renderer.render_water(camera, water_vertex_buffer.clone());
         }
     }
 

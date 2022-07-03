@@ -1,6 +1,6 @@
-use graphics::Color;
-use interface::elements::{ MutableColorValue, StaticLabel, Container };
-use interface::types::{ ElementCell, SizeConstraint, ChangeEvent };
+use crate::graphics::Color;
+use crate::interface::elements::{ MutableColorValue, StaticLabel, Container };
+use crate::interface::types::{ ElementCell, SizeConstraint, ChangeEvent };
 
 pub trait PrototypeMutableElement {
 

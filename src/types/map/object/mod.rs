@@ -3,8 +3,8 @@ pub mod model;
 use derive_new::new;
 use std::sync::Arc;
 
-use graphics::{ Renderer, Camera, Transform };
-use types::maths::*;
+use crate::graphics::{ Renderer, Camera, Transform };
+use crate::types::maths::*;
 
 use self::model::*;
 

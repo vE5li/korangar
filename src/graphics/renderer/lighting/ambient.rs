@@ -24,7 +24,7 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
-use graphics::*;
+use crate::graphics::*;
 
 use self::fragment_shader::ty::Constants;
 

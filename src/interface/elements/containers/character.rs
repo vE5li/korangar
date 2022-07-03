@@ -2,11 +2,11 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use num::Zero;
 
-use input::UserEvent;
-use interface::traits::Element;
-use interface::types::*;
-use interface::elements::*;
-use graphics::{ Renderer, Color };
+use crate::input::UserEvent;
+use crate::interface::traits::Element;
+use crate::interface::types::*;
+use crate::interface::elements::*;
+use crate::graphics::{ Renderer, Color };
 use crate::network::CharacterInformation;
 
 pub struct CharacterPreview {

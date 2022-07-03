@@ -1,8 +1,8 @@
 use derive_new::new;
 use serde::{ Serialize, Deserialize };
 
-use interface::traits::{ PrototypeElement, PrototypeMutableElement, PrototypeMutableRangeElement };
-use interface::{ ElementCell, ChangeEvent };
+use crate::interface::traits::{ PrototypeElement, PrototypeMutableElement, PrototypeMutableRangeElement };
+use crate::interface::{ ElementCell, ChangeEvent };
 
 // TODO: rework when const generics are able to do this:
 //pub struct MutableRange<T, const MIN: Vector2<T>, const MAX: Vector2<T>>(pub T);

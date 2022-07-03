@@ -1,9 +1,9 @@
 use derive_new::new;
 use num::Zero;
 
-use graphics::{ Renderer, Color };
-use interface::traits::Element;
-use interface::types::*;
+use crate::graphics::{ Renderer, Color };
+use crate::interface::traits::Element;
+use crate::interface::types::*;
 
 #[derive(new)]
 pub struct ColorValue {

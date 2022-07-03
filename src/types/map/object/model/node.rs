@@ -1,6 +1,6 @@
 use derive_new::new;
-use types::maths::*;
-use graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform };
+use crate::types::maths::*;
+use crate::graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform };
 
 #[derive(Clone, Debug, PrototypeElement, new)]
 pub struct BoundingBox {

@@ -7,7 +7,7 @@ pub use self::player::PlayerCamera;
 pub use self::debug::DebugCamera;
 
 use cgmath::{ Matrix4, Vector4, Vector3, Vector2 };
-use graphics::{ SmoothedValue, Transform };
+use crate::graphics::{ SmoothedValue, Transform };
 
 pub trait Camera {
 

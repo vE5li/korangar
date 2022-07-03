@@ -1,7 +1,7 @@
-use interface::traits::{ Window, PrototypeWindow };
-use interface::types::InterfaceSettings;
-use interface::{ WindowCache, Size };
-use interface::FramedWindow;
+use crate::interface::traits::{ Window, PrototypeWindow };
+use crate::interface::types::InterfaceSettings;
+use crate::interface::{ WindowCache, Size };
+use crate::interface::FramedWindow;
 
 pub struct ProfilerWindow {
     window_class: String,

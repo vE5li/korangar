@@ -4,7 +4,7 @@ pub mod traits;
 pub mod elements;
 pub mod windows;
 
-use graphics::Renderer;
+use crate::graphics::Renderer;
 
 pub use self::types::{ StateProvider, ClickAction, Size };
 pub use self::windows::*;

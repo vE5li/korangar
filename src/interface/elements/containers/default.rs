@@ -2,9 +2,9 @@ use derive_new::new;
 use std::rc::Rc;
 use num::Zero;
 
-use interface::traits::Element;
-use interface::types::*;
-use graphics::Renderer;
+use crate::interface::traits::Element;
+use crate::interface::types::*;
+use crate::graphics::Renderer;
 
 #[derive(new)]
 pub struct Container {

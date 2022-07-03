@@ -4,9 +4,9 @@ use std::fs::read;
 use yazi::*;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::ByteStream;
-use traits::ByteConvertable;
+use crate::debug::*;
+use crate::types::ByteStream;
+use crate::traits::ByteConvertable;
 use korangar_procedural::ByteConvertable;
 
 #[derive(Clone, ByteConvertable)]
@@ -158,6 +158,7 @@ impl GameFileLoader {
                 ".bmp" | ".BMP" => return self.get("data\\texture\\BLACK.BMP"),
                 ".rsm" => return self.get("data\\model\\abyss\\coin_j_01.rsm"),
                 ".spr" => return self.get("data\\sprite\\npc\\1_f_maria.spr"),
+                ".act" => return self.get("data\\sprite\\npc\\1_f_maria.act"),
                 _other => {},
             }
         }

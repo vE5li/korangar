@@ -14,14 +14,18 @@ impl ByteConvertable for Version {
     fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none());
 
-        let major = byte_stream.next();
         let minor = byte_stream.next();
+        let major = byte_stream.next();
 
         Self::new(major, minor)
     }
 }
 
 impl Version {
+
+    pub fn smaller(&self, major: u8, minor: u8) -> bool {
+        self.major < major || (self.major == major && self.minor < minor)
+    }
 
     pub fn equals(&self, major: u8, minor: u8) -> bool {
         self.major == major && self.minor >= minor

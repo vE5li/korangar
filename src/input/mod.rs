@@ -8,8 +8,8 @@ use cgmath::Vector2;
 use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
 
-use interface::types::ElementCell;
-use interface::{ Interface, ClickAction };
+use crate::interface::types::ElementCell;
+use crate::interface::{ Interface, ClickAction };
 use crate::graphics::{Renderer, RenderSettings};
 
 pub use self::event::UserEvent;

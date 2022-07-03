@@ -1,24 +1,32 @@
 use derive_new::new;
 use std::collections::HashMap;
-use vulkano::sync::GpuFuture;
+use std::sync::Arc;
 use std::rc::Rc;
 use std::cell::RefCell;
+use vulkano::device::{ Device, Queue };
+use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
+use vulkano::image::view::ImageView;
+use vulkano::format::Format;
+use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::ByteStream;
-use traits::ByteConvertable;
-use loaders::GameFileLoader;
-use types::Version;
+use crate::debug::*;
+use crate::types::ByteStream;
+use crate::traits::ByteConvertable;
+use crate::loaders::GameFileLoader;
+use crate::types::Version;
+use crate::graphics::Texture;
 
 #[derive(Clone)]
-pub struct Sprite {} 
+pub struct Sprite {
+    pub textures: Vec<Texture>,
+}
 
 #[derive(Debug)]
 struct EncodedData(pub Vec<u8>);
 
 impl ByteConvertable for EncodedData {
-    
+
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
 
         let image_size = length_hint.unwrap();
@@ -62,16 +70,19 @@ impl ByteConvertable for EncodedData {
 }
 
 #[derive(Debug, ByteConvertable)]
-struct PaletteImage {
+struct PaletteImageData {
     pub width: u16,
     pub height: u16,
+    #[version_equals_or_above(2, 1)]
     #[length_hint(self.width * self.height)]
-    pub encoded_data: EncodedData,
-    //pub raw_data: Option<Vec<u8>>,
+    pub encoded_data: Option<EncodedData>,
+    #[version_smaller(2, 1)]
+    #[length_hint(self.width * self.height)]
+    pub raw_data: Option<Vec<u8>>,
 }
 
 #[derive(Debug, ByteConvertable)]
-struct RgbaImage {
+struct RgbaImageData {
     pub width: u16,
     pub height: u16,
     #[length_hint(self.width * self.height)]
@@ -86,6 +97,19 @@ struct PaletteColor {
     pub reserved: u8,
 }
 
+impl PaletteColor {
+
+    pub fn to_data(&self, index: u8) -> u32 {
+
+        let alpha = match index {
+            0 => 0,
+            _other => 255,
+        };
+
+        (self.red as u32) | ((self.green as u32) << 8) | ((self.blue as u32) << 16) | (alpha << 24)
+    }
+}
+
 #[derive(Debug, ByteConvertable)]
 struct Palette {
     pub colors: [PaletteColor; 256],
@@ -93,20 +117,24 @@ struct Palette {
 
 #[derive(Debug, ByteConvertable)]
 struct SpriteData {
+    #[version]
     pub version: Version,
     pub palette_image_count: u16,
-    pub rgba_image_count: u16,
+    #[version_equals_or_above(2, 0)]
+    pub rgba_image_count: Option<u16>,
     #[repeating(self.palette_image_count)]
-    pub palette_images: Vec<PaletteImage>,
-    #[repeating(self.rgba_image_count)]
-    pub rgba_images: Vec<RgbaImage>,
-//    #[version_equals_above(self.version, 1, 1)]
-    pub palette: Palette,
+    pub palette_image_data: Vec<PaletteImageData>,
+    #[repeating(self.rgba_image_count.unwrap_or_default())]
+    pub rgba_image_data: Vec<RgbaImageData>,
+    #[version_equals_or_above(1, 1)]
+    pub palette: Option<Palette>,
 }
 
 #[derive(new)]
 pub struct SpriteLoader {
     game_file_loader: Rc<RefCell<GameFileLoader>>,
+    device: Arc<Device>,
+    queue: Arc<Queue>,
     #[new(default)]
     cache: HashMap<String, Sprite>,
 }
@@ -120,15 +148,58 @@ impl SpriteLoader {
 
         let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\sprite\\{}", path))?;
         let mut byte_stream = ByteStream::new(&bytes);
-        
+
         if byte_stream.string(2).as_str() != "SP" {
             return Err(format!("failed to read magic number from {}", path));
         }
 
         let sprite_data = SpriteData::from_bytes(&mut byte_stream, None);
 
-        let sprite = Sprite {};
+        assert!(byte_stream.is_empty());
+
+        let rgba_images: Vec<Arc<ImmutableImage>> = sprite_data.rgba_image_data
+            .into_iter()
+            .map(|image_data| {
+                let (image, future) = ImmutableImage::from_iter(image_data.data.iter().cloned(), ImageDimensions::Dim2d { width: image_data.width as u32, height: image_data.height as u32, array_layers: 1 }, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
+                let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
+                let combined_future = inner_future.join(future).boxed();
+                *texture_future = combined_future;
+                image
+            })
+            .collect();
+
+        let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
+                                                    // the default palette is
+
+        let palette_images: Vec<Arc<ImmutableImage>> = sprite_data.palette_image_data
+            .into_iter()
+            .map(|image_data| {
+
+                let data: Vec<u32> = image_data.encoded_data
+                    .map(|encoded| encoded.0)
+                    .unwrap_or_else(|| image_data.raw_data.unwrap())
+                    .iter()
+                    .map(|palette_index| palette.colors[*palette_index as usize].to_data(*palette_index))
+                    .collect();
+
+                let (image, future) = ImmutableImage::from_iter(data.into_iter(), ImageDimensions::Dim2d { width: image_data.width as u32, height: image_data.height as u32, array_layers: 1 }, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
+                let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
+                let combined_future = inner_future.join(future).boxed();
+                *texture_future = combined_future;
+                image
+            })
+            .collect();
+
+        let textures = rgba_images
+            .into_iter()
+            .chain(palette_images.into_iter())
+            .map(|image| ImageView::new(Arc::new(image)).unwrap())
+            .collect();
+
+        let sprite = Sprite { textures };
         self.cache.insert(path.to_string(), sprite.clone());
+
+        println!("images: {}", sprite.textures.len());
 
         #[cfg(feature = "debug")]
         timer.stop();

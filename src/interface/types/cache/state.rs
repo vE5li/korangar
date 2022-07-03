@@ -1,7 +1,7 @@
 use derive_new::new;
 use serde::{ Serialize, Deserialize };
 
-use interface::types::{ Position, Size };
+use crate::interface::types::{ Position, Size };
 
 #[derive(Serialize, Deserialize, new)]
 pub struct WindowState {

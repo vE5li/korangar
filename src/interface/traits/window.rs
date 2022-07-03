@@ -1,7 +1,7 @@
-use types::maths::Vector2;
-use graphics::Renderer;
-use interface::types::*;
-use interface::traits::Element;
+use crate::types::maths::Vector2;
+use crate::graphics::Renderer;
+use crate::interface::types::*;
+use crate::interface::traits::Element;
 
 pub trait Window {
 

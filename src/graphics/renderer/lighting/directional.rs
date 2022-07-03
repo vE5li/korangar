@@ -28,7 +28,7 @@ use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage };
 use cgmath::Vector3;
 
-use graphics::*;
+use crate::graphics::*;
 
 use self::fragment_shader::ty::Constants;
 use self::fragment_shader::ty::Matrices;

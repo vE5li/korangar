@@ -55,14 +55,14 @@ use winit::window::WindowBuilder;
 use database::Database;
 
 #[cfg(feature = "debug")]
-use debug::*;
-use types::Entity;
-use input::{ InputSystem, UserEvent };
+use crate::debug::*;
+use crate::types::Entity;
+use crate::input::{ InputSystem, UserEvent };
 use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
-use loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader, SpriteLoader };
-use graphics::{ Renderer, RenderSettings };
-use graphics::camera::*;
-use interface::*;
+use crate::loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader, SpriteLoader, ActionLoader };
+use crate::graphics::{ Renderer, RenderSettings };
+use crate::graphics::camera::*;
+use crate::interface::*;
 use network::{ NetworkingSystem, NetworkEvent };
 
 fn main() {
@@ -132,7 +132,8 @@ fn main() {
     let mut model_loader = ModelLoader::new(Rc::clone(&game_file_loader), device.clone());
     let mut texture_loader = TextureLoader::new(Rc::clone(&game_file_loader), device.clone(), queue.clone());
     let mut map_loader = MapLoader::new(Rc::clone(&game_file_loader), device.clone());
-    let mut sprite_loader = SpriteLoader::new(Rc::clone(&game_file_loader));
+    let mut sprite_loader = SpriteLoader::new(Rc::clone(&game_file_loader), device.clone(), queue.clone());
+    let mut action_loader = ActionLoader::new(Rc::clone(&game_file_loader));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -259,7 +260,7 @@ fn main() {
                     match event {
 
                         NetworkEvent::AddEntity(entity_id, job_id, position, movement_speed) => {
-                            entities.push(Entity::new(&mut sprite_loader, &mut texture_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed));
+                            entities.push(Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed));
                         }
 
                         NetworkEvent::RemoveEntity(entity_id) => {
@@ -334,7 +335,7 @@ fn main() {
 
                                     map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
-                                    let player = Entity::new(&mut sprite_loader, &mut texture_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
+                                    let player = Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
 
                                     player_camera.set_focus_point(player.position);
                                     entities.push(player);
@@ -556,6 +557,10 @@ fn main() {
 
                 if render_settings.show_entities {
                     entities.iter().for_each(|entity| entity.render(&mut renderer, current_camera));
+                }
+
+                if render_settings.show_water {
+                    map.render_water(&mut renderer, current_camera);
                 }
 
                 #[cfg(feature = "debug")]

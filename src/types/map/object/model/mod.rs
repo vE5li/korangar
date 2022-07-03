@@ -2,7 +2,7 @@ mod node;
 mod shading;
 
 use derive_new::new;
-use graphics::{ Renderer, Camera, Transform };
+use crate::graphics::{ Renderer, Camera, Transform };
 
 pub use self::node::Node;
 pub use self::node::BoundingBox;

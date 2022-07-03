@@ -1,5 +1,5 @@
-use interface::types::{ WindowCache, Size, InterfaceSettings };
-use interface::traits::Window;
+use crate::interface::types::{ WindowCache, Size, InterfaceSettings };
+use crate::interface::traits::Window;
 
 pub trait PrototypeWindow {
 

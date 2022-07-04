@@ -35,21 +35,4 @@ void main() {
 
     fragment_color.rgb = blended / 4.0;
     fragment_color.a = 1.0;
-
-    /*float water = subpassLoad(water_in, 0).r;
-
-    if (water == 0.0) {
-        discard;
-    }
-
-    float depth = subpassLoad(depth_in, 0).x;
-
-    vec4 pixel_position_world_space = constants.screen_to_world_matrix * vec4(position, depth, 1.0);
-    pixel_position_world_space /= pixel_position_world_space.w;
-
-    float delta = constants.water_level - pixel_position_world_space.y;
-    float jonas = max(0.2, delta / 30);
-
-    fragment_color.rgb = vec3(jonas, min(jonas / 2, 0.3), min(jonas / 10, 0.1));
-    fragment_color.a = 1.0;*/
 }

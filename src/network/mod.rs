@@ -382,6 +382,15 @@ struct RequestPlayerMovePacket {
     pub position: WorldPosition,
 }
 
+#[derive(Debug, Packet, new)]
+#[header(0x40, 0x01)]
+struct RequestWarpToMapPacket {
+    #[length_hint(16)]
+    pub map_name: String,
+    pub x: u16,
+    pub y: u16,
+}
+
 #[derive(Debug, Packet)]
 #[header(0x86, 0x00)]
 struct EntityMovePacket {
@@ -1449,6 +1458,10 @@ impl NetworkingSystem {
 
     pub fn request_player_move(&mut self, destination: Vector2<usize>) {
         self.send_packet_to_map_server(RequestPlayerMovePacket::new(WorldPosition::new(destination.x, destination.y)));
+    }
+
+    pub fn request_warp_to_map(&mut self, map_name: String, position: Vector2<usize>) {
+        self.send_packet_to_map_server(RequestWarpToMapPacket::new(map_name, position.x as u16, position.y as u16));
     }
 
     pub fn map_loaded(&mut self) {

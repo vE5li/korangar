@@ -19,7 +19,6 @@ struct SpriteClip {
     pub y: i32,
     pub sprite_number: u32,
     pub mirror_on: u32,
-    //#[version_equals_above]
     #[version_equals_or_above(2, 0)]
     pub color: Option<u32>,
     #[version_smaller(2, 4)]
@@ -48,11 +47,11 @@ struct AttachPoint {
 
 #[derive(Debug, ByteConvertable)]
 struct Motion {
-    pub range1: [i32; 4],
-    pub range2: [i32; 4],
+    pub range1: [i32; 4], // maybe just skip this?
+    pub range2: [i32; 4], // maybe just skip this?
     pub sprite_clip_count: u32,
     #[repeating(self.sprite_clip_count)]
-    pub soruce_clips: Vec<SpriteClip>,
+    pub sprite_clips: Vec<SpriteClip>,
     #[version_equals_or_above(2, 0)]
     pub event_id: Option<i32>, // if version == 2.0 this maybe needs to be set to None ?
                                // (after it is parsed)
@@ -96,12 +95,12 @@ struct ActionsData {
 pub struct ActionLoader {
     game_file_loader: Rc<RefCell<GameFileLoader>>,
     #[new(default)]
-    cache: HashMap<String, Actions>,
+    cache: HashMap<String, Rc<Actions>>,
 }
 
 impl ActionLoader {
 
-    fn load(&mut self, path: &str) -> Result<Actions, String> {
+    fn load(&mut self, path: &str) -> Result<Rc<Actions>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}{}{}", MAGENTA, path, NONE));
@@ -116,8 +115,8 @@ impl ActionLoader {
         let actions_data = ActionsData::from_bytes(&mut byte_stream, None);
         println!("{:#?}", actions_data);
 
-        let sprite = Actions {};
-        self.cache.insert(path.to_string(), sprite.clone());
+        let sprite = Rc::new(Actions {});
+        self.cache.insert(path.to_string(), Rc::clone(&sprite));
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -125,7 +124,7 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Actions, String> {
+    pub fn get(&mut self, path: &str) -> Result<Rc<Actions>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path),

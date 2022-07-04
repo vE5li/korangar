@@ -1,3 +1,4 @@
+use cgmath::Vector2;
 use derive_new::new;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,12 +16,18 @@ use crate::types::ByteStream;
 use crate::traits::ByteConvertable;
 use crate::loaders::GameFileLoader;
 use crate::types::Version;
-use crate::graphics::Texture;
+use crate::graphics::{Texture, Renderer};
 
 #[derive(Clone)]
 pub struct Sprite {
     pub textures: Vec<Texture>,
 }
+
+//impl Sprite {
+//
+//    pub fn render(renderer: &mut Renderer, motion: &Motion, position: Vector2<usize>, mirror: bool, ext: bool, , opacity: u8) {
+//    }
+//}
 
 #[derive(Debug)]
 struct EncodedData(pub Vec<u8>);
@@ -136,12 +143,12 @@ pub struct SpriteLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     #[new(default)]
-    cache: HashMap<String, Sprite>,
+    cache: HashMap<String, Rc<Sprite>>,
 }
 
 impl SpriteLoader {
 
-    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Sprite, String> {
+    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Rc<Sprite>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}{}{}", MAGENTA, path, NONE));
@@ -196,8 +203,8 @@ impl SpriteLoader {
             .map(|image| ImageView::new(Arc::new(image)).unwrap())
             .collect();
 
-        let sprite = Sprite { textures };
-        self.cache.insert(path.to_string(), sprite.clone());
+        let sprite = Rc::new(Sprite { textures });
+        self.cache.insert(path.to_string(), Rc::clone(&sprite));
 
         println!("images: {}", sprite.textures.len());
 
@@ -207,7 +214,7 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Sprite, String> {
+    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Rc<Sprite>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path, texture_future),

@@ -45,25 +45,4 @@ void main() {
 
     fragment_color.rgb = blended / 4.0;
     fragment_color.a = 1.0;
-
-    /*float depth = subpassLoad(depth_in, 0).x;
-
-    if (depth >= 1.0) {
-        discard;
-    }
-
-    vec4 pixel_position_world_space = constants.screen_to_world_matrix * vec4(position, depth, 1.0);
-    pixel_position_world_space /= pixel_position_world_space.w;
-
-    vec3 normal = normalize(subpassLoad(normal_in, 0).rgb);
-    vec3 light_direction = normalize(pixel_position_world_space.xyz - constants.position);
-
-    float light_percent = max(dot(light_direction, normal), 0.0);
-    float light_distance = length(constants.position - pixel_position_world_space.xyz);
-
-    light_percent *= constants.range / exp(light_distance / 10.0);
-
-    vec3 diffuse = subpassLoad(diffuse_in, 0).rgb;
-    fragment_color.rgb = min(light_percent * constants.color, vec3(0.6)) * diffuse;
-    fragment_color.a = 1.0;*/
 }

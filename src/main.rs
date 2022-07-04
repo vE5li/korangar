@@ -372,19 +372,7 @@ fn main() {
 
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
 
-                        #[cfg(feature = "debug")]
-                        UserEvent::LoadNewMap(map_name) => {
-                            match map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)) {
-
-                                Ok(new_map) => {
-                                    map = new_map;
-                                    entities.clear();
-                                    render_settings.use_debug_camera = true;
-                                },
-
-                                Err(message) => print_debug!("failed to load new map: {}", message),
-                            }
-                        },
+                        UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
@@ -393,7 +381,7 @@ fn main() {
                         UserEvent::OpenMapDataWindow => interface.open_window(std::ops::Deref::deref(&map)),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::new(game_file_loader.borrow().get_maps())),
+                        UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::new()),
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(),

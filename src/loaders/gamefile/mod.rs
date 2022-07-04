@@ -90,7 +90,6 @@ impl GameArchive {
 #[derive(Default)]
 pub struct GameFileLoader {
     archives: HashMap<String, GameArchive>,
-    maps: Vec<String>,
 }
 
 impl GameFileLoader {
@@ -119,18 +118,8 @@ impl GameFileLoader {
         let mut byte_stream = ByteStream::new(&decompressed);
         let mut files = HashMap::with_capacity(file_count);
 
-        self.maps.push("geffen".to_string());
-        self.maps.push("iz_int01".to_string());
-        self.maps.push("prontera".to_string());
-
         for _index in 0..file_count {
             let file_information = FileInformation::from_bytes(&mut byte_stream, None);
-
-            let delimiter = file_information.file_name.len() - 4;
-            if self.maps.len() < 40 && &file_information.file_name[delimiter..] == ".rsw" {
-                self.maps.push(file_information.file_name[5..delimiter].to_string());
-            }
-
             files.insert(file_information.file_name.clone(), file_information);
         }
 
@@ -164,10 +153,5 @@ impl GameFileLoader {
         }
 
         result
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn get_maps(&self) -> &Vec<String> {
-        &self.maps
     }
 }

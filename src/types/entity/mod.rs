@@ -1,5 +1,6 @@
 use derive_new::new;
 use std::sync::Arc;
+use std::rc::Rc;
 use cgmath::{ Vector3, Vector2, VectorSpace };
 use vulkano::sync::GpuFuture;
 #[cfg(feature = "debug")]
@@ -12,6 +13,7 @@ use crate::graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
 use crate::graphics::{ Renderer, Camera, Texture };
 use crate::types::map::Map;
 use crate::loaders::{ TextureLoader, SpriteLoader, ActionLoader };
+use crate::loaders::{ Sprite, Actions};
 use crate::database::Database;
 
 #[derive(new)]
@@ -37,8 +39,11 @@ pub struct Entity {
     pub current_spell_points: usize,
     pub current_activity_points: usize,
 
-    //sprite: Sprite,
-    texture: Texture,
+    sprite: Rc<Sprite>,
+    actions: Rc<Actions>,
+
+    timer: f32,
+    counter: usize,
 }
 
 impl Entity {
@@ -58,7 +63,7 @@ impl Entity {
 
         let file_path = format!("npc\\{}", database.job_name_from_id(job_id));
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
-        let actions = action_loader.get(&format!("{}.act", file_path));
+        let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
 
         let texture = Arc::clone(&sprite.textures[0]);
 
@@ -73,7 +78,11 @@ impl Entity {
             current_health_points,
             current_spell_points,
             current_activity_points,
-            texture,
+            sprite,
+            actions,
+
+            timer: 0.0,
+            counter: 0,
         }
     }
 
@@ -209,7 +218,7 @@ impl Entity {
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
     }
 
-    pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: u32) {
+    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: u32) {
 
         if let Some(active_movement) = self.active_movement.take() {
 
@@ -241,10 +250,17 @@ impl Entity {
                 self.active_movement = active_movement.into();
             }
         }
+
+
+        self.timer += delta_time;
+        if self.timer > 1.0 {
+            self.timer -= 1.0;
+            self.counter = (self.counter + 1) % self.sprite.textures.len();
+        }
     }
 
     pub fn render(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.render_entity(camera, self.texture.clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0));
+        renderer.render_entity(camera, self.sprite.textures[self.counter].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0));
     }
 
     #[cfg(feature = "debug")]

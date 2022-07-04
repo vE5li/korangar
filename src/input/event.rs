@@ -18,8 +18,7 @@ pub enum UserEvent {
     CancelSwitchCharacterSlot,
     SwitchCharacterSlot(usize),
     RequestPlayerMove(Vector2<usize>),
-    #[cfg(feature = "debug")]
-    LoadNewMap(String),
+    RequestWarpToMap(String, Vector2<usize>),
     #[cfg(feature = "debug")]
     OpenRenderSettingsWindow,
     #[cfg(feature = "debug")]

@@ -30,7 +30,7 @@ use winit::window::Window;
 use crate::debug::*;
 use crate::graphics::*;
 use crate::loaders::TextureLoader;
-use crate::types::map::model::Node2;
+use crate::types::map::model::Node;
 
 use self::picker::PickerRenderer;
 use self::deferred::*;
@@ -638,7 +638,7 @@ impl Renderer {
         self.geometry_shadow_renderer.render(camera, shadow_builder, vertex_buffer, textures, transform);
     }
 
-    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node2, transform: &Transform) {
+    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node, transform: &Transform) {
         let current_frame = self.current_frame.as_mut().unwrap();
         self.geometry_renderer.render_node(camera, &mut current_frame.builder, node, transform);
 

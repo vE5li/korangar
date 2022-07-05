@@ -17,7 +17,8 @@ use std::iter;
 
 use vulkano::device::Device;
 
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
+use vulkano::pipeline::graphics::rasterization::{RasterizationState, CullMode};
+use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline, StateMode };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
@@ -29,7 +30,7 @@ use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
 use crate::types::maths::*;
-use crate::types::map::model::Node2;
+use crate::types::map::model::Node;
 use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
@@ -74,6 +75,7 @@ impl GeometryRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .depth_stencil_state(DepthStencilState::simple_depth_test())
+            .rasterization_state(RasterizationState { cull_mode: StateMode::Fixed(CullMode::Back), ..Default::default() })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -200,7 +202,7 @@ impl GeometryRenderer {
             .draw(vertex_count as u32, 1, 0, 0).unwrap();
     }
 
-    pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node2, transform: &Transform) {
+    pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node, transform: &Transform) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -311,16 +313,12 @@ impl GeometryRenderer {
 
         let world_matrix = /*Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
             * Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z)
-            */ Matrix4::from_translation(transform.position)
-            * node.transform_matrix
+            */
+             Matrix4::from_translation(transform.position)
+            * (Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z))
             * Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
-            * (
-                 // x-y: not it
-                Matrix4::from_angle_y(transform.rotation.y) *
-                Matrix4::from_angle_z(transform.rotation.z) *
-                Matrix4::from_angle_x(transform.rotation.x) 
-            )
-            * Matrix4::from_cols(vector4!(1.0, 0.0, 0.0, 0.0), vector4!(0.0, -1.0, 0.0, 0.0), vector4!(0.0, 0.0, 1.0, 0.0), vector4!(0.0, 0.0, 0.0, 1.0));
+            * Matrix4::from_cols(vector4!(1.0, 0.0, 0.0, 0.0), vector4!(0.0, -1.0, 0.0, 0.0), vector4!(0.0, 0.0, 1.0, 0.0), vector4!(0.0, 0.0, 0.0, 1.0))
+            * node.transform_matrix;
         
 
         //let world_matrix =  node.transform_matrix

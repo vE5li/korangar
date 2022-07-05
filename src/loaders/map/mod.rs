@@ -574,7 +574,7 @@ impl MapLoader {
             }
         }
 
-        /*let row_size = width * 6;
+        /*let row_/size = width * 6;
 
         for index in 0..native_ground_vertices.len() / 6 {
 

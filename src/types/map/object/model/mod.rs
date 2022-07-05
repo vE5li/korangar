@@ -5,32 +5,12 @@ use derive_new::new;
 use crate::graphics::{ Renderer, Camera, Transform };
 
 pub use self::node::Node;
-pub use self::node::Node2;
 pub use self::node::BoundingBox;
 pub use self::shading::ShadingType;
 
-/*
-#[byte_conversion]
-struct Model {
-    version: Version,
-    animation_length: u32,
-    shading_type: ShadingType,
-    #[version_equals_above(1.4)]
-    alpha: Option<u8>,
-    _unknown0: [u8; 16],
-    texture_count: u32,
-    textures: Vec<String>,
-    main_node_name: String,
-    node_count: u32,
-    nodes: Vec<Node>,
-    _unknown1: [u8; 8],
-}
-*/
-
 #[derive(PrototypeElement, new)]
 pub struct Model {
-    pub root_node: Node2,
-    //pub bounding_box: BoundingBox,
+    pub root_node: Node,
 }
 
 impl Model {

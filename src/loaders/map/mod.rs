@@ -251,7 +251,10 @@ impl MapLoader {
                         let rotation = byte_stream.vector3();
                         let scale = byte_stream.vector3();
 
-                        let model = model_loader.get(texture_loader, &model_name, &mut texture_future)?;
+                        let array: [f32; 3] = scale.into();
+                        let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
+
+                        let model = model_loader.get(texture_loader, &mut texture_future, &model_name, reverse_order)?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, model, transform);
                         objects.push(object);
@@ -263,7 +266,10 @@ impl MapLoader {
                         let rotation = byte_stream.vector3();
                         let scale = byte_stream.vector3();
 
-                        let model = model_loader.get(texture_loader, &model_name, &mut texture_future)?;
+                        let array: [f32; 3] = scale.into();
+                        let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
+
+                        let model = model_loader.get(texture_loader, &mut texture_future, &model_name, reverse_order)?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(None, model_name, model, transform);
                         objects.push(object);

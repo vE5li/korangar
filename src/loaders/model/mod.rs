@@ -104,7 +104,7 @@ pub struct ModelLoader {
     game_file_loader: Rc<RefCell<GameFileLoader>>,
     device: Arc<Device>,
     #[new(default)]
-    cache: HashMap<String, Arc<Model>>,
+    cache: HashMap<(String, bool), Arc<Model>>,
 }
 
 impl ModelLoader {
@@ -114,17 +114,35 @@ impl ModelLoader {
         vector3!(adjusted_vector.x, adjusted_vector.y, adjusted_vector.z)
     }
 
-    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>) -> Vec<NativeModelVertex> {
-        
+    fn add_vertices(native_vertices: &mut Vec<NativeModelVertex>, vertex_positions: &Vec<Vector3<f32>>, texture_coordinates: &Vec<Vector2<f32>>, texture_index: u16, reverse_vertices: bool, reverse_normal: bool) {
+
+        let normal = match reverse_normal {
+            true => NativeModelVertex::calculate_normal(vertex_positions[0], vertex_positions[1], vertex_positions[2]),
+            false => NativeModelVertex::calculate_normal(vertex_positions[2], vertex_positions[1], vertex_positions[0]),
+        };
+
+        if reverse_vertices {
+            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates.clone()).rev() {
+                native_vertices.push(NativeModelVertex::new(vertex_position, normal, texture_coordinates, texture_index as i32));
+            }
+        } else {
+            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates.clone()) {
+                native_vertices.push(NativeModelVertex::new(vertex_position, normal, texture_coordinates, texture_index as i32));
+            }
+        }
+    }
+
+    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool) -> Vec<NativeModelVertex> {
+
         let mut native_vertices = Vec::new();
 
         let array: [f32; 3] = node.scale.into();
-        let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
+        let reverse_node_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
 
-        if reverse_order {
+        if reverse_node_order {
             panic!("this can actually happen");
         }
-        
+
         for face in &node.faces {
 
             // collect into tiny vec instead ?
@@ -135,22 +153,16 @@ impl ModelLoader {
                 .map(|position| Self::multiply_matrix4_and_vector3(main_matrix, position))
                 .collect();
 
-            let texture_coordinates = face.texture_coordinate_indices
+            let texture_coordinates: Vec<Vector2<f32>> = face.texture_coordinate_indices
                 .iter()
                 .copied()
-                .map(|index| node.texture_coordinates[index as usize].coordinates);
+                .map(|index| node.texture_coordinates[index as usize].coordinates)
+                .collect();
 
-            let normal = NativeModelVertex::calculate_normal(vertex_positions[2], vertex_positions[1], vertex_positions[0]);
-            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates.clone()) {
-                native_vertices.push(NativeModelVertex::new(vertex_position, normal, texture_coordinates, face.texture_index as i32));
-            }
+            Self::add_vertices(&mut native_vertices, &vertex_positions, &texture_coordinates, face.texture_index, reverse_order, false);
 
             if face.two_sided != 0 {
-
-                let normal = NativeModelVertex::calculate_normal(vertex_positions[0], vertex_positions[1], vertex_positions[2]);
-                for (vertex_position, texture_coordinates) in vertex_positions.into_iter().zip(texture_coordinates).rev() {
-                    native_vertices.push(NativeModelVertex::new(vertex_position, normal, texture_coordinates, face.texture_index as i32));
-                }
+                Self::add_vertices(&mut native_vertices, &vertex_positions, &texture_coordinates, face.texture_index, !reverse_order, true);
             }
         }
 
@@ -171,19 +183,19 @@ impl ModelLoader {
         (main, transform, box_transform)
     }
 
-    fn process_node_mesh(device: Arc<Device>, current_node: &NodeData, nodes: &Vec<NodeData>, textures: &Vec<Texture>, parent_matrix: &Matrix4<f32>, root_node_name: &str) -> Node {
+    fn process_node_mesh(device: Arc<Device>, current_node: &NodeData, nodes: &Vec<NodeData>, textures: &Vec<Texture>, parent_matrix: &Matrix4<f32>, root_node_name: &str, reverse_order: bool) -> Node {
 
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
-        let vertices = Self::make_vertices(current_node, &main_matrix);
+        let vertices = Self::make_vertices(current_node, &main_matrix, reverse_order);
 
         let m = box_transform_matrix * main_matrix;
         let bounding_box = BoundingBox::new_new(current_node.vertex_positions.iter().map(|position| Self::multiply_matrix4_and_vector3(&m, *position)));
-        
+
         let final_matrix = match current_node.node_name.as_str() == root_node_name {
             true => Matrix4::from_translation(-vector3!(bounding_box.center().x, bounding_box.biggest.y, bounding_box.center().z)) * transform_matrix, // cache the center call ?
             false => transform_matrix,
         };
-        
+
         let node_textures = current_node.texture_indices
             .iter()
             .map(|index| *index as usize)
@@ -193,7 +205,7 @@ impl ModelLoader {
         let child_nodes = nodes
             .iter()
             .filter(|node| node.parent_node_name == current_node.node_name)
-            .map(|node| Self::process_node_mesh(device.clone(), node, nodes, textures, &box_transform_matrix, root_node_name))
+            .map(|node| Self::process_node_mesh(device.clone(), node, nodes, textures, &box_transform_matrix, root_node_name, reverse_order))
             .collect();
 
         let vertices = NativeModelVertex::to_vertices(vertices);
@@ -202,7 +214,7 @@ impl ModelLoader {
         Node::new(final_matrix, vertex_buffer, node_textures, child_nodes, current_node.scale)
     }
 
-    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Model>, String> {
+    fn load(&mut self, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", MAGENTA, model_file, NONE));
@@ -211,7 +223,7 @@ impl ModelLoader {
         let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(4);
-        
+
         if &magic != "GRSM" {
             return Err(format!("failed to read magic number from {}", model_file));
         }
@@ -233,10 +245,10 @@ impl ModelLoader {
             .find(|node_data| node_data.node_name == model_data.root_node_name)
             .expect("failed to find main node");
 
-        let root_node = Self::process_node_mesh(self.device.clone(), root_node, &model_data.nodes, &textures, &Matrix4::identity(), &model_data.root_node_name);
+        let root_node = Self::process_node_mesh(self.device.clone(), root_node, &model_data.nodes, &textures, &Matrix4::identity(), &model_data.root_node_name, reverse_order);
         let model = Arc::new(Model::new(root_node));
 
-        self.cache.insert(model_file.to_string(), model.clone());
+        self.cache.insert((model_file.to_string(), reverse_order), model.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -244,10 +256,10 @@ impl ModelLoader {
         Ok(model)
     }
 
-    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Model>, String> {
-        match self.cache.get(model_file) {
+    pub fn get(&mut self, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, String> {
+        match self.cache.get(&(model_file.to_string(), reverse_order)) { // kinda dirty
             Some(model) => Ok(model.clone()),
-            None => self.load(texture_loader, model_file, texture_future),
+            None => self.load(texture_loader, texture_future, model_file, reverse_order),
         }
     }
 }

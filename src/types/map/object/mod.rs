@@ -27,10 +27,10 @@ impl Object {
         self.model.render_geometry(renderer, camera, &self.transform);
     }
 
-    #[cfg(feature = "debug")]
-    pub fn render_node_bounding_boxes(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        self.model.render_node_bounding_boxes(renderer, camera, &self.transform);
-    }
+    //#[cfg(feature = "debug")]
+    //pub fn render_node_bounding_boxes(&self, renderer: &mut Renderer, camera: &dyn Camera) {
+    //    self.model.render_node_bounding_boxes(renderer, camera, &self.transform);
+    //}
 
     #[cfg(feature = "debug")]
     pub fn hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, smallest_distance: f32) -> Option<f32> {

@@ -564,6 +564,11 @@ fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, Vec<
             from_bytes_initializers.push(quote!(byte_stream.set_version(#field_name);));
         }
 
+        let name_string = field_name.to_string();
+        if name_string.as_str() == "texture_count" ||  name_string.as_str() == "node_count"  ||  name_string.as_str() == "rotation_keyframe_count"||  name_string.as_str() == "frame" {
+            from_bytes_initializers.push(quote!(println!("{}: {}", #name_string, #field_name);));
+        }
+
         let initializer = match is_repeating || version_restricted {
             true => quote!(panic!("implement for to_bytes aswell")),
             false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint_option).as_slice()),

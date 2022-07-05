@@ -10,10 +10,94 @@ use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::ByteStream;
-use crate::types::map::model::{ Model, Node, BoundingBox, ShadingType };
-use crate::graphics::{ Transform, NativeModelVertex };
+use crate::types::{ ByteStream, Version };
+use crate::types::map::model::{ Model, Node, Node2, BoundingBox, ShadingType };
+use crate::graphics::{ Transform, NativeModelVertex, Texture };
 use crate::loaders::{ TextureLoader, GameFileLoader };
+use crate::traits::ByteConvertable;
+
+#[derive(Debug, ByteConvertable)]
+pub struct PositionKeyframeData {
+    pub frame: u32,
+    pub position: Vector3<f32>,
+}
+
+#[derive(Debug, ByteConvertable)]
+pub struct RotationKeyframeData {
+    pub frame: u32,
+    pub quaternions: Vector4<f32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, ByteConvertable)]
+pub struct FaceData {
+    pub vertex_position_indices: [u16; 3],
+    pub texture_coordinate_indices: [u16; 3],
+    pub texture_index: u16,
+    pub padding: u16,
+    pub two_sided: i32,
+    pub smooth_group: i32,
+}
+
+#[derive(Debug, ByteConvertable)]
+pub struct TextureCoordinateData {
+    #[version_equals_or_above(1, 2)]
+    pub color: Option<u32>,
+    pub coordinates: Vector2<f32>, // possibly wrong if version < 1.2
+}
+
+#[derive(Debug, ByteConvertable)]
+pub struct NodeData {
+    #[length_hint(40)]
+    pub node_name: String,
+    #[length_hint(40)]
+    pub parent_node_name: String,
+    pub texture_count: u32,
+    #[repeating(self.texture_count)]
+    pub texture_indices: Vec<u32>,
+    pub offset_matrix: Matrix3<f32>,
+    pub translation1: Vector3<f32>,
+    pub translation2: Vector3<f32>,
+    pub rotation_angle: f32,
+    pub rotation_axis: Vector3<f32>,
+    pub scale: Vector3<f32>,
+    pub vertex_position_count: u32,
+    #[repeating(self.vertex_position_count)]
+    pub vertex_positions: Vec<Vector3<f32>>, 
+    pub texture_coordinate_count: u32,
+    #[repeating(self.texture_coordinate_count)]
+    pub texture_coordinates: Vec<TextureCoordinateData>, 
+    pub face_count: u32,
+    #[repeating(self.face_count)]
+    pub faces: Vec<FaceData>,
+    #[version_equals_or_above(1, 5)] // is this actually the right version?
+    pub position_keyframe_count: Option<u32>,
+    #[repeating(self.position_keyframe_count.unwrap_or_default())]
+    pub position_keyframes: Vec<PositionKeyframeData>,
+    pub rotation_keyframe_count: u32,
+    #[repeating(self.rotation_keyframe_count)]
+    pub rotation_keyframes: Vec<RotationKeyframeData>,
+}
+
+#[derive(Debug, ByteConvertable)]
+pub struct ModelData {
+    //#[version]
+    //pub version: Version,
+    pub animation_length: u32,
+    pub shade_type: u32,
+    #[version_equals_or_above(1, 4)]
+    pub alpha: Option<u8>,
+    pub resorved: [u8; 16],
+    pub texture_count: u32,
+    #[repeating(self.texture_count)]
+    #[length_hint(40)]
+    pub texture_names: Vec<String>,
+    #[length_hint(40)]
+    pub root_node_name: String,
+    pub node_count: u32,
+    #[repeating(self.node_count)]
+    pub nodes: Vec<NodeData>,
+}
 
 #[derive(new)]
 pub struct ModelLoader {
@@ -25,7 +109,7 @@ pub struct ModelLoader {
 
 impl ModelLoader {
 
-    fn calculate_bounding_box(nodes: &Vec<Node>) -> BoundingBox {
+    /*fn calculate_bounding_box(nodes: &Vec<Node>) -> BoundingBox {
 
         let mut smallest: Vector3<f32> = vector3!(999999.0);
         let mut biggest: Vector3<f32> = vector3!(-999999.0);
@@ -71,6 +155,99 @@ impl ModelLoader {
         let range = (biggest - smallest).map(|component| component / 2.0);
 
         BoundingBox::new(smallest, biggest, offset, range)
+    }*/
+
+
+    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>) -> Vec<NativeModelVertex> {
+        
+        let mut native_vertices = Vec::new();
+        
+        for face in &node.faces {
+
+            // collect into tiny vec instead ?
+            let vertex_positions: Vec<Vector3<f32>> = face.vertex_position_indices
+                .iter()
+                .copied()
+                .map(|index| node.vertex_positions[index as usize])
+                .collect();
+
+            let texture_coordinates = face.texture_coordinate_indices
+                .iter()
+                .copied()
+                .map(|index| node.texture_coordinates[index as usize].coordinates);
+
+            let normal = NativeModelVertex::calculate_normal(vertex_positions[0], vertex_positions[1], vertex_positions[2]);
+
+            for (vertex_position, texture_coordinates) in vertex_positions.into_iter().zip(texture_coordinates) {
+                let adjusted_position = Self::multiply_matrix4_and_vector3(main_matrix, vertex_position);
+                native_vertices.push(NativeModelVertex::new(adjusted_position, normal, texture_coordinates, face.texture_index as i32));
+            }
+        }
+
+        native_vertices
+    }
+
+    fn multiply_matrix4_and_vector3(matrix: &Matrix4<f32>, vector: Vector3<f32>) -> Vector3<f32> {
+        let adjusted_vector = matrix * vector4!(vector, 1.0);
+        vector3!(adjusted_vector.x, adjusted_vector.y, adjusted_vector.z)
+    }
+
+    fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
+
+        let mut main = Matrix4::from(node.offset_matrix);
+
+        main = main * Matrix4::from_translation(node.translation1);
+
+        let scale_matrix = Matrix4::from_nonuniform_scale(node.scale.x, node.scale.y, node.scale.z);
+        let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis, Rad(node.rotation_angle));
+        let translation_matrix = Matrix4::from_translation(node.translation2);
+ 
+        let mut transform = scale_matrix;
+
+        //if (node.frames.len() == 0) {
+            transform = transform * rotation_matrix; // always apply, until we do animation)
+        //}
+
+        transform = transform * translation_matrix;
+
+        let mut box_transform = scale_matrix;
+
+        box_transform = box_transform * rotation_matrix;
+        box_transform = box_transform * translation_matrix;
+        box_transform = box_transform * parent_matrix;
+
+        (main, transform, box_transform)
+    }
+
+    fn process_node_mesh(device: Arc<Device>, current_node: &NodeData, nodes: &Vec<NodeData>, textures: &Vec<Texture>, parent_matrix: &Matrix4<f32>, root_node_name: &str) -> Node2 {
+
+        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
+        let vertices = Self::make_vertices(current_node, &main_matrix);
+
+        let m = main_matrix * box_transform_matrix;
+        let bounding_box = BoundingBox::new_new(current_node.vertex_positions.iter().map(|position| Self::multiply_matrix4_and_vector3(&m, *position)));
+        
+        let final_matrix = match current_node.node_name.as_str() == root_node_name {
+            true => transform_matrix * Matrix4::from_translation(vector3!(bounding_box.center().x, bounding_box.biggest.y, bounding_box.center().z)), // cache the center call ?
+            false => transform_matrix,
+        };
+        
+        let node_textures = current_node.texture_indices
+            .iter()
+            .map(|index| *index as usize)
+            .map(|index| textures[index].clone())
+            .collect();
+
+        let child_nodes = nodes
+            .iter()
+            .filter(|node| node.parent_node_name == current_node.node_name)
+            .map(|node| Self::process_node_mesh(device.clone(), node, nodes, textures, &box_transform_matrix, root_node_name))
+            .collect();
+
+        let vertices = NativeModelVertex::to_vertices(vertices);
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, vertices.into_iter()).unwrap();
+
+        Node2::new(final_matrix, vertex_buffer, node_textures, child_nodes)
     }
 
     fn load(&mut self, texture_loader: &mut TextureLoader, model_file: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Model>, String> {
@@ -86,6 +263,36 @@ impl ModelLoader {
         if &magic != "GRSM" {
             return Err(format!("failed to read magic number from {}", model_file));
         }
+
+        let major = byte_stream.next();
+        let minor = byte_stream.next();
+        byte_stream.set_version(Version::new(major, minor));
+
+        println!("{}", byte_stream.get_version());
+
+        let model_data = ModelData::from_bytes(&mut byte_stream, None);
+
+
+        //println!("{}", model_data.version);
+
+        let textures = model_data.texture_names
+            .iter()
+            .map(|texture_name| texture_loader.get(&texture_name, texture_future).unwrap())
+            .collect();
+
+        let root_node = model_data.nodes
+            .iter()
+            .find(|node_data| node_data.node_name == model_data.root_node_name)
+            .expect("failed to find main node");
+
+        let root_node = Self::process_node_mesh(self.device.clone(), root_node, &model_data.nodes, &textures, &Matrix4::identity(), &model_data.root_node_name);
+
+
+
+
+
+        /*println!("{:?}", model_data);
+
 
         let version = byte_stream.version();
         let _animation_length = byte_stream.integer32();
@@ -108,7 +315,7 @@ impl ModelLoader {
             textures.push(texture);
         }
 
-        let main_node_name = byte_stream.string(40);
+        let root_node_name = byte_stream.string(40);
         let node_count = byte_stream.integer32();
 
         let mut nodes = Vec::new();
@@ -269,8 +476,10 @@ impl ModelLoader {
             }
         }
 
-        let root_node = nodes.iter().find(|node| node.name == *main_node_name).expect("failed to find root node").clone(); // fix cloning issue
-        let model = Arc::new(Model::new(root_node, bounding_box));
+        let root_node = nodes.iter().find(|node| node.name == *root_node_name).expect("failed to find root node").clone(); // fix cloning issue
+        */
+
+        let model = Arc::new(Model::new(root_node));
 
         self.cache.insert(model_file.to_string(), model.clone());
 

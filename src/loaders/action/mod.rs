@@ -113,7 +113,7 @@ impl ActionLoader {
         }
 
         let actions_data = ActionsData::from_bytes(&mut byte_stream, None);
-        println!("{:#?}", actions_data);
+        //println!("{:#?}", actions_data);
 
         let sprite = Rc::new(Actions {});
         self.cache.insert(path.to_string(), Rc::clone(&sprite));

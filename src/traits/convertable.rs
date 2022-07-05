@@ -1,4 +1,5 @@
 use crate::types::ByteStream;
+use crate::types::maths::*;
 
 pub trait ByteConvertable {
 
@@ -165,6 +166,25 @@ impl ByteConvertable for i64 {
     }
 }
 
+impl ByteConvertable for f32 {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none(), "i32 may not have a length hint");
+
+        let first = byte_stream.next();
+        let second = byte_stream.next();
+        let third = byte_stream.next();
+        let fourth = byte_stream.next();
+
+        f32::from_le_bytes([first, second, third, fourth])
+    }
+
+    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+        assert!(length_hint.is_none(), "i32 may not have a length hint");
+        self.to_ne_bytes().to_vec()
+    }
+}
+
 impl<T: Copy + Default + ByteConvertable, const SIZE: usize> ByteConvertable for [T; SIZE] {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
@@ -247,24 +267,66 @@ impl<T: ByteConvertable> ByteConvertable for Vec<T> {
     }
 }
 
-impl ByteConvertable for f32 {
+impl<T: ByteConvertable> ByteConvertable for Vector2<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none(), "i32 may not have a length hint");
+        assert!(length_hint.is_none(), "vector2 may not have a length hint");
 
-        let first = byte_stream.next();
-        let second = byte_stream.next();
-        let third = byte_stream.next();
-        let fourth = byte_stream.next();
+        let first = ByteConvertable::from_bytes(byte_stream, None);
+        let second = ByteConvertable::from_bytes(byte_stream, None);
 
-        f32::from_le_bytes([first, second, third, fourth])
-    }
-
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        assert!(length_hint.is_none(), "i32 may not have a length hint");
-        self.to_ne_bytes().to_vec()
+        Vector2::new(first, second)
     }
 }
+
+impl<T: ByteConvertable> ByteConvertable for Vector3<T> {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none(), "vector3 may not have a length hint");
+
+        let first = ByteConvertable::from_bytes(byte_stream, None);
+        let second = ByteConvertable::from_bytes(byte_stream, None);
+        let third = ByteConvertable::from_bytes(byte_stream, None);
+
+        Vector3::new(first, second, third)
+    }
+}
+
+impl<T: ByteConvertable> ByteConvertable for Vector4<T> {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none(), "vector4 may not have a length hint");
+
+        let first = ByteConvertable::from_bytes(byte_stream, None);
+        let second = ByteConvertable::from_bytes(byte_stream, None);
+        let third = ByteConvertable::from_bytes(byte_stream, None);
+        let fourth = ByteConvertable::from_bytes(byte_stream, None);
+
+        Vector4::new(first, second, third, fourth)
+    }
+}
+
+impl<T: ByteConvertable> ByteConvertable for Matrix3<T> {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none(), "matrix may not have a length hint");
+
+        let c0r0 = ByteConvertable::from_bytes(byte_stream, None);
+        let c0r1 = ByteConvertable::from_bytes(byte_stream, None);
+        let c0r2 = ByteConvertable::from_bytes(byte_stream, None);
+
+        let c1r0 = ByteConvertable::from_bytes(byte_stream, None);
+        let c1r1 = ByteConvertable::from_bytes(byte_stream, None);
+        let c1r2 = ByteConvertable::from_bytes(byte_stream, None);
+
+        let c2r0 = ByteConvertable::from_bytes(byte_stream, None);
+        let c2r1 = ByteConvertable::from_bytes(byte_stream, None);
+        let c2r2 = ByteConvertable::from_bytes(byte_stream, None);
+
+        Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2)
+    }
+}
+
 
 #[cfg(test)]
 mod default_string {

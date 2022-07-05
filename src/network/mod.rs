@@ -1096,8 +1096,8 @@ impl NetworkingSystem {
 
     pub fn new() -> Self {
 
-        //let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
-        let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
+        let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
+        //let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
         
         let character_stream = None;
         let map_stream = None;

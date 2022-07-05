@@ -29,7 +29,7 @@ use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
 use crate::types::maths::*;
-use crate::types::map::model::Node;
+use crate::types::map::model::Node2;
 use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
@@ -172,7 +172,7 @@ impl GeometryShadowRenderer {
             .draw(vertex_count as u32, 1, 0, 0).unwrap();
     }
 
-    pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node, transform: &Transform) {
+    pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node2, transform: &Transform) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -251,34 +251,11 @@ impl GeometryShadowRenderer {
 
         let vertex_count = node.vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
 
-        let mut world_matrix = Matrix4::from_translation(transform.position);
-        //world_matrix = world_matrix * Matrix4::from_nonuniform_scale(node.scale.x, node.scale.y, node.scale.z);
-
-        world_matrix = world_matrix * Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
-        world_matrix = world_matrix * Matrix4::from_nonuniform_scale(node.scale.x, node.scale.y, node.scale.z);
-
-        // if is_main {
-            // if is_only {
-                world_matrix = world_matrix * Matrix4::from_translation(vector3!(0.0, -node.bounding_box.smallest.y + node.bounding_box.offset.y, 0.0));
-            // }
-        //}
-
-        let mut rotation_matrix = Matrix4::from_angle_x(node.rotation.x) * Matrix4::from_angle_y(node.rotation.y) * Matrix4::from_angle_z(node.rotation.z);
-        rotation_matrix = rotation_matrix * Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);
-        rotation_matrix = rotation_matrix * transform.rotation_matrix;
-
-        world_matrix = world_matrix * rotation_matrix;
-
-        //if is_main && is_only
-            world_matrix = world_matrix * Matrix4::from_translation(-node.bounding_box.offset);
-        // } else {
-            //world_matrix = world_matrix * Matrix4::from_translation(node.offset_translation);
-        //}
-
-        let offset_matrix: Matrix4<f32> = node.offset_matrix.into();
-        world_matrix = world_matrix * offset_matrix;
-
-        //let (rotation_matrix, world_matrix) = camera.transform_matrix(transform);
+        let world_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
+            //* Matrix4::from_axis_angle(axis, angle)
+            * Matrix4::from_translation(transform.position)
+            * node.transform_matrix;
+        
         let constants = Constants {
             world: world_matrix.into(),
         };

@@ -7,7 +7,7 @@ use crate::graphics::Color;
 
 use crate::types::Version;
 
-#[derive(new)]
+#[derive(Clone, new)]
 pub struct ByteStream<'b> {
     data: &'b [u8],
     #[new(default)]

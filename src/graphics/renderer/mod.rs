@@ -10,7 +10,7 @@ mod debug;
 
 use derive_new::new;
 
-use cgmath::{ Vector4, Vector3, Vector2 };
+use cgmath::{ Vector4, Vector3, Vector2, Matrix4 };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryCommandBuffer, CommandBufferUsage, SubpassContents };
 use vulkano::device::{ Device, Queue };
@@ -30,7 +30,7 @@ use winit::window::Window;
 use crate::debug::*;
 use crate::graphics::*;
 use crate::loaders::TextureLoader;
-use crate::types::map::model::Node;
+use crate::types::map::model::Node2;
 
 use self::picker::PickerRenderer;
 use self::deferred::*;
@@ -414,7 +414,7 @@ impl Renderer {
 
     fn window_size_dependent_shadow_setup(device: Arc<Device>, render_pass: Arc<RenderPass>, framebuffer_count: usize) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>) {
         
-        let dimensions = [8092, 8096];
+        let dimensions = [8096, 8096];
         let buffer_usage = ImageUsage {
             sampled: true,
             depth_stencil_attachment: true,
@@ -638,7 +638,7 @@ impl Renderer {
         self.geometry_shadow_renderer.render(camera, shadow_builder, vertex_buffer, textures, transform);
     }
 
-    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node, transform: &Transform) {
+    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node2, transform: &Transform) {
         let current_frame = self.current_frame.as_mut().unwrap();
         self.geometry_renderer.render_node(camera, &mut current_frame.builder, node, transform);
 

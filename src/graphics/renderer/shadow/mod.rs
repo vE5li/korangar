@@ -76,6 +76,7 @@ impl GeometryShadowRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .depth_stencil_state(DepthStencilState::simple_depth_test())
+            //.rasterization_state(RasterizationState { cull_mode: StateMode::Fixed(CullMode::Front), ..Default::default() })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -172,7 +173,7 @@ impl GeometryShadowRenderer {
             .draw(vertex_count as u32, 1, 0, 0).unwrap();
     }
 
-    pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node, transform: &Transform) {
+    pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node, transform: &Transform, client_tick: u32) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -251,13 +252,21 @@ impl GeometryShadowRenderer {
 
         let vertex_count = node.vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
 
-        let world_matrix = //Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
-            //* Matrix4::from_axis_angle(axis, angle)
-             Matrix4::from_translation(transform.position)
-            * (Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z))
+        let animation_rotation_matrix = match node.rotation_keyframes.is_empty() {
+            true => Matrix4::identity(),
+            false => node.animaton_matrix(client_tick),
+        };
+
+        let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
+            * Matrix4::from_angle_x(-transform.rotation.x)
+            * Matrix4::from_angle_y(transform.rotation.y);
+
+        let world_matrix = Matrix4::from_translation(transform.position)
+            * rotation_matrix
             * Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
             * Matrix4::from_cols(vector4!(1.0, 0.0, 0.0, 0.0), vector4!(0.0, -1.0, 0.0, 0.0), vector4!(0.0, 0.0, 1.0, 0.0), vector4!(0.0, 0.0, 0.0, 1.0))
-            * node.transform_matrix;
+            * node.transform_matrix
+            * animation_rotation_matrix;
         
         let constants = Constants {
             world: world_matrix.into(),

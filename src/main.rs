@@ -541,7 +541,7 @@ fn main() {
 
                 renderer.geometry_pass();
 
-                map.render_geomitry(&mut renderer, current_camera, &render_settings);
+                map.render_geomitry(&mut renderer, current_camera, &render_settings, game_timer.get_client_tick());
 
                 if render_settings.show_entities {
                     entities.iter().for_each(|entity| entity.render(&mut renderer, current_camera));

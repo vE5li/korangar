@@ -109,14 +109,14 @@ impl Map {
         renderer.render_tiles(camera, self.tile_picker_vertex_buffer.clone());
     }
 
-    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings) {
+    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, client_tick: u32) {
 
         if render_settings.show_map {
             renderer.render_geomitry(camera, self.ground_vertex_buffer.clone(), &self.ground_textures, &Transform::new());
         }
 
         if render_settings.show_objects {
-            self.objects.iter().for_each(|object| object.render_geometry(renderer, camera));
+            self.objects.iter().for_each(|object| object.render_geometry(renderer, camera, client_tick));
         }
 
         #[cfg(feature = "debug")]

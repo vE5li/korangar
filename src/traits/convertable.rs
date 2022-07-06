@@ -272,8 +272,8 @@ impl<T: ByteConvertable> ByteConvertable for Vector2<T> {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "vector2 may not have a length hint");
 
-        let first = ByteConvertable::from_bytes(byte_stream, None);
-        let second = ByteConvertable::from_bytes(byte_stream, None);
+        let first = T::from_bytes(byte_stream, None);
+        let second = T::from_bytes(byte_stream, None);
 
         Vector2::new(first, second)
     }
@@ -284,9 +284,9 @@ impl<T: ByteConvertable> ByteConvertable for Vector3<T> {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "vector3 may not have a length hint");
 
-        let first = ByteConvertable::from_bytes(byte_stream, None);
-        let second = ByteConvertable::from_bytes(byte_stream, None);
-        let third = ByteConvertable::from_bytes(byte_stream, None);
+        let first = T::from_bytes(byte_stream, None);
+        let second = T::from_bytes(byte_stream, None);
+        let third = T::from_bytes(byte_stream, None);
 
         Vector3::new(first, second, third)
     }
@@ -297,12 +297,31 @@ impl<T: ByteConvertable> ByteConvertable for Vector4<T> {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "vector4 may not have a length hint");
 
-        let first = ByteConvertable::from_bytes(byte_stream, None);
-        let second = ByteConvertable::from_bytes(byte_stream, None);
-        let third = ByteConvertable::from_bytes(byte_stream, None);
-        let fourth = ByteConvertable::from_bytes(byte_stream, None);
+        let first = T::from_bytes(byte_stream, None);
+        let second = T::from_bytes(byte_stream, None);
+        let third = T::from_bytes(byte_stream, None);
+        let fourth = T::from_bytes(byte_stream, None);
 
         Vector4::new(first, second, third, fourth)
+    }
+}
+
+impl<T: ByteConvertable + std::fmt::Display> ByteConvertable for Quaternion<T> {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        assert!(length_hint.is_none(), "quaternion may not have a length hint");
+
+        let fourth = T::from_bytes(byte_stream, None);
+        let first = T::from_bytes(byte_stream, None);
+        let second = T::from_bytes(byte_stream, None);
+        let third = T::from_bytes(byte_stream, None);
+
+        println!("\nfirst: {}", first);
+        println!("second: {}", second);
+        println!("third: {}", third);
+        println!("fourth: {}", fourth);
+
+        Quaternion::new(first, second, third, fourth)
     }
 }
 
@@ -311,17 +330,17 @@ impl<T: ByteConvertable> ByteConvertable for Matrix3<T> {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "matrix may not have a length hint");
 
-        let c0r0 = ByteConvertable::from_bytes(byte_stream, None);
-        let c0r1 = ByteConvertable::from_bytes(byte_stream, None);
-        let c0r2 = ByteConvertable::from_bytes(byte_stream, None);
+        let c0r0 = T::from_bytes(byte_stream, None);
+        let c0r1 = T::from_bytes(byte_stream, None);
+        let c0r2 = T::from_bytes(byte_stream, None);
 
-        let c1r0 = ByteConvertable::from_bytes(byte_stream, None);
-        let c1r1 = ByteConvertable::from_bytes(byte_stream, None);
-        let c1r2 = ByteConvertable::from_bytes(byte_stream, None);
+        let c1r0 = T::from_bytes(byte_stream, None);
+        let c1r1 = T::from_bytes(byte_stream, None);
+        let c1r2 = T::from_bytes(byte_stream, None);
 
-        let c2r0 = ByteConvertable::from_bytes(byte_stream, None);
-        let c2r1 = ByteConvertable::from_bytes(byte_stream, None);
-        let c2r2 = ByteConvertable::from_bytes(byte_stream, None);
+        let c2r0 = T::from_bytes(byte_stream, None);
+        let c2r1 = T::from_bytes(byte_stream, None);
+        let c2r2 = T::from_bytes(byte_stream, None);
 
         Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2)
     }

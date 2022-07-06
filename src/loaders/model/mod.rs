@@ -22,10 +22,10 @@ pub struct PositionKeyframeData {
     pub position: Vector3<f32>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable)]
 pub struct RotationKeyframeData {
     pub frame: u32,
-    pub quaternions: Vector4<f32>,
+    pub quaternions: Quaternion<f32>,
 }
 
 #[allow(dead_code)]
@@ -177,7 +177,11 @@ impl ModelLoader {
         let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis, Rad(node.rotation_angle));
         let translation_matrix = Matrix4::from_translation(node.translation2);
 
-        let transform = translation_matrix * rotation_matrix * scale_matrix;
+        let transform = match node.rotation_keyframe_count > 0 {
+            true => translation_matrix * scale_matrix,
+            false => translation_matrix * rotation_matrix * scale_matrix,
+        };
+
         let box_transform = parent_matrix * translation_matrix * rotation_matrix * scale_matrix;
 
         (main, transform, box_transform)
@@ -211,7 +215,7 @@ impl ModelLoader {
         let vertices = NativeModelVertex::to_vertices(vertices);
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
-        Node::new(final_matrix, vertex_buffer, node_textures, child_nodes, current_node.scale)
+        Node::new(final_matrix, vertex_buffer, node_textures, child_nodes, current_node.rotation_keyframes.clone())
     }
 
     fn load(&mut self, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, String> {

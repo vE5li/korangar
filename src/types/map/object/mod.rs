@@ -23,8 +23,8 @@ impl Object {
         self.transform.position += offset;
     }
 
-    pub fn render_geometry(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        self.model.render_geometry(renderer, camera, &self.transform);
+    pub fn render_geometry(&self, renderer: &mut Renderer, camera: &dyn Camera, client_tick: u32) {
+        self.model.render_geometry(renderer, camera, &self.transform, client_tick);
     }
 
     //#[cfg(feature = "debug")]

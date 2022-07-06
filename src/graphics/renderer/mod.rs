@@ -638,14 +638,14 @@ impl Renderer {
         self.geometry_shadow_renderer.render(camera, shadow_builder, vertex_buffer, textures, transform);
     }
 
-    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node, transform: &Transform) {
+    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node, transform: &Transform, client_tick: u32) {
         let current_frame = self.current_frame.as_mut().unwrap();
-        self.geometry_renderer.render_node(camera, &mut current_frame.builder, node, transform);
+        self.geometry_renderer.render_node(camera, &mut current_frame.builder, node, transform, client_tick);
 
         current_frame.render_info.object_count += 1;
 
         let shadow_builder = current_frame.shadow_builder.as_mut().unwrap();
-        self.geometry_shadow_renderer.render_node(camera, shadow_builder, node, transform);
+        self.geometry_shadow_renderer.render_node(camera, shadow_builder, node, transform, client_tick);
     }
 
     pub fn render_entity(&mut self, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>) {

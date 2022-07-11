@@ -3,6 +3,7 @@ use cgmath::Vector2;
 #[derive(Clone, Debug)]
 pub enum UserEvent {
     Exit,
+    LogOut,
     CameraZoom(f32),
     CameraRotate(f32),
     ToggleFrameLimit,
@@ -50,6 +51,8 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     ToggleShowFramesPerSecond,
     #[cfg(feature = "debug")]
+    ToggleShowWireframe,
+    #[cfg(feature = "debug")]
     ToggleShowMap,
     #[cfg(feature = "debug")]
     ToggleShowObjects,
@@ -91,6 +94,8 @@ pub enum UserEvent {
     ToggleShowWaterBuffer,
     #[cfg(feature = "debug")]
     ToggleShowDepthBuffer,
+    #[cfg(feature = "debug")]
+    ToggleShowShadowBuffer,
     #[cfg(feature = "debug")]
     ToggleShowPickerBuffer,
 }

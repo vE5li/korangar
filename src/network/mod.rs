@@ -12,7 +12,8 @@ use std::io::prelude::*;
 use crate::debug::*;
 use crate::interface::windows::CharacterSelectionWindow;
 use crate::traits::ByteConvertable;
-use crate::types::ByteStream;
+use crate::types::{ ByteStream, ChatMessage };
+use crate::graphics::{ Color, ColorRGB, ColorBGR };
 
 pub trait Packet {
 
@@ -22,7 +23,6 @@ pub trait Packet {
 }
 
 /// An event triggered by the character server
-#[derive(Clone, Debug)]
 pub enum NetworkEvent {
     /// Add an entity to the list of entities that the client is aware of
     AddEntity(usize, usize, Vector2<usize>, usize),
@@ -36,6 +36,8 @@ pub enum NetworkEvent {
     ChangeMap(String, Vector2<usize>),
     /// Update the client side [tick counter](crate::system::GameTimer::client_tick) to keep server and client synchronized
     UpdataClientTick(u32),
+    /// New chat message for the client
+    ChatMessage(ChatMessage),
 }
 
 #[derive(Copy, Clone, Debug, ByteConvertable)]
@@ -114,14 +116,14 @@ pub struct WorldPosition {
 }
 
 impl WorldPosition {
-    
+
     pub fn to_vector(&self) -> Vector2<usize> {
         Vector2::new(self.x, self.y)
     }
 }
 
 impl ByteConvertable for WorldPosition {
-    
+
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none());
         let coordinates = byte_stream.slice(3);
@@ -154,14 +156,14 @@ pub struct WorldPosition2 {
 }
 
 impl WorldPosition2 {
-    
+
     pub fn to_vectors(&self) -> (Vector2<usize>, Vector2<usize>) {
         (Vector2::new(self.x1, self.y1), Vector2::new(self.x2, self.y2))
     }
 }
 
 impl ByteConvertable for WorldPosition2 {
-    
+
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none()); 
         let coordinates: Vec<usize> = byte_stream.slice(6).into_iter().map(|byte| byte as usize).collect();
@@ -575,7 +577,7 @@ struct MapTypePacket {
 #[header(0xc3, 0x01)]
 struct BroadcastMessagePacket {
     pub packet_length: u16,
-    pub font_color: u32,
+    pub font_color: ColorRGB,
     pub font_type: u16,
     pub font_size: u16,
     pub font_alignment: u16,
@@ -589,7 +591,7 @@ struct BroadcastMessagePacket {
 struct EntityMessagePacket {
     pub packet_length: u16,
     pub entity_id: u32,
-    pub color: u32,
+    pub color: ColorBGR,
     #[length_hint(self.packet_length - 12)]
     pub message: String,
 }
@@ -721,7 +723,7 @@ impl ByteConvertable for StatusType {
             53 => Self::SP_ASPD(u32::from_bytes(&mut byte_stream, None)),
             55 => Self::SP_JOBLEVEL(u32::from_bytes(&mut byte_stream, None)),
             99 => Self::SP_CARTINFO(u16::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-	    219 => Self::SP_POW(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)), 
+            219 => Self::SP_POW(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
             220 => Self::SP_STA(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
             221 => Self::SP_WIS(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
             222 => Self::SP_SPL(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
@@ -1059,7 +1061,7 @@ struct NetworkTimer {
 }
 
 impl NetworkTimer {
-    
+
     pub fn update(&mut self, elapsed_time: f64) -> bool {
         self.accumulator += Duration::from_secs_f64(elapsed_time);
         let reset = self.accumulator > self.period;
@@ -1098,7 +1100,7 @@ impl NetworkingSystem {
 
         let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
         //let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
-        
+
         let character_stream = None;
         let map_stream = None;
         let login_data = None;
@@ -1125,10 +1127,10 @@ impl NetworkingSystem {
         }
     }
 
-    pub fn login(&mut self) -> Result<CharacterSelectionWindow, String> {
+    pub fn log_in(&mut self) -> Result<CharacterSelectionWindow, String> {
 
         #[cfg(feature = "debug_network")]
-        let timer = Timer::new("login");
+        let timer = Timer::new("log in");
 
         self.send_packet_to_login_server(LoginServerLoginPacket::new("test_user".to_string(), "password".to_string()));
 
@@ -1198,6 +1200,17 @@ impl NetworkingSystem {
         timer.stop();
 
         Ok(CharacterSelectionWindow::new(Rc::clone(&self.characters), Rc::clone(&self.move_request), Rc::clone(&self.changed), character_server_login_success_packet.normal_slot_count as usize))
+    }
+
+    pub fn log_out(&mut self) -> Result<(), String> {
+
+        #[cfg(feature = "debug_network")]
+        let timer = Timer::new("log out");
+
+        #[cfg(feature = "debug_network")]
+        timer.stop();
+
+        Ok(())
     }
 
     fn send_packet_to_login_server(&mut self, packet: impl Packet + Debug) {
@@ -1481,13 +1494,16 @@ impl NetworkingSystem {
             while !byte_stream.is_empty() {
                 
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
-                    println!("broadcast message: {}", packet.message);
+                    let chat_message = ChatMessage::new(packet.message, packet.font_color.into());
+                    events.push(NetworkEvent::ChatMessage(chat_message));
 
                 } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
-                    println!("server message: {}", packet.message);
+                    let chat_message = ChatMessage::new(packet.message, Color::monochrome(255));
+                    events.push(NetworkEvent::ChatMessage(chat_message));
 
                 } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
-                    println!("entity message: {}", packet.message);
+                    let chat_message = ChatMessage::new(packet.message, packet.color.into());
+                    events.push(NetworkEvent::ChatMessage(chat_message));
 
                 } else if let Ok(_packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
 

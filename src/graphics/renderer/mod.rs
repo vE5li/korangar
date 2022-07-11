@@ -10,7 +10,7 @@ mod debug;
 
 use derive_new::new;
 
-use cgmath::{ Vector4, Vector3, Vector2, Matrix4 };
+use cgmath::{ Vector4, Vector3, Vector2 };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryCommandBuffer, CommandBufferUsage, SubpassContents };
 use vulkano::device::{ Device, Queue };
@@ -30,7 +30,7 @@ use winit::window::Window;
 use crate::debug::*;
 use crate::graphics::*;
 use crate::loaders::TextureLoader;
-use crate::types::map::model::Node;
+use crate::types::map::model::{ Node, BoundingBox };
 
 use self::picker::PickerRenderer;
 use self::deferred::*;
@@ -65,7 +65,7 @@ pub struct Renderer {
     entity_renderer: EntityRenderer,
     water_renderer: WaterRenderer,
     #[cfg(feature = "debug")]
-    area_renderer: AreaRenderer,
+    box_renderer: BoxRenderer,
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     water_light_renderer: WaterLightRenderer,
@@ -75,7 +75,7 @@ pub struct Renderer {
     interface_renderer: InterfaceRenderer,
     dynamic_sprite_renderer: DynamicSpriteRenderer,
     #[cfg(feature = "debug")]
-    debug_renderer: DebugRenderer,
+    buffer_renderer: BufferRenderer,
     swapchain: Arc<Swapchain<Window>>,
     render_pass: Arc<RenderPass>,
     framebuffers: Vec<Arc<Framebuffer>>,
@@ -219,11 +219,17 @@ impl Renderer {
                     store: Store,
                     format: Format::R32_UINT,
                     samples: 1,
+                },
+                depth: {
+                    load: Clear,
+                    store: DontCare,
+                    format: Format::D16_UNORM,
+                    samples: 1,
                 }
             },
             pass: {
                 color: [color],
-                depth_stencil: {}
+                depth_stencil: {depth}
             }
         )
         .unwrap();
@@ -254,7 +260,7 @@ impl Renderer {
         let rectangle_renderer = RectangleRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
         let sprite_renderer = SpriteRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let area_renderer = AreaRenderer::new(device.clone(), deferred_subpass, viewport.clone());
+        let box_renderer = BoxRenderer::new(device.clone(), deferred_subpass, viewport.clone());
         let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let water_light_renderer = WaterLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
@@ -262,7 +268,7 @@ impl Renderer {
         let interface_renderer = InterfaceRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let dynamic_sprite_renderer = DynamicSpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let debug_renderer = DebugRenderer::new(device.clone(), lighting_subpass, viewport, texture_loader, &mut texture_future);
+        let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass, viewport, texture_loader, &mut texture_future);
         let geometry_shadow_renderer = GeometryShadowRenderer::new(device.clone(), shadow_render_pass.first_subpass(), shadow_viewport);
 
         #[cfg(feature = "debug")]
@@ -307,7 +313,7 @@ impl Renderer {
             entity_renderer,
             water_renderer,
             #[cfg(feature = "debug")]
-            area_renderer,
+            box_renderer,
             ambient_light_renderer,
             directional_light_renderer,
             water_light_renderer,
@@ -317,7 +323,7 @@ impl Renderer {
             interface_renderer,
             dynamic_sprite_renderer,
             #[cfg(feature = "debug")]
-            debug_renderer,
+            buffer_renderer,
             swapchain,
             render_pass,
             framebuffers,
@@ -415,13 +421,14 @@ impl Renderer {
     fn window_size_dependent_shadow_setup(device: Arc<Device>, render_pass: Arc<RenderPass>, framebuffer_count: usize) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>) {
         
         let dimensions = [8096, 8096];
-        let buffer_usage = ImageUsage {
+
+        let shadow_buffer_usage = ImageUsage {
             sampled: true,
             depth_stencil_attachment: true,
             ..ImageUsage::none()
         };
 
-        let directional_shadow_maps: Vec<ImageBuffer> = (0..framebuffer_count).map(|_| ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D32_SFLOAT, buffer_usage).unwrap())).unwrap()).collect();
+        let directional_shadow_maps: Vec<ImageBuffer> = (0..framebuffer_count).map(|_| ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D32_SFLOAT, shadow_buffer_usage).unwrap())).unwrap()).collect();
 
         let framebuffers = directional_shadow_maps.iter().map(|image| {
             Framebuffer::start(render_pass.clone())
@@ -435,10 +442,16 @@ impl Renderer {
     fn window_size_dependent_picker_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>, Vec<Arc<CpuAccessibleBuffer<[u32]>>>) {
         
         let dimensions = images[0].dimensions().width_height();
+
         let image_usage = ImageUsage {
             sampled: true,
             transfer_source: true,
             color_attachment: true,
+            ..ImageUsage::none()
+        };
+
+        let depth_buffer_usage = ImageUsage {
+            depth_stencil_attachment: true,
             ..ImageUsage::none()
         };
 
@@ -447,8 +460,11 @@ impl Renderer {
             .collect();
 
         let framebuffers = picker_images.iter().map(|image| {
+            let depth_buffer = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D16_UNORM, depth_buffer_usage).unwrap())).unwrap();
+
             Framebuffer::start(render_pass.clone())
                 .add(image.clone()).unwrap()
+                .add(depth_buffer).unwrap()
                 .build().unwrap()
         }).collect();
 
@@ -486,7 +502,7 @@ impl Renderer {
         self.water_renderer.update(delta_time);
     }
 
-    pub fn start_frame(&mut self, surface: &Arc<Surface<Window>>, clear_interface: bool) {
+    pub fn start_frame(&mut self, surface: &Arc<Surface<Window>>, render_settings: &RenderSettings, clear_interface: bool) {
 
         self.previous_frame_end
             .as_mut()
@@ -519,13 +535,13 @@ impl Renderer {
             let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
 
             self.picker_renderer.recreate_pipeline(self.device.clone(), self.picker_render_pass.clone().first_subpass(), new_viewport.clone());
-            self.geometry_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
+            self.geometry_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone(), render_settings.show_wireframe);
             self.entity_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             self.water_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             self.rectangle_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             self.sprite_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             #[cfg(feature = "debug")]
-            self.area_renderer.recreate_pipeline(self.device.clone(), deferred_subpass, new_viewport.clone());
+            self.box_renderer.recreate_pipeline(self.device.clone(), deferred_subpass, new_viewport.clone());
             self.ambient_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             self.directional_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             self.water_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
@@ -533,7 +549,7 @@ impl Renderer {
             self.interface_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             self.dynamic_sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
             #[cfg(feature = "debug")]
-            self.debug_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport);
+            self.buffer_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport);
 
             self.swapchain = new_swapchain;
             self.diffuse_buffer = new_diffuse_buffer;
@@ -579,7 +595,7 @@ impl Renderer {
         let mut shadow_builder = CommandBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
         shadow_builder.begin_render_pass(self.shadow_framebuffers[image_num].clone(), SubpassContents::Inline, shadow_clear_values).unwrap();
         
-        let picker_clear_values: Vec<ClearValue> = vec![[0u32].into()];
+        let picker_clear_values: Vec<ClearValue> = vec![[0u32].into(), 1f32.into()];
         let mut picker_builder = CommandBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
         picker_builder.begin_render_pass(self.picker_framebuffers[image_num].clone(), SubpassContents::Inline, picker_clear_values).unwrap();
 
@@ -666,9 +682,9 @@ impl Renderer {
         self.ambient_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.screen_vertex_buffer.clone(), color);
     }
 
-    pub fn directional_light(&mut self, camera: &dyn Camera, direction: Vector3<f32>, color: Color) {
+    pub fn directional_light(&mut self, camera: &dyn Camera, direction: Vector3<f32>, color: Color, intensity: f32) {
         let current_frame = self.current_frame.as_mut().unwrap();
-        self.directional_light_renderer.render(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.directional_shadow_maps[current_frame.image_num].clone(), self.screen_vertex_buffer.clone(), direction, color);
+        self.directional_light_renderer.render(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.directional_shadow_maps[current_frame.image_num].clone(), self.screen_vertex_buffer.clone(), direction, color, intensity);
     }
 
     pub fn water_light(&mut self, camera: &dyn Camera, water_level: f32) {
@@ -746,20 +762,20 @@ impl Renderer {
 
     #[cfg(feature = "debug")]
     pub fn render_map_tiles(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, transform: &Transform) { // remove transform
-        let tile_textures = self.debug_renderer.tile_textures.clone();
+        let tile_textures = self.buffer_renderer.tile_textures.clone();
         self.render_geomitry(camera, vertex_buffer, &tile_textures, transform);
     }
 
     #[cfg(feature = "debug")]
     pub fn render_pathing(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, transform: &Transform) { // remove transform
-        let step_textures = self.debug_renderer.step_textures.clone();
+        let step_textures = self.buffer_renderer.step_textures.clone();
         self.render_geomitry(camera, vertex_buffer, &step_textures, transform);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_bounding_box(&mut self, camera: &dyn Camera, transform: &Transform) {
+    pub fn render_bounding_box(&mut self, camera: &dyn Camera, transform: &Transform, bounding_box: &BoundingBox) {
         let current_frame = self.current_frame.as_mut().unwrap();
-        self.area_renderer.render(&mut current_frame.builder, camera, transform);
+        self.box_renderer.render(&mut current_frame.builder, camera, transform, bounding_box);
     }
 
     #[cfg(feature = "debug")]
@@ -794,7 +810,7 @@ impl Renderer {
             true => Color::rgb(100, 100, 255),
             false => Color::rgb(255, 100, 100),
         };
-        self.render_debug_marker(camera, self.debug_renderer.object_texture.clone(), position, color);
+        self.render_debug_marker(camera, self.buffer_renderer.object_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
@@ -803,7 +819,7 @@ impl Renderer {
             true => color.invert(),
             false => color,
         };
-        self.render_debug_marker(camera, self.debug_renderer.light_texture.clone(), position, color);
+        self.render_debug_marker(camera, self.buffer_renderer.light_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
@@ -812,7 +828,7 @@ impl Renderer {
             true => Color::monochrome(60),
             false => Color::monochrome(150),
         };
-        self.render_debug_marker(camera, self.debug_renderer.sound_texture.clone(), position, color);
+        self.render_debug_marker(camera, self.buffer_renderer.sound_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
@@ -821,7 +837,7 @@ impl Renderer {
             true => Color::rgb(200, 100, 255),
             false => Color::rgb(100, 255, 100),
         };
-        self.render_debug_marker(camera, self.debug_renderer.effect_texture.clone(), position, color);
+        self.render_debug_marker(camera, self.buffer_renderer.effect_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
@@ -830,7 +846,7 @@ impl Renderer {
             true => Color::rgb(255, 200, 20),
             false => Color::rgb(255, 20, 20),
         };
-        self.render_debug_marker(camera, self.debug_renderer.particle_texture.clone(), position, color);
+        self.render_debug_marker(camera, self.buffer_renderer.particle_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
@@ -839,18 +855,28 @@ impl Renderer {
             true => Color::rgb(255, 160, 255),
             false => Color::rgb(255, 100, 255),
         };
-        self.render_debug_marker(camera, self.debug_renderer.entity_texture.clone(), position, color);
+        self.render_debug_marker(camera, self.buffer_renderer.entity_texture.clone(), position, color);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_buffers(&mut self, camera: &dyn Camera, render_settings: &RenderSettings) {
+    pub fn render_buffers(&mut self, render_settings: &RenderSettings) {
 
         if let Some(fence) = self.picker_fence.take() {
             fence.wait(None).unwrap()
         }
 
         let current_frame = self.current_frame.as_mut().unwrap();
-        self.debug_renderer.render_buffers(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.water_buffer.clone(), self.depth_buffer.clone(), self.picker_images[current_frame.image_num].clone(), self.screen_vertex_buffer.clone(), render_settings);
+        self.buffer_renderer.render_buffers(
+            &mut current_frame.builder,
+            self.diffuse_buffer.clone(),
+            self.normal_buffer.clone(),
+            self.water_buffer.clone(),
+            self.depth_buffer.clone(),
+            self.directional_shadow_maps[current_frame.image_num].clone(),
+            self.picker_images[current_frame.image_num].clone(),
+            self.screen_vertex_buffer.clone(),
+            render_settings,
+        );
     }
 
     pub fn render_interface(&mut self, render_settings: &RenderSettings) {

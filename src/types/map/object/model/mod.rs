@@ -3,14 +3,18 @@ mod shading;
 
 use derive_new::new;
 use crate::graphics::{ Renderer, Camera, Transform };
+use crate::loaders::ModelData;
 
-pub use self::node::Node;
-pub use self::node::BoundingBox;
+pub use self::node::{ Node, BoundingBox };
 pub use self::shading::ShadingType;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
     pub root_node: Node,
+    #[cfg(feature = "debug")]
+    pub model_data: ModelData,
+    #[cfg(feature = "debug")]
+    pub bounding_box: BoundingBox,
 }
 
 impl Model {
@@ -19,14 +23,8 @@ impl Model {
         self.root_node.render_geometry(renderer, camera, root_transform, client_tick);
     }
 
-    //#[cfg(feature = "debug")]
-    //pub fn render_bounding_box(&self, renderer: &mut Renderer, camera: &dyn Camera, root_transform: &Transform) {
-    //    //let combined_transform = *root_transform + Transform::node_scale(self.bounding_box.range);
-    //    renderer.render_bounding_box(camera, &root_transform);
-    //}
-
-    //#[cfg(feature = "debug")]
-    //pub fn render_node_bounding_boxes(&self, renderer: &mut Renderer, camera: &dyn Camera, root_transform: &Transform) {
-    //    self.root_node.render_bounding_box(renderer, camera, root_transform);
-    //}
+    #[cfg(feature = "debug")]
+    pub fn render_bounding_box(&self, renderer: &mut Renderer, camera: &dyn Camera, root_transform: &Transform) {
+        renderer.render_bounding_box(camera, &root_transform, &self.bounding_box);
+    }
 }

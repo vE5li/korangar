@@ -1,14 +1,14 @@
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "shaders/debug_vertex_shader.glsl"
+        path: "shaders/buffer_vertex_shader.glsl"
     }
 }
 
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "shaders/debug_fragment_shader.glsl"
+        path: "shaders/buffer_fragment_shader.glsl"
     }
 }
 
@@ -31,7 +31,7 @@ use crate::loaders::TextureLoader;
 
 use self::fragment_shader::ty::Constants;
 
-pub struct DebugRenderer {
+pub struct BufferRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
@@ -46,7 +46,7 @@ pub struct DebugRenderer {
     pub step_textures: Vec<Texture>,
 }
 
-impl DebugRenderer {
+impl BufferRenderer {
 
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Self {
 
@@ -101,7 +101,7 @@ impl DebugRenderer {
             .unwrap()
     }
 
-    pub fn render_buffers(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, water_buffer: ImageBuffer, depth_buffer: ImageBuffer, picker_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, render_settings: &RenderSettings) {
+    pub fn render_buffers(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, water_buffer: ImageBuffer, depth_buffer: ImageBuffer, shadow_buffer: ImageBuffer, picker_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, render_settings: &RenderSettings) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -112,14 +112,15 @@ impl DebugRenderer {
             WriteDescriptorSet::image_view(2, water_buffer),
             WriteDescriptorSet::image_view(3, depth_buffer),
             WriteDescriptorSet::image_view_sampler(4, picker_buffer, self.nearest_sampler.clone()),
+            WriteDescriptorSet::image_view_sampler(5, shadow_buffer, self.nearest_sampler.clone()),
         ]).unwrap(); 
 
         let constants = Constants {
-            screen_to_world_matrix: camera.get_screen_to_world_matrix().into(),
             show_diffuse_buffer: render_settings.show_diffuse_buffer as u32,
             show_normal_buffer: render_settings.show_normal_buffer as u32,
             show_water_buffer: render_settings.show_water_buffer as u32,
             show_depth_buffer: render_settings.show_depth_buffer as u32,
+            show_shadow_buffer: render_settings.show_shadow_buffer as u32,
             show_picker_buffer: render_settings.show_picker_buffer as u32,
         };
 

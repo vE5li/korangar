@@ -25,6 +25,8 @@ impl PrototypeWindow for ColorWindow {
             cell!(Slider::new(unsafe { &(*self.color_pointer).green as *const u8 }, 0, 255, self.change_event)),
             cell!(Headline::new("blue".to_string(), Headline::DEFAULT_SIZE)),
             cell!(Slider::new(unsafe { &(*self.color_pointer).blue as *const u8 }, 0, 255, self.change_event)),
+            cell!(Headline::new("alpha".to_string(), Headline::DEFAULT_SIZE)),
+            cell!(Slider::new(unsafe { &(*self.color_pointer).alpha as *const u8 }, 0, 255, self.change_event)),
         ];
 
         let elements: Vec<ElementCell> = vec![

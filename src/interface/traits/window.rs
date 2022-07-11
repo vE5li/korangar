@@ -5,7 +5,9 @@ use crate::interface::traits::Element;
 
 pub trait Window {
 
-    fn window_class_matches(&self, other_window_class: &str) -> bool;
+    fn get_window_class(&self) -> Option<&str>;
+
+    fn has_transparency(&self, theme: &Theme) -> bool;
 
     fn resolve(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size) -> (Option<&str>, Vector2<f32>, Size);
 

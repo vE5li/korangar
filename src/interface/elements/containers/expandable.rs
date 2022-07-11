@@ -106,7 +106,7 @@ impl Element for Expandable {
 
     fn render(&self, renderer: &mut Renderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
-        let clip_size = vector2!(f32::min(clip_size.x, absolute_position.x + self.cached_size.x), f32::min(clip_size.y, absolute_position.y + self.cached_size.y));
+        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
         let background_color = match second_theme {
             true => *theme.expandable.second_background_color,

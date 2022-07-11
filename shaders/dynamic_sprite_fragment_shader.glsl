@@ -11,11 +11,11 @@ layout(push_constant) uniform Constants {
     vec2 screen_size;
     vec2 texture_position;
     vec2 texture_size;
-    vec3 color;
+    vec4 color;
 } constants;
 
 void main() {
-    fragment_color = texture(sprite_texture, texture_coordinates) * vec4(constants.color, 1.0);
+    fragment_color = texture(sprite_texture, texture_coordinates) * constants.color;
 
     //fragment_color.r = pow(fragment_color.r, 1.75);
     //fragment_color.g = pow(fragment_color.g, 1.75);

@@ -1,5 +1,12 @@
-use cgmath::{ Matrix4, Vector4, Vector3, Vector2, Point3, Rad, InnerSpace, SquareMatrix, Array };
+use std::sync::Arc;
+use cgmath::EuclideanSpace;
+
+use crate::types::maths::*;
+
 use crate::graphics::Transform;
+use crate::types::Entity;
+use crate::types::map::Map;
+use super::RenderSettings;
 
 use super::{ Camera, SmoothedValue };
 
@@ -15,6 +22,7 @@ pub struct PlayerCamera {
     screen_to_world_matrix: Matrix4<f32>,
     view_angle: SmoothedValue,
     zoom: SmoothedValue,
+    aspect_ratio: f32,
 }
 
 impl PlayerCamera {
@@ -29,6 +37,7 @@ impl PlayerCamera {
             screen_to_world_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             view_angle: SmoothedValue::new(0.0, 0.01, 15.0),
             zoom: SmoothedValue::new(400.0, 0.01, 5.0),
+            aspect_ratio: 0.0,
         }
     }
 
@@ -74,8 +83,8 @@ impl PlayerCamera {
 impl Camera for PlayerCamera {
 
     fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
-        let aspect_ratio = window_size.x as f32 / window_size.y as f32;
-        self.projection_matrix = cgmath::perspective(Rad(0.2617), aspect_ratio, 1.0, 10000.0);
+        self.aspect_ratio = window_size.x as f32 / window_size.y as f32;
+        self.projection_matrix = cgmath::perspective(Rad(0.2617), self.aspect_ratio, 1.0, 2000.0);
 
         let camera_position = self.camera_position();
         self.view_matrix = Matrix4::look_at_rh(camera_position, self.focus_position, self.look_up_vector);
@@ -92,9 +101,8 @@ impl Camera for PlayerCamera {
         let translation_matrix = Matrix4::from_translation(transform.position);
         let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x) * Matrix4::from_angle_y(transform.rotation.y) * Matrix4::from_angle_z(transform.rotation.z);
         let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
-        
 
-        translation_matrix * rotation_matrix * scale_matrix * transform.offset_translation * transform.offset_matrix 
+        translation_matrix * rotation_matrix * scale_matrix 
     }
 
     fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
@@ -144,15 +152,30 @@ impl Camera for PlayerCamera {
 
     fn get_light_matrix(&self) -> Matrix4<f32> {
 
-        let bounds = vector4!(-600.0, 600.0, -600.0, 600.0);
-        let z_near = 0.01;
-        let z_far = 1000.0;
-        let position = vector3!(500.0, 500.0, -100.0);
-        let look_at = vector3!(500.0, 400.0, 0.0);
-
+        let bounds = vector4!(-300.0, 300.0, -300.0, 300.0);
+        let z_near = -500.0;
+        let z_far = 500.0;
+        let position = self.focus_position + vector3!(0.0, 300.0, -100.0);
+        let look_at = self.focus_position + vector3!(0.0, 0.0, 0.0);
         let projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, z_near, z_far);
-        let view_matrix = Matrix4::look_at_rh(Point3::new(position.x, position.y, position.z), Point3::new(look_at.x, look_at.y, look_at.z), vector3!(0.0, -1.0, 0.0));
+        let view_matrix = Matrix4::look_at_rh(position, look_at, vector3!(0.0, 1.0, 0.0));
 
-        projection_matrix * view_matrix        
+        projection_matrix * view_matrix
     }
+
+    //fn render_scene(&self, map: Arc<Map>, entities: Arc<Vec<Arc<Entity>>>, render_settings: &RenderSettings, client_tick: u32) {
+    //
+    //    if render_settings.show_map {
+    //        renderer.render_geomitry(self, map.get_ground_vertex_buffer(), &map.get_ground_textures(), &Transform::new());
+    //    }
+
+    //    if render_settings.show_objects {
+    //        self.objects.iter().for_each(|object| object.render_geometry(renderer, camera, client_tick));
+    //    }
+
+    //    #[cfg(feature = "debug")]
+    //    if render_settings.show_map_tiles {
+    //        renderer.render_map_tiles(camera, self.tile_vertex_buffer.clone(), &Transform::new());
+    //    }
+    //}
 }

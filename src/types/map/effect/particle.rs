@@ -6,7 +6,6 @@ use crate::graphics::{ Renderer, Camera };
 use crate::graphics::Color;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
-#[window_title("particle")]
 pub struct Particle {
     pub position: Vector3<f32>,
     pub light_color: Color,

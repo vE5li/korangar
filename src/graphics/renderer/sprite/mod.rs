@@ -117,7 +117,7 @@ impl DynamicSpriteRenderer {
             screen_size: [screen_size.x, screen_size.y],
             texture_position: [texture_position.x, texture_position.y],
             texture_size: [texture_size.x, texture_size.y],
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
         };
 
         builder

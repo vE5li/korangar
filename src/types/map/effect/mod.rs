@@ -8,7 +8,7 @@ use crate::types::maths::*;
 pub use self::particle::Particle;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
-#[window_title("effect source")]
+#[window_title("Effect Source")]
 pub struct EffectSource {
     pub name: String,
     pub position: Vector3<f32>,

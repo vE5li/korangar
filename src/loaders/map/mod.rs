@@ -148,13 +148,13 @@ impl MapLoader {
         let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(4);
-        
+
         if &magic != "GRSW" {
             return Err(format!("failed to read magic number from {}", resource_file));
         }
 
         let resource_version = byte_stream.version();
- 
+
         if !resource_version.equals_or_above(1, 2) {
             return Err(format!("invalid resource version {}", resource_version));
         }
@@ -210,10 +210,10 @@ impl MapLoader {
             light_settings.light_latitude = light_latitude as isize;
             light_settings.diffuse_color = diffuse_color;
             light_settings.ambient_color = ambient_color;
-        }
 
-        if resource_version.equals_or_above(1, 7) {
-            let _unknown = byte_stream.float32();
+            if resource_version.equals_or_above(1, 7) {
+                light_settings.light_intensity = byte_stream.float32();
+            }
         }
 
         if resource_version.equals_or_above(1, 6) {

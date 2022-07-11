@@ -28,11 +28,8 @@ use vulkano::render_pass::Subpass;
 
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
-
-
 use crate::graphics::*;
 
-//use self::vertex_shader::ty::Constants;
 use self::vertex_shader::ty::Matrices;
 
 pub struct PickerRenderer {

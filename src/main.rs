@@ -2,6 +2,7 @@
 #![feature(option_zip)]
 #![feature(let_else)]
 #![feature(adt_const_params)]
+#![feature(arc_unwrap_or_clone)]
 
 #[macro_use]
 extern crate korangar_procedural;
@@ -40,6 +41,7 @@ mod interface;
 mod network;
 mod database;
 
+use std::sync::Arc;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vulkano::device::Device;
@@ -56,11 +58,11 @@ use database::Database;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::Entity;
+use crate::types::{ Entity, ChatMessage };
 use crate::input::{ InputSystem, UserEvent };
 use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
 use crate::loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader, SpriteLoader, ActionLoader };
-use crate::graphics::{ Renderer, RenderSettings };
+use crate::graphics::{ Renderer, RenderSettings, Color };
 use crate::graphics::camera::*;
 use crate::interface::*;
 use network::{ NetworkingSystem, NetworkEvent };
@@ -141,7 +143,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let mut map = map_loader.get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw").expect("failed to load initial map");
+    let mut map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw").expect("failed to load initial map"));
 
     // interesting: ma_zif07, ama_dun01
 
@@ -190,7 +192,7 @@ fn main() {
 
     let mut networking_system = NetworkingSystem::new();
 
-    match networking_system.login() { 
+    match networking_system.log_in() { 
         Ok(character_selection_window) => interface.open_window(&character_selection_window),
         Err(message) => interface.open_window(&ErrorWindow::new(message)),
     }
@@ -200,7 +202,9 @@ fn main() {
 
     let mut texture_future = now(device.clone()).boxed();
 
-    let mut entities: Vec<Entity> = Vec::new();
+    let mut entities = Arc::new(Vec::new());
+
+    let chat_messages = Rc::new(RefCell::new(vec![ChatMessage::new("welcome to korangar pre alpha!".to_string(), Color::rgb(220, 170, 220))]));
 
     let database = Database::new();
 
@@ -255,48 +259,67 @@ fn main() {
                 let (user_events, hovered_element) = input_system.user_events(&mut renderer, &mut interface, &render_settings);
 
                 let mut texture_future = now(device.clone()).boxed();
+                let mut entities_copy = std::borrow::Cow::Borrowed(&*entities);
 
                 for event in network_events {
                     match event {
 
                         NetworkEvent::AddEntity(entity_id, job_id, position, movement_speed) => {
-                            entities.push(Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed));
+                            entities_copy.to_mut().push(Arc::new(Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed)));
                         }
 
                         NetworkEvent::RemoveEntity(entity_id) => {
-                            entities.retain(|entity| entity.entity_id != entity_id);
+                            entities_copy.to_mut().retain(|entity| entity.entity_id != entity_id);
                         }
 
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
-                            let entity = entities.iter_mut().find(|entity| entity.entity_id == entity_id).expect("failed to find entity");
-                            entity.move_from_to(&map, position_from, position_to, starting_timestamp);
+                            let entities = entities_copy.to_mut();
+                            let entity_index = entities.iter().position(|entity| entity.entity_id == entity_id).expect("failed to find entity");
+                            let mut entity = Clone::clone(&*entities[entity_index]);
 
+                            entity.move_from_to(&map, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
                             entity.generate_steps_vertex_buffer(device.clone(), &map);
+
+                            entities[entity_index] = Arc::new(entity);
                         }
 
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
-                            entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
+                            let entities = entities_copy.to_mut();
+                            let mut entity = Clone::clone(&*entities[0]);
 
+                            entity.move_from_to(&map, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
-                            entities[0].generate_steps_vertex_buffer(device.clone(), &map);
+                            entity.generate_steps_vertex_buffer(device.clone(), &map);
+
+                            entities[0] = Arc::new(entity);
                         }
 
                         NetworkEvent::ChangeMap(map_name, player_position) => {
+                            let entities = entities_copy.to_mut();
 
                             while entities.len() > 1 {
                                 entities.pop(); 
                             }
 
-                            map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
+                            map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap());
 
-                            entities[0].set_position(&map, player_position);
-                            player_camera.set_focus_point(entities[0].position);
+                            let mut player = Arc::unwrap_or_clone(entities.remove(0));
+
+                            player.set_position(&map, player_position);
+                            player_camera.set_focus_point(player.position);
+
+                            entities.push(Arc::new(player));
+
                             networking_system.map_loaded();
                         }
 
                         NetworkEvent::UpdataClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
+                        }
+
+                        NetworkEvent::ChatMessage(message) => {
+                            chat_messages.borrow_mut().push(message);
                         }
                     }
                 }
@@ -306,6 +329,8 @@ fn main() {
 
                         UserEvent::Exit => *control_flow = ControlFlow::Exit,
 
+                        UserEvent::LogOut => networking_system.log_out().unwrap(),
+
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
 
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
@@ -314,6 +339,7 @@ fn main() {
                             render_settings.toggle_frame_limit();
                             renderer.set_frame_limit(render_settings.frame_limit);
                             interface.schedule_rerender();
+                            interface.open_window(&debug_camera.light_variables);
                         },
 
                         UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
@@ -332,13 +358,14 @@ fn main() {
                                 Ok((map_name, player_position, character_id, job_id, movement_speed, client_tick)) => {
 
                                     interface.close_window_with_class("character_selection"); // FIND A NICER WAY TO GET THE CLASS NAME
+                                    interface.open_window(&PrototypeChatWindow::new(Rc::clone(&chat_messages)));
 
-                                    map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
+                                    map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap());
 
                                     let player = Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
 
                                     player_camera.set_focus_point(player.position);
-                                    entities.push(player);
+                                    entities_copy.to_mut().push(Arc::new(player));
 
                                     networking_system.map_loaded();
                                     game_timer.set_client_tick(client_tick);
@@ -378,7 +405,7 @@ fn main() {
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapDataWindow => interface.open_window(std::ops::Deref::deref(&map)),
+                        UserEvent::OpenMapDataWindow => interface.open_window(map.to_prototype_window()),
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::new()),
@@ -418,6 +445,12 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowFramesPerSecond => render_settings.toggle_show_frames_per_second(),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowWireframe => {
+                            render_settings.toggle_show_wireframe();
+                            renderer.invalidate_swapchain();
+                        },
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
@@ -483,6 +516,9 @@ fn main() {
                         UserEvent::ToggleShowDepthBuffer => render_settings.toggle_show_depth_buffer(),
 
                         #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowShadowBuffer => render_settings.toggle_show_shadow_buffer(),
+
+                        #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPickerBuffer => render_settings.toggle_show_picker_buffer(),
                     }
                 }
@@ -492,7 +528,18 @@ fn main() {
                     .map(|_| texture_future.then_signal_fence_and_flush().unwrap().into())
                     .unwrap_or_default();
 
-                entities.iter_mut().for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
+                for entity_index in 0..entities_copy.len() {
+                    if entities_copy[entity_index].has_updates() {
+                        let entities = entities_copy.to_mut();
+                        let mut entity = Clone::clone(&*entities[entity_index]);
+                        entity.update(&map, delta_time as f32, game_timer.get_client_tick());
+                        entities[entity_index] = Arc::new(entity);
+                    }
+                }
+
+                if let std::borrow::Cow::Owned(new_entities) = entities_copy {
+                    entities = Arc::new(new_entities);
+                }
 
                 if !entities.is_empty() {
                     player_camera.set_focus_point(entities[0].position);
@@ -500,7 +547,7 @@ fn main() {
 
                 player_camera.update(delta_time);
 
-                map.update(delta_time as f32);
+                //map.update(delta_time as f32);
 
                 renderer.update(delta_time as f32);
 
@@ -508,7 +555,7 @@ fn main() {
 
                 networking_system.changes_applied();
 
-                renderer.start_frame(&surface, renderer_interface);
+                renderer.start_frame(&surface, &render_settings, renderer_interface);
 
                 if let Some(fence) = texture_fence {
                     fence.wait(None).unwrap();
@@ -525,13 +572,15 @@ fn main() {
 
                 current_camera.generate_view_projection(renderer.get_window_size());
 
+                // RENDER TO THE PICKER BUFFER INSTEAD?
                 #[cfg(feature = "debug")]
-                let hovered_marker = map.hovered_marker(&mut renderer, current_camera, &render_settings, input_system.mouse_position());
+                let hovered_marker = map.hovered_marker(&mut renderer, current_camera, &render_settings, &entities, input_system.mouse_position());
 
+                // RENDER TO THE PICKER BUFFER INSTEAD?
                 #[cfg(feature = "debug")]
                 if let Some(marker) = hovered_marker {
                     if input_system.unused_left_click() {
-                        let prototype_window = map.resolve_marker(marker);
+                        let prototype_window = map.resolve_marker(&entities, marker);
                         interface.open_window(prototype_window);
                         input_system.set_interface_clicked();
                     }
@@ -541,7 +590,18 @@ fn main() {
 
                 renderer.geometry_pass();
 
+                //current_camera.render_scene(/*&mut renderer,*/ Arc::clone(&map), Arc::clone(&entities), &render_settings, game_timer.get_client_tick());
+
+                //thread || {
+                //    directional_camera.render_scene(&mut shadow_renderer, &map, &entities, &render_settings, game_timer.get_client_tick());
+                //}
+
                 map.render_geomitry(&mut renderer, current_camera, &render_settings, game_timer.get_client_tick());
+
+                #[cfg(feature = "debug")]
+                if let Some(marker) = hovered_marker {
+                    map.render_marker_box(&mut renderer, current_camera, marker);
+                }
 
                 if render_settings.show_entities {
                     entities.iter().for_each(|entity| entity.render(&mut renderer, current_camera));
@@ -563,7 +623,7 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 match render_settings.show_buffers() {
-                    true => renderer.render_buffers(current_camera, &render_settings),
+                    true => renderer.render_buffers(&render_settings),
                     false => map.render_lights(&mut renderer, current_camera, &render_settings),
                 }
 
@@ -571,12 +631,9 @@ fn main() {
                 map.render_lights(&mut renderer, current_camera, &render_settings);
 
                 #[cfg(feature = "debug")]
-                map.render_markers(&mut renderer, current_camera, &render_settings, hovered_marker);
+                map.render_markers(&mut renderer, current_camera, &render_settings, &entities, hovered_marker);
 
                 #[cfg(feature = "debug")]
-                if render_settings.show_entity_markers {
-                    entities.iter().for_each(|entity| entity.render_marker(&mut renderer, current_camera));
-                }
 
                 renderer.render_interface(&render_settings);
 

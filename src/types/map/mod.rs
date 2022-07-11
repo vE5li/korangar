@@ -4,10 +4,11 @@ mod light;
 mod sound;
 mod effect;
 
+use std::sync::Arc;
 use derive_new::new;
 use cgmath::Vector2;
 
-use crate::types::Version;
+use crate::types::{ Version, Entity };
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::traits::PrototypeWindow;
@@ -44,6 +45,8 @@ pub struct LightSettings {
     pub diffuse_color: Color,
     #[new(value = "Color::monochrome(255)")]
     pub ambient_color: Color,
+    #[new(value = "1.0")]
+    pub light_intensity: f32,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -53,6 +56,7 @@ pub enum MarkerIdentifier {
     SoundSource(usize),
     EffectSource(usize),
     Particle(usize, usize),
+    Entity(usize),
 }
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
@@ -139,7 +143,7 @@ impl Map {
         }
 
         if render_settings.show_directional_light {
-            renderer.directional_light(camera, cgmath::Vector3::new(0.0, -1.0, 1.0), self.light_settings.diffuse_color);
+            renderer.directional_light(camera, cgmath::Vector3::new(0.0, -1.0, 1.0), self.light_settings.diffuse_color, self.light_settings.light_intensity);
         }
 
         if render_settings.show_point_lights {
@@ -155,8 +159,12 @@ impl Map {
         }
     }
 
+    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow {
+        self
+    }
+
     #[cfg(feature = "debug")]
-    pub fn hovered_marker(&self, renderer: &Renderer, camera: &dyn Camera, render_settings: &RenderSettings, mouse_position: Vector2<f32>) -> Option<MarkerIdentifier> {
+    pub fn hovered_marker(&self, renderer: &Renderer, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Arc<Vec<Arc<Entity>>>, mouse_position: Vector2<f32>) -> Option<MarkerIdentifier> {
 
         let mut nearest_marker = None;
         let mut smallest_distance = f32::MAX;
@@ -206,22 +214,32 @@ impl Map {
             }
         }
 
+        if render_settings.show_entity_markers {
+            for (index, entity) in entities.iter().enumerate() {
+                if let Some(new_distance) = entity.hovered(renderer, camera, mouse_position, smallest_distance) {
+                    nearest_marker = Some(MarkerIdentifier::Entity(index));
+                    smallest_distance = new_distance;
+                }
+            }
+        }
+
         nearest_marker
     }
 
     #[cfg(feature = "debug")]
-    pub fn resolve_marker(&self, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
+    pub fn resolve_marker<'a>(&'a self, entities: &'a Arc<Vec<Arc<Entity>>>, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
         match marker_identifier {
             MarkerIdentifier::Object(index) => &self.objects[index],
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
             MarkerIdentifier::Particle(index, particle_index) => &self.effect_sources[index].particles[particle_index],
+            MarkerIdentifier::Entity(index) => entities[index].as_ref(),
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_markers(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, marker_identifier: Option<MarkerIdentifier>) {
+    pub fn render_markers(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Arc<Vec<Arc<Entity>>>, marker_identifier: Option<MarkerIdentifier>) {
 
         if render_settings.show_object_markers {
             self.objects.iter().enumerate().for_each(|(index, object)| object.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Object(x)) if x == index)));
@@ -243,6 +261,21 @@ impl Map {
             for (index, effect_source) in self.effect_sources.iter().enumerate() {
                 effect_source.particles.iter().enumerate().for_each(|(particle_index, particle)| particle.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Particle(x, y)) if x == index && y == particle_index)));
             }
+        }
+
+        if render_settings.show_entity_markers {
+            entities.iter().enumerate().for_each(|(index, entity)| entity.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index)));
+        }
+    }
+
+    pub fn render_marker_box(&self, renderer: &mut Renderer, camera: &dyn Camera, marker_identifier: MarkerIdentifier) {
+        match marker_identifier {
+            MarkerIdentifier::Object(index) => self.objects[index].render_bounding_box(renderer, camera),
+            MarkerIdentifier::LightSource(_index) => {},
+            MarkerIdentifier::SoundSource(_index) => {}
+            MarkerIdentifier::EffectSource(_index) => {},
+            MarkerIdentifier::Particle(_index, _particle_index) => {},
+            MarkerIdentifier::Entity(_index) => {},
         }
     }
 }

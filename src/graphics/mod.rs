@@ -51,3 +51,12 @@ pub const WATER_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     alpha_source: BlendFactor::One,
     alpha_destination: BlendFactor::One,
 };
+
+pub const INTERFACE_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
+    color_op: BlendOp::Add,
+    color_source: BlendFactor::SrcAlpha,
+    color_destination: BlendFactor::OneMinusSrcAlpha,
+    alpha_op: BlendOp::Add,
+    alpha_source: BlendFactor::SrcAlpha,
+    alpha_destination: BlendFactor::DstAlpha,
+};

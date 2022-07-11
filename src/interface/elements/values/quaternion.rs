@@ -2,14 +2,14 @@ use derive_new::new;
 use num::Zero;
 use std::fmt::Display;
 
-use crate::types::maths::Vector2;
+use crate::types::maths::Quaternion;
 use crate::graphics::Renderer;
 use crate::interface::traits::Element;
 use crate::interface::types::*;
 
 #[derive(new)]
-pub struct Vector2Value<T: Display> {
-    value: Vector2<T>,
+pub struct QuaternionValue<T: Display> {
+    value: Quaternion<T>,
     #[new(default)]
     cached_values: String,
     #[new(value = "Size::zero()")]
@@ -18,13 +18,13 @@ pub struct Vector2Value<T: Display> {
     cached_position: Position,
 }
 
-impl<T: Display> Element for Vector2Value<T> {
+impl<T: Display> Element for QuaternionValue<T> {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
         let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
-        self.cached_values = format!("{:.1}, {:.1}", self.value.x, self.value.y);
+        self.cached_values = format!("{:.1}, {:.1}, {:.1} - {:.1}", self.value.v.x, self.value.v.y, self.value.v.z, self.value.s);
     }
 
     fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, _hovered_element: Option<&dyn Element>, _second_theme: bool) {

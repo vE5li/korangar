@@ -5,7 +5,7 @@ use crate::graphics::{ Renderer, Camera };
 use crate::types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
-#[window_title("sound source")]
+#[window_title("Sound Source")]
 pub struct SoundSource {
     pub name: String,
     pub sound_file: String,

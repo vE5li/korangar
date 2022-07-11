@@ -18,7 +18,7 @@ use crate::loaders::GameFileLoader;
 use crate::types::Version;
 use crate::graphics::{Texture, Renderer};
 
-#[derive(Clone)]
+#[derive(Clone, PrototypeElement)]
 pub struct Sprite {
     pub textures: Vec<Texture>,
 }

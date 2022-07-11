@@ -9,7 +9,7 @@ layout(push_constant) uniform Constants {
     vec2 screen_size;
     vec2 texture_position;
     vec2 texture_size;
-    vec3 color;
+    vec4 color;
 } constants;
 
 void main() {

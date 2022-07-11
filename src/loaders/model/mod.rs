@@ -11,25 +11,26 @@ use vulkano::sync::GpuFuture;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::types::{ ByteStream, Version };
+use crate::types::maths::multiply_matrix4_and_vector3;
 use crate::types::map::model::{ Model, Node, BoundingBox };
 use crate::graphics::{ NativeModelVertex, Texture };
 use crate::loaders::{ TextureLoader, GameFileLoader };
 use crate::traits::ByteConvertable;
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct PositionKeyframeData {
     pub frame: u32,
     pub position: Vector3<f32>,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub struct RotationKeyframeData {
     pub frame: u32,
     pub quaternions: Quaternion<f32>,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct FaceData {
     pub vertex_position_indices: [u16; 3],
     pub texture_coordinate_indices: [u16; 3],
@@ -39,14 +40,14 @@ pub struct FaceData {
     pub smooth_group: i32,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct TextureCoordinateData {
     #[version_equals_or_above(1, 2)]
     pub color: Option<u32>,
     pub coordinates: Vector2<f32>, // possibly wrong if version < 1.2
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct NodeData {
     #[length_hint(40)]
     pub node_name: String,
@@ -55,6 +56,7 @@ pub struct NodeData {
     pub texture_count: u32,
     #[repeating(self.texture_count)]
     pub texture_indices: Vec<u32>,
+    #[hidden_element]
     pub offset_matrix: Matrix3<f32>,
     pub translation1: Vector3<f32>,
     pub translation2: Vector3<f32>,
@@ -79,7 +81,7 @@ pub struct NodeData {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct ModelData {
     //#[version]
     //pub version: Version,
@@ -87,7 +89,7 @@ pub struct ModelData {
     pub shade_type: u32,
     #[version_equals_or_above(1, 4)]
     pub alpha: Option<u8>,
-    pub resorved: [u8; 16],
+    pub reserved: [u8; 16],
     pub texture_count: u32,
     #[repeating(self.texture_count)]
     #[length_hint(40)]
@@ -108,11 +110,6 @@ pub struct ModelLoader {
 }
 
 impl ModelLoader {
-
-    fn multiply_matrix4_and_vector3(matrix: &Matrix4<f32>, vector: Vector3<f32>) -> Vector3<f32> {
-        let adjusted_vector = matrix * vector4!(vector, 1.0);
-        vector3!(adjusted_vector.x, adjusted_vector.y, adjusted_vector.z)
-    }
 
     fn add_vertices(native_vertices: &mut Vec<NativeModelVertex>, vertex_positions: &Vec<Vector3<f32>>, texture_coordinates: &Vec<Vector2<f32>>, texture_index: u16, reverse_vertices: bool, reverse_normal: bool) {
 
@@ -150,7 +147,7 @@ impl ModelLoader {
                 .iter()
                 .copied()
                 .map(|index| node.vertex_positions[index as usize])
-                .map(|position| Self::multiply_matrix4_and_vector3(main_matrix, position))
+                .map(|position| multiply_matrix4_and_vector3(main_matrix, position))
                 .collect();
 
             let texture_coordinates: Vec<Vector2<f32>> = face.texture_coordinate_indices
@@ -187,16 +184,17 @@ impl ModelLoader {
         (main, transform, box_transform)
     }
 
-    fn process_node_mesh(device: Arc<Device>, current_node: &NodeData, nodes: &Vec<NodeData>, textures: &Vec<Texture>, parent_matrix: &Matrix4<f32>, root_node_name: &str, reverse_order: bool) -> Node {
+    fn process_node_mesh(device: Arc<Device>, current_node: &NodeData, nodes: &Vec<NodeData>, textures: &Vec<Texture>, parent_matrix: &Matrix4<f32>, main_bounding_box: &mut BoundingBox, root_node_name: &str, reverse_order: bool) -> Node {
 
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
         let vertices = Self::make_vertices(current_node, &main_matrix, reverse_order);
 
-        let m = box_transform_matrix * main_matrix;
-        let bounding_box = BoundingBox::new_new(current_node.vertex_positions.iter().map(|position| Self::multiply_matrix4_and_vector3(&m, *position)));
+        let box_matrix = box_transform_matrix * main_matrix;
+        let bounding_box = BoundingBox::new(current_node.vertex_positions.iter().map(|position| multiply_matrix4_and_vector3(&box_matrix, *position)));
+        main_bounding_box.extend(&bounding_box);
 
         let final_matrix = match current_node.node_name.as_str() == root_node_name {
-            true => Matrix4::from_translation(-vector3!(bounding_box.center().x, bounding_box.biggest.y, bounding_box.center().z)) * transform_matrix, // cache the center call ?
+            true => Matrix4::from_translation(-vector3!(bounding_box.center().x, bounding_box.biggest.y, bounding_box.center().z)) * transform_matrix,
             false => transform_matrix,
         };
 
@@ -209,7 +207,7 @@ impl ModelLoader {
         let child_nodes = nodes
             .iter()
             .filter(|node| node.parent_node_name == current_node.node_name)
-            .map(|node| Self::process_node_mesh(device.clone(), node, nodes, textures, &box_transform_matrix, root_node_name, reverse_order))
+            .map(|node| Self::process_node_mesh(device.clone(), node, nodes, textures, &box_transform_matrix, main_bounding_box, root_node_name, reverse_order))
             .collect();
 
         let vertices = NativeModelVertex::to_vertices(vertices);
@@ -249,8 +247,9 @@ impl ModelLoader {
             .find(|node_data| node_data.node_name == model_data.root_node_name)
             .expect("failed to find main node");
 
-        let root_node = Self::process_node_mesh(self.device.clone(), root_node, &model_data.nodes, &textures, &Matrix4::identity(), &model_data.root_node_name, reverse_order);
-        let model = Arc::new(Model::new(root_node));
+        let mut bounding_box = BoundingBox::uninitialized();
+        let root_node = Self::process_node_mesh(self.device.clone(), root_node, &model_data.nodes, &textures, &Matrix4::identity(), &mut bounding_box, &model_data.root_node_name, reverse_order);
+        let model = Arc::new(Model::new(root_node, #[cfg(feature = "debug")] model_data, #[cfg(feature = "debug")] bounding_box));
 
         self.cache.insert((model_file.to_string(), reverse_order), model.clone());
 

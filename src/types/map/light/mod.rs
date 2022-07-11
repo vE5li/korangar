@@ -4,7 +4,7 @@ use crate::graphics::{ Renderer, Camera, Color };
 use crate::types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
-#[window_title("light source")]
+#[window_title("Light Source")]
 pub struct LightSource {
     pub name: String,
     pub position: Vector3<f32>,

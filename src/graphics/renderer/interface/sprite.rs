@@ -58,13 +58,13 @@ impl SpriteRenderer {
         ];
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
-        
+
         let nearest_sampler = Sampler::start(device.clone())
             .filter(Filter::Nearest)
             .address_mode(SamplerAddressMode::MirroredRepeat)
             .build()
             .unwrap();
-        
+
         let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::MirroredRepeat)
@@ -95,7 +95,7 @@ impl SpriteRenderer {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
- 
+
         let sampler = match smooth {
             true => self.linear_sampler.clone(),
             false => self.nearest_sampler.clone(),
@@ -103,7 +103,7 @@ impl SpriteRenderer {
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::image_view_sampler(0, texture, sampler),
-        ]).unwrap(); 
+        ]).unwrap();
 
         let constants = Constants {
             screen_position: screen_position.into(),
@@ -111,7 +111,7 @@ impl SpriteRenderer {
             clip_size: clip_size.into(),
             texture_position: texture_position.into(),
             texture_size: texture_size.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
             _dummy0: [0, 0, 0, 0, 0, 0, 0, 0],
         };
 

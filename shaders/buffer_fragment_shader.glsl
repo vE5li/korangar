@@ -10,15 +10,20 @@ layout(input_attachment_index = 2, set = 0, binding = 2) uniform subpassInputMS 
 layout(input_attachment_index = 3, set = 0, binding = 3) uniform subpassInputMS depth_in;
 
 layout(set = 0, binding = 4) uniform usampler2D picker_buffer;
+layout(set = 0, binding = 5) uniform sampler2D shadow_buffer;
 
 layout(push_constant) uniform Constants {
-    mat4 screen_to_world_matrix;
     bool show_diffuse_buffer;
     bool show_normal_buffer;
     bool show_water_buffer;
     bool show_depth_buffer;
+    bool show_shadow_buffer;
     bool show_picker_buffer;
 } constants;
+
+float linearize(in float rawValue, in float zNear, in float zFar) {
+    return (2.0 * zNear) / (zFar + zNear - rawValue * (zFar - zNear));
+}
 
 void main() {
 
@@ -41,26 +46,18 @@ void main() {
 
     if (constants.show_depth_buffer) {
         float depth = subpassLoad(depth_in, 0).x;
+        output_color += linearize(depth, 1.0, 2000.0);
+    }
 
-        if (depth < 1.0) {
-            vec4 pixel_position_world_space = constants.screen_to_world_matrix * vec4(position, depth, 1.0);
-            output_color += pixel_position_world_space.w;
-        }
+    if (constants.show_shadow_buffer) {
+        float depth = texture(shadow_buffer, position * 0.5 + 0.5).x;
+        output_color += depth;
     }
 
     if (constants.show_picker_buffer) {
         uint picker = texture(picker_buffer, position * 0.5 + 0.5).r;
         output_color += vec3(picker);
     }
-
-    //if (constants.show_directional_shadow_map) {
-    //    float depth = subpassLoad(directional_shadow_map_in).x;
-
-    //    if (depth < 1.0) {
-    //        vec4 pixel_position_world_space = constants.screen_to_world_matrix * vec4(position, depth, 1.0);
-    //        output_color += pixel_position_world_space.w;
-    //    }
-    //}
 
     fragment_color = vec4(output_color, 1.0);
 }

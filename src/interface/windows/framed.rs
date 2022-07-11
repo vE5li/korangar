@@ -49,8 +49,12 @@ impl FramedWindow {
 
 impl Window for FramedWindow {
 
-    fn window_class_matches(&self, other_window_class: &str) -> bool {
-        self.window_class.as_ref().map_or(false, |window_class| window_class == other_window_class)
+    fn get_window_class(&self) -> Option<&str> {
+        self.window_class.as_ref().map(|window_class| window_class.as_str())
+    }
+
+    fn has_transparency(&self, theme: &Theme) -> bool {
+        theme.window.background_color.alpha != 255
     }
 
     fn resolve(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size) -> (Option<&str>, Vector2<f32>, Size) {

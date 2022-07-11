@@ -10,7 +10,7 @@ use crate::traits::ByteConvertable;
 use crate::loaders::GameFileLoader;
 use crate::types::Version;
 
-#[derive(Clone)]
+#[derive(Clone, PrototypeElement)]
 pub struct Actions {}
 
 #[derive(Debug, ByteConvertable)]

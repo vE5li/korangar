@@ -8,6 +8,7 @@ mod error;
 #[cfg(feature = "debug")]
 mod maps;
 mod character_selection;
+mod chat;
 
 pub use self::framed::FramedWindow;
 pub use self::menu::MenuWindow;
@@ -19,3 +20,4 @@ pub use self::error::ErrorWindow;
 #[cfg(feature = "debug")]
 pub use self::maps::MapsWindow;
 pub use self::character_selection::CharacterSelectionWindow;
+pub use self::chat::*;

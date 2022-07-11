@@ -23,7 +23,7 @@ impl WindowCache {
 
             #[cfg(feature = "debug")]
             print_debug!("failed to load window cache from {}filename{}. creating empty cache", MAGENTA, NONE);
-            
+
             Default::default()
         })
     }
@@ -38,7 +38,7 @@ impl WindowCache {
             .and_then(|data| ron::from_str(&data).ok())
             .map(|entries| Self { entries })
     }
-    
+
     pub fn save(&self) {
 
         #[cfg(feature = "debug")]

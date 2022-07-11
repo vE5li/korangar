@@ -43,6 +43,10 @@ pub struct RenderSettings {
     #[toggle]
     #[cfg(feature = "debug")]
     #[new(default)]
+    pub show_wireframe: bool,
+    #[toggle]
+    #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_object_markers: bool,
     #[toggle]
     #[cfg(feature = "debug")]
@@ -91,6 +95,10 @@ pub struct RenderSettings {
     #[toggle]
     #[cfg(feature = "debug")]
     #[new(default)]
+    pub show_shadow_buffer: bool,
+    #[toggle]
+    #[cfg(feature = "debug")]
+    #[new(default)]
     pub show_picker_buffer: bool,
 }
 
@@ -98,6 +106,6 @@ pub struct RenderSettings {
 impl RenderSettings {
 
     pub fn show_buffers(&self) -> bool {
-        self.show_diffuse_buffer || self.show_normal_buffer || self.show_water_buffer || self.show_depth_buffer || self.show_picker_buffer
+        self.show_diffuse_buffer || self.show_normal_buffer || self.show_water_buffer || self.show_depth_buffer || self.show_shadow_buffer || self.show_picker_buffer
     }
 }

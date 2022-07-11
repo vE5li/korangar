@@ -27,18 +27,12 @@ impl ByteConvertable for u16 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "u16 may not have a length hint");
-
-        let mut value = 0;
-
-        value |= byte_stream.next() as u16;
-        value |= (byte_stream.next() as u16) << 8;
-
-        value
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         assert!(length_hint.is_none(), "u16 may not have a length hint");
-        vec![*self as u8, (*self >> 8) as u8]
+        self.to_le_bytes().to_vec()
     }
 }
 
@@ -46,20 +40,12 @@ impl ByteConvertable for u32 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "u32 may not have a length hint");
-
-        let mut value = 0;
-
-        value |= byte_stream.next() as u32;
-        value |= (byte_stream.next() as u32) << 8;
-        value |= (byte_stream.next() as u32) << 16;
-        value |= (byte_stream.next() as u32) << 24;
-
-        value
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         assert!(length_hint.is_none(), "u32 may not have a length hint");
-        vec![*self as u8, (*self >> 8) as u8, (*self >> 16) as u8, (*self >> 24) as u8]
+        self.to_le_bytes().to_vec()
     }
 }
 
@@ -67,24 +53,12 @@ impl ByteConvertable for u64 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "u64 may not have a length hint");
-
-        let mut value = 0;
-
-        value |= byte_stream.next() as u64;
-        value |= (byte_stream.next() as u64) << 8;
-        value |= (byte_stream.next() as u64) << 16;
-        value |= (byte_stream.next() as u64) << 24;
-        value |= (byte_stream.next() as u64) << 32;
-        value |= (byte_stream.next() as u64) << 40;
-        value |= (byte_stream.next() as u64) << 48;
-        value |= (byte_stream.next() as u64) << 56;
-
-        value
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         assert!(length_hint.is_none(), "u64 may not have a length hint");
-        vec![*self as u8, (*self >> 8) as u8, (*self >> 16) as u8, (*self >> 24) as u8, (*self >> 32) as u8, (*self >> 40) as u8, (*self >> 48) as u8, (*self >> 56) as u8]
+        self.to_le_bytes().to_vec()
     }
 }
 
@@ -105,18 +79,12 @@ impl ByteConvertable for i16 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "i16 may not have a length hint");
-
-        let mut value = 0;
-
-        value |= byte_stream.next() as i16;
-        value |= (byte_stream.next() as i16) << 8;
-
-        value
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         assert!(length_hint.is_none(), "i16 may not have a length hint");
-        vec![*self as u8, (*self >> 8) as u8]
+        self.to_le_bytes().to_vec()
     }
 }
 
@@ -124,20 +92,12 @@ impl ByteConvertable for i32 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "i32 may not have a length hint");
-
-        let mut value = 0;
-
-        value |= byte_stream.next() as i32;
-        value |= (byte_stream.next() as i32) << 8;
-        value |= (byte_stream.next() as i32) << 16;
-        value |= (byte_stream.next() as i32) << 24;
-
-        value
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         assert!(length_hint.is_none(), "i32 may not have a length hint");
-        vec![*self as u8, (*self >> 8) as u8, (*self >> 16) as u8, (*self >> 24) as u8]
+        self.to_le_bytes().to_vec()
     }
 }
 
@@ -145,24 +105,12 @@ impl ByteConvertable for i64 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "i64 may not have a length hint");
-
-        let mut value = 0;
-
-        value |= byte_stream.next() as i64;
-        value |= (byte_stream.next() as i64) << 8;
-        value |= (byte_stream.next() as i64) << 16;
-        value |= (byte_stream.next() as i64) << 24;
-        value |= (byte_stream.next() as i64) << 32;
-        value |= (byte_stream.next() as i64) << 40;
-        value |= (byte_stream.next() as i64) << 48;
-        value |= (byte_stream.next() as i64) << 56;
-
-        value
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
         assert!(length_hint.is_none(), "i64 may not have a length hint");
-        vec![*self as u8, (*self >> 8) as u8, (*self >> 16) as u8, (*self >> 24) as u8, (*self >> 32) as u8, (*self >> 40) as u8, (*self >> 48) as u8, (*self >> 56) as u8]
+        self.to_le_bytes().to_vec()
     }
 }
 
@@ -306,7 +254,7 @@ impl<T: ByteConvertable> ByteConvertable for Vector4<T> {
     }
 }
 
-impl<T: ByteConvertable + std::fmt::Display> ByteConvertable for Quaternion<T> {
+impl<T: ByteConvertable> ByteConvertable for Quaternion<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "quaternion may not have a length hint");
@@ -315,11 +263,6 @@ impl<T: ByteConvertable + std::fmt::Display> ByteConvertable for Quaternion<T> {
         let first = T::from_bytes(byte_stream, None);
         let second = T::from_bytes(byte_stream, None);
         let third = T::from_bytes(byte_stream, None);
-
-        println!("\nfirst: {}", first);
-        println!("second: {}", second);
-        println!("third: {}", third);
-        println!("fourth: {}", fourth);
 
         Quaternion::new(first, second, third, fourth)
     }
@@ -345,7 +288,6 @@ impl<T: ByteConvertable> ByteConvertable for Matrix3<T> {
         Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2)
     }
 }
-
 
 #[cfg(test)]
 mod default_string {

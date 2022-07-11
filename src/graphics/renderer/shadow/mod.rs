@@ -136,6 +136,31 @@ impl GeometryShadowRenderer {
             false => texture0.clone(),
         };
 
+        let texture10 = match textures.len() > 10 {
+            true => textures[10].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture11 = match textures.len() > 11 {
+            true => textures[11].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture12 = match textures.len() > 12 {
+            true => textures[12].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture13 = match textures.len() > 13 {
+            true => textures[13].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture14 = match textures.len() > 14 {
+            true => textures[14].clone(),
+            false => texture0.clone(),
+        };
+
         let view_projection_matix = camera.get_light_matrix();
         let matrices = Matrices {
             view_projection: view_projection_matix.into(),
@@ -156,6 +181,11 @@ impl GeometryShadowRenderer {
                 texture7 as Arc<dyn ImageViewAbstract + 'static>,
                 texture8 as Arc<dyn ImageViewAbstract + 'static>,
                 texture9 as Arc<dyn ImageViewAbstract + 'static>,
+                texture10 as Arc<dyn ImageViewAbstract + 'static>,
+                texture11 as Arc<dyn ImageViewAbstract + 'static>,
+                texture12 as Arc<dyn ImageViewAbstract + 'static>,
+                texture13 as Arc<dyn ImageViewAbstract + 'static>,
+                texture14 as Arc<dyn ImageViewAbstract + 'static>,
             ])
         ]).unwrap(); 
 
@@ -227,6 +257,31 @@ impl GeometryShadowRenderer {
             false => texture0.clone(),
         };
 
+        let texture10 = match node.textures.len() > 10 {
+            true => node.textures[10].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture11 = match node.textures.len() > 11 {
+            true => node.textures[11].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture12 = match node.textures.len() > 12 {
+            true => node.textures[12].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture13 = match node.textures.len() > 13 {
+            true => node.textures[13].clone(),
+            false => texture0.clone(),
+        };
+
+        let texture14 = match node.textures.len() > 14 {
+            true => node.textures[14].clone(),
+            false => texture0.clone(),
+        };
+
         let view_projection_matix = camera.get_light_matrix();
         let matrices = Matrices {
             view_projection: view_projection_matix.into(),
@@ -247,6 +302,11 @@ impl GeometryShadowRenderer {
                 texture7 as Arc<dyn ImageViewAbstract + 'static>,
                 texture8 as Arc<dyn ImageViewAbstract + 'static>,
                 texture9 as Arc<dyn ImageViewAbstract + 'static>,
+                texture10 as Arc<dyn ImageViewAbstract + 'static>,
+                texture11 as Arc<dyn ImageViewAbstract + 'static>,
+                texture12 as Arc<dyn ImageViewAbstract + 'static>,
+                texture13 as Arc<dyn ImageViewAbstract + 'static>,
+                texture14 as Arc<dyn ImageViewAbstract + 'static>,
             ])
         ]).unwrap(); 
 

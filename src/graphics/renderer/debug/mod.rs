@@ -1,5 +1,5 @@
-mod area;
+mod r#box;
 mod buffer;
 
-pub use self::area::AreaRenderer;
-pub use self::buffer::DebugRenderer; // BufferRenderer;
+pub use self::r#box::BoxRenderer;
+pub use self::buffer::BufferRenderer; // BufferRenderer;

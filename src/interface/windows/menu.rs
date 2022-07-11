@@ -36,6 +36,7 @@ impl PrototypeWindow for MenuWindow {
             cell!(DebugButton::new("theme viewer", UserEvent::OpenThemeViewerWindow, true)),
             #[cfg(feature = "debug")]
             cell!(DebugButton::new("profiler", UserEvent::OpenProfilerWindow, true)),
+            cell!(Button::new("log out", UserEvent::LogOut, true)),
             cell!(Button::new("exit korangar", UserEvent::Exit, true)),
         ];
 

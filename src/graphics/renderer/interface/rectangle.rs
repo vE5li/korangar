@@ -71,7 +71,7 @@ impl RectangleRenderer {
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend_alpha())
+            .color_blend_state(ColorBlendState::new(1).blend(INTERFACE_ATTACHMENT_BLEND))
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -93,7 +93,7 @@ impl RectangleRenderer {
             screen_size: screen_size.into(),
             clip_size: clip_size.into(),
             corner_radius: corner_radius.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
             _dummy0: [0, 0, 0, 0, 0, 0, 0, 0],
         };
 

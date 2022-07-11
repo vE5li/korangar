@@ -18,6 +18,7 @@ fn general_expandable() -> ElementCell {
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("debug camera", UserEvent::ToggleUseDebugCamera, use_debug_camera),
         render_state_button!("show fps", UserEvent::ToggleShowFramesPerSecond, show_frames_per_second),
+        render_state_button!("show wireframe", UserEvent::ToggleShowWireframe, show_wireframe),
     ];
 
     cell!(Expandable::new("general".to_string(), buttons, true))
@@ -87,6 +88,7 @@ fn buffers_expandable() -> ElementCell {
         render_state_button!("normal buffer", UserEvent::ToggleShowNormalBuffer, show_normal_buffer),
         render_state_button!("water buffer", UserEvent::ToggleShowWaterBuffer, show_water_buffer),
         render_state_button!("depth buffer", UserEvent::ToggleShowDepthBuffer, show_depth_buffer),
+        render_state_button!("shadow buffer", UserEvent::ToggleShowShadowBuffer, show_shadow_buffer),
         render_state_button!("picker buffer", UserEvent::ToggleShowPickerBuffer, show_picker_buffer),
     ];
 

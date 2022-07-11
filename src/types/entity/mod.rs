@@ -11,13 +11,14 @@ use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 #[cfg(feature = "debug")]
 use crate::graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
 use crate::graphics::{ Renderer, Camera, Texture };
-use crate::types::map::Map;
+use crate::types::map::{ Map, MarkerIdentifier };
 use crate::loaders::{ TextureLoader, SpriteLoader, ActionLoader };
 use crate::loaders::{ Sprite, Actions};
 use crate::database::Database;
 
-#[derive(new)]
+#[derive(Clone, new, PrototypeElement)]
 struct Movement {
+    #[hidden_element]
     steps: Vec<(Vector2<usize>, u32)>,
     starting_timestamp: u32,
     #[cfg(feature = "debug")]
@@ -25,9 +26,11 @@ struct Movement {
     pub steps_vertex_buffer: Option<ModelVertexBuffer>,
 }
 
+#[derive(Clone, PrototypeWindow)]
 pub struct Entity {
     pub position: Vector3<f32>,
     pub entity_id: usize,
+    pub job_id: usize,
 
     active_movement: Option<Movement>,
     movement_speed: usize,
@@ -65,11 +68,10 @@ impl Entity {
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
 
-        let texture = Arc::clone(&sprite.textures[0]);
-
         Self {
             position,
             entity_id,
+            job_id,
             active_movement,
             movement_speed,
             maximum_health_points,
@@ -218,6 +220,10 @@ impl Entity {
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
     }
 
+    pub fn has_updates(&self) -> bool {
+        self.active_movement.is_some()
+    }
+
     pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: u32) {
 
         if let Some(active_movement) = self.active_movement.take() {
@@ -264,8 +270,18 @@ impl Entity {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.render_entity_marker(camera, self.position, false);
+    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera, hovered: bool) {
+        renderer.render_entity_marker(camera, self.position, hovered);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, smallest_distance: f32) -> Option<f32> {
+        let distance = camera.distance_to(self.position);
+
+        match distance < smallest_distance && renderer.marker_hovered(camera, self.position, mouse_position) {
+            true => Some(distance),
+            false => None,
+        }
     }
 
     #[cfg(feature = "debug")]

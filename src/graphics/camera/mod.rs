@@ -2,12 +2,17 @@ mod player;
 #[cfg(feature = "debug")]
 mod debug;
 
+use std::sync::Arc;
+
 pub use self::player::PlayerCamera;
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
 
 use cgmath::{ Matrix4, Vector4, Vector3, Vector2 };
 use crate::graphics::{ SmoothedValue, Transform };
+use crate::types::Entity;
+use crate::types::map::Map;
+use super::RenderSettings;
 
 pub trait Camera {
 
@@ -28,4 +33,6 @@ pub trait Camera {
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32>;
 
     fn get_light_matrix(&self) -> Matrix4<f32>;
+
+    //fn render_scene(&self, map: Arc<Map>, entities: Arc<Vec<Arc<Entity>>>, render_settings: &RenderSettings, client_tick: u32);
 }

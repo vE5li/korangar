@@ -3,22 +3,21 @@ use crate::loaders::RotationKeyframeData;
 use crate::types::maths::*;
 use crate::graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform };
 
-#[derive(Clone, Debug, PrototypeElement, new)]
+#[derive(Clone, Debug, PrototypeElement)]
 pub struct BoundingBox {
     pub smallest: Vector3<f32>,
     pub biggest: Vector3<f32>,
-    pub range: Vector3<f32>, // move these to function calls?
 }
 
 impl BoundingBox {
     
-    pub fn new_new<'t, T>(vertex_positions: T) -> Self
+    pub fn new<'t, T>(vertex_positions: T) -> Self
         where
             T: IntoIterator<Item = Vector3<f32>>,
     {
 
-        let mut smallest: Vector3<f32> = vector3!(999999.0);
-        let mut biggest: Vector3<f32> = vector3!(-999999.0);
+        let mut smallest: Vector3<f32> = vector3!(f32::MAX);
+        let mut biggest: Vector3<f32> = vector3!(-f32::MAX);
 
         for position in vertex_positions {
 
@@ -31,13 +30,26 @@ impl BoundingBox {
             biggest.z = biggest.z.max(position.z);
         }
 
-        let range = (biggest - smallest) / 2.0;
+        Self { smallest, biggest }
+    }
 
-        Self { smallest, biggest, range }
+    pub fn uninitialized() -> Self {
+        let smallest: Vector3<f32> = vector3!(f32::MAX);
+        let biggest: Vector3<f32> = vector3!(-f32::MAX);
+        Self { smallest, biggest }
+    }
+
+    pub fn size(&self) -> Vector3<f32> {
+        self.biggest - self.smallest
     }
 
     pub fn center(&self) -> Vector3<f32> {
-        self.smallest + self.range
+        self.smallest + self.size() / 2.0
+    }
+
+    pub fn extend(&mut self, other: &Self) {
+        self.biggest = self.biggest.zip(other.biggest, f32::max);
+        self.smallest = self.smallest.zip(other.smallest, f32::min);
     }
 }
 
@@ -45,12 +57,9 @@ impl BoundingBox {
 pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
-    #[hidden_element]
     pub vertex_buffer: ModelVertexBuffer,
-    #[hidden_element]
     pub textures: Vec<Texture>,
     pub child_nodes: Vec<Node>,
-    #[hidden_element]
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 

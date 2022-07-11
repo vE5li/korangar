@@ -57,7 +57,12 @@ impl Interface {
 
     pub fn schedule_rerender_window(&mut self, window_index: usize) {
         if window_index < self.windows.len() {
-            self.windows[window_index].2 = true;
+            let (window, _reresolve, rerender) = &mut self.windows[window_index];
+
+            match window.has_transparency(&self.theme) {
+                true => self.rerender = true,
+                false => *rerender = true,
+            }
         }
     }
 
@@ -68,7 +73,12 @@ impl Interface {
                 match change_event {
                     ChangeEvent::Reresolve => self.reresolve = true,
                     ChangeEvent::Rerender => self.rerender = true,
-                    ChangeEvent::RerenderWindow => *rerender = true,
+                    ChangeEvent::RerenderWindow => {
+                        match window.has_transparency(&self.theme) {
+                            true => self.rerender = true,
+                            false => *rerender = true,
+                        }
+                    },
                 }
             }
         }
@@ -80,16 +90,16 @@ impl Interface {
                 let (_position, previous_size) = window.get_area();
                 let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.avalible_space);
 
-                if previous_size != new_size {
-
-                    if let Some(window_class) = window_class {
-                        self.window_cache.register_window(window_class, new_position, new_size);
-                    }
-
-                    self.rerender |= previous_size.x > new_size.x || previous_size.y > new_size.y;
+                if let Some(window_class) = window_class {
+                    self.window_cache.register_window(window_class, new_position, new_size);
                 }
 
-                *rerender |= *reresolve;
+                self.rerender |= previous_size.x > new_size.x || previous_size.y > new_size.y;
+
+                match window.has_transparency(&self.theme) {
+                    true => self.rerender = true,
+                    false => *rerender = true,
+                }
                 *reresolve = false;
             }
         }
@@ -121,8 +131,10 @@ impl Interface {
     pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
         let (window, reresolve, _rerender) = self.windows.remove(window_index);
         let new_window_index = self.windows.len();
+        let has_transparency = window.has_transparency(&self.theme);
 
-        self.windows.push((window, reresolve, true));
+        self.windows.push((window, reresolve, !has_transparency));
+        self.rerender |= has_transparency;
 
         new_window_index
     }
@@ -139,7 +151,7 @@ impl Interface {
 
     pub fn drag_element(&mut self, element: &ElementCell, _window_index: usize, mouse_delta: Position) {
         //let (_window, _reresolve, _rerender) = &mut self.windows[window_index];
-        
+
         if let Some(change_event) = element.borrow_mut().drag(mouse_delta) {
             match change_event {
                 ChangeEvent::Reresolve => self.reresolve = true,
@@ -219,7 +231,7 @@ impl Interface {
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
-            Some(window_class) => self.windows.iter().any(|window| window.0.window_class_matches(window_class)),
+            Some(window_class) => self.windows.iter().any(|window| window.0.get_window_class().map_or(false, |other_window_class| window_class == other_window_class)),
             None => false,
         }
     }
@@ -249,7 +261,7 @@ impl Interface {
     }
 
     pub fn close_window_with_class(&mut self, window_class: &str) {
-        self.windows.retain(|window| !window.0.window_class_matches(window_class));
+        self.windows.retain(|window| !window.0.get_window_class().map_or(false, |other_window_class| window_class == other_window_class));
         self.rerender = true;
     }
 }

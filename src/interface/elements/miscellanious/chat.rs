@@ -9,7 +9,7 @@ use crate::interface::elements::*;
 use crate::graphics::{ Renderer, Color };
 use crate::network::CharacterInformation;
 
-pub struct CharacterPreview {
+pub struct Chat {
     characters: Rc<RefCell<Vec<CharacterInformation>>>,
     move_request: Rc<RefCell<Option<usize>>>,
     changed: Rc<RefCell<bool>>,
@@ -19,59 +19,7 @@ pub struct CharacterPreview {
     cached_position: Position,
 }
 
-impl CharacterPreview {
-
-    fn get_elements(characters: &Rc<RefCell<Vec<CharacterInformation>>>, move_request: &Rc<RefCell<Option<usize>>>, slot: usize) -> Vec<ElementCell> {
-
-        if let Some(origin_slot) = *move_request.borrow() {
-
-            let text = match origin_slot == slot {
-                true => "click to cancel",
-                false => "switch",
-            };
-
-            return vec![cell!(Text::new(text.to_string(), Color::rgb(200, 140, 180), 14.0, constraint!(100.0%, 14.0)))];
-        }
-
-        let characters = characters.borrow();
-        let character_information = characters.iter().find(|character| character.character_number as usize == slot);
-
-        if let Some(character_information) = character_information {
-            return vec![
-                cell!(Text::new(character_information.name.clone(), Color::rgb(220, 210, 210), 18.0, constraint!(100.0%, 18.0))), // alignment!(center, top)
-                cell!(EventButton::new("switch slot".to_string(), UserEvent::RequestSwitchCharacterSlot(slot))),
-                cell!(EventButton::new("delete character".to_string(), UserEvent::DeleteCharacter(character_information.character_id as usize))),
-            ];
-        }
-
-        vec![
-            cell!(Text::new("new character".to_string(), Color::rgb(200, 140, 180), 14.0, constraint!(100.0%, 14.0))),
-        ]
-    }
-
-    pub fn new(characters: Rc<RefCell<Vec<CharacterInformation>>>, move_request: Rc<RefCell<Option<usize>>>, changed: Rc<RefCell<bool>>, slot: usize) -> Self {
-
-        let elements = Self::get_elements(&characters, &move_request, slot); 
-        let cached_size = Size::zero();
-        let cached_position = Position::zero();
-
-        Self {
-            characters,
-            move_request,
-            changed,
-            slot,
-            elements,
-            cached_size,
-            cached_position,
-        }
-    }
-
-    fn has_character(&self) -> bool {
-        self.elements.len() > 1 // TODO:
-    }
-}
-
-impl Element for CharacterPreview {
+impl Element for Chat {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 

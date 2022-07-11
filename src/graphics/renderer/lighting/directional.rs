@@ -25,7 +25,7 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
-use vulkano::buffer::{ BufferUsage };
+use vulkano::buffer::BufferUsage;
 use cgmath::Vector3;
 
 use crate::graphics::*;
@@ -79,7 +79,7 @@ impl DirectionalLightRenderer {
             .unwrap()
     }
 
-    pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, shadow_map: ImageBuffer, vertex_buffer: ScreenVertexBuffer, direction: Vector3<f32>, color: Color) {
+    pub fn render(&self, builder: &mut CommandBuilder, camera: &dyn Camera, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, depth_buffer: ImageBuffer, shadow_map: ImageBuffer, vertex_buffer: ScreenVertexBuffer, direction: Vector3<f32>, color: Color, intensity: f32) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -102,7 +102,7 @@ impl DirectionalLightRenderer {
             //screen_to_world_matrix: camera.get_screen_to_world_matrix().into(),
             //light_matrix: camera.get_light_matrix().into(),
             direction: [direction.x, direction.y, direction.z],
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            color: [color.red_f32() * intensity, color.green_f32() * intensity, color.blue_f32() * intensity],
             _dummy0: Default::default(),
         };
 

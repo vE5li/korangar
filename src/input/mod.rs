@@ -123,7 +123,7 @@ impl InputSystem {
         };
 
         let shift_down = self.keys[42].down();
-  
+
         #[cfg(feature = "debug")]
         let lock_actions = render_settings.use_debug_camera;
         #[cfg(not(feature = "debug"))]
@@ -143,7 +143,7 @@ impl InputSystem {
                     self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
             }
-            
+
             hovered_element = None;
         }
 
@@ -313,7 +313,7 @@ impl InputSystem {
             if let Some((_element, window_index)) = &self.previous_hovered_element {
                 interface.schedule_rerender_window(*window_index);
             }
-            
+
             if let Some(window_index) = window_index {
                 interface.schedule_rerender_window(window_index);
             }
@@ -323,11 +323,11 @@ impl InputSystem {
 
         (events, hovered_element)
     }
-    
+
     pub fn unused_left_click(&self) -> bool {
         self.left_mouse_button.pressed() && self.mouse_input_mode.is_none()
     }
-    
+
     pub fn set_interface_clicked(&mut self) {
         self.mouse_input_mode = MouseInputMode::ClickInterface;
     }

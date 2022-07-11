@@ -226,6 +226,24 @@ impl Default for SliderTheme {
     }
 }
 
+#[derive(Serialize, Deserialize, PrototypeElement)]
+pub struct ChatTheme {
+    pub background_color: Mutable<Color, RERENDER>,
+    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
+    pub font_size: MutableRange<f32, RERENDER>,
+}
+
+impl Default for ChatTheme {
+
+    fn default() -> Self {
+        Self {
+            background_color: Mutable::new(Color::rgba(0, 0, 0, 170)),
+            border_radius: MutableRange::new(vector4!(6.0), vector4!(0.0), vector4!(30.0)),
+            font_size: MutableRange::new(14.0, 6.0, 50.0),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
 #[window_title("theme viewer")]
 #[window_class("theme_viewer")]
@@ -240,6 +258,7 @@ pub struct Theme {
     pub close_button: CloseButtonTheme,
     pub overlay: OverlayTheme,
     pub slider: SliderTheme,
+    pub chat: ChatTheme,
 }
 
 impl Theme {
@@ -277,7 +296,7 @@ impl Theme {
         *self = theme;
         true
     }
-        
+
     pub fn save(&self, theme_file: &str) {
 
         #[cfg(feature = "debug")]

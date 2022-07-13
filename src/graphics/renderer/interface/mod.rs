@@ -14,6 +14,7 @@ mod fragment_shader {
 
 mod rectangle;
 mod sprite;
+mod text;
 
 use std::sync::Arc;
 use std::iter;
@@ -31,6 +32,7 @@ use crate::graphics::*;
 
 pub use self::rectangle::RectangleRenderer;
 pub use self::sprite::SpriteRenderer;
+pub use self::text::TextRenderer;
 
 pub struct InterfaceRenderer {
     pipeline: Arc<GraphicsPipeline>,

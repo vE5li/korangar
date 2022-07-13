@@ -101,7 +101,7 @@ impl BufferRenderer {
             .unwrap()
     }
 
-    pub fn render_buffers(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, water_buffer: ImageBuffer, depth_buffer: ImageBuffer, shadow_buffer: ImageBuffer, picker_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, render_settings: &RenderSettings) {
+    pub fn render_buffers(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, water_buffer: ImageBuffer, depth_buffer: ImageBuffer, shadow_buffer: ImageBuffer, picker_buffer: ImageBuffer, font_atlas: ImageBuffer, vertex_buffer: ScreenVertexBuffer, render_settings: &RenderSettings) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -113,6 +113,7 @@ impl BufferRenderer {
             WriteDescriptorSet::image_view(3, depth_buffer),
             WriteDescriptorSet::image_view_sampler(4, picker_buffer, self.nearest_sampler.clone()),
             WriteDescriptorSet::image_view_sampler(5, shadow_buffer, self.nearest_sampler.clone()),
+            WriteDescriptorSet::image_view_sampler(6, font_atlas, self.nearest_sampler.clone()),
         ]).unwrap(); 
 
         let constants = Constants {
@@ -122,6 +123,7 @@ impl BufferRenderer {
             show_depth_buffer: render_settings.show_depth_buffer as u32,
             show_shadow_buffer: render_settings.show_shadow_buffer as u32,
             show_picker_buffer: render_settings.show_picker_buffer as u32,
+            show_font_atlas: render_settings.show_font_atlas as u32,
         };
 
         builder

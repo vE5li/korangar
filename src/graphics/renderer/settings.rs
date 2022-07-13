@@ -100,12 +100,16 @@ pub struct RenderSettings {
     #[cfg(feature = "debug")]
     #[new(default)]
     pub show_picker_buffer: bool,
+    #[toggle]
+    #[cfg(feature = "debug")]
+    #[new(default)]
+    pub show_font_atlas: bool,
 }
 
 #[cfg(feature = "debug")]
 impl RenderSettings {
 
     pub fn show_buffers(&self) -> bool {
-        self.show_diffuse_buffer || self.show_normal_buffer || self.show_water_buffer || self.show_depth_buffer || self.show_shadow_buffer || self.show_picker_buffer
+        self.show_diffuse_buffer || self.show_normal_buffer || self.show_water_buffer || self.show_depth_buffer || self.show_shadow_buffer || self.show_picker_buffer || self.show_font_atlas
     }
 }

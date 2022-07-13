@@ -53,9 +53,6 @@ impl DirectionalLightRenderer {
         let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::MirroredRepeat)
-            //.compare(Some(CompareOp::Less))
-            //.mip_lod_bias(1.0)
-            //.lod(0.0..=100.0)
             .build()
             .unwrap();
 

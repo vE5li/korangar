@@ -164,7 +164,7 @@ impl InputSystem {
                         match action {
                             ClickAction::Event(event) => events.push(event),
                             ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
-                            ClickAction::DragElement => self.mouse_input_mode = MouseInputMode::DragElement((Rc::clone(hovered_element), *window_index)),
+                            ClickAction::DragElement => self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index)),
                             ClickAction::OpenWindow(prototype_window) => interface.open_window(prototype_window.as_ref()),
                             ClickAction::CloseWindow => interface.close_window(*window_index),
                         }

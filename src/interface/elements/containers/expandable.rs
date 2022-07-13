@@ -81,7 +81,7 @@ impl Element for Expandable {
             if self.expanded {
                 for element in &self.elements {
                     match element.borrow().hovered_element(absolute_position) {
-                        HoverInformation::Hovered => return HoverInformation::Element(Rc::clone(element)),
+                        HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
                         HoverInformation::Element(element) => return HoverInformation::Element(element),
                         HoverInformation::Ignored => return HoverInformation::Ignored,
                         HoverInformation::Missed => {},

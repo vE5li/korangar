@@ -21,7 +21,7 @@ impl PrototypeWindow for PrototypeChatWindow{
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
-        Box::from(ChatWindow::new(window_cache, interface_settings, avalible_space, Rc::clone(&self.messages), constraint!(200.0 > 500.0 < 700.0, 100.0 > 100.0 < 600.0)))
+        Box::from(ChatWindow::new(window_cache, interface_settings, avalible_space, self.messages.clone(), constraint!(200.0 > 500.0 < 700.0, 100.0 > 100.0 < 600.0)))
     }
 }
 

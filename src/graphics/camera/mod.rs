@@ -16,7 +16,7 @@ use super::RenderSettings;
 
 pub trait Camera {
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>);
+    fn generate_view_projection(&mut self, window_size: Vector2<usize>, day_timer: f32);
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);
 

@@ -90,6 +90,7 @@ fn buffers_expandable() -> ElementCell {
         render_state_button!("depth buffer", UserEvent::ToggleShowDepthBuffer, show_depth_buffer),
         render_state_button!("shadow buffer", UserEvent::ToggleShowShadowBuffer, show_shadow_buffer),
         render_state_button!("picker buffer", UserEvent::ToggleShowPickerBuffer, show_picker_buffer),
+        render_state_button!("font atlas", UserEvent::ToggleShowFontAtlas, show_font_atlas),
     ];
 
     cell!(Expandable::new("buffers".to_string(), buttons, true))

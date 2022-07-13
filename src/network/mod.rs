@@ -1098,8 +1098,8 @@ impl NetworkingSystem {
 
     pub fn new() -> Self {
 
-        let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
-        //let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
+        //let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
+        let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
 
         let character_stream = None;
         let map_stream = None;
@@ -1199,7 +1199,7 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         timer.stop();
 
-        Ok(CharacterSelectionWindow::new(Rc::clone(&self.characters), Rc::clone(&self.move_request), Rc::clone(&self.changed), character_server_login_success_packet.normal_slot_count as usize))
+        Ok(CharacterSelectionWindow::new(self.characters.clone(), self.move_request.clone(), self.changed.clone(), character_server_login_success_packet.normal_slot_count as usize))
     }
 
     pub fn log_out(&mut self) -> Result<(), String> {
@@ -1355,7 +1355,7 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn select_character(&mut self, slot: usize) -> Result<(String, Vector2<usize>, usize, usize, usize, u32), String> {
+    pub fn select_character(&mut self, slot: usize, chat_messages: &Rc<RefCell<Vec<ChatMessage>>>) -> Result<(String, Vector2<usize>, usize, usize, usize, u32), String> {
 
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
@@ -1398,8 +1398,9 @@ impl NetworkingSystem {
         let _packet_180b = Packet180b::try_from_bytes(&mut byte_stream).unwrap();
         let map_server_login_success_packet = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
+        let mut chat_messages = chat_messages.borrow_mut();
         while let Ok(server_message_packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
-            println!("message from server: {}", server_message_packet.message);
+            chat_messages.push(ChatMessage::new(server_message_packet.message, Color::rgb(230, 230, 200)));
         }
 
         let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();

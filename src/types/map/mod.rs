@@ -6,7 +6,7 @@ mod effect;
 
 use std::sync::Arc;
 use derive_new::new;
-use cgmath::Vector2;
+use cgmath::{ Vector2, Vector3 };
 
 use crate::types::{ Version, Entity };
 use crate::graphics::*;
@@ -18,6 +18,57 @@ pub use self::object::{ Object, model };
 pub use self::light::LightSource;
 pub use self::sound::SoundSource;
 pub use self::effect::{ EffectSource, Particle };
+
+// MOVE
+fn get_value(day_timer: f32, offset: f32, p: f32) -> f32 {
+    let sin = (day_timer + offset).sin();
+    sin.abs().powf(2.0 - p) / sin
+}
+
+fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
+    let red = get_value(day_timer, offset, ps[0]);
+    let green = get_value(day_timer, offset, ps[1]);
+    let blue = get_value(day_timer, offset, ps[2]);
+    vector3!(red, green, blue)
+}
+
+fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
+    Color::rgb((base_color.red_f32() * channels.x) as u8, (base_color.green_f32() * channels.y) as u8, (base_color.blue_f32() * channels.z) as u8)
+}
+
+fn get_light_colors(ambient_color: Color, directional_color: Color, intensity: f32, day_timer: f32) -> (Color, Color, f32) {
+
+    let sun_offset = 0.0;
+    let moon_offset = std::f32::consts::PI;
+
+    let directional_channels = get_channels(day_timer, sun_offset, [0.8, 0.0, 0.25]) * 255.0;
+    let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.35 + vector3!(0.65)) * 255.0;
+
+    let ambient_color = color_from_channel(ambient_color, ambient_channels);
+
+    if directional_channels.x.is_sign_positive() {
+        let directional_color = color_from_channel(directional_color, directional_channels);
+        return (ambient_color, directional_color, f32::min(intensity * 1.2, 1.0));
+    }
+
+    let directional_channels = get_channels(day_timer, moon_offset, [0.3; 3]) * 255.0;
+    let directional_color = color_from_channel(Color::rgb(150, 150, 255), directional_channels);
+
+    (ambient_color, directional_color, f32::min(intensity * 1.2, 1.0))
+}
+
+pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
+
+    let sun_offset = -std::f32::consts::FRAC_PI_2;
+    let c = (day_timer + sun_offset).cos();
+    let s = (day_timer + sun_offset).sin();
+
+    match c.is_sign_positive() {
+        true => vector3!(s, c, -0.5),
+        false => vector3!(s, -c, 0.5),
+    }
+}
+//
 
 #[derive(PrototypeElement, new)]
 pub struct WaterSettings {
@@ -136,14 +187,22 @@ impl Map {
         }
     }
 
-    pub fn render_lights(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings) {
+    pub fn render_lights(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, day_timer: f32) {
+
+        let light_direction = get_light_direction(day_timer);
+        let (ambient_color, directional_color, intensity) = get_light_colors(
+            self.light_settings.ambient_color,
+            self.light_settings.diffuse_color,
+            self.light_settings.light_intensity,
+            day_timer
+        );
 
         if render_settings.show_ambient_light {
-            renderer.ambient_light(self.light_settings.ambient_color);
+            renderer.ambient_light(ambient_color);
         }
 
         if render_settings.show_directional_light {
-            renderer.directional_light(camera, cgmath::Vector3::new(0.0, -1.0, 1.0), self.light_settings.diffuse_color, self.light_settings.light_intensity);
+            renderer.directional_light(camera, light_direction, directional_color, intensity);
         }
 
         if render_settings.show_point_lights {

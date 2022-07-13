@@ -204,7 +204,7 @@ impl SpriteLoader {
             .collect();
 
         let sprite = Rc::new(Sprite { textures });
-        self.cache.insert(path.to_string(), Rc::clone(&sprite));
+        self.cache.insert(path.to_string(), sprite.clone());
 
         println!("images: {}", sprite.textures.len());
 

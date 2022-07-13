@@ -28,6 +28,19 @@ impl PrototypeWindow for MapsWindow {
             ("amatsu",Vector2::new(198,84)),
             ("ayothaya",Vector2::new(208,166)),
             ("prontera", Vector2::new(155, 183)),
+            ("brasilis", Vector2::new(196, 217)),
+            ("einbech", Vector2::new(63, 35)),
+            ("einbroch", Vector2::new(64, 200)),
+            ("dicastes01", Vector2::new(198, 187)),
+            ("gonryun", Vector2::new(160, 120)),
+            ("hugel", Vector2::new(96, 145)),
+            ("izlude", Vector2::new(128, 146)),
+            ("jawaii", Vector2::new(251, 132)),
+            ("lasagna", Vector2::new(193, 182)),
+            ("lighthalzen", Vector2::new(158, 92)),
+            ("louyang", Vector2::new(217, 100)),
+            ("xmas", Vector2::new(147, 134)),
+
         ];
 
         let elements = map_warps 

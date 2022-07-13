@@ -14,10 +14,6 @@ vec3 calculate_sample(int sample_index) {
     vec3 diffuse = subpassLoad(diffuse_in, sample_index).rgb;
     vec3 normal = subpassLoad(normal_in, sample_index).rgb;
 
-    if (length(normal) == 0.0) {
-        return diffuse;
-    }
-
     return diffuse * constants.color;
 }
 
@@ -30,15 +26,4 @@ void main() {
 
     fragment_color.rgb = blended / 4.0;
     fragment_color.a = 1.0;
-
-    //vec3 diffuse = subpassLoad(diffuse_in, 0).rgb;
-    //vec3 normal = subpassLoad(normal_in, 0).rgb;
-    //fragment_color.a = 1.0;
-
-    //if (length(normal) == 0.0) {
-    //    fragment_color.rgb = diffuse;
-    //    return;
-    //}
-
-    //fragment_color.rgb = diffuse * constants.color;
 }

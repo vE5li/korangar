@@ -97,6 +97,10 @@ impl GeometryRenderer {
 
     pub fn render(&self, camera: &dyn Camera, builder: &mut CommandBuilder, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
 
+        if textures.is_empty() {
+            return;
+        }
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -217,6 +221,10 @@ impl GeometryRenderer {
     }
 
     pub fn render_node(&self, camera: &dyn Camera, builder: &mut CommandBuilder, node: &Node, transform: &Transform, client_tick: u32) {
+
+        if node.textures.is_empty() {
+            return;
+        }
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();

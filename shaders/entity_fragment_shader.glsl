@@ -3,11 +3,17 @@
 const int TEXTURE_COUNT = 10;
 
 layout(location = 0) in vec2 texture_coordinates;
+layout(location = 1) in vec3 normal;
 
 layout(location = 0) out vec4 fragment_color;
 layout(location = 1) out vec3 fragment_normal;
 
 layout (set = 0, binding = 1) uniform sampler2D sampled_texture;
+
+layout(set = 0, binding = 0) uniform Matrices {
+    mat4 view;
+    mat4 projection;
+} matrices;
 
 void main() {
 
@@ -23,5 +29,5 @@ void main() {
     fragment_color.g = pow(fragment_color.g, 1.0 / 1.8);
     fragment_color.b = pow(fragment_color.b, 1.0 / 1.8);
 
-    fragment_normal = vec3(0.0, 0.0, 0.0);
+    fragment_normal = normalize(normal);
 }

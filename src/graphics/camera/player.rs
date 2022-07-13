@@ -23,6 +23,7 @@ pub struct PlayerCamera {
     view_angle: SmoothedValue,
     zoom: SmoothedValue,
     aspect_ratio: f32,
+    day_timer: f32,
 }
 
 impl PlayerCamera {
@@ -38,6 +39,7 @@ impl PlayerCamera {
             view_angle: SmoothedValue::new(0.0, 0.01, 15.0),
             zoom: SmoothedValue::new(400.0, 0.01, 5.0),
             aspect_ratio: 0.0,
+            day_timer: 0.0,
         }
     }
 
@@ -82,7 +84,7 @@ impl PlayerCamera {
 
 impl Camera for PlayerCamera {
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
+    fn generate_view_projection(&mut self, window_size: Vector2<usize>, day_timer: f32) {
         self.aspect_ratio = window_size.x as f32 / window_size.y as f32;
         self.projection_matrix = cgmath::perspective(Rad(0.2617), self.aspect_ratio, 1.0, 2000.0);
 
@@ -91,6 +93,7 @@ impl Camera for PlayerCamera {
 
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
         self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();
+        self.day_timer = day_timer;
     }
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
@@ -152,11 +155,15 @@ impl Camera for PlayerCamera {
 
     fn get_light_matrix(&self) -> Matrix4<f32> {
 
-        let bounds = vector4!(-300.0, 300.0, -300.0, 300.0);
-        let z_near = -500.0;
+        // TODO:
+        let direction = crate::types::map::get_light_direction(self.day_timer).normalize();
+        let scaled_direction = direction * 100.0;
+
+        let bounds = vector4!(-500.0, 500.0, -500.0, 500.0);
+        let z_near = -1000.0;
         let z_far = 500.0;
-        let position = self.focus_position + vector3!(0.0, 300.0, -100.0);
-        let look_at = self.focus_position + vector3!(0.0, 0.0, 0.0);
+        let position = self.focus_position + scaled_direction;
+        let look_at = self.focus_position;
         let projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, z_near, z_far);
         let view_matrix = Matrix4::look_at_rh(position, look_at, vector3!(0.0, 1.0, 0.0));
 

@@ -123,7 +123,7 @@ impl DebugCamera {
 
 impl Camera for DebugCamera {
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
+    fn generate_view_projection(&mut self, window_size: Vector2<usize>, _day_timer: f32) {
         let aspect_ratio = window_size.x as f32 / window_size.y as f32;
         self.projection_matrix = cgmath::perspective(Rad(FRAC_PI_4), aspect_ratio, 0.5, 10000.0);
         self.view_matrix = Matrix4::look_at_rh(self.camera_position, self.focus_position(), self.look_up_vector);

@@ -116,7 +116,7 @@ impl ActionLoader {
         //println!("{:#?}", actions_data);
 
         let sprite = Rc::new(Actions {});
-        self.cache.insert(path.to_string(), Rc::clone(&sprite));
+        self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();

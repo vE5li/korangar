@@ -21,5 +21,6 @@ void main() {
         discard;
     }
 
-    fragment_color = texture(sprite_texture, texture_coordinates) * constants.color;
+    fragment_color = vec4(texture(sprite_texture, texture_coordinates).r) * constants.color;
+    fragment_color = vec4(1.0);
 }

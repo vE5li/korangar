@@ -48,7 +48,7 @@ impl Element for Chat {
             return None;
         }
 
-        *self = Self::new(Rc::clone(&self.characters), Rc::clone(&self.move_request), Rc::clone(&self.changed), self.slot);
+        *self = Self::new(self.characters.clone(), self.move_request.clone(), self.changed.clone(), self.slot);
 
         ChangeEvent::Reresolve.into()
     }
@@ -79,7 +79,7 @@ impl Element for Chat {
         if absolute_position.x >= 0.0 && absolute_position.y >= 0.0 && absolute_position.x <= self.cached_size.x && absolute_position.y <= self.cached_size.y {
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position) {
-                    HoverInformation::Hovered => return HoverInformation::Element(Rc::clone(element)),
+                    HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
                     HoverInformation::Element(element) => return HoverInformation::Element(element),
                     HoverInformation::Ignored => return HoverInformation::Ignored,
                     HoverInformation::Missed => {},

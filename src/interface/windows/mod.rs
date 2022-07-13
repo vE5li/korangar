@@ -7,6 +7,8 @@ mod profiler;
 mod error;
 #[cfg(feature = "debug")]
 mod maps;
+#[cfg(feature = "debug")]
+mod time;
 mod character_selection;
 mod chat;
 
@@ -19,5 +21,7 @@ pub use self::profiler::ProfilerWindow;
 pub use self::error::ErrorWindow;
 #[cfg(feature = "debug")]
 pub use self::maps::MapsWindow;
+#[cfg(feature = "debug")]
+pub use self::time::TimeWindow;
 pub use self::character_selection::CharacterSelectionWindow;
 pub use self::chat::*;

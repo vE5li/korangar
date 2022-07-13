@@ -16,8 +16,6 @@ layout(set = 0, binding = 4) uniform Matrices {
 } matrices;
 
 layout(push_constant) uniform Constants {
-    //mat4 screen_to_world_matrix;
-    //mat4 light;
     vec3 direction;
     vec3 color;
 } constants;
@@ -29,7 +27,7 @@ vec3 calculate_sample(int sample_index) {
     pixel_position_world_space /= pixel_position_world_space.w;
 
     vec3 normal = normalize(subpassLoad(normal_in, sample_index).rgb);
-    float light_percent = dot(normalize(constants.direction), normal);
+    float light_percent = dot(normalize(-constants.direction), normal);
     light_percent = clamp(light_percent, 0.0, 1.0);
 
     // triangles flicker black if the direction of the light is the exact opposite of the normal of the triangle
@@ -56,32 +54,4 @@ void main() {
 
     fragment_color.rgb = blended / 4.0;
     fragment_color.a = 1.0;
-
-    /*float depth = subpassLoad(depth_in, 0).x;
-    vec4 pixel_position_world_space = matrices.screen_to_world * vec4(position, depth, 1.0);
-    pixel_position_world_space /= pixel_position_world_space.w;
-
-    if (depth >= 1.0) {
-        discard;
-    }
-
-    vec3 normal = normalize(subpassLoad(normal_in, 0).rgb);
-    float light_percent = dot(normalize(constants.direction), normal);
-    light_percent = clamp(light_percent, 0.0, 1.0);
-
-
-    // triangles flicker black if the direction of the light is the exact opposite of the normal of the triangle
-    float bias = 0.005 * tan(acos(light_percent));
-    bias = clamp(bias, 0 ,0.01);
-
-    vec4 light_position = matrices.light * pixel_position_world_space;
-    vec3 light_coords = light_position.xyz / light_position.w;
-    light_coords.xy = light_coords.xy * 0.5 + 0.5;
-
-    float shadow_map_depth = texture(shadow_map_in, light_coords.xy).r;
-    bool visibility = light_coords.z - bias < shadow_map_depth;
-
-    vec3 diffuse = subpassLoad(diffuse_in, 0).rgb;
-    fragment_color.rgb = light_percent * constants.color * diffuse * float(visibility); 
-    fragment_color.a = 1.0;*/
 }

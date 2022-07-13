@@ -15,15 +15,14 @@ extern crate num;
 extern crate cgmath;
 extern crate serde;
 extern crate ron;
-extern crate png;
-extern crate bmp;
+extern crate rusttype;
+extern crate yazi;
+extern crate image;
 extern crate pathfinding;
-#[cfg(feature = "debug")]
 extern crate chrono;
 #[cfg(feature = "debug")]
 #[macro_use]
 extern crate lazy_static;
-extern crate yazi;
 extern crate rusqlite;
 
 #[cfg(feature = "debug")]
@@ -55,13 +54,14 @@ use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
 use winit::window::WindowBuilder;
 use database::Database;
+use chrono::prelude::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::types::{ Entity, ChatMessage };
 use crate::input::{ InputSystem, UserEvent };
 use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
-use crate::loaders::{ GameFileLoader, MapLoader, ModelLoader, TextureLoader, SpriteLoader, ActionLoader };
+use crate::loaders::{ FontLoader, GameFileLoader, MapLoader, ModelLoader, TextureLoader, SpriteLoader, ActionLoader };
 use crate::graphics::{ Renderer, RenderSettings, Color };
 use crate::graphics::camera::*;
 use crate::interface::*;
@@ -131,11 +131,12 @@ fn main() {
 
     let game_file_loader = Rc::new(RefCell::new(game_file_loader));
 
-    let mut model_loader = ModelLoader::new(Rc::clone(&game_file_loader), device.clone());
-    let mut texture_loader = TextureLoader::new(Rc::clone(&game_file_loader), device.clone(), queue.clone());
-    let mut map_loader = MapLoader::new(Rc::clone(&game_file_loader), device.clone());
-    let mut sprite_loader = SpriteLoader::new(Rc::clone(&game_file_loader), device.clone(), queue.clone());
-    let mut action_loader = ActionLoader::new(Rc::clone(&game_file_loader));
+    let font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
+    let mut model_loader = ModelLoader::new(game_file_loader.clone(), device.clone());
+    let mut texture_loader = TextureLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
+    let mut map_loader = MapLoader::new(game_file_loader.clone(), device.clone());
+    let mut sprite_loader = SpriteLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
+    let mut action_loader = ActionLoader::new(game_file_loader.clone());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -153,7 +154,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create renderer");
 
-    let mut renderer = Renderer::new(&physical_device, device.clone(), queue, surface.clone(), &mut texture_loader);
+    let mut renderer = Renderer::new(&physical_device, device.clone(), queue, surface.clone(), &mut texture_loader, font_loader.clone());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -204,7 +205,13 @@ fn main() {
 
     let mut entities = Arc::new(Vec::new());
 
-    let chat_messages = Rc::new(RefCell::new(vec![ChatMessage::new("welcome to korangar pre alpha!".to_string(), Color::rgb(220, 170, 220))]));
+    // move
+    const TIME_FACTOR: f32 = 1000.0;
+    let local: DateTime<Local> = Local::now();
+    let mut day_timer = (local.hour() as f32 / TIME_FACTOR * 60.0 * 60.0) + (local.minute() as f32 / TIME_FACTOR * 60.0);
+    //
+
+    let chat_messages = Rc::new(RefCell::new(vec![ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220))]));
 
     let database = Database::new();
 
@@ -252,6 +259,8 @@ fn main() {
                 input_system.update_delta();
 
                 let delta_time = game_timer.update();
+
+                day_timer += delta_time as f32 / TIME_FACTOR;
 
                 networking_system.keep_alive(delta_time, game_timer.get_client_tick());
 
@@ -353,12 +362,12 @@ fn main() {
                         UserEvent::SaveTheme => interface.save_theme(),
 
                         UserEvent::SelectCharacter(character_slot) => {
-                            match networking_system.select_character(character_slot) {
+                            match networking_system.select_character(character_slot, &chat_messages) {
 
                                 Ok((map_name, player_position, character_id, job_id, movement_speed, client_tick)) => {
 
                                     interface.close_window_with_class("character_selection"); // FIND A NICER WAY TO GET THE CLASS NAME
-                                    interface.open_window(&PrototypeChatWindow::new(Rc::clone(&chat_messages)));
+                                    interface.open_window(&PrototypeChatWindow::new(chat_messages.clone()));
 
                                     map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap());
 
@@ -409,6 +418,21 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::new()),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::OpenTimeWindow => interface.open_window(&TimeWindow::new()),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::SetDawn => day_timer = 0.0,
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::SetNoon => day_timer = std::f32::consts::FRAC_PI_2,
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::SetDusk => day_timer = std::f32::consts::PI,
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::SetMidnight => day_timer = -std::f32::consts::FRAC_PI_2,
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(),
@@ -520,6 +544,9 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPickerBuffer => render_settings.toggle_show_picker_buffer(),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowFontAtlas => render_settings.toggle_show_font_atlas(),
                     }
                 }
 
@@ -570,7 +597,7 @@ fn main() {
                 #[cfg(not(feature = "debug"))]
                 let current_camera = &mut player_camera;
 
-                current_camera.generate_view_projection(renderer.get_window_size());
+                current_camera.generate_view_projection(renderer.get_window_size(), day_timer);
 
                 // RENDER TO THE PICKER BUFFER INSTEAD?
                 #[cfg(feature = "debug")]
@@ -598,6 +625,10 @@ fn main() {
 
                 map.render_geomitry(&mut renderer, current_camera, &render_settings, game_timer.get_client_tick());
 
+                //if renderer_interface {
+                //    renderer.render_text_new("test", vector2!(0.0), vector2!(300.0), Color::rgb(100, 255, 100), 10.0);
+                //}
+
                 #[cfg(feature = "debug")]
                 if let Some(marker) = hovered_marker {
                     map.render_marker_box(&mut renderer, current_camera, marker);
@@ -620,11 +651,12 @@ fn main() {
                 interface.render(&mut renderer, &state_provider, hovered_element);
 
                 renderer.lighting_pass();
+                let font_atlas_future = font_loader.borrow_mut().flush();
 
                 #[cfg(feature = "debug")]
                 match render_settings.show_buffers() {
-                    true => renderer.render_buffers(&render_settings),
-                    false => map.render_lights(&mut renderer, current_camera, &render_settings),
+                    true => renderer.render_buffers(&render_settings, font_loader.borrow().get_font_atlas()),
+                    false => map.render_lights(&mut renderer, current_camera, &render_settings, day_timer),
                 }
 
                 #[cfg(not(feature = "debug"))]
@@ -641,7 +673,7 @@ fn main() {
                     interface.render_frames_per_second(&mut renderer, game_timer.last_frames_per_second());
                 }
 
-                renderer.stop_frame();
+                renderer.stop_frame(font_atlas_future);
             }
 
             _ignored => ()

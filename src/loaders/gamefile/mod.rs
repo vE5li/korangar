@@ -65,7 +65,7 @@ pub struct GameArchive {
 }
 
 impl GameArchive {
-    
+
     fn load(&self, file_path: &str) -> Option<Vec<u8>> {
 
         let file_information = self.files.get(file_path)?;

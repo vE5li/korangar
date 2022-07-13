@@ -9,6 +9,8 @@ mod interface;
 mod debug;
 
 use derive_new::new;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use cgmath::{ Vector4, Vector3, Vector2 };
 use vulkano::device::physical::PhysicalDevice;
@@ -29,7 +31,7 @@ use winit::window::Window;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::*;
-use crate::loaders::TextureLoader;
+use crate::loaders::{TextureLoader, FontLoader};
 use crate::types::map::model::{ Node, BoundingBox };
 
 use self::picker::PickerRenderer;
@@ -71,6 +73,7 @@ pub struct Renderer {
     water_light_renderer: WaterLightRenderer,
     point_light_renderer: PointLightRenderer,
     sprite_renderer: SpriteRenderer,
+    text_renderer: TextRenderer,
     rectangle_renderer: RectangleRenderer,
     interface_renderer: InterfaceRenderer,
     dynamic_sprite_renderer: DynamicSpriteRenderer,
@@ -114,7 +117,7 @@ pub struct Renderer {
 
 impl Renderer {
 
-    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, texture_loader: &mut TextureLoader) -> Self {
+    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, texture_loader: &mut TextureLoader, font_loader: Rc<RefCell<FontLoader>>) -> Self {
 
         let mut texture_future = now(device.clone()).boxed();
 
@@ -246,7 +249,7 @@ impl Renderer {
 
         #[cfg(feature = "debug")]
         print_debug!("created {}pipeline{}", MAGENTA, NONE);
-        
+
         let shadow_viewport = Viewport {
             origin: [0.0, 0.0],
             dimensions: [8096.0, 8096.0],
@@ -259,6 +262,7 @@ impl Renderer {
         let water_renderer = WaterRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
         let rectangle_renderer = RectangleRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
         let sprite_renderer = SpriteRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
+        let text_renderer = TextRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone(), font_loader);
         #[cfg(feature = "debug")]
         let box_renderer = BoxRenderer::new(device.clone(), deferred_subpass, viewport.clone());
         let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
@@ -319,6 +323,7 @@ impl Renderer {
             water_light_renderer,
             point_light_renderer,
             sprite_renderer,
+            text_renderer,
             rectangle_renderer,
             interface_renderer,
             dynamic_sprite_renderer,
@@ -419,7 +424,7 @@ impl Renderer {
     }
 
     fn window_size_dependent_shadow_setup(device: Arc<Device>, render_pass: Arc<RenderPass>, framebuffer_count: usize) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>) {
-        
+
         let dimensions = [8096, 8096];
 
         let shadow_buffer_usage = ImageUsage {
@@ -440,7 +445,7 @@ impl Renderer {
     }
 
     fn window_size_dependent_picker_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>, Vec<Arc<CpuAccessibleBuffer<[u32]>>>) {
-        
+
         let dimensions = images[0].dimensions().width_height();
 
         let image_usage = ImageUsage {
@@ -540,6 +545,7 @@ impl Renderer {
             self.water_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             self.rectangle_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             self.sprite_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
+            self.text_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
             #[cfg(feature = "debug")]
             self.box_renderer.recreate_pipeline(self.device.clone(), deferred_subpass, new_viewport.clone());
             self.ambient_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
@@ -594,7 +600,7 @@ impl Renderer {
         let shadow_clear_values: Vec<ClearValue> = vec![1f32.into()];
         let mut shadow_builder = CommandBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
         shadow_builder.begin_render_pass(self.shadow_framebuffers[image_num].clone(), SubpassContents::Inline, shadow_clear_values).unwrap();
-        
+
         let picker_clear_values: Vec<ClearValue> = vec![[0u32].into(), 1f32.into()];
         let mut picker_builder = CommandBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
         picker_builder.begin_render_pass(self.picker_framebuffers[image_num].clone(), SubpassContents::Inline, picker_clear_values).unwrap();
@@ -737,6 +743,11 @@ impl Renderer {
         }
     }
 
+    pub fn render_text_new(&mut self, text: &str, position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
+        let current_frame = self.current_frame.as_mut().unwrap();
+        self.text_renderer.render(&mut current_frame.builder, self.window_size, position, vector2!(font_size), clip_size, color);
+    }
+
     pub fn render_dynamic_sprite_direct(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, smooth: bool) {
         let current_frame = self.current_frame.as_mut().unwrap();
         self.dynamic_sprite_renderer.render_direct(&mut current_frame.builder, texture, position, size, color, smooth);
@@ -859,7 +870,7 @@ impl Renderer {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_buffers(&mut self, render_settings: &RenderSettings) {
+    pub fn render_buffers(&mut self, render_settings: &RenderSettings, font_atlas: ImageBuffer) {
 
         if let Some(fence) = self.picker_fence.take() {
             fence.wait(None).unwrap()
@@ -874,6 +885,7 @@ impl Renderer {
             self.depth_buffer.clone(),
             self.directional_shadow_maps[current_frame.image_num].clone(),
             self.picker_images[current_frame.image_num].clone(),
+            font_atlas,
             self.screen_vertex_buffer.clone(),
             render_settings,
         );
@@ -884,7 +896,7 @@ impl Renderer {
         self.interface_renderer.render(&mut current_frame.builder, self.interface_buffer.clone(), self.screen_vertex_buffer.clone(), render_settings);
     }
 
-    pub fn stop_frame(&mut self) {
+    pub fn stop_frame(&mut self, font_atlas_future: Box<dyn GpuFuture>) {
         let mut current_frame = self.current_frame.take().unwrap();
 
         current_frame.builder.end_render_pass().unwrap();
@@ -893,6 +905,7 @@ impl Renderer {
         let future = current_frame.shadow_frame_end
             .take().unwrap()
             .join(current_frame.swapchain_future)
+            .join(font_atlas_future)
             .then_execute(self.queue.clone(), command_buffer).unwrap()
             .then_swapchain_present(self.queue.clone(), self.swapchain.clone(), current_frame.image_num)
             .then_signal_fence_and_flush();

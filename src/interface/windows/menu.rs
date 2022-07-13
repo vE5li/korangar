@@ -33,6 +33,8 @@ impl PrototypeWindow for MenuWindow {
             #[cfg(feature = "debug")]
             cell!(DebugButton::new("maps", UserEvent::OpenMapsWindow, true)),
             #[cfg(feature = "debug")]
+            cell!(DebugButton::new("time", UserEvent::OpenTimeWindow, true)),
+            #[cfg(feature = "debug")]
             cell!(DebugButton::new("theme viewer", UserEvent::OpenThemeViewerWindow, true)),
             #[cfg(feature = "debug")]
             cell!(DebugButton::new("profiler", UserEvent::OpenProfilerWindow, true)),

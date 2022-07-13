@@ -21,8 +21,6 @@ void main() {
         if (texture_index == index)
             diffuse_color = texture(textures[index], texture_coordinates);
 
-    //diffuse_color = texture(sampler2D(textures[texture_index], linear_sampler), texture_coordinates);
-
     if (diffuse_color.a + additional_color < 0.5) {
         discard;
     } 

@@ -1,3 +1,4 @@
+mod font;
 mod gamefile;
 mod texture;
 mod model;
@@ -5,6 +6,7 @@ mod map;
 mod sprite;
 mod action;
 
+pub use self::font::FontLoader;
 pub use self::gamefile::GameFileLoader;
 pub use self::texture::TextureLoader;
 //pub use self::model::ModelLoader;

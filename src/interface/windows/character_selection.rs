@@ -28,7 +28,7 @@ impl PrototypeWindow for CharacterSelectionWindow {
 
         let elements: Vec<ElementCell> = (0..self.slot_count)
             .into_iter()
-            .map(|slot| cell!(CharacterPreview::new(Rc::clone(&self.characters), Rc::clone(&self.move_request), Rc::clone(&self.changed), slot)) as ElementCell)
+            .map(|slot| cell!(CharacterPreview::new(self.characters.clone(), self.move_request.clone(), self.changed.clone(), slot)) as ElementCell)
             .collect();
 
         Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "character selection".to_string(), self.window_class.clone().into(), elements, constraint!(600.0, ?)))

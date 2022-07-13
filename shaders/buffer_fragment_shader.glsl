@@ -11,6 +11,7 @@ layout(input_attachment_index = 3, set = 0, binding = 3) uniform subpassInputMS 
 
 layout(set = 0, binding = 4) uniform usampler2D picker_buffer;
 layout(set = 0, binding = 5) uniform sampler2D shadow_buffer;
+layout(set = 0, binding = 6) uniform sampler2D font_atlas;
 
 layout(push_constant) uniform Constants {
     bool show_diffuse_buffer;
@@ -19,6 +20,7 @@ layout(push_constant) uniform Constants {
     bool show_depth_buffer;
     bool show_shadow_buffer;
     bool show_picker_buffer;
+    bool show_font_atlas;
 } constants;
 
 float linearize(in float rawValue, in float zNear, in float zFar) {
@@ -57,6 +59,11 @@ void main() {
     if (constants.show_picker_buffer) {
         uint picker = texture(picker_buffer, position * 0.5 + 0.5).r;
         output_color += vec3(picker);
+    }
+
+    if (constants.show_font_atlas) {
+        float color = texture(font_atlas, position * 0.5 + 0.5).r;
+        output_color += color;
     }
 
     fragment_color = vec4(output_color, 1.0);

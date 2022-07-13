@@ -27,6 +27,16 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     OpenMapsWindow,
     #[cfg(feature = "debug")]
+    OpenTimeWindow,
+    #[cfg(feature = "debug")]
+    SetDawn,
+    #[cfg(feature = "debug")]
+    SetNoon,
+    #[cfg(feature = "debug")]
+    SetDusk,
+    #[cfg(feature = "debug")]
+    SetMidnight,
+    #[cfg(feature = "debug")]
     OpenThemeViewerWindow,
     #[cfg(feature = "debug")]
     OpenProfilerWindow,
@@ -98,4 +108,6 @@ pub enum UserEvent {
     ToggleShowShadowBuffer,
     #[cfg(feature = "debug")]
     ToggleShowPickerBuffer,
+    #[cfg(feature = "debug")]
+    ToggleShowFontAtlas,
 }

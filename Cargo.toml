@@ -14,16 +14,16 @@ num = "*"
 cgmath = { version = "0.18", features = ["serde"] }
 serde = "1.0.137"
 ron = "0.7.1"
-png = "0.16"
-bmp = "*"
-pathfinding = "2.2.2"
+rusttype = { version = "0.9.2", features = ["gpu_cache"] }
 yazi = "0.1.4"
+image = "0.24.2"
+pathfinding = "2.2.2"
 rusqlite = "0.27.0"
-chrono = { version = "0.4", optional = true }
+chrono = "0.4"
 lazy_static = { version = "1.4.0", optional = true }
 
 [features]
-debug = ["lazy_static", "chrono"]
+debug = ["lazy_static"]
 debug_network = ["debug"]
 unicode = ["debug"]
 colors = ["debug"]

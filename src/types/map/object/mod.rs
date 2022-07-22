@@ -3,8 +3,8 @@ pub mod model;
 use derive_new::new;
 use std::sync::Arc;
 
-use crate::graphics::{ Renderer, Camera, Transform };
 use crate::types::maths::*;
+use crate::graphics::*;
 
 use self::model::*;
 
@@ -22,27 +22,21 @@ impl Object {
         self.transform.position += offset;
     }
 
-    pub fn render_geometry(&self, renderer: &mut Renderer, camera: &dyn Camera, client_tick: u32) {
-        self.model.render_geometry(renderer, camera, &self.transform, client_tick);
+    pub fn render_geometry<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
+        where T: Renderer + GeometryRenderer
+    {
+        self.model.render_geometry(render_target, renderer, camera, &self.transform, client_tick);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_bounding_box(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        self.model.render_bounding_box(renderer, camera, &self.transform);
+    pub fn render_bounding_box(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        //self.model.render_bounding_box(render_target, renderer, camera, &self.transform);
     }
 
     #[cfg(feature = "debug")]
-    pub fn hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, smallest_distance: f32) -> Option<f32> {
-        let distance = camera.distance_to(self.transform.position);
-
-        match distance < smallest_distance && renderer.marker_hovered(camera, self.transform.position, mouse_position) {
-            true => Some(distance),
-            false => None,
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera, hovered: bool) {
-        renderer.render_object_marker(camera, self.transform.position, hovered);
+    pub fn render_marker<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+        where T: Renderer + MarkerRenderer
+    {
+        renderer.render_marker(render_target, camera, self.transform.position, hovered);
     }
 }

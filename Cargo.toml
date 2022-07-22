@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 korangar_procedural = { path = "procedural" }
+rayon = "1.5.3"
 derive-new = "0.5"
 vulkano = "0.28"
 vulkano-shaders = "0.28"

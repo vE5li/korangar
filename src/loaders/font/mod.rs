@@ -78,7 +78,7 @@ impl FontLoader {
             ..ImageUsage::none()
         };
 
-        let font_atlas_image = Arc::new(AttachmentImage::with_usage(device.clone(), cache_size.into(), Format::R8_SRGB, image_usage).unwrap());
+        let font_atlas_image = Arc::new(AttachmentImage::with_usage(device.clone(), cache_size.into(), Format::R8G8B8A8_SRGB, image_usage).unwrap());
         let font_atlas = ImageView::new(font_atlas_image.clone()).unwrap();
 
         let font_path = "raleway.medium.ttf";
@@ -104,7 +104,7 @@ impl FontLoader {
 
         let buffer_usage = BufferUsage{
             transfer_source: true,
-            .. BufferUsage::none()
+            ..BufferUsage::none()
         };
 
         self.cache.cache_queued(|rect, data| {

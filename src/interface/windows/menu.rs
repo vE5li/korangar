@@ -42,6 +42,6 @@ impl PrototypeWindow for MenuWindow {
             cell!(Button::new("exit korangar", UserEvent::Exit, true)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "menu".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Menu".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
     }
 }

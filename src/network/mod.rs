@@ -15,6 +15,8 @@ use crate::traits::ByteConvertable;
 use crate::types::{ ByteStream, ChatMessage };
 use crate::graphics::{ Color, ColorRGB, ColorBGR };
 
+/// Base trait that all packets implement.
+/// All packets in Ragnarok online consist of a header, two bytes in size, followed by the packet data. If the packet does not have a fixed size, the first two bytes will be the size of the packet in bytes *including* the header. Packets are sent in little endian.
 pub trait Packet {
 
     fn header() -> [u8; 2];
@@ -22,7 +24,7 @@ pub trait Packet {
     fn to_bytes(&self) -> Vec<u8>;
 }
 
-/// An event triggered by the character server
+/// An event triggered by the map server.
 pub enum NetworkEvent {
     /// Add an entity to the list of entities that the client is aware of
     AddEntity(usize, usize, Vector2<usize>, usize),
@@ -48,19 +50,27 @@ pub enum Sex {
     Server,
 }
 
+/// Sent by the client to the login server.
+/// The very first packet sent when logging in, it is sent after the user has
+/// entered email and password.
 #[derive(Debug, Packet, new)]
 #[header(0x64, 0x00)]
 struct LoginServerLoginPacket {
+    /// unused
     #[new(default)]
-    pub version: [u8; 4], // unused ?
+    pub version: [u8; 4],
     #[length_hint(24)]
     pub name: String, 
     #[length_hint(24)]
-    pub password: String, 
+    pub password: String,
+    /// unused
     #[new(default)]
-    pub client_type: u8, // also unused ?
+    pub client_type: u8,
 }
 
+/// Sent by the login server as a response to [LoginServerLoginPacket] succeeding.
+/// After receiving this packet, the client will connect to one of the character servers
+/// provided by this packet.
 #[allow(dead_code)]
 #[derive(Debug, Packet)]
 #[header(0xc4, 0x0a)]
@@ -69,20 +79,26 @@ struct LoginServerLoginSuccessPacket {
     pub login_id1: u32,
     pub account_id: u32,
     pub login_id2: u32,
-    pub ip_address: u32, // deprecated and always 0
-    pub name: [u8; 24], // deprecated and always 0
-    pub unknown: u16, // always 0
+    /// deprecated and always 0 on rAthena
+    pub ip_address: u32,
+    /// deprecated and always 0 on rAthena
+    pub name: [u8; 24],
+    /// always 0 on rAthena
+    pub unknown: u16,
     pub sex: Sex,
     pub auth_token: [u8; 17],
     #[repeating((self.packet_length - 64) / 160)]
     pub character_server_information: Vec<CharacterServerInformation>,
 }
 
+/// Sent by the character server as a response to [CharacterServerLoginPacket] succeeding.
+/// Provides basic information about the number of avalible character slots.
 #[allow(dead_code)]
 #[derive(Debug, Packet)]
 #[header(0x2d, 0x08)]
 struct CharacterServerLoginSuccessPacket {
-    pub unknown: u16, // always 29 on rAthena
+    /// always 29 on rAthena
+    pub unknown: u16,
     pub normal_slot_count: u8,
     pub vip_slot_count: u8,
     pub billing_slot_count: u8,
@@ -106,7 +122,8 @@ struct Packet6b00 {
 #[derive(Debug, Packet)]
 #[header(0x18, 0x0b)]
 struct Packet180b {
-    pub unknown: u16, // possibly inventory related
+    /// possibly inventory related
+    pub unknown: u16,
 }
 
 #[derive(Debug, new)]
@@ -178,23 +195,25 @@ impl ByteConvertable for WorldPosition2 {
     }
 }
 
+/// Sent by the map server as a response to [MapServerLoginPacket] succeeding.
 #[allow(dead_code)]
 #[derive(Debug, Packet)]
 #[header(0xeb, 0x02)]
 struct MapServerLoginSuccessPacket {
     pub client_tick: u32,
     pub position: WorldPosition,
-    pub ignored: [u8; 2], // always [5, 5] ?
+    /// always [5, 5] on rAthena
+    pub ignored: [u8; 2],
     pub font: u16,
 }
 
 #[derive(Debug, ByteConvertable)]
 pub enum LoginFailedReason {
-    #[variant_value(1)]
+    #[numeric_value(1)]
     ServerClosed,
-    #[variant_value(2)]
+    #[numeric_value(2)]
     AlreadyLoggedIn,
-    #[variant_value(8)]
+    #[numeric_value(8)]
     AlreadyOnline,
 }
 
@@ -209,16 +228,22 @@ pub enum CharacterSelectionFailedReason {
     RejectedFromServer,
 }
 
+/// Sent by the character server as a response to [SelectCharacterPacket] failing.
+/// Provides a reason for the character selection failing.
 #[derive(Debug, Packet)]
 #[header(0x6c, 0x00)]
 struct CharacterSelectionFailedPacket {
     pub reason: CharacterSelectionFailedReason,
 }
 
+/// Sent by the character server as a response to [SelectCharacterPacket] succeeding.
+/// Provides a map server to connect to, along with the ID of our selected character.
 #[derive(Debug, Packet)]
 #[header(0xc5, 0x0a)]
 struct CharacterSelectionSuccessPacket {
     pub character_id: u32,
+    /// Ignored by Korangar, since the players current map will be taken from
+    /// the [ChangeMapPacket].
     #[length_hint(16)]
     pub map_name: String,
     pub map_server_ip: Ipv4Addr,
@@ -230,18 +255,21 @@ struct CharacterSelectionSuccessPacket {
 pub enum CharacterCreationFailedReason {
     CharacterNameAlreadyUsed,
     NotOldEnough,
-    #[variant_value(3)]
+    #[numeric_value(3)]
     NotAllowedToUseSlot,
-    #[variant_value(255)]
+    #[numeric_value(255)]
     CharacterCerationFailed,
 }
 
+/// Sent by the character server as a response to [CreateCharacterPacket] failing.
+/// Provides a reason for the character creation failing.
 #[derive(Debug, Packet)]
 #[header(0x6e, 0x00)]
 struct CharacterCreationFailedPacket {
     pub reason: CharacterCreationFailedReason,
 }
 
+/// Sent by the client to the login server every 60 seconds to keep the connection alive.
 #[derive(Debug, Default, Packet)]
 #[header(0x00, 0x02)]
 struct LoginServerKeepalivePacket {
@@ -267,6 +295,9 @@ struct CharacterServerInformation {
     pub unknown: [u8; 128],
 }
 
+/// Sent by the client to the character server after after successfully logging into the login
+/// server.
+/// Attempts to log into the character server using the provided information.
 #[derive(Debug, Packet, new)]
 #[header(0x65, 0x00)]
 struct CharacterServerLoginPacket {
@@ -278,6 +309,8 @@ struct CharacterServerLoginPacket {
     pub sex: Sex,
 }
 
+/// Sent by the client to the map server after after successfully selecting a character.
+/// Attempts to log into the map server using the provided information.
 #[derive(Debug, Packet, new)]
 #[header(0x36, 0x04)]
 struct MapServerLoginPacket {
@@ -296,6 +329,9 @@ struct Packet8302 {
     pub entity_id: u32,
 }
 
+/// Sent by the client to the character server when the player tries to create
+/// a new character.
+/// Attempts to create a new character in an empty slot using the provided information.
 #[derive(Debug, Packet, new)]
 #[header(0x39, 0x0a)]
 struct CreateCharacterPacket {
@@ -360,16 +396,22 @@ pub struct CharacterInformation {
     pub sex: Sex,
 }
 
+/// Sent by the character server as a response to [CreateCharacterPacket] succeeding.
+/// Provides all character information of the newly created character.
 #[derive(Debug, Packet)]
 #[header(0x6f, 0x0b)]
 struct CreateCharacterSuccessPacket {
     pub character_information: CharacterInformation,
 }
 
+/// Sent by the client to the character server.
+/// Requests a list of every character associated with the account.
 #[derive(Debug, Default, Packet)]
 #[header(0xa1, 0x09)]
 struct RequestCharacterListPacket {}
 
+/// Sent by the character server as a response to [RequestCharacterListPacket] succeeding.
+/// Provides the requested list of character information.
 #[derive(Debug, Packet)]
 #[header(0x72, 0x0b)]
 struct RequestCharacterListSuccessPacket {
@@ -378,12 +420,17 @@ struct RequestCharacterListSuccessPacket {
     pub character_information: Vec<CharacterInformation>,
 }
 
+/// Sent by the client to the map server when the player wants to move.
+/// Attempts to path the player towards the provided position.
 #[derive(Debug, Packet, new)]
 #[header(0x81, 0x08)]
 struct RequestPlayerMovePacket {
     pub position: WorldPosition,
 }
 
+/// Sent by the client to the map server when the player wants to warp.
+/// Attempts to warp the player to a specific position on a specific map using the
+/// provided information.
 #[derive(Debug, Packet, new)]
 #[header(0x40, 0x01)]
 struct RequestWarpToMapPacket {
@@ -393,6 +440,10 @@ struct RequestWarpToMapPacket {
     pub y: u16,
 }
 
+/// Sent by the map server to the client.
+/// Informs the client that an entity is pathing towards a new position.
+/// Provides the initial position and destination of the movement, as well as a
+/// timestamp of when it started (for synchronization).
 #[derive(Debug, Packet)]
 #[header(0x86, 0x00)]
 struct EntityMovePacket {
@@ -401,6 +452,10 @@ struct EntityMovePacket {
     pub timestamp: u32,
 }
 
+/// Sent by the map server to the client.
+/// Informs the client that the player is pathing towards a new position.
+/// Provides the initial position and destination of the movement, as well as a
+/// timestamp of when it started (for synchronization).
 #[derive(Debug, Packet)]
 #[header(0x87, 0x00)]
 struct PlayerMovePacket {
@@ -408,12 +463,19 @@ struct PlayerMovePacket {
     pub from_to: WorldPosition2,
 }
 
+/// Sent by the client to the character server when the user tries to delete a
+/// character.
+/// Attempts to delete a character from the user account using the provided
+/// information.
 #[derive(Debug, Packet, new)]
 #[header(0xfb, 0x01)]
 struct DeleteCharacterPacket {
     character_id: u32,
+    /// This field can be used for email or date of birth, depending on the
+    /// configuration of the character server.
     #[length_hint(40)]
     pub email: String,
+    /// ignored by rAthena
     #[new(default)]
     pub unknown: [u8; 10],
 }
@@ -425,22 +487,29 @@ pub enum CharacterDeletionFailedReason {
     NotEligible,
 }
 
+/// Sent by the character server as a response to [DeleteCharacterPacket] failing.
+/// Provides a reason for the character deletion failing.
 #[derive(Debug, Packet)]
 #[header(0x70, 0x00)]
 struct CharacterDeletionFailedPacket {
     pub reason: CharacterDeletionFailedReason,
 }
 
+/// Sent by the character server as a response to [DeleteCharacterPacket] succeeding.
 #[derive(Debug, Packet)]
 #[header(0x6f, 0x00)]
 struct CharacterDeletionSuccessPacket {}
 
+/// Sent by the client to the character server when the user selects a character.
+/// Attempts to select the character in the specified slot.
 #[derive(Debug, Packet, new)]
 #[header(0x66, 0x00)]
 struct SelectCharacterPacket {
     pub selected_slot: u8,
 }
 
+/// Sent by the map server to the client when there is a new chat message from the server.
+/// Provides the message to be displayed in the chat window.
 #[derive(Debug, Packet)]
 #[header(0x8e, 0x00)]
 struct ServerMessagePacket {
@@ -470,7 +539,7 @@ struct AchievementUpdatePacket {
     pub total_score: u32,
     pub level: u16,
     pub acheivement_experience: u32,
-    pub acheivement_experience_tnl: u32, // ?
+    pub acheivement_experience_to_next_level: u32, // "to_next_level" might be wrong
     pub acheivement_data: AchievementData,
 }
 
@@ -482,7 +551,7 @@ struct AchievementListPacket {
     pub total_score: u32,
     pub level: u16,
     pub acheivement_experience: u32,
-    pub acheivement_experience_tnl: u32, // ?
+    pub acheivement_experience_to_next_level: u32, // "to_next_level" might be wrong
     #[repeating(self.acheivement_count)]
     pub acheivement_data: Vec<AchievementData>,
 }
@@ -573,6 +642,9 @@ struct MapTypePacket {
     pub flags: u32,
 }
 
+/// Sent by the map server to the client when there is a new chat message from ??.
+/// Provides the message to be displayed in the chat window, as well as information on how
+/// the message should be displayed.
 #[derive(Debug, Packet)]
 #[header(0xc3, 0x01)]
 struct BroadcastMessagePacket {
@@ -586,6 +658,9 @@ struct BroadcastMessagePacket {
     pub message: String,
 }
 
+/// Sent by the map server to the client when there is a new chat message from an entity.
+/// Provides the message to be displayed in the chat window, the color of the message,
+/// and the ID of the entity it originated from.
 #[derive(Debug, Packet)]
 #[header(0xc1, 0x02)]
 struct EntityMessagePacket {
@@ -603,73 +678,77 @@ struct DisplayEmotionPacket {
     pub emotion: u8,
 }
 
+/// Every value that can be set from the server through [UpdateStatusPacket],
+/// [UpdateStatusPacket1], [UpdateStatusPacket2], and [UpdateStatusPacket3].
+/// All UpdateStatusPackets do the same, they just have different sizes correlating
+/// to the space the updated value requires.
 #[derive(Debug)]
 enum StatusType {
-    SP_WEIGHT(u32),
-    SP_MAXWEIGHT(u32),
-    SP_SPEED(u32),
-    SP_BASELEVEL(u32),
-    SP_JOBLEVEL(u32),
-    SP_KARMA(u32),
-    SP_MANNER(u32),
-    SP_STATUSPOINT(u32),
-    SP_SKILLPOINT(u32),
-    SP_HIT(u32),
-    SP_FLEE1(u32),
-    SP_FLEE2(u32),
-    SP_MAXHP(u32),
-    SP_MAXSP(u32),
-    SP_HP(u32),
-    SP_SP(u32),
-    SP_ASPD(u32),
-    SP_ATK1(u32),
-    SP_DEF1(u32),
-    SP_MDEF1(u32),
-    SP_ATK2(u32),
-    SP_DEF2(u32),
-    SP_MDEF2(u32),
-    SP_CRITICAL(u32),
-    SP_MATK1(u32),
-    SP_MATK2(u32),
-    SP_ZENY(u32),
-    SP_BASEEXP(u64),
-    SP_JOBEXP(u64),
-    SP_NEXTBASEEXP(u64),
-    SP_NEXTJOBEXP(u64),
+    Weight(u32),
+    MaximumWeight(u32),
+    MovementSpeed(u32),
+    BaseLevel(u32),
+    JobLevel(u32),
+    Karma(u32),
+    Manner(u32),
+    StatusPoint(u32),
+    SkillPoint(u32),
+    Hit(u32),
+    Flee1(u32),
+    Flee2(u32),
+    MaximumHealthPoints(u32),
+    MaximumSpellPoints(u32),
+    HealthPoints(u32),
+    SpellPoints(u32),
+    AttackSpeed(u32),
+    Attack1(u32),
+    Defense1(u32),
+    MagicDefense1(u32),
+    Attack2(u32),
+    Defense2(u32),
+    MagicDefense2(u32),
+    Critical(u32),
+    MagicAttack1(u32),
+    MagicAttack2(u32),
+    Zeny(u32),
+    BaseExperience(u64),
+    JobExperience(u64),
+    NextBaseExperience(u64),
+    NextJobExperience(u64),
     SP_USTR(u8),
     SP_UAGI(u8),
     SP_UVIT(u8),
     SP_UINT(u8),
     SP_UDEX(u8),
     SP_ULUK(u8),
-    SP_STR(u32, u32),
-    SP_AGI(u32, u32),
-    SP_VIT(u32, u32),
-    SP_INT(u32, u32),
-    SP_DEX(u32, u32),
-    SP_LUK(u32, u32),
-    SP_CARTINFO(u16, u32, u32),
-    SP_AP(u32),
-    SP_TRAITPOINT(u32),
-    SP_MAXAP(u32),
-    SP_POW(u32, u32),
-    SP_STA(u32, u32),
-    SP_WIS(u32, u32),
-    SP_SPL(u32, u32),
-    SP_CON(u32, u32),
-    SP_CRT(u32, u32),
+    Strength(u32, u32),
+    Agility(u32, u32),
+    Vitality(u32, u32),
+    Intelligence(u32, u32),
+    Dexterity(u32, u32),
+    Luck(u32, u32),
+    CartInfo(u16, u32, u32),
+    ActivityPoints(u32),
+    TraitPoint(u32),
+    MaximumActivityPoints(u32),
+    Power(u32, u32),
+    Stamina(u32, u32),
+    Wisdom(u32, u32),
+    Spell(u32, u32),
+    Concentration(u32, u32),
+    Creativity(u32, u32),
     SP_UPOW(u8),
     SP_USTA(u8),
     SP_UWIS(u8),
     SP_USPL(u8),
     SP_UCON(u8),
     SP_UCRT(u8),
-    SP_PATK(u32),
-    SP_SMATK(u32),
-    SP_RES(u32),
-    SP_MRES(u32),
-    SP_HPLUS(u32),
-    SP_CRATE(u32),
+    PhysicalAttack(u32),
+    SpellMagicAttack(u32),
+    Resistance(u32),
+    MagicResistance(u32),
+    HealingPlus(u32),
+    CriticalDamageRate(u32),
 }
 
 impl ByteConvertable for StatusType {
@@ -679,65 +758,65 @@ impl ByteConvertable for StatusType {
         let mut byte_stream = ByteStream::new(&data);
 
         match u16::from_bytes(&mut byte_stream, None) {
-            0 => Self::SP_SPEED(u32::from_bytes(&mut byte_stream, None)),
-            1 => Self::SP_BASEEXP(u64::from_bytes(&mut byte_stream, None)),
-            2 => Self::SP_JOBEXP(u64::from_bytes(&mut byte_stream, None)),
-            3 => Self::SP_KARMA(u32::from_bytes(&mut byte_stream, None)),
-            4 => Self::SP_MANNER(u32::from_bytes(&mut byte_stream, None)),
-            5 => Self::SP_HP(u32::from_bytes(&mut byte_stream, None)),
-            6 => Self::SP_MAXHP(u32::from_bytes(&mut byte_stream, None)),
-            7 => Self::SP_SP(u32::from_bytes(&mut byte_stream, None)),
-            8 => Self::SP_MAXSP(u32::from_bytes(&mut byte_stream, None)),
-            9 => Self::SP_STATUSPOINT(u32::from_bytes(&mut byte_stream, None)),
-            11 => Self::SP_BASELEVEL(u32::from_bytes(&mut byte_stream, None)),
-            12 => Self::SP_SKILLPOINT(u32::from_bytes(&mut byte_stream, None)),
-            13 => Self::SP_STR(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            14 => Self::SP_AGI(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            15 => Self::SP_VIT(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            16 => Self::SP_INT(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            17 => Self::SP_DEX(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            18 => Self::SP_LUK(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            20 => Self::SP_ZENY(u32::from_bytes(&mut byte_stream, None)),
-            22 => Self::SP_NEXTBASEEXP(u64::from_bytes(&mut byte_stream, None)),
-            23 => Self::SP_NEXTJOBEXP(u64::from_bytes(&mut byte_stream, None)),
-            24 => Self::SP_WEIGHT(u32::from_bytes(&mut byte_stream, None)),
-            25 => Self::SP_MAXWEIGHT(u32::from_bytes(&mut byte_stream, None)),
+            0 => Self::MovementSpeed(u32::from_bytes(&mut byte_stream, None)),
+            1 => Self::BaseExperience(u64::from_bytes(&mut byte_stream, None)),
+            2 => Self::JobExperience(u64::from_bytes(&mut byte_stream, None)),
+            3 => Self::Karma(u32::from_bytes(&mut byte_stream, None)),
+            4 => Self::Manner(u32::from_bytes(&mut byte_stream, None)),
+            5 => Self::HealthPoints(u32::from_bytes(&mut byte_stream, None)),
+            6 => Self::MaximumHealthPoints(u32::from_bytes(&mut byte_stream, None)),
+            7 => Self::SpellPoints(u32::from_bytes(&mut byte_stream, None)),
+            8 => Self::MaximumSpellPoints(u32::from_bytes(&mut byte_stream, None)),
+            9 => Self::StatusPoint(u32::from_bytes(&mut byte_stream, None)),
+            11 => Self::BaseLevel(u32::from_bytes(&mut byte_stream, None)),
+            12 => Self::SkillPoint(u32::from_bytes(&mut byte_stream, None)),
+            13 => Self::Strength(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            14 => Self::Agility(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            15 => Self::Vitality(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            16 => Self::Intelligence(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            17 => Self::Dexterity(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            18 => Self::Luck(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            20 => Self::Zeny(u32::from_bytes(&mut byte_stream, None)),
+            22 => Self::NextBaseExperience(u64::from_bytes(&mut byte_stream, None)),
+            23 => Self::NextJobExperience(u64::from_bytes(&mut byte_stream, None)),
+            24 => Self::Weight(u32::from_bytes(&mut byte_stream, None)),
+            25 => Self::MaximumWeight(u32::from_bytes(&mut byte_stream, None)),
             32 => Self::SP_USTR(u8::from_bytes(&mut byte_stream, None)),
             33 => Self::SP_UAGI(u8::from_bytes(&mut byte_stream, None)),
             34 => Self::SP_UVIT(u8::from_bytes(&mut byte_stream, None)),
             35 => Self::SP_UINT(u8::from_bytes(&mut byte_stream, None)),
             36 => Self::SP_UDEX(u8::from_bytes(&mut byte_stream, None)),
             37 => Self::SP_ULUK(u8::from_bytes(&mut byte_stream, None)),
-            41 => Self::SP_ATK1(u32::from_bytes(&mut byte_stream, None)),
-            42 => Self::SP_ATK2(u32::from_bytes(&mut byte_stream, None)),
-            43 => Self::SP_MATK1(u32::from_bytes(&mut byte_stream, None)),
-            44 => Self::SP_MATK2(u32::from_bytes(&mut byte_stream, None)),
-            45 => Self::SP_DEF1(u32::from_bytes(&mut byte_stream, None)),
-            46 => Self::SP_DEF2(u32::from_bytes(&mut byte_stream, None)),
-            47 => Self::SP_MDEF1(u32::from_bytes(&mut byte_stream, None)),
-            48 => Self::SP_MDEF2(u32::from_bytes(&mut byte_stream, None)),
-            49 => Self::SP_HIT(u32::from_bytes(&mut byte_stream, None)),
-            50 => Self::SP_FLEE1(u32::from_bytes(&mut byte_stream, None)),
-            51 => Self::SP_FLEE2(u32::from_bytes(&mut byte_stream, None)),
-            52 => Self::SP_CRITICAL(u32::from_bytes(&mut byte_stream, None)),
-            53 => Self::SP_ASPD(u32::from_bytes(&mut byte_stream, None)),
-            55 => Self::SP_JOBLEVEL(u32::from_bytes(&mut byte_stream, None)),
-            99 => Self::SP_CARTINFO(u16::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            219 => Self::SP_POW(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            220 => Self::SP_STA(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            221 => Self::SP_WIS(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            222 => Self::SP_SPL(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            223 => Self::SP_CON(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            224 => Self::SP_CRT(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-            225 => Self::SP_PATK(u32::from_bytes(&mut byte_stream, None)),
-            226 => Self::SP_SMATK(u32::from_bytes(&mut byte_stream, None)),
-            227 => Self::SP_RES(u32::from_bytes(&mut byte_stream, None)),
-            228 => Self::SP_MRES(u32::from_bytes(&mut byte_stream, None)),
-            229 => Self::SP_HPLUS(u32::from_bytes(&mut byte_stream, None)),
-            230 => Self::SP_CRATE(u32::from_bytes(&mut byte_stream, None)),
-            231 => Self::SP_TRAITPOINT(u32::from_bytes(&mut byte_stream, None)),
-            232 => Self::SP_AP(u32::from_bytes(&mut byte_stream, None)),
-            233 => Self::SP_MAXAP(u32::from_bytes(&mut byte_stream, None)),
+            41 => Self::Attack1(u32::from_bytes(&mut byte_stream, None)),
+            42 => Self::Attack2(u32::from_bytes(&mut byte_stream, None)),
+            43 => Self::MagicAttack1(u32::from_bytes(&mut byte_stream, None)),
+            44 => Self::MagicAttack2(u32::from_bytes(&mut byte_stream, None)),
+            45 => Self::Defense1(u32::from_bytes(&mut byte_stream, None)),
+            46 => Self::Defense2(u32::from_bytes(&mut byte_stream, None)),
+            47 => Self::MagicDefense1(u32::from_bytes(&mut byte_stream, None)),
+            48 => Self::MagicDefense2(u32::from_bytes(&mut byte_stream, None)),
+            49 => Self::Hit(u32::from_bytes(&mut byte_stream, None)),
+            50 => Self::Flee1(u32::from_bytes(&mut byte_stream, None)),
+            51 => Self::Flee2(u32::from_bytes(&mut byte_stream, None)),
+            52 => Self::Critical(u32::from_bytes(&mut byte_stream, None)),
+            53 => Self::AttackSpeed(u32::from_bytes(&mut byte_stream, None)),
+            55 => Self::JobLevel(u32::from_bytes(&mut byte_stream, None)),
+            99 => Self::CartInfo(u16::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            219 => Self::Power(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            220 => Self::Stamina(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            221 => Self::Wisdom(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            222 => Self::Spell(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            223 => Self::Concentration(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            224 => Self::Creativity(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
+            225 => Self::PhysicalAttack(u32::from_bytes(&mut byte_stream, None)),
+            226 => Self::SpellMagicAttack(u32::from_bytes(&mut byte_stream, None)),
+            227 => Self::Resistance(u32::from_bytes(&mut byte_stream, None)),
+            228 => Self::MagicResistance(u32::from_bytes(&mut byte_stream, None)),
+            229 => Self::HealingPlus(u32::from_bytes(&mut byte_stream, None)),
+            230 => Self::CriticalDamageRate(u32::from_bytes(&mut byte_stream, None)),
+            231 => Self::TraitPoint(u32::from_bytes(&mut byte_stream, None)),
+            232 => Self::ActivityPoints(u32::from_bytes(&mut byte_stream, None)),
+            233 => Self::MaximumActivityPoints(u32::from_bytes(&mut byte_stream, None)),
             247 => Self::SP_UPOW(u8::from_bytes(&mut byte_stream, None)),
             248 => Self::SP_USTA(u8::from_bytes(&mut byte_stream, None)),
             249 => Self::SP_UWIS(u8::from_bytes(&mut byte_stream, None)),
@@ -756,6 +835,9 @@ struct UpdateStatusPacket {
     pub status_type: StatusType,
 }
 
+/// Sent by the character server to the client when loading onto a new map.
+/// This packet is ignored by Korangar since all of the provided values are set
+/// again individually using the UpdateStatusPackets.
 #[derive(Debug, Packet)]
 #[header(0xbd, 0x00)]
 struct InitialStatusPacket {
@@ -785,7 +867,8 @@ struct InitialStatusPacket {
     pub flee2: u16,
     pub crit: u16,
     pub attack_speed: u16,
-    pub bonus_attack_speed: u16, // always 0
+    /// always 0 on rAthena
+    pub bonus_attack_speed: u16,
 }
 
 #[derive(Debug, Packet)]
@@ -837,7 +920,7 @@ struct RequestServerTickPacket {
 }
 
 #[derive(Debug, PartialEq, Eq, ByteConvertable)]
-#[base_type(u16)]
+#[numeric_type(u16)]
 pub enum SwitchCharacterSlotResponseStatus {
     Success,
     Error,

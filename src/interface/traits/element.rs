@@ -1,5 +1,5 @@
 use crate::types::maths::Vector2;
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, InterfaceRenderer};
 use crate::interface::types::*;
 
 pub trait Element {
@@ -26,5 +26,5 @@ pub trait Element {
         None 
     }
 
-    fn render(&self, renderer: &mut Renderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool);
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, render: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool);
 }

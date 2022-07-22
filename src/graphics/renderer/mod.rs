@@ -2,451 +2,228 @@ mod settings;
 mod picker;
 mod deferred;
 mod shadow;
-mod lighting;
-mod sprite;
 mod interface;
-#[cfg(feature = "debug")]
-mod debug;
 
-use derive_new::new;
-use std::rc::Rc;
-use std::cell::RefCell;
-
-use cgmath::{ Vector4, Vector3, Vector2 };
+use std::sync::Arc;
+use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
+use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, SubpassContents, CommandBufferUsage, PrimaryCommandBuffer };
+use vulkano::device::{Device, Queue};
 use vulkano::device::physical::PhysicalDevice;
-use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryCommandBuffer, CommandBufferUsage, SubpassContents };
-use vulkano::device::{ Device, Queue };
-use vulkano::swapchain::{ AcquireError, Swapchain, SwapchainCreationError, SwapchainAcquireFuture, Surface, ColorSpace, PresentMode, acquire_next_image };
-use vulkano::image::{ ImageUsage, SwapchainImage, ImageAccess, SampleCount };
-use vulkano::image::view::ImageView;
-use vulkano::image::attachment::AttachmentImage;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::render_pass::{ Framebuffer, RenderPass, Subpass };
-use vulkano::buffer::BufferUsage;
 use vulkano::format::{ Format, ClearValue };
-use vulkano::sync::{ FlushError, GpuFuture, now, FenceSignalFuture };
-use vulkano::ordered_passes_renderpass;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::render_pass::{Framebuffer, RenderPass};
+use vulkano::swapchain::{ PresentMode, Swapchain, Surface, ColorSpace, AcquireError, acquire_next_image };
+use vulkano::sync::{ FenceSignalFuture, GpuFuture, SemaphoreSignalFuture };
+use vulkano::image::{ ImageUsage, AttachmentImage, SampleCount, SwapchainImage };
+use vulkano::image::view::ImageView;
 use winit::window::Window;
 
-#[cfg(feature = "debug")]
-use crate::debug::*;
-use crate::graphics::*;
-use crate::loaders::{TextureLoader, FontLoader};
-use crate::types::map::model::{ Node, BoundingBox };
-
-use self::picker::PickerRenderer;
-use self::deferred::*;
-use self::shadow::*;
-use self::lighting::*;
-use self::sprite::DynamicSpriteRenderer;
-use self::interface::*;
-#[cfg(feature = "debug")]
-use self::debug::*;
+use crate::types::maths::*;
+use crate::graphics::{ ImageBuffer, Texture, Camera, ModelVertexBuffer };
 
 pub use self::settings::RenderSettings;
+pub use self::picker::PickerRenderer;
+pub use self::deferred::DeferredRenderer;
+pub use self::shadow::ShadowRenderer;
+pub use self::interface::InterfaceRenderer;
 
-#[cfg(feature = "debug")]
-const MARKER_SIZE: f32 = 1.25;
-
-#[derive(new)]
-struct CurrentFrame {
-    pub builder: CommandBuilder,
-    pub shadow_builder: Option<CommandBuilder>,
-    pub picker_builder: Option<CommandBuilder>,
-    pub shadow_frame_end: Option<Box<dyn GpuFuture>>,
-    pub image_num: usize,
-    pub swapchain_future: SwapchainAcquireFuture<Window>,
-    pub render_info: RenderInfo,
+pub trait Renderer {
+    type Target;
 }
 
-pub struct Renderer {
-    queue: Arc<Queue>,
-    device: Arc<Device>,
-    picker_renderer: PickerRenderer,
-    geometry_renderer: GeometryRenderer,
-    entity_renderer: EntityRenderer,
-    water_renderer: WaterRenderer,
-    #[cfg(feature = "debug")]
-    box_renderer: BoxRenderer,
-    ambient_light_renderer: AmbientLightRenderer,
-    directional_light_renderer: DirectionalLightRenderer,
-    water_light_renderer: WaterLightRenderer,
-    point_light_renderer: PointLightRenderer,
-    sprite_renderer: SpriteRenderer,
-    text_renderer: TextRenderer,
-    rectangle_renderer: RectangleRenderer,
-    interface_renderer: InterfaceRenderer,
-    dynamic_sprite_renderer: DynamicSpriteRenderer,
-    #[cfg(feature = "debug")]
-    buffer_renderer: BufferRenderer,
-    swapchain: Arc<Swapchain<Window>>,
-    render_pass: Arc<RenderPass>,
-    framebuffers: Vec<Arc<Framebuffer>>,
-    diffuse_buffer: ImageBuffer,
-    normal_buffer: ImageBuffer,
-    water_buffer: ImageBuffer,
-    interface_buffer: ImageBuffer,
-    depth_buffer: ImageBuffer,
-    present_mode: PresentMode,
-    screen_vertex_buffer: ScreenVertexBuffer,
-    billboard_vertex_buffer: ScreenVertexBuffer,
-    current_frame: Option<CurrentFrame>,
-    previous_frame_end: Option<Box<dyn GpuFuture>>,
-    picker_fence: Option<FenceSignalFuture<Box<dyn GpuFuture>>>,
-    recreate_swapchain: bool,
-    window_size: Vector2<usize>,
-    font_map: Texture,
-    #[cfg(feature = "debug")]
-    debug_icon_texture: Texture,
-    checked_box_texture: Texture,
-    unchecked_box_texture: Texture,
-    expanded_arrow_texture: Texture,
-    collapsed_arrow_texture: Texture,
+pub trait GeometryRenderer {
 
-    shadow_framebuffers: Vec<Arc<Framebuffer>>,
-    directional_shadow_maps: Vec<ImageBuffer>,
-    geometry_shadow_renderer: GeometryShadowRenderer,
-
-    picker_render_pass: Arc<RenderPass>,
-    picker_framebuffers: Vec<Arc<Framebuffer>>,
-    picker_images: Vec<ImageBuffer>,
-    picker_buffers: Vec<Arc<CpuAccessibleBuffer<[u32]>>>,
-
-    last_image_num: usize,
+    fn render_geometry(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>)
+        where Self: Renderer;
 }
 
-impl Renderer {
+pub trait EntityRenderer {
 
-    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>, texture_loader: &mut TextureLoader, font_loader: Rc<RefCell<FontLoader>>) -> Self {
+    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>)
+        where Self: Renderer;
+}
 
-        let mut texture_future = now(device.clone()).boxed();
+enum PickerColor {
+    ObjectMarker(u16),
+    LightSoorceMarker(u16),
+    SoundSourceMarker(u16),
+    EffectSourceMarker(u16),
+    ParticleMarker(u16, u8),
+    Entity(u16),
+    Tile(u8, u8),
+}
 
-        let capabilities = surface.capabilities(*physical_device).expect("failed to get surface capabilities");
-        let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
-        let format = capabilities.supported_formats[0].0;
-        let dimensions: [u32; 2] = surface.window().inner_size().into();
-        let window_size = Vector2::new(dimensions[0] as usize, dimensions[1] as usize);
-        let present_mode = PresentMode::Fifo;
+pub trait MarkerRenderer {
 
-        let (swapchain, images) = Swapchain::start(device.clone(), surface)
-            .num_images(capabilities.min_image_count)
-            .format(format)
-            .dimensions(dimensions)
-            .usage(ImageUsage::color_attachment())
-            .sharing_mode(&queue)
-            .composite_alpha(composite_alpha)
-            .color_space(ColorSpace::SrgbNonLinear)
-            .present_mode(present_mode)
-            .build()
-            .expect("failed to create swapchain");
+    fn render_marker(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, position: Vector3<f32>, hovered: bool)
+        where Self: Renderer;
+}
 
-        #[cfg(feature = "debug")]
-        print_debug!("created {}swapchain{}", MAGENTA, NONE);
+pub enum RenderTargetState {
+    Ready,
+    Rendering(AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
+    Semaphore(SemaphoreSignalFuture<Box<dyn GpuFuture>>),
+    Fence(FenceSignalFuture<Box<dyn GpuFuture>>),
+}
 
-        let render_pass = ordered_passes_renderpass!(device.clone(),
-            attachments: {
-                output: {
-                    load: Clear,
-                    store: Store,
-                    format: swapchain.format(),
-                    samples: 1,
-                },
-                diffuse: {
-                    load: Clear,
-                    store: Store,
-                    format: Format::R32G32B32A32_SFLOAT,
-                    samples: 4,
-                },
-                normal: {
-                    load: Clear,
-                    store: Store,
-                    format: Format::R16G16B16A16_SFLOAT,
-                    samples: 4,
-                },
-                water: {
-                    load: Clear,
-                    store: Store,
-                    format: Format::R8_SRGB,
-                    samples: 4,
-                },
-                interface: {
-                    load: DontCare,
-                    store: Store,
-                    format: Format::R32G32B32A32_SFLOAT,
-                    samples: 4,
-                },
-                depth: {
-                    load: Clear,
-                    store: Store,
-                    format: Format::D32_SFLOAT,
-                    samples: 4,
-                }
-            },
-            passes: [
-                {
-                    color: [diffuse, normal, water, interface],
-                    depth_stencil: {depth},
-                    input: []
-                },
-                {
-                    color: [output],
-                    depth_stencil: {},
-                    input: [diffuse, normal, water, depth]
-                }
-            ]
-        )
-        .unwrap();
+unsafe impl Send for RenderTargetState {}
 
-        let shadow_render_pass = vulkano::single_pass_renderpass!(
-            device.clone(),
-            attachments: {
-                depth: {
-                    load: Clear,
-                    store: Store,
-                    format: Format::D32_SFLOAT,
-                    samples: 1,
-                }
-            },
-            pass: {
-                color: [],
-                depth_stencil: {depth}
-            }
-        )
-        .unwrap();
+impl RenderTargetState {
 
-        let picker_render_pass = vulkano::single_pass_renderpass!(
-            device.clone(),
-            attachments: {
-                color: {
-                    load: Clear,
-                    store: Store,
-                    format: Format::R32_UINT,
-                    samples: 1,
-                },
-                depth: {
-                    load: Clear,
-                    store: DontCare,
-                    format: Format::D16_UNORM,
-                    samples: 1,
-                }
-            },
-            pass: {
-                color: [color],
-                depth_stencil: {depth}
-            }
-        )
-        .unwrap();
-
-        let deferred_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-        let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
-
-        #[cfg(feature = "debug")]
-        print_debug!("created {}render pass{}", MAGENTA, NONE);
-
-        let (framebuffers, diffuse_buffer, normal_buffer, water_buffer, interface_buffer, depth_buffer, viewport) = Self::window_size_dependent_setup(device.clone(), &images, render_pass.clone());
-        let (shadow_framebuffers, directional_shadow_maps) = Self::window_size_dependent_shadow_setup(device.clone(), shadow_render_pass.clone(), images.len());
-        let (picker_framebuffers, picker_images, picker_buffers) = Self::window_size_dependent_picker_setup(device.clone(), &images, picker_render_pass.clone());
-
-        #[cfg(feature = "debug")]
-        print_debug!("created {}pipeline{}", MAGENTA, NONE);
-
-        let shadow_viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: [8096.0, 8096.0],
-            depth_range: 0.0..1.0,
+    pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+        let RenderTargetState::Rendering(builder) = self else {
+            panic!("render target is not in the render state");
         };
 
-        let picker_renderer = PickerRenderer::new(device.clone(), picker_render_pass.clone().first_subpass(), viewport.clone());
-        let geometry_renderer = GeometryRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
-        let entity_renderer = EntityRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
-        let water_renderer = WaterRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
-        let rectangle_renderer = RectangleRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
-        let sprite_renderer = SpriteRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone());
-        let text_renderer = TextRenderer::new(device.clone(), deferred_subpass.clone(), viewport.clone(), font_loader);
-        #[cfg(feature = "debug")]
-        let box_renderer = BoxRenderer::new(device.clone(), deferred_subpass, viewport.clone());
-        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let water_light_renderer = WaterLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let interface_renderer = InterfaceRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let dynamic_sprite_renderer = DynamicSpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        #[cfg(feature = "debug")]
-        let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass, viewport, texture_loader, &mut texture_future);
-        let geometry_shadow_renderer = GeometryShadowRenderer::new(device.clone(), shadow_render_pass.first_subpass(), shadow_viewport);
+        builder
+    }
 
-        #[cfg(feature = "debug")]
-        print_debug!("created {}renderers{}", MAGENTA, NONE);
+    pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+        let RenderTargetState::Rendering(builder) = std::mem::replace(self, RenderTargetState::Ready) else {
+            panic!("render target is not in the render state");
+        };
 
-        let vertices = vec![ScreenVertex::new(Vector2::new(-1.0, -1.0)), ScreenVertex::new(Vector2::new(-1.0, 3.0)), ScreenVertex::new(Vector2::new(3.0, -1.0))];
-        let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        builder
+    }
 
-        let vertices = vec![
-            ScreenVertex::new(Vector2::new(0.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 1.0))
-        ];
-        let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+    pub fn take_semaphore(&mut self) -> SemaphoreSignalFuture<Box<dyn GpuFuture>> {
+        let RenderTargetState::Semaphore(semaphore) = std::mem::replace(self, RenderTargetState::Ready) else {
+            panic!("render target is not in the semaphore state");
+        };
 
-        let font_map = texture_loader.get("assets/font.png", &mut texture_future).unwrap();
-        #[cfg(feature = "debug")]
-        let debug_icon_texture = texture_loader.get("assets/debug_icon.png", &mut texture_future).unwrap();
-        let checked_box_texture = texture_loader.get("assets/checked_box.png", &mut texture_future).unwrap();
-        let unchecked_box_texture = texture_loader.get("assets/unchecked_box.png", &mut texture_future).unwrap();
-        let expanded_arrow_texture = texture_loader.get("assets/expanded_arrow.png", &mut texture_future).unwrap();
-        let collapsed_arrow_texture = texture_loader.get("assets/collapsed_arrow.png", &mut texture_future).unwrap();
+        semaphore
+    }
 
-        texture_future.flush().unwrap();
-        texture_future.cleanup_finished();
+    pub fn try_take_semaphore(&mut self) -> Option<Box<dyn GpuFuture>> {
 
-        let previous_frame_end = now(device.clone()).boxed().into();
-        let picker_fence = None;
-        let current_frame = None;
-        let recreate_swapchain = false;
+        if let RenderTargetState::Ready = self {
+            return None;
+        }
 
-        let last_image_num = 0;
+        let RenderTargetState::Semaphore(semaphore) = std::mem::replace(self, RenderTargetState::Ready) else {
+            panic!("render target is in an unexpected state");
+        };
+
+        semaphore.boxed().into()
+    }
+
+    pub fn try_take_fence(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
+
+        if let RenderTargetState::Ready = self {
+            return None;
+        }
+
+        let RenderTargetState::Fence(fence) = std::mem::replace(self, RenderTargetState::Ready) else {
+            panic!("render target is in an unexpected state");
+        };
+
+        fence.into()
+    }
+}
+
+pub struct DeferredRenderTarget {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    framebuffer: Arc<Framebuffer>,
+    diffuse_image: ImageBuffer,
+    normal_image: ImageBuffer,
+    water_image: ImageBuffer,
+    depth_image: ImageBuffer,
+    pub state: RenderTargetState,
+    image_index: usize,
+}
+
+impl DeferredRenderTarget {
+
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, swapchain_image: Arc<SwapchainImage<Window>>, dimensions: [u32; 2]) -> Self {
+
+        let color_image_usage = ImageUsage {
+            sampled: true,
+            color_attachment: true,
+            input_attachment: true,
+            ..ImageUsage::none()
+        };
+
+        let depth_image_usage = ImageUsage {
+            sampled: true,
+            depth_stencil_attachment: true,
+            input_attachment: true,
+            ..ImageUsage::none()
+        };
+
+        let diffuse_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, color_image_usage).unwrap())).unwrap();
+        let normal_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R16G16B16A16_SFLOAT, color_image_usage).unwrap())).unwrap();
+        let water_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R8G8B8A8_SRGB, color_image_usage).unwrap())).unwrap();
+        let depth_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::D32_SFLOAT, depth_image_usage).unwrap())).unwrap();
+
+        let framebuffer = Framebuffer::start(render_pass.clone())
+            .add(ImageView::new(swapchain_image).unwrap()).unwrap()
+            .add(diffuse_image.clone()).unwrap()
+            .add(normal_image.clone()).unwrap()
+            .add(water_image.clone()).unwrap()
+            .add(depth_image.clone()).unwrap()
+            .build().unwrap();
+
+        let state = RenderTargetState::Ready;
+        let image_index = 0;
 
         Self {
-            queue,
             device,
-            picker_renderer,
-            geometry_renderer,
-            entity_renderer,
-            water_renderer,
-            #[cfg(feature = "debug")]
-            box_renderer,
-            ambient_light_renderer,
-            directional_light_renderer,
-            water_light_renderer,
-            point_light_renderer,
-            sprite_renderer,
-            text_renderer,
-            rectangle_renderer,
-            interface_renderer,
-            dynamic_sprite_renderer,
-            #[cfg(feature = "debug")]
-            buffer_renderer,
-            swapchain,
-            render_pass,
-            framebuffers,
-            diffuse_buffer,
-            normal_buffer,
-            water_buffer,
-            interface_buffer,
-            depth_buffer,
-            present_mode,
-            screen_vertex_buffer,
-            billboard_vertex_buffer,
-            current_frame,
-            previous_frame_end,
-            picker_fence,
-            recreate_swapchain,
-            window_size,
-            font_map,
-            #[cfg(feature = "debug")]
-            debug_icon_texture,
-            checked_box_texture,
-            unchecked_box_texture,
-            expanded_arrow_texture,
-            collapsed_arrow_texture,
-
-            geometry_shadow_renderer,
-            shadow_framebuffers,
-            directional_shadow_maps,
-
-            picker_render_pass,
-            picker_framebuffers,
-            picker_images,
-            picker_buffers,
-
-            last_image_num,
+            queue,
+            framebuffer,
+            diffuse_image,
+            normal_image,
+            water_image,
+            depth_image,
+            state,
+            image_index,
         }
     }
 
-    fn window_size_dependent_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Vec<Arc<Framebuffer>>, ImageBuffer, ImageBuffer, ImageBuffer, ImageBuffer, ImageBuffer, Viewport) {
+    pub fn start(&mut self) {
 
-        let dimensions = images[0].dimensions().width_height();
+        let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        let color_buffer_usage = ImageUsage {
-            sampled: true,
-            color_attachment: true,
-            input_attachment: true, 
-            ..ImageUsage::none()
-        };
+        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Depth(1.0)]).unwrap(); 
 
-        let interface_image_usage = ImageUsage {
-            sampled: true,
-            transfer_destination: true,
-            color_attachment: true,
-            input_attachment: true,
-            ..ImageUsage::none()
-        };
-
-        let depth_buffer_usage = ImageUsage {
-            sampled: true,
-            depth_stencil_attachment: true,
-            input_attachment: true,
-            ..ImageUsage::none()
-        };
-
-        let diffuse_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, color_buffer_usage).unwrap())).unwrap();
-        let normal_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R16G16B16A16_SFLOAT, color_buffer_usage).unwrap())).unwrap();
-        let water_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R8_SRGB, color_buffer_usage).unwrap())).unwrap();
-        let interface_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, interface_image_usage).unwrap())).unwrap();
-        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device, dimensions, SampleCount::Sample4, Format::D32_SFLOAT, depth_buffer_usage).unwrap())).unwrap();
-
-        let framebuffers = images
-            .iter()
-            .map(|image| {
-                let image_buffer = ImageView::new(image.clone()).unwrap();
-
-                Framebuffer::start(render_pass.clone())
-                    .add(image_buffer).unwrap()
-                    .add(diffuse_buffer.clone()).unwrap()
-                    .add(normal_buffer.clone()).unwrap()
-                    .add(water_buffer.clone()).unwrap()
-                    .add(interface_buffer.clone()).unwrap()
-                    .add(depth_buffer.clone()).unwrap()
-                    .build().unwrap()
-            })
-            .collect::<Vec<_>>();
-
-        let viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: [dimensions[0] as f32, dimensions[1] as f32],
-            depth_range: 0.0..1.0,
-        };
-
-        (framebuffers, diffuse_buffer, normal_buffer, water_buffer, interface_buffer, depth_buffer, viewport)
+        self.state = RenderTargetState::Rendering(builder);
     }
 
-    fn window_size_dependent_shadow_setup(device: Arc<Device>, render_pass: Arc<RenderPass>, framebuffer_count: usize) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>) {
-
-        let dimensions = [8096, 8096];
-
-        let shadow_buffer_usage = ImageUsage {
-            sampled: true,
-            depth_stencil_attachment: true,
-            ..ImageUsage::none()
-        };
-
-        let directional_shadow_maps: Vec<ImageBuffer> = (0..framebuffer_count).map(|_| ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D32_SFLOAT, shadow_buffer_usage).unwrap())).unwrap()).collect();
-
-        let framebuffers = directional_shadow_maps.iter().map(|image| {
-            Framebuffer::start(render_pass.clone())
-                .add(image.clone()).unwrap()
-                .build().unwrap()
-        }).collect();
-
-        (framebuffers, directional_shadow_maps)
+    pub fn lighting_pass(&mut self) {
+        self.state.get_builder().next_subpass(SubpassContents::Inline).unwrap();
     }
 
-    fn window_size_dependent_picker_setup(device: Arc<Device>, images: &[Arc<SwapchainImage<Window>>], render_pass: Arc<RenderPass>) -> (Vec<Arc<Framebuffer>>, Vec<ImageBuffer>, Vec<Arc<CpuAccessibleBuffer<[u32]>>>) {
+    pub fn finish(&mut self, swapchain: Arc<Swapchain<Window>>, semaphore: Box<dyn GpuFuture>) {
 
-        let dimensions = images[0].dimensions().width_height();
+        let mut builder = self.state.take_builder();
+
+        builder.end_render_pass().unwrap();
+
+        let command_buffer = builder.build().unwrap();
+
+        let fence = semaphore
+            .then_execute(self.queue.clone(), command_buffer).unwrap()
+            .then_swapchain_present(self.queue.clone(), swapchain, self.image_index)
+            .boxed()
+            .then_signal_fence_and_flush()
+            .unwrap();
+
+        self.state = RenderTargetState::Fence(fence);
+    }
+}
+
+pub struct PickerRenderTarget {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    framebuffer: Arc<Framebuffer>,
+    pub image: ImageBuffer,
+    pub buffer: Arc<CpuAccessibleBuffer<[u32]>>,
+    pub state: RenderTargetState,
+}
+
+impl PickerRenderTarget {
+
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2]) -> Self {
 
         let image_usage = ImageUsage {
             sampled: true,
@@ -455,478 +232,257 @@ impl Renderer {
             ..ImageUsage::none()
         };
 
-        let depth_buffer_usage = ImageUsage {
+        let depth_image_usage = ImageUsage {
             depth_stencil_attachment: true,
             ..ImageUsage::none()
         };
 
-        let picker_images: Vec<ImageBuffer> = (0..images.len())
-            .map(|_| ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::R32_UINT, image_usage).unwrap())).unwrap())
-            .collect();
+        let image = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::R32_UINT, image_usage).unwrap())).unwrap();
+        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D16_UNORM, depth_image_usage).unwrap())).unwrap();
+        let framebuffer = Framebuffer::start(render_pass.clone())
+            .add(image.clone()).unwrap()
+            .add(depth_buffer.clone()).unwrap()
+            .build().unwrap();
 
-        let framebuffers = picker_images.iter().map(|image| {
-            let depth_buffer = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D16_UNORM, depth_buffer_usage).unwrap())).unwrap();
+        let buffer = unsafe { CpuAccessibleBuffer::uninitialized_array(device.clone(), dimensions[0] as u64 * dimensions[1] as u64, BufferUsage::transfer_destination(), false).unwrap() };
+        let state = RenderTargetState::Ready;
 
-            Framebuffer::start(render_pass.clone())
-                .add(image.clone()).unwrap()
-                .add(depth_buffer).unwrap()
-                .build().unwrap()
-        }).collect();
-
-        let picker_buffers: Vec<Arc<CpuAccessibleBuffer<[u32]>>> = (0..images.len())
-            .map(|_| unsafe { CpuAccessibleBuffer::uninitialized_array(device.clone(), dimensions[0] as u64 * dimensions[1] as u64, BufferUsage::transfer_destination(), false).unwrap() })
-            .collect();
-
-        (framebuffers, picker_images, picker_buffers)
-    }
-
-    pub fn invalidate_swapchain(&mut self) {
-        self.recreate_swapchain = true;
-    }
-
-    pub fn set_frame_limit(&mut self, capped: bool) {
-        self.present_mode = match capped {
-            true => PresentMode::Fifo,
-            false => PresentMode::Mailbox,
-        };
-        self.invalidate_swapchain();
-    }
-
-    pub fn get_window_size(&mut self) -> Vector2<usize> {
-        self.window_size
-    }
-
-    pub fn get_picker_buffer(&mut self) -> &CpuAccessibleBuffer<[u32]> {
-        if let Some(fence) = self.picker_fence.take() {
-            fence.wait(None).unwrap()
+        Self {
+            device,
+            queue,
+            framebuffer,
+            image,
+            buffer,
+            state,
         }
-        &self.picker_buffers[self.last_image_num]
     }
 
-    pub fn update(&mut self, delta_time: f32) {
-        self.water_renderer.update(delta_time);
-    }
+    pub fn start(&mut self) {
 
-    pub fn start_frame(&mut self, surface: &Arc<Surface<Window>>, render_settings: &RenderSettings, clear_interface: bool) {
-
-        self.previous_frame_end
-            .as_mut()
-            .unwrap()
-            .cleanup_finished();
-
-        if self.recreate_swapchain {
-
-            #[cfg(feature = "debug")]
-            let timer = Timer::new("recreating swapchain");
-
-            let new_dimensions: [u32; 2] = surface.window().inner_size().into();
-            let new_window_size = Vector2::new(new_dimensions[0] as usize, new_dimensions[1] as usize);
-            let swapchain_result  = self.swapchain
-                .recreate()
-                .dimensions(new_dimensions)
-                .present_mode(self.present_mode)
-                .build();
-
-            let (new_swapchain, new_images) =  match swapchain_result {
-                Ok(r) => r,
-                Err(SwapchainCreationError::UnsupportedDimensions) => return,
-                Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
-            };
-
-            let (new_framebuffers, new_diffuse_buffer, new_normal_buffer, new_water_buffer, new_interface_buffer, new_depth_buffer, new_viewport) = Self::window_size_dependent_setup(self.device.clone(), &new_images, self.render_pass.clone());
-            let (new_picker_framebuffers, new_picker_images, new_picker_buffers) = Self::window_size_dependent_picker_setup(self.device.clone(), &new_images, self.picker_render_pass.clone());
-
-            let deferred_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
-            let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
-
-            self.picker_renderer.recreate_pipeline(self.device.clone(), self.picker_render_pass.clone().first_subpass(), new_viewport.clone());
-            self.geometry_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone(), render_settings.show_wireframe);
-            self.entity_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
-            self.water_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
-            self.rectangle_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
-            self.sprite_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
-            self.text_renderer.recreate_pipeline(self.device.clone(), deferred_subpass.clone(), new_viewport.clone());
-            #[cfg(feature = "debug")]
-            self.box_renderer.recreate_pipeline(self.device.clone(), deferred_subpass, new_viewport.clone());
-            self.ambient_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
-            self.directional_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
-            self.water_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
-            self.point_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
-            self.interface_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
-            self.dynamic_sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), new_viewport.clone());
-            #[cfg(feature = "debug")]
-            self.buffer_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, new_viewport);
-
-            self.swapchain = new_swapchain;
-            self.diffuse_buffer = new_diffuse_buffer;
-            self.normal_buffer = new_normal_buffer;
-            self.water_buffer = new_water_buffer;
-            self.interface_buffer = new_interface_buffer;
-            self.depth_buffer = new_depth_buffer;
-            self.framebuffers = new_framebuffers;
-            self.window_size = new_window_size;
-            self.recreate_swapchain = false;
-
-            self.picker_framebuffers = new_picker_framebuffers;
-            self.picker_images = new_picker_images;
-            self.picker_buffers = new_picker_buffers;
-
-            #[cfg(feature = "debug")]
-            timer.stop();
-        }
-
-        let (image_num, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
-            Ok(r) => r,
-            Err(AcquireError::OutOfDate) => {
-                self.recreate_swapchain = true;
-                return;
-            }
-            Err(e) => panic!("Failed to acquire next image: {:?}", e),
-        };
-
-        if suboptimal {
-            self.recreate_swapchain = true;
-        }
-
-        let clear_values = vec![[0.0, 0.0, 0.0, 1.0].into(), [0.0, 0.0, 0.0, 1.0].into(), [0.0, 0.0, 0.0, 1.0].into(), [0f32].into(), ClearValue::None, 1f32.into()];
         let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        if clear_interface {
-            builder.clear_color_image(self.interface_buffer.image().clone(), [0.0, 0.0, 0.0, 0.0].into()).unwrap();
-        }
+        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::Uint([0; 4]), ClearValue::Depth(1.0)]).unwrap();
 
-        builder.begin_render_pass(self.framebuffers[image_num].clone(), SubpassContents::Inline, clear_values).unwrap();
-
-        let shadow_clear_values: Vec<ClearValue> = vec![1f32.into()];
-        let mut shadow_builder = CommandBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
-        shadow_builder.begin_render_pass(self.shadow_framebuffers[image_num].clone(), SubpassContents::Inline, shadow_clear_values).unwrap();
-
-        let picker_clear_values: Vec<ClearValue> = vec![[0u32].into(), 1f32.into()];
-        let mut picker_builder = CommandBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
-        picker_builder.begin_render_pass(self.picker_framebuffers[image_num].clone(), SubpassContents::Inline, picker_clear_values).unwrap();
-
-        self.current_frame = Some(CurrentFrame::new(builder, shadow_builder.into(), picker_builder.into(), None, image_num, acquire_future, RenderInfo::default()));
+        self.state = RenderTargetState::Rendering(builder);
     }
 
-    pub fn geometry_pass(&mut self) {
+    pub fn finish(&mut self) {
 
-        let current_frame = self.current_frame.as_mut().unwrap(); 
-        let mut picker_builder = current_frame.picker_builder.take().unwrap();
+        let mut builder = self.state.take_builder();
 
-        picker_builder.end_render_pass().unwrap();
-        picker_builder.copy_image_to_buffer(self.picker_images[current_frame.image_num].image().clone(), self.picker_buffers[current_frame.image_num].clone()).unwrap();
+        builder.end_render_pass().unwrap();
+        builder.copy_image_to_buffer(self.image.image().clone(), self.buffer.clone()).unwrap();
 
-        let future = picker_builder
-            .build()
-            .unwrap()
+        let command_buffer = builder.build().unwrap();
+        let fence = command_buffer
             .execute(self.queue.clone())
             .unwrap()
             .boxed()
             .then_signal_fence_and_flush()
             .unwrap();
 
-        self.picker_fence = future.into();
+        self.state = RenderTargetState::Fence(fence);
+    }
+}
+
+pub struct SingleRenderTarget<const F: Format> {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    framebuffer: Arc<Framebuffer>,
+    pub image: ImageBuffer,
+    pub state: RenderTargetState,
+    clear_value: ClearValue,
+}
+
+impl<const F: Format> SingleRenderTarget<F> {
+
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2], image_usage: ImageUsage, clear_value: ClearValue) -> Self {
+
+        let image = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, F, image_usage).unwrap())).unwrap();
+        let framebuffer = Framebuffer::start(render_pass.clone())
+            .add(image.clone()).unwrap()
+            .build().unwrap();
+
+        let state = RenderTargetState::Ready;
+
+        Self {
+            device,
+            queue,
+            framebuffer,
+            image,
+            state,
+            clear_value,
+        }
     }
 
-    pub fn lighting_pass(&mut self) {
-        let current_frame = self.current_frame.as_mut().unwrap();
+    pub fn start(&mut self) {
 
-        current_frame.builder.next_subpass(SubpassContents::Inline).unwrap();
+        let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        let mut shadow_builder = current_frame.shadow_builder.take().unwrap();
-        shadow_builder.end_render_pass().unwrap();
-        let shadow_command_buffer = shadow_builder.build().unwrap();
+        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [self.clear_value]).unwrap();
 
-        let shadow_future = self.previous_frame_end
-            .take()
+        self.state = RenderTargetState::Rendering(builder);
+    }
+
+    pub fn finish(&mut self) {
+
+        let mut builder = self.state.take_builder();
+
+        builder.end_render_pass().unwrap();
+
+        let command_buffer = builder.build().unwrap();
+        let semaphore = command_buffer
+            .execute(self.queue.clone())
             .unwrap()
-            .then_execute(self.queue.clone(), shadow_command_buffer).unwrap();
+            .boxed()
+            .then_signal_semaphore_and_flush()
+            .unwrap();
 
-        shadow_future.flush().unwrap();
-        current_frame.shadow_frame_end = shadow_future.boxed().into();
+        self.state = RenderTargetState::Semaphore(semaphore);
     }
+}
 
-    pub fn render_tiles(&mut self, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        let picker_builder = current_frame.picker_builder.as_mut().unwrap();
-        self.picker_renderer.render(camera, picker_builder, vertex_buffer);
-    }
+pub struct SwapchainHolder {
+    swapchain: Arc<Swapchain<Window>>,
+    swapchain_images: Vec<Arc<SwapchainImage<Window>>>,
+    present_mode: PresentMode,
+    window_size: [u32; 2],
+    image_number: usize,
+    recreate: bool,
+    acquire_future: Option<Box<dyn GpuFuture>>,
+}
 
-    pub fn render_geomitry(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, transform: &Transform) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.geometry_renderer.render(camera, &mut current_frame.builder, vertex_buffer.clone(), textures, transform);
+impl SwapchainHolder {
 
-        let shadow_builder = current_frame.shadow_builder.as_mut().unwrap();
-        self.geometry_shadow_renderer.render(camera, shadow_builder, vertex_buffer, textures, transform);
-    }
+    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>) -> Self {
 
-    pub fn render_node(&mut self, camera: &dyn Camera, node: &Node, transform: &Transform, client_tick: u32) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.geometry_renderer.render_node(camera, &mut current_frame.builder, node, transform, client_tick);
+        let window_size: [u32; 2] = surface.window().inner_size().into();
+        let capabilities = surface.capabilities(*physical_device).expect("failed to get surface capabilities");
+        let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
+        let format = capabilities.supported_formats[0].0;
+        let present_mode = PresentMode::Fifo;
+        let image_number = 0;
+        let recreate = false;
+        let acquire_future = None;
 
-        current_frame.render_info.object_count += 1;
+        let (swapchain, swapchain_images) = Swapchain::start(device, surface)
+            .num_images(capabilities.min_image_count)
+            .format(format)
+            .dimensions(window_size)
+            .usage(ImageUsage::color_attachment())
+            .sharing_mode(&queue)
+            .composite_alpha(composite_alpha)
+            .color_space(ColorSpace::SrgbNonLinear)
+            .present_mode(present_mode)
+            .build()
+            .expect("failed to create swapchain");
 
-        let shadow_builder = current_frame.shadow_builder.as_mut().unwrap();
-        self.geometry_shadow_renderer.render_node(camera, shadow_builder, node, transform, client_tick);
-    }
-
-    pub fn render_entity(&mut self, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-
-        current_frame.render_info.entity_count += 1;
-
-        self.entity_renderer.render(camera, &mut current_frame.builder, texture, position, origin, size, cell_count, cell_position);
-    }
-
-    pub fn render_water(&mut self, camera: &dyn Camera, vertex_buffer: WaterVertexBuffer) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.water_renderer.render(camera, &mut current_frame.builder, vertex_buffer);
-    }
-
-    pub fn ambient_light(&mut self, color: Color) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.ambient_light_renderer.render(&mut current_frame.builder, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.screen_vertex_buffer.clone(), color);
-    }
-
-    pub fn directional_light(&mut self, camera: &dyn Camera, direction: Vector3<f32>, color: Color, intensity: f32) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.directional_light_renderer.render(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.directional_shadow_maps[current_frame.image_num].clone(), self.screen_vertex_buffer.clone(), direction, color, intensity);
-    }
-
-    pub fn water_light(&mut self, camera: &dyn Camera, water_level: f32) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.water_light_renderer.render(&mut current_frame.builder, camera, self.water_buffer.clone(), self.depth_buffer.clone(), self.screen_vertex_buffer.clone(), water_level);
-    }
-
-    pub fn point_light(&mut self, camera: &dyn Camera, position: Vector3<f32>, color: Color, range: f32) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-
-        current_frame.render_info.point_light_count += 1;
-
-        self.point_light_renderer.render(&mut current_frame.builder, camera, self.diffuse_buffer.clone(), self.normal_buffer.clone(), self.depth_buffer.clone(), self.billboard_vertex_buffer.clone(), position, color, range);
-    }
-
-    pub fn render_sprite(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, smooth: bool) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.sprite_renderer.render(&mut current_frame.builder, self.window_size, texture, position, size, clip_size, color, smooth);
-    }
-
-    pub fn render_sprite_indexed(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.sprite_renderer.render_indexed(&mut current_frame.builder, self.window_size, texture, position, size, clip_size, color, column_count, cell_index, smooth);
-    }
-
-    pub fn render_rectangle(&mut self, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, corner_radius: Vector4<f32>, color: Color) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.rectangle_renderer.render(&mut current_frame.builder, self.window_size, position, size, clip_size, corner_radius, color);
-    }
-
-    pub fn render_checkbox(&mut self, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, checked: bool) {
-        match checked {
-            true => self.render_sprite(self.checked_box_texture.clone(), position, size, clip_size, color, true),
-            false => self.render_sprite(self.unchecked_box_texture.clone(), position, size, clip_size, color, true),
+        Self {
+            swapchain,
+            swapchain_images,
+            present_mode,
+            window_size,
+            image_number,
+            recreate,
+            acquire_future,
         }
     }
 
-    pub fn render_expand_arrow(&mut self, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, expanded: bool) {
-        match expanded {
-            true => self.render_sprite(self.expanded_arrow_texture.clone(), position, size, clip_size, color, true),
-            false => self.render_sprite(self.collapsed_arrow_texture.clone(), position, size, clip_size, color, true),
-        }
-    }
+    pub fn acquire_next_image(&mut self) -> Result<(), ()> {
 
-    pub fn render_text(&mut self, text: &str, mut position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
-        for character in text.as_bytes() {
-            let index = (*character as usize).saturating_sub(31);
-            self.render_sprite_indexed(self.font_map.clone(), position, Vector2::new(font_size, font_size), clip_size, color, 10, index, true);
-            position.x += font_size / 2.0;
-        }
-    }
-
-    pub fn render_text_new(&mut self, text: &str, position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.text_renderer.render(&mut current_frame.builder, self.window_size, position, vector2!(font_size), clip_size, color);
-    }
-
-    pub fn render_dynamic_sprite_direct(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, smooth: bool) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.dynamic_sprite_renderer.render_direct(&mut current_frame.builder, texture, position, size, color, smooth);
-    }
-
-    pub fn render_dynamic_sprite_indexed(&mut self, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.dynamic_sprite_renderer.render_indexed(&mut current_frame.builder, self.window_size, texture, position, size, color, column_count, cell_index, smooth);
-    }
-
-    pub fn render_dynamic_text(&mut self, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
-        for character in text.as_bytes() {
-            let index = (*character as usize).saturating_sub(31);
-            self.render_dynamic_sprite_indexed(self.font_map.clone(), position, Vector2::new(font_size, font_size), color, 10, index, true);
-            position.x += font_size / 2.0;
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_debug_icon(&mut self, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color) {
-        self.render_sprite(self.debug_icon_texture.clone(), position, size, clip_size, color, true);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_map_tiles(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, transform: &Transform) { // remove transform
-        let tile_textures = self.buffer_renderer.tile_textures.clone();
-        self.render_geomitry(camera, vertex_buffer, &tile_textures, transform);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_pathing(&mut self, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, transform: &Transform) { // remove transform
-        let step_textures = self.buffer_renderer.step_textures.clone();
-        self.render_geomitry(camera, vertex_buffer, &step_textures, transform);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_bounding_box(&mut self, camera: &dyn Camera, transform: &Transform, bounding_box: &BoundingBox) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.box_renderer.render(&mut current_frame.builder, camera, transform, bounding_box);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn marker_hovered(&self, camera: &dyn Camera, position: Vector3<f32>, mouse_position: Vector2<f32>) -> bool {
-        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MARKER_SIZE);
-
-        if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 {
-            return false;
-        }
-
-        let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
-        let half_screen = Vector2::new(self.window_size.x as f32 / 2.0, self.window_size.y as f32 / 2.0);
-        let mouse_position = Vector2::new(mouse_position.x / half_screen.x, mouse_position.y / half_screen.y);
-
-        mouse_position.x >= screen_position.x && mouse_position.y >= screen_position.y &&
-            mouse_position.x <= screen_position.x + screen_size.x && mouse_position.y <= screen_position.y + screen_size.y
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_debug_marker(&mut self, camera: &dyn Camera, icon: Texture, position: Vector3<f32>, color: Color) {
-        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MARKER_SIZE);
-
-        if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
-            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
-            self.render_dynamic_sprite_direct(icon, screen_position, screen_size, color, true);
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_object_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, hovered: bool) {
-        let color = match hovered {
-            true => Color::rgb(100, 100, 255),
-            false => Color::rgb(255, 100, 100),
-        };
-        self.render_debug_marker(camera, self.buffer_renderer.object_texture.clone(), position, color);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_light_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, color: Color, hovered: bool) {
-        let color = match hovered {
-            true => color.invert(),
-            false => color,
-        };
-        self.render_debug_marker(camera, self.buffer_renderer.light_texture.clone(), position, color);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_sound_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, hovered: bool) {
-        let color = match hovered {
-            true => Color::monochrome(60),
-            false => Color::monochrome(150),
-        };
-        self.render_debug_marker(camera, self.buffer_renderer.sound_texture.clone(), position, color);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_effect_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, hovered: bool) {
-        let color = match hovered {
-            true => Color::rgb(200, 100, 255),
-            false => Color::rgb(100, 255, 100),
-        };
-        self.render_debug_marker(camera, self.buffer_renderer.effect_texture.clone(), position, color);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_particle_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, hovered: bool) {
-        let color = match hovered {
-            true => Color::rgb(255, 200, 20),
-            false => Color::rgb(255, 20, 20),
-        };
-        self.render_debug_marker(camera, self.buffer_renderer.particle_texture.clone(), position, color);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_entity_marker(&mut self, camera: &dyn Camera, position: Vector3<f32>, hovered: bool) {
-        let color = match hovered {
-            true => Color::rgb(255, 160, 255),
-            false => Color::rgb(255, 100, 255),
-        };
-        self.render_debug_marker(camera, self.buffer_renderer.entity_texture.clone(), position, color);
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_buffers(&mut self, render_settings: &RenderSettings, font_atlas: ImageBuffer) {
-
-        if let Some(fence) = self.picker_fence.take() {
-            fence.wait(None).unwrap()
-        }
-
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.buffer_renderer.render_buffers(
-            &mut current_frame.builder,
-            self.diffuse_buffer.clone(),
-            self.normal_buffer.clone(),
-            self.water_buffer.clone(),
-            self.depth_buffer.clone(),
-            self.directional_shadow_maps[current_frame.image_num].clone(),
-            self.picker_images[current_frame.image_num].clone(),
-            font_atlas,
-            self.screen_vertex_buffer.clone(),
-            render_settings,
-        );
-    }
-
-    pub fn render_interface(&mut self, render_settings: &RenderSettings) {
-        let current_frame = self.current_frame.as_mut().unwrap();
-        self.interface_renderer.render(&mut current_frame.builder, self.interface_buffer.clone(), self.screen_vertex_buffer.clone(), render_settings);
-    }
-
-    pub fn stop_frame(&mut self, font_atlas_future: Box<dyn GpuFuture>) {
-        let mut current_frame = self.current_frame.take().unwrap();
-
-        current_frame.builder.end_render_pass().unwrap();
-
-        let command_buffer = current_frame.builder.build().unwrap();
-        let future = current_frame.shadow_frame_end
-            .take().unwrap()
-            .join(current_frame.swapchain_future)
-            .join(font_atlas_future)
-            .then_execute(self.queue.clone(), command_buffer).unwrap()
-            .then_swapchain_present(self.queue.clone(), self.swapchain.clone(), current_frame.image_num)
-            .then_signal_fence_and_flush();
-
-        match future {
-
-            Ok(future) => {
-                self.previous_frame_end = future.boxed().into();
+        let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
+            Ok(r) => r,
+            Err(AcquireError::OutOfDate) => {
+                self.recreate = true;
+                return Err(());
             }
+            Err(e) => panic!("Failed to acquire next image: {:?}", e),
+        };
 
-            Err(FlushError::OutOfDate) => {
-                self.recreate_swapchain = true;
-                self.previous_frame_end = now(self.device.clone()).boxed().into();
-            }
+        self.image_number = image_number;
+        self.recreate |= suboptimal;
+        self.acquire_future = acquire_future.boxed().into();
+        Ok(())
+    }
 
-            Err(error) => {
-                println!("Failed to flush future: {:?}", error);
-                self.previous_frame_end = now(self.device.clone()).boxed().into();
-            }
+    pub fn take_acquire_future(&mut self) -> Box<dyn GpuFuture> {
+        self.acquire_future.take().unwrap()
+    }
+
+    pub fn invalidate_swapchain(&mut self) {
+        self.recreate = true;
+    }
+
+    pub fn is_swapchain_invalid(&self) -> bool {
+        self.recreate
+    }
+
+    pub fn recreate_swapchain(&mut self) -> Viewport {
+
+        let swapchain_result = self.swapchain
+            .recreate()
+            .dimensions(self.window_size)
+            .present_mode(self.present_mode)
+            .build();
+
+        let (swapchain, swapchain_images) =  match swapchain_result {
+            Ok(r) => r,
+            //Err(SwapchainCreationError::UnsupportedDimensions) => return,
+            Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
+        };
+
+        self.swapchain = swapchain;
+        self.swapchain_images = swapchain_images;
+        self.recreate = false;
+        self.viewport()
+    }
+
+    pub fn get_swapchain(&self) -> Arc<Swapchain<Window>> {
+        self.swapchain.clone()
+    }
+
+    pub fn get_swapchain_images(&self) -> Vec<Arc<SwapchainImage<Window>>> {
+        self.swapchain_images.clone()
+    }
+
+    pub fn swapchain_format(&self) -> Format {
+        self.swapchain.format()
+    }
+
+    pub fn get_image_number(&self) -> usize {
+        self.image_number
+    }
+
+    pub fn viewport(&self) -> Viewport {
+        Viewport {
+            origin: [0.0, 0.0],
+            dimensions: self.window_size.map(|component| component as f32),
+            depth_range: 0.0..1.0,
         }
+    }
 
-        self.last_image_num = current_frame.image_num;
+    pub fn set_frame_limit(&mut self, limited: bool) {
+        self.present_mode = match limited {
+            true => PresentMode::Fifo,
+            false => PresentMode::Mailbox,
+        };
+        self.invalidate_swapchain();
+    }
+
+    pub fn update_window_size(&mut self, window_size: [u32; 2]) {
+        self.window_size = window_size;
+        self.invalidate_swapchain();
+    }
+
+    pub fn window_size(&self) -> Vector2<usize> {
+        self.window_size.map(|component| component as usize).into()
+    }
+
+    pub fn window_size_u32(&self) -> [u32; 2] {
+        self.window_size
+    }
+
+    pub fn window_size_f32(&self) -> Vector2<f32> {
+        self.window_size.map(|component| component as f32).into()
     }
 }

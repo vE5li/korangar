@@ -3,7 +3,7 @@ use num::Zero;
 
 use crate::interface::traits::Element;
 use crate::interface::types::*;
-use crate::graphics::{ Renderer, Color };
+use crate::graphics::{ Renderer, Color, InterfaceRenderer };
 
 #[derive(new)]
 pub struct Text {
@@ -25,9 +25,9 @@ impl Element for Text {
         self.cached_position = position;
     }
 
-    fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, _theme: &Theme, parent_position: Position, clip_size: Size, _hovered_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, _theme: &Theme, parent_position: Position, clip_size: Size, _hovered_element: Option<&dyn Element>, _second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        renderer.render_text(&self.display, absolute_position, clip_size, self.color, self.font_size * *interface_settings.scaling);
+        renderer.render_text(render_target, &self.display, absolute_position, clip_size, self.color, self.font_size * *interface_settings.scaling);
     }
 }

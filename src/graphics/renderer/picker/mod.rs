@@ -2,42 +2,48 @@ mod geometry;
 mod entity;
 
 use std::sync::Arc;
-use vulkano::render_pass::RenderPass;
-use vulkano::{device::Device, format::Format};
-use vulkano::device::Queue;
+use vulkano::device::{ Device, Queue };
 use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::image::ImageUsage;
+use vulkano::format::Format;
+use vulkano::render_pass::RenderPass;
 
 use crate::types::maths::*;
-use super::{ Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, SingleRenderTarget, Texture, ModelVertexBuffer };
+use super::{ Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, Texture, ModelVertexBuffer, PickerRenderTarget };
 
 use self::geometry::GeometryRenderer;
 use self::entity::EntityRenderer;
 
-pub struct ShadowRenderer {
+pub struct PickerRenderer {
     device: Arc<Device>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
+    dimensions: [u32; 2],
 }
 
-impl ShadowRenderer {
+impl PickerRenderer {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, viewport: Viewport) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
 
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
-                depth: {
+                color: {
                     load: Clear,
                     store: Store,
-                    format: Format::D32_SFLOAT,
+                    format: Format::R32_UINT,
+                    samples: 1,
+                },
+                depth: {
+                    load: Clear,
+                    store: DontCare,
+                    format: Format::D16_UNORM,
                     samples: 1,
                 }
             },
             pass: {
-                color: [],
+                color: [color],
                 depth_stencil: {depth}
             }
         )
@@ -53,32 +59,27 @@ impl ShadowRenderer {
             render_pass,
             geometry_renderer,
             entity_renderer,
+            dimensions,
         }
     }
 
-    pub fn recreate_pipeline(&mut self, viewport: Viewport) {
+    pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
         let subpass = self.render_pass.clone().first_subpass();
         self.geometry_renderer.recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone(), false);
-        self.entity_renderer.recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
+        self.entity_renderer.recreate_pipeline(self.device.clone(), subpass.clone(), viewport);
+        self.dimensions = dimensions;
     }
 
-    pub fn create_render_target(&self, size: u32) -> <Self as Renderer>::Target {
-
-        let image_usage = ImageUsage {
-            sampled: true,
-            depth_stencil_attachment: true,
-            ..ImageUsage::none()
-        };
-
-        <Self as Renderer>::Target::new(self.device.clone(), self.queue.clone(), self.render_pass.clone(), [size; 2], image_usage, vulkano::format::ClearValue::Depth(1.0))
+    pub fn create_render_target(&self) -> <Self as Renderer>::Target {
+        <Self as Renderer>::Target::new(self.device.clone(), self.queue.clone(), self.render_pass.clone(), self.dimensions)
     }
 }
 
-impl Renderer for ShadowRenderer {
-    type Target = SingleRenderTarget<{ Format::D32_SFLOAT }>;
+impl Renderer for PickerRenderer {
+    type Target = PickerRenderTarget;
 }
 
-impl GeometryRendererTrait for ShadowRenderer {
+impl GeometryRendererTrait for PickerRenderer {
 
     fn render_geometry(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>)
         where Self: Renderer
@@ -87,7 +88,7 @@ impl GeometryRendererTrait for ShadowRenderer {
     }
 }
 
-impl EntityRendererTrait for ShadowRenderer {
+impl EntityRendererTrait for PickerRenderer {
 
     fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>)
         where Self: Renderer

@@ -6,7 +6,7 @@ mod effect;
 
 use std::sync::Arc;
 use derive_new::new;
-use cgmath::{ Vector2, Vector3 };
+use cgmath::{ Vector2, Vector3, Matrix4 };
 
 use crate::types::{ Version, Entity };
 use crate::graphics::*;
@@ -36,25 +36,28 @@ fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
     Color::rgb((base_color.red_f32() * channels.x) as u8, (base_color.green_f32() * channels.y) as u8, (base_color.blue_f32() * channels.z) as u8)
 }
 
-fn get_light_colors(ambient_color: Color, directional_color: Color, intensity: f32, day_timer: f32) -> (Color, Color, f32) {
+fn get_ambient_light_color(ambient_color: Color, day_timer: f32) -> Color {
+    let sun_offset = 0.0;
+    let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.35 + vector3!(0.65)) * 255.0;
+    color_from_channel(ambient_color, ambient_channels)
+}
+
+fn get_directional_light_color_intensity(directional_color: Color, intensity: f32, day_timer: f32) -> (Color, f32) {
 
     let sun_offset = 0.0;
     let moon_offset = std::f32::consts::PI;
 
     let directional_channels = get_channels(day_timer, sun_offset, [0.8, 0.0, 0.25]) * 255.0;
-    let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.35 + vector3!(0.65)) * 255.0;
-
-    let ambient_color = color_from_channel(ambient_color, ambient_channels);
 
     if directional_channels.x.is_sign_positive() {
         let directional_color = color_from_channel(directional_color, directional_channels);
-        return (ambient_color, directional_color, f32::min(intensity * 1.2, 1.0));
+        return (directional_color, f32::min(intensity * 1.2, 1.0));
     }
 
     let directional_channels = get_channels(day_timer, moon_offset, [0.3; 3]) * 255.0;
     let directional_color = color_from_channel(Color::rgb(150, 150, 255), directional_channels);
 
-    (ambient_color, directional_color, f32::min(intensity * 1.2, 1.0))
+    (directional_color, f32::min(intensity * 1.2, 1.0))
 }
 
 pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
@@ -100,7 +103,7 @@ pub struct LightSettings {
     pub light_intensity: f32,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum MarkerIdentifier {
     Object(usize),
     LightSource(usize),
@@ -111,7 +114,7 @@ pub enum MarkerIdentifier {
 }
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
-#[window_title("map viewer")]
+#[window_title("Map Viewer")]
 #[window_class("map_viewer")]
 pub struct Map {
     resource_version: Version,
@@ -160,129 +163,60 @@ impl Map {
         &self.tiles[position.x + position.y * self.width]
     }
 
-    pub fn render_picker(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.render_tiles(camera, self.tile_picker_vertex_buffer.clone());
+    pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
+        where T: Renderer + GeometryRenderer
+    {
+        let world_matrix = camera.transform_matrix(&Transform::new());
+        renderer.render_geometry(render_target, camera, self.ground_vertex_buffer.clone(), &self.ground_textures, world_matrix);
     }
 
-    pub fn render_geomitry(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, client_tick: u32) {
-
-        if render_settings.show_map {
-            renderer.render_geomitry(camera, self.ground_vertex_buffer.clone(), &self.ground_textures, &Transform::new());
-        }
-
-        if render_settings.show_objects {
-            self.objects.iter().for_each(|object| object.render_geometry(renderer, camera, client_tick));
-        }
-
-        #[cfg(feature = "debug")]
-        if render_settings.show_map_tiles {
-            renderer.render_map_tiles(camera, self.tile_vertex_buffer.clone(), &Transform::new());
+    pub fn render_objects<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
+        where T: Renderer + GeometryRenderer
+    {
+        for object in &self.objects {
+            // check if on screen
+            object.render_geometry(render_target, renderer, camera, client_tick);
         }
     }
 
-    pub fn render_water(&self, renderer: &mut Renderer, camera: &dyn Camera) {
+    pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {
+        //renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
+    }
 
+    pub fn render_water(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, day_timer: f32) {
         if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
-            renderer.render_water(camera, water_vertex_buffer.clone());
+            renderer.render_water(render_target, camera, water_vertex_buffer.clone(), day_timer);
         }
     }
 
-    pub fn render_lights(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, day_timer: f32) {
+    pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
+        let ambient_color = get_ambient_light_color(self.light_settings.ambient_color, day_timer);
+        renderer.ambient_light(render_target, ambient_color);
+    }
+
+    pub fn directional_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, light_image: ImageBuffer, light_matrix: Matrix4<f32>, day_timer: f32) {
 
         let light_direction = get_light_direction(day_timer);
-        let (ambient_color, directional_color, intensity) = get_light_colors(
-            self.light_settings.ambient_color,
+        let (directional_color, intensity) = get_directional_light_color_intensity(
             self.light_settings.diffuse_color,
             self.light_settings.light_intensity,
             day_timer
         );
 
-        if render_settings.show_ambient_light {
-            renderer.ambient_light(ambient_color);
-        }
-
-        if render_settings.show_directional_light {
-            renderer.directional_light(camera, light_direction, directional_color, intensity);
-        }
-
-        if render_settings.show_point_lights {
-            self.light_sources.iter().for_each(|light_source| light_source.render_lights(renderer, camera));
-        }
-
-        if render_settings.show_particle_lights {
-            self.effect_sources.iter().for_each(|effect_source| effect_source.render_lights(renderer, camera));
-        }
-
-        if render_settings.show_water {
-            renderer.water_light(camera, self.water_settings.water_level);
-        }
+        renderer.directional_light(render_target, camera, light_image, light_matrix, light_direction, directional_color, intensity);
     }
 
-    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow {
-        self
+    pub fn point_lights(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        self.light_sources.iter().for_each(|light_source| light_source.render_light(render_target, renderer, camera));
+    }
+
+    pub fn water_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        renderer.water_light(render_target, camera, self.water_settings.water_level);
     }
 
     #[cfg(feature = "debug")]
-    pub fn hovered_marker(&self, renderer: &Renderer, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Arc<Vec<Arc<Entity>>>, mouse_position: Vector2<f32>) -> Option<MarkerIdentifier> {
-
-        let mut nearest_marker = None;
-        let mut smallest_distance = f32::MAX;
-
-        if render_settings.show_object_markers {
-            for (index, object) in self.objects.iter().enumerate() {
-                if let Some(new_distance) = object.hovered(renderer, camera, mouse_position, smallest_distance) {
-                    nearest_marker = Some(MarkerIdentifier::Object(index));
-                    smallest_distance = new_distance;
-                }
-            }
-        }
-
-        if render_settings.show_light_markers {
-            for (index, light_source) in self.light_sources.iter().enumerate() {
-                if let Some(new_distance) = light_source.hovered(renderer, camera, mouse_position, smallest_distance) {
-                    nearest_marker = Some(MarkerIdentifier::LightSource(index));
-                    smallest_distance = new_distance;
-                }
-            }
-        }
-
-        if render_settings.show_sound_markers {
-            for (index, sound_source) in self.sound_sources.iter().enumerate() {
-                if let Some(new_distance) = sound_source.hovered(renderer, camera, mouse_position, smallest_distance) {
-                    nearest_marker = Some(MarkerIdentifier::SoundSource(index));
-                    smallest_distance = new_distance;
-                }
-            }
-        }
-
-        if render_settings.show_effect_markers {
-            for (index, effect_source) in self.effect_sources.iter().enumerate() {
-                if let Some(new_distance) = effect_source.hovered(renderer, camera, mouse_position, smallest_distance) {
-                    nearest_marker = Some(MarkerIdentifier::EffectSource(index));
-                    smallest_distance = new_distance;
-                }
-            }
-        }
-
-        if render_settings.show_particle_markers {
-            for (effect_index, effect_source) in self.effect_sources.iter().enumerate() {
-                if let Some((new_distance, particle_index)) = effect_source.particle_hovered(renderer, camera, mouse_position, smallest_distance) {
-                    nearest_marker = Some(MarkerIdentifier::Particle(effect_index, particle_index));
-                    smallest_distance = new_distance;
-                }
-            }
-        }
-
-        if render_settings.show_entity_markers {
-            for (index, entity) in entities.iter().enumerate() {
-                if let Some(new_distance) = entity.hovered(renderer, camera, mouse_position, smallest_distance) {
-                    nearest_marker = Some(MarkerIdentifier::Entity(index));
-                    smallest_distance = new_distance;
-                }
-            }
-        }
-
-        nearest_marker
+    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow {
+        self
     }
 
     #[cfg(feature = "debug")]
@@ -298,38 +232,41 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_markers(&self, renderer: &mut Renderer, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Arc<Vec<Arc<Entity>>>, marker_identifier: Option<MarkerIdentifier>) {
+    pub fn render_markers<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Vec<Entity>, marker_identifier: Option<MarkerIdentifier>)
+        where T: Renderer + MarkerRenderer
+    {
 
         if render_settings.show_object_markers {
-            self.objects.iter().enumerate().for_each(|(index, object)| object.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Object(x)) if x == index)));
+            self.objects.iter().enumerate().for_each(|(index, object)| object.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::Object(index))));
         }
 
         if render_settings.show_light_markers {
-            self.light_sources.iter().enumerate().for_each(|(index, light_source)| light_source.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::LightSource(x)) if x == index)));
+            self.light_sources.iter().enumerate().for_each(|(index, light_source)| light_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::LightSource(index))));
         }
 
         if render_settings.show_sound_markers {
-            self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| sound_source.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::SoundSource(x)) if x == index)));
+            self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| sound_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::SoundSource(index))));
         }
 
         if render_settings.show_effect_markers {
-            self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| effect_source.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::EffectSource(x)) if x == index)));
+            self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| effect_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::EffectSource(index))));
         }
 
         if render_settings.show_particle_markers {
             for (index, effect_source) in self.effect_sources.iter().enumerate() {
-                effect_source.particles.iter().enumerate().for_each(|(particle_index, particle)| particle.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Particle(x, y)) if x == index && y == particle_index)));
+                effect_source.particles.iter().enumerate().for_each(|(particle_index, particle)| particle.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::Particle(particle_index, index))));
             }
         }
 
         if render_settings.show_entity_markers {
-            entities.iter().enumerate().for_each(|(index, entity)| entity.render_marker(renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index)));
+            entities.iter().enumerate().for_each(|(index, entity)| entity.render_marker(render_target, renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index)));
         }
     }
 
-    pub fn render_marker_box(&self, renderer: &mut Renderer, camera: &dyn Camera, marker_identifier: MarkerIdentifier) {
+    #[cfg(feature = "debug")]
+    pub fn render_marker_box(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, marker_identifier: MarkerIdentifier) {
         match marker_identifier {
-            MarkerIdentifier::Object(index) => self.objects[index].render_bounding_box(renderer, camera),
+            MarkerIdentifier::Object(index) => self.objects[index].render_bounding_box(render_target, renderer, camera),
             MarkerIdentifier::LightSource(_index) => {},
             MarkerIdentifier::SoundSource(_index) => {}
             MarkerIdentifier::EffectSource(_index) => {},

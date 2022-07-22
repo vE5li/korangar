@@ -24,6 +24,6 @@ impl PrototypeWindow for AudioSettingsWindow {
 
         let elements = vec![];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "audio settigs".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Audio Settings".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
     }
 }

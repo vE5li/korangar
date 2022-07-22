@@ -1,10 +1,12 @@
 mod player;
+mod shadow;
 #[cfg(feature = "debug")]
 mod debug;
 
 use std::sync::Arc;
 
 pub use self::player::PlayerCamera;
+pub use self::shadow::ShadowCamera;
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
 
@@ -16,7 +18,7 @@ use super::RenderSettings;
 
 pub trait Camera {
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>, day_timer: f32);
+    fn generate_view_projection(&mut self, window_size: Vector2<usize>);
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);
 
@@ -31,8 +33,6 @@ pub trait Camera {
     fn distance_to(&self, position: Vector3<f32>) -> f32;
 
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32>;
-
-    fn get_light_matrix(&self) -> Matrix4<f32>;
 
     //fn render_scene(&self, map: Arc<Map>, entities: Arc<Vec<Arc<Entity>>>, render_settings: &RenderSettings, client_tick: u32);
 }

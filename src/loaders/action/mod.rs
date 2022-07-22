@@ -1,6 +1,7 @@
 use derive_new::new;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::cell::RefCell;
 
 #[cfg(feature = "debug")]
@@ -95,12 +96,12 @@ struct ActionsData {
 pub struct ActionLoader {
     game_file_loader: Rc<RefCell<GameFileLoader>>,
     #[new(default)]
-    cache: HashMap<String, Rc<Actions>>,
+    cache: HashMap<String, Arc<Actions>>,
 }
 
 impl ActionLoader {
 
-    fn load(&mut self, path: &str) -> Result<Rc<Actions>, String> {
+    fn load(&mut self, path: &str) -> Result<Arc<Actions>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}{}{}", MAGENTA, path, NONE));
@@ -115,7 +116,7 @@ impl ActionLoader {
         let actions_data = ActionsData::from_bytes(&mut byte_stream, None);
         //println!("{:#?}", actions_data);
 
-        let sprite = Rc::new(Actions {});
+        let sprite = Arc::new(Actions {});
         self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]
@@ -124,7 +125,7 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Rc<Actions>, String> {
+    pub fn get(&mut self, path: &str) -> Result<Arc<Actions>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path),

@@ -1,7 +1,7 @@
 use derive_new::new;
 use num::Zero;
 
-use crate::graphics::{ Renderer, Color };
+use crate::graphics::{ Renderer, Color, InterfaceRenderer };
 use crate::interface::traits::Element;
 use crate::interface::windows::ColorWindow;
 use crate::interface::types::*;
@@ -55,15 +55,15 @@ impl Element for MutableColorValue {
         Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(self.name.clone(), self.color_pointer, self.change_event))))
     }
 
-    fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            true => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, self.cached_color.shade()),
-            false => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, self.cached_color),
+            true => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, self.cached_color.shade()),
+            false => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, self.cached_color),
         }
 
-        renderer.render_text(&self.cached_values, absolute_position + *theme.value.text_offset * *interface_settings.scaling, clip_size, self.cached_color.invert(), *theme.value.font_size * *interface_settings.scaling);
+        renderer.render_text(render_target, &self.cached_values, absolute_position + *theme.value.text_offset * *interface_settings.scaling, clip_size, self.cached_color.invert(), *theme.value.font_size * *interface_settings.scaling);
     }
 }

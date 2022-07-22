@@ -3,9 +3,11 @@
 #![feature(let_else)]
 #![feature(adt_const_params)]
 #![feature(arc_unwrap_or_clone)]
+#![feature(option_result_contains)]
 
 #[macro_use]
 extern crate korangar_procedural;
+extern crate rayon;
 extern crate derive_new;
 extern crate vulkano;
 extern crate vulkano_shaders;
@@ -44,6 +46,7 @@ use std::sync::Arc;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vulkano::device::Device;
+use vulkano::format::ClearValue;
 use vulkano::instance::Instance;
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{ MessageSeverity, MessageType };
@@ -58,12 +61,12 @@ use chrono::prelude::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
+use crate::types::maths::Vector2;
 use crate::types::{ Entity, ChatMessage };
 use crate::input::{ InputSystem, UserEvent };
 use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
-use crate::loaders::{ FontLoader, GameFileLoader, MapLoader, ModelLoader, TextureLoader, SpriteLoader, ActionLoader };
-use crate::graphics::{ Renderer, RenderSettings, Color };
-use crate::graphics::camera::*;
+use crate::loaders::*;
+use crate::graphics::*;
 use crate::interface::*;
 use network::{ NetworkingSystem, NetworkEvent };
 
@@ -125,13 +128,14 @@ fn main() {
     let timer = Timer::new("create resource managers");
 
     let mut game_file_loader = GameFileLoader::default();
+
     game_file_loader.add_archive("data3.grf".to_string());
     game_file_loader.add_archive("data.grf".to_string());
     game_file_loader.add_archive("rdata.grf".to_string()); 
 
     let game_file_loader = Rc::new(RefCell::new(game_file_loader));
-
     let font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
+
     let mut model_loader = ModelLoader::new(game_file_loader.clone(), device.clone());
     let mut texture_loader = TextureLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
     let mut map_loader = MapLoader::new(game_file_loader.clone(), device.clone());
@@ -144,7 +148,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let mut map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw").expect("failed to load initial map"));
+    let mut map = map_loader.get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw").expect("failed to load initial map");
 
     // interesting: ma_zif07, ama_dun01
 
@@ -152,9 +156,44 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = Timer::new("create renderer");
+    let timer = Timer::new("create swapchain");
 
-    let mut renderer = Renderer::new(&physical_device, device.clone(), queue, surface.clone(), &mut texture_loader, font_loader.clone());
+    let mut swapchain_holder = SwapchainHolder::new(&physical_device, device.clone(), queue.clone(), surface.clone());
+    let viewport = swapchain_holder.viewport();
+
+    #[cfg(feature = "debug")]
+    timer.stop();
+
+    #[cfg(feature = "debug")]
+    let timer = Timer::new("create renderers");
+
+    let mut deferred_renderer = DeferredRenderer::new(device.clone(), queue.clone(), swapchain_holder.swapchain_format(), viewport.clone(), swapchain_holder.window_size_u32());
+    let mut interface_renderer = InterfaceRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
+    let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
+    let mut shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone(), viewport.clone());
+
+    #[cfg(feature = "debug")]
+    timer.stop();
+
+    #[cfg(feature = "debug")]
+    let timer = Timer::new("create render targets");
+
+    let mut screen_targets = swapchain_holder.get_swapchain_images()
+        .into_iter()
+        .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
+        .collect::<Vec<<DeferredRenderer as Renderer>::Target>>();
+
+    let mut interface_target = interface_renderer.create_render_target();
+
+    let mut picker_targets = swapchain_holder.get_swapchain_images()
+        .into_iter()
+        .map(|_| picker_renderer.create_render_target())
+        .collect::<Vec<<PickerRenderer as Renderer>::Target>>();
+
+    let mut directional_shadow_targets = swapchain_holder.get_swapchain_images()
+        .into_iter()
+        .map(|_| shadow_renderer.create_render_target(4096))
+        .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -162,8 +201,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let window_size = renderer.get_window_size().map(|c| c as f32);
-    let mut interface = Interface::new(window_size);
+    let mut interface = Interface::new(swapchain_holder.window_size_f32());
     let mut input_system = InputSystem::new();
     let mut render_settings = RenderSettings::new();
 
@@ -184,6 +222,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let mut debug_camera = DebugCamera::new();
     let mut player_camera = PlayerCamera::new();
+    let mut directional_shadow_camera = ShadowCamera::new();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -201,9 +240,7 @@ fn main() {
     #[cfg(feature = "debug")]
     timer.stop();
 
-    let mut texture_future = now(device.clone()).boxed();
-
-    let mut entities = Arc::new(Vec::new());
+    let mut entities = Vec::new();
 
     // move
     const TIME_FACTOR: f32 = 1000.0;
@@ -211,12 +248,11 @@ fn main() {
     let mut day_timer = (local.hour() as f32 / TIME_FACTOR * 60.0 * 60.0) + (local.minute() as f32 / TIME_FACTOR * 60.0);
     //
 
-    let chat_messages = Rc::new(RefCell::new(vec![ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220))]));
-
+    let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220));
+    let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
     let database = Database::new();
 
-    texture_future.flush().unwrap();
-    texture_future.cleanup_finished();
+    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(8).build().unwrap();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -227,9 +263,8 @@ fn main() {
 
             Event::WindowEvent { event: WindowEvent::Resized(_), .. } => {
                 let window_size = surface.window().inner_size();
-                let window_size = Size::new(window_size.width as f32, window_size.height as f32);
-                interface.update_window_size(window_size);
-                renderer.invalidate_swapchain();
+                interface.update_window_size(Size::new(window_size.width as f32, window_size.height as f32));
+                swapchain_holder.update_window_size(window_size.into());
             }
 
             Event::WindowEvent { event: WindowEvent::Focused(focused), .. } => {
@@ -265,60 +300,48 @@ fn main() {
                 networking_system.keep_alive(delta_time, game_timer.get_client_tick());
 
                 let network_events = networking_system.network_events();
-                let (user_events, hovered_element) = input_system.user_events(&mut renderer, &mut interface, &render_settings);
+                let (user_events, hovered_element) = input_system.user_events(&mut interface, &mut picker_targets[swapchain_holder.get_image_number()], &render_settings, swapchain_holder.window_size());
 
                 let mut texture_future = now(device.clone()).boxed();
-                let mut entities_copy = std::borrow::Cow::Borrowed(&*entities);
 
                 for event in network_events {
                     match event {
 
                         NetworkEvent::AddEntity(entity_id, job_id, position, movement_speed) => {
-                            entities_copy.to_mut().push(Arc::new(Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed)));
+                            entities.push(Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed));
                         }
 
                         NetworkEvent::RemoveEntity(entity_id) => {
-                            entities_copy.to_mut().retain(|entity| entity.entity_id != entity_id);
+                            entities.retain(|entity| entity.entity_id != entity_id);
                         }
 
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
-                            let entities = entities_copy.to_mut();
-                            let entity_index = entities.iter().position(|entity| entity.entity_id == entity_id).expect("failed to find entity");
-                            let mut entity = Clone::clone(&*entities[entity_index]);
+                            let entity = entities
+                                .iter_mut()
+                                .find(|entity| entity.entity_id == entity_id)
+                                .unwrap();
 
                             entity.move_from_to(&map, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
                             entity.generate_steps_vertex_buffer(device.clone(), &map);
-
-                            entities[entity_index] = Arc::new(entity);
                         }
 
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
-                            let entities = entities_copy.to_mut();
-                            let mut entity = Clone::clone(&*entities[0]);
-
-                            entity.move_from_to(&map, position_from, position_to, starting_timestamp);
+                            entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
-                            entity.generate_steps_vertex_buffer(device.clone(), &map);
-
-                            entities[0] = Arc::new(entity);
+                            entities[0].generate_steps_vertex_buffer(device.clone(), &map);
                         }
 
                         NetworkEvent::ChangeMap(map_name, player_position) => {
-                            let entities = entities_copy.to_mut();
 
                             while entities.len() > 1 {
                                 entities.pop(); 
                             }
 
-                            map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap());
+                            map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
-                            let mut player = Arc::unwrap_or_clone(entities.remove(0));
-
-                            player.set_position(&map, player_position);
-                            player_camera.set_focus_point(player.position);
-
-                            entities.push(Arc::new(player));
+                            entities[0].set_position(&map, player_position);
+                            player_camera.set_focus_point(entities[0].position);
 
                             networking_system.map_loaded();
                         }
@@ -346,9 +369,8 @@ fn main() {
 
                         UserEvent::ToggleFrameLimit => {
                             render_settings.toggle_frame_limit();
-                            renderer.set_frame_limit(render_settings.frame_limit);
-                            interface.schedule_rerender();
-                            interface.open_window(&debug_camera.light_variables);
+                            swapchain_holder.set_frame_limit(render_settings.frame_limit);
+                            //interface.schedule_rerender();
                         },
 
                         UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
@@ -369,12 +391,12 @@ fn main() {
                                     interface.close_window_with_class("character_selection"); // FIND A NICER WAY TO GET THE CLASS NAME
                                     interface.open_window(&PrototypeChatWindow::new(chat_messages.clone()));
 
-                                    map = Arc::new(map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap());
+                                    map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
                                     let player = Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
 
                                     player_camera.set_focus_point(player.position);
-                                    entities_copy.to_mut().push(Arc::new(player));
+                                    entities.push(player);
 
                                     networking_system.map_loaded();
                                     game_timer.set_client_tick(client_tick);
@@ -384,27 +406,15 @@ fn main() {
                             }
                         },
 
-                        UserEvent::CreateCharacter(character_slot) => {
-                            if let Err(message) = networking_system.crate_character(character_slot) {
-                                interface.open_window(&ErrorWindow::new(message));
-                            } 
-                        },
+                        UserEvent::CreateCharacter(character_slot) => interface.handle_result(networking_system.crate_character(character_slot)),
 
-                        UserEvent::DeleteCharacter(character_id) => {
-                            if let Err(message) = networking_system.delete_character(character_id) {
-                                interface.open_window(&ErrorWindow::new(message));
-                            }
-                        },
+                        UserEvent::DeleteCharacter(character_id) => interface.handle_result(networking_system.delete_character(character_id)),
 
                         UserEvent::RequestSwitchCharacterSlot(origin_slot) => networking_system.request_switch_character_slot(origin_slot),
 
                         UserEvent::CancelSwitchCharacterSlot => networking_system.cancel_switch_character_slot(),
 
-                        UserEvent::SwitchCharacterSlot(destination_slot) => {
-                            if let Err(message) = networking_system.switch_character_slot(destination_slot) {
-                                interface.open_window(&ErrorWindow::new(message));
-                            }
-                        },
+                        UserEvent::SwitchCharacterSlot(destination_slot) => interface.handle_result(networking_system.switch_character_slot(destination_slot)),
 
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
 
@@ -473,7 +483,7 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWireframe => {
                             render_settings.toggle_show_wireframe();
-                            renderer.invalidate_swapchain();
+                            swapchain_holder.invalidate_swapchain();
                         },
 
                         #[cfg(feature = "debug")]
@@ -552,21 +562,11 @@ fn main() {
 
                 let texture_fence = texture_future
                     .queue()
-                    .map(|_| texture_future.then_signal_fence_and_flush().unwrap().into())
-                    .unwrap_or_default();
+                    .map(|_| texture_future.then_signal_fence_and_flush().unwrap());
 
-                for entity_index in 0..entities_copy.len() {
-                    if entities_copy[entity_index].has_updates() {
-                        let entities = entities_copy.to_mut();
-                        let mut entity = Clone::clone(&*entities[entity_index]);
-                        entity.update(&map, delta_time as f32, game_timer.get_client_tick());
-                        entities[entity_index] = Arc::new(entity);
-                    }
-                }
-
-                if let std::borrow::Cow::Owned(new_entities) = entities_copy {
-                    entities = Arc::new(new_entities);
-                }
+                entities
+                    .iter_mut()
+                    .for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
 
                 if !entities.is_empty() {
                     player_camera.set_focus_point(entities[0].position);
@@ -574,106 +574,174 @@ fn main() {
 
                 player_camera.update(delta_time);
 
-                //map.update(delta_time as f32);
-
-                renderer.update(delta_time as f32);
-
                 let renderer_interface = interface.update();
 
                 networking_system.changes_applied();
 
-                renderer.start_frame(&surface, &render_settings, renderer_interface);
+                for index in 0..screen_targets.len() { // temp
+                    if let Some(mut fence) = screen_targets[index].state.try_take_fence() {
+                        fence.cleanup_finished();
+                        fence.wait(None).unwrap();
+                    }
+                }
 
-                if let Some(fence) = texture_fence {
+                // think about this position
+                if swapchain_holder.is_swapchain_invalid() {
+                    let viewport = swapchain_holder.recreate_swapchain();
+
+                    deferred_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
+                    interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
+                    picker_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
+                    shadow_renderer.recreate_pipeline(viewport.clone()); // does this need to be
+                                                                         // recreated?
+
+                    screen_targets = swapchain_holder.get_swapchain_images()
+                        .into_iter()
+                        .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
+                        .collect();
+
+                    interface_target = interface_renderer.create_render_target();
+
+                    picker_targets = swapchain_holder.get_swapchain_images()
+                        .into_iter()
+                        .map(|_| picker_renderer.create_render_target())
+                        .collect();
+
+                    directional_shadow_targets = swapchain_holder.get_swapchain_images()
+                        .into_iter()
+                        .map(|_| shadow_renderer.create_render_target(4096))
+                        .collect(); // does this need to be recreated?
+                }
+
+                if swapchain_holder.acquire_next_image().is_err() { // temporary check?
+                    return;
+                }
+
+                if let Some(mut fence) = texture_fence {
+                    fence.cleanup_finished();
                     fence.wait(None).unwrap();
                 }
 
                 #[cfg(feature = "debug")]
-                let current_camera: &mut dyn Camera = match render_settings.use_debug_camera {
+                let current_camera: &mut (dyn Camera + Send + Sync) = match render_settings.use_debug_camera {
                     true => &mut debug_camera,
                     false => &mut player_camera,
                 };
 
                 #[cfg(not(feature = "debug"))]
-                let current_camera = &mut player_camera;
+                let current_camera: &mut (dyn Camera + Send + Sync) = &mut player_camera;
 
-                current_camera.generate_view_projection(renderer.get_window_size(), day_timer);
+                current_camera.generate_view_projection(swapchain_holder.window_size());
+                directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
 
-                // RENDER TO THE PICKER BUFFER INSTEAD?
-                #[cfg(feature = "debug")]
-                let hovered_marker = map.hovered_marker(&mut renderer, current_camera, &render_settings, &entities, input_system.mouse_position());
+                let image_number = swapchain_holder.get_image_number();
+                let client_tick = game_timer.get_client_tick();
+                let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
+                let screen_target = &mut screen_targets[image_number];
+                let current_camera = Box::new(&*current_camera);
+                let entities = &entities[..];
 
-                // RENDER TO THE PICKER BUFFER INSTEAD?
-                #[cfg(feature = "debug")]
-                if let Some(marker) = hovered_marker {
-                    if input_system.unused_left_click() {
-                        let prototype_window = map.resolve_marker(&entities, marker);
-                        interface.open_window(prototype_window);
-                        input_system.set_interface_clicked();
+                thread_pool.in_place_scope(|scope| {
+
+                    if renderer_interface && false {
+                        scope.spawn(|_| {
+
+                            interface_target.start();
+
+                            // render interface
+
+                            interface_target.finish(); // make this a fence
+                        });
                     }
+
+                    scope.spawn(|_| {
+
+                        let picker_target = &mut picker_targets[image_number];
+
+                        picker_target.start();
+
+                        map.render_tiles(picker_target, &picker_renderer, *current_camera);
+
+                        entities.iter().for_each(|entity| entity.render(picker_target, &picker_renderer, *current_camera));
+
+                        picker_target.finish();
+                    });
+
+                    scope.spawn(|_| {
+
+                        let directional_shadow_target = &mut directional_shadow_targets[image_number];
+
+                        directional_shadow_target.start();
+
+                        if render_settings.show_map {
+                            map.render_ground(directional_shadow_target, &shadow_renderer, &directional_shadow_camera);
+                        }
+
+                        if render_settings.show_objects {
+                            map.render_objects(directional_shadow_target, &shadow_renderer, &directional_shadow_camera, client_tick);
+                        }
+
+                        if render_settings.show_entities {
+                            entities.iter().for_each(|entity| entity.render(directional_shadow_target, &shadow_renderer, &directional_shadow_camera));
+                        }
+
+                        directional_shadow_target.finish();
+                    });
+
+                    screen_target.start();
+
+                    if render_settings.show_map {
+                        map.render_ground(screen_target, &deferred_renderer, *current_camera);
+                    }
+
+                    if render_settings.show_objects {
+                        map.render_objects(screen_target, &deferred_renderer, *current_camera, client_tick);
+                    }
+
+                    if render_settings.show_entities {
+                        entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, *current_camera));
+                    }
+
+                    if render_settings.show_water {
+                        map.render_water(screen_target, &deferred_renderer, *current_camera, day_timer);
+                    }
+
+                    screen_target.lighting_pass();
+
+                    //#[debug_condition(render_settings.show_ambient_light)]
+                    if render_settings.show_ambient_light && !render_settings.show_buffers() {
+                        map.ambient_light(screen_target, &deferred_renderer, day_timer);
+                    }
+
+                    if render_settings.show_directional_light && !render_settings.show_buffers() {
+                        let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
+                        let light_matrix = view_matrix * projection_matrix;
+                        map.directional_light(screen_target, &deferred_renderer, *current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
+                    }
+
+                    if render_settings.show_point_lights && !render_settings.show_buffers() {
+                        map.point_lights(screen_target, &deferred_renderer, *current_camera);
+                    }
+                });
+
+                if render_settings.show_buffers() {
+                    deferred_renderer.overlay_buffers(screen_target, directional_shadow_image);
                 }
 
-                map.render_picker(&mut renderer, current_camera);
-
-                renderer.geometry_pass();
-
-                //current_camera.render_scene(/*&mut renderer,*/ Arc::clone(&map), Arc::clone(&entities), &render_settings, game_timer.get_client_tick());
-
-                //thread || {
-                //    directional_camera.render_scene(&mut shadow_renderer, &map, &entities, &render_settings, game_timer.get_client_tick());
-                //}
-
-                map.render_geomitry(&mut renderer, current_camera, &render_settings, game_timer.get_client_tick());
-
-                //if renderer_interface {
-                //    renderer.render_text_new("test", vector2!(0.0), vector2!(300.0), Color::rgb(100, 255, 100), 10.0);
-                //}
-
-                #[cfg(feature = "debug")]
-                if let Some(marker) = hovered_marker {
-                    map.render_marker_box(&mut renderer, current_camera, marker);
+                if render_settings.show_interface {
+                    deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
                 }
 
-                if render_settings.show_entities {
-                    entities.iter().for_each(|entity| entity.render(&mut renderer, current_camera));
-                }
+                let interface_future = interface_target.state.try_take_semaphore().unwrap_or_else(|| now(device.clone()).boxed());
+                let directional_shadow_future = directional_shadow_targets[image_number].state.take_semaphore();
+                let swapchain_acquire_future = swapchain_holder.take_acquire_future();
 
-                if render_settings.show_water {
-                    map.render_water(&mut renderer, current_camera);
-                }
+                let combined_future = interface_future
+                    .join(directional_shadow_future)
+                    .join(swapchain_acquire_future)
+                    .boxed();
 
-                #[cfg(feature = "debug")]
-                if render_settings.show_pathing {
-                    entities.iter().for_each(|entity| entity.render_pathing(&mut renderer, current_camera));
-                }
-
-                let state_provider = StateProvider::new(&render_settings);
-                interface.render(&mut renderer, &state_provider, hovered_element);
-
-                renderer.lighting_pass();
-                let font_atlas_future = font_loader.borrow_mut().flush();
-
-                #[cfg(feature = "debug")]
-                match render_settings.show_buffers() {
-                    true => renderer.render_buffers(&render_settings, font_loader.borrow().get_font_atlas()),
-                    false => map.render_lights(&mut renderer, current_camera, &render_settings, day_timer),
-                }
-
-                #[cfg(not(feature = "debug"))]
-                map.render_lights(&mut renderer, current_camera, &render_settings);
-
-                #[cfg(feature = "debug")]
-                map.render_markers(&mut renderer, current_camera, &render_settings, &entities, hovered_marker);
-
-                #[cfg(feature = "debug")]
-
-                renderer.render_interface(&render_settings);
-
-                if render_settings.show_frames_per_second {
-                    interface.render_frames_per_second(&mut renderer, game_timer.last_frames_per_second());
-                }
-
-                renderer.stop_frame(font_atlas_future);
+                screen_target.finish(swapchain_holder.get_swapchain(), combined_future);
             }
 
             _ignored => ()

@@ -1,48 +1,62 @@
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "shaders/ambient_light_vertex_shader.glsl"
+        path: "shaders/directional_light_vertex_shader.glsl"
     }
 }
 
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "shaders/ambient_light_fragment_shader.glsl"
+        path: "shaders/directional_light_fragment_shader.glsl"
     }
 }
 
 use std::sync::Arc;
 use std::iter;
 use vulkano::device::Device;
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
+
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
+use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
+use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
+use vulkano::buffer::BufferUsage;
+use cgmath::{Vector3, Matrix4};
 
 use crate::graphics::*;
 
 use self::fragment_shader::ty::Constants;
+use self::fragment_shader::ty::Matrices;
 
-pub struct AmbientLightRenderer {
+pub struct DirectionalLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
+    matrices_buffer: CpuBufferPool<Matrices>,
+    linear_sampler: Arc<Sampler>,
 }
 
-impl AmbientLightRenderer {
+impl DirectionalLightRenderer {
 
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
 
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
+        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
+        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+ 
+        let linear_sampler = Sampler::start(device)
+            .filter(Filter::Linear)
+            .address_mode(SamplerAddressMode::MirroredRepeat)
+            .build()
+            .unwrap();
 
-        Self { pipeline, vertex_shader, fragment_shader }
+        Self { pipeline, vertex_shader, fragment_shader, matrices_buffer, linear_sampler }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
@@ -62,21 +76,32 @@ impl AmbientLightRenderer {
             .unwrap()
     }
 
-    pub fn render(&self, builder: &mut CommandBuilder, diffuse_buffer: ImageBuffer, normal_buffer: ImageBuffer, vertex_buffer: ScreenVertexBuffer, color: Color) {
+    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, shadow_image: ImageBuffer, light_matrix: Matrix4<f32>, vertex_buffer: ScreenVertexBuffer, direction: Vector3<f32>, color: Color, intensity: f32) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+
+        let matrices = Matrices {
+            screen_to_world: camera.get_screen_to_world_matrix().into(),
+            light: light_matrix.into(),
+        };
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
         
         let set = PersistentDescriptorSet::new(descriptor_layout, [
-            WriteDescriptorSet::image_view(0, diffuse_buffer),
-            WriteDescriptorSet::image_view(1, normal_buffer),
+            WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()), 
+            WriteDescriptorSet::image_view(1, render_target.normal_image.clone()), 
+            WriteDescriptorSet::image_view(2, render_target.depth_image.clone()), 
+            WriteDescriptorSet::image_view_sampler(3, shadow_image, self.linear_sampler.clone()),
+            WriteDescriptorSet::buffer(4, matrices_subbuffer),
         ]).unwrap();
 
         let constants = Constants {
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            direction: [direction.x, direction.y, direction.z],
+            color: [color.red_f32() * intensity, color.green_f32() * intensity, color.blue_f32() * intensity],
+            _dummy0: Default::default(),
         };
 
-        builder
+        render_target.state.get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)

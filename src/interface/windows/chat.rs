@@ -4,7 +4,7 @@ use std::cell::RefCell;
 
 use crate::types::ChatMessage;
 use crate::types::maths::Vector2;
-use crate::graphics::{ Renderer, Color };
+use crate::graphics::{ Renderer, Color, InterfaceRenderer };
 use crate::interface::traits::{ Element, Window, PrototypeWindow };
 use crate::interface::types::*;
 use crate::interface::{ StateProvider, WindowCache, SizeConstraint, Size, Position };
@@ -129,16 +129,16 @@ impl Window for ChatWindow {
         self.size = self.size_constraint.validated_size(self.size, avalible_space, *interface_settings.scaling);
     }
 
-    fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, _hovered_element: Option<&dyn Element>) {
-        renderer.render_rectangle(self.position, self.size, self.position + self.size, *theme.chat.border_radius, *theme.chat.background_color);
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, _hovered_element: Option<&dyn Element>) {
+        renderer.render_rectangle(render_target, self.position, self.size, self.position + self.size, *theme.chat.border_radius, *theme.chat.background_color);
 
         let clip_size = self.position + self.size;
         let scaled_font_size = *theme.chat.font_size * *interface_settings.scaling;
         let scaled_shadow_offset = 1.0 * *interface_settings.scaling;
 
         for (message_index, message) in self.messages.borrow().iter().enumerate() {
-            renderer.render_text(&message.text, self.position + vector2!(0.0, message_index as f32 * scaled_font_size) + vector2!(scaled_shadow_offset), clip_size, Color::monochrome(0), scaled_font_size);
-            renderer.render_text(&message.text, self.position + vector2!(0.0, message_index as f32 * scaled_font_size), clip_size, message.color, scaled_font_size);
+            renderer.render_text(render_target, &message.text, self.position + vector2!(0.0, message_index as f32 * scaled_font_size) + vector2!(scaled_shadow_offset), clip_size, Color::monochrome(0), scaled_font_size);
+            renderer.render_text(render_target, &message.text, self.position + vector2!(0.0, message_index as f32 * scaled_font_size), clip_size, message.color, scaled_font_size);
         }
     }
 }

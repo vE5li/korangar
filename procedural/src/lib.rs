@@ -186,7 +186,7 @@ pub fn derive_prototype_window(item: proc_macro::TokenStream) -> proc_macro::Tok
 //    proc_macro::TokenStream::from(expanded)
 //}
 
-#[proc_macro_derive(ByteConvertable, attributes(length_hint, repeating, base_type, variant_value, version, version_smaller, version_equals_or_above))]
+#[proc_macro_derive(ByteConvertable, attributes(length_hint, repeating, numeric_type, numeric_value, version, version_smaller, version_equals_or_above))]
 pub fn derive_byte_convertable(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let ast: DeriveInput = syn::parse(item).expect("Couldn't parse item");
@@ -220,7 +220,7 @@ fn derive_byte_convertable_struct(data_struct: DataStruct, name: Ident) -> proc_
             fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
                 [#(#to_bytes_initializers),*].concat()
-            } 
+            }
         }
     };
 
@@ -229,18 +229,18 @@ fn derive_byte_convertable_struct(data_struct: DataStruct, name: Ident) -> proc_
 
 fn derive_byte_convertable_enum(data_enum: DataEnum, attributes: Vec<Attribute>, name: Ident) -> proc_macro::TokenStream {
 
-    let mut base_type = Ident::new("u8", name.span()); // get a correct span
-    let mut base_type_set = false;
+    let mut numeric_type = Ident::new("u8", name.span()); // get a correct span
+    let mut numeric_type_set = false;
     //let mut length_hint = None;
 
     for attribute in attributes {
 
         let identifier = attribute.path.segments[0].ident.to_string();
 
-        if identifier.as_str() == "base_type" {
-            assert!(!base_type_set, "base type may only be set once per enum");
-            base_type = attribute.parse_args::<Ident>().unwrap();
-            base_type_set = true;
+        if identifier.as_str() == "numeric_type" {
+            assert!(!numeric_type_set, "numeric type may only be set once per enum");
+            numeric_type = attribute.parse_args::<Ident>().unwrap();
+            numeric_type_set = true;
         }
 
         //if identifier.as_str() == "length_hint" {
@@ -266,7 +266,7 @@ fn derive_byte_convertable_enum(data_enum: DataEnum, attributes: Vec<Attribute>,
         for attribute in variant.attrs {
             let attribute_name = attribute.path.segments[0].ident.to_string();
 
-            if &attribute_name == "variant_value" {
+            if &attribute_name == "numeric_value" {
                 assert!(!index_set, "variant value may only be set once per variant");
                 current_index = attribute.parse_args::<syn::LitInt>().unwrap().base10_parse().unwrap();
                 index_set = true;
@@ -287,7 +287,7 @@ fn derive_byte_convertable_enum(data_enum: DataEnum, attributes: Vec<Attribute>,
 
                 //#length_hint
 
-                match #base_type::from_bytes(byte_stream, None) as usize {
+                match #numeric_type::from_bytes(byte_stream, None) as usize {
                     #( #indices => Self::#values, )*
                     invalid => panic!("invalid value {}", invalid),
                 }
@@ -296,7 +296,7 @@ fn derive_byte_convertable_enum(data_enum: DataEnum, attributes: Vec<Attribute>,
             fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
                 assert!(length_hint.is_none(), "length hint may not be given to enums");
                 match self {
-                    #( #name::#values => (#indices as #base_type).to_bytes(None), )*
+                    #( #name::#values => (#indices as #numeric_type).to_bytes(None), )*
                 }
             }
         }

@@ -5,7 +5,7 @@ use std::cmp::PartialOrd;
 
 use crate::interface::traits::Element;
 use crate::interface::types::*;
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, InterfaceRenderer};
 
 #[derive(new)]
 pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
@@ -66,21 +66,21 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         self.change_event
     }
 
-    fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
         if matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.slider.background_color);
+            renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.slider.background_color);
         }
 
         let bar_size = Size::new(self.cached_size.x * 0.9, self.cached_size.y / 4.0);
         let offset = (self.cached_size - bar_size) / 2.0;
-        renderer.render_rectangle(absolute_position + offset, bar_size, clip_size, vector4!(0.5) * *interface_settings.scaling, *theme.slider.rail_color);
+        renderer.render_rectangle(render_target, absolute_position + offset, bar_size, clip_size, vector4!(0.5) * *interface_settings.scaling, *theme.slider.rail_color);
 
         let knob_size = Size::new(20.0 * *interface_settings.scaling, self.cached_size.y * 0.8);
         let total_range = self.maximum_value - self.minimum_value;
         let offset = Position::new((self.cached_size.x - knob_size.x) / total_range.to_f32().unwrap() * (self.cached_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap()), (self.cached_size.y - knob_size.y) / 2.0);
-        renderer.render_rectangle(absolute_position + offset, knob_size, clip_size, vector4!(4.0) * *interface_settings.scaling, *theme.slider.knob_color);
+        renderer.render_rectangle(render_target, absolute_position + offset, knob_size, clip_size, vector4!(4.0) * *interface_settings.scaling, *theme.slider.knob_color);
     }
 }

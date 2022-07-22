@@ -117,18 +117,12 @@ impl ByteConvertable for i64 {
 impl ByteConvertable for f32 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none(), "i32 may not have a length hint");
-
-        let first = byte_stream.next();
-        let second = byte_stream.next();
-        let third = byte_stream.next();
-        let fourth = byte_stream.next();
-
-        f32::from_le_bytes([first, second, third, fourth])
+        assert!(length_hint.is_none(), "f32 may not have a length hint");
+        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        assert!(length_hint.is_none(), "i32 may not have a length hint");
+        assert!(length_hint.is_none(), "f32 may not have a length hint");
         self.to_ne_bytes().to_vec()
     }
 }
@@ -177,7 +171,6 @@ impl ByteConvertable for String {
 
         if let Some(length) = length_hint {
             byte_stream.skip(length - offset); 
-            // maybe error if no zero byte was found
         }
 
         value
@@ -259,12 +252,12 @@ impl<T: ByteConvertable> ByteConvertable for Quaternion<T> {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "quaternion may not have a length hint");
 
-        let fourth = T::from_bytes(byte_stream, None);
         let first = T::from_bytes(byte_stream, None);
         let second = T::from_bytes(byte_stream, None);
         let third = T::from_bytes(byte_stream, None);
+        let fourth = T::from_bytes(byte_stream, None);
 
-        Quaternion::new(first, second, third, fourth)
+        Quaternion::new(fourth, first, second, third)
     }
 }
 
@@ -533,18 +526,18 @@ mod default_enum {
 }
 
 #[cfg(test)]
-mod variant_value_enum {
+mod numeric_value_enum {
 
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
 
     #[derive(ByteConvertable)]
     enum TestEnum {
-        #[variant_value(2)]
+        #[numeric_value(2)]
         First,
-        #[variant_value(10)]
+        #[numeric_value(10)]
         Second,
-        #[variant_value(255)]
+        #[numeric_value(255)]
         Third,
     }
 
@@ -565,13 +558,13 @@ mod variant_value_enum {
 }
 
 #[cfg(test)]
-mod base_type_enum {
+mod numeric_type_enum {
 
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
 
     #[derive(ByteConvertable)]
-    #[base_type(u16)]
+    #[numeric_type(u16)]
     enum TestEnum {
         First,
         Second,

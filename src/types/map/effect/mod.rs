@@ -2,7 +2,7 @@ mod particle;
 
 use derive_new::new;
 
-use crate::graphics::{ Renderer, Camera, Color };
+use crate::graphics::{ Renderer, Camera, Color, DeferredRenderer, MarkerRenderer };
 use crate::types::maths::*;
 
 pub use self::particle::Particle;
@@ -47,38 +47,14 @@ impl EffectSource {
         }
     }
 
-    pub fn render_lights(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        self.particles.iter().for_each(|particle| renderer.point_light(camera, particle.position, particle.light_color, particle.light_range));
+    pub fn render_lights(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        self.particles.iter().for_each(|particle| renderer.point_light(render_target, camera, particle.position, particle.light_color, particle.light_range));
     }
 
     #[cfg(feature = "debug")]
-    pub fn hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, smallest_distance: f32) -> Option<f32> {
-        let distance = camera.distance_to(self.position);
-
-        match distance < smallest_distance && renderer.marker_hovered(camera, self.position, mouse_position) {
-            true => Some(distance),
-            false => None,
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn particle_hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, mut smallest_distance: f32) -> Option<(f32, usize)> {
-        let mut closest_particle = None;
-
-        for (index, particle) in self.particles.iter().enumerate() {
-            let distance = camera.distance_to(particle.position);
-
-            if distance < smallest_distance && renderer.marker_hovered(camera, particle.position, mouse_position) {
-                smallest_distance = distance;
-                closest_particle = Some((distance, index));
-            }
-        }
-
-        closest_particle
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera, hovered: bool) {
-        renderer.render_effect_marker(camera, self.position, hovered);
+    pub fn render_marker<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+        where T: Renderer + MarkerRenderer
+    {
+        renderer.render_marker(render_target, camera, self.position, hovered);
     }
 }

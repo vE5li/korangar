@@ -48,6 +48,6 @@ impl PrototypeWindow for MapsWindow {
             .map(|(name, position)| cell!(EventButton::new(name.to_string(), UserEvent::RequestWarpToMap(format!("{}.gat", name), position))) as ElementCell)
             .collect();
         
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "maps".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Maps".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
     }
 }

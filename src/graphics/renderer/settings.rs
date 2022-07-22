@@ -23,6 +23,9 @@ pub struct RenderSettings {
     pub show_water: bool,
     #[toggle]
     #[new(value = "true")]
+    pub show_interface: bool,
+    #[toggle]
+    #[new(value = "true")]
     pub show_ambient_light: bool,
     #[toggle]
     #[new(value = "true")]

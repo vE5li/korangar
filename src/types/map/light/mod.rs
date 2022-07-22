@@ -1,6 +1,6 @@
 use derive_new::new;
 
-use crate::graphics::{ Renderer, Camera, Color };
+use crate::graphics::*;
 use crate::types::maths::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
@@ -18,22 +18,14 @@ impl LightSource {
         self.position += offset;
     }
 
-    pub fn render_lights(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.point_light(camera, self.position, self.color, self.range);
+    pub fn render_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        renderer.point_light(render_target, camera, self.position, self.color, self.range);
     }
 
     #[cfg(feature = "debug")]
-    pub fn hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, smallest_distance: f32) -> Option<f32> {
-        let distance = camera.distance_to(self.position);
-
-        match distance < smallest_distance && renderer.marker_hovered(camera, self.position, mouse_position) {
-            true => Some(distance),
-            false => None,
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera, hovered: bool) {
-        renderer.render_light_marker(camera, self.position, self.color, hovered);
+    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+        where T: Renderer + MarkerRenderer
+    {
+        renderer.render_marker(render_target, camera, self.position, hovered);
     }
 }

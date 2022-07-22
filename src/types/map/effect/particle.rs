@@ -2,7 +2,7 @@ use derive_new::new;
 use cgmath::Vector3;
 
 #[cfg(feature = "debug")]
-use crate::graphics::{ Renderer, Camera };
+use crate::graphics::{ Renderer, Camera, MarkerRenderer };
 use crate::graphics::Color;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
@@ -16,12 +16,13 @@ impl Particle {
 
     pub fn update(&mut self, delta_time: f32) -> bool {
         self.position.y += 10.0 * delta_time;
-
         self.position.y < 30.0
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera, hovered: bool) {
-        renderer.render_particle_marker(camera, self.position, hovered);
+    pub fn render_marker<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+        where T: Renderer + MarkerRenderer
+    {
+        renderer.render_marker(render_target, camera, self.position, hovered);
     }
 }

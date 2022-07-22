@@ -1,7 +1,5 @@
 #version 450
 
-const int TEXTURE_COUNT = 10;
-
 layout(location = 0) in vec2 texture_coordinates;
 layout(location = 1) in vec3 normal;
 

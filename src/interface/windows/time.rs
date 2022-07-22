@@ -28,6 +28,6 @@ impl PrototypeWindow for TimeWindow {
             cell!(Button::new("set midnight", UserEvent::SetMidnight, false)),
         ];
         
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "time".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Time".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
     }
 }

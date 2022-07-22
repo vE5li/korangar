@@ -5,7 +5,7 @@ use std::cmp::PartialOrd;
 use std::fmt::Display;
 
 use crate::types::maths::*;
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, InterfaceRenderer};
 use crate::interface::traits::Element;
 use crate::interface::windows::Vector2Window;
 use crate::interface::types::*;
@@ -64,15 +64,15 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         Some(ClickAction::OpenWindow(Box::new(Vector2Window::new(self.name.clone(), self.inner_pointer, self.minimum_value, self.maximum_value, self.change_event))))
     }
 
-    fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            true => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, *theme.value.hovered_background_color),
-            false => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, *theme.value.background_color),
+            true => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, *theme.value.hovered_background_color),
+            false => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, *theme.value.background_color),
         }
 
-        renderer.render_text(&self.cached_values, absolute_position + *theme.value.text_offset * *interface_settings.scaling, clip_size, *theme.value.foreground_color, *theme.value.font_size * *interface_settings.scaling);
+        renderer.render_text(render_target, &self.cached_values, absolute_position + *theme.value.text_offset * *interface_settings.scaling, clip_size, *theme.value.foreground_color, *theme.value.font_size * *interface_settings.scaling);
     }
 }

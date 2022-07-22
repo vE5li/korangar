@@ -19,7 +19,7 @@ impl PrototypeWindow for ErrorWindow {
             cell!(Text::new(self.message.clone(), Color::rgb(220, 100, 100), 14.0, constraint!(100.0%, 14.0))),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "error".to_string(), None, elements, constraint!(300.0 > 400.0 < 500.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Error".to_string(), None, elements, constraint!(300.0 > 400.0 < 500.0, ?)))
     }
 }
 

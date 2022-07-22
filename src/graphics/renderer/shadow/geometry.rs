@@ -1,14 +1,14 @@
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "shaders/geometry_vertex_shader.glsl"
+        path: "shaders/geometry_shadow_vertex_shader.glsl"
     }
 }
 
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "shaders/geometry_fragment_shader.glsl"
+        path: "shaders/geometry_shadow_fragment_shader.glsl"
     }
 }
 
@@ -17,8 +17,7 @@ use std::iter;
 
 use vulkano::device::Device;
 
-use vulkano::pipeline::graphics::rasterization::{ RasterizationState, CullMode, PolygonMode };
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline, StateMode };
+use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
@@ -30,13 +29,10 @@ use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage, BufferAccess };
 
 use crate::types::maths::*;
-use crate::types::map::model::Node;
 use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
 use self::vertex_shader::ty::Matrices;
-
-use self::fragment_shader::SpecializationConstants;
 
 pub struct GeometryRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -58,7 +54,7 @@ impl GeometryRenderer {
         let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::ClampToEdge)
-            .anisotropy(Some(4.0))
+            //.anisotropy(Some(4.0))
             .min_lod(1.0)
             .build()
             .unwrap();
@@ -72,30 +68,20 @@ impl GeometryRenderer {
 
     fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule, wireframe: bool) -> Arc<GraphicsPipeline> {
 
-        let polygon_mode = match wireframe {
-            true => PolygonMode::Line,
-            false => PolygonMode::Fill,
-        };
-
-        let specialization_constants = match wireframe {
-            true => SpecializationConstants { additional_color: 1.0 },
-            false => SpecializationConstants { additional_color: 0.0 },
-        };
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), specialization_constants)
+            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .depth_stencil_state(DepthStencilState::simple_depth_test())
-            .rasterization_state(RasterizationState { cull_mode: StateMode::Fixed(CullMode::Back), polygon_mode, ..Default::default() })
+            //.rasterization_state(RasterizationState { cull_mode: StateMode::Fixed(CullMode::Back) })
             .render_pass(subpass)
             .build(device)
             .unwrap()
     }
 
-    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>) {
+    pub fn render(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>) {
 
         if textures.is_empty() {
             return;
@@ -180,8 +166,7 @@ impl GeometryRenderer {
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
-            view: view_matrix.into(),
-            projection: projection_matrix.into(),
+            view_projection: (view_matrix * projection_matrix).into(),
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 

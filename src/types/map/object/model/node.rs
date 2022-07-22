@@ -1,7 +1,7 @@
 use derive_new::new;
 use crate::loaders::RotationKeyframeData;
 use crate::types::maths::*;
-use crate::graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform };
+use crate::graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform, GeometryRenderer };
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct BoundingBox {
@@ -65,12 +65,31 @@ pub struct Node {
 
 impl Node {
 
-    pub fn render_geometry(&self, renderer: &mut Renderer, camera: &dyn Camera, parent_transform: &Transform, client_tick: u32) {
-        renderer.render_node(camera, self, parent_transform, client_tick);
-        self.child_nodes.iter().for_each(|node| node.render_geometry(renderer, camera, parent_transform, client_tick));
+    pub fn render_geometry<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, transform: &Transform, client_tick: u32)
+        where T: Renderer + GeometryRenderer
+    {
+
+        let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
+            true => Matrix4::identity(),
+            false => self.animaton_matrix(client_tick),
+        };
+
+        let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
+            * Matrix4::from_angle_x(-transform.rotation.x)
+            * Matrix4::from_angle_y(transform.rotation.y);
+
+        let world_matrix = Matrix4::from_translation(transform.position)
+            * rotation_matrix
+            * Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
+            * Matrix4::from_cols(vector4!(1.0, 0.0, 0.0, 0.0), vector4!(0.0, -1.0, 0.0, 0.0), vector4!(0.0, 0.0, 1.0, 0.0), vector4!(0.0, 0.0, 0.0, 1.0))
+            * self.transform_matrix
+            * animation_rotation_matrix;
+
+        renderer.render_geometry(render_target, camera, self.vertex_buffer.clone(), &self.textures.clone(), world_matrix);
+        self.child_nodes.iter().for_each(|node| node.render_geometry(render_target, renderer, camera, transform, client_tick));
     }
 
-    pub fn animaton_matrix(&self, client_tick: u32) -> Matrix4<f32> {
+    fn animaton_matrix(&self, client_tick: u32) -> Matrix4<f32> {
 
         let last_step = self.rotation_keyframes.last().unwrap();
         let animation_tick = client_tick % last_step.frame;

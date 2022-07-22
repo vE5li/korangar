@@ -4,7 +4,7 @@ pub mod traits;
 pub mod elements;
 pub mod windows;
 
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, InterfaceRenderer};
 
 pub use self::types::{ StateProvider, ClickAction, Size };
 pub use self::windows::*;
@@ -207,7 +207,7 @@ impl Interface {
         }
     }
 
-    pub fn render(&mut self, renderer: &mut Renderer, state_provider: &StateProvider, hovered_element: Option<ElementCell>) {
+    pub fn render(&mut self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, hovered_element: Option<ElementCell>) {
 
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
 
@@ -217,7 +217,7 @@ impl Interface {
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if self.rerender || *rerender {
-                window.render(renderer, state_provider, &self.interface_settings, &self.theme, hovered_element);
+                window.render(render_target, renderer, state_provider, &self.interface_settings, &self.theme, hovered_element);
                 *rerender = false;
             }
         }
@@ -225,8 +225,8 @@ impl Interface {
         self.rerender = false;
     }
 
-    pub fn render_frames_per_second(&self, renderer: &mut Renderer, frames_per_second: usize) {
-        renderer.render_dynamic_text(&frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
+    pub fn render_frames_per_second(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, frames_per_second: usize) {
+        //renderer.render_dynamic_text(&frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
     }
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {
@@ -245,6 +245,12 @@ impl Interface {
             let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
             self.open_new_window(window);
         }
+    }
+
+    pub fn handle_result<T>(&mut self, result: Result<T, String>) {
+        if let Err(message) = result {
+            self.open_window(&ErrorWindow::new(message));
+        } 
     }
 
     #[cfg(feature = "debug")]

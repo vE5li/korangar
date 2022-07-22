@@ -10,7 +10,7 @@ use winit::dpi::PhysicalPosition;
 
 use crate::interface::types::ElementCell;
 use crate::interface::{ Interface, ClickAction };
-use crate::graphics::{Renderer, RenderSettings};
+use crate::graphics::{ RenderSettings, PickerRenderTarget };
 
 pub use self::event::UserEvent;
 pub use self::mode::MouseInputMode;
@@ -114,7 +114,7 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, renderer: &mut Renderer, interface: &mut Interface, render_settings: &RenderSettings) -> (Vec<UserEvent>, Option<ElementCell>) {
+    pub fn user_events(&mut self, interface: &mut Interface, picker_target: &mut PickerRenderTarget, render_settings: &RenderSettings, window_size: Vector2<usize>) -> (Vec<UserEvent>, Option<ElementCell>) {
 
         let mut events = Vec::new();
         let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {         
@@ -226,9 +226,14 @@ impl InputSystem {
         }
 
         if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
-            let window_size = renderer.get_window_size();
-            let picker_buffer = renderer.get_picker_buffer();
-            let pixel = picker_buffer.read().unwrap()[self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x];
+
+            if let Some(fence) = picker_target.state.try_take_fence() {
+                fence.wait(None).unwrap();
+            }
+
+            let pixel = picker_target.buffer
+                .read()
+                .unwrap()[self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x];
 
             if pixel != 0 {
                 let x = (pixel & 0xff) - 1;

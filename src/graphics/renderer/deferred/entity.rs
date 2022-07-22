@@ -67,7 +67,6 @@ impl EntityRenderer {
         let nearest_sampler = Sampler::start(device)
             .filter(Filter::Nearest)
             .address_mode(SamplerAddressMode::MirroredRepeat)
-            //.lod(0.0..=100.0)
             .build()
             .unwrap();
 
@@ -91,7 +90,8 @@ impl EntityRenderer {
             .unwrap()
     }
 
-    pub fn render(&self, camera: &dyn Camera, builder: &mut CommandBuilder, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>) {
+    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>)
+    {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -118,7 +118,7 @@ impl EntityRenderer {
             texture_size: [texture_size.x, texture_size.y],
         };
 
-        builder
+        render_target.state.get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)

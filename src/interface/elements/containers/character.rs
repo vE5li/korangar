@@ -2,6 +2,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use num::Zero;
 
+use crate::graphics::InterfaceRenderer;
 use crate::input::UserEvent;
 use crate::interface::traits::Element;
 use crate::interface::types::*;
@@ -144,15 +145,15 @@ impl Element for CharacterPreview {
         HoverInformation::Missed
     }
 
-    fn render(&self, renderer: &mut Renderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            true => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.hovered_background_color),
-            false => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.background_color),
+            true => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.hovered_background_color),
+            false => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.background_color),
         }
 
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        self.elements.iter().for_each(|element| element.borrow().render(renderer, state_provider, interface_settings, theme, absolute_position, clip_size, hovered_element, second_theme));
+        self.elements.iter().for_each(|element| element.borrow().render(render_target, renderer, state_provider, interface_settings, theme, absolute_position, clip_size, hovered_element, second_theme));
     }
 }

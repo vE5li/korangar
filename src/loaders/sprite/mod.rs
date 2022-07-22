@@ -143,12 +143,12 @@ pub struct SpriteLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     #[new(default)]
-    cache: HashMap<String, Rc<Sprite>>,
+    cache: HashMap<String, Arc<Sprite>>,
 }
 
 impl SpriteLoader {
 
-    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Rc<Sprite>, String> {
+    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Sprite>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}{}{}", MAGENTA, path, NONE));
@@ -203,7 +203,7 @@ impl SpriteLoader {
             .map(|image| ImageView::new(Arc::new(image)).unwrap())
             .collect();
 
-        let sprite = Rc::new(Sprite { textures });
+        let sprite = Arc::new(Sprite { textures });
         self.cache.insert(path.to_string(), sprite.clone());
 
         println!("images: {}", sprite.textures.len());
@@ -214,7 +214,7 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Rc<Sprite>, String> {
+    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Sprite>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path, texture_future),

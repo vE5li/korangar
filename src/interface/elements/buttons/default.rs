@@ -4,7 +4,7 @@ use num::Zero;
 use crate::input::UserEvent;
 use crate::interface::traits::Element;
 use crate::interface::types::*;
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, InterfaceRenderer};
 
 #[derive(new)]
 pub struct Button {
@@ -45,16 +45,16 @@ impl Element for Button {
         Some(ClickAction::Event(self.event.clone()))
     }
 
-    fn render(&self, renderer: &mut Renderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            true => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.hovered_background_color),
-            false => renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.background_color),
+            true => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.hovered_background_color),
+            false => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.background_color),
         }
 
         let offset = vector2!(0.0, (self.cached_size.y - *theme.button.font_size * *interface_settings.scaling) / 2.0);
-        renderer.render_text(self.text, absolute_position + offset + *theme.button.text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
+        renderer.render_text(render_target, self.text, absolute_position + offset + *theme.button.text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
     }
 }

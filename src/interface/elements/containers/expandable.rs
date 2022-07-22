@@ -1,9 +1,8 @@
-use std::rc::Rc;
 use num::Zero;
 
 use crate::interface::traits::Element;
 use crate::interface::types::*;
-use crate::graphics::Renderer;
+use crate::graphics::{Renderer, InterfaceRenderer};
 
 pub struct Expandable {
     display: String,
@@ -104,7 +103,7 @@ impl Element for Expandable {
         None
     }
 
-    fn render(&self, renderer: &mut Renderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
@@ -113,16 +112,16 @@ impl Element for Expandable {
             false => *theme.expandable.background_color,
         };
 
-        renderer.render_rectangle(absolute_position, self.cached_size, clip_size, *theme.expandable.border_radius * *interface_settings.scaling, background_color);
-        renderer.render_expand_arrow(absolute_position + *theme.expandable.icon_offset * *interface_settings.scaling, *theme.expandable.icon_size * *interface_settings.scaling, clip_size, *theme.expandable.foreground_color, self.expanded);
+        renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.expandable.border_radius * *interface_settings.scaling, background_color);
+        renderer.render_expand_arrow(render_target, absolute_position + *theme.expandable.icon_offset * *interface_settings.scaling, *theme.expandable.icon_size * *interface_settings.scaling, clip_size, *theme.expandable.foreground_color, self.expanded);
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            true => renderer.render_text(&self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, *theme.expandable.hovered_foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
-            false => renderer.render_text(&self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, *theme.expandable.foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
+            true => renderer.render_text(render_target, &self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, *theme.expandable.hovered_foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
+            false => renderer.render_text(render_target, &self.display, absolute_position + *theme.expandable.text_offset * *interface_settings.scaling, clip_size, *theme.expandable.foreground_color, *theme.expandable.font_size * *interface_settings.scaling),
         }
 
         if self.expanded {
-            self.elements.iter().for_each(|element| element.borrow().render(renderer, state_provider, interface_settings, theme, absolute_position, clip_size, hovered_element, !second_theme));
+            self.elements.iter().for_each(|element| element.borrow().render(render_target, renderer, state_provider, interface_settings, theme, absolute_position, clip_size, hovered_element, !second_theme));
         }
     }
 }

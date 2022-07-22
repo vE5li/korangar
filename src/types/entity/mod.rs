@@ -1,6 +1,5 @@
 use derive_new::new;
 use std::sync::Arc;
-use std::rc::Rc;
 use cgmath::{ Vector3, Vector2, VectorSpace };
 use vulkano::sync::GpuFuture;
 #[cfg(feature = "debug")]
@@ -10,7 +9,7 @@ use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 
 #[cfg(feature = "debug")]
 use crate::graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
-use crate::graphics::{ Renderer, Camera, Texture };
+use crate::graphics::{ Renderer, EntityRenderer, Camera, MarkerRenderer, DeferredRenderer };
 use crate::types::map::{ Map, MarkerIdentifier };
 use crate::loaders::{ TextureLoader, SpriteLoader, ActionLoader };
 use crate::loaders::{ Sprite, Actions};
@@ -42,8 +41,8 @@ pub struct Entity {
     pub current_spell_points: usize,
     pub current_activity_points: usize,
 
-    sprite: Rc<Sprite>,
-    actions: Rc<Actions>,
+    sprite: Arc<Sprite>,
+    actions: Arc<Actions>,
 
     timer: f32,
     counter: usize,
@@ -265,30 +264,24 @@ impl Entity {
         }
     }
 
-    pub fn render(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        renderer.render_entity(camera, self.sprite.textures[self.counter].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0));
+    pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
+        where T: Renderer + EntityRenderer
+    {
+        //renderer.render_entity(render_target, camera, &self.sprite.textures[0].clone());
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker(&self, renderer: &mut Renderer, camera: &dyn Camera, hovered: bool) {
-        renderer.render_entity_marker(camera, self.position, hovered);
+    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+        where T: Renderer + MarkerRenderer
+    {
+        renderer.render_marker(render_target, camera, self.position, hovered);
     }
 
     #[cfg(feature = "debug")]
-    pub fn hovered(&self, renderer: &Renderer, camera: &dyn Camera, mouse_position: Vector2<f32>, smallest_distance: f32) -> Option<f32> {
-        let distance = camera.distance_to(self.position);
-
-        match distance < smallest_distance && renderer.marker_hovered(camera, self.position, mouse_position) {
-            true => Some(distance),
-            false => None,
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_pathing(&self, renderer: &mut Renderer, camera: &dyn Camera) {
-        if let Some(active_movement) = &self.active_movement {
+    pub fn render_pathing(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        /*if let Some(active_movement) = &self.active_movement {
             let vertex_buffer = active_movement.steps_vertex_buffer.clone().unwrap();
-            renderer.render_pathing(camera, vertex_buffer, &Transform::new());
-        }
+            renderer.render_pathing(render_target, camera, vertex_buffer, &Transform::new());
+        }*/
     }
 }

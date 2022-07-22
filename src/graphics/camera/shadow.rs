@@ -13,7 +13,7 @@ use super::{ Camera, SmoothedValue };
 const ZOOM_SPEED: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.02;
 
-pub struct PlayerCamera {
+pub struct ShadowCamera {
     focus_position: Point3<f32>,
     look_up_vector: Vector3<f32>,
     view_matrix: Matrix4<f32>,
@@ -25,7 +25,7 @@ pub struct PlayerCamera {
     aspect_ratio: f32,
 }
 
-impl PlayerCamera {
+impl ShadowCamera {
 
     pub fn new() -> Self {
         Self {
@@ -80,14 +80,26 @@ impl PlayerCamera {
     }
 }
 
-impl Camera for PlayerCamera {
+impl Camera for ShadowCamera {
 
     fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
-        self.aspect_ratio = window_size.x as f32 / window_size.y as f32;
-        self.projection_matrix = cgmath::perspective(Rad(0.2617), self.aspect_ratio, 1.0, 2000.0);
 
-        let camera_position = self.camera_position();
-        self.view_matrix = Matrix4::look_at_rh(camera_position, self.focus_position, self.look_up_vector);
+        let direction = crate::types::map::get_light_direction(0.5).normalize();
+        let scaled_direction = direction * 100.0;
+
+        let bounds = vector4!(-500.0, 500.0, -500.0, 500.0);
+        let z_near = -1000.0;
+        let z_far = 500.0;
+        let position = self.focus_position + scaled_direction;
+        let look_at = self.focus_position;
+        self.projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, z_near, z_far);
+        self.view_matrix = Matrix4::look_at_rh(position, look_at, vector3!(0.0, 1.0, 0.0));
+
+        self.aspect_ratio = window_size.x as f32 / window_size.y as f32;
+        //self.projection_matrix = cgmath::perspective(Rad(0.2617), self.aspect_ratio, 1.0, 2000.0);
+
+        //let camera_position = self.camera_position();
+        //self.view_matrix = Matrix4::look_at_rh(camera_position, self.focus_position, self.look_up_vector);
 
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
         self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();

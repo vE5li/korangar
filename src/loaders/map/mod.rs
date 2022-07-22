@@ -12,7 +12,7 @@ use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::ByteStream;
+use crate::types::{ByteStream, Version};
 use crate::types::map::{ Map, Tile, TileType, WaterSettings, LightSettings, Object, LightSource, SoundSource, EffectSource };
 use crate::graphics::{ Color, ModelVertex, Transform, NativeModelVertex, WaterVertex, TileVertex };
 use crate::loaders::{ ModelLoader, TextureLoader, GameFileLoader };
@@ -127,6 +127,35 @@ pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
     }
 }
 
+#[derive(ByteConvertable)]
+struct MapData {
+    #[version]
+    pub version: Version,
+    /// Ignored
+    #[length_hint(40)]
+    pub ini_file: String,
+    #[length_hint(40)]
+    pub ground_file: String,
+    #[version_equals_or_above(1, 4)]
+    #[length_hint(40)]
+    pub gat_file: Option<String>,
+    /// Ignored
+    #[length_hint(40)]
+    pub source_file: String,
+    #[version_equals_or_above(1, 4)]
+    pub water_level: Option<f32>,
+    #[version_equals_or_above(1, 8)]
+    pub water_type: Option<i32>,
+    #[version_equals_or_above(1, 8)]
+    pub wave_height: Option<f32>,
+    #[version_equals_or_above(1, 8)]
+    pub wave_speed: Option<f32>,
+    #[version_equals_or_above(1, 8)]
+    pub wave_pitch: Option<f32>,
+    #[version_equals_or_above(1, 9)]
+    pub water_animation_speed: Option<i32>,
+}
+
 #[derive(new)]
 pub struct MapLoader {
     game_file_loader: Rc<RefCell<GameFileLoader>>,
@@ -147,9 +176,7 @@ impl MapLoader {
         let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\{}", resource_file))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        let magic = byte_stream.string(4);
-
-        if &magic != "GRSW" {
+        if byte_stream.string(4) != "GRSW" {
             return Err(format!("failed to read magic number from {}", resource_file));
         }
 

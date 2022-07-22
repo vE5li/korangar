@@ -17,7 +17,7 @@ use vulkano::pipeline::graphics::color_blend::BlendOp;
 
 pub use self::types::*;
 pub use self::vertices::*;
-pub use self::renderer::{ Renderer, RenderSettings };
+pub use self::renderer::*;
 pub use self::camera::*;
 
 pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;

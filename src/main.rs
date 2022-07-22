@@ -578,13 +578,6 @@ fn main() {
 
                 networking_system.changes_applied();
 
-                for index in 0..screen_targets.len() { // temp
-                    if let Some(mut fence) = screen_targets[index].state.try_take_fence() {
-                        fence.cleanup_finished();
-                        fence.wait(None).unwrap();
-                    }
-                }
-
                 // think about this position
                 if swapchain_holder.is_swapchain_invalid() {
                     let viewport = swapchain_holder.recreate_swapchain();
@@ -615,6 +608,11 @@ fn main() {
 
                 if swapchain_holder.acquire_next_image().is_err() { // temporary check?
                     return;
+                }
+
+                if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
+                    fence.wait(None).unwrap();
+                    fence.cleanup_finished();
                 }
 
                 if let Some(mut fence) = texture_fence {
@@ -741,7 +739,7 @@ fn main() {
                     .join(swapchain_acquire_future)
                     .boxed();
 
-                screen_target.finish(swapchain_holder.get_swapchain(), combined_future);
+                screen_target.finish(swapchain_holder.get_swapchain(), combined_future, image_number);
             }
 
             _ignored => ()

@@ -130,7 +130,6 @@ pub struct DeferredRenderTarget {
     water_image: ImageBuffer,
     depth_image: ImageBuffer,
     pub state: RenderTargetState,
-    image_index: usize,
 }
 
 impl DeferredRenderTarget {
@@ -165,7 +164,6 @@ impl DeferredRenderTarget {
             .build().unwrap();
 
         let state = RenderTargetState::Ready;
-        let image_index = 0;
 
         Self {
             device,
@@ -176,7 +174,6 @@ impl DeferredRenderTarget {
             water_image,
             depth_image,
             state,
-            image_index,
         }
     }
 
@@ -193,7 +190,7 @@ impl DeferredRenderTarget {
         self.state.get_builder().next_subpass(SubpassContents::Inline).unwrap();
     }
 
-    pub fn finish(&mut self, swapchain: Arc<Swapchain<Window>>, semaphore: Box<dyn GpuFuture>) {
+    pub fn finish(&mut self, swapchain: Arc<Swapchain<Window>>, semaphore: Box<dyn GpuFuture>, image_number: usize) {
 
         let mut builder = self.state.take_builder();
 
@@ -203,7 +200,7 @@ impl DeferredRenderTarget {
 
         let fence = semaphore
             .then_execute(self.queue.clone(), command_buffer).unwrap()
-            .then_swapchain_present(self.queue.clone(), swapchain, self.image_index)
+            .then_swapchain_present(self.queue.clone(), swapchain, image_number)
             .boxed()
             .then_signal_fence_and_flush()
             .unwrap();

@@ -15,7 +15,7 @@ pub fn get_instance_extensions() -> InstanceExtensions {
 pub fn get_layers() -> Vec<&'static str> {
 
     let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
-    let desired_layers = vec!["VK_LAYER_KHRONOS_validation"];
+    let desired_layers = Vec::new(); // vec!["VK_LAYER_KHRONOS_validation"];
 
     #[cfg(feature = "debug")]
     let timer = Timer::new("available layers");

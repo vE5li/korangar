@@ -65,7 +65,7 @@ pub struct Node {
 
 impl Node {
 
-    pub fn render_geometry<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, transform: &Transform, client_tick: u32)
+    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, transform: &Transform, client_tick: u32)
         where T: Renderer + GeometryRenderer
     {
 
@@ -85,7 +85,7 @@ impl Node {
             * self.transform_matrix
             * animation_rotation_matrix;
 
-        renderer.render_geometry(render_target, camera, self.vertex_buffer.clone(), &self.textures.clone(), world_matrix);
+        renderer.render_geometry(render_target, camera, self.vertex_buffer.clone(), &self.textures, world_matrix);
         self.child_nodes.iter().for_each(|node| node.render_geometry(render_target, renderer, camera, transform, client_tick));
     }
 

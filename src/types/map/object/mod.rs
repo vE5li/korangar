@@ -22,7 +22,7 @@ impl Object {
         self.transform.position += offset;
     }
 
-    pub fn render_geometry<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
+    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
         where T: Renderer + GeometryRenderer
     {
         self.model.render_geometry(render_target, renderer, camera, &self.transform, client_tick);
@@ -34,7 +34,7 @@ impl Object {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
         where T: Renderer + MarkerRenderer
     {
         renderer.render_marker(render_target, camera, self.transform.position, hovered);

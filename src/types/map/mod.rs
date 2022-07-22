@@ -232,7 +232,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_markers<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Vec<Entity>, marker_identifier: Option<MarkerIdentifier>)
+    pub fn render_markers<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Vec<Entity>, marker_identifier: Option<MarkerIdentifier>)
         where T: Renderer + MarkerRenderer
     {
 

@@ -20,7 +20,7 @@ impl Particle {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut <T as Renderer>::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
         where T: Renderer + MarkerRenderer
     {
         renderer.render_marker(render_target, camera, self.position, hovered);

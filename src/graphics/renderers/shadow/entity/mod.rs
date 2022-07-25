@@ -13,11 +13,9 @@ mod fragment_shader {
 }
 
 use std::sync::Arc;
-use std::iter;
 
 use cgmath::{ Vector3, Vector2 };
 
-use num::integer::Roots;
 use vulkano::device::Device;
 
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };

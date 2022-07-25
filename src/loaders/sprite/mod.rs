@@ -1,4 +1,4 @@
-use cgmath::Vector2;
+use procedural::*;
 use derive_new::new;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,7 +16,7 @@ use crate::types::ByteStream;
 use crate::traits::ByteConvertable;
 use crate::loaders::GameFileLoader;
 use crate::types::Version;
-use crate::graphics::{Texture, Renderer};
+use crate::graphics::Texture;
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {

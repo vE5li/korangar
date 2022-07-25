@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use derive_new::new;
 use std::sync::Mutex;
 

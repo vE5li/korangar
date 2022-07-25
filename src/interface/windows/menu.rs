@@ -1,3 +1,5 @@
+use procedural::*;
+
 use crate::input::UserEvent;
 use crate::interface::traits::{ Window, PrototypeWindow };
 use crate::interface::types::InterfaceSettings;
@@ -9,7 +11,7 @@ pub struct MenuWindow {
 }
 
 impl Default for MenuWindow {
-   
+
     fn default() -> Self {
         Self { window_class: "menu".to_string() }
     }
@@ -19,7 +21,7 @@ impl PrototypeWindow for MenuWindow {
 
     fn window_class(&self) -> Option<&str> {
         Some(&self.window_class)
-    } 
+    }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
 

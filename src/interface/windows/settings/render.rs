@@ -1,3 +1,5 @@
+use procedural::*;
+
 use crate::input::UserEvent;
 use crate::interface::traits::{ Window, PrototypeWindow };
 use crate::interface::types::InterfaceSettings;
@@ -101,7 +103,7 @@ pub struct RenderSettingsWindow {
 }
 
 impl Default for RenderSettingsWindow {
-   
+
     fn default() -> Self {
         Self { window_class: "render_settings".to_string() }
     }
@@ -111,7 +113,7 @@ impl PrototypeWindow for RenderSettingsWindow {
 
     fn window_class(&self) -> Option<&str> {
         Some(&self.window_class)
-    } 
+    }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
 

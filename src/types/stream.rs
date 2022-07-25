@@ -49,7 +49,7 @@ impl<'b> ByteStream<'b> {
         }
 
         let signature_matches = self.data[self.offset] == signature[0] && self.data[self.offset + 1] == signature[1];
-        
+
         if signature_matches {
             self.offset += 2;
         }

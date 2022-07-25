@@ -1,4 +1,5 @@
-use cgmath::{ Matrix4, Vector3, Rad, Deg, SquareMatrix };
+use procedural::*;
+use cgmath::{ Vector3, Rad, Deg };
 use std::ops::Add;
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]

@@ -1,11 +1,6 @@
 #![feature(let_else)]
 #![feature(extend_one)]
 
-extern crate proc_macro;
-extern crate proc_macro2;
-extern crate syn;
-extern crate quote;
-
 use syn::{ Ident, Data, Fields, LitFloat, DeriveInput, DataStruct, DataEnum, Attribute, FieldsNamed };
 use proc_macro2::{TokenStream, TokenTree};
 use quote::quote;

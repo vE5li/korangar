@@ -1,5 +1,5 @@
 [package]
-name = "korangar_procedural"
+name = "procedural"
 version = "0.1.0"
 edition = "2021"
 

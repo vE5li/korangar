@@ -1,3 +1,4 @@
+use procedural::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 use num::Zero;
@@ -52,7 +53,7 @@ impl CharacterPreview {
 
     pub fn new(characters: Rc<RefCell<Vec<CharacterInformation>>>, move_request: Rc<RefCell<Option<usize>>>, changed: Rc<RefCell<bool>>, slot: usize) -> Self {
 
-        let elements = Self::get_elements(&characters, &move_request, slot); 
+        let elements = Self::get_elements(&characters, &move_request, slot);
         let cached_size = Size::zero();
         let cached_position = Position::zero();
 

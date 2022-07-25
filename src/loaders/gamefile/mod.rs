@@ -1,3 +1,4 @@
+use procedural::*;
 use derive_new::new;
 use std::collections::HashMap;
 use std::fs::read;
@@ -7,7 +8,6 @@ use yazi::*;
 use crate::debug::*;
 use crate::types::ByteStream;
 use crate::traits::ByteConvertable;
-use korangar_procedural::ByteConvertable;
 
 #[derive(Clone, ByteConvertable)]
 pub struct FileHeader {

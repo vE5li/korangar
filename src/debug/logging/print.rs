@@ -1,13 +1,11 @@
 use super::*;
 
-#[macro_export]
 macro_rules! print_debug {
     ($format:expr) => (print_indented(String::from($format), true));
     ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), true));
 }
 
-#[macro_export]
-macro_rules! print_debug_prefix { 
+macro_rules! print_debug_prefix {
     ($format:expr) => (print_indented(String::from($format), false));
     ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), false));
 }

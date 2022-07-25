@@ -1,5 +1,6 @@
 pub mod model;
 
+use procedural::*;
 use derive_new::new;
 use std::sync::Arc;
 

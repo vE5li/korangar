@@ -1,4 +1,4 @@
-use korangar_procedural::toggle;
+use procedural::toggle;
 use derive_new::new;
 
 #[derive(toggle, new)]

@@ -1,3 +1,4 @@
+use procedural::*;
 use derive_new::new;
 
 #[cfg(feature = "debug")]

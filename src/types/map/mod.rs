@@ -4,6 +4,7 @@ mod light;
 mod sound;
 mod effect;
 
+use procedural::*;
 use std::sync::Arc;
 use derive_new::new;
 use cgmath::{ Vector2, Vector3, Matrix4, SquareMatrix };

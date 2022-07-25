@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-korangar_procedural = { path = "procedural" }
+procedural = { path = "procedural" }
 rayon = "1.5.3"
 derive-new = "0.5"
 vulkano = "0.28"

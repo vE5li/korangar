@@ -5,28 +5,6 @@
 #![feature(arc_unwrap_or_clone)]
 #![feature(option_result_contains)]
 
-#[macro_use]
-extern crate korangar_procedural;
-extern crate rayon;
-extern crate derive_new;
-extern crate vulkano;
-extern crate vulkano_shaders;
-extern crate vulkano_win;
-extern crate winit;
-extern crate num;
-extern crate cgmath;
-extern crate serde;
-extern crate ron;
-extern crate rusttype;
-extern crate yazi;
-extern crate image;
-extern crate pathfinding;
-extern crate chrono;
-#[cfg(feature = "debug")]
-#[macro_use]
-extern crate lazy_static;
-extern crate rusqlite;
-
 #[cfg(feature = "debug")]
 #[macro_use]
 mod debug;
@@ -59,7 +37,6 @@ use chrono::prelude::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::maths::Vector2;
 use crate::types::{ Entity, ChatMessage };
 use crate::input::{ InputSystem, UserEvent };
 use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
@@ -129,7 +106,7 @@ fn main() {
 
     game_file_loader.add_archive("data3.grf".to_string());
     game_file_loader.add_archive("data.grf".to_string());
-    game_file_loader.add_archive("rdata.grf".to_string()); 
+    game_file_loader.add_archive("rdata.grf".to_string());
 
     let game_file_loader = Rc::new(RefCell::new(game_file_loader));
     let font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
@@ -230,7 +207,7 @@ fn main() {
 
     let mut networking_system = NetworkingSystem::new();
 
-    match networking_system.log_in() { 
+    match networking_system.log_in() {
         Ok(character_selection_window) => interface.open_window(&character_selection_window),
         Err(message) => interface.open_window(&ErrorWindow::new(message)),
     }
@@ -333,7 +310,7 @@ fn main() {
                         NetworkEvent::ChangeMap(map_name, player_position) => {
 
                             while entities.len() > 1 {
-                                entities.pop(); 
+                                entities.pop();
                             }
 
                             map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();

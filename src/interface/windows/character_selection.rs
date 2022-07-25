@@ -1,3 +1,4 @@
+use procedural::*;
 use derive_new::new;
 
 use std::rc::Rc;
@@ -22,7 +23,7 @@ impl PrototypeWindow for CharacterSelectionWindow {
 
     fn window_class(&self) -> Option<&str> {
         Some(&self.window_class)
-    } 
+    }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
 

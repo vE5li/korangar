@@ -1,3 +1,4 @@
+use procedural::*;
 mod node;
 mod shading;
 

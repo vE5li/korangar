@@ -1,3 +1,4 @@
+use procedural::*;
 use derive_new::new;
 
 use crate::interface::traits::{ Window, PrototypeWindow };
@@ -22,4 +23,3 @@ impl PrototypeWindow for ErrorWindow {
         Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Error".to_string(), None, elements, constraint!(300.0 > 400.0 < 500.0, ?)))
     }
 }
-

@@ -1,3 +1,4 @@
+use procedural::*;
 use serde::{ Serialize, Deserialize };
 use ron::ser::PrettyConfig;
 
@@ -13,7 +14,7 @@ pub struct InterfaceSettings {
 }
 
 impl Default for InterfaceSettings {
-    
+
     fn default() -> Self {
         let scaling = MutableRange::new(1.0, 0.7, 1.7);
         let theme_file = "client/themes/theme.ron".to_string();
@@ -28,7 +29,7 @@ impl InterfaceSettings {
 
             #[cfg(feature = "debug")]
             print_debug!("failed to load interface settings from {}filename{}", MAGENTA, NONE);
-            
+
             Default::default()
         })
     }
@@ -42,7 +43,7 @@ impl InterfaceSettings {
             .ok()
             .and_then(|data| ron::from_str(&data).ok())
     }
-    
+
     pub fn save(&self) {
 
         #[cfg(feature = "debug")]

@@ -267,7 +267,7 @@ impl Entity {
     pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
         where T: Renderer + EntityRenderer
     {
-        //renderer.render_entity(render_target, camera, &self.sprite.textures[0].clone());
+        renderer.render_entity(render_target, camera, self.sprite.textures[0].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0), self.entity_id);
     }
 
     #[cfg(feature = "debug")]

@@ -14,7 +14,7 @@ use vulkano::sync::{ GpuFuture, now };
 use crate::debug::*;
 use crate::types::{ByteStream, Version};
 use crate::types::map::{ Map, Tile, TileType, WaterSettings, LightSettings, Object, LightSource, SoundSource, EffectSource };
-use crate::graphics::{ Color, ModelVertex, Transform, NativeModelVertex, WaterVertex, TileVertex };
+use crate::graphics::{ Color, ModelVertex, Transform, NativeModelVertex, WaterVertex, TileVertex, PickerTarget };
 use crate::loaders::{ ModelLoader, TextureLoader, GameFileLoader };
 
 use self::resource::ResourceType;
@@ -513,7 +513,12 @@ impl MapLoader {
                     tile_vertices.push(ModelVertex::new(third_position, second_normal, third_texture_coordinates, tile_type_index as i32));
                     tile_vertices.push(ModelVertex::new(fourth_position, second_normal, fourth_texture_coordinates, tile_type_index as i32));
 
-                    let color = (x as u32 + 1) | ((y as u32 + 1) << 16);
+                    let first_position = Vector3::new(offset.x, upper_left_height, offset.y);
+                    let second_position = Vector3::new(offset.x + 5.0, upper_right_height, offset.y);
+                    let third_position = Vector3::new(offset.x + 5.0, lower_right_height, offset.y + 5.0);
+                    let fourth_position = Vector3::new(offset.x, lower_left_height, offset.y + 5.0);
+
+                    let color = PickerTarget::Tile(x as u16, y as u16).into();
                     tile_picker_vertices.push(TileVertex::new(first_position, color));
                     tile_picker_vertices.push(TileVertex::new(second_position, color));
                     tile_picker_vertices.push(TileVertex::new(third_position, color));

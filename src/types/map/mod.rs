@@ -6,7 +6,7 @@ mod effect;
 
 use std::sync::Arc;
 use derive_new::new;
-use cgmath::{ Vector2, Vector3, Matrix4 };
+use cgmath::{ Vector2, Vector3, Matrix4, SquareMatrix };
 
 use crate::types::{ Version, Entity };
 use crate::graphics::*;
@@ -166,8 +166,7 @@ impl Map {
     pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
         where T: Renderer + GeometryRenderer
     {
-        let world_matrix = camera.transform_matrix(&Transform::new());
-        renderer.render_geometry(render_target, camera, self.ground_vertex_buffer.clone(), &self.ground_textures, world_matrix);
+        renderer.render_geometry(render_target, camera, self.ground_vertex_buffer.clone(), &self.ground_textures, Matrix4::identity());
     }
 
     pub fn render_objects<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
@@ -180,7 +179,7 @@ impl Map {
     }
 
     pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {
-        //renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
+        renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
     }
 
     pub fn render_water(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, day_timer: f32) {

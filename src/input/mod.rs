@@ -10,7 +10,7 @@ use winit::dpi::PhysicalPosition;
 
 use crate::interface::types::ElementCell;
 use crate::interface::{ Interface, ClickAction };
-use crate::graphics::{ RenderSettings, PickerRenderTarget };
+use crate::graphics::{ RenderSettings, PickerRenderTarget, PickerTarget };
 
 pub use self::event::UserEvent;
 pub use self::mode::MouseInputMode;
@@ -225,23 +225,6 @@ impl InputSystem {
             }
         }
 
-        if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
-
-            if let Some(fence) = picker_target.state.try_take_fence() {
-                fence.wait(None).unwrap();
-            }
-
-            let pixel = picker_target.buffer
-                .read()
-                .unwrap()[self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x];
-
-            if pixel != 0 {
-                let x = (pixel & 0xff) - 1;
-                let y = (pixel >> 16) - 1;
-                events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize)));
-            }
-        }
-
         if self.keys[1].pressed() {
             events.push(UserEvent::OpenMenuWindow);
         }
@@ -305,6 +288,31 @@ impl InputSystem {
         // to fix redrawing twice when clicking on elements
         if !self.mouse_input_mode.is_none() {
             hovered_element = None;
+        }
+
+        if let Some(fence) = picker_target.state.try_take_fence() {
+            fence.wait(None).unwrap();
+        }
+
+        let sample_index = self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x;
+        let lock = picker_target.buffer
+            .read()
+            .unwrap();
+
+        if sample_index < lock.len() {
+
+            let pixel = lock[sample_index];
+
+            if pixel != 0 {
+                let picker_target = PickerTarget::from(pixel);
+
+                if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
+                    match picker_target {
+                        PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
+                        PickerTarget::Entity(entity_id) => {},
+                    }
+                }
+            }
         }
 
         let rerender = self.previous_hovered_element

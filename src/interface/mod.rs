@@ -66,7 +66,7 @@ impl Interface {
         }
     }
 
-    pub fn update(&mut self) -> bool {
+    pub fn update(&mut self) -> (bool, bool) {
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if let Some(change_event) = window.update() {
@@ -107,7 +107,7 @@ impl Interface {
         self.rerender |= self.reresolve;
         self.reresolve = false;
 
-        self.rerender
+        (self.rerender, self.rerender | self.windows.iter().any(|(_window, _reresolve, rerender)| *rerender))
     }
 
     pub fn update_window_size(&mut self, screen_size: Size) {

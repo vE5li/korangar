@@ -42,11 +42,9 @@ mod interface;
 mod network;
 mod database;
 
-use std::sync::Arc;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vulkano::device::Device;
-use vulkano::format::ClearValue;
 use vulkano::instance::Instance;
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{ MessageSeverity, MessageType };
@@ -170,7 +168,7 @@ fn main() {
     let mut deferred_renderer = DeferredRenderer::new(device.clone(), queue.clone(), swapchain_holder.swapchain_format(), viewport.clone(), swapchain_holder.window_size_u32());
     let mut interface_renderer = InterfaceRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
     let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
-    let mut shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone(), viewport.clone());
+    let mut shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -341,7 +339,8 @@ fn main() {
                             map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
                             entities[0].set_position(&map, player_position);
-                            player_camera.set_focus_point(entities[0].position);
+                            //player_camera.set_focus_point(entities[0].position);
+                            //directional_shadow_camera.set_focus_point(entities[0].position);
 
                             networking_system.map_loaded();
                         }
@@ -395,7 +394,7 @@ fn main() {
 
                                     let player = Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
 
-                                    player_camera.set_focus_point(player.position);
+                                    //player_camera.set_focus_point(player.position);
                                     entities.push(player);
 
                                     networking_system.map_loaded();
@@ -570,11 +569,13 @@ fn main() {
 
                 if !entities.is_empty() {
                     player_camera.set_focus_point(entities[0].position);
+                    directional_shadow_camera.set_focus_point(entities[0].position);
                 }
 
                 player_camera.update(delta_time);
+                directional_shadow_camera.update(day_timer);
 
-                let renderer_interface = interface.update();
+                let (clear_interface, rerender_interface) = interface.update();
 
                 networking_system.changes_applied();
 
@@ -585,8 +586,7 @@ fn main() {
                     deferred_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     picker_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
-                    shadow_renderer.recreate_pipeline(viewport.clone()); // does this need to be
-                                                                         // recreated?
+                    shadow_renderer.recreate_pipeline(); // does this need to be recreated?
 
                     screen_targets = swapchain_holder.get_swapchain_images()
                         .into_iter()
@@ -615,9 +615,18 @@ fn main() {
                     fence.cleanup_finished();
                 }
 
+                if rerender_interface || render_settings.show_buffers() {
+                    for index in 0..screen_targets.len() {
+                        if let Some(mut fence) = screen_targets[index].state.try_take_fence() {
+                            fence.wait(None).unwrap();
+                            fence.cleanup_finished();
+                        }
+                    }
+                }
+
                 if let Some(mut fence) = texture_fence {
-                    fence.cleanup_finished();
                     fence.wait(None).unwrap();
+                    fence.cleanup_finished();
                 }
 
                 #[cfg(feature = "debug")]
@@ -640,17 +649,6 @@ fn main() {
                 let entities = &entities[..];
 
                 thread_pool.in_place_scope(|scope| {
-
-                    if renderer_interface && false {
-                        scope.spawn(|_| {
-
-                            interface_target.start();
-
-                            // render interface
-
-                            interface_target.finish(); // make this a fence
-                        });
-                    }
 
                     scope.spawn(|_| {
 
@@ -686,44 +684,68 @@ fn main() {
                         directional_shadow_target.finish();
                     });
 
-                    screen_target.start();
+                    scope.spawn(|_| {
 
-                    if render_settings.show_map {
-                        map.render_ground(screen_target, &deferred_renderer, *current_camera);
-                    }
+                        screen_target.start();
 
-                    if render_settings.show_objects {
-                        map.render_objects(screen_target, &deferred_renderer, *current_camera, client_tick);
-                    }
+                        if render_settings.show_map {
+                            map.render_ground(screen_target, &deferred_renderer, *current_camera);
+                        }
 
-                    if render_settings.show_entities {
-                        entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, *current_camera));
-                    }
+                        if render_settings.show_objects {
+                            map.render_objects(screen_target, &deferred_renderer, *current_camera, client_tick);
+                        }
 
-                    if render_settings.show_water {
-                        map.render_water(screen_target, &deferred_renderer, *current_camera, day_timer);
-                    }
+                        if render_settings.show_entities {
+                            entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, *current_camera));
+                        }
 
-                    screen_target.lighting_pass();
+                        if render_settings.show_water {
+                            map.render_water(screen_target, &deferred_renderer, *current_camera, day_timer);
+                        }
 
-                    //#[debug_condition(render_settings.show_ambient_light)]
-                    if render_settings.show_ambient_light && !render_settings.show_buffers() {
-                        map.ambient_light(screen_target, &deferred_renderer, day_timer);
-                    }
+                        screen_target.lighting_pass();
 
-                    if render_settings.show_directional_light && !render_settings.show_buffers() {
-                        let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
-                        let light_matrix = view_matrix * projection_matrix;
-                        map.directional_light(screen_target, &deferred_renderer, *current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
-                    }
+                        //#[debug_condition(render_settings.show_ambient_light)]
+                        if render_settings.show_ambient_light && !render_settings.show_buffers() {
+                            map.ambient_light(screen_target, &deferred_renderer, day_timer);
+                        }
 
-                    if render_settings.show_point_lights && !render_settings.show_buffers() {
-                        map.point_lights(screen_target, &deferred_renderer, *current_camera);
+                        if render_settings.show_directional_light && !render_settings.show_buffers() {
+                            let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
+                            let light_matrix = projection_matrix * view_matrix;
+                            map.directional_light(screen_target, &deferred_renderer, *current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
+                        }
+
+                        if render_settings.show_point_lights && !render_settings.show_buffers() {
+                            map.point_lights(screen_target, &deferred_renderer, *current_camera);
+                        }
+
+                        if render_settings.show_water {
+                            map.water_light(screen_target, &deferred_renderer, *current_camera);
+                        }
+                    });
+
+                    if rerender_interface {
+
+                        interface_target.start_interface(clear_interface);
+
+                        let state_provider = &StateProvider::new(&render_settings);
+                        interface.render(&mut interface_target, &interface_renderer, state_provider, hovered_element);
+
+                        interface_target.finish();
                     }
                 });
 
                 if render_settings.show_buffers() {
-                    deferred_renderer.overlay_buffers(screen_target, directional_shadow_image);
+
+                    let picker_target = &mut picker_targets[image_number];
+
+                    if let Some(fence) = picker_target.state.try_take_fence() {
+                        fence.wait(None).unwrap();
+                    }
+
+                    deferred_renderer.overlay_buffers(screen_target, directional_shadow_image, picker_target.image.clone(), &render_settings);
                 }
 
                 if render_settings.show_interface {

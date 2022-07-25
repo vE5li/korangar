@@ -68,9 +68,9 @@ impl ShadowCamera {
 
 impl Camera for ShadowCamera {
 
-    fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
+    fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
 
-        let bounds = vector4!(-500.0, 500.0, -500.0, 500.0);
+        let bounds = vector4!(-300.0, 300.0, -300.0, 300.0);
         let z_near = -1000.0;
         let z_far = 500.0;
 

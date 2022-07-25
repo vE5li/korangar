@@ -52,7 +52,9 @@ void main() {
     }
 
     if (constants.show_shadow_buffer) {
-        float depth = texture(shadow_buffer, position * 0.5 + 0.5).x;
+        vec2 sample_position = (position * 0.5 + 0.5);
+        sample_position.y = 1.0 - sample_position.y;
+        float depth = texture(shadow_buffer, sample_position).x;
         output_color += depth;
     }
 

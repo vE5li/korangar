@@ -31,8 +31,8 @@ vec3 calculate_sample(int sample_index) {
     light_percent = clamp(light_percent, 0.0, 1.0);
 
     // triangles flicker black if the direction of the light is the exact opposite of the normal of the triangle
-    float bias = 0.005 * tan(acos(light_percent));
-    bias = clamp(bias, 0 ,0.01);
+    float bias = 0.001 * tan(acos(light_percent));
+    bias = clamp(bias, 0, 0.005);
 
     vec4 light_position = matrices.light * pixel_position_world_space;
     vec3 light_coords = light_position.xyz / light_position.w;

@@ -39,11 +39,11 @@ use chrono::prelude::*;
 use crate::debug::*;
 use crate::types::{ Entity, ChatMessage };
 use crate::input::{ InputSystem, UserEvent };
-use system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
+use crate::system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
 use crate::loaders::*;
 use crate::graphics::*;
 use crate::interface::*;
-use network::{ NetworkingSystem, NetworkEvent };
+use crate::network::{ NetworkingSystem, NetworkEvent };
 
 fn main() {
 

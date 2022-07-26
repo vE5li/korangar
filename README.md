@@ -1,3 +1,5 @@
+<img align="left" alt="" src="assets/logo.png" height="150" />
+
 # [Korangar](https://korangar.rs)
 
 [![Build](https://github.com/ve5li/korangar/workflows/build/badge.svg)](https://github.com/ve5li/korangar/actions?query=workflow%3ABuild)

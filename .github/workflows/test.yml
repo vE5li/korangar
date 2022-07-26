@@ -1,6 +1,6 @@
 on: [push]
 
-name: build
+name: test
 
 jobs:
   check:
@@ -15,12 +15,7 @@ jobs:
             override: true
             #components: rustfmt, clippy
 
-      - name: Build Korangar (release)
+      - name: Run unit tests
         uses: actions-rs/cargo@v1
         with:
-          command: build
-
-      - name: Build Korangar (debug)
-        uses: actions-rs/cargo@v1
-        with:
-          command: build --features debug
+          command: test

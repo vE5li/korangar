@@ -1,4 +1,4 @@
-<img align="left" alt="" src="assets/logo.png" height="150" />
+<img align="left" alt="" src="assets/logo.png" height="130" />
 
 # [Korangar](https://korangar.rs)
 

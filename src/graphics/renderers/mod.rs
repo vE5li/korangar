@@ -25,6 +25,7 @@ use crate::types::maths::*;
 use crate::graphics::{ ImageBuffer, Texture, Camera, ModelVertexBuffer };
 
 use self::deferred::DeferredSubrenderer;
+use self::picker::PickerSubrenderer;
 pub use self::settings::RenderSettings;
 pub use self::picker::PickerRenderer;
 pub use self::deferred::DeferredRenderer;
@@ -123,7 +124,7 @@ impl From<PickerTarget> for u32 {
                     false => entity_id,
                 };
 
-                entity_id
+                data
             }
         }
     }
@@ -306,6 +307,7 @@ pub struct PickerRenderTarget {
     pub image: ImageBuffer,
     pub buffer: Arc<CpuAccessibleBuffer<[u32]>>,
     pub state: RenderTargetState,
+    bound_subrenderer: Option<PickerSubrenderer>,
 }
 
 impl PickerRenderTarget {
@@ -333,6 +335,7 @@ impl PickerRenderTarget {
 
         let buffer = unsafe { CpuAccessibleBuffer::uninitialized_array(device.clone(), dimensions[0] as u64 * dimensions[1] as u64, BufferUsage::transfer_destination(), false).unwrap() };
         let state = RenderTargetState::Ready;
+        let bound_subrenderer = None;
 
         Self {
             device,
@@ -341,6 +344,7 @@ impl PickerRenderTarget {
             image,
             buffer,
             state,
+            bound_subrenderer,
         }
     }
 
@@ -351,6 +355,16 @@ impl PickerRenderTarget {
         builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::Uint([0; 4]), ClearValue::Depth(1.0)]).unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
+    }
+
+    pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
+        let already_bound = self.bound_subrenderer.contains(&subrenderer);
+        self.bound_subrenderer = Some(subrenderer);
+        !already_bound
+    }
+
+    pub fn unbind_subrenderer(&mut self) {
+        self.bound_subrenderer = None;
     }
 
     pub fn finish(&mut self) {
@@ -369,6 +383,7 @@ impl PickerRenderTarget {
             .unwrap();
 
         self.state = RenderTargetState::Fence(fence);
+        self.bound_subrenderer = None;
     }
 }
 
@@ -430,7 +445,11 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
-        already_bound
+        !already_bound
+    }
+
+    pub fn unbind_subrenderer(&mut self) {
+        self.bound_subrenderer = None;
     }
 
     pub fn finish(&mut self) {

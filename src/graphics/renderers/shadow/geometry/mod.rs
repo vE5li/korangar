@@ -78,6 +78,26 @@ impl GeometryRenderer {
             .unwrap()
     }
 
+    pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
+
+        let layout = self.pipeline.layout().clone();
+        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let matrices = Matrices {
+            view_projection: (projection_matrix * view_matrix).into(),
+        };
+
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::buffer(0, matrices_subbuffer),
+        ]).unwrap();
+
+        render_target.state.get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
+    }
+
     pub fn render(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>) {
 
         if textures.is_empty() {
@@ -85,7 +105,7 @@ impl GeometryRenderer {
         }
 
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
 
         // SUPER DIRTY, PLEASE FIX
 
@@ -161,15 +181,8 @@ impl GeometryRenderer {
             false => texture0.clone(),
         };
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let matrices = Matrices {
-            view_projection: (projection_matrix * view_matrix).into(),
-        };
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
-
         let set = PersistentDescriptorSet::new(descriptor_layout, [
-            WriteDescriptorSet::buffer(0, matrices_subbuffer),
-            WriteDescriptorSet::image_view_sampler_array(1, 0, [
+            WriteDescriptorSet::image_view_sampler_array(0, 0, [
                 (texture0 as _, self.linear_sampler.clone()),
                 (texture1 as _, self.linear_sampler.clone()),
                 (texture2 as _, self.linear_sampler.clone()),
@@ -193,10 +206,7 @@ impl GeometryRenderer {
             world: world_matrix.into(),
         };
 
-        //let size = render_target.image.image().mem_size().sqrt() / 4; // FIND A BETTER WAY TO GET THE
-                                                                        // SIZE OF A PIXEL
         let size = 4096.0;
-
         let viewport = Viewport {
             origin: [0.0, 0.0],
             dimensions: [size; 2],
@@ -204,8 +214,7 @@ impl GeometryRenderer {
         };
 
         render_target.state.get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
             .set_viewport(0, [viewport])
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, vertex_buffer)

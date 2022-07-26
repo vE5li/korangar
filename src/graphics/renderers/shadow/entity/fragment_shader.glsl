@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec2 texture_coordinates;
 
-layout (set = 0, binding = 1) uniform sampler2D sampled_texture;
+layout (set = 1, binding = 0) uniform sampler2D sampled_texture;
 
 layout(set = 0, binding = 0) uniform Matrices {
     mat4 view;

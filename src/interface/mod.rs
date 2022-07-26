@@ -4,7 +4,8 @@ pub mod traits;
 pub mod elements;
 pub mod windows;
 
-use crate::graphics::{Renderer, InterfaceRenderer};
+use crate::graphics::{Renderer, InterfaceRenderer, DeferredRenderer, Color};
+use crate::types::maths::Vector2;
 
 pub use self::types::{ StateProvider, ClickAction, Size };
 pub use self::windows::*;
@@ -225,8 +226,14 @@ impl Interface {
         self.rerender = false;
     }
 
-    pub fn render_frames_per_second(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, frames_per_second: usize) {
-        //renderer.render_dynamic_text(&frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
+    pub fn render_hover_text(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, text: &str, mouse_position: Position) {
+        let offset = Vector2::new(text.len() as f32 * -3.0, 20.0);
+        renderer.render_text(render_target, text, mouse_position + offset + Vector2::new(1.0, 1.0), Color::monochrome(0), 12.0); // move variables into theme
+        renderer.render_text(render_target, text, mouse_position + offset, Color::monochrome(255), 12.0); // move variables into theme
+    }
+
+    pub fn render_frames_per_second(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, frames_per_second: usize) {
+        renderer.render_text(render_target, &frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
     }
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {

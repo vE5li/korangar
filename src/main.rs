@@ -4,6 +4,7 @@
 #![feature(adt_const_params)]
 #![feature(arc_unwrap_or_clone)]
 #![feature(option_result_contains)]
+#![feature(proc_macro_hygiene)]
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -20,6 +21,7 @@ mod interface;
 mod network;
 mod database;
 
+use procedural::debug_condition;
 use std::cell::RefCell;
 use std::rc::Rc;
 use vulkano::device::Device;
@@ -33,11 +35,11 @@ use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
 use winit::window::WindowBuilder;
 use database::Database;
-use chrono::prelude::*;
+use chrono::{prelude::*, offset};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::{ Entity, ChatMessage };
+use crate::types::{ Entity, ChatMessage, ResourceState };
 use crate::input::{ InputSystem, UserEvent };
 use crate::system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
 use crate::loaders::*;
@@ -142,8 +144,8 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create renderers");
 
-    let mut deferred_renderer = DeferredRenderer::new(device.clone(), queue.clone(), swapchain_holder.swapchain_format(), viewport.clone(), swapchain_holder.window_size_u32());
-    let mut interface_renderer = InterfaceRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
+    let mut deferred_renderer = DeferredRenderer::new(device.clone(), queue.clone(), swapchain_holder.swapchain_format(), viewport.clone(), swapchain_holder.window_size_u32(), &mut texture_loader);
+    let mut interface_renderer = InterfaceRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32(), &mut texture_loader);
     let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
     let mut shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone());
 
@@ -215,7 +217,7 @@ fn main() {
     #[cfg(feature = "debug")]
     timer.stop();
 
-    let mut entities = Vec::new();
+    let mut entities = Vec::<Entity>::new();
 
     // move
     const TIME_FACTOR: f32 = 1000.0;
@@ -227,7 +229,7 @@ fn main() {
     let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
     let database = Database::new();
 
-    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(8).build().unwrap();
+    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
@@ -275,7 +277,20 @@ fn main() {
                 networking_system.keep_alive(delta_time, game_timer.get_client_tick());
 
                 let network_events = networking_system.network_events();
-                let (user_events, hovered_element) = input_system.user_events(&mut interface, &mut picker_targets[swapchain_holder.get_image_number()], &render_settings, swapchain_holder.window_size());
+                let (user_events, hovered_element, mouse_target) = input_system.user_events(&mut interface, &mut picker_targets[swapchain_holder.get_image_number()], &render_settings, swapchain_holder.window_size());
+
+                if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+
+                    let entity = entities
+                        .iter_mut()
+                        .find(|entity| entity.entity_id == entity_id as usize)
+                        .unwrap();
+
+                    if let ResourceState::Unavalible = entity.details {
+                        networking_system.request_entity_details(entity_id);
+                        entity.details = ResourceState::Requested;
+                    }
+                }
 
                 let mut texture_future = now(device.clone()).boxed();
 
@@ -316,18 +331,25 @@ fn main() {
                             map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
                             entities[0].set_position(&map, player_position);
-                            //player_camera.set_focus_point(entities[0].position);
-                            //directional_shadow_camera.set_focus_point(entities[0].position);
 
                             networking_system.map_loaded();
                         }
 
-                        NetworkEvent::UpdataClientTick(client_tick) => {
+                        NetworkEvent::UpdateClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
                         }
 
                         NetworkEvent::ChatMessage(message) => {
                             chat_messages.borrow_mut().push(message);
+                        }
+
+                        NetworkEvent::UpdateEntityDetails(entity_id, name) => {
+                            let entity = entities
+                                .iter_mut()
+                                .find(|entity| entity.entity_id == entity_id as usize)
+                                .unwrap();
+
+                            entity.details = ResourceState::Avalible(name);
                         }
                     }
                 }
@@ -346,7 +368,6 @@ fn main() {
                         UserEvent::ToggleFrameLimit => {
                             render_settings.toggle_frame_limit();
                             swapchain_holder.set_frame_limit(render_settings.frame_limit);
-                            //interface.schedule_rerender();
                         },
 
                         UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
@@ -556,7 +577,6 @@ fn main() {
 
                 networking_system.changes_applied();
 
-                // think about this position
                 if swapchain_holder.is_swapchain_invalid() {
                     let viewport = swapchain_holder.recreate_swapchain();
 
@@ -592,7 +612,14 @@ fn main() {
                     fence.cleanup_finished();
                 }
 
-                if rerender_interface || render_settings.show_buffers() {
+
+                #[cfg(feature = "debug")]
+                let wait_for_previous = rerender_interface || render_settings.show_buffers();
+
+                #[cfg(not(feature = "debug"))]
+                let wait_for_previous = rerender_interface;
+
+                if wait_for_previous {
                     for index in 0..screen_targets.len() {
                         if let Some(mut fence) = screen_targets[index].state.try_take_fence() {
                             fence.wait(None).unwrap();
@@ -633,8 +660,10 @@ fn main() {
 
                         picker_target.start();
 
+                        #[debug_condition(render_settings.show_map)]
                         map.render_tiles(picker_target, &picker_renderer, *current_camera);
 
+                        #[debug_condition(render_settings.show_entities)]
                         entities.iter().for_each(|entity| entity.render(picker_target, &picker_renderer, *current_camera));
 
                         picker_target.finish();
@@ -646,17 +675,14 @@ fn main() {
 
                         directional_shadow_target.start();
 
-                        if render_settings.show_map {
-                            map.render_ground(directional_shadow_target, &shadow_renderer, &directional_shadow_camera);
-                        }
+                        #[debug_condition(render_settings.show_map)]
+                        map.render_ground(directional_shadow_target, &shadow_renderer, &directional_shadow_camera);
 
-                        if render_settings.show_objects {
-                            map.render_objects(directional_shadow_target, &shadow_renderer, &directional_shadow_camera, client_tick);
-                        }
+                        #[debug_condition(render_settings.show_objects)]
+                        map.render_objects(directional_shadow_target, &shadow_renderer, &directional_shadow_camera, client_tick);
 
-                        if render_settings.show_entities {
-                            entities.iter().for_each(|entity| entity.render(directional_shadow_target, &shadow_renderer, &directional_shadow_camera));
-                        }
+                        #[debug_condition(render_settings.show_entities)]
+                        entities.iter().for_each(|entity| entity.render(directional_shadow_target, &shadow_renderer, &directional_shadow_camera));
 
                         directional_shadow_target.finish();
                     });
@@ -665,42 +691,34 @@ fn main() {
 
                         screen_target.start();
 
-                        if render_settings.show_map {
-                            map.render_ground(screen_target, &deferred_renderer, *current_camera);
-                        }
+                        #[debug_condition(render_settings.show_map)]
+                        map.render_ground(screen_target, &deferred_renderer, *current_camera);
 
-                        if render_settings.show_objects {
-                            map.render_objects(screen_target, &deferred_renderer, *current_camera, client_tick);
-                        }
+                        #[debug_condition(render_settings.show_objects)]
+                        map.render_objects(screen_target, &deferred_renderer, *current_camera, client_tick);
 
-                        if render_settings.show_entities {
-                            entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, *current_camera));
-                        }
+                        #[debug_condition(render_settings.show_entities)]
+                        entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, *current_camera));
 
-                        if render_settings.show_water {
-                            map.render_water(screen_target, &deferred_renderer, *current_camera, day_timer);
-                        }
+                        #[debug_condition(render_settings.show_water)]
+                        map.render_water(screen_target, &deferred_renderer, *current_camera, day_timer);
 
                         screen_target.lighting_pass();
 
-                        //#[debug_condition(render_settings.show_ambient_light)]
-                        if render_settings.show_ambient_light && !render_settings.show_buffers() {
-                            map.ambient_light(screen_target, &deferred_renderer, day_timer);
-                        }
+                        #[debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers())]
+                        map.ambient_light(screen_target, &deferred_renderer, day_timer);
 
-                        if render_settings.show_directional_light && !render_settings.show_buffers() {
-                            let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
-                            let light_matrix = projection_matrix * view_matrix;
-                            map.directional_light(screen_target, &deferred_renderer, *current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
-                        }
+                        let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
+                        let light_matrix = projection_matrix * view_matrix;
 
-                        if render_settings.show_point_lights && !render_settings.show_buffers() {
-                            map.point_lights(screen_target, &deferred_renderer, *current_camera);
-                        }
+                        #[debug_condition(render_settings.show_directional_light && !render_settings.show_buffers())]
+                        map.directional_light(screen_target, &deferred_renderer, *current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
 
-                        if render_settings.show_water {
-                            map.water_light(screen_target, &deferred_renderer, *current_camera);
-                        }
+                        #[debug_condition(render_settings.show_point_lights && !render_settings.show_buffers())]
+                        map.point_lights(screen_target, &deferred_renderer, *current_camera);
+
+                        #[debug_condition(render_settings.show_water && !render_settings.show_buffers())]
+                        map.water_light(screen_target, &deferred_renderer, *current_camera);
                     });
 
                     if rerender_interface {
@@ -714,6 +732,7 @@ fn main() {
                     }
                 });
 
+                #[cfg(feature = "debug")]
                 if render_settings.show_buffers() {
 
                     let picker_target = &mut picker_targets[image_number];
@@ -725,8 +744,26 @@ fn main() {
                     deferred_renderer.overlay_buffers(screen_target, directional_shadow_image, picker_target.image.clone(), &render_settings);
                 }
 
+                if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+
+                    let entity = entities
+                        .iter()
+                        .find(|entity| entity.entity_id == entity_id as usize);
+
+                    if let Some(entity) = entity {
+                        if let ResourceState::Avalible(name) = &entity.details {
+                            let name = name.split("#").next().unwrap();
+                            interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.mouse_position());
+                        }
+                    }
+                }
+
                 if render_settings.show_interface {
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
+                }
+
+                if render_settings.show_frames_per_second {
+                    interface.render_frames_per_second(screen_target, &deferred_renderer, game_timer.last_frames_per_second());
                 }
 
                 let interface_future = interface_target.state.try_take_semaphore().unwrap_or_else(|| now(device.clone()).boxed());

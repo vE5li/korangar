@@ -6,6 +6,8 @@ mod directional;
 mod point;
 mod water_light;
 mod overlay;
+mod sprite;
+#[cfg(feature = "debug")]
 mod buffer;
 
 use std::sync::Arc;
@@ -17,8 +19,10 @@ use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 use vulkano::render_pass::Subpass;
 use vulkano::format::Format;
+use vulkano::sync::{ now, GpuFuture };
 use winit::window::Window;
 
+use crate::loaders::TextureLoader;
 use crate::{types::maths::*, graphics::ImageBuffer};
 
 use super::{ DeferredRenderTarget, Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, RenderSettings };
@@ -32,6 +36,8 @@ use self::directional::DirectionalLightRenderer;
 use self::point::PointLightRenderer;
 use self::water_light::WaterLightRenderer;
 use self::overlay::OverlayRenderer;
+use self::sprite::SpriteRenderer;
+#[cfg(feature = "debug")]
 use self::buffer::BufferRenderer;
 
 #[derive(PartialEq)]
@@ -53,15 +59,18 @@ pub struct DeferredRenderer {
     point_light_renderer: PointLightRenderer,
     water_light_renderer: WaterLightRenderer,
     overlay_renderer: OverlayRenderer,
+    sprite_renderer: SpriteRenderer,
+    #[cfg(feature = "debug")]
     buffer_renderer: BufferRenderer,
     screen_vertex_buffer: ScreenVertexBuffer,
     billboard_vertex_buffer: ScreenVertexBuffer,
+    font_map: Texture,
     dimensions: [u32; 2],
 }
 
 impl DeferredRenderer {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, swapchain_format: Format, viewport: Viewport, dimensions: [u32; 2]) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, swapchain_format: Format, viewport: Viewport, dimensions: [u32; 2], texture_loader: &mut TextureLoader) -> Self {
 
         let render_pass = ordered_passes_renderpass!(device.clone(),
             attachments: {
@@ -122,6 +131,8 @@ impl DeferredRenderer {
         let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let water_light_renderer = WaterLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let overlay_renderer = OverlayRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
         let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
 
         let vertices = vec![ScreenVertex::new(Vector2::new(-1.0, -1.0)), ScreenVertex::new(Vector2::new(-1.0, 3.0)), ScreenVertex::new(Vector2::new(3.0, -1.0))];
@@ -137,6 +148,12 @@ impl DeferredRenderer {
         ];
         let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
+        let mut texture_future = now(device.clone()).boxed();
+        let font_map = texture_loader.get("assets/font.png", &mut texture_future).unwrap();
+
+        texture_future.flush().unwrap();
+        texture_future.cleanup_finished();
+
         Self {
             device,
             queue,
@@ -149,9 +166,12 @@ impl DeferredRenderer {
             point_light_renderer,
             water_light_renderer,
             overlay_renderer,
+            sprite_renderer,
+            #[cfg(feature = "debug")]
             buffer_renderer,
             screen_vertex_buffer,
             billboard_vertex_buffer,
+            font_map,
             dimensions,
         }
     }
@@ -169,6 +189,8 @@ impl DeferredRenderer {
         self.point_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         self.water_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         self.overlay_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+        self.sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
         self.buffer_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         self.dimensions = dimensions;
     }
@@ -211,6 +233,16 @@ impl DeferredRenderer {
         self.overlay_renderer.render(render_target, interface_image, self.screen_vertex_buffer.clone());
     }
 
+    pub fn render_text(&self, render_target: &mut <Self as Renderer>::Target, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        for character in text.as_bytes() {
+            let index = (*character as usize).saturating_sub(31);
+            self.sprite_renderer.render_indexed(render_target, self.font_map.clone(), window_size, position, Vector2::new(font_size, font_size), color, 10, index, true);
+            position.x += font_size / 2.0;
+        }
+    }
+
+    #[cfg(feature = "debug")]
     pub fn overlay_buffers(&self, render_target: &mut <Self as Renderer>::Target, light_image: ImageBuffer, picker_image: ImageBuffer, render_settings: &RenderSettings) {
         render_target.unbind_subrenderer();
         self.buffer_renderer.render(render_target, light_image, picker_image, self.screen_vertex_buffer.clone(), render_settings);

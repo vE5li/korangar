@@ -701,3 +701,24 @@ pub fn derive_toggle(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     proc_macro::TokenStream::from(expanded)
 }
+
+#[proc_macro_attribute]
+pub fn debug_condition(attribute: proc_macro::TokenStream, item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+
+    let condition = TokenStream::from(attribute);
+    let token_stream = TokenStream::from(item);
+
+    let expanded = quote! {
+
+        #[cfg(feature = "debug")]
+        let render = #condition;
+        #[cfg(not(feature = "debug"))]
+        let render = true;
+
+        if render {
+            #token_stream
+        }
+    };
+
+    proc_macro::TokenStream::from(expanded)
+}

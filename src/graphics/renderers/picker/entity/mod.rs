@@ -91,8 +91,7 @@ impl EntityRenderer {
             .unwrap()
     }
 
-    pub fn render(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, entity_id: usize)
-    {
+    pub fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -102,11 +101,26 @@ impl EntityRenderer {
             view: view_matrix.into(),
             projection: projection_matrix.into(),
         };
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::buffer(0, matrices_subbuffer),
-            WriteDescriptorSet::image_view_sampler(1, texture, self.nearest_sampler.clone()),
+        ]).unwrap();
+
+        render_target.state.get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_vertex_buffers(0, self.vertex_buffer.clone());
+    }
+
+    pub fn render(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, entity_id: usize)
+    {
+
+        let layout = self.pipeline.layout().clone();
+        let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
+
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone()),
         ]).unwrap(); 
 
         let world_matrix = camera.billboard_matrix(position, origin, size);
@@ -122,10 +136,8 @@ impl EntityRenderer {
         };
 
         render_target.state.get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
             .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .draw(6, 1, 0, 0).unwrap();
     }
 }

@@ -16,6 +16,7 @@ use self::tile::TileRenderer;
 use self::geometry::GeometryRenderer;
 use self::entity::EntityRenderer;
 
+#[derive(PartialEq)]
 pub enum PickerSubrenderer {
     Geometry,
     Entity,
@@ -87,6 +88,7 @@ impl PickerRenderer {
     }
 
     pub fn render_tiles(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
+        render_target.unbind_subrenderer();
         self.tile_renderer.render(render_target, camera, vertex_buffer);
     }
 }
@@ -100,6 +102,10 @@ impl GeometryRendererTrait for PickerRenderer {
     fn render_geometry(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>)
         where Self: Renderer
     {
+        if render_target.bind_subrenderer(PickerSubrenderer::Geometry) {
+            self.geometry_renderer.bind_pipeline(render_target, camera);
+        }
+
         self.geometry_renderer.render(render_target, camera, vertex_buffer.clone(), textures, world_matrix);
     }
 }
@@ -109,6 +115,10 @@ impl EntityRendererTrait for PickerRenderer {
     fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, entity_id: usize)
         where Self: Renderer
     {
+        if render_target.bind_subrenderer(PickerSubrenderer::Entity) {
+            self.entity_renderer.bind_pipeline(render_target, camera);
+        }
+
         self.entity_renderer.render(render_target, camera, texture, position, origin, size, cell_count, cell_position, entity_id);
     }
 }

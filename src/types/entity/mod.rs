@@ -16,6 +16,12 @@ use crate::loaders::{ TextureLoader, SpriteLoader, ActionLoader };
 use crate::loaders::{ Sprite, Actions};
 use crate::database::Database;
 
+pub enum ResourceState<T> {
+    Avalible(T),
+    Unavalible,
+    Requested,
+}
+
 #[derive(Clone, new, PrototypeElement)]
 struct Movement {
     #[hidden_element]
@@ -26,7 +32,7 @@ struct Movement {
     pub steps_vertex_buffer: Option<ModelVertexBuffer>,
 }
 
-#[derive(Clone, PrototypeWindow)]
+#[derive(PrototypeWindow)]
 pub struct Entity {
     pub position: Vector3<f32>,
     pub entity_id: usize,
@@ -44,6 +50,8 @@ pub struct Entity {
 
     sprite: Arc<Sprite>,
     actions: Arc<Actions>,
+    #[hidden_element]
+    pub details: ResourceState<String>,
 
     timer: f32,
     counter: usize,
@@ -67,6 +75,7 @@ impl Entity {
         let file_path = format!("npc\\{}", database.job_name_from_id(job_id));
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
+        let details = ResourceState::Unavalible;
 
         Self {
             position,
@@ -82,6 +91,7 @@ impl Entity {
             current_activity_points,
             sprite,
             actions,
+            details,
 
             timer: 0.0,
             counter: 0,

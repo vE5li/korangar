@@ -1,4 +1,5 @@
 mod rectangle;
+mod sprite;
 
 use std::sync::Arc;
 use vulkano::{device::Device, format::Format};
@@ -6,25 +7,36 @@ use vulkano::device::Queue;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{Subpass, RenderPass};
 use vulkano::image::{ ImageUsage, SampleCount };
+use vulkano::sync::{ now, GpuFuture };
 
+use crate::loaders::TextureLoader;
 use crate::{types::maths::*};
 
 use super::{ DeferredRenderTarget, Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, SingleRenderTarget };
 use crate::graphics::{ Texture, ModelVertexBuffer, WaterVertexBuffer, Color };
 
 use self::rectangle::RectangleRenderer;
+use self::sprite::SpriteRenderer;
 
 pub struct InterfaceRenderer { 
     device: Arc<Device>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     rectangle_renderer: RectangleRenderer,
+    sprite_renderer: SpriteRenderer,
+    font_map: Texture,
+    #[cfg(feature = "debug")]
+    debug_icon_texture: Texture,
+    checked_box_texture: Texture,
+    unchecked_box_texture: Texture,
+    expanded_arrow_texture: Texture,
+    collapsed_arrow_texture: Texture,
     dimensions: [u32; 2],
 }
 
 impl InterfaceRenderer { 
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2], texture_loader: &mut TextureLoader) -> Self {
 
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
@@ -45,12 +57,33 @@ impl InterfaceRenderer {
 
         let subpass = render_pass.clone().first_subpass();
         let rectangle_renderer = RectangleRenderer::new(device.clone(), subpass.clone(), viewport.clone());
+        let sprite_renderer = SpriteRenderer::new(device.clone(), subpass.clone(), viewport.clone());
+
+        let mut texture_future = now(device.clone()).boxed();
+        let font_map = texture_loader.get("assets/font.png", &mut texture_future).unwrap();
+        #[cfg(feature = "debug")]
+        let debug_icon_texture = texture_loader.get("assets/debug_icon.png", &mut texture_future).unwrap();
+        let checked_box_texture = texture_loader.get("assets/checked_box.png", &mut texture_future).unwrap();
+        let unchecked_box_texture = texture_loader.get("assets/unchecked_box.png", &mut texture_future).unwrap();
+        let expanded_arrow_texture = texture_loader.get("assets/expanded_arrow.png", &mut texture_future).unwrap();
+        let collapsed_arrow_texture = texture_loader.get("assets/collapsed_arrow.png", &mut texture_future).unwrap();
+
+        texture_future.flush().unwrap();
+        texture_future.cleanup_finished();
 
         Self {
             device,
             queue,
             render_pass,
             rectangle_renderer,
+            sprite_renderer,
+            font_map,
+            #[cfg(feature = "debug")]
+            debug_icon_texture,
+            checked_box_texture,
+            unchecked_box_texture,
+            expanded_arrow_texture,
+            collapsed_arrow_texture,
             dimensions,
         }
     }
@@ -59,6 +92,7 @@ impl InterfaceRenderer {
         let subpass = self.render_pass.clone().first_subpass();
 
         self.rectangle_renderer.recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
+        self.sprite_renderer.recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
         self.dimensions = dimensions;
     }
 
@@ -76,37 +110,40 @@ impl InterfaceRenderer {
     }
 
     pub fn render_sprite(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, smooth: bool) {
-        //self.sprite_renderer.render(render_target, self.window_size, texture, position, size, clip_size, color, smooth);
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        self.sprite_renderer.render(render_target, texture, window_size, position, size, clip_size, color, smooth);
     }
 
     pub fn render_sprite_indexed(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, column_count: usize, cell_index: usize, smooth: bool) {
-        //self.sprite_renderer.render_indexed(render_target, self.window_size, texture, position, size, clip_size, color, column_count, cell_index, smooth);
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        self.sprite_renderer.render_indexed(render_target, texture, window_size, position, size, clip_size, color, column_count, cell_index, smooth);
     }
 
     pub fn render_rectangle(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, corner_radius: Vector4<f32>, color: Color) {
-        self.rectangle_renderer.render(render_target, Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize), position, size, clip_size, corner_radius, color);
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        self.rectangle_renderer.render(render_target, window_size, position, size, clip_size, corner_radius, color);
     }
 
     pub fn render_checkbox(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, checked: bool) {
-        /*match checked {
+        match checked {
             true => self.render_sprite(render_target, self.checked_box_texture.clone(), position, size, clip_size, color, true),
             false => self.render_sprite(render_target, self.unchecked_box_texture.clone(), position, size, clip_size, color, true),
-        }*/
+        }
     }
 
     pub fn render_expand_arrow(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color, expanded: bool) {
-        /*match expanded {
+        match expanded {
             true => self.render_sprite(render_target, self.expanded_arrow_texture.clone(), position, size, clip_size, color, true),
             false => self.render_sprite(render_target, self.collapsed_arrow_texture.clone(), position, size, clip_size, color, true),
-        }*/
+        }
     }
 
-    pub fn render_text(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, text: &str, position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
-        /*for character in text.as_bytes() {
+    pub fn render_text(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, text: &str, mut position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
+        for character in text.as_bytes() {
             let index = (*character as usize).saturating_sub(31);
             self.render_sprite_indexed(render_target, self.font_map.clone(), position, Vector2::new(font_size, font_size), clip_size, color, 10, index, true);
             position.x += font_size / 2.0;
-        }*/
+        }
     }
 
     /*pub fn render_text_new(&self, text: &str, position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
@@ -115,7 +152,7 @@ impl InterfaceRenderer {
 
     #[cfg(feature = "debug")]
     pub fn render_debug_icon(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, position: Vector2<f32>, size: Vector2<f32>, clip_size: Vector2<f32>, color: Color) {
-        //self.render_sprite(self.debug_icon_texture.clone(), position, size, clip_size, color, true);
+        self.render_sprite(render_target, self.debug_icon_texture.clone(), position, size, clip_size, color, true);
     }
 }
 

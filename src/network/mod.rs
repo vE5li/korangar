@@ -38,7 +38,10 @@ pub enum NetworkEvent {
     /// Player was moved to a new position on a different map or the current map
     ChangeMap(String, Vector2<usize>),
     /// Update the client side [tick counter](crate::system::GameTimer::client_tick) to keep server and client synchronized
-    UpdataClientTick(u32),
+    UpdateClientTick(u32),
+    /// Update entity details. Mostly received when the client sends [RequestDetailsPacket]
+    /// after the player hovered an entity.
+    UpdateEntityDetails(u32, String),
     /// New chat message for the client
     ChatMessage(ChatMessage),
 }
@@ -519,6 +522,44 @@ struct ServerMessagePacket {
     pub message: String,
 }
 
+/// Sent by the client to the map server when the user hovers over an entity.
+/// Attempts to fetch additional information about the entity, such as the display name.
+#[derive(Debug, Packet, new)]
+#[header(0x68, 0x03)]
+struct RequestDetailsPacket {
+    pub entity_id: u32,
+}
+
+/// Sent by the map server to the client as a response to [RequestDetailsPacket].
+/// Provides additional information about the player.
+#[derive(Debug, Packet)]
+#[header(0x30, 0x0a)]
+struct RequestPlayerDetailsSuccessPacket {
+    pub entity_id: u32,
+    #[length_hint(24)]
+    pub name: String,
+    #[length_hint(24)]
+    pub party_name: String,
+    #[length_hint(24)]
+    pub guild_name: String,
+    #[length_hint(24)]
+    pub position_name: String,
+    pub title_id: u32,
+}
+
+/// Sent by the map server to the client as a response to [RequestDetailsPacket].
+/// Provides additional information about the entity.
+#[derive(Debug, Packet)]
+#[header(0xdf, 0x0a)]
+struct RequestEntityDetailsSuccessPacket {
+    pub entity_id: u32,
+    pub group_id: u32,
+    #[length_hint(24)]
+    pub name: String,
+    #[length_hint(24)]
+    pub title: String,
+}
+
 #[derive(Debug, Packet)]
 #[header(0xe7, 0x09)]
 struct NewMailStatusPacket {
@@ -753,7 +794,7 @@ enum StatusType {
 }
 
 impl ByteConvertable for StatusType {
-    
+
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         let data = byte_stream.slice(length_hint.unwrap());
         let mut byte_stream = ByteStream::new(&data);
@@ -1182,8 +1223,8 @@ impl NetworkingSystem {
 
     pub fn new() -> Self {
 
-        //let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
-        let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
+        let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
+        //let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
 
         let character_stream = None;
         let map_stream = None;
@@ -1570,6 +1611,10 @@ impl NetworkingSystem {
         *self.changed.borrow_mut() = false;
     }
 
+    pub fn request_entity_details(&mut self, entity_id: u32) {
+        self.send_packet_to_map_server(RequestDetailsPacket::new(entity_id as u32));
+    }
+
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
 
@@ -1577,7 +1622,7 @@ impl NetworkingSystem {
             let mut byte_stream = ByteStream::new(&data);
 
             while !byte_stream.is_empty() {
-                
+
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
                     let chat_message = ChatMessage::new(packet.message, packet.font_color.into());
                     events.push(NetworkEvent::ChatMessage(chat_message));
@@ -1665,7 +1710,13 @@ impl NetworkingSystem {
                 } else if let Ok(_packet) = QuestNotificatonPacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) {
-                    events.push(NetworkEvent::UpdataClientTick(packet.client_tick));
+                    events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
+
+                } else if let Ok(packet) = RequestPlayerDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
+
+                } else if let Ok(packet) = RequestEntityDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
 
                 } else {
 

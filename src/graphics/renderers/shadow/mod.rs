@@ -14,6 +14,12 @@ use super::{ Renderer, Camera, GeometryRenderer as GeometryRendererTrait, Entity
 use self::geometry::GeometryRenderer;
 use self::entity::EntityRenderer;
 
+#[derive(PartialEq)]
+pub enum ShadowSubrenderer {
+    Geometry,
+    Entity,
+}
+
 pub struct ShadowRenderer {
     device: Arc<Device>,
     queue: Arc<Queue>,
@@ -75,7 +81,7 @@ impl ShadowRenderer {
 }
 
 impl Renderer for ShadowRenderer {
-    type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ()>;
+    type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ShadowSubrenderer>;
 }
 
 impl GeometryRendererTrait for ShadowRenderer {
@@ -83,6 +89,10 @@ impl GeometryRendererTrait for ShadowRenderer {
     fn render_geometry(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>)
         where Self: Renderer
     {
+        if render_target.bind_subrenderer(ShadowSubrenderer::Geometry) {
+            self.geometry_renderer.bind_pipeline(render_target, camera);
+        }
+
         self.geometry_renderer.render(render_target, camera, vertex_buffer.clone(), textures, world_matrix);
     }
 }
@@ -92,6 +102,10 @@ impl EntityRendererTrait for ShadowRenderer {
     fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, _entity_id: usize)
         where Self: Renderer
     {
+        if render_target.bind_subrenderer(ShadowSubrenderer::Entity) {
+            self.entity_renderer.bind_pipeline(render_target, camera);
+        }
+
         self.entity_renderer.render(render_target, camera, texture, position, origin, size, cell_count, cell_position);
     }
 }

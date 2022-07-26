@@ -10,5 +10,7 @@ pub mod map;
 
 pub use self::stream::ByteStream;
 pub use self::entity::Entity;
+// TODO: find a different place for this
+pub use self::entity::ResourceState;
 pub use self::version::Version;
 pub use self::message::ChatMessage;

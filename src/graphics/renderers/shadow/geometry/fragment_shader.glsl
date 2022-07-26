@@ -5,7 +5,7 @@ const int TEXTURE_COUNT = 15;
 layout(location = 0) in vec2 texture_coordinates;
 layout(location = 1) flat in int texture_index;
 
-layout (set = 0, binding = 1) uniform sampler2D textures[TEXTURE_COUNT];
+layout (set = 1, binding = 0) uniform sampler2D textures[TEXTURE_COUNT];
 
 void main() {
 

@@ -329,6 +329,7 @@ mod length_hint_string {
 #[cfg(test)]
 mod const_length_hint_string {
 
+    use procedural::*;
     use derive_new::new;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
@@ -360,6 +361,7 @@ mod const_length_hint_string {
 #[cfg(test)]
 mod dynamic_length_hint_string {
 
+    use procedural::*;
     use derive_new::new;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
@@ -390,6 +392,7 @@ mod dynamic_length_hint_string {
 #[cfg(test)]
 mod default_struct {
 
+    use procedural::*;
     use derive_new::new;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
@@ -420,6 +423,7 @@ mod default_struct {
 #[cfg(test)]
 mod version_struct_smaller {
 
+    use procedural::*;
     use derive_new::new;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
@@ -459,6 +463,7 @@ mod version_struct_smaller {
 #[cfg(test)]
 mod version_struct_bigger {
 
+    use procedural::*;
     use derive_new::new;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
@@ -499,6 +504,7 @@ mod version_struct_bigger {
 #[cfg(test)]
 mod default_enum {
 
+    use procedural::*;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
 
@@ -528,6 +534,7 @@ mod default_enum {
 #[cfg(test)]
 mod numeric_value_enum {
 
+    use procedural::*;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
 
@@ -560,6 +567,7 @@ mod numeric_value_enum {
 #[cfg(test)]
 mod numeric_type_enum {
 
+    use procedural::*;
     use crate::types::ByteStream;
     use crate::traits::ByteConvertable;
 

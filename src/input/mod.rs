@@ -114,10 +114,11 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, interface: &mut Interface, picker_target: &mut PickerRenderTarget, render_settings: &RenderSettings, window_size: Vector2<usize>) -> (Vec<UserEvent>, Option<ElementCell>) {
+    pub fn user_events(&mut self, interface: &mut Interface, picker_target: &mut PickerRenderTarget, render_settings: &RenderSettings, window_size: Vector2<usize>) -> (Vec<UserEvent>, Option<ElementCell>, Option<PickerTarget>) {
 
         let mut events = Vec::new();
-        let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {         
+        let mut mouse_target = None;
+        let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {
             true => interface.hovered_element(self.new_mouse_position),
             false => (None, None),
         };
@@ -290,27 +291,28 @@ impl InputSystem {
             hovered_element = None;
         }
 
-        if let Some(fence) = picker_target.state.try_take_fence() {
-            fence.wait(None).unwrap();
-        }
+        if window_index.is_none() {
 
-        let sample_index = self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x;
-        let lock = picker_target.buffer
-            .read()
-            .unwrap();
+            if let Some(fence) = picker_target.state.try_take_fence() {
+                fence.wait(None).unwrap();
+            }
 
-        if sample_index < lock.len() {
+            let sample_index = self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x;
+            let lock = picker_target.buffer.read().unwrap();
 
-            let pixel = lock[sample_index];
+            if sample_index < lock.len() {
+                let pixel = lock[sample_index];
 
-            if pixel != 0 {
-                let picker_target = PickerTarget::from(pixel);
+                if pixel != 0 {
+                    let picker_target = PickerTarget::from(pixel);
 
-                if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
-                    match picker_target {
-                        PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
-                        PickerTarget::Entity(entity_id) => {},
+                    if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
+                        if let PickerTarget::Tile(x, y) = picker_target {
+                            events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize)));
+                        }
                     }
+
+                    mouse_target = Some(picker_target);
                 }
             }
         }
@@ -334,7 +336,7 @@ impl InputSystem {
 
         self.previous_hovered_element = hovered_element.clone().zip(window_index);
 
-        (events, hovered_element)
+        (events, hovered_element, mouse_target)
     }
 
     pub fn unused_left_click(&self) -> bool {

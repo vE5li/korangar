@@ -23,4 +23,5 @@ jobs:
       - name: Build Korangar (debug)
         uses: actions-rs/cargo@v1
         with:
-          command: build --features debug
+          command: build
+          args: --features debug

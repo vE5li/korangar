@@ -4,7 +4,7 @@ name: test
 
 jobs:
   check:
-    name: Build
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

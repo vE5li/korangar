@@ -217,6 +217,7 @@ fn main() {
     #[cfg(feature = "debug")]
     timer.stop();
 
+    let mut particle_holder = ParticleHolder::default();
     let mut entities = Vec::<Entity>::new();
 
     // move
@@ -351,6 +352,17 @@ fn main() {
 
                             entity.details = ResourceState::Avalible(name);
                         }
+
+                        NetworkEvent::DamageEffect(entity_id, damage_amount) => {
+
+                            /*let entity = entities
+                                .iter_mut()
+                                .find(|entity| entity.entity_id == entity_id as usize)
+                                .unwrap();*/
+
+                            let start_position = swapchain_holder.window_size_f32() / 2.0;
+                            particle_holder.spawn_particle(Box::new(DamageNumber::new(start_position, damage_amount.to_string())));
+                        }
                     }
                 }
 
@@ -414,6 +426,8 @@ fn main() {
                         UserEvent::SwitchCharacterSlot(destination_slot) => interface.handle_result(networking_system.switch_character_slot(destination_slot)),
 
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
+
+                        UserEvent::RequestPlayerAttack(entity_id) => networking_system.request_player_attack(entity_id),
 
                         UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
 
@@ -560,6 +574,8 @@ fn main() {
                 let texture_fence = texture_future
                     .queue()
                     .map(|_| texture_future.then_signal_fence_and_flush().unwrap());
+
+                particle_holder.update(delta_time as f32);
 
                 entities
                     .iter_mut()
@@ -719,6 +735,8 @@ fn main() {
 
                         #[debug_condition(render_settings.show_water && !render_settings.show_buffers())]
                         map.water_light(screen_target, &deferred_renderer, *current_camera);
+
+                        particle_holder.render(screen_target, &deferred_renderer);
                     });
 
                     if rerender_interface {

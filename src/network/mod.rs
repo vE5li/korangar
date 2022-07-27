@@ -39,11 +39,12 @@ pub enum NetworkEvent {
     ChangeMap(String, Vector2<usize>),
     /// Update the client side [tick counter](crate::system::GameTimer::client_tick) to keep server and client synchronized
     UpdateClientTick(u32),
+    /// New chat message for the client
+    ChatMessage(ChatMessage),
     /// Update entity details. Mostly received when the client sends [RequestDetailsPacket]
     /// after the player hovered an entity.
     UpdateEntityDetails(u32, String),
-    /// New chat message for the client
-    ChatMessage(ChatMessage),
+    DamageEffect(u32, usize),
 }
 
 #[derive(Copy, Clone, Debug, ByteConvertable)]
@@ -60,14 +61,14 @@ pub enum Sex {
 #[derive(Debug, Packet, new)]
 #[header(0x64, 0x00)]
 struct LoginServerLoginPacket {
-    /// unused
+    /// Unused
     #[new(default)]
     pub version: [u8; 4],
     #[length_hint(24)]
     pub name: String, 
     #[length_hint(24)]
     pub password: String,
-    /// unused
+    /// Unused
     #[new(default)]
     pub client_type: u8,
 }
@@ -83,11 +84,11 @@ struct LoginServerLoginSuccessPacket {
     pub login_id1: u32,
     pub account_id: u32,
     pub login_id2: u32,
-    /// deprecated and always 0 on rAthena
+    /// Deprecated and always 0 on rAthena
     pub ip_address: u32,
-    /// deprecated and always 0 on rAthena
+    /// Deprecated and always 0 on rAthena
     pub name: [u8; 24],
-    /// always 0 on rAthena
+    /// Always 0 on rAthena
     pub unknown: u16,
     pub sex: Sex,
     pub auth_token: [u8; 17],
@@ -101,7 +102,7 @@ struct LoginServerLoginSuccessPacket {
 #[derive(Debug, Packet)]
 #[header(0x2d, 0x08)]
 struct CharacterServerLoginSuccessPacket {
-    /// always 29 on rAthena
+    /// Always 29 on rAthena
     pub unknown: u16,
     pub normal_slot_count: u8,
     pub vip_slot_count: u8,
@@ -126,7 +127,7 @@ struct Packet6b00 {
 #[derive(Debug, Packet)]
 #[header(0x18, 0x0b)]
 struct Packet180b {
-    /// possibly inventory related
+    /// Possibly inventory related
     pub unknown: u16,
 }
 
@@ -206,7 +207,7 @@ impl ByteConvertable for WorldPosition2 {
 struct MapServerLoginSuccessPacket {
     pub client_tick: u32,
     pub position: WorldPosition,
-    /// always [5, 5] on rAthena
+    /// Always [5, 5] on rAthena
     pub ignored: [u8; 2],
     pub font: u16,
 }
@@ -479,7 +480,7 @@ struct DeleteCharacterPacket {
     /// configuration of the character server.
     #[length_hint(40)]
     pub email: String,
-    /// ignored by rAthena
+    /// Ignored by rAthena
     #[new(default)]
     pub unknown: [u8; 10],
 }
@@ -665,7 +666,8 @@ struct EquippableItemListPacket {
 
 #[derive(Debug, ByteConvertable)]
 struct EquippableSwitchItemInformation {
-    pub index: u16, // is actually index + 2
+    /// is in actually index + 2
+    pub index: u16,
     pub position: u32,
 }
 
@@ -909,7 +911,7 @@ struct InitialStatusPacket {
     pub flee2: u16,
     pub crit: u16,
     pub attack_speed: u16,
-    /// always 0 on rAthena
+    /// Always 0 on rAthena
     pub bonus_attack_speed: u16,
 }
 
@@ -947,6 +949,65 @@ struct SwitchCharacterSlotPacket {
     pub destination_slot: u16,
     #[new(value = "1")]
     pub remaining_moves: u16, // 1 instead of default, just in case the sever actually uses this value (rAthena does not)
+}
+
+#[derive(Debug, ByteConvertable)]
+enum Action {
+    Attack,
+    PickUpItem,
+    SitDown,
+    StandUp,
+    #[numeric_value(7)]
+    ContinousAttack,
+    /// Unsure what this does
+    #[numeric_value(12)]
+    TouchSkill,
+}
+
+#[derive(Debug, Packet, new)]
+#[header(0x37, 0x04)]
+struct RequestActionPacket {
+    pub value: u32,
+    pub action: Action,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x39, 0x01)]
+struct RequestPlayerAttackFailedPacket {
+    pub target_entity_id: u32,
+    pub target_x: u16,
+    pub target_y: u16,
+    pub x: u16,
+    pub y: u16,
+    pub attack_range: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x77, 0x09)]
+struct UpdateEntityHealthPointsPacket {
+    pub entity_id: u32,
+    pub health_points: u32,
+    pub maximum_health_points: u32,
+}
+
+/*#[derive(Debug, ByteConvertable)]
+enum DamageType {
+}*/
+
+#[derive(Debug, Packet)]
+#[header(0xc8, 0x08)]
+struct DamagePacket {
+    pub source_entity_id: u32,
+    pub destination_entity_id: u32,
+    pub client_tick: u32,
+    pub source_movement_speed: u32,
+    pub destination_movement_speed: u32,
+    pub damage_amount: u32,
+    pub is_special_damage: u8,
+    pub amount_of_hits: u16,
+    pub damage_type: u8,
+    /// Assassin dual wield damage
+    pub damage_amount2: u32,
 }
 
 #[derive(Debug, Packet)]
@@ -1612,7 +1673,11 @@ impl NetworkingSystem {
     }
 
     pub fn request_entity_details(&mut self, entity_id: u32) {
-        self.send_packet_to_map_server(RequestDetailsPacket::new(entity_id as u32));
+        self.send_packet_to_map_server(RequestDetailsPacket::new(entity_id));
+    }
+
+    pub fn request_player_attack(&mut self, entity_id: u32) {
+        self.send_packet_to_map_server(RequestActionPacket::new(entity_id, Action::Attack));
     }
 
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
@@ -1717,6 +1782,13 @@ impl NetworkingSystem {
 
                 } else if let Ok(packet) = RequestEntityDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
+
+                } else if let Ok(_packet) = UpdateEntityHealthPointsPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = RequestPlayerAttackFailedPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(packet) = DamagePacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::DamageEffect(packet.destination_entity_id, packet.damage_amount as usize));
 
                 } else {
 

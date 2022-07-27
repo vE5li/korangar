@@ -307,8 +307,9 @@ impl InputSystem {
                     let picker_target = PickerTarget::from(pixel);
 
                     if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
-                        if let PickerTarget::Tile(x, y) = picker_target {
-                            events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize)));
+                        match picker_target {
+                            PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
+                            PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerAttack(entity_id)),
                         }
                     }
 

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 procedural = { path = "procedural" }
 rayon = "1.5.3"
+rand = "0.8.5"
 derive-new = "0.5"
 vulkano = "0.28"
 vulkano-shaders = "0.28"

@@ -2,6 +2,7 @@ mod types;
 mod vertices;
 mod renderers;
 mod cameras;
+mod particles;
 
 use std::sync::Arc;
 
@@ -16,6 +17,7 @@ pub use self::types::*;
 pub use self::vertices::*;
 pub use self::renderers::*;
 pub use self::cameras::*;
+pub use self::particles::*;
 
 pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
 

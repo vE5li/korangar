@@ -227,7 +227,8 @@ impl Map {
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
             MarkerIdentifier::Particle(index, particle_index) => &self.effect_sources[index].particles[particle_index],
-            MarkerIdentifier::Entity(index) => entities[index].as_ref(),
+            //MarkerIdentifier::Entity(index) => entities[index].as_ref(),
+            MarkerIdentifier::Entity(index) => panic!(),
         }
     }
 

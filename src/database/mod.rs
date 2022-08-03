@@ -80,4 +80,15 @@ impl Database {
             .unwrap_or("1_f_maria".to_string())
             //.expect(&format!("failed to find actor with id {} in database", id))
     }
+
+    pub fn itme_name_from_id(&self, id: usize) -> String {
+
+        let mut statement = self.connection.prepare("SELECT * FROM items WHERE id = ?;").unwrap();
+        let mut result = statement.query_map([id], |row| row.get("en")).unwrap();
+
+        result
+            .next()
+            .map(|name: Result<String, _>| name.unwrap())
+            .unwrap_or("!Failed to find!".to_string())
+    }
 }

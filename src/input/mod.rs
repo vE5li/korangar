@@ -309,7 +309,7 @@ impl InputSystem {
                     if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
                         match picker_target {
                             PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
-                            PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerAttack(entity_id)),
+                            PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
                         }
                     }
 

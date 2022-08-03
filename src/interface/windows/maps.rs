@@ -1,5 +1,4 @@
 use procedural::*;
-use derive_new::new;
 
 use crate::input::UserEvent;
 use crate::interface::traits::{ Window, PrototypeWindow };
@@ -8,16 +7,18 @@ use crate::interface::elements::*;
 use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
 use crate::types::maths::Vector2;
 
-#[derive(new)]
-pub struct MapsWindow {
-    #[new(value = "\"maps\".to_string()")]
-    window_class: String,
+#[derive(Default)]
+pub struct MapsWindow {}
+
+impl MapsWindow {
+
+    pub const WINDOW_CLASS: &'static str = "maps";
 }
 
 impl PrototypeWindow for MapsWindow {
 
     fn window_class(&self) -> Option<&str> {
-        Some(&self.window_class)
+        Self::WINDOW_CLASS.into()
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
@@ -41,7 +42,8 @@ impl PrototypeWindow for MapsWindow {
             ("lighthalzen", Vector2::new(158, 92)),
             ("louyang", Vector2::new(217, 100)),
             ("xmas", Vector2::new(147, 134)),
-
+            ("c_tower1", Vector2::new(235, 218)),
+            ("ama_dun01", Vector2::new(54, 107)),
         ];
 
         let elements = map_warps
@@ -49,6 +51,6 @@ impl PrototypeWindow for MapsWindow {
             .map(|(name, position)| cell!(EventButton::new(name.to_string(), UserEvent::RequestWarpToMap(format!("{}.gat", name), position))) as ElementCell)
             .collect();
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Maps".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Maps".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
     }
 }

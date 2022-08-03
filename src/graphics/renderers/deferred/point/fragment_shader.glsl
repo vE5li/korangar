@@ -33,10 +33,10 @@ vec3 calculate_sample(int sample_index) {
     float light_percent = max(dot(light_direction, normal), 0.0);
     float light_distance = length(constants.position - pixel_position_world_space.xyz);
 
-    light_percent *= constants.range / exp(light_distance / 10.0);
+    light_percent *= min(constants.range / exp(light_distance / 10.0), 0.7);
 
     vec3 diffuse = subpassLoad(diffuse_in, sample_index).rgb;
-    return min(light_percent * constants.color, vec3(0.6)) * diffuse;
+    return light_percent * constants.color * diffuse;
 }
 
 void main() {

@@ -3,15 +3,30 @@ pub mod types;
 pub mod traits;
 pub mod elements;
 pub mod windows;
+pub mod cursor;
+
+use derive_new::new;
+use std::rc::Rc;
+use std::cell::RefCell;
+use vulkano::sync::GpuFuture;
 
 use crate::graphics::{Renderer, InterfaceRenderer, DeferredRenderer, Color};
+use crate::loaders::{ SpriteLoader, ActionLoader };
 use crate::types::maths::Vector2;
 
 pub use self::types::{ StateProvider, ClickAction, Size };
 pub use self::windows::*;
+pub use self::cursor::MouseCursor;
 
 use self::types::*;
 use self::traits::*;
+
+#[derive(new)]
+struct DialogHandle {
+    elements: Rc<RefCell<Vec<DialogElement>>>,
+    changed: Rc<RefCell<bool>>,
+    clear: bool,
+}
 
 pub struct Interface {
     windows: Vec<(Box<dyn Window>, bool, bool)>,
@@ -19,17 +34,21 @@ pub struct Interface {
     interface_settings: InterfaceSettings,
     avalible_space: Size,
     theme: Theme,
+    dialog_handle: Option<DialogHandle>,
+    mouse_cursor: MouseCursor,
     reresolve: bool,
     rerender: bool,
 }
 
 impl Interface {
 
-    pub fn new(avalible_space: Size) -> Self {
+    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, avalible_space: Size) -> Self {
 
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
         let theme = Theme::new(&interface_settings.theme_file);
+        let dialog_handle = None;
+        let mouse_cursor = MouseCursor::new(sprite_loader, action_loader, texture_future);
 
         Self {
             windows: Vec::new(),
@@ -37,6 +56,8 @@ impl Interface {
             interface_settings,
             avalible_space,
             theme,
+            dialog_handle,
+            mouse_cursor,
             reresolve: false,
             rerender: true, // set to true initially to clear the interface buffer
         }
@@ -50,10 +71,6 @@ impl Interface {
 
     pub fn save_theme(&self) {
         self.theme.save(&self.interface_settings.theme_file);
-    }
-
-    pub fn schedule_rerender(&mut self) {
-        self.rerender = true;
     }
 
     pub fn schedule_rerender_window(&mut self, window_index: usize) {
@@ -236,6 +253,10 @@ impl Interface {
         renderer.render_text(render_target, &frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
     }
 
+    pub fn render_mouse_cursor(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, mouse_position: Position) {
+        self.mouse_cursor.render(render_target, renderer, mouse_position, *self.theme.cursor.color);
+    }
+
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
             Some(window_class) => self.windows.iter().any(|window| window.0.get_window_class().map_or(false, |other_window_class| window_class == other_window_class)),
@@ -252,6 +273,68 @@ impl Interface {
             let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
             self.open_new_window(window);
         }
+    }
+
+    pub fn open_dialog_window(&mut self, text: String, npc_id: u32) {
+        if let Some(dialog_handle) = &mut self.dialog_handle {
+            let mut elements = dialog_handle.elements.borrow_mut();
+
+            if dialog_handle.clear {
+                elements.clear();
+                dialog_handle.clear = false;
+            }
+
+            elements.push(DialogElement::Text(text));
+            *dialog_handle.changed.borrow_mut() = true;
+        } else {
+            let (window, elements, changed) = DialogWindow::new(text, npc_id);
+            self.dialog_handle = Some(DialogHandle::new(elements, changed, false));
+            self.open_window(&window);
+        }
+    }
+
+    pub fn add_next_button(&mut self) {
+        if let Some(dialog_handle) = &mut self.dialog_handle {
+
+            let mut elements = dialog_handle.elements.borrow_mut();
+            elements.push(DialogElement::NextButton);
+
+            *dialog_handle.changed.borrow_mut() = true;
+            dialog_handle.clear = true;
+        }
+    }
+
+    pub fn add_close_button(&mut self) {
+        if let Some(dialog_handle) = &self.dialog_handle {
+
+            let mut elements = dialog_handle.elements.borrow_mut();
+            elements.retain(|element| *element != DialogElement::NextButton);
+            elements.push(DialogElement::CloseButton);
+
+            *dialog_handle.changed.borrow_mut() = true;
+        }
+    }
+
+    pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
+        if let Some(dialog_handle) = &self.dialog_handle {
+
+            let mut elements = dialog_handle.elements.borrow_mut();
+            elements.retain(|element| *element != DialogElement::NextButton);
+
+            choices
+                .into_iter()
+                .enumerate()
+                .for_each(|(index, choice)| elements.push(DialogElement::ChoiceButton(choice, index as i8 + 1)));
+
+            elements.push(DialogElement::ChoiceButton("cancel".to_string(), -1));
+
+            *dialog_handle.changed.borrow_mut() = true;
+        }
+    }
+
+    pub fn close_dialog_window(&mut self) {
+        self.close_window_with_class(DialogWindow::WINDOW_CLASS);
+        self.dialog_handle = None;
     }
 
     pub fn handle_result<T>(&mut self, result: Result<T, String>) {

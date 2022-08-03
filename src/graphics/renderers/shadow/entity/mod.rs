@@ -105,9 +105,17 @@ impl EntityRenderer {
             WriteDescriptorSet::buffer(0, matrices_subbuffer),
         ]).unwrap();
 
+        let size = 8192.0;
+        let viewport = Viewport {
+            origin: [0.0, 0.0],
+            dimensions: [size; 2],
+            depth_range: 0.0..1.0,
+        };
+
         render_target.state.get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .set_viewport(0, [viewport])
             .bind_vertex_buffers(0, self.vertex_buffer.clone());
     }
 
@@ -131,16 +139,8 @@ impl EntityRenderer {
             texture_size: [texture_size.x, texture_size.y],
         };
 
-        let size = 4096.0;
-        let viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: [size; 2],
-            depth_range: 0.0..1.0,
-        };
-
         render_target.state.get_builder()
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
-            .set_viewport(0, [viewport])
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0).unwrap();
     }

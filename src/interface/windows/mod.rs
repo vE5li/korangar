@@ -11,6 +11,7 @@ mod maps;
 mod time;
 mod character_selection;
 mod chat;
+mod dialog;
 
 pub use self::framed::FramedWindow;
 pub use self::menu::MenuWindow;
@@ -25,3 +26,4 @@ pub use self::maps::MapsWindow;
 pub use self::time::TimeWindow;
 pub use self::character_selection::CharacterSelectionWindow;
 pub use self::chat::*;
+pub use self::dialog::DialogWindow;

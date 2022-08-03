@@ -10,11 +10,12 @@ use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
 
 #[cfg(feature = "debug")]
 use crate::graphics::{ ModelVertexBuffer, NativeModelVertex, Transform };
-use crate::graphics::{ Renderer, EntityRenderer, Camera, MarkerRenderer, DeferredRenderer };
+use crate::graphics::{ Renderer, EntityRenderer, Camera, MarkerRenderer, DeferredRenderer, Color };
 use crate::types::map::{ Map, MarkerIdentifier };
 use crate::loaders::{ TextureLoader, SpriteLoader, ActionLoader };
 use crate::loaders::{ Sprite, Actions};
 use crate::database::Database;
+use crate::network::{StatusType, EntityData, CharacterInformation };
 
 pub enum ResourceState<T> {
     Avalible(T),
@@ -22,8 +23,18 @@ pub enum ResourceState<T> {
     Requested,
 }
 
+impl<T> ResourceState<T> {
+
+    pub fn as_option(&self) -> Option<&T> {
+        match self {
+            ResourceState::Avalible(value) => Some(value),
+            _requested_or_unavalible => None,
+        }
+    }
+}
+
 #[derive(Clone, new, PrototypeElement)]
-struct Movement {
+pub struct Movement {
     #[hidden_element]
     steps: Vec<(Vector2<usize>, u32)>,
     starting_timestamp: u32,
@@ -32,46 +43,38 @@ struct Movement {
     pub steps_vertex_buffer: Option<ModelVertexBuffer>,
 }
 
-#[derive(PrototypeWindow)]
-pub struct Entity {
-    pub position: Vector3<f32>,
-    pub entity_id: usize,
+pub struct Common {
+    pub entity_id: u32,
     pub job_id: usize,
-
-    active_movement: Option<Movement>,
-    movement_speed: usize,
-
+    pub health_points: usize,
     pub maximum_health_points: usize,
-    pub maximum_spell_points: usize,
-    pub maximum_activity_points: usize,
-    pub current_health_points: usize,
-    pub current_spell_points: usize,
-    pub current_activity_points: usize,
+    pub movement_speed: usize,
 
-    sprite: Arc<Sprite>,
-    actions: Arc<Actions>,
-    #[hidden_element]
-    pub details: ResourceState<String>,
-
-    timer: f32,
-    counter: usize,
+    pub active_movement: Option<Movement>,
+    pub sprite: Arc<Sprite>,
+    pub actions: Arc<Actions>,
+    pub position: Vector3<f32>,
+    details: ResourceState<String>,
 }
 
-impl Entity {
+impl Common {
 
-    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_id: usize, job_id: usize, position: Vector2<usize>, _movement_speed: usize) -> Self {
+    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_data: EntityData) -> Self {
 
-        let position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
+        let entity_id = entity_data.entity_id;
+        let job_id = entity_data.job as usize;
+
+        let position = Vector3::new(
+            entity_data.position.x as f32 * 5.0 + 2.5,
+            map.get_height_at(entity_data.position),
+            entity_data.position.y as f32 * 5.0 + 2.5,
+        );
+
+        let movement_speed = entity_data.movement_speed as usize;
+        let health_points = entity_data.health_points as usize;
+        let maximum_health_points = entity_data.maximum_health_points as usize;
+
         let active_movement = None;
-        let movement_speed = 300;
-
-        let maximum_health_points = 10000;
-        let maximum_spell_points = 200;
-        let maximum_activity_points = 500;
-        let current_health_points = 100;
-        let current_spell_points = 50;
-        let current_activity_points = 0;
-
         let file_path = format!("npc\\{}", database.job_name_from_id(job_id));
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
@@ -83,24 +86,52 @@ impl Entity {
             job_id,
             active_movement,
             movement_speed,
+            health_points,
             maximum_health_points,
-            maximum_spell_points,
-            maximum_activity_points,
-            current_health_points,
-            current_spell_points,
-            current_activity_points,
             sprite,
             actions,
             details,
-
-            timer: 0.0,
-            counter: 0,
         }
     }
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
         self.position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
         self.active_movement = None;
+    }
+
+    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: u32) {
+
+        if let Some(active_movement) = self.active_movement.take() {
+
+            let last_step = active_movement.steps.last().unwrap();
+
+            if client_tick > last_step.1 {
+                let position = Vector2::new(last_step.0.x, last_step.0.y);
+                self.set_position(map, position);
+            } else {
+
+                let mut last_step_index = 0;
+                while active_movement.steps[last_step_index + 1].1 < client_tick {
+                    last_step_index += 1;
+                }
+
+                let last_step = active_movement.steps[last_step_index];
+                let next_step = active_movement.steps[last_step_index + 1];
+
+                let last_step_position = Vector3::new(last_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(last_step.0), last_step.0.y as f32 * 5.0 + 2.5);
+                let next_step_position = Vector3::new(next_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(next_step.0), next_step.0.y as f32 * 5.0 + 2.5);
+
+                let clamped_tick = u32::max(last_step.1, client_tick);
+                let total = next_step.1 - last_step.1;
+                let offset = clamped_tick - last_step.1;
+
+                let movement_elapsed = (1.0 / total as f32) * offset as f32;
+                let position = last_step_position.lerp(next_step_position, movement_elapsed);
+
+                self.position = position;
+                self.active_movement = active_movement.into();
+            }
+        }
     }
 
     pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
@@ -165,7 +196,7 @@ impl Entity {
 
         if let Some(path) = result {
             let steps: Vec<(Vector2<usize>, u32)> = path.into_iter().enumerate().map(|(index, pos)| {
-                let arrival_timestamp = starting_timestamp + index as u32 * (self.movement_speed as u32 / 2);
+                let arrival_timestamp = starting_timestamp + index as u32 * self.movement_speed as u32;
                 (pos.to_vector(), arrival_timestamp)
             }).collect();
 
@@ -230,55 +261,10 @@ impl Entity {
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
     }
 
-    pub fn has_updates(&self) -> bool {
-        self.active_movement.is_some()
-    }
-
-    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: u32) {
-
-        if let Some(active_movement) = self.active_movement.take() {
-
-            let last_step = active_movement.steps.last().unwrap();
-
-            if client_tick > last_step.1 {
-                self.set_position(map, Vector2::new(last_step.0.x, last_step.0.y));
-            } else {
-
-                let mut last_step_index = 0;
-                while active_movement.steps[last_step_index + 1].1 < client_tick { 
-                    last_step_index += 1;
-                }
-
-                let last_step = active_movement.steps[last_step_index];
-                let next_step = active_movement.steps[last_step_index + 1];
-
-                let last_step_position = Vector3::new(last_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(last_step.0), last_step.0.y as f32 * 5.0 + 2.5);
-                let next_step_position = Vector3::new(next_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(next_step.0), next_step.0.y as f32 * 5.0 + 2.5);
-
-                let clamped_tick = u32::max(last_step.1, client_tick);
-                let total = next_step.1 - last_step.1;
-                let offset = clamped_tick - last_step.1;
-
-                let movement_elapsed = (1.0 / total as f32) * offset as f32;
-                let current_position = last_step_position.lerp(next_step_position, movement_elapsed);
-
-                self.position = current_position;
-                self.active_movement = active_movement.into();
-            }
-        }
-
-
-        self.timer += delta_time;
-        if self.timer > 1.0 {
-            self.timer -= 1.0;
-            self.counter = (self.counter + 1) % self.sprite.textures.len();
-        }
-    }
-
     pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
         where T: Renderer + EntityRenderer
     {
-        renderer.render_entity(render_target, camera, self.sprite.textures[0].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0), self.entity_id);
+        renderer.render_entity(render_target, camera, self.sprite.textures[0].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0), self.entity_id as usize);
     }
 
     #[cfg(feature = "debug")]
@@ -287,12 +273,204 @@ impl Entity {
     {
         renderer.render_marker(render_target, camera, self.position, hovered);
     }
+}
+
+pub struct Player {
+    common: Common,
+    pub spell_points: usize,
+    pub activity_points: usize,
+    pub maximum_spell_points: usize,
+    pub maximum_activity_points: usize,
+}
+
+impl Player {
+
+    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, character_information: CharacterInformation, player_position: Vector2<usize>) -> Self {
+
+        let spell_points = character_information.spell_points as usize;
+        let activity_points = 0;
+        let maximum_spell_points = character_information.maximum_spell_points as usize;
+        let maximum_activity_points = 0;
+        let common = Common::new(sprite_loader, action_loader, texture_future, map, database, EntityData::from_character(character_information, player_position));
+
+        Self {
+            common,
+            spell_points,
+            activity_points,
+            maximum_spell_points,
+            maximum_activity_points,
+        }
+    }
+
+    pub fn get_common(&self) -> &Common {
+        &self.common
+    }
+
+    pub fn get_common_mut(&mut self) -> &mut Common {
+        &mut self.common
+    }
+
+    pub fn update_status(&mut self, status_type: StatusType) {
+        match status_type {
+            StatusType::MaximumHealthPoints(value) => self.common.maximum_health_points = value as usize,
+            StatusType::MaximumSpellPoints(value) => self.maximum_spell_points = value as usize,
+            StatusType::HealthPoints(value) => self.common.health_points = value as usize,
+            StatusType::SpellPoints(value) => self.spell_points = value as usize,
+            StatusType::ActivityPoints(value) => self.activity_points = value as usize,
+            StatusType::MaximumActivityPoints(value) => self.maximum_activity_points = value as usize,
+            _ => {},
+        }
+    }
+
+    pub fn render_status(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>) {
+
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
+        let screen_position = Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
+        let screen_position = screen_position / 2.0;
+        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+
+        renderer.render_bar(render_target, final_position, Color::rgb(67, 163, 83), self.common.maximum_health_points as f32, self.common.health_points as f32);
+        renderer.render_bar(render_target, final_position + Vector2::new(0.0, 5.0), Color::rgb(67, 129, 163), self.maximum_spell_points as f32, self.spell_points as f32);
+        renderer.render_bar(render_target, final_position + Vector2::new(0.0, 10.0), Color::rgb(163, 96, 67), self.maximum_activity_points as f32, self.activity_points as f32);
+    }
+}
+
+pub struct Npc {
+    common: Common,
+}
+
+impl Npc {
+
+    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, database: &Database, entity_data: EntityData) -> Self {
+
+        let common = Common::new(sprite_loader, action_loader, texture_future, map, database, entity_data);
+
+        Self {
+            common,
+        }
+    }
+
+    pub fn get_common(&self) -> &Common {
+        &self.common
+    }
+
+    pub fn get_common_mut(&mut self) -> &mut Common {
+        &mut self.common
+    }
+
+    pub fn render_status(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>) {
+
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
+        let screen_position = Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
+        let screen_position = screen_position / 2.0;
+        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+
+        renderer.render_bar(render_target, final_position, Color::rgb(67, 163, 83), self.common.maximum_health_points as f32, self.common.health_points as f32);
+    }
+}
+
+pub enum Entity {
+    Player(Player),
+    Npc(Npc),
+}
+
+impl Entity {
+
+    fn get_common(&self) -> &Common {
+        match self {
+            Self::Player(player) => player.get_common(),
+            Self::Npc(npc) => npc.get_common(),
+        }
+    }
+
+    fn get_common_mut(&mut self) -> &mut Common {
+        match self {
+            Self::Player(player) => player.get_common_mut(),
+            Self::Npc(npc) => npc.get_common_mut(),
+        }
+    }
+
+    pub fn get_entity_id(&self) -> u32 {
+        self.get_common().entity_id
+    }
+
+    pub fn get_job(&self) -> usize {
+        self.get_common().job_id
+    }
+
+    pub fn are_details_unavalible(&self) -> bool {
+        match &self.get_common().details {
+            ResourceState::Unavalible => true,
+            _requested_or_avalible => false,
+        }
+    }
+
+    pub fn set_details_requested(&mut self) {
+        self.get_common_mut().details = ResourceState::Requested;
+    }
+
+    pub fn set_details(&mut self, details: String) {
+        self.get_common_mut().details = ResourceState::Avalible(details);
+    }
+
+    pub fn get_details(&self) -> Option<&String> {
+        self.get_common().details.as_option()
+    }
+
+    pub fn get_position(&self) -> Vector3<f32> {
+        self.get_common().position
+    }
+
+    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
+        self.get_common_mut().set_position(map, position);
+    }
+
+    pub fn update_health(&mut self, health_points: usize, maximum_health_points: usize) {
+        let common = self.get_common_mut();
+        common.health_points = health_points;
+        common.maximum_health_points = maximum_health_points;
+    }
+
+    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: u32) {
+        self.get_common_mut().update(map, delta_time, client_tick);
+    }
+
+    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
+        self.get_common_mut().move_from_to(map, from, to, starting_timestamp);
+    }
 
     #[cfg(feature = "debug")]
-    pub fn render_pathing(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
-        /*if let Some(active_movement) = &self.active_movement {
-            let vertex_buffer = active_movement.steps_vertex_buffer.clone().unwrap();
-            renderer.render_pathing(render_target, camera, vertex_buffer, &Transform::new());
-        }*/
+    pub fn generate_steps_vertex_buffer(&mut self, device: Arc<Device>, map: &Map) {
+        self.get_common_mut().generate_steps_vertex_buffer(device, map);
+    }
+
+    pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
+        where T: Renderer + EntityRenderer
+    {
+        self.get_common().render(render_target, renderer, camera);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
+        where T: Renderer + MarkerRenderer
+    {
+        self.get_common().render_marker(render_target, renderer, camera, hovered);
+    }
+
+    pub fn render_status(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>) {
+        match self {
+            Self::Player(player) => player.render_status(render_target, renderer, camera, window_size),
+            Self::Npc(npc) => npc.render_status(render_target, renderer, camera, window_size),
+        }
+    }
+
+    pub fn render_lights(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+        let job_id = self.get_common().job_id;
+
+        if job_id == 45 {
+            renderer.point_light(render_target, camera, self.get_position() + Vector3::new(0.0, 10.0, 0.0), Color::rgb(0, 0, 255), 80.0);
+        }
     }
 }

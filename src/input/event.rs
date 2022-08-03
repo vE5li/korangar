@@ -19,8 +19,11 @@ pub enum UserEvent {
     CancelSwitchCharacterSlot,
     SwitchCharacterSlot(usize),
     RequestPlayerMove(Vector2<usize>),
-    RequestPlayerAttack(u32),
+    RequestPlayerInteract(u32),
     RequestWarpToMap(String, Vector2<usize>),
+    NextDialog(u32),
+    CloseDialog(u32),
+    ChooseDialogOption(u32, i8),
     #[cfg(feature = "debug")]
     OpenRenderSettingsWindow,
     #[cfg(feature = "debug")]

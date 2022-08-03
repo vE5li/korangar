@@ -6,21 +6,18 @@ use crate::interface::types::InterfaceSettings;
 use crate::interface::elements::*;
 use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
 
-pub struct MenuWindow {
-    window_class: String,
-}
+#[derive(Default)]
+pub struct MenuWindow {}
 
-impl Default for MenuWindow {
+impl MenuWindow {
 
-    fn default() -> Self {
-        Self { window_class: "menu".to_string() }
-    }
+    pub const WINDOW_CLASS: &'static str = "menu";
 }
 
 impl PrototypeWindow for MenuWindow {
 
     fn window_class(&self) -> Option<&str> {
-        Some(&self.window_class)
+        Self::WINDOW_CLASS.into()
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
@@ -44,6 +41,6 @@ impl PrototypeWindow for MenuWindow {
             cell!(Button::new("exit korangar", UserEvent::Exit, true)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Menu".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Menu".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
     }
 }

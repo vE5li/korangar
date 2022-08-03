@@ -245,6 +245,20 @@ impl Default for ChatTheme {
     }
 }
 
+#[derive(Serialize, Deserialize, PrototypeElement)]
+pub struct CursorTheme {
+    pub color: Mutable<Color, NO_EVENT>,
+}
+
+impl Default for CursorTheme {
+
+    fn default() -> Self {
+        Self {
+            color: Mutable::new(Color::monochrome(255)),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
 #[window_title("theme viewer")]
 #[window_class("theme_viewer")]
@@ -260,6 +274,7 @@ pub struct Theme {
     pub overlay: OverlayTheme,
     pub slider: SliderTheme,
     pub chat: ChatTheme,
+    pub cursor: CursorTheme,
 }
 
 impl Theme {

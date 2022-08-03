@@ -17,7 +17,8 @@ use crate::types::{ ByteStream, ChatMessage };
 use crate::graphics::{ Color, ColorRGB, ColorBGR };
 
 /// Base trait that all packets implement.
-/// All packets in Ragnarok online consist of a header, two bytes in size, followed by the packet data. If the packet does not have a fixed size, the first two bytes will be the size of the packet in bytes *including* the header. Packets are sent in little endian.
+/// All packets in Ragnarok online consist of a header, two bytes in size, followed by the packet data. If the packet does not have a fixed size,
+/// the first two bytes will be the size of the packet in bytes *including* the header. Packets are sent in little endian.
 pub trait Packet {
 
     fn header() -> [u8; 2];
@@ -28,13 +29,13 @@ pub trait Packet {
 /// An event triggered by the map server.
 pub enum NetworkEvent {
     /// Add an entity to the list of entities that the client is aware of
-    AddEntity(usize, usize, Vector2<usize>, usize),
+    AddEntity(EntityData),
     /// Remove an entity from the list of entities that the client is aware of by its id
-    RemoveEntity(usize),
+    RemoveEntity(u32),
     /// The player is pathing to a new position
     PlayerMove(Vector2<usize>, Vector2<usize>, u32),
     /// An Entity nearby is pathing to a new position
-    EntityMove(usize, Vector2<usize>, Vector2<usize>, u32),
+    EntityMove(u32, Vector2<usize>, Vector2<usize>, u32),
     /// Player was moved to a new position on a different map or the current map
     ChangeMap(String, Vector2<usize>),
     /// Update the client side [tick counter](crate::system::GameTimer::client_tick) to keep server and client synchronized
@@ -44,7 +45,14 @@ pub enum NetworkEvent {
     /// Update entity details. Mostly received when the client sends [RequestDetailsPacket]
     /// after the player hovered an entity.
     UpdateEntityDetails(u32, String),
+    UpdateEntityHealth(u32, usize, usize),
     DamageEffect(u32, usize),
+    UpdateStatus(StatusType),
+    OpenDialog(String, u32),
+    AddNextButton,
+    AddCloseButton,
+    AddChoiceButtons(Vec<String>),
+    Inventory(Vec<usize>),
 }
 
 #[derive(Copy, Clone, Debug, ByteConvertable)]
@@ -351,7 +359,7 @@ struct CreateCharacterPacket {
     pub sex: Sex,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable)]
 pub struct CharacterInformation {
     pub character_id: u32,
     pub experience: i64,
@@ -364,11 +372,11 @@ pub struct CharacterInformation {
     pub virtue: i32,
     pub honor: i32,
     pub jobpoint: i16,
-    pub health: i64,
-    pub maximum_health: i64,
+    pub health_points: i64,
+    pub maximum_health_points: i64,
     pub spell_points: i64,
     pub maximum_spell_points: i64,
-    pub speed: i16,
+    pub movement_speed: i16,
     pub job: i16,
     pub head: i16,
     pub body: i16,
@@ -455,6 +463,14 @@ struct EntityMovePacket {
     pub entity_id: u32,
     pub from_to: WorldPosition2,
     pub timestamp: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x88, 0x00)]
+struct EntityStopMovePacket {
+    pub entity_id: u32,
+    pub x: u16,
+    pub y: u16,
 }
 
 /// Sent by the map server to the client.
@@ -630,7 +646,7 @@ struct InventoyEndPacket {
     pub flag: u8, // maybe char ?
 }
 
-#[derive(Copy, Clone, Debug, Default, ByteConvertable)]
+#[derive(Debug, ByteConvertable)]
 struct ItemOptions {
     pub index: u16,
     pub value: u16,
@@ -638,17 +654,38 @@ struct ItemOptions {
 }
 
 #[derive(Debug, ByteConvertable)]
+struct RegularItemInformation {
+    pub index: u16,
+    pub item_id: u32,
+    pub item_type: u8,
+    pub amount: u16,
+    pub wear_state: u32,
+    pub slot: [u32; 4], // card ?
+    pub hire_expiration_date: i32,
+    pub fags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
+}
+
+#[derive(Debug, Packet)]
+#[header(0x09, 0x0b)]
+struct RegularItemListPacket {
+    pub packet_length: u16,
+    pub inventory_type: u8,
+    #[repeating((self.packet_length - 5) / 34)]
+    pub item_information: Vec<RegularItemInformation>,
+}
+
+#[derive(Debug, ByteConvertable)]
 struct EquippableItemInformation {
     pub index: u16,
     pub item_id: u32,
     pub item_type: u8,
-    pub location: u32, // 11
+    pub location: u32,
     pub wear_state: u32,
     pub slot: [u32; 4], // card ?
-    pub hire_expiration_date: i32, // 35
+    pub hire_expiration_date: i32,
     pub bind_on_equip_type: u16,
     pub w_item_sprite_number: u16,
-    pub option_count: u8, // 40
+    pub option_count: u8,
     pub option_data: [ItemOptions; 5], // fix count
     pub refinement_level: u8,
     pub enchantment_level: u8,
@@ -727,7 +764,7 @@ struct DisplayEmotionPacket {
 /// All UpdateStatusPackets do the same, they just have different sizes correlating
 /// to the space the updated value requires.
 #[derive(Debug)]
-enum StatusType {
+pub enum StatusType {
     Weight(u32),
     MaximumWeight(u32),
     MovementSpeed(u32),
@@ -947,8 +984,9 @@ struct UpdateAttackRangePacket {
 struct SwitchCharacterSlotPacket {
     pub origin_slot: u16,
     pub destination_slot: u16,
+    /// 1 instead of default, just in case the sever actually uses this value (rAthena does not)
     #[new(value = "1")]
-    pub remaining_moves: u16, // 1 instead of default, just in case the sever actually uses this value (rAthena does not)
+    pub remaining_moves: u16,
 }
 
 #[derive(Debug, ByteConvertable)]
@@ -1069,7 +1107,7 @@ struct MovingEntityAppearedPacket {
     pub object_type: u8,
     pub entity_id: u32,
     pub group_id: u32, // may be reversed - or completely wrong
-    pub speed: u16,
+    pub movement_speed: u16,
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
@@ -1111,7 +1149,7 @@ struct EntityAppearedPacket {
     pub object_type: u8,
     pub entity_id: u32,
     pub group_id: u32, // may be reversed - or completely wrong
-    pub speed: u16,
+    pub movement_speed: u16,
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
@@ -1146,6 +1184,63 @@ struct EntityAppearedPacket {
     pub name: String,
 }
 
+pub struct EntityData {
+    pub entity_id: u32,
+    pub movement_speed: u16,
+    pub job: u16,
+    pub position: Vector2<usize>,
+    pub destination: Option<Vector2<usize>>,
+    pub health_points: i32,
+    pub maximum_health_points: i32,
+}
+
+impl EntityData {
+
+    pub fn from_character(character_information: CharacterInformation, position: Vector2<usize>) -> Self {
+        Self {
+            entity_id: character_information.character_id,
+            movement_speed: character_information.movement_speed as u16,
+            job: character_information.job as u16,
+            position,
+            destination: None,
+            health_points: character_information.health_points as i32,
+            maximum_health_points: character_information.maximum_health_points as i32,
+        }
+    }
+}
+
+impl From<EntityAppearedPacket> for EntityData {
+
+    fn from(packet: EntityAppearedPacket) -> Self {
+        Self {
+            entity_id: packet.entity_id,
+            movement_speed: packet.movement_speed,
+            job: packet.job,
+            position: packet.position.to_vector(),
+            destination: None,
+            health_points: packet.health_points,
+            maximum_health_points: packet.maximum_health_points,
+        }
+    }
+}
+
+impl From<MovingEntityAppearedPacket> for EntityData {
+
+    fn from(packet: MovingEntityAppearedPacket) -> Self {
+        let (origin, destination) = packet.position.to_vectors();
+
+        Self {
+            entity_id: packet.entity_id,
+            movement_speed: packet.movement_speed,
+            job: packet.job,
+            position: origin,
+            destination: Some(destination),
+            health_points: packet.health_points,
+            maximum_health_points: packet.maximum_health_points,
+        }
+    }
+}
+
 #[derive(Debug, ByteConvertable)]
 struct SkillInformation {
     pub skill_id: u16,
@@ -1166,7 +1261,7 @@ struct UpdateSkillTreePacket {
     pub skill_information: Vec<SkillInformation>,
 }
 
-#[derive(Copy, Clone, Debug, Default, ByteConvertable)]
+#[derive(Debug, ByteConvertable)]
 struct HotkeyData {
     pub is_skill: u8,
     pub skill_id: u32,
@@ -1213,20 +1308,295 @@ struct NavigateToMonsterPacket {
     pub target_monster_id: u16,
 }
 
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u32)]
+enum MarkerType {
+    DisplayFor15Seconds,
+    DisplayUntilLeave,
+    RemoveMark,
+}
+
 #[derive(Debug, Packet)]
-#[header(0xb6, 0x00)]
-struct CloseScriptPacket {
+#[header(0x44, 0x01)]
+struct MarkMinimapPositionPacket {
+    pub npc_id: u32,
+    pub marker_type: MarkerType,
+    pub position: Vector2<u32>,
+    pub id: u8,
+    pub color: ColorRGB,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb5, 0x00)]
+struct NextButtonPacket {
     pub entity_id: u32,
 }
 
 #[derive(Debug, Packet)]
+#[header(0xb6, 0x00)]
+struct CloseButtonPacket {
+    pub entity_id: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb7, 0x00)]
+struct DialogMenuPacket {
+    pub packet_length: u16,
+    pub entity_id: u32,
+    #[length_hint(self.packet_length - 8)]
+    pub message: String,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xf3, 0x01)]
+struct DisplaySpecialEffectPacket {
+    pub entity_id: u32,
+    pub effect_id: u32,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xcb, 0x09)]
+struct DisplaySkillEffectPacket {
+    pub skill_id: u16,
+    pub heal: u32,
+    pub destination_entity_id: u32,
+    pub source_entity_id: u32,
+    pub result: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x83, 0x09)]
+struct StatusChangePacket {
+    pub index: u16,
+    pub entity_id: u32,
+    pub state: u8,
+    pub duration_in_milliseconds: u32,
+    pub remaining_in_milliseconds: u32,
+    pub value: [u32; 3],
+}
+
+#[derive(Debug, ByteConvertable)]
+struct ObjectiveDetails1 {
+    pub hunt_identification: u32,
+    pub objective_type: u32,
+    pub mob_id: u32,
+    pub minimum_level: u16,
+    pub maximum_level: u16,
+    pub mob_count: u16,
+    #[length_hint(24)]
+    pub mob_name: String,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xf9, 0x09)]
+struct QuestNotificationPacket1 {
+    pub quest_id: u32,
+    pub active: u8,
+    pub start_time: u32,
+    pub expire_time: u32,
+    pub objective_count: u16,
+    /// For some reason this packet always has space for three objective details, even if none are sent
+    pub objective_details: [ObjectiveDetails1; 3],
+}
+
+#[derive(Debug, ByteConvertable)]
+struct HuntingObjective {
+    pub quest_id: u32,
+    pub mob_id: u32,
+    pub total_count: u16,
+    pub current_count: u16,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xfe, 0x08)]
+struct HuntingQuestNotificationPacket {
+    pub packet_length: u16,
+    #[repeating((self.packet_length - 4) / 12)]
+    pub objective_details: Vec<HuntingObjective>,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xfa, 0x09)]
+struct HuntingQuestUpdateObjectivePacket {
+    pub packet_length: u16,
+    pub objective_count: u16,
+    #[repeating((self.packet_length - 4) / 12)]
+    pub objective_details: Vec<HuntingObjective>,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb4, 0x02)]
+struct QuestRemovedPacket {
+    pub quest_id: u32,
+}
+
+#[derive(Debug, ByteConvertable)]
+struct QuestDetails {
+    pub hunt_identification: u32,
+    pub objective_type: u32,
+    pub mob_id: u32,
+    pub minimum_level: u16,
+    pub maximum_level: u16,
+    pub kill_count: u16,
+    pub total_count: u16,
+    #[length_hint(24)]
+    pub mob_name: String,
+}
+
+#[derive(Debug, ByteConvertable)]
+struct Quest {
+    pub quest_id: u32,
+    pub active: u8,
+    pub remaining_time: u32, // TODO: double check these
+    pub expire_time: u32, // TODO: double check these
+    pub objective_count: u16,
+    #[repeating(self.objective_count)]
+    pub objective_details: Vec<QuestDetails>,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xf8, 0x09)]
+struct QuestListPacket {
+    pub packet_length: u16,
+    pub quest_count: u32,
+    #[repeating(self.quest_count)]
+    pub quests: Vec<Quest>,
+}
+
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u32)]
+enum VisualEffect {
+    BaseLevelUp,
+    JobLevelUp,
+    RefineFailure,
+    RefineSuccess,
+    GameOver,
+    PharmacySuccess,
+    PharmacyFailure,
+    BaseLevelUpSuperNovice,
+    JobLevelUpSuperNovice,
+    BaseLevelUpTaekwon,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x9b, 0x01)]
+struct VisualEffectPacket {
+    pub entity_id: u32,
+    pub effect: VisualEffect,
+}
+
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u16)]
+enum ExperienceType {
+    #[numeric_value(1)]
+    BaseExperience,
+    JobExperience,
+}
+
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u16)]
+enum ExperienceSource{
+    Regular,
+    Quest,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xcc, 0x0a)]
+struct DisplayGainedExperiencePacket {
+    pub account_id: u32,
+    pub amount: u64,
+    pub experience_type: ExperienceType,
+    pub experience_source: ExperienceSource,
+}
+
+#[derive(Debug, ByteConvertable)]
+enum ImageLocation {
+    BottomLeft,
+    BottomMiddle,
+    BottomRight,
+    MiddleFloating,
+    MiddleColorless,
+    #[numeric_value(255)]
+    ClearAll,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb3, 0x01)]
+struct DisplayImagePacket {
+    #[length_hint(64)]
+    pub image_name: String,
+    pub location: ImageLocation,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x29, 0x02)]
+struct StateChangePacket {
+    pub entity_id: u32,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub is_pk_mode_on: u8,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x41, 0x0b)]
+struct ItemPickupPacket {
+    pub index: u16,
+    pub count: u16,
+    pub name_id: u32,
+    pub is_identified: u8,
+    pub is_damaged: u8,
+    pub cards: [u32; 4],
+    pub location: u32,
+    pub item_type: u8,
+    pub result: u8,
+    pub hire_expiration_date: u32,
+    pub bind_on_equip_type: u16,
+    pub option_data: [ItemOptions; 5], // fix count
+    pub favorite: u8,
+    pub look: u16,
+    pub refinement_level: u8,
+    pub enchantment_level: u8,
+}
+
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u16)]
+enum RemoveItemReason {
+    Normal,
+    ItemUsedForSkill,
+    RefinsFailed,
+    MaterialChanged,
+    MovedToStorage,
+    MovedToCart,
+    ItemSold,
+    ConsumedByFourSpiritAnalysis,
+}
+
+#[derive(Debug, Packet)]
+#[header(0xfa, 0x07)]
+struct RemoveItemFromInventoryPacket {
+    pub remove_reason: RemoveItemReason,
+    pub index: u16,
+    pub amount: u16,
+}
+
+#[derive(Debug, Packet)]
 #[header(0x46, 0x04)]
-struct QuestNotificatonPacket {
+struct QuestEffectPacket {
     pub entity_id: u32,
     pub position_x: u16,
     pub position_y: u16,
     pub effect: u16, // 0 - none; 1 - exclamation mark; 2 - question mark 
     pub color: u16, // 0 - yellow; 1 - orange; 2 - green; 3 - purple
+}
+
+#[derive(Debug, Packet)]
+#[header(0xb4, 0x00)]
+struct NpcDialogPacket {
+    pub packet_length: u16,
+    pub npc_id: u32,
+    #[length_hint(self.packet_length - 8)]
+    pub text: String,
 }
 
 #[derive(Debug, Default, Packet)]
@@ -1237,6 +1607,33 @@ struct MapLoadedPacket {}
 #[header(0x87, 0x01)]
 struct CharacterServerKeepalivePacket {
     pub account_id: u32,
+}
+
+#[derive(Debug, Packet, new)]
+#[header(0x90, 0x00)]
+struct StartDialogPacket {
+    pub npc_id: u32,
+    #[new(value = "1")]
+    pub dialog_type: u8,
+}
+
+#[derive(Debug, Packet, new)]
+#[header(0xb9, 0x00)]
+struct NextDialogPacket {
+    pub npc_id: u32,
+}
+
+#[derive(Debug, Packet, new)]
+#[header(0x46, 0x01)]
+struct CloseDialogPacket {
+    pub npc_id: u32,
+}
+
+#[derive(Debug, Packet, new)]
+#[header(0xb8, 0x00)]
+struct ChooseDialogOptionPacket {
+    pub npc_id: u32,
+    pub option: i8,
 }
 
 #[derive(new)]
@@ -1541,7 +1938,7 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn select_character(&mut self, slot: usize, chat_messages: &Rc<RefCell<Vec<ChatMessage>>>) -> Result<(String, Vector2<usize>, usize, usize, usize, u32), String> {
+    pub fn select_character(&mut self, slot: usize, chat_messages: &Rc<RefCell<Vec<ChatMessage>>>) -> Result<(String, Vector2<usize>, CharacterInformation, u32), String> {
 
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
@@ -1562,16 +1959,16 @@ impl NetworkingSystem {
             }
         }
 
-        let select_character_success_packet = CharacterSelectionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+        let character_selection_success_packet = CharacterSelectionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
-        let server_ip = IpAddr::V4(select_character_success_packet.map_server_ip);
-        let socket_address = SocketAddr::new(server_ip, select_character_success_packet.map_server_port);
+        let server_ip = IpAddr::V4(character_selection_success_packet.map_server_ip);
+        let socket_address = SocketAddr::new(server_ip, character_selection_success_packet.map_server_port);
         self.map_stream = TcpStream::connect(socket_address)
             .expect("failed to connect to map server")
             .into();
 
         let login_data = self.login_data.as_ref().unwrap();
-        self.send_packet_to_map_server(MapServerLoginPacket::new(login_data.account_id, select_character_success_packet.character_id, login_data.login_id1, 100, login_data.sex));
+        self.send_packet_to_map_server(MapServerLoginPacket::new(login_data.account_id, character_selection_success_packet.character_id, login_data.login_id1, 100, login_data.sex));
 
         let response = self.get_data_from_map_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -1590,14 +1987,13 @@ impl NetworkingSystem {
         }
 
         let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
+        let character_information = self.characters.borrow()[slot].clone();
 
         Ok((
             change_map_packet.map_name.replace(".gat", ""),
             Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
-            select_character_success_packet.character_id as usize,
-            45, // how do we get this ?
-            200, // set 200 to 0 as soon as stats are properly updated
-            map_server_login_success_packet.client_tick
+            character_information,
+            map_server_login_success_packet.client_tick,
         ))
     }
 
@@ -1680,6 +2076,22 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(RequestActionPacket::new(entity_id, Action::Attack));
     }
 
+    pub fn start_dialog(&mut self, npc_id: u32) {
+        self.send_packet_to_map_server(StartDialogPacket::new(npc_id));
+    }
+
+    pub fn next_dialog(&mut self, npc_id: u32) {
+        self.send_packet_to_map_server(NextDialogPacket::new(npc_id));
+    }
+
+    pub fn close_dialog(&mut self, npc_id: u32) {
+        self.send_packet_to_map_server(CloseDialogPacket::new(npc_id));
+    }
+
+    pub fn choose_dialog_option(&mut self, npc_id: u32, option: i8) {
+        self.send_packet_to_map_server(ChooseDialogOptionPacket::new(npc_id, option as i8));
+    }
+
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
 
@@ -1704,55 +2116,70 @@ impl NetworkingSystem {
 
                 } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) { 
                     let (origin, destination) = packet.from_to.to_vectors();
-                    events.push(NetworkEvent::EntityMove(packet.entity_id as usize, origin, destination, packet.timestamp));
+                    events.push(NetworkEvent::EntityMove(packet.entity_id, origin, destination, packet.timestamp));
+
+                } else if let Ok(_packet) = EntityStopMovePacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(packet) = PlayerMovePacket::try_from_bytes(&mut byte_stream) {
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
 
-                } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::ChangeMap(packet.map_name.replace(".gat", "").to_string(), Vector2::new(packet.x as usize, packet.y as usize)));
 
-                } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
-                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.job as usize, packet.position.to_vector(), packet.speed as usize));
+                } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::AddEntity(packet.into()));
 
-                } else if let Ok(packet) = MovingEntityAppearedPacket::try_from_bytes(&mut byte_stream) { 
-                    let (_origin, destination) = packet.position.to_vectors();
-                    events.push(NetworkEvent::AddEntity(packet.entity_id as usize, packet.job as usize, destination, packet.speed as usize));
+                } else if let Ok(packet) = MovingEntityAppearedPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::AddEntity(packet.into()));
 
-                } else if let Ok(packet) = EntityDisappearedPacket::try_from_bytes(&mut byte_stream) { 
-                    events.push(NetworkEvent::RemoveEntity(packet.entity_id as usize));
+                } else if let Ok(packet) = EntityDisappearedPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::RemoveEntity(packet.entity_id));
 
-                } else if let Ok(_packet) = UpdateStatusPacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = UpdateStatusPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateStatus(packet.status_type));
 
-                } else if let Ok(_packet) = UpdateStatusPacket1::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = UpdateStatusPacket1::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateStatus(packet.status_type));
 
-                } else if let Ok(_packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateStatus(packet.status_type));
 
-                } else if let Ok(_packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateStatus(packet.status_type));
 
-                } else if let Ok(_packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(_packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) {
+                    let mut inventory = Vec::new();
 
                     while InventoyEndPacket::try_from_bytes(&mut byte_stream).is_err() {
-                        if let Ok(_packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
+                        if let Ok(packet) = RegularItemListPacket::try_from_bytes(&mut byte_stream) {
+                            for item_information in packet.item_information {
+                                inventory.push(item_information.item_id as usize);
+                            }
+                        } else if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
+                            for item_information in packet.item_information {
+                                inventory.push(item_information.item_id as usize);
+                            }
                         } else {
-                            panic!();
+                            panic!("unexpected packet with header: {:x?}", byte_stream.slice(2));
                         }
                     }
 
-                } else if let Ok(_packet) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) { 
+                    events.push(NetworkEvent::Inventory(inventory));
+
+                } else if let Ok(_packet) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(_packet) = MapTypePacket::try_from_bytes(&mut byte_stream) {
 
@@ -1770,9 +2197,53 @@ impl NetworkingSystem {
 
                 } else if let Ok(_packet) = NavigateToMonsterPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = CloseScriptPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_packet) = MarkMinimapPositionPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = QuestNotificatonPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_packet) = NextButtonPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::AddNextButton);
+
+                } else if let Ok(_packet) = CloseButtonPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::AddCloseButton);
+
+                } else if let Ok(packet) = DialogMenuPacket::try_from_bytes(&mut byte_stream) {
+
+                    let choices = packet.message
+                        .split(":")
+                        .map(String::from)
+                        .filter(|text| !text.is_empty())
+                        .collect();
+
+                    events.push(NetworkEvent::AddChoiceButtons(choices));
+
+                } else if let Ok(_packet) = DisplaySpecialEffectPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = DisplaySkillEffectPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = StatusChangePacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = QuestNotificationPacket1::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = HuntingQuestNotificationPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = HuntingQuestUpdateObjectivePacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = QuestRemovedPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = QuestListPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = VisualEffectPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = DisplayGainedExperiencePacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = DisplayImagePacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = StateChangePacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = QuestEffectPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = ItemPickupPacket::try_from_bytes(&mut byte_stream) {
+
+                } else if let Ok(_packet) = RemoveItemFromInventoryPacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
@@ -1783,12 +2254,16 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = RequestEntityDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
 
-                } else if let Ok(_packet) = UpdateEntityHealthPointsPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = UpdateEntityHealthPointsPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateEntityHealth(packet.entity_id, packet.health_points as usize, packet.maximum_health_points as usize));
 
                 } else if let Ok(_packet) = RequestPlayerAttackFailedPacket::try_from_bytes(&mut byte_stream) {
 
                 } else if let Ok(packet) = DamagePacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::DamageEffect(packet.destination_entity_id, packet.damage_amount as usize));
+
+                } else if let Ok(packet) = NpcDialogPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::OpenDialog(packet.text, packet.npc_id));
 
                 } else {
 

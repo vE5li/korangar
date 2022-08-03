@@ -15,14 +15,17 @@ pub struct CharacterSelectionWindow {
     move_request: Rc<RefCell<Option<usize>>>,
     changed: Rc<RefCell<bool>>,
     slot_count: usize,
-    #[new(value = "\"character_selection\".to_string()")]
-    window_class: String,
+}
+
+impl CharacterSelectionWindow {
+
+    pub const WINDOW_CLASS: &'static str = "character_selection";
 }
 
 impl PrototypeWindow for CharacterSelectionWindow {
 
     fn window_class(&self) -> Option<&str> {
-        Some(&self.window_class)
+        Self::WINDOW_CLASS.into()
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
@@ -32,6 +35,6 @@ impl PrototypeWindow for CharacterSelectionWindow {
             .map(|slot| cell!(CharacterPreview::new(self.characters.clone(), self.move_request.clone(), self.changed.clone(), slot)) as ElementCell)
             .collect();
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Character Selection".to_string(), self.window_class.clone().into(), elements, constraint!(600.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Character Selection".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(600.0, ?)))
     }
 }

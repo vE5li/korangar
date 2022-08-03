@@ -93,8 +93,16 @@ impl GeometryRenderer {
             WriteDescriptorSet::buffer(0, matrices_subbuffer),
         ]).unwrap();
 
+        let size = 8192.0;
+        let viewport = Viewport {
+            origin: [0.0, 0.0],
+            dimensions: [size; 2],
+            depth_range: 0.0..1.0,
+        };
+
         render_target.state.get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
+            .set_viewport(0, [viewport])
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
     }
 
@@ -206,16 +214,8 @@ impl GeometryRenderer {
             world: world_matrix.into(),
         };
 
-        let size = 4096.0;
-        let viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: [size; 2],
-            depth_range: 0.0..1.0,
-        };
-
         render_target.state.get_builder()
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
-            .set_viewport(0, [viewport])
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, vertex_buffer)
             .draw(vertex_count as u32, 1, 0, 0).unwrap();

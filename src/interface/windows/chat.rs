@@ -15,7 +15,7 @@ pub struct PrototypeChatWindow {
     messages: Rc<RefCell<Vec<ChatMessage>>>,
 }
 
-impl PrototypeWindow for PrototypeChatWindow{
+impl PrototypeWindow for PrototypeChatWindow {
 
     fn window_class(&self) -> Option<&str> {
         ChatWindow::WINDOW_CLASS.into()

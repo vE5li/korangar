@@ -98,21 +98,18 @@ fn buffers_expandable() -> ElementCell {
     cell!(Expandable::new("buffers".to_string(), buttons, true))
 }
 
-pub struct RenderSettingsWindow {
-    window_class: String,
-}
+#[derive(Default)]
+pub struct RenderSettingsWindow {}
 
-impl Default for RenderSettingsWindow {
+impl RenderSettingsWindow  {
 
-    fn default() -> Self {
-        Self { window_class: "render_settings".to_string() }
-    }
+    pub const WINDOW_CLASS: &'static str = "render_settings";
 }
 
 impl PrototypeWindow for RenderSettingsWindow {
 
     fn window_class(&self) -> Option<&str> {
-        Some(&self.window_class)
+        Self::WINDOW_CLASS.into()
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
@@ -127,6 +124,6 @@ impl PrototypeWindow for RenderSettingsWindow {
             buffers_expandable(),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Render Settings".to_string(), self.window_class.clone().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Render Settings".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
     }
 }

@@ -11,6 +11,7 @@ use crate::interface::elements::*;
 use crate::graphics::{ Renderer, Color };
 use crate::network::CharacterInformation;
 
+// TODO: rework all of this
 pub struct CharacterPreview {
     characters: Rc<RefCell<Vec<CharacterInformation>>>,
     move_request: Rc<RefCell<Option<usize>>>,

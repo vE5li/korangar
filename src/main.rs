@@ -39,7 +39,7 @@ use chrono::{prelude::*, offset};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::{ Entity, ChatMessage, ResourceState };
+use crate::types::*;
 use crate::input::{ InputSystem, UserEvent };
 use crate::system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
 use crate::loaders::*;
@@ -68,6 +68,8 @@ fn main() {
 
     let events_loop = EventLoop::new();
     let surface = WindowBuilder::new().with_title(String::from("korangar")).build_vk_surface(&events_loop, instance.clone()).unwrap();
+
+    surface.window().set_cursor_visible(false);
 
     #[cfg(feature = "debug")]
     print_debug!("created {}window{}", MAGENTA, NONE);
@@ -169,7 +171,7 @@ fn main() {
 
     let mut directional_shadow_targets = swapchain_holder.get_swapchain_images()
         .into_iter()
-        .map(|_| shadow_renderer.create_render_target(4096))
+        .map(|_| shadow_renderer.create_render_target(8192))
         .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
 
     #[cfg(feature = "debug")]
@@ -178,7 +180,9 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let mut interface = Interface::new(swapchain_holder.window_size_f32());
+    let mut texture_future = now(device.clone()).boxed();
+
+    let mut interface = Interface::new(&mut sprite_loader, &mut action_loader, &mut texture_future, swapchain_holder.window_size_f32());
     let mut input_system = InputSystem::new();
     let mut render_settings = RenderSettings::new();
 
@@ -232,6 +236,12 @@ fn main() {
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
+    texture_future
+        .then_signal_fence_and_flush()
+        .unwrap()
+        .wait(None)
+        .unwrap();
+
     events_loop.run(move |event, _, control_flow| {
         match event {
 
@@ -284,12 +294,12 @@ fn main() {
 
                     let entity = entities
                         .iter_mut()
-                        .find(|entity| entity.entity_id == entity_id as usize)
+                        .find(|entity| entity.get_entity_id() == entity_id)
                         .unwrap();
 
-                    if let ResourceState::Unavalible = entity.details {
+                    if entity.are_details_unavalible() {
                         networking_system.request_entity_details(entity_id);
-                        entity.details = ResourceState::Requested;
+                        entity.set_details_requested();
                     }
                 }
 
@@ -298,23 +308,27 @@ fn main() {
                 for event in network_events {
                     match event {
 
-                        NetworkEvent::AddEntity(entity_id, job_id, position, movement_speed) => {
-                            entities.push(Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_id, job_id, position, movement_speed));
+                        NetworkEvent::AddEntity(entity_appeared_data) => {
+                            let npc = Npc::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_appeared_data);
+                            let npc = Entity::Npc(npc);
+                            entities.push(npc);
                         }
 
                         NetworkEvent::RemoveEntity(entity_id) => {
-                            entities.retain(|entity| entity.entity_id != entity_id);
+                            entities.retain(|entity| entity.get_entity_id() != entity_id);
                         }
 
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
                             let entity = entities
                                 .iter_mut()
-                                .find(|entity| entity.entity_id == entity_id)
-                                .unwrap();
+                                .find(|entity| entity.get_entity_id() == entity_id);
 
-                            entity.move_from_to(&map, position_from, position_to, starting_timestamp);
-                            #[cfg(feature = "debug")]
-                            entity.generate_steps_vertex_buffer(device.clone(), &map);
+
+                            if let Some(entity) = entity {
+                                entity.move_from_to(&map, position_from, position_to, starting_timestamp);
+                                #[cfg(feature = "debug")]
+                                entity.generate_steps_vertex_buffer(device.clone(), &map);
+                            }
                         }
 
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
@@ -347,21 +361,55 @@ fn main() {
                         NetworkEvent::UpdateEntityDetails(entity_id, name) => {
                             let entity = entities
                                 .iter_mut()
-                                .find(|entity| entity.entity_id == entity_id as usize)
-                                .unwrap();
+                                .find(|entity| entity.get_entity_id() == entity_id);
 
-                            entity.details = ResourceState::Avalible(name);
+                            if let Some(entity) = entity {
+                                entity.set_details(name);
+                            }
                         }
 
                         NetworkEvent::DamageEffect(entity_id, damage_amount) => {
 
-                            /*let entity = entities
-                                .iter_mut()
-                                .find(|entity| entity.entity_id == entity_id as usize)
-                                .unwrap();*/
+                            let entity = entities
+                                .iter()
+                                .find(|entity| entity.get_entity_id() == entity_id)
+                                .unwrap_or(&entities[0]);
 
-                            let start_position = swapchain_holder.window_size_f32() / 2.0;
-                            particle_holder.spawn_particle(Box::new(DamageNumber::new(start_position, damage_amount.to_string())));
+                            particle_holder.spawn_particle(Box::new(DamageNumber::new(entity.get_position(), damage_amount.to_string())));
+                        }
+
+                        NetworkEvent::UpdateEntityHealth(entity_id, health_points, maximum_health_points) => {
+
+                            let entity = entities
+                                .iter_mut()
+                                .find(|entity| entity.get_entity_id() == entity_id);
+
+                            if let Some(entity) = entity {
+                                entity.update_health(health_points, maximum_health_points);
+                            }
+                        }
+
+                        NetworkEvent::UpdateStatus(status_type) => {
+
+                            let Entity::Player(player) = &mut entities[0] else {
+                                panic!();
+                            };
+
+                            player.update_status(status_type);
+                        }
+
+                        NetworkEvent::OpenDialog(text, npc_id) => interface.open_dialog_window(text, npc_id),
+
+                        NetworkEvent::AddNextButton => interface.add_next_button(),
+
+                        NetworkEvent::AddCloseButton => interface.add_close_button(),
+
+                        NetworkEvent::AddChoiceButtons(choices) => interface.add_choice_buttons(choices),
+
+                        NetworkEvent::Inventory(inventory) => {
+                            for stack in inventory {
+                                println!("item: {}", database.itme_name_from_id(stack));
+                            }
                         }
                     }
                 }
@@ -395,16 +443,17 @@ fn main() {
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot, &chat_messages) {
 
-                                Ok((map_name, player_position, character_id, job_id, movement_speed, client_tick)) => {
+                                Ok((map_name, player_position, character_information, client_tick)) => {
 
-                                    interface.close_window_with_class("character_selection"); // FIND A NICER WAY TO GET THE CLASS NAME
+                                    interface.close_window_with_class(CharacterSelectionWindow::WINDOW_CLASS);
                                     interface.open_window(&PrototypeChatWindow::new(chat_messages.clone()));
 
                                     map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
 
-                                    let player = Entity::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_id, job_id, player_position, movement_speed);
+                                    let player = Player::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_information, player_position);
+                                    let player = Entity::Player(player);
 
-                                    //player_camera.set_focus_point(player.position);
+                                    player_camera.set_focus_point(player.get_position());
                                     entities.push(player);
 
                                     networking_system.map_loaded();
@@ -427,9 +476,32 @@ fn main() {
 
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
 
-                        UserEvent::RequestPlayerAttack(entity_id) => networking_system.request_player_attack(entity_id),
+                        UserEvent::RequestPlayerInteract(entity_id) => {
+
+                            let entity = entities
+                                .iter_mut()
+                                .find(|entity| entity.get_entity_id() == entity_id);
+
+                            if let Some(entity) = entity {
+                                let job = entity.get_job();
+
+                                match job > 1002 && job < 1010 {
+                                    true => networking_system.request_player_attack(entity_id),
+                                    false => networking_system.start_dialog(entity_id),
+                                }
+                            }
+                        },
 
                         UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
+
+                        UserEvent::NextDialog(npc_id) => networking_system.next_dialog(npc_id),
+
+                        UserEvent::CloseDialog(npc_id) => {
+                            networking_system.close_dialog(npc_id);
+                            interface.close_dialog_window();
+                        },
+
+                        UserEvent::ChooseDialogOption(npc_id, option) => networking_system.choose_dialog_option(npc_id, option),
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
@@ -438,10 +510,10 @@ fn main() {
                         UserEvent::OpenMapDataWindow => interface.open_window(map.to_prototype_window()),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::new()),
+                        UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::default()),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenTimeWindow => interface.open_window(&TimeWindow::new()),
+                        UserEvent::OpenTimeWindow => interface.open_window(&TimeWindow::default()),
 
                         #[cfg(feature = "debug")]
                         UserEvent::SetDawn => day_timer = 0.0,
@@ -582,8 +654,9 @@ fn main() {
                     .for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
 
                 if !entities.is_empty() {
-                    player_camera.set_focus_point(entities[0].position);
-                    directional_shadow_camera.set_focus_point(entities[0].position);
+                    let player_position = entities[0].get_position();
+                    player_camera.set_focus_point(player_position);
+                    directional_shadow_camera.set_focus_point(player_position);
                 }
 
                 player_camera.update(delta_time);
@@ -615,7 +688,7 @@ fn main() {
 
                     directional_shadow_targets = swapchain_holder.get_swapchain_images()
                         .into_iter()
-                        .map(|_| shadow_renderer.create_render_target(4096))
+                        .map(|_| shadow_renderer.create_render_target(8192))
                         .collect(); // does this need to be recreated?
                 }
 
@@ -665,7 +738,7 @@ fn main() {
                 let client_tick = game_timer.get_client_tick();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
-                let current_camera = Box::new(&*current_camera);
+                let window_size = swapchain_holder.window_size_f32();
                 let entities = &entities[..];
 
                 thread_pool.in_place_scope(|scope| {
@@ -677,10 +750,10 @@ fn main() {
                         picker_target.start();
 
                         #[debug_condition(render_settings.show_map)]
-                        map.render_tiles(picker_target, &picker_renderer, *current_camera);
+                        map.render_tiles(picker_target, &picker_renderer, current_camera);
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities.iter().for_each(|entity| entity.render(picker_target, &picker_renderer, *current_camera));
+                        entities.iter().for_each(|entity| entity.render(picker_target, &picker_renderer, current_camera));
 
                         picker_target.finish();
                     });
@@ -708,16 +781,16 @@ fn main() {
                         screen_target.start();
 
                         #[debug_condition(render_settings.show_map)]
-                        map.render_ground(screen_target, &deferred_renderer, *current_camera);
+                        map.render_ground(screen_target, &deferred_renderer, current_camera);
 
                         #[debug_condition(render_settings.show_objects)]
-                        map.render_objects(screen_target, &deferred_renderer, *current_camera, client_tick);
+                        map.render_objects(screen_target, &deferred_renderer, current_camera, client_tick);
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, *current_camera));
+                        entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, current_camera));
 
                         #[debug_condition(render_settings.show_water)]
-                        map.render_water(screen_target, &deferred_renderer, *current_camera, day_timer);
+                        map.render_water(screen_target, &deferred_renderer, current_camera, day_timer);
 
                         screen_target.lighting_pass();
 
@@ -728,15 +801,18 @@ fn main() {
                         let light_matrix = projection_matrix * view_matrix;
 
                         #[debug_condition(render_settings.show_directional_light && !render_settings.show_buffers())]
-                        map.directional_light(screen_target, &deferred_renderer, *current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
+                        map.directional_light(screen_target, &deferred_renderer, current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
 
                         #[debug_condition(render_settings.show_point_lights && !render_settings.show_buffers())]
-                        map.point_lights(screen_target, &deferred_renderer, *current_camera);
+                        map.point_lights(screen_target, &deferred_renderer, current_camera);
+
+                        // just for fun
+                        entities.iter().for_each(|entity| entity.render_lights(screen_target, &deferred_renderer, current_camera));
 
                         #[debug_condition(render_settings.show_water && !render_settings.show_buffers())]
-                        map.water_light(screen_target, &deferred_renderer, *current_camera);
+                        map.water_light(screen_target, &deferred_renderer, current_camera);
 
-                        particle_holder.render(screen_target, &deferred_renderer);
+                        particle_holder.render(screen_target, &deferred_renderer, current_camera, window_size);
                     });
 
                     if rerender_interface {
@@ -766,22 +842,31 @@ fn main() {
 
                     let entity = entities
                         .iter()
-                        .find(|entity| entity.entity_id == entity_id as usize);
+                        .find(|entity| entity.get_entity_id() == entity_id);
 
                     if let Some(entity) = entity {
-                        if let ResourceState::Avalible(name) = &entity.details {
+                        entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
+
+                        if let Some(name) = &entity.get_details() {
                             let name = name.split("#").next().unwrap();
                             interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.mouse_position());
                         }
+
+                        entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
                     }
                 }
 
-                if render_settings.show_interface {
-                    deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
+                if !entities.is_empty() {
+                    entities[0].render_status(screen_target, &deferred_renderer, current_camera, window_size);
                 }
 
                 if render_settings.show_frames_per_second {
                     interface.render_frames_per_second(screen_target, &deferred_renderer, game_timer.last_frames_per_second());
+                }
+
+                if render_settings.show_interface {
+                    deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
+                    interface.render_mouse_cursor(screen_target, &deferred_renderer, input_system.mouse_position());
                 }
 
                 let interface_future = interface_target.state.try_take_semaphore().unwrap_or_else(|| now(device.clone()).boxed());

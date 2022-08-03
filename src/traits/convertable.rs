@@ -127,18 +127,29 @@ impl ByteConvertable for f32 {
     }
 }
 
-impl<T: Copy + Default + ByteConvertable, const SIZE: usize> ByteConvertable for [T; SIZE] {
+impl<T: ByteConvertable, const SIZE: usize> ByteConvertable for [T; SIZE] {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        use std::mem::MaybeUninit;
+
         assert!(length_hint.is_none(), "array may not have a length hint");
 
-        let mut value = [T::default(); SIZE];
+        let mut data: [MaybeUninit<T>; SIZE] = unsafe {
+            MaybeUninit::uninit().assume_init()
+        };
 
-        for index in 0..SIZE {
-            value[index] = T::from_bytes(byte_stream, None);
+        for element in &mut data[..] {
+            *element = MaybeUninit::new(T::from_bytes(byte_stream, None));
         }
 
-        value
+        // rust wont let us do this currently
+        //unsafe { mem::transmute::<_, [T; SIZE]>(data) }
+
+        // workaround from: https://github.com/rust-lang/rust/issues/61956
+        let ptr = &mut data as *mut _ as *mut [T; SIZE];
+        let result = unsafe { ptr.read() };
+        core::mem::forget(data);
+        result
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
@@ -170,7 +181,7 @@ impl ByteConvertable for String {
         }
 
         if let Some(length) = length_hint {
-            byte_stream.skip(length - offset); 
+            byte_stream.skip(length - offset);
         }
 
         value

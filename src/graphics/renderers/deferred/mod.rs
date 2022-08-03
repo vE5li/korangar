@@ -6,6 +6,7 @@ mod directional;
 mod point;
 mod water_light;
 mod overlay;
+mod rectangle;
 mod sprite;
 #[cfg(feature = "debug")]
 mod buffer;
@@ -35,6 +36,7 @@ use self::ambient::AmbientLightRenderer;
 use self::directional::DirectionalLightRenderer;
 use self::point::PointLightRenderer;
 use self::water_light::WaterLightRenderer;
+use self::rectangle::RectangleRenderer;
 use self::overlay::OverlayRenderer;
 use self::sprite::SpriteRenderer;
 #[cfg(feature = "debug")]
@@ -59,6 +61,7 @@ pub struct DeferredRenderer {
     point_light_renderer: PointLightRenderer,
     water_light_renderer: WaterLightRenderer,
     overlay_renderer: OverlayRenderer,
+    rectangle_renderer: RectangleRenderer,
     sprite_renderer: SpriteRenderer,
     #[cfg(feature = "debug")]
     buffer_renderer: BufferRenderer,
@@ -131,6 +134,7 @@ impl DeferredRenderer {
         let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let water_light_renderer = WaterLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let overlay_renderer = OverlayRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let rectangle_renderer = RectangleRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
         let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
@@ -166,6 +170,7 @@ impl DeferredRenderer {
             point_light_renderer,
             water_light_renderer,
             overlay_renderer,
+            rectangle_renderer,
             sprite_renderer,
             #[cfg(feature = "debug")]
             buffer_renderer,
@@ -189,6 +194,7 @@ impl DeferredRenderer {
         self.point_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         self.water_light_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         self.overlay_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+        self.rectangle_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         self.sprite_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
         self.buffer_renderer.recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
@@ -233,6 +239,11 @@ impl DeferredRenderer {
         self.overlay_renderer.render(render_target, interface_image, self.screen_vertex_buffer.clone());
     }
 
+    pub fn render_sprite(&self, render_target: &mut <Self as Renderer>::Target, texture: Texture, position: Vector2<f32>, size: Vector2<f32>, color: Color) {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        self.sprite_renderer.render_indexed(render_target, texture, window_size, position, size, color, 1, 0, true);
+    }
+
     pub fn render_text(&self, render_target: &mut <Self as Renderer>::Target, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
         for character in text.as_bytes() {
@@ -240,6 +251,18 @@ impl DeferredRenderer {
             self.sprite_renderer.render_indexed(render_target, self.font_map.clone(), window_size, position, Vector2::new(font_size, font_size), color, 10, index, true);
             position.x += font_size / 2.0;
         }
+    }
+
+    pub fn render_rectangle(&self, render_target: &mut <Self as Renderer>::Target, position: Vector2<f32>, size: Vector2<f32>, color: Color) {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        self.rectangle_renderer.render(render_target, window_size, position, size, color);
+    }
+
+    pub fn render_bar(&self, render_target: &mut <Self as Renderer>::Target, position: Vector2<f32>, color: Color, maximum: f32, current: f32) {
+        const BAR_SIZE: f32 = 70.0;
+        let offset = Vector2::new(BAR_SIZE / 2.0, 0.0);
+        self.render_rectangle(render_target, position - offset, Vector2::new(BAR_SIZE, 5.0), Color::monochrome(40));
+        self.render_rectangle(render_target, position - offset, Vector2::new((BAR_SIZE / maximum) * current, 5.0), color);
     }
 
     #[cfg(feature = "debug")]

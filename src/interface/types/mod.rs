@@ -7,6 +7,7 @@ mod theme;
 mod cache;
 mod wrappers;
 mod settings;
+mod dialog;
 
 pub use self::layout::*;
 pub use self::hover::HoverInformation;
@@ -17,6 +18,7 @@ pub use self::theme::Theme;
 pub use self::cache::WindowCache;
 pub use self::wrappers::*;
 pub use self::settings::InterfaceSettings;
+pub use self::dialog::DialogElement;
 
 use crate::interface::traits::Element;
 use std::rc::Rc;

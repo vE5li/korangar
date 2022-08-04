@@ -1,4 +1,4 @@
-<img align="left" alt="" src=".github/logo.png" height="130" />
+<img align="left" alt="" src=".github/logo.png" height="150" />
 
 # [Korangar](https://korangar.rs)
 

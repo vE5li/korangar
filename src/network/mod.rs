@@ -52,6 +52,8 @@ pub enum NetworkEvent {
     AddNextButton,
     AddCloseButton,
     AddChoiceButtons(Vec<String>),
+    AddQuestEffect(QuestEffectPacket),
+    RemoveQuestEffect(u32),
     Inventory(Vec<usize>),
 }
 
@@ -1580,14 +1582,41 @@ struct RemoveItemFromInventoryPacket {
     pub amount: u16,
 }
 
+// TODO: improve names
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u16)]
+pub enum QuestEffect {
+    Quest,
+    Quest2,
+    Job,
+    Job2,
+    Event,
+    Event2,
+    ClickMe,
+    DailyQuest,
+    Event3,
+    JobQuest,
+    JumpingPoring,
+    #[numeric_value(9999)]
+    None,
+}
+
+#[derive(Debug, ByteConvertable)]
+#[numeric_type(u16)]
+pub enum QuestColor {
+    Yellow,
+    Orange,
+    Green,
+    Purple,
+}
+
 #[derive(Debug, Packet)]
 #[header(0x46, 0x04)]
-struct QuestEffectPacket {
+pub struct QuestEffectPacket {
     pub entity_id: u32,
-    pub position_x: u16,
-    pub position_y: u16,
-    pub effect: u16, // 0 - none; 1 - exclamation mark; 2 - question mark 
-    pub color: u16, // 0 - yellow; 1 - orange; 2 - green; 3 - purple
+    pub position: Vector2<u16>,
+    pub effect: QuestEffect,
+    pub color: QuestColor,
 }
 
 #[derive(Debug, Packet)]
@@ -2239,7 +2268,12 @@ impl NetworkingSystem {
 
                 } else if let Ok(_packet) = StateChangePacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(_packet) = QuestEffectPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = QuestEffectPacket::try_from_bytes(&mut byte_stream) {
+                    let event = match packet.effect {
+                        QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
+                        _ => NetworkEvent::AddQuestEffect(packet),
+                    };
+                    events.push(event);
 
                 } else if let Ok(_packet) = ItemPickupPacket::try_from_bytes(&mut byte_stream) {
 

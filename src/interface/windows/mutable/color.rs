@@ -34,6 +34,6 @@ impl PrototypeWindow for ColorWindow {
             cell!(Expandable::new("rgb".to_string(), rgb_elements, true)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, self.name.to_string(), None, elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, self.name.to_string(), None, elements, constraint!(200 > 250 < 300, ?)))
     }
 }

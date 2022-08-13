@@ -35,7 +35,7 @@ use winit::event::{ Event, WindowEvent };
 use winit::event_loop::{ ControlFlow, EventLoop };
 use winit::window::WindowBuilder;
 use database::Database;
-use chrono::{prelude::*, offset};
+use chrono::prelude::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -67,7 +67,10 @@ fn main() {
     let timer = Timer::new("create window");
 
     let events_loop = EventLoop::new();
-    let surface = WindowBuilder::new().with_title(String::from("korangar")).build_vk_surface(&events_loop, instance.clone()).unwrap();
+    let surface = WindowBuilder::new()
+        .with_title("korangar".to_string())
+        .build_vk_surface(&events_loop, instance.clone())
+        .unwrap();
 
     surface.window().set_cursor_visible(false);
 
@@ -149,7 +152,7 @@ fn main() {
     let mut deferred_renderer = DeferredRenderer::new(device.clone(), queue.clone(), swapchain_holder.swapchain_format(), viewport.clone(), swapchain_holder.window_size_u32(), &mut texture_loader);
     let mut interface_renderer = InterfaceRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32(), &mut texture_loader);
     let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
-    let mut shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone());
+    let shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -347,6 +350,7 @@ fn main() {
 
                             entities[0].set_position(&map, player_position);
 
+                            particle_holder.clear();
                             networking_system.map_loaded();
                         }
 
@@ -406,6 +410,10 @@ fn main() {
 
                         NetworkEvent::AddChoiceButtons(choices) => interface.add_choice_buttons(choices),
 
+                        NetworkEvent::AddQuestEffect(quest_effect) => particle_holder.add_quest_icon(&mut texture_loader, &mut texture_future, &map, quest_effect),
+
+                        NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
+
                         NetworkEvent::Inventory(inventory) => {
                             for stack in inventory {
                                 println!("item: {}", database.itme_name_from_id(stack));
@@ -456,6 +464,7 @@ fn main() {
                                     player_camera.set_focus_point(player.get_position());
                                     entities.push(player);
 
+                                    particle_holder.clear();
                                     networking_system.map_loaded();
                                     game_timer.set_client_tick(client_tick);
                                 }
@@ -672,7 +681,6 @@ fn main() {
                     deferred_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     picker_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
-                    shadow_renderer.recreate_pipeline(); // does this need to be recreated?
 
                     screen_targets = swapchain_holder.get_swapchain_images()
                         .into_iter()
@@ -685,11 +693,6 @@ fn main() {
                         .into_iter()
                         .map(|_| picker_renderer.create_render_target())
                         .collect();
-
-                    directional_shadow_targets = swapchain_holder.get_swapchain_images()
-                        .into_iter()
-                        .map(|_| shadow_renderer.create_render_target(8192))
-                        .collect(); // does this need to be recreated?
                 }
 
                 if swapchain_holder.acquire_next_image().is_err() { // temporary check?
@@ -806,13 +809,10 @@ fn main() {
                         #[debug_condition(render_settings.show_point_lights && !render_settings.show_buffers())]
                         map.point_lights(screen_target, &deferred_renderer, current_camera);
 
-                        // just for fun
-                        entities.iter().for_each(|entity| entity.render_lights(screen_target, &deferred_renderer, current_camera));
-
                         #[debug_condition(render_settings.show_water && !render_settings.show_buffers())]
                         map.water_light(screen_target, &deferred_renderer, current_camera);
 
-                        particle_holder.render(screen_target, &deferred_renderer, current_camera, window_size);
+                        particle_holder.render(screen_target, &deferred_renderer, current_camera, window_size, entities);
                     });
 
                     if rerender_interface {

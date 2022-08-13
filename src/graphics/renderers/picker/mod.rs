@@ -112,13 +112,13 @@ impl GeometryRendererTrait for PickerRenderer {
 
 impl EntityRendererTrait for PickerRenderer {
 
-    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, entity_id: usize)
+    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, scale: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, entity_id: usize)
         where Self: Renderer
     {
         if render_target.bind_subrenderer(PickerSubrenderer::Entity) {
             self.entity_renderer.bind_pipeline(render_target, camera);
         }
 
-        self.entity_renderer.render(render_target, camera, texture, position, origin, size, cell_count, cell_position, entity_id);
+        self.entity_renderer.render(render_target, camera, texture, position, origin, scale, cell_count, cell_position, entity_id);
     }
 }

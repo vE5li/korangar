@@ -246,6 +246,7 @@ impl DeferredRenderer {
 
     pub fn render_text(&self, render_target: &mut <Self as Renderer>::Target, text: &str, mut position: Vector2<f32>, color: Color, font_size: f32) {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
         for character in text.as_bytes() {
             let index = (*character as usize).saturating_sub(31);
             self.sprite_renderer.render_indexed(render_target, self.font_map.clone(), window_size, position, Vector2::new(font_size, font_size), color, 10, index, true);
@@ -292,7 +293,7 @@ impl GeometryRendererTrait for DeferredRenderer {
 
 impl EntityRendererTrait for DeferredRenderer {
 
-    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, _entity_id: usize)
+    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, scale: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, _entity_id: usize)
         where Self: Renderer
     {
 
@@ -300,6 +301,6 @@ impl EntityRendererTrait for DeferredRenderer {
             self.entity_renderer.bind_pipeline(render_target, camera);
         }
 
-        self.entity_renderer.render(render_target, camera, texture, position, origin, size, cell_count, cell_position);
+        self.entity_renderer.render(render_target, camera, texture, position, origin, scale, cell_count, cell_position);
     }
 }

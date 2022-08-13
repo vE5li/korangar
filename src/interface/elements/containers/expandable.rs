@@ -22,8 +22,8 @@ impl Expandable {
         Self {
             display,
             expanded,
-            open_size_constraint: constraint!(100.0%, ?),
-            closed_size_constraint: constraint!(100.0%, 18.0),
+            open_size_constraint: constraint!(100%, ?),
+            closed_size_constraint: constraint!(100%, 18),
             cached_size: Size::zero(),
             cached_closed_size: Size::zero(),
             cached_position: Position::zero(),

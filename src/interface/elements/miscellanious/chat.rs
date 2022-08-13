@@ -24,7 +24,7 @@ impl Element for Chat {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
-        let size_constraint = &constraint!(20.0%, 150.0);
+        let size_constraint = &constraint!(20%, 150);
 
         let (mut size, position) = placement_resolver.allocate(size_constraint);
         let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::new(3.0, 3.0));

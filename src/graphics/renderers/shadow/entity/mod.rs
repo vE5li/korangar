@@ -17,7 +17,7 @@ use std::sync::Arc;
 use cgmath::{ Vector3, Vector2 };
 
 use vulkano::device::Device;
-
+use vulkano::image::ImageAccess;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -105,10 +105,14 @@ impl EntityRenderer {
             WriteDescriptorSet::buffer(0, matrices_subbuffer),
         ]).unwrap();
 
-        let size = 8192.0;
+        let dimensions = render_target.image.image()
+            .dimensions()
+            .width_height()
+            .map(|component| component as f32);
+
         let viewport = Viewport {
             origin: [0.0, 0.0],
-            dimensions: [size; 2],
+            dimensions,
             depth_range: 0.0..1.0,
         };
 
@@ -119,8 +123,10 @@ impl EntityRenderer {
             .bind_vertex_buffers(0, self.vertex_buffer.clone());
     }
 
-    pub fn render(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>)
+    pub fn render(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, scale: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>)
     {
+        let image_dimensions = Vector2::<u32>::from(texture.image().dimensions().width_height());
+        let size = Vector2::new(image_dimensions.x as f32 * scale.x / 10.0, image_dimensions.y as f32 * scale.y / 10.0);
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();

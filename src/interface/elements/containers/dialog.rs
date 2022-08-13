@@ -21,7 +21,7 @@ impl DialogContainer {
 
     fn to_element(dialog_element: &DialogElement, npc_id: u32) -> ElementCell {
         match dialog_element {
-            DialogElement::Text(text) => cell!(Text::new(text.clone(), Color::rgb(100, 200, 100), 12.0, constraint!(100.0%, 12.0))),
+            DialogElement::Text(text) => cell!(Text::new(text.clone(), Color::monochrome(255), 14.0, constraint!(100%, 14))),
             DialogElement::NextButton => cell!(Button::new("next", crate::input::UserEvent::NextDialog(npc_id), false)),
             DialogElement::CloseButton => cell!(Button::new("close", crate::input::UserEvent::CloseDialog(npc_id), false)),
             DialogElement::ChoiceButton(text, index)=> cell!(EventButton::new(text.clone(), crate::input::UserEvent::ChooseDialogOption(npc_id, *index))),
@@ -54,7 +54,7 @@ impl Element for DialogContainer {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
-        let size_constraint = &constraint!(100.0%, ?);
+        let size_constraint = &constraint!(100%, ?);
 
         let (mut size, position) = placement_resolver.allocate(&size_constraint);
         let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::zero());

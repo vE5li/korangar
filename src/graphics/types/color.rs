@@ -15,6 +15,15 @@ impl Color {
         Self { red, green, blue, alpha: 255 }
     }
 
+    pub fn rgb_f32(red: f32, green: f32, blue: f32) -> Self {
+
+        let red = (red * 255.0) as u8;
+        let green = (green * 255.0) as u8;
+        let blue = (blue * 255.0) as u8;
+
+        Self { red, green, blue, alpha: 255 }
+    }
+
     pub const fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         Self { red, green, blue, alpha }
     }

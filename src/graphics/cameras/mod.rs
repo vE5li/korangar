@@ -8,9 +8,9 @@ pub use self::shadow::ShadowCamera;
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
 
-use cgmath::{ Matrix4, Vector4, Vector3, Vector2 };
+use crate::types::maths::*;
 use crate::graphics::{ SmoothedValue, Transform };
-use super::RenderSettings;
+use crate::types::map::model::BoundingBox;
 
 pub trait Camera {
 

@@ -44,6 +44,6 @@ impl PrototypeWindow for DialogWindow {
             cell!(DialogContainer::new(self.elements.clone(), self.changed.clone(), self.npc_id)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Dialog".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(300.0 > 400.0 < 500.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Dialog".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(300 > 400 < 500, ?)))
     }
 }

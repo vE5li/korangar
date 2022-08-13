@@ -1,12 +1,7 @@
-use std::sync::Arc;
-use cgmath::EuclideanSpace;
+use std::f32::consts::FRAC_PI_2;
 
 use crate::types::maths::*;
-
 use crate::graphics::Transform;
-use crate::types::Entity;
-use crate::types::map::Map;
-use super::RenderSettings;
 
 use super::{ Camera, SmoothedValue };
 
@@ -35,7 +30,7 @@ impl PlayerCamera {
             projection_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             world_to_screen_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             screen_to_world_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            view_angle: SmoothedValue::new(0.0, 0.01, 15.0),
+            view_angle: SmoothedValue::new(FRAC_PI_2, 0.01, 15.0),
             zoom: SmoothedValue::new(400.0, 0.01, 5.0),
             aspect_ratio: 0.0,
         }
@@ -71,8 +66,7 @@ impl PlayerCamera {
     }
 
     fn world_to_clip_space(&self, world_space_position: Vector3<f32>) -> Vector4<f32> {
-        let position = Vector4::new(world_space_position.x, world_space_position.y, world_space_position.z, 1.0);
-        self.world_to_screen_matrix * position  
+        self.world_to_screen_matrix * world_space_position.extend(1.0)
     }
 
     fn clip_to_screen_space(&self, clip_space_position: Vector4<f32>) -> Vector2<f32> {

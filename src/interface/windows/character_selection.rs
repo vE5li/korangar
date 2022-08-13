@@ -35,6 +35,6 @@ impl PrototypeWindow for CharacterSelectionWindow {
             .map(|slot| cell!(CharacterPreview::new(self.characters.clone(), self.move_request.clone(), self.changed.clone(), slot)) as ElementCell)
             .collect();
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Character Selection".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(600.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Character Selection".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(600, ?)))
     }
 }

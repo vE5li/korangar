@@ -35,6 +35,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
             cell!(Slider::new(unsafe { &(*self.inner_pointer).w as *const T }, self.minimum_value.w, self.maximum_value.y, self.change_event)),
         ];
 
-        Box::new(FramedWindow::new(window_cache, interface_settings, avalible_space, self.name.clone(), None, elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::new(FramedWindow::new(window_cache, interface_settings, avalible_space, self.name.clone(), None, elements, constraint!(200 > 250 < 300, ?)))
     }
 }

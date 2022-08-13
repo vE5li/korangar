@@ -1,6 +1,6 @@
 #version 450
 
-const int TEXTURE_COUNT = 15;
+const int TEXTURE_COUNT = 30;
 
 layout(location = 0) in vec2 texture_coordinates;
 layout(location = 1) flat in int texture_index;

@@ -120,11 +120,6 @@ impl GameFileLoader {
 
         for _index in 0..file_count {
             let file_information = FileInformation::from_bytes(&mut byte_stream, None);
-
-            if file_information.file_name.contains("cursor") || file_information.file_name.contains("mouse") {
-                println!("{}", file_information.file_name);
-            }
-
             files.insert(file_information.file_name.clone(), file_information);
         }
 

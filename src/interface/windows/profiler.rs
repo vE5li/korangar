@@ -23,6 +23,6 @@ impl PrototypeWindow for ProfilerWindow {
 
         let elements = vec![];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Profiler".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Profiler".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ?)))
     }
 }

@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::collections::HashMap;
-use cgmath::{ Vector3, Vector2, Deg };
+use cgmath::{ Vector3, Vector2, Deg, Array };
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
 use vulkano::sync::{ GpuFuture, now };
@@ -44,7 +44,7 @@ impl Surface {
         Self {
             u,
             v,
-            texture_index: texture_index % 14, // TODO: remove % 14 and derive new
+            texture_index: texture_index % 29, // TODO: remove % 29 and derive new
             _light_map_index: light_map_index,
             _color: color
         }
@@ -259,7 +259,7 @@ impl MapLoader {
         let mut sound_sources = Vec::new();
         let mut effect_sources = Vec::new();
 
-        for _index in 0..object_count {
+        for index in 0..object_count {
             let type_index = byte_stream.integer32();
             let resource_type = ResourceType::from(type_index);
 
@@ -281,6 +281,9 @@ impl MapLoader {
 
                         let array: [f32; 3] = scale.into();
                         let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
+
+                        // offset the objects slightly to avoid depth buffer fighting
+                        let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
 
                         let model = model_loader.get(texture_loader, &mut texture_future, &model_name, reverse_order)?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
@@ -308,10 +311,11 @@ impl MapLoader {
 
                     let name = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
-                    let red = byte_stream.integer32() as u8;
-                    let green = byte_stream.integer32() as u8;
-                    let blue = byte_stream.integer32() as u8;
-                    let color = Color::rgb(red, green, blue);
+                    let red = byte_stream.float32();
+                    let green = byte_stream.float32();
+                    let blue = byte_stream.float32();
+
+                    let color = Color::rgb_f32(red, green, blue);
                     let range = byte_stream.float32();
 
                     light_sources.push(LightSource::new(name, position, color, range));

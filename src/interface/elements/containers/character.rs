@@ -33,7 +33,7 @@ impl CharacterPreview {
                 false => "switch",
             };
 
-            return vec![cell!(Text::new(text.to_string(), Color::rgb(200, 140, 180), 14.0, constraint!(100.0%, 14.0)))];
+            return vec![cell!(Text::new(text.to_string(), Color::rgb(200, 140, 180), 14.0, constraint!(100%, 14)))];
         }
 
         let characters = characters.borrow();
@@ -41,14 +41,14 @@ impl CharacterPreview {
 
         if let Some(character_information) = character_information {
             return vec![
-                cell!(Text::new(character_information.name.clone(), Color::rgb(220, 210, 210), 18.0, constraint!(100.0%, 18.0))), // alignment!(center, top)
+                cell!(Text::new(character_information.name.clone(), Color::rgb(220, 210, 210), 18.0, constraint!(100%, 18))), // alignment!(center, top)
                 cell!(EventButton::new("switch slot".to_string(), UserEvent::RequestSwitchCharacterSlot(slot))),
                 cell!(EventButton::new("delete character".to_string(), UserEvent::DeleteCharacter(character_information.character_id as usize))),
             ];
         }
 
         vec![
-            cell!(Text::new("new character".to_string(), Color::rgb(200, 140, 180), 14.0, constraint!(100.0%, 14.0))),
+            cell!(Text::new("new character".to_string(), Color::rgb(200, 140, 180), 14.0, constraint!(100%, 14))),
         ]
     }
 
@@ -78,7 +78,7 @@ impl Element for CharacterPreview {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
-        let size_constraint = &constraint!(20.0%, 150.0);
+        let size_constraint = &constraint!(20%, 150);
 
         let (mut size, position) = placement_resolver.allocate(size_constraint);
         let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::new(3.0, 3.0));

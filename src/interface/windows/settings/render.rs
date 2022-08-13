@@ -124,6 +124,6 @@ impl PrototypeWindow for RenderSettingsWindow {
             buffers_expandable(),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Render Settings".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ?)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Render Settings".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ?)))
     }
 }

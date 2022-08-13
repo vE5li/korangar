@@ -1,14 +1,8 @@
-use std::sync::Arc;
-use cgmath::EuclideanSpace;
-
 use crate::types::maths::*;
 
 use crate::graphics::Transform;
-use crate::types::Entity;
-use crate::types::map::Map;
-use super::RenderSettings;
 
-use super::{ Camera, SmoothedValue };
+use super::Camera;
 
 const ZOOM_SPEED: f32 = 4.0;
 const ROTATION_SPEED: f32 = 0.02;

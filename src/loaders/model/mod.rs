@@ -73,7 +73,7 @@ pub struct NodeData {
     pub face_count: u32,
     #[repeating(self.face_count)]
     pub faces: Vec<FaceData>,
-    #[version_equals_or_above(1, 5)] // is this actually the right version?
+    #[version_equals_or_above(2, 5)] // unsure what vesion this is supposed to be (must be > 1.5)
     pub position_keyframe_count: Option<u32>,
     #[repeating(self.position_keyframe_count.unwrap_or_default())]
     pub position_keyframes: Vec<PositionKeyframeData>,
@@ -188,7 +188,8 @@ impl ModelLoader {
     fn process_node_mesh(device: Arc<Device>, current_node: &NodeData, nodes: &Vec<NodeData>, textures: &Vec<Texture>, parent_matrix: &Matrix4<f32>, main_bounding_box: &mut BoundingBox, root_node_name: &str, reverse_order: bool) -> Node {
 
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
-        let vertices = Self::make_vertices(current_node, &main_matrix, reverse_order);
+        let vertices = NativeModelVertex::to_vertices(Self::make_vertices(current_node, &main_matrix, reverse_order));
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = BoundingBox::new(current_node.vertex_positions.iter().map(|position| multiply_matrix4_and_vector3(&box_matrix, *position)));
@@ -208,11 +209,9 @@ impl ModelLoader {
         let child_nodes = nodes
             .iter()
             .filter(|node| node.parent_node_name == current_node.node_name)
+            .filter(|node| node.parent_node_name != node.node_name)
             .map(|node| Self::process_node_mesh(device.clone(), node, nodes, textures, &box_transform_matrix, main_bounding_box, root_node_name, reverse_order))
             .collect();
-
-        let vertices = NativeModelVertex::to_vertices(vertices);
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
         Node::new(final_matrix, vertex_buffer, node_textures, child_nodes, current_node.rotation_keyframes.clone())
     }
@@ -250,7 +249,7 @@ impl ModelLoader {
 
         let mut bounding_box = BoundingBox::uninitialized();
         let root_node = Self::process_node_mesh(self.device.clone(), root_node, &model_data.nodes, &textures, &Matrix4::identity(), &mut bounding_box, &model_data.root_node_name, reverse_order);
-        let model = Arc::new(Model::new(root_node, #[cfg(feature = "debug")] model_data, #[cfg(feature = "debug")] bounding_box));
+        let model = Arc::new(Model::new(root_node, bounding_box, #[cfg(feature = "debug")] model_data));
 
         self.cache.insert((model_file.to_string(), reverse_order), model.clone());
 

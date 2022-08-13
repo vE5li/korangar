@@ -44,6 +44,9 @@ impl PrototypeWindow for MapsWindow {
             ("xmas", Vector2::new(147, 134)),
             ("c_tower1", Vector2::new(235, 218)),
             ("ama_dun01", Vector2::new(54, 107)),
+            ("umbala", Vector2::new(97, 153)),
+            ("rachel", Vector2::new(120, 120)),
+            ("mid_camp", Vector2::new(180, 240)),
         ];
 
         let elements = map_warps
@@ -51,6 +54,6 @@ impl PrototypeWindow for MapsWindow {
             .map(|(name, position)| cell!(EventButton::new(name.to_string(), UserEvent::RequestWarpToMap(format!("{}.gat", name), position))) as ElementCell)
             .collect();
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Maps".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Maps".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ? < 80%)))
     }
 }

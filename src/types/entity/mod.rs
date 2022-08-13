@@ -1,7 +1,7 @@
 use procedural::*;
 use derive_new::new;
 use std::sync::Arc;
-use cgmath::{ Vector3, Vector2, VectorSpace };
+use cgmath::{ Vector3, Vector2, VectorSpace, Array };
 use vulkano::sync::GpuFuture;
 #[cfg(feature = "debug")]
 use vulkano::device::Device;
@@ -63,12 +63,7 @@ impl Common {
 
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
-
-        let position = Vector3::new(
-            entity_data.position.x as f32 * 5.0 + 2.5,
-            map.get_height_at(entity_data.position),
-            entity_data.position.y as f32 * 5.0 + 2.5,
-        );
+        let position = map.get_world_position(entity_data.position);
 
         let movement_speed = entity_data.movement_speed as usize;
         let health_points = entity_data.health_points as usize;
@@ -95,7 +90,7 @@ impl Common {
     }
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
-        self.position = Vector3::new(position.x as f32 * 5.0 + 2.5, map.get_height_at(position), position.y as f32 * 5.0 + 2.5);
+        self.position = map.get_world_position(position);
         self.active_movement = None;
     }
 
@@ -118,8 +113,8 @@ impl Common {
                 let last_step = active_movement.steps[last_step_index];
                 let next_step = active_movement.steps[last_step_index + 1];
 
-                let last_step_position = Vector3::new(last_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(last_step.0), last_step.0.y as f32 * 5.0 + 2.5);
-                let next_step_position = Vector3::new(next_step.0.x as f32 * 5.0 + 2.5, map.get_height_at(next_step.0), next_step.0.y as f32 * 5.0 + 2.5);
+                let last_step_position = map.get_world_position(last_step.0);
+                let next_step_position = map.get_world_position(next_step.0);
 
                 let clamped_tick = u32::max(last_step.1, client_tick);
                 let total = next_step.1 - last_step.1;
@@ -264,7 +259,7 @@ impl Common {
     pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
         where T: Renderer + EntityRenderer
     {
-        renderer.render_entity(render_target, camera, self.sprite.textures[0].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::new(5.0, 10.0), Vector2::new(1, 1), Vector2::new(0, 0), self.entity_id as usize);
+        renderer.render_entity(render_target, camera, self.sprite.textures[0].clone(), self.position, Vector3::new(0.0, 3.0, 0.0), Vector2::from_value(1.0), Vector2::new(1, 1), Vector2::new(0, 0), self.entity_id as usize);
     }
 
     #[cfg(feature = "debug")]
@@ -328,7 +323,7 @@ impl Player {
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
         let screen_position = Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y + 5.0);
 
         renderer.render_bar(render_target, final_position, Color::rgb(67, 163, 83), self.common.maximum_health_points as f32, self.common.health_points as f32);
         renderer.render_bar(render_target, final_position + Vector2::new(0.0, 5.0), Color::rgb(67, 129, 163), self.maximum_spell_points as f32, self.spell_points as f32);
@@ -365,7 +360,7 @@ impl Npc {
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
         let screen_position = Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y + 5.0);
 
         renderer.render_bar(render_target, final_position, Color::rgb(67, 163, 83), self.common.maximum_health_points as f32, self.common.health_points as f32);
     }
@@ -463,14 +458,6 @@ impl Entity {
         match self {
             Self::Player(player) => player.render_status(render_target, renderer, camera, window_size),
             Self::Npc(npc) => npc.render_status(render_target, renderer, camera, window_size),
-        }
-    }
-
-    pub fn render_lights(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
-        let job_id = self.get_common().job_id;
-
-        if job_id == 45 {
-            renderer.point_light(render_target, camera, self.get_position() + Vector3::new(0.0, 10.0, 0.0), Color::rgb(0, 0, 255), 80.0);
         }
     }
 }

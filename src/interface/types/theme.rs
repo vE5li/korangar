@@ -39,8 +39,8 @@ impl Default for ButtonTheme {
             icon_text_offset: MutableRange::new(Vector2::new(20.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(40.0 > 100.0%, 16.0),
-            menu_size_constraint: constraint!(40.0 > 100.0%, 20.0),
+            size_constraint: constraint!(40 > 100%, 16),
+            menu_size_constraint: constraint!(40 > 100%, 20),
         }
     }
 }
@@ -72,7 +72,7 @@ impl Default for WindowTheme {
             text_offset: MutableRange::new(Vector2::new(5.0, -1.0), Vector2::zero(), Vector2::new(50.0, 30.0)),
             gaps: MutableRange::new(Vector2::new(6.0, 8.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            title_size_constraint: constraint!(80.0%, 12.0),
+            title_size_constraint: constraint!(80%, 12),
         }
     }
 }
@@ -132,7 +132,7 @@ impl Default for LabelTheme {
             border_radius: MutableRange::new(vector4!(6.0), vector4!(0.0), vector4!(30.0)),
             text_offset: MutableRange::new(vector2!(5.0, 0.0), vector2!(-10.0), vector2!(20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(150.0 > 0.0 < 70.0%, 14.0),
+            size_constraint: constraint!(150 > 0 < 70%, 14),
         }
     }
 }
@@ -158,7 +158,7 @@ impl Default for ValueTheme {
             border_radius: MutableRange::new(vector4!(6.0), vector4!(0.0), vector4!(30.0)),
             text_offset: MutableRange::new(vector2!(5.0, 0.0), vector2!(-10.0), vector2!(20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(60.0 > !, 14.0),
+            size_constraint: constraint!(60 > !, 14),
         }
     }
 }
@@ -184,7 +184,7 @@ impl Default for CloseButtonTheme {
             border_radius: MutableRange::new(vector4!(6.0), vector4!(0.0), vector4!(30.0)),
             text_offset: MutableRange::new(vector2!(6.0, 0.0), vector2!(-10.0), vector2!(20.0)),
             font_size: MutableRange::new(12.0, 6.0, 30.0),
-            size_constraint: constraint!(25.0, 12.0),
+            size_constraint: constraint!(25, 12),
         }
     }
 }
@@ -222,7 +222,7 @@ impl Default for SliderTheme {
             background_color: Mutable::new(Color::rgb(140, 80, 100)),
             rail_color: Mutable::new(Color::rgb(150, 130, 150)),
             knob_color: Mutable::new(Color::rgb(100, 180, 180)),
-            size_constraint: constraint!(100.0%, 18.0),
+            size_constraint: constraint!(100%, 18),
         }
     }
 }

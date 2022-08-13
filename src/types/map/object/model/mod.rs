@@ -13,10 +13,9 @@ pub use self::shading::ShadingType;
 #[derive(PrototypeElement, new)]
 pub struct Model {
     pub root_node: Node,
+    pub bounding_box: BoundingBox,
     #[cfg(feature = "debug")]
     pub model_data: ModelData,
-    #[cfg(feature = "debug")]
-    pub bounding_box: BoundingBox,
 }
 
 impl Model {

@@ -18,7 +18,7 @@ pub struct Headline {
 
 impl Headline {
 
-    pub const DEFAULT_SIZE: SizeConstraint = constraint!(100.0%, 12.0);
+    pub const DEFAULT_SIZE: SizeConstraint = constraint!(100%, 12);
 }
 
 impl Element for Headline {

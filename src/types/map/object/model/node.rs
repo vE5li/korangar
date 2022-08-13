@@ -4,7 +4,7 @@ use crate::loaders::RotationKeyframeData;
 use crate::types::maths::*;
 use crate::graphics::{ Renderer, Camera, ModelVertexBuffer, Texture, Transform, GeometryRenderer };
 
-#[derive(Clone, Debug, PrototypeElement)]
+#[derive(Copy, Clone, Debug, PrototypeElement)]
 pub struct BoundingBox {
     pub smallest: Vector3<f32>,
     pub biggest: Vector3<f32>,
@@ -66,9 +66,7 @@ pub struct Node {
 
 impl Node {
 
-    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, transform: &Transform, client_tick: u32)
-        where T: Renderer + GeometryRenderer
-    {
+    pub fn world_matrix(&self, transform: &Transform, client_tick: u32) -> Matrix4<f32> {
 
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
@@ -79,14 +77,18 @@ impl Node {
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
 
-        let world_matrix = Matrix4::from_translation(transform.position)
+        Matrix4::from_translation(transform.position)
             * rotation_matrix
             * Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
             * Matrix4::from_cols(vector4!(1.0, 0.0, 0.0, 0.0), vector4!(0.0, -1.0, 0.0, 0.0), vector4!(0.0, 0.0, 1.0, 0.0), vector4!(0.0, 0.0, 0.0, 1.0))
             * self.transform_matrix
-            * animation_rotation_matrix;
+            * animation_rotation_matrix
+    }
 
-        renderer.render_geometry(render_target, camera, self.vertex_buffer.clone(), &self.textures, world_matrix);
+    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, transform: &Transform, client_tick: u32)
+        where T: Renderer + GeometryRenderer
+    {
+        renderer.render_geometry(render_target, camera, self.vertex_buffer.clone(), &self.textures, self.world_matrix(transform, client_tick));
         self.child_nodes.iter().for_each(|node| node.render_geometry(render_target, renderer, camera, transform, client_tick));
     }
 

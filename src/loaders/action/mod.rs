@@ -14,6 +14,32 @@ use crate::types::Version;
 
 #[derive(Clone, PrototypeElement)]
 pub struct Actions {}
+/*    start_time: u32,
+    duration: u32,
+    factor: u32,
+    action: usize,
+    next_action: usize,
+    event: usize,
+}
+
+impl Actions {
+
+    pub fn render(&self, client_tick: u32) {
+
+        let mut time = client_tick - self.start_time;
+
+        if (self.duration > 0 && time > self.duration) {
+
+            self.action = self.next_action;
+            self.start_time = client_tick;
+            self.duration = 0;
+
+            time = 0;
+        }
+
+
+    }
+}*/
 
 #[derive(Debug, ByteConvertable)]
 struct SpriteClip {

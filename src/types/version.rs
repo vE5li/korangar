@@ -14,6 +14,7 @@ impl ByteConvertable for Version {
     fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none());
 
+        // TODO: this should be the other way around?
         let minor = byte_stream.next();
         let major = byte_stream.next();
 

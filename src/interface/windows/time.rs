@@ -1,12 +1,10 @@
 use procedural::*;
-use derive_new::new;
 
 use crate::input::UserEvent;
 use crate::interface::traits::{ Window, PrototypeWindow };
 use crate::interface::types::InterfaceSettings;
 use crate::interface::elements::*;
 use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
-use crate::types::maths::Vector2;
 
 #[derive(Default)]
 pub struct TimeWindow {}
@@ -31,6 +29,6 @@ impl PrototypeWindow for TimeWindow {
             cell!(Button::new("set midnight", UserEvent::SetMidnight, false)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Time".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200.0 > 250.0 < 300.0, ? < 80.0%)))
+        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Time".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ? < 80%)))
     }
 }

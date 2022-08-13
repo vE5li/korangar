@@ -18,7 +18,7 @@ pub use self::tile::{ Tile, TileType };
 pub use self::object::{ Object, model };
 pub use self::light::LightSource;
 pub use self::sound::SoundSource;
-pub use self::effect::{ EffectSource, Particle };
+pub use self::effect::EffectSource;
 
 // MOVE
 fn get_value(day_timer: f32, offset: f32, p: f32) -> f32 {
@@ -144,10 +144,6 @@ pub struct Map {
 
 impl Map {
 
-    pub fn update(&self, delta_time: f32) {
-        self.effect_sources.iter().for_each(|effect_source| effect_source.update(delta_time));
-    }
-
     pub fn x_in_bounds(&self, x: usize) -> bool {
         x <= self.width
     }
@@ -156,8 +152,9 @@ impl Map {
         y <= self.height
     }
 
-    pub fn get_height_at(&self, position: Vector2<usize>) -> f32 {
-        self.get_tile(position).average_height()
+    pub fn get_world_position(&self, position: Vector2<usize>) -> Vector3<f32> {
+        let height = self.get_tile(position).average_height();
+        Vector3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
 
     pub fn get_tile(&self, position: Vector2<usize>) -> &Tile {
@@ -174,7 +171,6 @@ impl Map {
         where T: Renderer + GeometryRenderer
     {
         for object in &self.objects {
-            // check if on screen
             object.render_geometry(render_target, renderer, camera, client_tick);
         }
     }
@@ -226,9 +222,10 @@ impl Map {
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
-            MarkerIdentifier::Particle(index, particle_index) => &self.effect_sources[index].particles[particle_index],
+            //MarkerIdentifier::Particle(index, particle_index) => &self.effect_sources[index].particles[particle_index],
+            MarkerIdentifier::Particle(..) => panic!(),
             //MarkerIdentifier::Entity(index) => entities[index].as_ref(),
-            MarkerIdentifier::Entity(index) => panic!(),
+            MarkerIdentifier::Entity(..) => panic!(),
         }
     }
 
@@ -253,11 +250,11 @@ impl Map {
             self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| effect_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::EffectSource(index))));
         }
 
-        if render_settings.show_particle_markers {
+        /*if render_settings.show_particle_markers {
             for (index, effect_source) in self.effect_sources.iter().enumerate() {
                 effect_source.particles.iter().enumerate().for_each(|(particle_index, particle)| particle.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::Particle(particle_index, index))));
             }
-        }
+        }*/
 
         if render_settings.show_entity_markers {
             entities.iter().enumerate().for_each(|(index, entity)| entity.render_marker(render_target, renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index)));

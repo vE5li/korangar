@@ -18,7 +18,7 @@ pub struct Container {
 
 impl Container {
 
-    pub const DEFAULT_SIZE: SizeConstraint = constraint!(100.0%, ?);
+    pub const DEFAULT_SIZE: SizeConstraint = constraint!(100%, ?);
 }
 
 impl Element for Container {

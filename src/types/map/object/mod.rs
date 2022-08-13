@@ -29,6 +29,10 @@ impl Object {
         self.model.render_geometry(render_target, renderer, camera, &self.transform, client_tick);
     }
 
+    pub fn get_bounding_box(&self) -> BoundingBox {
+        self.model.bounding_box
+    }
+
     #[cfg(feature = "debug")]
     pub fn render_bounding_box(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
         //self.model.render_bounding_box(render_target, renderer, camera, &self.transform);

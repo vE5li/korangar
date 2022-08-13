@@ -19,8 +19,8 @@ use self::byte::*;
 use self::prototype::*;
 
 #[proc_macro]
-pub fn constraint(item: InterfaceTokenStream) -> InterfaceTokenStream {
-    parse::<SizeConstraint>(item).unwrap().stream.into()
+pub fn constraint(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    parse::<SizeConstraint>(token_stream).unwrap().stream.into()
 }
 
 #[proc_macro_attribute]

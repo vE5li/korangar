@@ -153,7 +153,7 @@ impl DeferredRenderer {
         let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
         let mut texture_future = now(device.clone()).boxed();
-        let font_map = texture_loader.get("assets/font.png", &mut texture_future).unwrap();
+        let font_map = texture_loader.get("font.png", &mut texture_future).unwrap();
 
         texture_future.flush().unwrap();
         texture_future.cleanup_finished();

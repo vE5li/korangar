@@ -41,18 +41,7 @@ impl TextureLoader {
             extension => return Err(format!("unsupported file format {}", extension)),
         };
 
-        let file_data = if image_format == ImageFormat::Png {
-
-            let file = File::open(path).expect("failed to open file");
-            let mut reader = BufReader::new(file);
-            let mut png_bytes = Vec::new();
-
-            reader.read_to_end(&mut png_bytes).expect("failed to read texture data");
-            png_bytes
-        } else {
-            self.game_file_loader.borrow_mut().get(&format!("data\\texture\\{}", path))?
-        };
-
+        let file_data = self.game_file_loader.borrow_mut().get(&format!("data\\texture\\{}", path))?;
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
         let mut image_buffer = reader.decode().map_err(|error| format!("failed to decode image file ({})", error))?.to_rgba8();
 

@@ -60,13 +60,13 @@ impl InterfaceRenderer {
         let sprite_renderer = SpriteRenderer::new(device.clone(), subpass.clone(), viewport.clone());
 
         let mut texture_future = now(device.clone()).boxed();
-        let font_map = texture_loader.get("assets/font.png", &mut texture_future).unwrap();
+        let font_map = texture_loader.get("font.png", &mut texture_future).unwrap();
         #[cfg(feature = "debug")]
-        let debug_icon_texture = texture_loader.get("assets/debug_icon.png", &mut texture_future).unwrap();
-        let checked_box_texture = texture_loader.get("assets/checked_box.png", &mut texture_future).unwrap();
-        let unchecked_box_texture = texture_loader.get("assets/unchecked_box.png", &mut texture_future).unwrap();
-        let expanded_arrow_texture = texture_loader.get("assets/expanded_arrow.png", &mut texture_future).unwrap();
-        let collapsed_arrow_texture = texture_loader.get("assets/collapsed_arrow.png", &mut texture_future).unwrap();
+        let debug_icon_texture = texture_loader.get("debug_icon.png", &mut texture_future).unwrap();
+        let checked_box_texture = texture_loader.get("checked_box.png", &mut texture_future).unwrap();
+        let unchecked_box_texture = texture_loader.get("unchecked_box.png", &mut texture_future).unwrap();
+        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", &mut texture_future).unwrap();
+        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", &mut texture_future).unwrap();
 
         texture_future.flush().unwrap();
         texture_future.cleanup_finished();

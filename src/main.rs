@@ -114,6 +114,7 @@ fn main() {
     game_file_loader.add_archive("data3.grf".to_string());
     game_file_loader.add_archive("data.grf".to_string());
     game_file_loader.add_archive("rdata.grf".to_string());
+    game_file_loader.add_archive("korangar.grf".to_string());
 
     let game_file_loader = Rc::new(RefCell::new(game_file_loader));
     let font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));

@@ -27,6 +27,6 @@ pub trait Window {
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size);
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, hovered_element: Option<&dyn Element>);
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, hovered_element: Option<&dyn Element>, focused_element: Option<&dyn Element>);
 }
 

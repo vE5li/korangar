@@ -1,3 +1,5 @@
+mod login;
+
 use procedural::*;
 use derive_new::new;
 use cgmath::Vector2;
@@ -15,6 +17,8 @@ use crate::interface::windows::CharacterSelectionWindow;
 use crate::traits::ByteConvertable;
 use crate::types::{ ByteStream, ChatMessage };
 use crate::graphics::{ Color, ColorRGB, ColorBGR };
+
+pub use self::login::LoginSettings;
 
 /// Base trait that all packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size, followed by the packet data. If the packet does not have a fixed size,
@@ -236,6 +240,25 @@ pub enum LoginFailedReason {
 #[header(0x81, 0x00)]
 struct LoginFailedPacket {
     pub reason: LoginFailedReason,
+}
+
+#[derive(Debug, ByteConvertable)]
+pub enum LoginFailedReason2 {
+    UnregisteredId,
+    IncorrectPassword,
+    IdExpired,
+    RejectedFromServer,
+    BlockedByGMTeam,
+    GameOutdated,
+    LoginProhibitedUntil,
+    ServerFull,
+    CompanyAccountLimitReached,
+}
+
+#[derive(Debug, Packet)]
+#[header(0x3e, 0x08)]
+struct LoginFailedPacket2 {
+    pub reason: LoginFailedReason2,
 }
 
 #[derive(Debug, ByteConvertable)]
@@ -1694,6 +1717,7 @@ struct LoginData {
 }
 
 pub struct NetworkingSystem {
+    login_settings: LoginSettings,
     login_stream: TcpStream,
     character_stream: Option<TcpStream>,
     map_stream: Option<TcpStream>,
@@ -1710,8 +1734,8 @@ impl NetworkingSystem {
 
     pub fn new() -> Self {
 
-        let login_stream = TcpStream::connect("127.0.0.1:6900").expect("failed to connect to login server");
-        //let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
+        let login_settings = LoginSettings::new();
+        let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
 
         let character_stream = None;
         let map_stream = None;
@@ -1726,6 +1750,7 @@ impl NetworkingSystem {
         login_stream.set_read_timeout(Duration::from_secs(20).into()).unwrap();
 
         Self {
+            login_settings,
             login_stream,
             character_stream,
             move_request,
@@ -1739,12 +1764,24 @@ impl NetworkingSystem {
         }
     }
 
-    pub fn log_in(&mut self) -> Result<CharacterSelectionWindow, String> {
+    pub fn get_login_settings(&self) -> &LoginSettings {
+        &self.login_settings
+    }
+
+    pub fn toggle_remember_username(&mut self) {
+        self.login_settings.remember_username = !self.login_settings.remember_username;
+    }
+
+    pub fn toggle_remember_password(&mut self) {
+        self.login_settings.remember_password = !self.login_settings.remember_password;
+    }
+
+    pub fn log_in(&mut self, username: String, password: String) -> Result<CharacterSelectionWindow, String> {
 
         #[cfg(feature = "debug_network")]
         let timer = Timer::new("log in");
 
-        self.send_packet_to_login_server(LoginServerLoginPacket::new("test_user".to_string(), "password".to_string()));
+        self.send_packet_to_login_server(LoginServerLoginPacket::new(username.clone(), password.clone()));
 
         let response = self.get_data_from_login_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -1757,18 +1794,32 @@ impl NetworkingSystem {
             }
         }
 
+        if let Ok(login_failed_packet) = LoginFailedPacket2::try_from_bytes(&mut byte_stream) {
+            match login_failed_packet.reason {
+                LoginFailedReason2::UnregisteredId => return Err("unregistered id".to_string()),
+                LoginFailedReason2::IncorrectPassword => return Err("incorrect password".to_string()),
+                LoginFailedReason2::IdExpired => return Err("id has expired".to_string()),
+                LoginFailedReason2::RejectedFromServer => return Err("rejected from server".to_string()),
+                LoginFailedReason2::BlockedByGMTeam => return Err("blocked by gm team".to_string()),
+                LoginFailedReason2::GameOutdated => return Err("game outdated".to_string()),
+                LoginFailedReason2::LoginProhibitedUntil => return Err("login prohibited until".to_string()),
+                LoginFailedReason2::ServerFull => return Err("server is full".to_string()),
+                LoginFailedReason2::CompanyAccountLimitReached => return Err("company account limit reached".to_string()),
+            }
+        }
+
         let login_server_login_success_packet = LoginServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
         self.login_data = LoginData::new(login_server_login_success_packet.account_id, login_server_login_success_packet.login_id1, login_server_login_success_packet.sex).into();
 
         let character_server_information = login_server_login_success_packet.character_server_information
             .into_iter()
             .next()
-            .expect("no character server available");
+            .ok_or("no character server available")?;
 
         let server_ip = IpAddr::V4(character_server_information.server_ip);
         let socket_address = SocketAddr::new(server_ip, character_server_information.server_port);
         self.character_stream = TcpStream::connect(socket_address)
-            .expect("failed to connect to character server")
+            .map_err(|_| "failed to connect to character server")?
             .into();
 
         let character_server_login_packet = CharacterServerLoginPacket::new(
@@ -1778,8 +1829,8 @@ impl NetworkingSystem {
             login_server_login_success_packet.sex,
         );
 
-        let character_stream = self.character_stream.as_mut().expect("no character server connection");
-        character_stream.write(&character_server_login_packet.to_bytes()).expect("failed to send packet to character server");
+        let character_stream = self.character_stream.as_mut().ok_or("no character server connection")?;
+        character_stream.write(&character_server_login_packet.to_bytes()).map_err(|_| "failed to send packet to character server")?;
 
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -1807,6 +1858,18 @@ impl NetworkingSystem {
 
         let request_character_list_success_packet = RequestCharacterListSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
         *self.characters.borrow_mut() = request_character_list_success_packet.character_information;
+
+        self.login_settings.username = match self.login_settings.remember_username {
+            true => username,
+            // clear in case it was previously saved
+            false => String::new(),
+        };
+
+        self.login_settings.password = match self.login_settings.remember_password {
+            true => password,
+            // clear in case it was previously saved
+            false => String::new(),
+        };
 
         #[cfg(feature = "debug_network")]
         timer.stop();
@@ -1897,25 +1960,7 @@ impl NetworkingSystem {
         }
     }
 
-    pub fn crate_character(&mut self, slot: usize, /* TODO: */) -> Result<(), String> {
-
-        let name = [
-            "lucas",
-            "warlock dude",
-            "t3st CH4R",
-            "Seemon",
-            "Pretty Long Name",
-            "xXdarkshadowXx",
-            "nvidia fanboy",
-            "AMD Enjoyer",
-            "Slutty eGirl",
-            "NULL",
-            "bitwise or",
-            "im out of names",
-            "someone help me",
-            "seriously",
-            "Ron Howard",
-        ][slot].to_string();
+    pub fn crate_character(&mut self, slot: usize, name: String) -> Result<(), String> {
 
         let hair_color = 0;
         let hair_style = 0;
@@ -2016,7 +2061,12 @@ impl NetworkingSystem {
         }
 
         let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
-        let character_information = self.characters.borrow()[slot].clone();
+        let character_information = self.characters
+            .borrow()
+            .iter()
+            .find(|character| character.character_number as usize == slot)
+            .cloned()
+            .unwrap();
 
         Ok((
             change_map_packet.map_name.replace(".gat", ""),

@@ -136,8 +136,8 @@ impl Window for FramedWindow {
         self.size = self.size_constraint.validated_size(self.size, avalible_space, *interface_settings.scaling);
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, hovered_element: Option<&dyn Element>) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, hovered_element: Option<&dyn Element>, focused_element: Option<&dyn Element>) {
         renderer.render_rectangle(render_target, self.position, self.size, self.position + self.size, *theme.window.border_radius, *theme.window.background_color);
-        self.elements.iter().for_each(|element| element.borrow().render(render_target, renderer, state_provider, interface_settings, theme, self.position, self.position + self.size, hovered_element, false));
+        self.elements.iter().for_each(|element| element.borrow().render(render_target, renderer, state_provider, interface_settings, theme, self.position, self.position + self.size, hovered_element, focused_element, false));
     }
 }

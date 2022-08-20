@@ -2,8 +2,11 @@ use cgmath::Vector2;
 
 #[derive(Clone, Debug)]
 pub enum UserEvent {
-    Exit,
+    LogIn(String, String),
     LogOut,
+    Exit,
+    ToggleRemeberUsername,
+    ToggleRemeberPassword,
     CameraZoom(f32),
     CameraRotate(f32),
     ToggleFrameLimit,
@@ -13,7 +16,8 @@ pub enum UserEvent {
     ReloadTheme,
     SaveTheme,
     SelectCharacter(usize),
-    CreateCharacter(usize),
+    OpenCharacterCreationWindow(usize),
+    CreateCharacter(usize, String),
     DeleteCharacter(usize),
     RequestSwitchCharacterSlot(usize),
     CancelSwitchCharacterSlot,

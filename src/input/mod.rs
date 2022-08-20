@@ -31,6 +31,9 @@ pub struct InputSystem {
     keys: [Key; KEY_COUNT],
     mouse_input_mode: MouseInputMode,
     previous_hovered_element: Option<(ElementCell, usize)>,
+    focused_element: Option<(ElementCell, usize)>,
+    previous_focused_element: Option<(ElementCell, usize)>,
+    input_buffer: Vec<char>,
 }
 
 impl InputSystem {
@@ -51,6 +54,9 @@ impl InputSystem {
 
         let mouse_input_mode = MouseInputMode::None;
         let previous_hovered_element = None;
+        let focused_element = None;
+        let previous_focused_element = None;
+        let input_buffer = Vec::new();
 
         Self {
             previous_mouse_position,
@@ -64,6 +70,9 @@ impl InputSystem {
             keys,
             mouse_input_mode,
             previous_hovered_element,
+            focused_element,
+            previous_focused_element,
+            input_buffer,
         }
     }
 
@@ -72,6 +81,7 @@ impl InputSystem {
         self.right_mouse_button.reset();
         self.keys.iter_mut().for_each(|key| key.reset());
         self.mouse_input_mode = MouseInputMode::None;
+        self.focused_element = None;
     }
 
     pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
@@ -101,6 +111,10 @@ impl InputSystem {
         //println!("code: {}", code);
     }
 
+    pub fn buffer_character(&mut self, character: char) {
+        self.input_buffer.push(character);
+    }
+
     pub fn update_delta(&mut self) {
 
         self.mouse_delta = self.new_mouse_position - self.previous_mouse_position;
@@ -114,7 +128,7 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, interface: &mut Interface, picker_target: &mut PickerRenderTarget, render_settings: &RenderSettings, window_size: Vector2<usize>) -> (Vec<UserEvent>, Option<ElementCell>, Option<PickerTarget>) {
+    pub fn user_events(&mut self, interface: &mut Interface, picker_target: &mut PickerRenderTarget, render_settings: &RenderSettings, window_size: Vector2<usize>) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
 
         let mut events = Vec::new();
         let mut mouse_target = None;
@@ -129,6 +143,10 @@ impl InputSystem {
         let lock_actions = render_settings.use_debug_camera;
         #[cfg(not(feature = "debug"))]
         let lock_actions = false;
+
+        if self.left_mouse_button.pressed() || self.right_mouse_button.pressed() {
+            self.focused_element = None;
+        }
 
         if shift_down {
 
@@ -163,6 +181,7 @@ impl InputSystem {
 
                     if let Some(action) = action {
                         match action {
+                            ClickAction::FocusElement => self.focused_element = Some((hovered_element.clone(), *window_index)),
                             ClickAction::Event(event) => events.push(event),
                             ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
                             ClickAction::DragElement => self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index)),
@@ -226,64 +245,71 @@ impl InputSystem {
             }
         }
 
-        if self.keys[1].pressed() {
-            events.push(UserEvent::OpenMenuWindow);
-        }
+        let characters = self.input_buffer.drain(..);
 
-        #[cfg(feature = "debug")]
-        if self.keys[50].pressed() {
-            events.push(UserEvent::OpenMapsWindow);
-        }
+        if let Some((focused_element, focused_window)) = &self.focused_element {
+            characters.for_each(|character| interface.input_character_element(focused_element, *focused_window, character));
+        } else {
 
-        #[cfg(feature = "debug")]
-        if self.keys[19].pressed() {
-            events.push(UserEvent::OpenRenderSettingsWindow);
-        }
+            if self.keys[1].pressed() {
+                events.push(UserEvent::OpenMenuWindow);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[42].pressed() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraAccelerate);
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[50].pressed() {
+                events.push(UserEvent::OpenMapsWindow);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[42].released() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraDecelerate);
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[19].pressed() {
+                events.push(UserEvent::OpenRenderSettingsWindow);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[33].pressed() {
-            events.push(UserEvent::ToggleUseDebugCamera);
-            events.push(UserEvent::CameraDecelerate);
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[42].pressed() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraAccelerate);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.left_mouse_button.down() && !self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraLookAround(-self.mouse_delta));
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[42].released() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraDecelerate);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[17].down() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraMoveForward);
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[33].pressed() {
+                events.push(UserEvent::ToggleUseDebugCamera);
+                events.push(UserEvent::CameraDecelerate);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[31].down() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraMoveBackward);
-        }
+            #[cfg(feature = "debug")]
+            if self.left_mouse_button.down() && !self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraLookAround(-self.mouse_delta));
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[30].down() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraMoveLeft);
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[17].down() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraMoveForward);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[32].down() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraMoveRight);
-        }
+            #[cfg(feature = "debug")]
+            if self.keys[31].down() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraMoveBackward);
+            }
 
-        #[cfg(feature = "debug")]
-        if self.keys[57].down() && render_settings.use_debug_camera {
-            events.push(UserEvent::CameraMoveUp);
+            #[cfg(feature = "debug")]
+            if self.keys[30].down() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraMoveLeft);
+            }
+
+            #[cfg(feature = "debug")]
+            if self.keys[32].down() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraMoveRight);
+            }
+
+            #[cfg(feature = "debug")]
+            if self.keys[57].down() && render_settings.use_debug_camera {
+                events.push(UserEvent::CameraMoveUp);
+            }
         }
 
         // to fix redrawing twice when clicking on elements
@@ -318,13 +344,14 @@ impl InputSystem {
             }
         }
 
-        let rerender = self.previous_hovered_element
+        // check if the hovered element changed from last frame
+        let rerender_hovered = self.previous_hovered_element
             .as_ref()
             .zip(hovered_element.as_ref())
             .map(|(previous, current)| !Rc::ptr_eq(&previous.0, current))
             .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some());
 
-        if rerender {
+        if rerender_hovered {
 
             if let Some((_element, window_index)) = &self.previous_hovered_element {
                 interface.schedule_rerender_window(*window_index);
@@ -335,9 +362,28 @@ impl InputSystem {
             }
         }
 
-        self.previous_hovered_element = hovered_element.clone().zip(window_index);
+        // check if the focused element changed from last frame
+        let rerender_focused = self.previous_focused_element
+            .as_ref()
+            .zip(self.focused_element.as_ref())
+            .map(|(previous, current)| !Rc::ptr_eq(&previous.0, &current.0))
+            .unwrap_or(self.previous_focused_element.is_some() || self.focused_element.is_some());
 
-        (events, hovered_element, mouse_target)
+        if rerender_focused {
+
+            if let Some((_element, window_index)) = &self.previous_focused_element {
+                interface.schedule_rerender_window(*window_index);
+            }
+
+            if let Some((_element, window_index)) = &self.focused_element {
+                interface.schedule_rerender_window(*window_index);
+            }
+        }
+
+        self.previous_hovered_element = hovered_element.clone().zip(window_index);
+        self.previous_focused_element = self.focused_element.clone();
+
+        (events, hovered_element, self.focused_element.clone().map(|(element, _)| element), mouse_target)
     }
 
     pub fn unused_left_click(&self) -> bool {

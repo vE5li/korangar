@@ -130,7 +130,7 @@ impl Window for ChatWindow {
         self.size = self.size_constraint.validated_size(self.size, avalible_space, *interface_settings.scaling);
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, _hovered_element: Option<&dyn Element>) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, _hovered_element: Option<&dyn Element>, focused_element: Option<&dyn Element>) {
         renderer.render_rectangle(render_target, self.position, self.size, self.position + self.size, *theme.chat.border_radius, *theme.chat.background_color);
 
         let clip_size = self.position + self.size;

@@ -26,5 +26,9 @@ pub trait Element {
         None 
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, render: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool);
+    fn input_character(&mut self, _character: char) -> Option<ChangeEvent> {
+        None
+    }
+
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, render: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _focused_element: Option<&dyn Element>, second_theme: bool);
 }

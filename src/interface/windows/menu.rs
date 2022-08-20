@@ -1,5 +1,6 @@
 use procedural::*;
 
+use crate::graphics::Color;
 use crate::input::UserEvent;
 use crate::interface::traits::{ Window, PrototypeWindow };
 use crate::interface::types::InterfaceSettings;

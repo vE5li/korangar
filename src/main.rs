@@ -109,6 +109,8 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create resource managers");
 
+    std::fs::create_dir_all("client/themes").unwrap();
+
     let mut game_file_loader = GameFileLoader::default();
 
     game_file_loader.add_archive("data.grf".to_string());
@@ -216,10 +218,7 @@ fn main() {
 
     let mut networking_system = NetworkingSystem::new();
 
-    match networking_system.log_in() {
-        Ok(character_selection_window) => interface.open_window(&character_selection_window),
-        Err(message) => interface.open_window(&ErrorWindow::new(message)),
-    }
+    interface.open_window(&LoginWindow::new(networking_system.get_login_settings().clone()));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -248,9 +247,7 @@ fn main() {
     events_loop.run(move |event, _, control_flow| {
         match event {
 
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
-                *control_flow = ControlFlow::Exit;
-            }
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => *control_flow = ControlFlow::Exit,
 
             Event::WindowEvent { event: WindowEvent::Resized(_), .. } => {
                 let window_size = surface.window().inner_size();
@@ -264,21 +261,15 @@ fn main() {
                 }
             }
 
-            Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => {
-                input_system.update_mouse_position(position);
-            }
+            Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => input_system.update_mouse_position(position),
 
-            Event::WindowEvent { event: WindowEvent::MouseInput{ button, state, .. }, .. } => {
-                input_system.update_mouse_buttons(button, state);
-            }
+            Event::WindowEvent { event: WindowEvent::MouseInput { button, state, .. }, .. } => input_system.update_mouse_buttons(button, state),
 
-            Event::WindowEvent { event: WindowEvent::MouseWheel{ delta, .. }, .. } => {
-                input_system.update_mouse_wheel(delta);
-            }
+            Event::WindowEvent { event: WindowEvent::MouseWheel { delta, .. }, .. } => input_system.update_mouse_wheel(delta),
 
-            Event::WindowEvent { event: WindowEvent::KeyboardInput{ input, .. }, .. } => {
-                input_system.update_keyboard(input.scancode as usize, input.state);
-            }
+            Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => input_system.update_keyboard(input.scancode as usize, input.state),
+
+            Event::WindowEvent { event: WindowEvent::ReceivedCharacter(character), .. } => input_system.buffer_character(character),
 
             Event::RedrawEventsCleared => {
 
@@ -291,7 +282,7 @@ fn main() {
                 networking_system.keep_alive(delta_time, game_timer.get_client_tick());
 
                 let network_events = networking_system.network_events();
-                let (user_events, hovered_element, mouse_target) = input_system.user_events(&mut interface, &mut picker_targets[swapchain_holder.get_image_number()], &render_settings, swapchain_holder.window_size());
+                let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(&mut interface, &mut picker_targets[swapchain_holder.get_image_number()], &render_settings, swapchain_holder.window_size());
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
 
@@ -425,9 +416,25 @@ fn main() {
                 for event in user_events {
                     match event {
 
-                        UserEvent::Exit => *control_flow = ControlFlow::Exit,
+                        UserEvent::LogIn(username, password) => {
+                            match networking_system.log_in(username, password) {
+
+                                Ok(character_selection_window) => {
+                                    interface.close_window_with_class(LoginWindow::WINDOW_CLASS);
+                                    interface.open_window(&character_selection_window);
+                                },
+
+                                Err(message) => interface.open_window(&ErrorWindow::new(message)),
+                            }
+                        },
 
                         UserEvent::LogOut => networking_system.log_out().unwrap(),
+
+                        UserEvent::Exit => *control_flow = ControlFlow::Exit,
+
+                        UserEvent::ToggleRemeberUsername => networking_system.toggle_remember_username(),
+
+                        UserEvent::ToggleRemeberPassword => networking_system.toggle_remember_password(),
 
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
 
@@ -473,7 +480,14 @@ fn main() {
                             }
                         },
 
-                        UserEvent::CreateCharacter(character_slot) => interface.handle_result(networking_system.crate_character(character_slot)),
+                        UserEvent::OpenCharacterCreationWindow(character_slot) => interface.open_window(&CharacterCreationWindow::new(character_slot)),
+
+                        UserEvent::CreateCharacter(character_slot, name) => {
+                            match networking_system.crate_character(character_slot, name) {
+                                Ok(..) => interface.close_window_with_class(CharacterCreationWindow::WINDOW_CLASS),
+                                Err(message) => interface.open_window(&ErrorWindow::new(message)),
+                            }
+                        },
 
                         UserEvent::DeleteCharacter(character_id) => interface.handle_result(networking_system.delete_character(character_id)),
 
@@ -819,8 +833,8 @@ fn main() {
 
                         interface_target.start_interface(clear_interface);
 
-                        let state_provider = &StateProvider::new(&render_settings);
-                        interface.render(&mut interface_target, &interface_renderer, state_provider, hovered_element);
+                        let state_provider = &StateProvider::new(&render_settings, networking_system.get_login_settings());
+                        interface.render(&mut interface_target, &interface_renderer, state_provider, hovered_element, focused_element);
 
                         interface_target.finish();
                     }

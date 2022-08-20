@@ -228,6 +228,40 @@ impl Default for SliderTheme {
 }
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
+pub struct InputTheme {
+    pub background_color: Mutable<Color, RERENDER>,
+    pub hovered_background_color: Mutable<Color, RERENDER>,
+    pub focused_background_color: Mutable<Color, RERENDER>,
+    pub text_color: Mutable<Color, RERENDER>,
+    pub ghost_text_color: Mutable<Color, RERENDER>,
+    pub focused_text_color: Mutable<Color, RERENDER>,
+    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
+    pub font_size: MutableRange<f32, RERENDER>,
+    pub cursor_offset: MutableRange<f32, RERENDER>,
+    pub cursor_width: MutableRange<f32, RERENDER>,
+    pub size_constraint: SizeConstraint,
+}
+
+impl Default for InputTheme {
+
+    fn default() -> Self {
+        Self {
+            background_color: Mutable::new(Color::monochrome(60)),
+            hovered_background_color: Mutable::new(Color::monochrome(80)),
+            focused_background_color: Mutable::new(Color::monochrome(100)),
+            text_color: Mutable::new(Color::monochrome(200)),
+            ghost_text_color: Mutable::new(Color::monochrome(100)),
+            focused_text_color: Mutable::new(Color::monochrome(200)),
+            border_radius: MutableRange::new(vector4!(6.0), vector4!(0.0), vector4!(30.0)),
+            font_size: MutableRange::new(14.0, 6.0, 50.0),
+            cursor_offset: MutableRange::new(4.0, 2.0, 10.0),
+            cursor_width: MutableRange::new(3.0, 2.0, 30.0),
+            size_constraint: constraint!(100%, 15),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ChatTheme {
     pub background_color: Mutable<Color, RERENDER>,
     pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
@@ -273,6 +307,7 @@ pub struct Theme {
     pub close_button: CloseButtonTheme,
     pub overlay: OverlayTheme,
     pub slider: SliderTheme,
+    pub input: InputTheme,
     pub chat: ChatTheme,
     pub cursor: CursorTheme,
 }

@@ -122,7 +122,7 @@ impl Element for CharacterPreview {
 
         let event = match self.has_character() {
             true => UserEvent::SelectCharacter(self.slot),
-            false => UserEvent::CreateCharacter(self.slot),
+            false => UserEvent::OpenCharacterCreationWindow(self.slot),
         };
 
         Some(ClickAction::Event(event))
@@ -147,7 +147,7 @@ impl Element for CharacterPreview {
         HoverInformation::Missed
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, second_theme: bool) {
+    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, focused_element: Option<&dyn Element>, second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
 
         match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
@@ -156,6 +156,6 @@ impl Element for CharacterPreview {
         }
 
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        self.elements.iter().for_each(|element| element.borrow().render(render_target, renderer, state_provider, interface_settings, theme, absolute_position, clip_size, hovered_element, second_theme));
+        self.elements.iter().for_each(|element| element.borrow().render(render_target, renderer, state_provider, interface_settings, theme, absolute_position, clip_size, hovered_element, focused_element, second_theme));
     }
 }

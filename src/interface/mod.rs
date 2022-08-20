@@ -179,6 +179,24 @@ impl Interface {
         }
     }
 
+    pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) {
+        let (window, _reresolve, rerender) = &mut self.windows[window_index];
+        let has_transparency = window.has_transparency(&self.theme);
+
+        if let Some(change_event) = element.borrow_mut().input_character(character) {
+            match change_event {
+                ChangeEvent::Reresolve => self.reresolve = true,
+                ChangeEvent::Rerender => self.rerender = true,
+                ChangeEvent::RerenderWindow => {
+                    match has_transparency {
+                        true => self.rerender = true,
+                        false => *rerender = true,
+                    }
+                },
+            }
+        }
+    }
+
     pub fn move_window(&mut self, window_index: usize, offset: Position) {
 
         if let Some((window_class, position)) = self.windows[window_index].0.offset(self.avalible_space, offset) {
@@ -225,9 +243,10 @@ impl Interface {
         }
     }
 
-    pub fn render(&mut self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, hovered_element: Option<ElementCell>) {
+    pub fn render(&mut self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, hovered_element: Option<ElementCell>, focused_element: Option<ElementCell>) {
 
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
+        let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
 
         if !self.rerender {
             self.flag_rerender_windows(0, None);
@@ -235,7 +254,7 @@ impl Interface {
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if self.rerender || *rerender {
-                window.render(render_target, renderer, state_provider, &self.interface_settings, &self.theme, hovered_element);
+                window.render(render_target, renderer, state_provider, &self.interface_settings, &self.theme, hovered_element, focused_element);
                 *rerender = false;
             }
         }

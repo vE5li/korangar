@@ -206,8 +206,6 @@ impl SpriteLoader {
         let sprite = Arc::new(Sprite { textures });
         self.cache.insert(path.to_string(), sprite.clone());
 
-        println!("images: {}", sprite.textures.len());
-
         #[cfg(feature = "debug")]
         timer.stop();
 

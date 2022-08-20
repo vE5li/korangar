@@ -111,7 +111,6 @@ fn main() {
 
     let mut game_file_loader = GameFileLoader::default();
 
-    game_file_loader.add_archive("data3.grf".to_string());
     game_file_loader.add_archive("data.grf".to_string());
     game_file_loader.add_archive("rdata.grf".to_string());
     game_file_loader.add_archive("korangar.grf".to_string());

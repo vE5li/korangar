@@ -120,7 +120,7 @@ impl GameFileLoader {
 
         for _index in 0..file_count {
             let file_information = FileInformation::from_bytes(&mut byte_stream, None);
-            files.insert(file_information.file_name.clone(), file_information);
+            files.insert(file_information.file_name.to_lowercase(), file_information);
         }
 
         #[cfg(feature = "debug")]
@@ -134,7 +134,7 @@ impl GameFileLoader {
 
         let result = self.archives
             .values_mut() // convert this to a multithreaded iter ?
-            .find_map(|archive| archive.get(path))
+            .find_map(|archive| archive.get(&path.to_lowercase()))
             .ok_or(format!("failed to find file {}", path));
 
         if result.is_err() { // TEMP
@@ -144,7 +144,7 @@ impl GameFileLoader {
 
             let delimiter = path.len() - 4;
             match &path[delimiter..] {
-                ".bmp" | ".BMP" => return self.get("data\\texture\\BLACK.BMP"),
+                ".bmp" | ".BMP" => return self.get("data\\texture\\backside.bmp"),
                 ".rsm" => return self.get("data\\model\\abyss\\coin_j_01.rsm"),
                 ".spr" => return self.get("data\\sprite\\npc\\1_f_maria.spr"),
                 ".act" => return self.get("data\\sprite\\npc\\1_f_maria.act"),

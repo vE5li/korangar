@@ -21,9 +21,10 @@ _Lighthalzen_
 
 That being said, you can already get through the tutorial mostly as intended and "walk" around (walk in quotes because there are no proper sprite animations yet, so it's more like sliding).
 
-This project requires Rust nightly to compile. For instructions on how to set up rust and set the correct toolchain, please check out [rustup](https://rustup.rs/). In order to run the client, you will need to get the `data.grf` and `rdata.grf` from the official kRO client. Move them to this directory and start the client with `cargo run --release`. There are a lot of tools for debugging in this client, to enable them you can run `cargo run --release --features debug`. If you are on Linux, you may also want to enable the features `colors` and `unicode` for some nicer terminal output.
+This project requires Rust nightly to compile. For instructions on how to set up rust and set the correct toolchain, please check out [Rustup](https://rustup.rs/). In order to run the client, you will need to get the `data.grf` and `rdata.grf` from the official kRO client. Move them to this directory and start the client with `cargo run --release`. There are a lot of tools for debugging in this client, to enable them you can run `cargo run --release --features debug`. If you are on Linux, you may also want to enable the features `colors` and `unicode` for some nicer terminal output.
 
 Once the client starts, you will hopefully be asked for a username and a password. A new user can be created by entering your desired username with the suffix `_m` or `_f` and your desired password (*Hint*: remember to remove the `_*` suffix the next time you want to log in to your account).
+*Another disclaimer*: Please don't use any of your usual credentials as i will be able to see them in the database. They will also be saved in **plain text** in the client folder if you tick the boxes during login.
 
 After logging in, you will be able to create a new character. If the character creation fails, it could be that you are using invalid characters in the name (e.g. `_`).
 

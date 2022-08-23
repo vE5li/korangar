@@ -1835,7 +1835,7 @@ impl NetworkingSystem {
         );
 
         let character_stream = self.character_stream.as_mut().ok_or("no character server connection")?;
-        character_stream.write(&character_server_login_packet.to_bytes()).map_err(|_| "failed to send packet to character server")?;
+        character_stream.write_all(&character_server_login_packet.to_bytes()).map_err(|_| "failed to send packet to character server")?;
 
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -1899,7 +1899,7 @@ impl NetworkingSystem {
         print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
 
         let packet_bytes = packet.to_bytes();
-        self.login_stream.write(&packet_bytes).expect("failed to send packet to login server");
+        self.login_stream.write_all(&packet_bytes).expect("failed to send packet to login server");
     }
 
     fn send_packet_to_character_server(&mut self, packet: impl Packet + Debug) {
@@ -1909,7 +1909,7 @@ impl NetworkingSystem {
 
         let packet_bytes = packet.to_bytes();
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
-        character_stream.write(&packet_bytes).expect("failed to send packet to character server");
+        character_stream.write_all(&packet_bytes).expect("failed to send packet to character server");
     }
 
     fn send_packet_to_map_server(&mut self, packet: impl Packet + Debug) {
@@ -1919,7 +1919,7 @@ impl NetworkingSystem {
 
         let packet_bytes = packet.to_bytes();
         let map_stream = self.map_stream.as_mut().expect("no map server connection");
-        map_stream.write(&packet_bytes).expect("failed to send packet to map server");
+        map_stream.write_all(&packet_bytes).expect("failed to send packet to map server");
     }
 
     fn get_data_from_login_server(&mut self) -> Vec<u8> {

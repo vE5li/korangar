@@ -18,13 +18,13 @@ impl syn::parse::Parse for Dimension {
             // remove the ','
             input.parse::<Punct>()?;
 
-            quote!(crate::interface::types::Dimension::Remaining)
+            quote!(crate::interface::Dimension::Remaining)
         } else if lookahead.peek(syn::Token![?]) {
 
             // remove the ','
             input.parse::<Punct>()?;
 
-            quote!(crate::interface::types::Dimension::Flexible)
+            quote!(crate::interface::Dimension::Flexible)
         } else {
             let literal: Lit = input.parse()?;
 
@@ -37,9 +37,9 @@ impl syn::parse::Parse for Dimension {
 
             if lookahead.peek(syn::Token![%]) {
                 input.parse::<Punct>()?;
-                quote!(crate::interface::types::Dimension::Relative(#literal as f32))
+                quote!(crate::interface::Dimension::Relative(#literal as f32))
             } else {
-                quote!(crate::interface::types::Dimension::Absolute(#literal as f32))
+                quote!(crate::interface::Dimension::Absolute(#literal as f32))
             }
         };
 
@@ -110,7 +110,7 @@ impl syn::parse::Parse for SizeConstraint {
         };
 
         let expanded = quote! {
-            crate::interface::types::SizeConstraint {
+            crate::interface::SizeConstraint {
                 width: #width,
                 minimum_width: #minimum_width,
                 maximum_width: #maximum_width,

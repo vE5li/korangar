@@ -2,13 +2,13 @@ use procedural::*;
 use derive_new::new;
 use num::{ Zero, NumCast };
 use num::traits::NumOps;
+use cgmath::Vector2;
 use std::cmp::PartialOrd;
 
-use crate::types::maths::*;
-use crate::interface::traits::{ Window, PrototypeWindow };
-use crate::interface::types::{ InterfaceSettings, ChangeEvent };
+use crate::interface::{ Window, PrototypeWindow };
+use crate::interface::{ InterfaceSettings, ChangeEvent };
 use crate::interface::{ WindowCache, ElementCell, Size };
-use crate::interface::elements::*;
+use crate::interface::*;
 use crate::interface::FramedWindow;
 
 #[derive(new)]

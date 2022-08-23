@@ -6,8 +6,7 @@ use yazi::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::ByteStream;
-use crate::traits::ByteConvertable;
+use crate::loaders::{ ByteStream, ByteConvertable };
 
 #[derive(Clone, ByteConvertable)]
 pub struct FileHeader {

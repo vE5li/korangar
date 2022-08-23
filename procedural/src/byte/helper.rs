@@ -71,7 +71,7 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
         let is_repeating = repeating.is_some();
 
         // base from bytes implementation
-        let from_implementation = quote!(crate::traits::ByteConvertable::from_bytes(byte_stream, #from_length_hint));
+        let from_implementation = quote!(crate::loaders::ByteConvertable::from_bytes(byte_stream, #from_length_hint));
 
         // wrap base implementation in a loop if the element can appear multiple times
         let from_implementation = match repeating {
@@ -97,7 +97,7 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
         // base to byte implementation
         let to_implementation = match is_repeating || version_restricted {
             true => quote!(panic!("implement for to_bytes aswell")),
-            false => quote!(crate::traits::ByteConvertable::to_bytes(&self.#field_name, #length_hint).as_slice()),
+            false => quote!(crate::loaders::ByteConvertable::to_bytes(&self.#field_name, #length_hint).as_slice()),
         };
 
         implemented_fields.push(quote!(#field_name));

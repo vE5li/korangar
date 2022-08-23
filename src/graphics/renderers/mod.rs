@@ -20,8 +20,8 @@ use vulkano::pipeline::graphics::color_blend::AttachmentBlend;
 use vulkano::pipeline::graphics::color_blend::BlendFactor;
 use vulkano::pipeline::graphics::color_blend::BlendOp;
 use winit::window::Window;
+use cgmath::{ Vector2, Vector3, Matrix4 };
 
-use crate::types::maths::*;
 use crate::graphics::{ ImageBuffer, Texture, Camera, ModelVertexBuffer };
 
 use self::deferred::DeferredSubrenderer;

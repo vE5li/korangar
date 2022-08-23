@@ -9,13 +9,11 @@
 #[cfg(feature = "debug")]
 #[macro_use]
 mod debug;
-#[macro_use]
-mod types;
-mod traits;
 mod input;
 #[macro_use]
 mod system;
 mod graphics;
+mod world;
 mod loaders;
 mod interface;
 mod network;
@@ -39,13 +37,13 @@ use chrono::prelude::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::*;
 use crate::input::{ InputSystem, UserEvent };
 use crate::system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
+use crate::world::*;
 use crate::loaders::*;
 use crate::graphics::*;
 use crate::interface::*;
-use crate::network::{ NetworkingSystem, NetworkEvent };
+use crate::network::{ NetworkingSystem, NetworkEvent, ChatMessage };
 
 fn main() {
 

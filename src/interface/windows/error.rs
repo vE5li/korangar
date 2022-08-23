@@ -1,9 +1,9 @@
 use procedural::*;
 use derive_new::new;
 
-use crate::interface::traits::{ Window, PrototypeWindow };
-use crate::interface::types::InterfaceSettings;
-use crate::interface::elements::*;
+use crate::interface::{ Window, PrototypeWindow };
+use crate::interface::InterfaceSettings;
+use crate::interface::*;
 use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
 use crate::graphics::Color;
 

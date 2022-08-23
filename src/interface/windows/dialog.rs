@@ -2,9 +2,9 @@ use procedural::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use crate::interface::traits::{ Window, PrototypeWindow };
-use crate::interface::types::{InterfaceSettings, DialogElement};
-use crate::interface::elements::*;
+use crate::interface::{ Window, PrototypeWindow };
+use crate::interface::{InterfaceSettings, DialogElement};
+use crate::interface::*;
 use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
 
 pub struct DialogWindow {

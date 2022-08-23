@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
 use derive_new::new;
 use rand::{ thread_rng, Rng };
+use std::collections::HashMap;
 use vulkano::sync::GpuFuture;
+use cgmath::{ Vector2, Vector3, Array };
 
-use crate::loaders::{ Sprite, Actions, TextureLoader };
+use crate::loaders::TextureLoader;
 use crate::network::{ QuestEffectPacket, QuestColor };
-use crate::types::maths::*;
 use crate::graphics::*;
-use crate::types::map::Map;
-use crate::types::Entity;
+use crate::world::*;
 
 pub trait Particle {
 

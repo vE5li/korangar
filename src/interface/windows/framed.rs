@@ -1,8 +1,9 @@
-use crate::types::maths::Vector2;
+use cgmath::Vector2;
 use crate::graphics::{Renderer, InterfaceRenderer};
-use crate::interface::traits::{ Element, Window };
-use crate::interface::types::*;
-use crate::interface::elements::{ DragButton, CloseButton };
+use crate::interface::Element;
+use crate::interface::Window;
+use crate::interface::*;
+use crate::interface::{ DragButton, CloseButton };
 use crate::interface::{ StateProvider, WindowCache, ElementCell, SizeConstraint, Size, PartialSize, Position };
 
 pub struct FramedWindow {

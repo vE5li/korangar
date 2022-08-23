@@ -26,8 +26,8 @@ use vulkano::shader::ShaderModule;
 use vulkano::render_pass::Subpass;
 use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage, BufferAccess };
+use cgmath::Matrix4;
 
-use crate::types::maths::*;
 use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;

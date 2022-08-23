@@ -5,10 +5,9 @@ use std::sync::Arc;
 use vulkano::render_pass::RenderPass;
 use vulkano::{device::Device, format::Format};
 use vulkano::device::Queue;
-use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::image::{ImageUsage, SampleCount};
+use cgmath::{ Vector2, Vector3, Matrix4 };
 
-use crate::types::maths::*;
 use super::{ Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, SingleRenderTarget, Texture, ModelVertexBuffer };
 
 use self::geometry::GeometryRenderer;

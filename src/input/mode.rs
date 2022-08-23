@@ -1,4 +1,4 @@
-use crate::interface::types::ElementCell;
+use crate::interface::ElementCell;
 
 pub enum MouseInputMode {
     MoveInterface(usize),

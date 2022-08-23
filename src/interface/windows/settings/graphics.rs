@@ -1,10 +1,10 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::traits::{ Window, PrototypeWindow, PrototypeElement };
-use crate::interface::types::InterfaceSettings;
+use crate::interface::{ Window, PrototypeWindow, PrototypeElement };
+use crate::interface::InterfaceSettings;
 use crate::interface::{ StateProvider, WindowCache, FramedWindow, ElementCell, Size };
-use crate::interface::elements::StateButton;
+use crate::interface::StateButton;
 
 #[derive(Default)]
 pub struct GraphicsSettingsWindow {}

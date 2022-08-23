@@ -12,11 +12,8 @@ use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::ByteStream;
-use crate::traits::ByteConvertable;
-use crate::loaders::GameFileLoader;
-use crate::types::Version;
 use crate::graphics::Texture;
+use crate::loaders::{ ByteStream, Version, ByteConvertable, GameFileLoader };
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {

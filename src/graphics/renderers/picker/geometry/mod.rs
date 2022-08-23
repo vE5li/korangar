@@ -14,9 +14,8 @@ mod fragment_shader {
 
 use std::sync::Arc;
 use std::iter;
-
 use vulkano::device::Device;
-
+use vulkano::image::ImageViewAbstract;
 use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -27,8 +26,8 @@ use vulkano::shader::ShaderModule;
 use vulkano::render_pass::Subpass;
 use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
 use vulkano::buffer::{ BufferUsage, BufferAccess };
+use cgmath::Matrix4;
 
-use crate::types::maths::*;
 use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
@@ -54,7 +53,6 @@ impl GeometryRenderer {
         let linear_sampler = Sampler::start(device)
             .filter(Filter::Linear)
             .address_mode(SamplerAddressMode::ClampToEdge)
-            //.anisotropy(Some(4.0))
             .min_lod(1.0)
             .build()
             .unwrap();
@@ -75,7 +73,6 @@ impl GeometryRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .depth_stencil_state(DepthStencilState::simple_depth_test())
-            //.rasterization_state(RasterizationState { cull_mode: StateMode::Fixed(CullMode::Back) })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -102,106 +99,28 @@ impl GeometryRenderer {
     }
 
     pub fn render(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>) {
-
         if textures.is_empty() {
             return;
         }
 
+        const TEXTURE_COUNT: usize = 15;
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
 
-        // SUPER DIRTY, PLEASE FIX
+        let texture_count = textures.len();
+        let mut samplers: Vec<(Arc<dyn ImageViewAbstract>, Arc<Sampler>)> = textures
+            .iter()
+            .take(TEXTURE_COUNT.min(texture_count))
+            .map(|texture| (texture.clone() as _, self.linear_sampler.clone()))
+            .collect();
 
-        let texture0 = textures[0].clone();
-
-        let texture1 = match textures.len() > 1 {
-            true => textures[1].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture2 = match textures.len() > 2 {
-            true => textures[2].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture3 = match textures.len() > 3 {
-            true => textures[3].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture4 = match textures.len() > 4 {
-            true => textures[4].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture5 = match textures.len() > 5 {
-            true => textures[5].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture6 = match textures.len() > 6 {
-            true => textures[6].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture7 = match textures.len() > 7 {
-            true => textures[7].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture8 = match textures.len() > 8 {
-            true => textures[8].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture9 = match textures.len() > 9 {
-            true => textures[9].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture10 = match textures.len() > 10 {
-            true => textures[10].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture11 = match textures.len() > 11 {
-            true => textures[11].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture12 = match textures.len() > 12 {
-            true => textures[12].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture13 = match textures.len() > 13 {
-            true => textures[13].clone(),
-            false => texture0.clone(),
-        };
-
-        let texture14 = match textures.len() > 14 {
-            true => textures[14].clone(),
-            false => texture0.clone(),
-        };
+        for _ in 0..TEXTURE_COUNT.saturating_sub(texture_count) {
+            samplers.push((textures[0].clone() as _, self.linear_sampler.clone()));
+        }
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
-            WriteDescriptorSet::image_view_sampler_array(0, 0, [
-                (texture0 as _, self.linear_sampler.clone()),
-                (texture1 as _, self.linear_sampler.clone()),
-                (texture2 as _, self.linear_sampler.clone()),
-                (texture3 as _, self.linear_sampler.clone()),
-                (texture4 as _, self.linear_sampler.clone()),
-                (texture5 as _, self.linear_sampler.clone()),
-                (texture6 as _, self.linear_sampler.clone()),
-                (texture7 as _, self.linear_sampler.clone()),
-                (texture8 as _, self.linear_sampler.clone()),
-                (texture9 as _, self.linear_sampler.clone()),
-                (texture10 as _, self.linear_sampler.clone()),
-                (texture11 as _, self.linear_sampler.clone()),
-                (texture12 as _, self.linear_sampler.clone()),
-                (texture13 as _, self.linear_sampler.clone()),
-                (texture14 as _, self.linear_sampler.clone()),
-            ])
+            WriteDescriptorSet::image_view_sampler_array(0, 0, samplers)
         ]).unwrap(); 
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();

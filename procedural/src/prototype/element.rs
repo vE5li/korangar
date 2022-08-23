@@ -10,10 +10,10 @@ pub fn derive_prototype_element_struct(data_struct: DataStruct, generics: Generi
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     quote! {
-        impl #impl_generics crate::interface::traits::PrototypeElement for #name #type_generics #where_clause {
-            fn to_element(&self, display: String) -> crate::interface::types::ElementCell {
-                let elements: Vec<crate::interface::types::ElementCell> = vec![#(#initializers),*];
-                std::rc::Rc::new(std::cell::RefCell::new(crate::interface::elements::Expandable::new(display, elements, false)))
+        impl #impl_generics crate::interface::PrototypeElement for #name #type_generics #where_clause {
+            fn to_element(&self, display: String) -> crate::interface::ElementCell {
+                let elements: Vec<crate::interface::ElementCell> = vec![#(#initializers),*];
+                std::rc::Rc::new(std::cell::RefCell::new(crate::interface::Expandable::new(display, elements, false)))
             }
         }
     }.into()

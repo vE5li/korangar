@@ -5,15 +5,13 @@ use std::sync::Arc;
 use vulkano::{device::Device, format::Format};
 use vulkano::device::Queue;
 use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::render_pass::{Subpass, RenderPass};
+use vulkano::render_pass::RenderPass;
 use vulkano::image::{ ImageUsage, SampleCount };
 use vulkano::sync::{ now, GpuFuture };
+use cgmath::{ Vector2, Vector4 };
 
 use crate::loaders::TextureLoader;
-use crate::{types::maths::*};
-
-use super::{ DeferredRenderTarget, Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, SingleRenderTarget };
-use crate::graphics::{ Texture, ModelVertexBuffer, WaterVertexBuffer, Color };
+use crate::graphics::{ Texture, Renderer, SingleRenderTarget, Color };
 
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
@@ -147,7 +145,7 @@ impl InterfaceRenderer {
     }
 
     /*pub fn render_text_new(&self, text: &str, position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
-        self.text_renderer.render(&mut current_frame.builder, self.window_size, position, vector2!(font_size), clip_size, color);
+        self.text_renderer.render(&mut current_frame.builder, self.window_size, position, Vector2::from_value(font_size), clip_size, color);
     }*/
 
     #[cfg(feature = "debug")]

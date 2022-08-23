@@ -13,10 +13,9 @@ use vulkano::sync::{ GpuFuture, now };
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::{ByteStream, Version};
-use crate::types::map::{ Map, Tile, TileType, WaterSettings, LightSettings, Object, LightSource, SoundSource, EffectSource };
 use crate::graphics::{ Color, ModelVertex, Transform, NativeModelVertex, WaterVertex, TileVertex, PickerTarget };
-use crate::loaders::{ ModelLoader, TextureLoader, GameFileLoader };
+use crate::world::*;
+use crate::loaders::{ ByteStream, Version, ModelLoader, TextureLoader, GameFileLoader };
 
 use self::resource::ResourceType;
 

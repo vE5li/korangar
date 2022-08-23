@@ -4,19 +4,17 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::collections::HashMap;
-use crate::types::maths::*;
 use vulkano::buffer::{ BufferUsage, CpuAccessibleBuffer };
 use vulkano::device::Device;
 use vulkano::sync::GpuFuture;
+use cgmath::{ Vector2, Vector3, Matrix3, Matrix4, Quaternion, Rad, SquareMatrix };
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::{ ByteStream, Version };
-use crate::types::maths::multiply_matrix4_and_vector3;
-use crate::types::map::model::{ Model, Node, BoundingBox };
+use crate::system::multiply_matrix4_and_vector3;
 use crate::graphics::{ NativeModelVertex, Texture };
-use crate::loaders::{ TextureLoader, GameFileLoader };
-use crate::traits::ByteConvertable;
+use crate::world::{ Model, Node, BoundingBox };
+use crate::loaders::{ ByteStream, Version, ByteConvertable, TextureLoader, GameFileLoader };
 
 #[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct PositionKeyframeData {
@@ -66,10 +64,10 @@ pub struct NodeData {
     pub scale: Vector3<f32>,
     pub vertex_position_count: u32,
     #[repeating(self.vertex_position_count)]
-    pub vertex_positions: Vec<Vector3<f32>>, 
+    pub vertex_positions: Vec<Vector3<f32>>,
     pub texture_coordinate_count: u32,
     #[repeating(self.texture_coordinate_count)]
-    pub texture_coordinates: Vec<TextureCoordinateData>, 
+    pub texture_coordinates: Vec<TextureCoordinateData>,
     pub face_count: u32,
     #[repeating(self.face_count)]
     pub faces: Vec<FaceData>,
@@ -196,7 +194,7 @@ impl ModelLoader {
         main_bounding_box.extend(&bounding_box);
 
         let final_matrix = match current_node.node_name.as_str() == root_node_name {
-            true => Matrix4::from_translation(-vector3!(bounding_box.center().x, bounding_box.biggest.y, bounding_box.center().z)) * transform_matrix,
+            true => Matrix4::from_translation(-Vector3::new(bounding_box.center().x, bounding_box.biggest.y, bounding_box.center().z)) * transform_matrix,
             false => transform_matrix,
         };
 

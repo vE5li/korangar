@@ -1,11 +1,12 @@
 use derive_new::new;
+use cgmath::{ Vector4, Array };
 use num::{ Zero, NumCast, clamp };
 use num::traits::NumOps;
 use std::cmp::PartialOrd;
 
-use crate::interface::traits::Element;
-use crate::interface::types::*;
-use crate::graphics::{Renderer, InterfaceRenderer};
+use crate::interface::Element;
+use crate::interface::*;
+use crate::graphics::{ Renderer, InterfaceRenderer };
 
 #[derive(new)]
 pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
@@ -76,11 +77,11 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
 
         let bar_size = Size::new(self.cached_size.x * 0.9, self.cached_size.y / 4.0);
         let offset = (self.cached_size - bar_size) / 2.0;
-        renderer.render_rectangle(render_target, absolute_position + offset, bar_size, clip_size, vector4!(0.5) * *interface_settings.scaling, *theme.slider.rail_color);
+        renderer.render_rectangle(render_target, absolute_position + offset, bar_size, clip_size, Vector4::from_value(0.5) * *interface_settings.scaling, *theme.slider.rail_color);
 
         let knob_size = Size::new(20.0 * *interface_settings.scaling, self.cached_size.y * 0.8);
         let total_range = self.maximum_value - self.minimum_value;
         let offset = Position::new((self.cached_size.x - knob_size.x) / total_range.to_f32().unwrap() * (self.cached_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap()), (self.cached_size.y - knob_size.y) / 2.0);
-        renderer.render_rectangle(render_target, absolute_position + offset, knob_size, clip_size, vector4!(4.0) * *interface_settings.scaling, *theme.slider.knob_color);
+        renderer.render_rectangle(render_target, absolute_position + offset, knob_size, clip_size, Vector4::from_value(4.0) * *interface_settings.scaling, *theme.slider.knob_color);
     }
 }

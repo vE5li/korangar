@@ -5,9 +5,9 @@ use std::cmp::PartialOrd;
 use std::fmt::Display;
 
 use crate::graphics::{Renderer, InterfaceRenderer};
-use crate::interface::traits::Element;
-use crate::interface::windows::NumberWindow;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::NumberWindow;
+use crate::interface::*;
 
 #[derive(new)]
 pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> {

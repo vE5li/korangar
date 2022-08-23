@@ -1,10 +1,11 @@
 use derive_new::new;
 use num::Zero;
+use cgmath::{ Vector2, Array };
 
 use crate::input::UserEvent;
-use crate::interface::traits::Element;
-use crate::interface::types::*;
-use crate::graphics::{Renderer, InterfaceRenderer};
+use crate::interface::Element;
+use crate::interface::*;
+use crate::graphics::{ Renderer, InterfaceRenderer };
 
 #[derive(new)]
 pub struct EventButton {
@@ -35,7 +36,7 @@ impl Element for EventButton {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::Event(self.user_event.clone())) 
+        Some(ClickAction::Event(self.user_event.clone()))
     }
 
     fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _focused_element: Option<&dyn Element>, _second_theme: bool) {
@@ -47,7 +48,7 @@ impl Element for EventButton {
             false => renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.button.background_color),
         }
 
-        let offset = vector2!(0.0, (self.cached_size.y - *theme.button.font_size * *interface_settings.scaling) / 2.0); 
+        let offset = Vector2::new(0.0, (self.cached_size.y - *theme.button.font_size * *interface_settings.scaling) / 2.0);
         renderer.render_text(render_target, &self.display, absolute_position + offset + *theme.button.text_offset * *interface_settings.scaling, clip_size, *theme.button.foreground_color, *theme.button.font_size * *interface_settings.scaling);
     }
 }

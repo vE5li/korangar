@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use cgmath::{ Vector2, Array };
 
 use rusttype::*;
 use rusttype::gpu_cache::Cache;
@@ -67,7 +68,7 @@ impl FontLoader {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
 
         let scale = 1.0; // get dynamically
-        let cache_size = vector2!((512.0 * scale) as u32);
+        let cache_size = Vector2::from_value((512.0 * scale) as u32);
         let cache = Cache::builder()
             .dimensions(cache_size.x, cache_size.y)
             .build();

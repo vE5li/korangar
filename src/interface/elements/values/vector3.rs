@@ -2,10 +2,10 @@ use derive_new::new;
 use num::Zero;
 use std::fmt::Display;
 
-use crate::types::maths::Vector3;
+use cgmath::Vector3;
 use crate::graphics::{Renderer, InterfaceRenderer};
-use crate::interface::traits::Element;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::*;
 
 #[derive(new)]
 pub struct Vector3Value<T: Display> {

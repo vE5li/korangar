@@ -1,3 +1,6 @@
+mod convertable;
+mod version;
+mod stream;
 mod font;
 mod gamefile;
 mod texture;
@@ -6,6 +9,9 @@ mod map;
 mod sprite;
 mod action;
 
+pub use self::convertable::ByteConvertable;
+pub use self::version::Version;
+pub use self::stream::ByteStream;
 pub use self::font::FontLoader;
 pub use self::gamefile::GameFileLoader;
 pub use self::texture::TextureLoader;

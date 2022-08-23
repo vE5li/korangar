@@ -7,9 +7,9 @@ use vulkano::device::{ Device, Queue };
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::format::Format;
 use vulkano::render_pass::RenderPass;
+use cgmath::{ Vector2, Vector3, Matrix4 };
 
 use crate::graphics::TileVertexBuffer;
-use crate::types::maths::*;
 use super::{ Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, Texture, ModelVertexBuffer, PickerRenderTarget };
 
 use self::tile::TileRenderer;

@@ -2,9 +2,9 @@ use derive_new::new;
 use num::Zero;
 
 use crate::graphics::{ Renderer, Color, InterfaceRenderer };
-use crate::interface::traits::Element;
-use crate::interface::windows::ColorWindow;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::ColorWindow;
+use crate::interface::*;
 
 #[derive(new)]
 pub struct MutableColorValue {

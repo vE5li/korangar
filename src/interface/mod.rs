@@ -1,25 +1,30 @@
+mod settings;
+mod layout;
+mod theme;
+mod event;
+mod provider;
 #[macro_use]
-pub mod types;
-pub mod traits;
-pub mod elements;
-pub mod windows;
-pub mod cursor;
+mod elements;
+mod windows;
+mod cursor;
 
 use derive_new::new;
 use std::rc::Rc;
 use std::cell::RefCell;
 use vulkano::sync::GpuFuture;
+use cgmath::Vector2;
 
-use crate::graphics::{Renderer, InterfaceRenderer, DeferredRenderer, Color};
+use crate::graphics::{ Renderer, InterfaceRenderer, DeferredRenderer, Color };
 use crate::loaders::{ SpriteLoader, ActionLoader };
-use crate::types::maths::Vector2;
 
-pub use self::types::{ StateProvider, ClickAction, Size };
+pub use self::settings::InterfaceSettings;
+pub use self::layout::*;
+pub use self::theme::Theme;
+pub use self::event::*;
+pub use self::provider::StateProvider;
+pub use self::elements::*;
 pub use self::windows::*;
 pub use self::cursor::MouseCursor;
-
-use self::types::*;
-use self::traits::*;
 
 #[derive(new)]
 struct DialogHandle {
@@ -359,7 +364,7 @@ impl Interface {
     pub fn handle_result<T>(&mut self, result: Result<T, String>) {
         if let Err(message) = result {
             self.open_window(&ErrorWindow::new(message));
-        } 
+        }
     }
 
     #[cfg(feature = "debug")]

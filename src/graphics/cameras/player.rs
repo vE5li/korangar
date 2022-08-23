@@ -1,6 +1,6 @@
+use cgmath::{ Vector2, Vector3, Vector4, Point3, Matrix4, SquareMatrix, InnerSpace, Rad, Array };
 use std::f32::consts::FRAC_PI_2;
 
-use crate::types::maths::*;
 use crate::graphics::Transform;
 
 use super::{ Camera, SmoothedValue };
@@ -26,10 +26,10 @@ impl PlayerCamera {
         Self {
             focus_position: Point3::new(0.0, 0.0, 0.0),
             look_up_vector: Vector3::new(0.0, -1.0, 0.0),
-            view_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            projection_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            world_to_screen_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            screen_to_world_matrix: Matrix4::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            view_matrix: Matrix4::from_value(0.0),
+            projection_matrix: Matrix4::from_value(0.0),
+            world_to_screen_matrix: Matrix4::from_value(0.0),
+            screen_to_world_matrix: Matrix4::from_value(0.0),
             view_angle: SmoothedValue::new(FRAC_PI_2, 0.01, 15.0),
             zoom: SmoothedValue::new(400.0, 0.01, 5.0),
             aspect_ratio: 0.0,

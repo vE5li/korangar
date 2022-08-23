@@ -16,9 +16,9 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     quote! {
-        impl #impl_generics crate::traits::ByteConvertable for #name #type_generics #where_clause {
+        impl #impl_generics crate::loaders::ByteConvertable for #name #type_generics #where_clause {
 
-            fn from_bytes(byte_stream: &mut crate::types::ByteStream, length_hint: Option<usize>) -> Self {
+            fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Self {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
                 #(#from_bytes_implementations)*
                 Self { #(#implemented_fields),* }

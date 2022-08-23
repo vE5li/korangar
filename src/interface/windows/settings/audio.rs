@@ -1,7 +1,7 @@
 use procedural::*;
 
-use crate::interface::traits::{ Window, PrototypeWindow };
-use crate::interface::types::InterfaceSettings;
+use crate::interface::{ Window, PrototypeWindow };
+use crate::interface::InterfaceSettings;
 use crate::interface::{ WindowCache, Size };
 use crate::interface::FramedWindow;
 

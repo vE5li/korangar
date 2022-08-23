@@ -1,14 +1,14 @@
 use derive_new::new;
 use num::{ Zero, NumCast };
 use num::traits::NumOps;
+use cgmath::Vector2;
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use crate::types::maths::*;
 use crate::graphics::{Renderer, InterfaceRenderer};
-use crate::interface::traits::Element;
-use crate::interface::windows::Vector2Window;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::Vector2Window;
+use crate::interface::*;
 
 #[derive(new)]
 pub struct MutableVector2Value<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> {
@@ -33,14 +33,12 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
-
-        //self.cached_inner = unsafe { *self.inner_pointer };
-        //self.cached_values = format!("{:.1}, {:.1}", self.cached_inner.x, self.cached_inner.y);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
         let current_value = unsafe { *self.inner_pointer };
 
+        // TODO: fix behavior in case the initial value is 0.0 for all components
         if self.cached_inner != current_value {
             self.cached_inner = current_value;
             self.cached_values = format!("{:.1}, {:.1}", self.cached_inner.x, self.cached_inner.y);

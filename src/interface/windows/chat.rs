@@ -2,13 +2,12 @@ use procedural::*;
 use derive_new::new;
 use std::rc::Rc;
 use std::cell::RefCell;
+use cgmath::{ Vector2, Array };
 
-use crate::types::ChatMessage;
-use crate::types::maths::Vector2;
+use crate::network::ChatMessage;
 use crate::graphics::{ Renderer, Color, InterfaceRenderer };
-use crate::interface::traits::{ Element, Window, PrototypeWindow };
-use crate::interface::types::*;
-use crate::interface::{ StateProvider, WindowCache, SizeConstraint, Size, Position };
+use crate::interface::*;
+use crate::interface::{ StateProvider, WindowCache, SizeConstraint, Size, Position,  Window, PrototypeWindow, Element };
 
 #[derive(new)]
 pub struct PrototypeChatWindow {
@@ -48,7 +47,7 @@ impl ChatWindow {
 
         let position = cached_position
             .map(|position| size_constraint.validated_position(position, size, avalible_space))
-            .unwrap_or(vector2!(0.0, avalible_space.y - size.y));
+            .unwrap_or(Vector2::new(0.0, avalible_space.y - size.y));
 
         let cached_message_count = messages.borrow().len();
 
@@ -138,8 +137,8 @@ impl Window for ChatWindow {
         let scaled_shadow_offset = 1.0 * *interface_settings.scaling;
 
         for (message_index, message) in self.messages.borrow().iter().enumerate() {
-            renderer.render_text(render_target, &message.text, self.position + vector2!(0.0, message_index as f32 * scaled_font_size) + vector2!(scaled_shadow_offset), clip_size, Color::monochrome(0), scaled_font_size);
-            renderer.render_text(render_target, &message.text, self.position + vector2!(0.0, message_index as f32 * scaled_font_size), clip_size, message.color, scaled_font_size);
+            renderer.render_text(render_target, &message.text, self.position + Vector2::new(0.0, message_index as f32 * scaled_font_size) + Vector2::from_value(scaled_shadow_offset), clip_size, Color::monochrome(0), scaled_font_size);
+            renderer.render_text(render_target, &message.text, self.position + Vector2::new(0.0, message_index as f32 * scaled_font_size), clip_size, message.color, scaled_font_size);
         }
     }
 }

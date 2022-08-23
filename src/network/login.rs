@@ -4,7 +4,7 @@ use ron::ser::PrettyConfig;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::interface::types::*;
+use crate::interface::*;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct LoginSettings {

@@ -1,8 +1,9 @@
 use derive_new::new;
 use num::Zero;
+use cgmath::{ Vector2, Array };
 
-use crate::interface::traits::Element;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::*;
 use crate::graphics::{Renderer, InterfaceRenderer};
 
 #[derive(new)]
@@ -38,7 +39,7 @@ impl Element for DragButton {
 
     fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _focused_element: Option<&dyn Element>, _second_theme: bool) {
         let absolute_position = parent_position + self.cached_position;
-        let clip_size = vector2!(f32::min(clip_size.x, absolute_position.x + self.cached_size.x), clip_size.y);
+        let clip_size = Vector2::new(f32::min(clip_size.x, absolute_position.x + self.cached_size.x), clip_size.y);
 
         if matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
             renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.window.title_border_radius * *interface_settings.scaling, *theme.window.title_background_color);

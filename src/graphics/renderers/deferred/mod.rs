@@ -22,11 +22,11 @@ use vulkano::render_pass::Subpass;
 use vulkano::format::Format;
 use vulkano::sync::{ now, GpuFuture };
 use winit::window::Window;
+use cgmath::{ Vector2, Vector3, Matrix4 };
 
 use crate::loaders::TextureLoader;
-use crate::{types::maths::*, graphics::ImageBuffer};
-
-use super::{ DeferredRenderTarget, Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, RenderSettings };
+use crate::graphics::ImageBuffer;
+use crate::graphics::{ DeferredRenderTarget, Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, RenderSettings };
 use crate::graphics::{ Texture, ModelVertexBuffer, WaterVertexBuffer, Color, ScreenVertexBuffer, ScreenVertex };
 
 use self::geometry::GeometryRenderer;

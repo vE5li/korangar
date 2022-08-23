@@ -4,9 +4,9 @@ use std::cell::RefCell;
 use num::Zero;
 
 use crate::input::UserEvent;
-use crate::interface::traits::Element;
-use crate::interface::types::*;
-use crate::interface::elements::*;
+use crate::interface::Element;
+use crate::interface::*;
+use crate::interface::*;
 use crate::graphics::{ Renderer, Color };
 use crate::network::CharacterInformation;
 

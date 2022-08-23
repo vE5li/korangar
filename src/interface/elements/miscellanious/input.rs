@@ -1,11 +1,11 @@
 use derive_new::new;
 use num::Zero;
+use cgmath::{ Vector2, Vector4, Array };
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::types::maths::*;
-use crate::interface::traits::Element;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::*;
 use crate::graphics::{ Renderer, InterfaceRenderer };
 
 #[derive(new)]

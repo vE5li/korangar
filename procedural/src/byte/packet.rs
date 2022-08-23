@@ -37,7 +37,7 @@ pub fn derive_packet_struct(data_struct: DataStruct, generics: Generics, mut att
 
         impl #impl_generics #name #type_generics #where_clause {
 
-            fn try_from_bytes(byte_stream: &mut crate::types::ByteStream) -> Result<Self, String> {
+            fn try_from_bytes(byte_stream: &mut crate::loaders::ByteStream) -> Result<Self, String> {
                 let result = match byte_stream.match_signature(Self::header()) {
                     true => {
                         #(#from_bytes_implementations)*

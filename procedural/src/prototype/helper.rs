@@ -34,7 +34,7 @@ pub fn prototype_element_helper(data_struct: DataStruct, mut attributes: Vec<Att
             .map(|name: LitStr| name.value())
             .unwrap_or_else(|| str::replace(&field_name.to_string(), "_", " "));
 
-        initializers.push(quote!(crate::interface::traits::PrototypeElement::to_element(&self.#field_name, #display_name.to_string())));
+        initializers.push(quote!(crate::interface::PrototypeElement::to_element(&self.#field_name, #display_name.to_string())));
     }
 
     (initializers, window_title, window_class)

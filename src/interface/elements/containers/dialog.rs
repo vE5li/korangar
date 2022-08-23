@@ -3,10 +3,18 @@ use num::Zero;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use crate::interface::traits::Element;
-use crate::interface::types::*;
-use crate::interface::elements::*;
+use crate::interface::Element;
+use crate::interface::*;
+use crate::interface::*;
 use crate::graphics::{Renderer, InterfaceRenderer, Color};
+
+#[derive(Clone, PartialEq)]
+pub enum DialogElement {
+    Text(String),
+    NextButton,
+    CloseButton,
+    ChoiceButton(String, i8),
+}
 
 pub struct DialogContainer {
     dialog_elements: Rc<RefCell<Vec<DialogElement>>>,

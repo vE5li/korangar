@@ -7,10 +7,7 @@ use std::cell::RefCell;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::types::ByteStream;
-use crate::traits::ByteConvertable;
-use crate::loaders::GameFileLoader;
-use crate::types::Version;
+use crate::loaders::{ ByteStream, Version, ByteConvertable, GameFileLoader };
 
 #[derive(Clone, PrototypeElement)]
 pub struct Actions {}

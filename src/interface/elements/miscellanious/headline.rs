@@ -2,8 +2,8 @@ use procedural::*;
 use derive_new::new;
 use num::Zero;
 
-use crate::interface::traits::Element;
-use crate::interface::types::*;
+use crate::interface::Element;
+use crate::interface::*;
 use crate::graphics::{Renderer, InterfaceRenderer};
 
 #[derive(new)]

@@ -13,9 +13,8 @@ use std::io::prelude::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::interface::windows::CharacterSelectionWindow;
-use crate::traits::ByteConvertable;
-use crate::types::{ ByteStream, ChatMessage };
+use crate::interface::CharacterSelectionWindow;
+use crate::loaders::{ ByteStream, ByteConvertable };
 use crate::graphics::{ Color, ColorRGB, ColorBGR };
 
 pub use self::login::LoginSettings;
@@ -61,6 +60,12 @@ pub enum NetworkEvent {
     Inventory(Vec<usize>),
 }
 
+#[derive(new)]
+pub struct ChatMessage {
+    pub text: String,
+    pub color: Color,
+}
+
 #[derive(Copy, Clone, Debug, ByteConvertable)]
 pub enum Sex {
     Male,
@@ -79,7 +84,7 @@ struct LoginServerLoginPacket {
     #[new(default)]
     pub version: [u8; 4],
     #[length_hint(24)]
-    pub name: String, 
+    pub name: String,
     #[length_hint(24)]
     pub password: String,
     /// Unused
@@ -172,7 +177,7 @@ impl ByteConvertable for WorldPosition {
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        assert!(length_hint.is_none()); 
+        assert!(length_hint.is_none());
         let mut coordinates = vec![0, 0, 0];
 
         coordinates[0] = (self.x >> 2) as u8;
@@ -201,7 +206,7 @@ impl WorldPosition2 {
 impl ByteConvertable for WorldPosition2 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none()); 
+        assert!(length_hint.is_none());
         let coordinates: Vec<usize> = byte_stream.slice(6).into_iter().map(|byte| byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -1818,8 +1823,8 @@ impl NetworkingSystem {
 
         let server_ip = IpAddr::V4(character_server_information.server_ip);
         let socket_address = SocketAddr::new(server_ip, character_server_information.server_port);
-        self.character_stream = TcpStream::connect(socket_address)
-            .map_err(|_| "failed to connect to character server")?
+        self.character_stream = TcpStream::connect_timeout(&socket_address, Duration::from_secs(1))
+            .map_err(|_| "Failed to connect to character server. Please try again")?
             .into();
 
         let character_server_login_packet = CharacterServerLoginPacket::new(
@@ -2037,8 +2042,8 @@ impl NetworkingSystem {
 
         let server_ip = IpAddr::V4(character_selection_success_packet.map_server_ip);
         let socket_address = SocketAddr::new(server_ip, character_selection_success_packet.map_server_port);
-        self.map_stream = TcpStream::connect(socket_address)
-            .expect("failed to connect to map server")
+        self.map_stream = TcpStream::connect_timeout(&socket_address, Duration::from_secs(1))
+            .map_err(|_| "Failed to connect to map server. Please try again")?
             .into();
 
         let login_data = self.login_data.as_ref().unwrap();
@@ -2120,7 +2125,7 @@ impl NetworkingSystem {
                     characters.push(character_information);
                 }
 
-                // packet_length and packet 0xa0 0x09 are left unread because we don't need them 
+                // packet_length and packet 0xa0 0x09 are left unread because we don't need them
             },
 
             SwitchCharacterSlotResponseStatus::Error => return Err("failed to move character to a different slot".to_string()),
@@ -2193,7 +2198,7 @@ impl NetworkingSystem {
 
                 } else if let Ok(_packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
 
-                } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) { 
+                } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) {
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::EntityMove(packet.entity_id, origin, destination, packet.timestamp));
 

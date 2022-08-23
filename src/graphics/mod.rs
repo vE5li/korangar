@@ -1,4 +1,6 @@
-mod types;
+mod color;
+mod transform;
+mod smoothed;
 mod vertices;
 mod renderers;
 mod cameras;
@@ -13,7 +15,9 @@ use vulkano::image::ImmutableImage;
 use vulkano::buffer::CpuAccessibleBuffer;
 use vulkano::buffer::cpu_pool::CpuBufferPool;
 
-pub use self::types::*;
+pub use self::color::*;
+pub use self::transform::Transform;
+pub use self::smoothed::SmoothedValue;
 pub use self::vertices::*;
 pub use self::renderers::*;
 pub use self::cameras::*;

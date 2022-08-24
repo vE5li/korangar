@@ -1,9 +1,9 @@
-mod dimension;
 mod constraint;
-mod size;
+mod dimension;
 mod resolver;
+mod size;
 
-pub use self::dimension::Dimension;
 pub use self::constraint::SizeConstraint;
-pub use self::size::{ Size, PartialSize, Position };
+pub use self::dimension::Dimension;
 pub use self::resolver::PlacementResolver;
+pub use self::size::{PartialSize, Position, Size};

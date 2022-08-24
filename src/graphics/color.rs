@@ -1,5 +1,5 @@
 use procedural::*;
-use serde::{ Serialize, Deserialize };
+use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Color {
@@ -12,7 +12,13 @@ pub struct Color {
 impl Color {
 
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
-        Self { red, green, blue, alpha: 255 }
+
+        Self {
+            red,
+            green,
+            blue,
+            alpha: 255,
+        }
     }
 
     pub fn rgb_f32(red: f32, green: f32, blue: f32) -> Self {
@@ -21,7 +27,12 @@ impl Color {
         let green = (green * 255.0) as u8;
         let blue = (blue * 255.0) as u8;
 
-        Self { red, green, blue, alpha: 255 }
+        Self {
+            red,
+            green,
+            blue,
+            alpha: 255,
+        }
     }
 
     pub const fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
@@ -29,7 +40,13 @@ impl Color {
     }
 
     pub const fn monochrome(brightness: u8) -> Self {
-        Self { red: brightness, green: brightness, blue: brightness, alpha: 255 }
+
+        Self {
+            red: brightness,
+            green: brightness,
+            blue: brightness,
+            alpha: 255,
+        }
     }
 
     pub fn red_f32(&self) -> f32 {
@@ -54,8 +71,20 @@ impl Color {
 
     pub fn shade(&self) -> Self {
         match (self.red as usize) + (self.green as usize) + (self.blue as usize) > 382 {
-            true => Self::rgba(self.red.saturating_sub(40), self.green.saturating_sub(40), self.blue.saturating_sub(40), self.alpha),
-            false => Self::rgba(self.red.saturating_add(40), self.green.saturating_add(40), self.blue.saturating_add(40), self.alpha),
+
+            true => Self::rgba(
+                self.red.saturating_sub(40),
+                self.green.saturating_sub(40),
+                self.blue.saturating_sub(40),
+                self.alpha,
+            ),
+
+            false => Self::rgba(
+                self.red.saturating_add(40),
+                self.green.saturating_add(40),
+                self.blue.saturating_add(40),
+                self.alpha,
+            ),
         }
     }
 }

@@ -1,6 +1,5 @@
 use crate::graphics::Color;
-use crate::interface::{ MutableColorValue, StaticLabel, Container };
-use crate::interface::{ ElementCell, SizeConstraint, ChangeEvent };
+use crate::interface::{ChangeEvent, Container, ElementCell, MutableColorValue, SizeConstraint, StaticLabel};
 
 pub trait PrototypeMutableElement {
 
@@ -24,9 +23,7 @@ impl PrototypeMutableElement for SizeConstraint {
 
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }

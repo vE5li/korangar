@@ -1,15 +1,15 @@
 mod state;
 
 use std::collections::HashMap;
-use cgmath::Vector2;
-use serde::{ Serialize, Deserialize };
-use ron::ser::PrettyConfig;
 
-#[cfg(feature = "debug")]
-use crate::debug::*;
-use crate::interface::{ Position, Size };
+use cgmath::Vector2;
+use ron::ser::PrettyConfig;
+use serde::{Deserialize, Serialize};
 
 use self::state::WindowState;
+#[cfg(feature = "debug")]
+use crate::debug::*;
+use crate::interface::{Position, Size};
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct WindowCache {
@@ -19,10 +19,15 @@ pub struct WindowCache {
 impl WindowCache {
 
     pub fn new() -> Self {
+
         Self::load().unwrap_or_else(|| {
 
             #[cfg(feature = "debug")]
-            print_debug!("failed to load window cache from {}filename{}. creating empty cache", MAGENTA, NONE);
+            print_debug!(
+                "failed to load window cache from {}filename{}. creating empty cache",
+                MAGENTA,
+                NONE
+            );
 
             Default::default()
         })
@@ -50,9 +55,11 @@ impl WindowCache {
 
     pub fn register_window(&mut self, identifier: &str, position: Position, size: Size) {
         if let Some(entry) = self.entries.get_mut(identifier) {
-            entry.position = position; 
-            entry.size = size; 
+
+            entry.position = position;
+            entry.size = size;
         } else {
+
             let entry = WindowState::new(position, size);
             self.entries.insert(identifier.to_string(), entry);
         }

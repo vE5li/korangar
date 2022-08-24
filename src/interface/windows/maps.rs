@@ -1,11 +1,8 @@
+use cgmath::Vector2;
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::InterfaceSettings;
-use crate::interface::*;
-use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
-use cgmath::Vector2;
+use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
 
 #[derive(Default)]
 pub struct MapsWindow {}
@@ -21,14 +18,19 @@ impl PrototypeWindow for MapsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
         let map_warps = [
             ("geffen", Vector2::new(119, 59)),
-            ("alberta",Vector2::new(28,234)),
-            ("aldebaran",Vector2::new(140,131)),
-            ("amatsu",Vector2::new(198,84)),
-            ("ayothaya",Vector2::new(208,166)),
+            ("alberta", Vector2::new(28, 234)),
+            ("aldebaran", Vector2::new(140, 131)),
+            ("amatsu", Vector2::new(198, 84)),
+            ("ayothaya", Vector2::new(208, 166)),
             ("prontera", Vector2::new(155, 183)),
             ("brasilis", Vector2::new(196, 217)),
             ("einbech", Vector2::new(63, 35)),
@@ -51,9 +53,23 @@ impl PrototypeWindow for MapsWindow {
 
         let elements = map_warps
             .into_iter()
-            .map(|(name, position)| cell!(EventButton::new(name.to_string(), UserEvent::RequestWarpToMap(format!("{}.gat", name), position))) as ElementCell)
+            .map(|(name, position)| {
+
+                cell!(EventButton::new(
+                    name.to_string(),
+                    UserEvent::RequestWarpToMap(format!("{}.gat", name), position)
+                )) as ElementCell
+            })
             .collect();
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Maps".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ? < 80%)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Maps".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(200 > 250 < 300, ? < 80%),
+        ))
     }
 }

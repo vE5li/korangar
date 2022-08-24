@@ -1,16 +1,15 @@
-mod player;
-mod shadow;
 #[cfg(feature = "debug")]
 mod debug;
+mod player;
+mod shadow;
 
-pub use self::player::PlayerCamera;
-pub use self::shadow::ShadowCamera;
+use cgmath::{Matrix4, Vector2, Vector3, Vector4};
+
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
-
-use cgmath::{ Vector2, Vector3, Vector4, Matrix4 };
-
-use crate::graphics::{ SmoothedValue, Transform };
+pub use self::player::PlayerCamera;
+pub use self::shadow::ShadowCamera;
+use crate::graphics::{SmoothedValue, Transform};
 
 pub trait Camera {
 

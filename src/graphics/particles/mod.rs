@@ -1,19 +1,26 @@
-use derive_new::new;
-use rand::{ thread_rng, Rng };
 use std::collections::HashMap;
-use vulkano::sync::GpuFuture;
-use cgmath::{ Vector2, Vector3, Array };
 
-use crate::loaders::TextureLoader;
-use crate::network::{ QuestEffectPacket, QuestColor };
+use cgmath::{Array, Vector2, Vector3};
+use derive_new::new;
+use rand::{thread_rng, Rng};
+use vulkano::sync::GpuFuture;
+
 use crate::graphics::*;
+use crate::loaders::TextureLoader;
+use crate::network::{QuestColor, QuestEffectPacket};
 use crate::world::*;
 
 pub trait Particle {
 
     fn update(&mut self, delta_time: f32) -> bool;
 
-    fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>);
+    fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        window_size: Vector2<f32>,
+    );
 }
 
 #[derive(new)]
@@ -33,6 +40,7 @@ pub struct DamageNumber {
 impl Particle for DamageNumber {
 
     fn update(&mut self, delta_time: f32) -> bool {
+
         self.velocity_y -= 200.0 * delta_time;
 
         self.position.y += self.velocity_y * delta_time;
@@ -43,11 +51,20 @@ impl Particle for DamageNumber {
         self.timer > 0.0
     }
 
-    fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>) {
+    fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        window_size: Vector2<f32>,
+    ) {
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
-        let screen_position = Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
+        let screen_position = Vector2::new(
+            clip_space_position.x / clip_space_position.w + 1.0,
+            clip_space_position.y / clip_space_position.w + 1.0,
+        );
         let screen_position = screen_position / 2.0;
         let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
 
@@ -63,11 +80,21 @@ pub struct QuestIcon {
 
 impl QuestIcon {
 
-    pub fn new(texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, quest_effect: QuestEffectPacket) -> Self {
+    pub fn new(
+        texture_loader: &mut TextureLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+        map: &Map,
+        quest_effect: QuestEffectPacket,
+    ) -> Self {
 
         let position = map.get_world_position(quest_effect.position.map(usize::from)) + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
-        let texture = texture_loader.get(&format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1 /* 1 - 3 */), texture_future).unwrap();
+        let texture = texture_loader
+            .get(
+                &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1 /* 1 - 3 */),
+                texture_future,
+            )
+            .unwrap();
         let color = match quest_effect.color {
             QuestColor::Yellow => Color::rgb(200, 200, 30),
             QuestColor::Orange => Color::rgb(200, 100, 30),
@@ -75,22 +102,33 @@ impl QuestIcon {
             QuestColor::Purple => Color::rgb(200, 30, 200),
         };
 
-        Self {
-            position,
-            texture,
-            color,
-        }
+        Self { position, texture, color }
     }
 
-    fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>) {
+    fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        window_size: Vector2<f32>,
+    ) {
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
-        let screen_position = Vector2::new(clip_space_position.x / clip_space_position.w + 1.0, clip_space_position.y / clip_space_position.w + 1.0);
+        let screen_position = Vector2::new(
+            clip_space_position.x / clip_space_position.w + 1.0,
+            clip_space_position.y / clip_space_position.w + 1.0,
+        );
         let screen_position = screen_position / 2.0;
         let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
 
-        renderer.render_sprite(render_target, self.texture.clone(), final_position - Vector2::from_value(15.0), Vector2::from_value(30.0), self.color);
+        renderer.render_sprite(
+            render_target,
+            self.texture.clone(),
+            final_position - Vector2::from_value(15.0),
+            Vector2::from_value(30.0),
+            self.color,
+        );
     }
 }
 
@@ -106,8 +144,18 @@ impl ParticleHolder {
         self.particles.push(particle);
     }
 
-    pub fn add_quest_icon(&mut self, texture_loader: &mut TextureLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, map: &Map, quest_effect: QuestEffectPacket) {
-        self.quest_icons.insert(quest_effect.entity_id, QuestIcon::new(texture_loader, texture_future, map, quest_effect));
+    pub fn add_quest_icon(
+        &mut self,
+        texture_loader: &mut TextureLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+        map: &Map,
+        quest_effect: QuestEffectPacket,
+    ) {
+
+        self.quest_icons.insert(
+            quest_effect.entity_id,
+            QuestIcon::new(texture_loader, texture_future, map, quest_effect),
+        );
     }
 
     pub fn remove_quest_icon(&mut self, entity_id: u32) {
@@ -115,6 +163,7 @@ impl ParticleHolder {
     }
 
     pub fn clear(&mut self) {
+
         self.particles.clear();
         self.quest_icons.clear();
     }
@@ -123,8 +172,18 @@ impl ParticleHolder {
         self.particles.retain_mut(|particle| particle.update(delta_time));
     }
 
-    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, window_size: Vector2<f32>, entities: &[Entity]) {
-        self.particles.iter().for_each(|particle| particle.render(render_target, renderer, camera, window_size));
+    pub fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        window_size: Vector2<f32>,
+        entities: &[Entity],
+    ) {
+
+        self.particles
+            .iter()
+            .for_each(|particle| particle.render(render_target, renderer, camera, window_size));
 
         entities
             .iter()

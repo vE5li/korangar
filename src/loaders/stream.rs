@@ -1,5 +1,5 @@
+use cgmath::{Matrix3, Vector3};
 use derive_new::new;
-use cgmath::{ Vector3, Matrix3 };
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -18,6 +18,7 @@ pub struct ByteStream<'b> {
 impl<'b> ByteStream<'b> {
 
     pub fn next(&mut self) -> u8 {
+
         assert!(self.offset < self.data.len(), "byte stream is shorter than expected");
         let byte = self.data[self.offset];
         self.offset += 1;
@@ -25,6 +26,7 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn peek(&self, index: usize) -> u8 {
+
         assert!(self.offset + index < self.data.len(), "byte stream is shorter than expected");
         self.data[self.offset + index]
     }
@@ -69,6 +71,7 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn integer16(&mut self) -> i16 {
+
         let mut value = 0;
 
         value |= self.next() as i16;
@@ -78,6 +81,7 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn integer32(&mut self) -> i32 {
+
         let mut value = 0;
 
         value |= self.next() as i32;
@@ -93,9 +97,11 @@ impl<'b> ByteStream<'b> {
         let mut value = String::new();
 
         for index in 0..count {
+
             let byte = self.next();
 
             if byte == 0 {
+
                 self.skip(count - index - 1);
                 break;
             }
@@ -161,9 +167,11 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn slice(&mut self, count: usize) -> Vec<u8> {
+
         let mut value = Vec::new();
 
         for _index in 0..count {
+
             let byte = self.next();
             value.push(byte);
         }
@@ -171,7 +179,8 @@ impl<'b> ByteStream<'b> {
         value
     }
 
-    pub fn remaining(&mut self) -> Vec<u8> { // temporary ?
+    pub fn remaining(&mut self) -> Vec<u8> {
+        // temporary ?
         self.slice(self.data.len() - self.offset)
     }
 
@@ -181,10 +190,19 @@ impl<'b> ByteStream<'b> {
 
     #[cfg(feature = "debug")]
     pub fn assert_empty(&self, file_name: &str) {
+
         let remaining = self.data.len() - self.offset;
 
         if remaining != 0 {
-            print_debug!("incomplete read on file {}{}{}; {}{}{} bytes remaining", MAGENTA, file_name, NONE, YELLOW, remaining, NONE);
+            print_debug!(
+                "incomplete read on file {}{}{}; {}{}{} bytes remaining",
+                MAGENTA,
+                file_name,
+                NONE,
+                YELLOW,
+                remaining,
+                NONE
+            );
         }
     }
 }

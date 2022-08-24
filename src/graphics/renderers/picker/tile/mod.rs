@@ -12,25 +12,22 @@ mod fragment_shader {
     }
 }
 
-use std::sync::Arc;
 use std::iter;
+use std::sync::Arc;
 
-use vulkano::device::Device;
-
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline };
-use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
-use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
+use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::shader::ShaderModule;
+use vulkano::device::Device;
+use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
+use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
+use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-
-use vulkano::buffer::{ BufferUsage, BufferAccess };
-
-use crate::graphics::*;
+use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Matrices;
+use crate::graphics::*;
 
 pub struct TileRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -48,14 +45,26 @@ impl TileRenderer {
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
         let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
 
-        Self { pipeline, vertex_shader, fragment_shader, matrices_buffer }
+        Self {
+            pipeline,
+            vertex_shader,
+            fragment_shader,
+            matrices_buffer,
+        }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
 
-    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
+    fn create_pipeline(
+        device: Arc<Device>,
+        subpass: Subpass,
+        viewport: Viewport,
+        vertex_shader: &ShaderModule,
+        fragment_shader: &ShaderModule,
+    ) -> Arc<GraphicsPipeline> {
+
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<TileVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -79,16 +88,17 @@ impl TileRenderer {
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [
-            WriteDescriptorSet::buffer(0, matrices_subbuffer),
-        ]).unwrap(); 
+        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<TileVertex>();
 
-        render_target.state.get_builder()
+        render_target
+            .state
+            .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set)
             .bind_vertex_buffers(0, vertex_buffer)
-            .draw(vertex_count as u32, 1, 0, 0).unwrap();
+            .draw(vertex_count as u32, 1, 0, 0)
+            .unwrap();
     }
 }

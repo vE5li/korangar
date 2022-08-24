@@ -3,18 +3,16 @@ mod key;
 mod mode;
 
 use std::rc::Rc;
+
 use cgmath::Vector2;
-
-use winit::event::{ MouseButton, ElementState, MouseScrollDelta };
 use winit::dpi::PhysicalPosition;
-
-use crate::interface::ElementCell;
-use crate::interface::{ Interface, ClickAction };
-use crate::graphics::{ RenderSettings, PickerRenderTarget, PickerTarget };
+use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 
 pub use self::event::UserEvent;
-pub use self::mode::MouseInputMode;
 pub use self::key::Key;
+pub use self::mode::MouseInputMode;
+use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
+use crate::interface::{ClickAction, ElementCell, Interface};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;
@@ -77,6 +75,7 @@ impl InputSystem {
     }
 
     pub fn reset(&mut self) {
+
         self.left_mouse_button.reset();
         self.right_mouse_button.reset();
         self.keys.iter_mut().for_each(|key| key.reset());
@@ -89,12 +88,13 @@ impl InputSystem {
     }
 
     pub fn update_mouse_buttons(&mut self, button: MouseButton, state: ElementState) {
+
         let pressed = matches!(state, ElementState::Pressed);
 
         match button {
             MouseButton::Left => self.left_mouse_button.set_down(pressed),
             MouseButton::Right => self.right_mouse_button.set_down(pressed),
-            _ignored => {},
+            _ignored => {}
         }
     }
 
@@ -106,6 +106,7 @@ impl InputSystem {
     }
 
     pub fn update_keyboard(&mut self, code: usize, state: ElementState) {
+
         let pressed = matches!(state, ElementState::Pressed);
         self.keys[code].set_down(pressed);
         //println!("code: {}", code);
@@ -128,7 +129,13 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    pub fn user_events(&mut self, interface: &mut Interface, picker_target: &mut PickerRenderTarget, render_settings: &RenderSettings, window_size: Vector2<usize>) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
+    pub fn user_events(
+        &mut self,
+        interface: &mut Interface,
+        picker_target: &mut PickerRenderTarget,
+        render_settings: &RenderSettings,
+        window_size: Vector2<usize>,
+    ) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
 
         let mut events = Vec::new();
         let mut mouse_target = None;
@@ -153,11 +160,13 @@ impl InputSystem {
             if let Some(window_index) = &mut window_index {
 
                 if self.left_mouse_button.pressed() {
+
                     *window_index = interface.move_window_to_top(*window_index);
                     self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
                 }
 
                 if self.right_mouse_button.pressed() {
+
                     *window_index = interface.move_window_to_top(*window_index);
                     self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
@@ -181,11 +190,19 @@ impl InputSystem {
 
                     if let Some(action) = action {
                         match action {
+
                             ClickAction::FocusElement => self.focused_element = Some((hovered_element.clone(), *window_index)),
+
                             ClickAction::Event(event) => events.push(event),
+
                             ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
-                            ClickAction::DragElement => self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index)),
+
+                            ClickAction::DragElement => {
+                                self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
+                            }
+
                             ClickAction::OpenWindow(prototype_window) => interface.open_window(prototype_window.as_ref()),
+
                             ClickAction::CloseWindow => interface.close_window(*window_index),
                         }
                     }
@@ -233,7 +250,12 @@ impl InputSystem {
             }
         }
 
-        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && self.mouse_input_mode.is_none() && self.mouse_delta.x != 0.0 && !lock_actions {
+        if self.right_mouse_button.down()
+            && !self.right_mouse_button.pressed()
+            && self.mouse_input_mode.is_none()
+            && self.mouse_delta.x != 0.0
+            && !lock_actions
+        {
             events.push(UserEvent::CameraRotate(self.mouse_delta.x));
         }
 
@@ -277,12 +299,17 @@ impl InputSystem {
 
             #[cfg(feature = "debug")]
             if self.keys[33].pressed() {
+
                 events.push(UserEvent::ToggleUseDebugCamera);
                 events.push(UserEvent::CameraDecelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.left_mouse_button.down() && !self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && render_settings.use_debug_camera {
+            if self.left_mouse_button.down()
+                && !self.left_mouse_button.pressed()
+                && self.mouse_input_mode.is_none()
+                && render_settings.use_debug_camera
+            {
                 events.push(UserEvent::CameraLookAround(-self.mouse_delta));
             }
 
@@ -327,9 +354,11 @@ impl InputSystem {
             let lock = picker_target.buffer.read().unwrap();
 
             if sample_index < lock.len() {
+
                 let pixel = lock[sample_index];
 
                 if pixel != 0 {
+
                     let picker_target = PickerTarget::from(pixel);
 
                     if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
@@ -345,7 +374,8 @@ impl InputSystem {
         }
 
         // check if the hovered element changed from last frame
-        let rerender_hovered = self.previous_hovered_element
+        let rerender_hovered = self
+            .previous_hovered_element
             .as_ref()
             .zip(hovered_element.as_ref())
             .map(|(previous, current)| !Rc::ptr_eq(&previous.0, current))
@@ -363,7 +393,8 @@ impl InputSystem {
         }
 
         // check if the focused element changed from last frame
-        let rerender_focused = self.previous_focused_element
+        let rerender_focused = self
+            .previous_focused_element
             .as_ref()
             .zip(self.focused_element.as_ref())
             .map(|(previous, current)| !Rc::ptr_eq(&previous.0, &current.0))
@@ -383,7 +414,12 @@ impl InputSystem {
         self.previous_hovered_element = hovered_element.clone().zip(window_index);
         self.previous_focused_element = self.focused_element.clone();
 
-        (events, hovered_element, self.focused_element.clone().map(|(element, _)| element), mouse_target)
+        (
+            events,
+            hovered_element,
+            self.focused_element.clone().map(|(element, _)| element),
+            mouse_target,
+        )
     }
 
     pub fn unused_left_click(&self) -> bool {

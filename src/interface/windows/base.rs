@@ -1,7 +1,7 @@
 use cgmath::Vector2;
-use crate::graphics::{Renderer, InterfaceRenderer};
-use crate::interface::*;
-use crate::interface::Element;
+
+use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::interface::{Element, *};
 
 pub trait Window {
 
@@ -9,7 +9,12 @@ pub trait Window {
 
     fn has_transparency(&self, theme: &Theme) -> bool;
 
-    fn resolve(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size) -> (Option<&str>, Vector2<f32>, Size);
+    fn resolve(
+        &mut self,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        avalible_space: Size,
+    ) -> (Option<&str>, Vector2<f32>, Size);
 
     fn update(&mut self) -> Option<ChangeEvent>;
 
@@ -23,9 +28,24 @@ pub trait Window {
 
     fn validate_position(&mut self, avalible_space: Size);
 
-    fn resize(&mut self, interface_settings: &InterfaceSettings, theme: &Theme, avalible_space: Size, growth: Vector2<f32>) -> (Option<&str>, Size);
+    fn resize(
+        &mut self,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        avalible_space: Size,
+        growth: Vector2<f32>,
+    ) -> (Option<&str>, Size);
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size);
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, hovered_element: Option<&dyn Element>, focused_element: Option<&dyn Element>);
+    fn render(
+        &self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        renderer: &InterfaceRenderer,
+        state_provider: &StateProvider,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        hovered_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
+    );
 }

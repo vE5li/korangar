@@ -1,5 +1,6 @@
+use std::fmt::{Display, Formatter, Result};
+
 use derive_new::new;
-use std::fmt::{ Display, Formatter, Result };
 
 use crate::loaders::ByteConvertable;
 
@@ -12,6 +13,7 @@ pub struct Version {
 impl ByteConvertable for Version {
 
     fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none());
 
         // TODO: this should be the other way around?

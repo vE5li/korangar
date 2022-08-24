@@ -1,11 +1,11 @@
-use std::rc::Rc;
 use std::fmt::Display;
-use cgmath::{ Vector2, Vector3, Quaternion };
+use std::rc::Rc;
 
+use cgmath::{Quaternion, Vector2, Vector3};
+
+use crate::graphics::{Color, ModelVertexBuffer, Texture};
+use crate::interface::{ElementCell, SizeConstraint, *};
 use crate::loaders::Version;
-use crate::graphics::{ Color, ModelVertexBuffer, Texture };
-use crate::interface::*;
-use crate::interface::{ ElementCell, SizeConstraint };
 
 pub trait PrototypeElement {
 
@@ -16,9 +16,7 @@ impl PrototypeElement for SizeConstraint {
 
     fn to_element(&self, display: String) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }
@@ -28,10 +26,7 @@ impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Vector
 
     fn to_element(&self, display: String) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(Vector2Value::new(*self)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(Vector2Value::new(*self))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }
@@ -41,10 +36,7 @@ impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Vector
 
     fn to_element(&self, display: String) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(Vector3Value::new(*self)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(Vector3Value::new(*self))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }
@@ -54,10 +46,7 @@ impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Quater
 
     fn to_element(&self, display: String) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(QuaternionValue::new(*self)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(QuaternionValue::new(*self))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }
@@ -85,10 +74,7 @@ impl<T: PrototypeElement> PrototypeElement for Option<T> {
             return value.to_element(display);
         }
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(StringValue::new("none".to_string())),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(StringValue::new("none".to_string()))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }
@@ -126,10 +112,7 @@ impl PrototypeElement for Color {
 
     fn to_element(&self, display: String) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(ColorValue::new(*self)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(ColorValue::new(*self))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
     }
@@ -145,6 +128,7 @@ impl<T: PrototypeElement> PrototypeElement for Rc<T> {
 impl PrototypeElement for ModelVertexBuffer {
 
     fn to_element(&self, display: String) -> ElementCell {
+
         use vulkano::buffer::BufferAccess;
 
         let identifier = self.inner().buffer.key();
@@ -162,8 +146,8 @@ impl PrototypeElement for ModelVertexBuffer {
 impl PrototypeElement for Texture {
 
     fn to_element(&self, display: String) -> ElementCell {
-        use vulkano::VulkanObject;
-        use vulkano::Handle;
+
+        use vulkano::{Handle, VulkanObject};
 
         let identifier = self.internal_object().as_raw();
 

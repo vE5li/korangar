@@ -1,5 +1,5 @@
-use derive_new::new;
 use cgmath::Vector2;
+use derive_new::new;
 
 pub type Size = Vector2<f32>;
 pub type Position = Vector2<f32>;
@@ -13,12 +13,14 @@ pub struct PartialSize {
 impl PartialSize {
 
     pub fn finalize(self) -> Vector2<f32> {
+
         let x = self.x;
         let y = self.y.expect("element cannot have flexible height");
         Vector2::new(x, y)
     }
 
     pub fn finalize_or(self, y: f32) -> Vector2<f32> {
+
         let x = self.x;
         let y = self.y.unwrap_or(y);
         Vector2::new(x, y)
@@ -26,8 +28,12 @@ impl PartialSize {
 }
 
 impl From<Size> for PartialSize {
-   
-    fn from(size: Size) -> Self { 
-        Self { x: size.x, y: Some(size.y) }
+
+    fn from(size: Size) -> Self {
+
+        Self {
+            x: size.x,
+            y: Some(size.y),
+        }
     }
 }

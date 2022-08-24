@@ -1,7 +1,7 @@
 use derive_new::new;
-use serde::{ Serialize, Deserialize };
+use serde::{Deserialize, Serialize};
 
-use crate::interface::{ Dimension, Size, Position, PartialSize };
+use crate::interface::{Dimension, PartialSize, Position, Size};
 
 #[derive(Copy, Clone, Serialize, Deserialize, new)]
 pub struct SizeConstraint {
@@ -44,11 +44,13 @@ impl SizeConstraint {
     fn validated_width(&self, mut width: f32, avalible: f32, remaining: f32, scaling: f32) -> f32 {
 
         if let Some(maximum_width) = self.maximum_width {
+
             let maximum_value = maximum_width.resolve_width(avalible, remaining, scaling);
             width = f32::min(width, maximum_value);
         }
 
         if let Some(minimum_width) = self.minimum_width {
+
             let minimum_value = minimum_width.resolve_width(avalible, remaining, scaling);
             width = f32::max(width, minimum_value);
         }
@@ -59,11 +61,13 @@ impl SizeConstraint {
     pub fn validated_height(&self, mut height: f32, avalible: Option<f32>, remaining: Option<f32>, scaling: f32) -> f32 {
 
         if let Some(maximum_height) = self.maximum_height {
+
             let maximum_value = maximum_height.resolve_height(avalible, remaining, scaling);
             height = f32::min(height, maximum_value.expect("maximum height cannot be flexible"));
         }
 
         if let Some(minimum_height) = self.minimum_height {
+
             let minimum_value = minimum_height.resolve_height(avalible, remaining, scaling);
             height = f32::max(height, minimum_value.expect("minimum height cannot be flexible"));
         }
@@ -72,12 +76,14 @@ impl SizeConstraint {
     }
 
     pub fn validated_size(&self, size: Size, avalible: Size, scaling: f32) -> Size {
+
         let width = self.validated_width(size.x, avalible.x, avalible.x, scaling);
         let height = self.validated_height(size.y, avalible.y.into(), avalible.y.into(), scaling);
         Size::new(width, height)
     }
 
     pub fn validated_position(&self, position: Position, size: Size, avalible: Size) -> Position {
+
         let half_size = size / 2.0;
         let x = f32::clamp(position.x, -half_size.x, avalible.x - half_size.x);
         let y = f32::clamp(position.y, 0.0, avalible.y - 30.0);

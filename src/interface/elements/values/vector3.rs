@@ -1,11 +1,11 @@
-use derive_new::new;
-use num::Zero;
 use std::fmt::Display;
 
 use cgmath::Vector3;
-use crate::graphics::{Renderer, InterfaceRenderer};
-use crate::interface::Element;
-use crate::interface::*;
+use derive_new::new;
+use num::Zero;
+
+use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::interface::{Element, *};
 
 #[derive(new)]
 pub struct Vector3Value<T: Display> {
@@ -21,16 +21,44 @@ pub struct Vector3Value<T: Display> {
 impl<T: Display> Element for Vector3Value<T> {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+
         let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
         self.cached_values = format!("{:.1}, {:.1}, {:.1}", self.value.x, self.value.y, self.value.z);
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, _hovered_element: Option<&dyn Element>, _focused_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(
+        &self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        renderer: &InterfaceRenderer,
+        _state_provider: &StateProvider,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        parent_position: Position,
+        clip_size: Size,
+        _hovered_element: Option<&dyn Element>,
+        _focused_element: Option<&dyn Element>,
+        _second_theme: bool,
+    ) {
+
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.value.border_radius * *interface_settings.scaling, *theme.value.background_color);
-        renderer.render_text(render_target, &self.cached_values, absolute_position + *theme.value.text_offset * *interface_settings.scaling, clip_size, *theme.value.foreground_color, *theme.value.font_size * *interface_settings.scaling);
+        renderer.render_rectangle(
+            render_target,
+            absolute_position,
+            self.cached_size,
+            clip_size,
+            *theme.value.border_radius * *interface_settings.scaling,
+            *theme.value.background_color,
+        );
+        renderer.render_text(
+            render_target,
+            &self.cached_values,
+            absolute_position + *theme.value.text_offset * *interface_settings.scaling,
+            clip_size,
+            *theme.value.foreground_color,
+            *theme.value.font_size * *interface_settings.scaling,
+        );
     }
 }

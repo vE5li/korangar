@@ -1,12 +1,12 @@
-use derive_new::new;
-use cgmath::{ Vector4, Array };
-use num::{ Zero, NumCast, clamp };
-use num::traits::NumOps;
 use std::cmp::PartialOrd;
 
-use crate::interface::Element;
-use crate::interface::*;
-use crate::graphics::{ Renderer, InterfaceRenderer };
+use cgmath::{Array, Vector4};
+use derive_new::new;
+use num::traits::NumOps;
+use num::{clamp, NumCast, Zero};
+
+use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::interface::{Element, *};
 
 #[derive(new)]
 pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
@@ -25,6 +25,7 @@ pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+
         let (size, position) = placement_resolver.allocate(&theme.slider.size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
@@ -33,9 +34,11 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
+
         let current_value = unsafe { *self.value_pointer };
 
         if self.cached_value != current_value {
+
             self.cached_value = current_value;
             return Some(ChangeEvent::RerenderWindow);
         }
@@ -44,9 +47,14 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
+
         let absolute_position = mouse_position - self.cached_position;
 
-        if absolute_position.x >= 0.0 && absolute_position.y >= 0.0 && absolute_position.x <= self.cached_size.x && absolute_position.y <= self.cached_size.y {
+        if absolute_position.x >= 0.0
+            && absolute_position.y >= 0.0
+            && absolute_position.x <= self.cached_size.x
+            && absolute_position.y <= self.cached_size.y
+        {
             return HoverInformation::Hovered;
         }
 
@@ -61,27 +69,72 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
 
         let total_range = self.maximum_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap();
         let raw_value = self.cached_value.to_f32().unwrap() + (mouse_delta.x * total_range * 0.005);
-        let new_value = clamp(raw_value, self.minimum_value.to_f32().unwrap(), self.maximum_value.to_f32().unwrap());
+        let new_value = clamp(
+            raw_value,
+            self.minimum_value.to_f32().unwrap(),
+            self.maximum_value.to_f32().unwrap(),
+        );
 
-        unsafe { std::ptr::write(self.value_pointer as *mut T, T::from(new_value).unwrap()); }
+        unsafe {
+            std::ptr::write(self.value_pointer as *mut T, T::from(new_value).unwrap());
+        }
         self.change_event
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, hovered_element: Option<&dyn Element>, _focused_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(
+        &self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        renderer: &InterfaceRenderer,
+        _state_provider: &StateProvider,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        parent_position: Position,
+        clip_size: Size,
+        hovered_element: Option<&dyn Element>,
+        _focused_element: Option<&dyn Element>,
+        _second_theme: bool,
+    ) {
+
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
 
         if matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ())) {
-            renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.button.border_radius * *interface_settings.scaling, *theme.slider.background_color);
+
+            renderer.render_rectangle(
+                render_target,
+                absolute_position,
+                self.cached_size,
+                clip_size,
+                *theme.button.border_radius * *interface_settings.scaling,
+                *theme.slider.background_color,
+            );
         }
 
         let bar_size = Size::new(self.cached_size.x * 0.9, self.cached_size.y / 4.0);
         let offset = (self.cached_size - bar_size) / 2.0;
-        renderer.render_rectangle(render_target, absolute_position + offset, bar_size, clip_size, Vector4::from_value(0.5) * *interface_settings.scaling, *theme.slider.rail_color);
+        renderer.render_rectangle(
+            render_target,
+            absolute_position + offset,
+            bar_size,
+            clip_size,
+            Vector4::from_value(0.5) * *interface_settings.scaling,
+            *theme.slider.rail_color,
+        );
 
         let knob_size = Size::new(20.0 * *interface_settings.scaling, self.cached_size.y * 0.8);
         let total_range = self.maximum_value - self.minimum_value;
-        let offset = Position::new((self.cached_size.x - knob_size.x) / total_range.to_f32().unwrap() * (self.cached_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap()), (self.cached_size.y - knob_size.y) / 2.0);
-        renderer.render_rectangle(render_target, absolute_position + offset, knob_size, clip_size, Vector4::from_value(4.0) * *interface_settings.scaling, *theme.slider.knob_color);
+        let offset = Position::new(
+            (self.cached_size.x - knob_size.x) / total_range.to_f32().unwrap()
+                * (self.cached_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap()),
+            (self.cached_size.y - knob_size.y) / 2.0,
+        );
+        renderer.render_rectangle(
+            render_target,
+            absolute_position + offset,
+            knob_size,
+            clip_size,
+            Vector4::from_value(4.0) * *interface_settings.scaling,
+            *theme.slider.knob_color,
+        );
     }
 }

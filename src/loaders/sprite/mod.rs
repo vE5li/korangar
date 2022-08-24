@@ -1,19 +1,20 @@
-use procedural::*;
-use derive_new::new;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::rc::Rc;
 use std::cell::RefCell;
-use vulkano::device::{ Device, Queue };
-use vulkano::image::{ ImageDimensions, ImmutableImage, MipmapsCount };
-use vulkano::image::view::ImageView;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use derive_new::new;
+use procedural::*;
+use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
-use vulkano::sync::{ GpuFuture, now };
+use vulkano::image::view::ImageView;
+use vulkano::image::{ImageDimensions, ImmutableImage, MipmapsCount};
+use vulkano::sync::{now, GpuFuture};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::Texture;
-use crate::loaders::{ ByteStream, Version, ByteConvertable, GameFileLoader };
+use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {
@@ -58,8 +59,8 @@ impl ByteConvertable for EncodedData {
                 }
 
                 next += length;
-
             } else {
+
                 data[next] = byte;
                 next += 1;
             }
@@ -161,10 +162,23 @@ impl SpriteLoader {
 
         assert!(byte_stream.is_empty());
 
-        let rgba_images: Vec<Arc<ImmutableImage>> = sprite_data.rgba_image_data
+        let rgba_images: Vec<Arc<ImmutableImage>> = sprite_data
+            .rgba_image_data
             .into_iter()
             .map(|image_data| {
-                let (image, future) = ImmutableImage::from_iter(image_data.data.iter().cloned(), ImageDimensions::Dim2d { width: image_data.width as u32, height: image_data.height as u32, array_layers: 1 }, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
+
+                let (image, future) = ImmutableImage::from_iter(
+                    image_data.data.iter().cloned(),
+                    ImageDimensions::Dim2d {
+                        width: image_data.width as u32,
+                        height: image_data.height as u32,
+                        array_layers: 1,
+                    },
+                    MipmapsCount::One,
+                    Format::R8G8B8A8_SRGB,
+                    self.queue.clone(),
+                )
+                .unwrap();
                 let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
                 let combined_future = inner_future.join(future).boxed();
                 *texture_future = combined_future;
@@ -173,20 +187,33 @@ impl SpriteLoader {
             .collect();
 
         let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
-                                                    // the default palette is
+        // the default palette is
 
-        let palette_images: Vec<Arc<ImmutableImage>> = sprite_data.palette_image_data
+        let palette_images: Vec<Arc<ImmutableImage>> = sprite_data
+            .palette_image_data
             .into_iter()
             .map(|image_data| {
 
-                let data: Vec<u32> = image_data.encoded_data
+                let data: Vec<u32> = image_data
+                    .encoded_data
                     .map(|encoded| encoded.0)
                     .unwrap_or_else(|| image_data.raw_data.unwrap())
                     .iter()
                     .map(|palette_index| palette.colors[*palette_index as usize].to_data(*palette_index))
                     .collect();
 
-                let (image, future) = ImmutableImage::from_iter(data.into_iter(), ImageDimensions::Dim2d { width: image_data.width as u32, height: image_data.height as u32, array_layers: 1 }, MipmapsCount::One, Format::R8G8B8A8_SRGB, self.queue.clone()).unwrap();
+                let (image, future) = ImmutableImage::from_iter(
+                    data.into_iter(),
+                    ImageDimensions::Dim2d {
+                        width: image_data.width as u32,
+                        height: image_data.height as u32,
+                        array_layers: 1,
+                    },
+                    MipmapsCount::One,
+                    Format::R8G8B8A8_SRGB,
+                    self.queue.clone(),
+                )
+                .unwrap();
                 let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
                 let combined_future = inner_future.join(future).boxed();
                 *texture_future = combined_future;

@@ -1,6 +1,7 @@
-use lazy_static::lazy_static;
-use derive_new::new;
 use std::sync::Mutex;
+
+use derive_new::new;
+use lazy_static::lazy_static;
 
 #[derive(new)]
 struct StackItem {
@@ -17,14 +18,14 @@ pub fn stack_size() -> usize {
         Ok(ref mut mutex) => mutex.len(),
         Err(..) => panic!(),
     }
-} 
+}
 
 pub fn message_offset() -> usize {
     match STACK.try_lock() {
         Ok(ref mut mutex) => mutex.iter().map(|item| item.size).sum(),
         Err(..) => panic!(),
     }
-} 
+}
 
 pub fn increment_stack(size: usize) {
     match STACK.try_lock() {
@@ -34,6 +35,7 @@ pub fn increment_stack(size: usize) {
 }
 
 pub fn decrement_stack() {
+
     match STACK.try_lock() {
         Ok(ref mut mutex) => mutex.pop(),
         Err(..) => panic!(),

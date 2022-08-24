@@ -1,9 +1,6 @@
 use procedural::*;
 
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::InterfaceSettings;
-use crate::interface::{ WindowCache, Size };
-use crate::interface::FramedWindow;
+use crate::interface::{FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 
 #[derive(Default)]
 pub struct ProfilerWindow {}
@@ -19,10 +16,23 @@ impl PrototypeWindow for ProfilerWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
         let elements = vec![];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Profiler".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ?)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Profiler".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(200 > 250 < 300, ?),
+        ))
     }
 }

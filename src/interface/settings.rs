@@ -1,6 +1,6 @@
 use procedural::*;
-use serde::{ Serialize, Deserialize };
 use ron::ser::PrettyConfig;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -16,6 +16,7 @@ pub struct InterfaceSettings {
 impl Default for InterfaceSettings {
 
     fn default() -> Self {
+
         let scaling = MutableRange::new(1.0, 0.7, 1.7);
         let theme_file = "client/themes/theme.ron".to_string();
         Self { scaling, theme_file }
@@ -25,6 +26,7 @@ impl Default for InterfaceSettings {
 impl InterfaceSettings {
 
     pub fn new() -> Self {
+
         Self::load().unwrap_or_else(|| {
 
             #[cfg(feature = "debug")]

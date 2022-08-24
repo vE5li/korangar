@@ -1,25 +1,27 @@
 mod tile;
 
-use procedural::*;
 use std::sync::Arc;
-use derive_new::new;
-use cgmath::{ Vector2, Vector3, Matrix4, SquareMatrix, Array };
 
-use crate::loaders::Version;
+use cgmath::{Array, Matrix4, SquareMatrix, Vector2, Vector3};
+use derive_new::new;
+use procedural::*;
+
+pub use self::tile::{Tile, TileType};
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
+use crate::loaders::Version;
 use crate::world::*;
-
-pub use self::tile::{ Tile, TileType };
 
 // MOVE
 fn get_value(day_timer: f32, offset: f32, p: f32) -> f32 {
+
     let sin = (day_timer + offset).sin();
     sin.abs().powf(2.0 - p) / sin
 }
 
 fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
+
     let red = get_value(day_timer, offset, ps[0]);
     let green = get_value(day_timer, offset, ps[1]);
     let blue = get_value(day_timer, offset, ps[2]);
@@ -27,10 +29,16 @@ fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
 }
 
 fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
-    Color::rgb((base_color.red_f32() * channels.x) as u8, (base_color.green_f32() * channels.y) as u8, (base_color.blue_f32() * channels.z) as u8)
+
+    Color::rgb(
+        (base_color.red_f32() * channels.x) as u8,
+        (base_color.green_f32() * channels.y) as u8,
+        (base_color.blue_f32() * channels.z) as u8,
+    )
 }
 
 fn get_ambient_light_color(ambient_color: Color, day_timer: f32) -> Color {
+
     let sun_offset = 0.0;
     let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.35 + Vector3::from_value(0.65)) * 255.0;
     color_from_channel(ambient_color, ambient_channels)
@@ -44,6 +52,7 @@ fn get_directional_light_color_intensity(directional_color: Color, intensity: f3
     let directional_channels = get_channels(day_timer, sun_offset, [0.8, 0.0, 0.25]) * 255.0;
 
     if directional_channels.x.is_sign_positive() {
+
         let directional_color = color_from_channel(directional_color, directional_channels);
         return (directional_color, f32::min(intensity * 1.2, 1.0));
     }
@@ -97,7 +106,7 @@ pub struct LightSettings {
     pub light_intensity: f32,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MarkerIdentifier {
     Object(usize),
     LightSource(usize),
@@ -146,6 +155,7 @@ impl Map {
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Vector3<f32> {
+
         let height = self.get_tile(position).average_height();
         Vector3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
@@ -155,13 +165,22 @@ impl Map {
     }
 
     pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
-        where T: Renderer + GeometryRenderer
+    where
+        T: Renderer + GeometryRenderer,
     {
-        renderer.render_geometry(render_target, camera, self.ground_vertex_buffer.clone(), &self.ground_textures, Matrix4::identity());
+
+        renderer.render_geometry(
+            render_target,
+            camera,
+            self.ground_vertex_buffer.clone(),
+            &self.ground_textures,
+            Matrix4::identity(),
+        );
     }
 
     pub fn render_objects<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
-        where T: Renderer + GeometryRenderer
+    where
+        T: Renderer + GeometryRenderer,
     {
         for object in &self.objects {
             object.render_geometry(render_target, renderer, camera, client_tick);
@@ -172,34 +191,70 @@ impl Map {
         renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
     }
 
-    pub fn render_water(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, day_timer: f32) {
+    pub fn render_water(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        day_timer: f32,
+    ) {
         if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
             renderer.render_water(render_target, camera, water_vertex_buffer.clone(), day_timer);
         }
     }
 
     pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
+
         let ambient_color = get_ambient_light_color(self.light_settings.ambient_color, day_timer);
         renderer.ambient_light(render_target, ambient_color);
     }
 
-    pub fn directional_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, light_image: ImageBuffer, light_matrix: Matrix4<f32>, day_timer: f32) {
+    pub fn directional_light(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        light_image: ImageBuffer,
+        light_matrix: Matrix4<f32>,
+        day_timer: f32,
+    ) {
 
         let light_direction = get_light_direction(day_timer);
         let (directional_color, intensity) = get_directional_light_color_intensity(
             self.light_settings.diffuse_color,
             self.light_settings.light_intensity,
-            day_timer
+            day_timer,
         );
 
-        renderer.directional_light(render_target, camera, light_image, light_matrix, light_direction, directional_color, intensity);
+        renderer.directional_light(
+            render_target,
+            camera,
+            light_image,
+            light_matrix,
+            light_direction,
+            directional_color,
+            intensity,
+        );
     }
 
-    pub fn point_lights(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
-        self.light_sources.iter().for_each(|light_source| light_source.render_light(render_target, renderer, camera));
+    pub fn point_lights(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    ) {
+
+        self.light_sources
+            .iter()
+            .for_each(|light_source| light_source.render_light(render_target, renderer, camera));
     }
 
-    pub fn water_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+    pub fn water_light(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    ) {
         renderer.water_light(render_target, camera, self.water_settings.water_level);
     }
 
@@ -209,7 +264,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn resolve_marker<'a>(&'a self, entities: &'a Arc<Vec<Arc<Entity>>>, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
+    pub fn resolve_marker<'a>(&'a self, _entities: &'a Arc<Vec<Arc<Entity>>>, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
         match marker_identifier {
             MarkerIdentifier::Object(index) => &self.objects[index],
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],
@@ -223,24 +278,68 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_markers<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, render_settings: &RenderSettings, entities: &Vec<Entity>, marker_identifier: Option<MarkerIdentifier>)
-        where T: Renderer + MarkerRenderer
+    pub fn render_markers<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        render_settings: &RenderSettings,
+        entities: &Vec<Entity>,
+        marker_identifier: Option<MarkerIdentifier>,
+    ) where
+        T: Renderer + MarkerRenderer,
     {
 
         if render_settings.show_object_markers {
-            self.objects.iter().enumerate().for_each(|(index, object)| object.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::Object(index))));
+
+            self.objects.iter().enumerate().for_each(|(index, object)| {
+
+                object.render_marker(
+                    render_target,
+                    renderer,
+                    camera,
+                    marker_identifier.contains(&MarkerIdentifier::Object(index)),
+                )
+            });
         }
 
         if render_settings.show_light_markers {
-            self.light_sources.iter().enumerate().for_each(|(index, light_source)| light_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::LightSource(index))));
+
+            self.light_sources.iter().enumerate().for_each(|(index, light_source)| {
+
+                light_source.render_marker(
+                    render_target,
+                    renderer,
+                    camera,
+                    marker_identifier.contains(&MarkerIdentifier::LightSource(index)),
+                )
+            });
         }
 
         if render_settings.show_sound_markers {
-            self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| sound_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::SoundSource(index))));
+
+            self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| {
+
+                sound_source.render_marker(
+                    render_target,
+                    renderer,
+                    camera,
+                    marker_identifier.contains(&MarkerIdentifier::SoundSource(index)),
+                )
+            });
         }
 
         if render_settings.show_effect_markers {
-            self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| effect_source.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::EffectSource(index))));
+
+            self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| {
+
+                effect_source.render_marker(
+                    render_target,
+                    renderer,
+                    camera,
+                    marker_identifier.contains(&MarkerIdentifier::EffectSource(index)),
+                )
+            });
         }
 
         /*if render_settings.show_particle_markers {
@@ -250,19 +349,34 @@ impl Map {
         }*/
 
         if render_settings.show_entity_markers {
-            entities.iter().enumerate().for_each(|(index, entity)| entity.render_marker(render_target, renderer, camera, matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index)));
+
+            entities.iter().enumerate().for_each(|(index, entity)| {
+
+                entity.render_marker(
+                    render_target,
+                    renderer,
+                    camera,
+                    matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index),
+                )
+            });
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker_box(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, marker_identifier: MarkerIdentifier) {
+    pub fn render_marker_box(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+    ) {
         match marker_identifier {
             MarkerIdentifier::Object(index) => self.objects[index].render_bounding_box(render_target, renderer, camera),
-            MarkerIdentifier::LightSource(_index) => {},
+            MarkerIdentifier::LightSource(_index) => {}
             MarkerIdentifier::SoundSource(_index) => {}
-            MarkerIdentifier::EffectSource(_index) => {},
-            MarkerIdentifier::Particle(_index, _particle_index) => {},
-            MarkerIdentifier::Entity(_index) => {},
+            MarkerIdentifier::EffectSource(_index) => {}
+            MarkerIdentifier::Particle(_index, _particle_index) => {}
+            MarkerIdentifier::Entity(_index) => {}
         }
     }
 }

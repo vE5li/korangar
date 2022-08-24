@@ -1,6 +1,7 @@
 use derive_new::new;
 
-use crate::{graphics::RenderSettings, network::LoginSettings};
+use crate::graphics::RenderSettings;
+use crate::network::LoginSettings;
 
 #[derive(new)]
 pub struct StateProvider<'t> {

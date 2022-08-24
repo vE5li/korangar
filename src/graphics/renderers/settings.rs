@@ -1,8 +1,8 @@
-use procedural::toggle;
 use derive_new::new;
+use procedural::toggle;
 
 #[derive(toggle, new)]
-pub struct RenderSettings { 
+pub struct RenderSettings {
     #[toggle]
     #[new(value = "true")]
     pub frame_limit: bool,
@@ -113,6 +113,13 @@ pub struct RenderSettings {
 impl RenderSettings {
 
     pub fn show_buffers(&self) -> bool {
-        self.show_diffuse_buffer || self.show_normal_buffer || self.show_water_buffer || self.show_depth_buffer || self.show_shadow_buffer || self.show_picker_buffer || self.show_font_atlas
+
+        self.show_diffuse_buffer
+            || self.show_normal_buffer
+            || self.show_water_buffer
+            || self.show_depth_buffer
+            || self.show_shadow_buffer
+            || self.show_picker_buffer
+            || self.show_font_atlas
     }
 }

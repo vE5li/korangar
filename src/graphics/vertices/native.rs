@@ -1,5 +1,5 @@
+use cgmath::{InnerSpace, Vector2, Vector3};
 use derive_new::new;
-use cgmath::{ Vector2, Vector3, InnerSpace };
 
 use crate::graphics::ModelVertex;
 
@@ -23,6 +23,7 @@ impl NativeModelVertex {
         let mut drain_iterator = native_vertices.drain(..);
 
         while let Some(mut first_partial) = drain_iterator.next() {
+
             let mut second_partial = drain_iterator.next().unwrap();
             let mut third_partial = drain_iterator.next().unwrap();
 
@@ -39,6 +40,7 @@ impl NativeModelVertex {
     }
 
     pub fn calculate_normal(first_position: Vector3<f32>, second_position: Vector3<f32>, third_position: Vector3<f32>) -> Vector3<f32> {
+
         let delta_position_1 = second_position - first_position;
         let delta_position_2 = third_position - first_position;
         delta_position_1.cross(delta_position_2)

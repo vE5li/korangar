@@ -12,38 +12,39 @@ mod debug;
 mod input;
 #[macro_use]
 mod system;
-mod graphics;
-mod world;
-mod loaders;
-mod interface;
-mod network;
 mod database;
+mod graphics;
+mod interface;
+mod loaders;
+mod network;
+mod world;
 
-use procedural::debug_condition;
 use std::cell::RefCell;
 use std::rc::Rc;
-use vulkano::device::Device;
-use vulkano::instance::Instance;
-#[cfg(feature = "debug")]
-use vulkano::instance::debug::{ MessageSeverity, MessageType };
-use vulkano::Version;
-use vulkano::sync::{ GpuFuture, now };
-use vulkano_win::VkSurfaceBuild;
-use winit::event::{ Event, WindowEvent };
-use winit::event_loop::{ ControlFlow, EventLoop };
-use winit::window::WindowBuilder;
-use database::Database;
+
 use chrono::prelude::*;
+use database::Database;
+use procedural::debug_condition;
+use vulkano::device::Device;
+#[cfg(feature = "debug")]
+use vulkano::instance::debug::{MessageSeverity, MessageType};
+use vulkano::instance::Instance;
+use vulkano::sync::{now, GpuFuture};
+use vulkano::Version;
+use vulkano_win::VkSurfaceBuild;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::WindowBuilder;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::input::{ InputSystem, UserEvent };
-use crate::system::{ GameTimer, get_instance_extensions, get_layers, get_device_extensions };
-use crate::world::*;
-use crate::loaders::*;
 use crate::graphics::*;
+use crate::input::{InputSystem, UserEvent};
 use crate::interface::*;
-use crate::network::{ NetworkingSystem, NetworkEvent, ChatMessage };
+use crate::loaders::*;
+use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
+use crate::system::{get_device_extensions, get_instance_extensions, get_layers, GameTimer};
+use crate::world::*;
 
 fn main() {
 
@@ -53,7 +54,8 @@ fn main() {
     let instance = Instance::new(None, Version::V1_2, &get_instance_extensions(), get_layers()).expect("failed to create instance");
 
     #[cfg(feature = "debug")]
-    let _debug_callback = vulkano::instance::debug::DebugCallback::new(&instance, MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
+    let _debug_callback =
+        vulkano::instance::debug::DebugCallback::new(&instance, MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}instance{}", MAGENTA, NONE);
@@ -91,7 +93,13 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    let (device, mut queues) = Device::new(physical_device, physical_device.supported_features(), &required_device_extensions, [(queue_family, 0.5)].iter().cloned()).expect("failed to create device");
+    let (device, mut queues) = Device::new(
+        physical_device,
+        physical_device.supported_features(),
+        &required_device_extensions,
+        [(queue_family, 0.5)].iter().cloned(),
+    )
+    .expect("failed to create device");
 
     #[cfg(feature = "debug")]
     print_debug!("created {}vulkan device{}", MAGENTA, NONE);
@@ -116,13 +124,13 @@ fn main() {
     game_file_loader.add_archive("korangar.grf".to_string());
 
     let game_file_loader = Rc::new(RefCell::new(game_file_loader));
-    let font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
+    let _font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
 
     let mut model_loader = ModelLoader::new(game_file_loader.clone(), device.clone());
     let mut texture_loader = TextureLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
     let mut map_loader = MapLoader::new(game_file_loader.clone(), device.clone());
     let mut sprite_loader = SpriteLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
-    let mut action_loader = ActionLoader::new(game_file_loader.clone());
+    let mut action_loader = ActionLoader::new(game_file_loader);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -130,7 +138,9 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let mut map = map_loader.get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw").expect("failed to load initial map");
+    let mut map = map_loader
+        .get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw")
+        .expect("failed to load initial map");
 
     // interesting: ma_zif07, ama_dun01
 
@@ -149,10 +159,23 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create renderers");
 
-    let mut deferred_renderer = DeferredRenderer::new(device.clone(), queue.clone(), swapchain_holder.swapchain_format(), viewport.clone(), swapchain_holder.window_size_u32(), &mut texture_loader);
-    let mut interface_renderer = InterfaceRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32(), &mut texture_loader);
-    let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport.clone(), swapchain_holder.window_size_u32());
-    let shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone());
+    let mut deferred_renderer = DeferredRenderer::new(
+        device.clone(),
+        queue.clone(),
+        swapchain_holder.swapchain_format(),
+        viewport.clone(),
+        swapchain_holder.window_size_u32(),
+        &mut texture_loader,
+    );
+    let mut interface_renderer = InterfaceRenderer::new(
+        device.clone(),
+        queue.clone(),
+        viewport.clone(),
+        swapchain_holder.window_size_u32(),
+        &mut texture_loader,
+    );
+    let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport, swapchain_holder.window_size_u32());
+    let shadow_renderer = ShadowRenderer::new(device.clone(), queue);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -160,19 +183,22 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create render targets");
 
-    let mut screen_targets = swapchain_holder.get_swapchain_images()
+    let mut screen_targets = swapchain_holder
+        .get_swapchain_images()
         .into_iter()
         .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
         .collect::<Vec<<DeferredRenderer as Renderer>::Target>>();
 
     let mut interface_target = interface_renderer.create_render_target();
 
-    let mut picker_targets = swapchain_holder.get_swapchain_images()
+    let mut picker_targets = swapchain_holder
+        .get_swapchain_images()
         .into_iter()
         .map(|_| picker_renderer.create_render_target())
         .collect::<Vec<<PickerRenderer as Renderer>::Target>>();
 
-    let mut directional_shadow_targets = swapchain_holder.get_swapchain_images()
+    let mut directional_shadow_targets = swapchain_holder
+        .get_swapchain_images()
         .into_iter()
         .map(|_| shadow_renderer.create_render_target(8192))
         .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
@@ -185,7 +211,12 @@ fn main() {
 
     let mut texture_future = now(device.clone()).boxed();
 
-    let mut interface = Interface::new(&mut sprite_loader, &mut action_loader, &mut texture_future, swapchain_holder.window_size_f32());
+    let mut interface = Interface::new(
+        &mut sprite_loader,
+        &mut action_loader,
+        &mut texture_future,
+        swapchain_holder.window_size_f32(),
+    );
     let mut input_system = InputSystem::new();
     let mut render_settings = RenderSettings::new();
 
@@ -236,38 +267,59 @@ fn main() {
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
-    texture_future
-        .then_signal_fence_and_flush()
-        .unwrap()
-        .wait(None)
-        .unwrap();
+    texture_future.then_signal_fence_and_flush().unwrap().wait(None).unwrap();
 
     events_loop.run(move |event, _, control_flow| {
         match event {
 
-            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => *control_flow = ControlFlow::Exit,
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
 
-            Event::WindowEvent { event: WindowEvent::Resized(_), .. } => {
+            Event::WindowEvent {
+                event: WindowEvent::Resized(_),
+                ..
+            } => {
+
                 let window_size = surface.window().inner_size();
                 interface.update_window_size(Size::new(window_size.width as f32, window_size.height as f32));
                 swapchain_holder.update_window_size(window_size.into());
             }
 
-            Event::WindowEvent { event: WindowEvent::Focused(focused), .. } => {
+            Event::WindowEvent {
+                event: WindowEvent::Focused(focused),
+                ..
+            } => {
                 if !focused {
                     input_system.reset();
                 }
             }
 
-            Event::WindowEvent { event: WindowEvent::CursorMoved { position, .. }, .. } => input_system.update_mouse_position(position),
+            Event::WindowEvent {
+                event: WindowEvent::CursorMoved { position, .. },
+                ..
+            } => input_system.update_mouse_position(position),
 
-            Event::WindowEvent { event: WindowEvent::MouseInput { button, state, .. }, .. } => input_system.update_mouse_buttons(button, state),
+            Event::WindowEvent {
+                event: WindowEvent::MouseInput { button, state, .. },
+                ..
+            } => input_system.update_mouse_buttons(button, state),
 
-            Event::WindowEvent { event: WindowEvent::MouseWheel { delta, .. }, .. } => input_system.update_mouse_wheel(delta),
+            Event::WindowEvent {
+                event: WindowEvent::MouseWheel { delta, .. },
+                ..
+            } => input_system.update_mouse_wheel(delta),
 
-            Event::WindowEvent { event: WindowEvent::KeyboardInput { input, .. }, .. } => input_system.update_keyboard(input.scancode as usize, input.state),
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { input, .. },
+                ..
+            } => input_system.update_keyboard(input.scancode as usize, input.state),
 
-            Event::WindowEvent { event: WindowEvent::ReceivedCharacter(character), .. } => input_system.buffer_character(character),
+            Event::WindowEvent {
+                event: WindowEvent::ReceivedCharacter(character),
+                ..
+            } => input_system.buffer_character(character),
 
             Event::RedrawEventsCleared => {
 
@@ -280,16 +332,19 @@ fn main() {
                 networking_system.keep_alive(delta_time, game_timer.get_client_tick());
 
                 let network_events = networking_system.network_events();
-                let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(&mut interface, &mut picker_targets[swapchain_holder.get_image_number()], &render_settings, swapchain_holder.window_size());
+                let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
+                    &mut interface,
+                    &mut picker_targets[swapchain_holder.get_image_number()],
+                    &render_settings,
+                    swapchain_holder.window_size(),
+                );
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
 
-                    let entity = entities
-                        .iter_mut()
-                        .find(|entity| entity.get_entity_id() == entity_id)
-                        .unwrap();
+                    let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id).unwrap();
 
                     if entity.are_details_unavalible() {
+
                         networking_system.request_entity_details(entity_id);
                         entity.set_details_requested();
                     }
@@ -301,7 +356,15 @@ fn main() {
                     match event {
 
                         NetworkEvent::AddEntity(entity_appeared_data) => {
-                            let npc = Npc::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, entity_appeared_data);
+
+                            let npc = Npc::new(
+                                &mut sprite_loader,
+                                &mut action_loader,
+                                &mut texture_future,
+                                &map,
+                                &database,
+                                entity_appeared_data,
+                            );
                             let npc = Entity::Npc(npc);
                             entities.push(npc);
                         }
@@ -311,12 +374,11 @@ fn main() {
                         }
 
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
-                            let entity = entities
-                                .iter_mut()
-                                .find(|entity| entity.get_entity_id() == entity_id);
 
+                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
+
                                 entity.move_from_to(&map, position_from, position_to, starting_timestamp);
                                 #[cfg(feature = "debug")]
                                 entity.generate_steps_vertex_buffer(device.clone(), &map);
@@ -324,6 +386,7 @@ fn main() {
                         }
 
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
+
                             entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
                             entities[0].generate_steps_vertex_buffer(device.clone(), &map);
@@ -335,7 +398,9 @@ fn main() {
                                 entities.pop();
                             }
 
-                            map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
+                            map = map_loader
+                                .get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name))
+                                .unwrap();
 
                             entities[0].set_position(&map, player_position);
 
@@ -352,9 +417,8 @@ fn main() {
                         }
 
                         NetworkEvent::UpdateEntityDetails(entity_id, name) => {
-                            let entity = entities
-                                .iter_mut()
-                                .find(|entity| entity.get_entity_id() == entity_id);
+
+                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
                                 entity.set_details(name);
@@ -373,9 +437,7 @@ fn main() {
 
                         NetworkEvent::UpdateEntityHealth(entity_id, health_points, maximum_health_points) => {
 
-                            let entity = entities
-                                .iter_mut()
-                                .find(|entity| entity.get_entity_id() == entity_id);
+                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
                                 entity.update_health(health_points, maximum_health_points);
@@ -399,7 +461,9 @@ fn main() {
 
                         NetworkEvent::AddChoiceButtons(choices) => interface.add_choice_buttons(choices),
 
-                        NetworkEvent::AddQuestEffect(quest_effect) => particle_holder.add_quest_icon(&mut texture_loader, &mut texture_future, &map, quest_effect),
+                        NetworkEvent::AddQuestEffect(quest_effect) => {
+                            particle_holder.add_quest_icon(&mut texture_loader, &mut texture_future, &map, quest_effect)
+                        }
 
                         NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
 
@@ -414,16 +478,15 @@ fn main() {
                 for event in user_events {
                     match event {
 
-                        UserEvent::LogIn(username, password) => {
-                            match networking_system.log_in(username, password) {
+                        UserEvent::LogIn(username, password) => match networking_system.log_in(username, password) {
 
-                                Ok(character_selection_window) => {
-                                    interface.close_window_with_class(LoginWindow::WINDOW_CLASS);
-                                    interface.open_window(&character_selection_window);
-                                },
+                            Ok(character_selection_window) => {
 
-                                Err(message) => interface.open_window(&ErrorWindow::new(message)),
+                                interface.close_window_with_class(LoginWindow::WINDOW_CLASS);
+                                interface.open_window(&character_selection_window);
                             }
+
+                            Err(message) => interface.open_window(&ErrorWindow::new(message)),
                         },
 
                         UserEvent::LogOut => networking_system.log_out().unwrap(),
@@ -439,9 +502,10 @@ fn main() {
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
 
                         UserEvent::ToggleFrameLimit => {
+
                             render_settings.toggle_frame_limit();
                             swapchain_holder.set_frame_limit(render_settings.frame_limit);
-                        },
+                        }
 
                         UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
 
@@ -461,9 +525,19 @@ fn main() {
                                     interface.close_window_with_class(CharacterSelectionWindow::WINDOW_CLASS);
                                     interface.open_window(&PrototypeChatWindow::new(chat_messages.clone()));
 
-                                    map = map_loader.get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name)).unwrap();
+                                    map = map_loader
+                                        .get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name))
+                                        .unwrap();
 
-                                    let player = Player::new(&mut sprite_loader, &mut action_loader, &mut texture_future, &map, &database, character_information, player_position);
+                                    let player = Player::new(
+                                        &mut sprite_loader,
+                                        &mut action_loader,
+                                        &mut texture_future,
+                                        &map,
+                                        &database,
+                                        character_information,
+                                        player_position,
+                                    );
                                     let player = Entity::Player(player);
 
                                     player_camera.set_focus_point(player.get_position());
@@ -476,34 +550,37 @@ fn main() {
 
                                 Err(message) => interface.open_window(&ErrorWindow::new(message)),
                             }
+                        }
+
+                        UserEvent::OpenCharacterCreationWindow(character_slot) => {
+                            interface.open_window(&CharacterCreationWindow::new(character_slot))
+                        }
+
+                        UserEvent::CreateCharacter(character_slot, name) => match networking_system.crate_character(character_slot, name) {
+                            Ok(..) => interface.close_window_with_class(CharacterCreationWindow::WINDOW_CLASS),
+                            Err(message) => interface.open_window(&ErrorWindow::new(message)),
                         },
 
-                        UserEvent::OpenCharacterCreationWindow(character_slot) => interface.open_window(&CharacterCreationWindow::new(character_slot)),
-
-                        UserEvent::CreateCharacter(character_slot, name) => {
-                            match networking_system.crate_character(character_slot, name) {
-                                Ok(..) => interface.close_window_with_class(CharacterCreationWindow::WINDOW_CLASS),
-                                Err(message) => interface.open_window(&ErrorWindow::new(message)),
-                            }
-                        },
-
-                        UserEvent::DeleteCharacter(character_id) => interface.handle_result(networking_system.delete_character(character_id)),
+                        UserEvent::DeleteCharacter(character_id) => {
+                            interface.handle_result(networking_system.delete_character(character_id))
+                        }
 
                         UserEvent::RequestSwitchCharacterSlot(origin_slot) => networking_system.request_switch_character_slot(origin_slot),
 
                         UserEvent::CancelSwitchCharacterSlot => networking_system.cancel_switch_character_slot(),
 
-                        UserEvent::SwitchCharacterSlot(destination_slot) => interface.handle_result(networking_system.switch_character_slot(destination_slot)),
+                        UserEvent::SwitchCharacterSlot(destination_slot) => {
+                            interface.handle_result(networking_system.switch_character_slot(destination_slot))
+                        }
 
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
 
                         UserEvent::RequestPlayerInteract(entity_id) => {
 
-                            let entity = entities
-                                .iter_mut()
-                                .find(|entity| entity.get_entity_id() == entity_id);
+                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
+
                                 let job = entity.get_job();
 
                                 match job > 1002 && job < 1010 {
@@ -511,16 +588,17 @@ fn main() {
                                     false => networking_system.start_dialog(entity_id),
                                 }
                             }
-                        },
+                        }
 
                         UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
 
                         UserEvent::NextDialog(npc_id) => networking_system.next_dialog(npc_id),
 
                         UserEvent::CloseDialog(npc_id) => {
+
                             networking_system.close_dialog(npc_id);
                             interface.close_dialog_window();
-                        },
+                        }
 
                         UserEvent::ChooseDialogOption(npc_id, option) => networking_system.choose_dialog_option(npc_id, option),
 
@@ -586,9 +664,10 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWireframe => {
+
                             render_settings.toggle_show_wireframe();
                             swapchain_holder.invalidate_swapchain();
-                        },
+                        }
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
@@ -675,6 +754,7 @@ fn main() {
                     .for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
 
                 if !entities.is_empty() {
+
                     let player_position = entities[0].get_position();
                     player_camera.set_focus_point(player_position);
                     directional_shadow_camera.set_focus_point(player_position);
@@ -688,34 +768,38 @@ fn main() {
                 networking_system.changes_applied();
 
                 if swapchain_holder.is_swapchain_invalid() {
+
                     let viewport = swapchain_holder.recreate_swapchain();
 
                     deferred_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
-                    picker_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
+                    picker_renderer.recreate_pipeline(viewport, swapchain_holder.window_size_u32());
 
-                    screen_targets = swapchain_holder.get_swapchain_images()
+                    screen_targets = swapchain_holder
+                        .get_swapchain_images()
                         .into_iter()
                         .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
                         .collect();
 
                     interface_target = interface_renderer.create_render_target();
 
-                    picker_targets = swapchain_holder.get_swapchain_images()
+                    picker_targets = swapchain_holder
+                        .get_swapchain_images()
                         .into_iter()
                         .map(|_| picker_renderer.create_render_target())
                         .collect();
                 }
 
-                if swapchain_holder.acquire_next_image().is_err() { // temporary check?
+                if swapchain_holder.acquire_next_image().is_err() {
+                    // temporary check?
                     return;
                 }
 
                 if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
+
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
-
 
                 #[cfg(feature = "debug")]
                 let wait_for_previous = rerender_interface || render_settings.show_buffers();
@@ -726,6 +810,7 @@ fn main() {
                 if wait_for_previous {
                     for index in 0..screen_targets.len() {
                         if let Some(mut fence) = screen_targets[index].state.try_take_fence() {
+
                             fence.wait(None).unwrap();
                             fence.cleanup_finished();
                         }
@@ -733,6 +818,7 @@ fn main() {
                 }
 
                 if let Some(mut fence) = texture_fence {
+
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
@@ -768,7 +854,9 @@ fn main() {
                         map.render_tiles(picker_target, &picker_renderer, current_camera);
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities.iter().for_each(|entity| entity.render(picker_target, &picker_renderer, current_camera));
+                        entities
+                            .iter()
+                            .for_each(|entity| entity.render(picker_target, &picker_renderer, current_camera));
 
                         picker_target.finish();
                     });
@@ -783,10 +871,17 @@ fn main() {
                         map.render_ground(directional_shadow_target, &shadow_renderer, &directional_shadow_camera);
 
                         #[debug_condition(render_settings.show_objects)]
-                        map.render_objects(directional_shadow_target, &shadow_renderer, &directional_shadow_camera, client_tick);
+                        map.render_objects(
+                            directional_shadow_target,
+                            &shadow_renderer,
+                            &directional_shadow_camera,
+                            client_tick,
+                        );
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities.iter().for_each(|entity| entity.render(directional_shadow_target, &shadow_renderer, &directional_shadow_camera));
+                        entities
+                            .iter()
+                            .for_each(|entity| entity.render(directional_shadow_target, &shadow_renderer, &directional_shadow_camera));
 
                         directional_shadow_target.finish();
                     });
@@ -802,7 +897,9 @@ fn main() {
                         map.render_objects(screen_target, &deferred_renderer, current_camera, client_tick);
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities.iter().for_each(|entity| entity.render(screen_target, &deferred_renderer, current_camera));
+                        entities
+                            .iter()
+                            .for_each(|entity| entity.render(screen_target, &deferred_renderer, current_camera));
 
                         #[debug_condition(render_settings.show_water)]
                         map.render_water(screen_target, &deferred_renderer, current_camera, day_timer);
@@ -816,7 +913,14 @@ fn main() {
                         let light_matrix = projection_matrix * view_matrix;
 
                         #[debug_condition(render_settings.show_directional_light && !render_settings.show_buffers())]
-                        map.directional_light(screen_target, &deferred_renderer, current_camera, directional_shadow_image.clone(), light_matrix, day_timer);
+                        map.directional_light(
+                            screen_target,
+                            &deferred_renderer,
+                            current_camera,
+                            directional_shadow_image.clone(),
+                            light_matrix,
+                            day_timer,
+                        );
 
                         #[debug_condition(render_settings.show_point_lights && !render_settings.show_buffers())]
                         map.point_lights(screen_target, &deferred_renderer, current_camera);
@@ -832,7 +936,13 @@ fn main() {
                         interface_target.start_interface(clear_interface);
 
                         let state_provider = &StateProvider::new(&render_settings, networking_system.get_login_settings());
-                        interface.render(&mut interface_target, &interface_renderer, state_provider, hovered_element, focused_element);
+                        interface.render(
+                            &mut interface_target,
+                            &interface_renderer,
+                            state_provider,
+                            hovered_element,
+                            focused_element,
+                        );
 
                         interface_target.finish();
                     }
@@ -847,20 +957,25 @@ fn main() {
                         fence.wait(None).unwrap();
                     }
 
-                    deferred_renderer.overlay_buffers(screen_target, directional_shadow_image, picker_target.image.clone(), &render_settings);
+                    deferred_renderer.overlay_buffers(
+                        screen_target,
+                        directional_shadow_image,
+                        picker_target.image.clone(),
+                        &render_settings,
+                    );
                 }
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
 
-                    let entity = entities
-                        .iter()
-                        .find(|entity| entity.get_entity_id() == entity_id);
+                    let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
                     if let Some(entity) = entity {
+
                         entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
 
                         if let Some(name) = &entity.get_details() {
-                            let name = name.split("#").next().unwrap();
+
+                            let name = name.split('#').next().unwrap();
                             interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.mouse_position());
                         }
 
@@ -877,11 +992,15 @@ fn main() {
                 }
 
                 if render_settings.show_interface {
+
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
                     interface.render_mouse_cursor(screen_target, &deferred_renderer, input_system.mouse_position());
                 }
 
-                let interface_future = interface_target.state.try_take_semaphore().unwrap_or_else(|| now(device.clone()).boxed());
+                let interface_future = interface_target
+                    .state
+                    .try_take_semaphore()
+                    .unwrap_or_else(|| now(device.clone()).boxed());
                 let directional_shadow_future = directional_shadow_targets[image_number].state.take_semaphore();
                 let swapchain_acquire_future = swapchain_holder.take_acquire_future();
 
@@ -893,7 +1012,7 @@ fn main() {
                 screen_target.finish(swapchain_holder.get_swapchain(), combined_future, image_number);
             }
 
-            _ignored => ()
+            _ignored => (),
         }
     });
 }

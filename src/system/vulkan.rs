@@ -1,11 +1,12 @@
-use vulkano::instance::InstanceExtensions;
+use cgmath::{Matrix4, Vector3};
 use vulkano::device::DeviceExtensions;
-use cgmath::{ Vector3, Matrix4 };
+use vulkano::instance::InstanceExtensions;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
 
 pub fn get_instance_extensions() -> InstanceExtensions {
+
     InstanceExtensions {
         ext_debug_utils: true,
         //khr_get_physical_device_properties2: true,
@@ -27,7 +28,7 @@ pub fn get_layers() -> Vec<&'static str> {
     }
 
     #[cfg(feature = "debug")]
-    timer.stop(); 
+    timer.stop();
 
     #[cfg(feature = "debug")]
     for layer in &desired_layers {
@@ -47,6 +48,7 @@ pub fn get_layers() -> Vec<&'static str> {
 }
 
 pub fn get_device_extensions() -> DeviceExtensions {
+
     DeviceExtensions {
         khr_swapchain: true,
         //amd_mixed_attachment_samples: true,
@@ -56,9 +58,11 @@ pub fn get_device_extensions() -> DeviceExtensions {
 
 macro_rules! choose_physical_device {
     ($instance:expr, $surface:expr, $device_extensions:expr) => {{
+
         vulkano::device::physical::PhysicalDevice::enumerate($instance)
             .filter(|&p| p.supported_extensions().is_superset_of($device_extensions))
             .filter_map(|p| {
+
                 p.queue_families()
                     .find(|&q| q.supports_graphics() && $surface.is_supported(q).unwrap_or(false))
                     .map(|q| (p, q))
@@ -71,10 +75,11 @@ macro_rules! choose_physical_device {
                 vulkano::device::physical::PhysicalDeviceType::Other => 4,
             })
             .unwrap()
-    }}
+    }};
 }
 
 pub fn multiply_matrix4_and_vector3(matrix: &Matrix4<f32>, vector: Vector3<f32>) -> Vector3<f32> {
+
     let adjusted_vector = matrix * vector.extend(1.0);
     adjusted_vector.truncate()
 }

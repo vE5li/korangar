@@ -1,4 +1,4 @@
-use cgmath::{ Vector2, Vector3 };
+use cgmath::{Vector2, Vector3};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct ModelVertex {
@@ -11,6 +11,7 @@ pub struct ModelVertex {
 impl ModelVertex {
 
     pub const fn new(position: Vector3<f32>, normal: Vector3<f32>, texture_coordinates: Vector2<f32>, texture_index: i32) -> Self {
+
         Self {
             position: [position.x, position.y, position.z],
             normal: [normal.x, normal.y, normal.z],

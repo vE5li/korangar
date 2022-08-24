@@ -1,14 +1,14 @@
 mod node;
 mod shading;
 
-use procedural::*;
 use derive_new::new;
-use crate::graphics::{ Renderer, Camera, Transform, DeferredRenderer, GeometryRenderer };
+use procedural::*;
+
+pub use self::node::{BoundingBox, Node};
+pub use self::shading::ShadingType;
+use crate::graphics::{Camera, DeferredRenderer, GeometryRenderer, Renderer, Transform};
 #[cfg(feature = "debug")]
 use crate::loaders::ModelData;
-
-pub use self::node::{ Node, BoundingBox };
-pub use self::shading::ShadingType;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
@@ -20,14 +20,28 @@ pub struct Model {
 
 impl Model {
 
-    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, root_transform: &Transform, client_tick: u32)
-        where T: Renderer + GeometryRenderer
+    pub fn render_geometry<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        root_transform: &Transform,
+        client_tick: u32,
+    ) where
+        T: Renderer + GeometryRenderer,
     {
-        self.root_node.render_geometry(render_target, renderer, camera, root_transform, client_tick);
+        self.root_node
+            .render_geometry(render_target, renderer, camera, root_transform, client_tick);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_bounding_box<T>(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera, root_transform: &Transform) {
+    pub fn render_bounding_box<T>(
+        &self,
+        _render_target: &mut <DeferredRenderer as Renderer>::Target,
+        _renderer: &DeferredRenderer,
+        _camera: &dyn Camera,
+        _root_transform: &Transform,
+    ) {
         //renderer.render_bounding_box(render_target, camera, &root_transform, &self.bounding_box);
     }
 }

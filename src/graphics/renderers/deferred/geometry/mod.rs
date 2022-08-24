@@ -12,31 +12,27 @@ mod fragment_shader {
     }
 }
 
-use std::sync::Arc;
 use std::iter;
+use std::sync::Arc;
 
-use vulkano::device::Device;
-
-use vulkano::image::ImageViewAbstract;
-use vulkano::pipeline::graphics::rasterization::{ RasterizationState, CullMode, PolygonMode };
-use vulkano::pipeline::{ GraphicsPipeline, PipelineBindPoint, Pipeline, StateMode };
-use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
-use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::shader::ShaderModule;
-use vulkano::render_pass::Subpass;
-use vulkano::sampler::{ Sampler, Filter, SamplerAddressMode };
-use vulkano::buffer::{ BufferUsage, BufferAccess };
 use cgmath::Matrix4;
-
-use crate::graphics::*;
-
-use self::vertex_shader::ty::Constants;
-use self::vertex_shader::ty::Matrices;
+use vulkano::buffer::{BufferAccess, BufferUsage};
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::device::Device;
+use vulkano::image::ImageViewAbstract;
+use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
+use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::rasterization::{CullMode, PolygonMode, RasterizationState};
+use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
+use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint, StateMode};
+use vulkano::render_pass::Subpass;
+use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::SpecializationConstants;
+use self::vertex_shader::ty::{Constants, Matrices};
+use crate::graphics::*;
 
 pub struct GeometryRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -70,14 +66,28 @@ impl GeometryRenderer {
             .build()
             .unwrap();
 
-        Self { pipeline, vertex_shader, fragment_shader, matrices_buffer, nearest_sampler, linear_sampler }
+        Self {
+            pipeline,
+            vertex_shader,
+            fragment_shader,
+            matrices_buffer,
+            nearest_sampler,
+            linear_sampler,
+        }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport, wireframe: bool) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader, wireframe);
     }
 
-    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule, wireframe: bool) -> Arc<GraphicsPipeline> {
+    fn create_pipeline(
+        device: Arc<Device>,
+        subpass: Subpass,
+        viewport: Viewport,
+        vertex_shader: &ShaderModule,
+        fragment_shader: &ShaderModule,
+        wireframe: bool,
+    ) -> Arc<GraphicsPipeline> {
 
         let polygon_mode = match wireframe {
             true => PolygonMode::Line,
@@ -96,7 +106,11 @@ impl GeometryRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), specialization_constants)
             .depth_stencil_state(DepthStencilState::simple_depth_test())
-            .rasterization_state(RasterizationState { cull_mode: StateMode::Fixed(CullMode::Back), polygon_mode, ..Default::default() })
+            .rasterization_state(RasterizationState {
+                cull_mode: StateMode::Fixed(CullMode::Back),
+                polygon_mode,
+                ..Default::default()
+            })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -113,16 +127,23 @@ impl GeometryRenderer {
         };
 
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
-        let set = PersistentDescriptorSet::new(descriptor_layout, [
-            WriteDescriptorSet::buffer(0, matrices_subbuffer),
-        ]).unwrap(); 
+        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 
-        render_target.state.get_builder()
+        render_target
+            .state
+            .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
-    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>) {
+    pub fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        _camera: &dyn Camera,
+        vertex_buffer: ModelVertexBuffer,
+        textures: &Vec<Texture>,
+        world_matrix: Matrix4<f32>,
+    ) {
 
         if textures.is_empty() {
             return;
@@ -144,21 +165,28 @@ impl GeometryRenderer {
             textures.push(textures[0].clone());
         }
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [
-            WriteDescriptorSet::sampler(0, self.nearest_sampler.clone()),
-            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
-            WriteDescriptorSet::image_view_array(2, 0, textures)
-        ]).unwrap(); 
+        let set = PersistentDescriptorSet::new(
+            descriptor_layout,
+            [
+                WriteDescriptorSet::sampler(0, self.nearest_sampler.clone()),
+                WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
+                WriteDescriptorSet::image_view_array(2, 0, textures),
+            ],
+        )
+        .unwrap();
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
         let constants = Constants {
             world: world_matrix.into(),
         };
 
-        render_target.state.get_builder()
+        render_target
+            .state
+            .get_builder()
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, vertex_buffer)
-            .draw(vertex_count as u32, 1, 0, 0).unwrap();
+            .draw(vertex_count as u32, 1, 0, 0)
+            .unwrap();
     }
 }

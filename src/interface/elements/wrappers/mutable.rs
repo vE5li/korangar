@@ -1,8 +1,7 @@
 use derive_new::new;
-use serde::{ Serialize, Deserialize };
+use serde::{Deserialize, Serialize};
 
-use crate::interface::{ PrototypeElement, PrototypeMutableElement };
-use crate::interface::{ ElementCell, ChangeEvent };
+use crate::interface::{ChangeEvent, ElementCell, PrototypeElement, PrototypeMutableElement};
 
 #[derive(Serialize, Deserialize, new)]
 pub struct Mutable<T: PrototypeMutableElement, const E: Option<ChangeEvent>>(pub T);

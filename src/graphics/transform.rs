@@ -1,11 +1,12 @@
-use procedural::*;
-use cgmath::{ Vector3, Rad, Deg };
 use std::ops::Add;
+
+use cgmath::{Deg, Rad, Vector3};
+use procedural::*;
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]
 pub struct Transform {
     pub position: Vector3<f32>,
-    #[hidden_element] // TODO: unhide 
+    #[hidden_element] // TODO: unhide
     pub rotation: Vector3<Rad<f32>>,
     pub scale: Vector3<f32>,
 }
@@ -13,6 +14,7 @@ pub struct Transform {
 impl Transform {
 
     pub fn new() -> Self {
+
         Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
@@ -21,11 +23,13 @@ impl Transform {
     }
 
     pub fn from(position: Vector3<f32>, rotation: Vector3<Deg<f32>>, scale: Vector3<f32>) -> Self {
+
         let rotation = rotation.map(|degrees| degrees.into());
         Self { position, rotation, scale }
     }
 
     pub fn position(position: Vector3<f32>) -> Self {
+
         Self {
             position,
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
@@ -34,6 +38,7 @@ impl Transform {
     }
 
     pub fn scale(scale: Vector3<f32>) -> Self {
+
         Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
@@ -43,13 +48,23 @@ impl Transform {
 }
 
 impl Add for Transform {
+
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
+
         Self {
             position: self.position + other.position,
-            rotation: Vector3::new(self.rotation.x + other.rotation.x, self.rotation.y + other.rotation.y, self.rotation.z + other.rotation.z),
-            scale: Vector3::new(self.scale.x * other.scale.x, self.scale.y * other.scale.y, self.scale.z * other.scale.z),
+            rotation: Vector3::new(
+                self.rotation.x + other.rotation.x,
+                self.rotation.y + other.rotation.y,
+                self.rotation.z + other.rotation.z,
+            ),
+            scale: Vector3::new(
+                self.scale.x * other.scale.x,
+                self.scale.y * other.scale.y,
+                self.scale.z * other.scale.z,
+            ),
         }
     }
 }

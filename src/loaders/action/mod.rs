@@ -1,13 +1,14 @@
-use procedural::*;
-use derive_new::new;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::cell::RefCell;
+
+use derive_new::new;
+use procedural::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::loaders::{ ByteStream, Version, ByteConvertable, GameFileLoader };
+use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 
 #[derive(Clone, PrototypeElement)]
 pub struct Actions {}
@@ -79,7 +80,7 @@ struct Motion {
     pub sprite_clips: Vec<SpriteClip>,
     #[version_equals_or_above(2, 0)]
     pub event_id: Option<i32>, // if version == 2.0 this maybe needs to be set to None ?
-                               // (after it is parsed)
+    // (after it is parsed)
     #[version_equals_or_above(2, 3)]
     pub attach_point_count: Option<u32>,
     #[repeating(self.attach_point_count.unwrap_or_default())]
@@ -137,7 +138,7 @@ impl ActionLoader {
             return Err(format!("failed to read magic number from {}", path));
         }
 
-        let actions_data = ActionsData::from_bytes(&mut byte_stream, None);
+        let _actions_data = ActionsData::from_bytes(&mut byte_stream, None);
         //println!("{:#?}", actions_data);
 
         let sprite = Arc::new(Actions {});

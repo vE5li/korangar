@@ -3,7 +3,7 @@ pub enum ResourceType {
     Object,
     LightSource,
     SoundSource,
-    EffectSource
+    EffectSource,
 }
 
 impl ResourceType {

@@ -1,4 +1,5 @@
 use std::time::Instant;
+
 use derive_new::new;
 
 #[derive(new)]
@@ -37,6 +38,7 @@ impl GameTimer {
         self.previous_elapsed = new_elapsed;
 
         if self.accumulate_second > 1.0 {
+
             self.frames_per_second = self.frame_counter;
             self.accumulate_second -= 1.0;
             self.frame_counter = 0;

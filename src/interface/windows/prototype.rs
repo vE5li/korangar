@@ -1,5 +1,4 @@
-use crate::interface::{ WindowCache, Size, InterfaceSettings };
-use crate::interface::Window;
+use crate::interface::{InterfaceSettings, Size, Window, WindowCache};
 
 pub trait PrototypeWindow {
 
@@ -7,5 +6,10 @@ pub trait PrototypeWindow {
         None
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static>;
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static>;
 }

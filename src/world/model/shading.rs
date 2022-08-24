@@ -1,4 +1,4 @@
-use std::fmt::{ Display, Formatter, Result };
+use std::fmt::{Display, Formatter, Result};
 
 pub enum ShadingType {
     None,

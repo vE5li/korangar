@@ -1,12 +1,10 @@
-use procedural::*;
-use derive_new::new;
-
-use std::rc::Rc;
 use std::cell::RefCell;
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::InterfaceSettings;
-use crate::interface::*;
-use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
+use std::rc::Rc;
+
+use derive_new::new;
+use procedural::*;
+
+use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
 use crate::network::CharacterInformation;
 
 #[derive(new)]
@@ -28,13 +26,34 @@ impl PrototypeWindow for CharacterSelectionWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
         let elements: Vec<ElementCell> = (0..self.slot_count)
             .into_iter()
-            .map(|slot| cell!(CharacterPreview::new(self.characters.clone(), self.move_request.clone(), self.changed.clone(), slot)) as ElementCell)
+            .map(|slot| {
+
+                cell!(CharacterPreview::new(
+                    self.characters.clone(),
+                    self.move_request.clone(),
+                    self.changed.clone(),
+                    slot
+                )) as ElementCell
+            })
             .collect();
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Character Selection".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(600, ?)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Character Selection".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(600, ?),
+        ))
     }
 }

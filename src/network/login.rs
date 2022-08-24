@@ -1,10 +1,8 @@
-use procedural::*;
-use serde::{ Serialize, Deserialize };
 use ron::ser::PrettyConfig;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::interface::*;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct LoginSettings {
@@ -17,6 +15,7 @@ pub struct LoginSettings {
 impl LoginSettings {
 
     pub fn new() -> Self {
+
         Self::load().unwrap_or_else(|| {
 
             #[cfg(feature = "debug")]

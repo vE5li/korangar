@@ -1,18 +1,16 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::InterfaceSettings;
-use crate::interface::{ Expandable, StateButton };
-use crate::interface::{ StateProvider, WindowCache, FramedWindow, ElementCell, Size };
+use crate::interface::{
+    ElementCell, Expandable, FramedWindow, InterfaceSettings, PrototypeWindow, Size, StateButton, StateProvider, Window, WindowCache,
+};
 
 macro_rules! render_state_button {
-    ($display:expr, $event:expr, $selector:ident) => {
-        {
-            let selector = Box::new(|state_provider: &StateProvider| state_provider.render_settings.$selector);
-            cell!(StateButton::new($display, $event, selector))
-        }
-    };
+    ($display:expr, $event:expr, $selector:ident) => {{
+
+        let selector = Box::new(|state_provider: &StateProvider| state_provider.render_settings.$selector);
+        cell!(StateButton::new($display, $event, selector))
+    }};
 }
 
 fn general_expandable() -> ElementCell {
@@ -42,7 +40,11 @@ fn lighting_expandable() -> ElementCell {
 
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("ambient light", UserEvent::ToggleShowAmbientLight, show_ambient_light),
-        render_state_button!("directional light", UserEvent::ToggleShowDirectionalLight, show_directional_light),
+        render_state_button!(
+            "directional light",
+            UserEvent::ToggleShowDirectionalLight,
+            show_directional_light
+        ),
         render_state_button!("point lights", UserEvent::ToggleShowPointLights, show_point_lights),
         render_state_button!("particle lights", UserEvent::ToggleShowParticleLights, show_particle_lights),
     ];
@@ -52,9 +54,11 @@ fn lighting_expandable() -> ElementCell {
 
 fn shadows_expandable() -> ElementCell {
 
-    let buttons: Vec<ElementCell> = vec![
-        render_state_button!("directional shadows", UserEvent::ToggleShowDirectionalShadows, show_directional_shadows),
-    ];
+    let buttons: Vec<ElementCell> = vec![render_state_button!(
+        "directional shadows",
+        UserEvent::ToggleShowDirectionalShadows,
+        show_directional_shadows
+    )];
 
     cell!(Expandable::new("shadows".to_string(), buttons, true))
 }
@@ -101,7 +105,7 @@ fn buffers_expandable() -> ElementCell {
 #[derive(Default)]
 pub struct RenderSettingsWindow {}
 
-impl RenderSettingsWindow  {
+impl RenderSettingsWindow {
 
     pub const WINDOW_CLASS: &'static str = "render_settings";
 }
@@ -112,7 +116,12 @@ impl PrototypeWindow for RenderSettingsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
         let elements: Vec<ElementCell> = vec![
             general_expandable(),
@@ -124,6 +133,14 @@ impl PrototypeWindow for RenderSettingsWindow {
             buffers_expandable(),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Render Settings".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ?)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Render Settings".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(200 > 250 < 300, ?),
+        ))
     }
 }

@@ -15,6 +15,7 @@ pub struct Key {
 impl Key {
 
     pub fn reset(&mut self) {
+
         self.update();
         self.is_down = false;
     }
@@ -24,6 +25,7 @@ impl Key {
     }
 
     pub fn update(&mut self) {
+
         self.is_pressed = self.is_down && !self.was_down;
         self.is_released = !self.is_down && self.was_down;
         self.was_down = self.is_down;

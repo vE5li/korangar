@@ -1,11 +1,9 @@
-use procedural::*;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::{InterfaceSettings, DialogElement};
-use crate::interface::*;
-use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
+use procedural::*;
+
+use crate::interface::{DialogElement, ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
 
 pub struct DialogWindow {
     elements: Rc<RefCell<Vec<DialogElement>>>,
@@ -38,12 +36,27 @@ impl PrototypeWindow for DialogWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(DialogContainer::new(self.elements.clone(), self.changed.clone(), self.npc_id)),
-        ];
+        let elements: Vec<ElementCell> = vec![cell!(DialogContainer::new(
+            self.elements.clone(),
+            self.changed.clone(),
+            self.npc_id
+        ))];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Dialog".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(300 > 400 < 500, ?)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Dialog".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(300 > 400 < 500, ?),
+        ))
     }
 }

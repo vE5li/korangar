@@ -1,12 +1,13 @@
-use procedural::*;
-use derive_new::new;
 use std::collections::HashMap;
 use std::fs::read;
+
+use derive_new::new;
+use procedural::*;
 use yazi::*;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::loaders::{ ByteStream, ByteConvertable };
+use crate::loaders::{ByteConvertable, ByteStream};
 
 #[derive(Clone, ByteConvertable)]
 pub struct FileHeader {
@@ -73,7 +74,7 @@ impl GameArchive {
         byte_stream.skip(file_information.offset as usize + 46);
 
         let compressed = byte_stream.slice(file_information.compressed_size_aligned as usize);
-        let (uncompressed, _checksum) = decompress(&compressed, Format::Zlib).unwrap(); 
+        let (uncompressed, _checksum) = decompress(&compressed, Format::Zlib).unwrap();
 
         uncompressed.into()
     }
@@ -101,7 +102,10 @@ impl GameFileLoader {
         let bytes = read(path.clone()).unwrap_or_else(|_| panic!("failed to load archive from {}", path));
         let mut byte_stream = ByteStream::new(&bytes);
 
-        assert!(byte_stream.string(16).as_str() == "Master of Magic", "failed to read magic number"); // TODO: change failed to invalid
+        assert!(
+            byte_stream.string(16).as_str() == "Master of Magic",
+            "failed to read magic number"
+        ); // TODO: change failed to invalid
 
         let file_header = FileHeader::from_bytes(&mut byte_stream, None);
         file_header.validate_version();
@@ -118,6 +122,7 @@ impl GameFileLoader {
         let mut files = HashMap::with_capacity(file_count);
 
         for _index in 0..file_count {
+
             let file_information = FileInformation::from_bytes(&mut byte_stream, None);
             files.insert(file_information.file_name.to_lowercase(), file_information);
         }
@@ -131,12 +136,15 @@ impl GameFileLoader {
 
     pub fn get(&mut self, path: &str) -> Result<Vec<u8>, String> {
 
-        let result = self.archives
+        let result = self
+            .archives
             .values_mut() // convert this to a multithreaded iter ?
             .find_map(|archive| archive.get(&path.to_lowercase()))
             .ok_or(format!("failed to find file {}", path));
 
-        if result.is_err() { // TEMP
+        if result.is_err() {
+
+            // TEMP
 
             #[cfg(feature = "debug")]
             print_debug!("failed to find file {}; tying to replace it with placeholder", path);
@@ -147,7 +155,7 @@ impl GameFileLoader {
                 ".rsm" => return self.get("data\\model\\abyss\\coin_j_01.rsm"),
                 ".spr" => return self.get("data\\sprite\\npc\\1_f_maria.spr"),
                 ".act" => return self.get("data\\sprite\\npc\\1_f_maria.act"),
-                _other => {},
+                _other => {}
             }
         }
 

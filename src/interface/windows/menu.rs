@@ -1,11 +1,7 @@
 use procedural::*;
 
-use crate::graphics::Color;
 use crate::input::UserEvent;
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::InterfaceSettings;
-use crate::interface::*;
-use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
+use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
 
 #[derive(Default)]
 pub struct MenuWindow {}
@@ -21,7 +17,12 @@ impl PrototypeWindow for MenuWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
         let elements: Vec<ElementCell> = vec![
             cell!(Button::new("graphics settings", UserEvent::OpenGraphicsSettingsWindow, true)),
@@ -42,6 +43,14 @@ impl PrototypeWindow for MenuWindow {
             cell!(Button::new("exit korangar", UserEvent::Exit, true)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Menu".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ?)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Menu".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(200 > 250 < 300, ?),
+        ))
     }
 }

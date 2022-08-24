@@ -3,4 +3,4 @@ mod timer;
 mod vulkan;
 
 pub use self::timer::GameTimer;
-pub use self::vulkan::{ get_instance_extensions, get_layers, get_device_extensions, multiply_matrix4_and_vector3 };
+pub use self::vulkan::{get_device_extensions, get_instance_extensions, get_layers, multiply_matrix4_and_vector3};

@@ -1,14 +1,11 @@
-use procedural::*;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use derive_new::new;
-use std::rc::Rc;
-use std::cell::RefCell;
+use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ Window, PrototypeWindow };
-use crate::interface::InterfaceSettings;
-use crate::interface::*;
-use crate::interface::{ WindowCache, FramedWindow, ElementCell, Size };
+use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
 
 #[derive(new)]
 pub struct CharacterCreationWindow {
@@ -26,16 +23,23 @@ impl PrototypeWindow for CharacterCreationWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Box<dyn Window + 'static> {
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
 
         let name = Rc::new(RefCell::new(String::new()));
 
         let selector = {
+
             let name = name.clone();
             Box::new(move || !name.borrow().is_empty())
         };
 
         let action = {
+
             let slot = self.slot;
             let name = name.clone();
             Box::new(move || UserEvent::CreateCharacter(slot, name.borrow().clone()))
@@ -46,6 +50,14 @@ impl PrototypeWindow for CharacterCreationWindow {
             cell!(FormButton::new("done", selector, action)),
         ];
 
-        Box::from(FramedWindow::new(window_cache, interface_settings, avalible_space, "Create Character".to_string(), Self::WINDOW_CLASS.to_string().into(), elements, constraint!(200 > 250 < 300, ? < 80%)))
+        Box::from(FramedWindow::new(
+            window_cache,
+            interface_settings,
+            avalible_space,
+            "Create Character".to_string(),
+            Self::WINDOW_CLASS.to_string().into(),
+            elements,
+            constraint!(200 > 250 < 300, ? < 80%),
+        ))
     }
 }

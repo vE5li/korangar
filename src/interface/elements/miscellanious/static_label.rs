@@ -1,9 +1,8 @@
 use derive_new::new;
 use num::Zero;
 
-use crate::interface::Element;
-use crate::interface::*;
-use crate::graphics::{Renderer, InterfaceRenderer};
+use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::interface::{Element, *};
 
 #[derive(new)]
 pub struct StaticLabel {
@@ -27,10 +26,37 @@ impl Element for StaticLabel {
         self.cached_position = position;
     }
 
-    fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, _state_provider: &StateProvider, interface_settings: &InterfaceSettings, theme: &Theme, parent_position: Position, clip_size: Size, _hovered_element: Option<&dyn Element>, _focused_element: Option<&dyn Element>, _second_theme: bool) {
+    fn render(
+        &self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        renderer: &InterfaceRenderer,
+        _state_provider: &StateProvider,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        parent_position: Position,
+        clip_size: Size,
+        _hovered_element: Option<&dyn Element>,
+        _focused_element: Option<&dyn Element>,
+        _second_theme: bool,
+    ) {
+
         let absolute_position = parent_position + self.cached_position;
         let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        renderer.render_rectangle(render_target, absolute_position, self.cached_size, clip_size, *theme.label.border_radius * *interface_settings.scaling, *theme.label.background_color);
-        renderer.render_text(render_target, &self.label, absolute_position + *theme.label.text_offset * *interface_settings.scaling, clip_size, *theme.label.foreground_color, *theme.label.font_size * *interface_settings.scaling);
+        renderer.render_rectangle(
+            render_target,
+            absolute_position,
+            self.cached_size,
+            clip_size,
+            *theme.label.border_radius * *interface_settings.scaling,
+            *theme.label.background_color,
+        );
+        renderer.render_text(
+            render_target,
+            &self.label,
+            absolute_position + *theme.label.text_offset * *interface_settings.scaling,
+            clip_size,
+            *theme.label.foreground_color,
+            *theme.label.font_size * *interface_settings.scaling,
+        );
     }
 }

@@ -1,36 +1,36 @@
-mod settings;
-mod picker;
 mod deferred;
-mod shadow;
 mod interface;
+mod picker;
+mod settings;
+mod shadow;
 
 use std::sync::Arc;
-use vulkano::buffer::{ CpuAccessibleBuffer, BufferUsage };
-use vulkano::command_buffer::{ AutoCommandBufferBuilder, PrimaryAutoCommandBuffer, SubpassContents, CommandBufferUsage, PrimaryCommandBuffer };
-use vulkano::device::{Device, Queue};
+
+use cgmath::{Matrix4, Vector2, Vector3};
+use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, PrimaryCommandBuffer, SubpassContents,
+};
 use vulkano::device::physical::PhysicalDevice;
-use vulkano::format::{ Format, ClearValue };
+use vulkano::device::{Device, Queue};
+use vulkano::format::{ClearValue, Format};
+use vulkano::image::view::ImageView;
+use vulkano::image::{AttachmentImage, ImageUsage, SampleCount, SwapchainImage};
+use vulkano::pipeline::graphics::color_blend::{AttachmentBlend, BlendFactor, BlendOp};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{Framebuffer, RenderPass};
-use vulkano::swapchain::{ PresentMode, Swapchain, Surface, ColorSpace, AcquireError, acquire_next_image };
-use vulkano::sync::{ FenceSignalFuture, GpuFuture, SemaphoreSignalFuture };
-use vulkano::image::{ ImageUsage, AttachmentImage, SampleCount, SwapchainImage };
-use vulkano::image::view::ImageView;
-use vulkano::pipeline::graphics::color_blend::AttachmentBlend;
-use vulkano::pipeline::graphics::color_blend::BlendFactor;
-use vulkano::pipeline::graphics::color_blend::BlendOp;
+use vulkano::swapchain::{acquire_next_image, AcquireError, ColorSpace, PresentMode, Surface, Swapchain};
+use vulkano::sync::{FenceSignalFuture, GpuFuture, SemaphoreSignalFuture};
 use winit::window::Window;
-use cgmath::{ Vector2, Vector3, Matrix4 };
 
-use crate::graphics::{ ImageBuffer, Texture, Camera, ModelVertexBuffer };
-
+pub use self::deferred::DeferredRenderer;
 use self::deferred::DeferredSubrenderer;
+pub use self::interface::InterfaceRenderer;
+pub use self::picker::PickerRenderer;
 use self::picker::PickerSubrenderer;
 pub use self::settings::RenderSettings;
-pub use self::picker::PickerRenderer;
-pub use self::deferred::DeferredRenderer;
 pub use self::shadow::ShadowRenderer;
-pub use self::interface::InterfaceRenderer;
+use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     color_op: BlendOp::Add,
@@ -60,19 +60,38 @@ pub const INTERFACE_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
 };
 
 pub trait Renderer {
+
     type Target;
 }
 
 pub trait GeometryRenderer {
 
-    fn render_geometry(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>)
-        where Self: Renderer;
+    fn render_geometry(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        vertex_buffer: ModelVertexBuffer,
+        textures: &Vec<Texture>,
+        world_matrix: Matrix4<f32>,
+    ) where
+        Self: Renderer;
 }
 
 pub trait EntityRenderer {
 
-    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, scale: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, entity_id: usize)
-        where Self: Renderer;
+    fn render_entity(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        texture: Texture,
+        position: Vector3<f32>,
+        origin: Vector3<f32>,
+        scale: Vector2<f32>,
+        cell_count: Vector2<usize>,
+        cell_position: Vector2<usize>,
+        entity_id: usize,
+    ) where
+        Self: Renderer;
 }
 
 #[derive(Debug)]
@@ -91,6 +110,7 @@ impl From<u32> for PickerTarget {
     fn from(data: u32) -> Self {
 
         if data >> 31 == 1 {
+
             let x = ((data >> 16) as u16) ^ (1 << 15);
             let y = data as u16;
             return Self::Tile(x, y);
@@ -108,24 +128,19 @@ impl From<u32> for PickerTarget {
 impl From<PickerTarget> for u32 {
 
     fn from(picker_target: PickerTarget) -> Self {
-
         match picker_target {
 
             PickerTarget::Tile(x, y) => {
+
                 let mut encoded = ((x as u32) << 16) | y as u32;
                 encoded |= 1 << 31;
                 encoded
             }
 
-            PickerTarget::Entity(entity_id) => {
-
-                let data = match entity_id >> 24 == 0 {
-                    true => entity_id | (5 << 24),
-                    false => entity_id,
-                };
-
-                data
-            }
+            PickerTarget::Entity(entity_id) => match entity_id >> 24 == 0 {
+                true => entity_id | (5 << 24),
+                false => entity_id,
+            },
         }
     }
 }
@@ -133,7 +148,8 @@ impl From<PickerTarget> for u32 {
 pub trait MarkerRenderer {
 
     fn render_marker(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, position: Vector3<f32>, hovered: bool)
-        where Self: Renderer;
+    where
+        Self: Renderer;
 }
 
 pub enum RenderTargetState {
@@ -148,6 +164,7 @@ unsafe impl Send for RenderTargetState {}
 impl RenderTargetState {
 
     pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+
         let RenderTargetState::Rendering(builder) = self else {
             panic!("render target is not in the render state");
         };
@@ -156,6 +173,7 @@ impl RenderTargetState {
     }
 
     pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+
         let RenderTargetState::Rendering(builder) = std::mem::replace(self, RenderTargetState::Ready) else {
             panic!("render target is not in the render state");
         };
@@ -164,6 +182,7 @@ impl RenderTargetState {
     }
 
     pub fn take_semaphore(&mut self) -> SemaphoreSignalFuture<Box<dyn GpuFuture>> {
+
         let RenderTargetState::Semaphore(semaphore) = std::mem::replace(self, RenderTargetState::Ready) else {
             panic!("render target is not in the semaphore state");
         };
@@ -212,7 +231,13 @@ pub struct DeferredRenderTarget {
 
 impl DeferredRenderTarget {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, swapchain_image: Arc<SwapchainImage<Window>>, dimensions: [u32; 2]) -> Self {
+    pub fn new(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        render_pass: Arc<RenderPass>,
+        swapchain_image: Arc<SwapchainImage<Window>>,
+        dimensions: [u32; 2],
+    ) -> Self {
 
         let color_image_usage = ImageUsage {
             sampled: true,
@@ -228,18 +253,64 @@ impl DeferredRenderTarget {
             ..ImageUsage::none()
         };
 
-        let diffuse_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R32G32B32A32_SFLOAT, color_image_usage).unwrap())).unwrap();
-        let normal_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R16G16B16A16_SFLOAT, color_image_usage).unwrap())).unwrap();
-        let water_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::R8G8B8A8_SRGB, color_image_usage).unwrap())).unwrap();
-        let depth_image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, SampleCount::Sample4, Format::D32_SFLOAT, depth_image_usage).unwrap())).unwrap();
+        let diffuse_image = ImageView::new(Arc::new(
+            AttachmentImage::multisampled_with_usage(
+                device.clone(),
+                dimensions,
+                SampleCount::Sample4,
+                Format::R32G32B32A32_SFLOAT,
+                color_image_usage,
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+        let normal_image = ImageView::new(Arc::new(
+            AttachmentImage::multisampled_with_usage(
+                device.clone(),
+                dimensions,
+                SampleCount::Sample4,
+                Format::R16G16B16A16_SFLOAT,
+                color_image_usage,
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+        let water_image = ImageView::new(Arc::new(
+            AttachmentImage::multisampled_with_usage(
+                device.clone(),
+                dimensions,
+                SampleCount::Sample4,
+                Format::R8G8B8A8_SRGB,
+                color_image_usage,
+            )
+            .unwrap(),
+        ))
+        .unwrap();
+        let depth_image = ImageView::new(Arc::new(
+            AttachmentImage::multisampled_with_usage(
+                device.clone(),
+                dimensions,
+                SampleCount::Sample4,
+                Format::D32_SFLOAT,
+                depth_image_usage,
+            )
+            .unwrap(),
+        ))
+        .unwrap();
 
-        let framebuffer = Framebuffer::start(render_pass.clone())
-            .add(ImageView::new(swapchain_image).unwrap()).unwrap()
-            .add(diffuse_image.clone()).unwrap()
-            .add(normal_image.clone()).unwrap()
-            .add(water_image.clone()).unwrap()
-            .add(depth_image.clone()).unwrap()
-            .build().unwrap();
+        let framebuffer = Framebuffer::start(render_pass)
+            .add(ImageView::new(swapchain_image).unwrap())
+            .unwrap()
+            .add(diffuse_image.clone())
+            .unwrap()
+            .add(normal_image.clone())
+            .unwrap()
+            .add(water_image.clone())
+            .unwrap()
+            .add(depth_image.clone())
+            .unwrap()
+            .build()
+            .unwrap();
 
         let state = RenderTargetState::Ready;
         let bound_subrenderer = None;
@@ -259,14 +330,28 @@ impl DeferredRenderTarget {
 
     pub fn start(&mut self) {
 
-        let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
+        let mut builder =
+            AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Float([0.0, 0.0, 0.0, 1.0]), ClearValue::Depth(1.0)]).unwrap(); 
+        builder
+            .begin_render_pass(
+                self.framebuffer.clone(),
+                SubpassContents::Inline,
+                [
+                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                    ClearValue::Depth(1.0),
+                ],
+            )
+            .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
 
     pub fn bind_subrenderer(&mut self, subrenderer: DeferredSubrenderer) -> bool {
+
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
@@ -289,7 +374,8 @@ impl DeferredRenderTarget {
         let command_buffer = builder.build().unwrap();
 
         let fence = semaphore
-            .then_execute(self.queue.clone(), command_buffer).unwrap()
+            .then_execute(self.queue.clone(), command_buffer)
+            .unwrap()
             .then_swapchain_present(self.queue.clone(), swapchain, image_number)
             .boxed()
             .then_signal_fence_and_flush()
@@ -326,14 +412,31 @@ impl PickerRenderTarget {
             ..ImageUsage::none()
         };
 
-        let image = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::R32_UINT, image_usage).unwrap())).unwrap();
-        let depth_buffer = ImageView::new(Arc::new(AttachmentImage::with_usage(device.clone(), dimensions, Format::D16_UNORM, depth_image_usage).unwrap())).unwrap();
-        let framebuffer = Framebuffer::start(render_pass.clone())
-            .add(image.clone()).unwrap()
-            .add(depth_buffer.clone()).unwrap()
-            .build().unwrap();
+        let image = ImageView::new(Arc::new(
+            AttachmentImage::with_usage(device.clone(), dimensions, Format::R32_UINT, image_usage).unwrap(),
+        ))
+        .unwrap();
+        let depth_buffer = ImageView::new(Arc::new(
+            AttachmentImage::with_usage(device.clone(), dimensions, Format::D16_UNORM, depth_image_usage).unwrap(),
+        ))
+        .unwrap();
+        let framebuffer = Framebuffer::start(render_pass)
+            .add(image.clone())
+            .unwrap()
+            .add(depth_buffer)
+            .unwrap()
+            .build()
+            .unwrap();
 
-        let buffer = unsafe { CpuAccessibleBuffer::uninitialized_array(device.clone(), dimensions[0] as u64 * dimensions[1] as u64, BufferUsage::transfer_destination(), false).unwrap() };
+        let buffer = unsafe {
+            CpuAccessibleBuffer::uninitialized_array(
+                device.clone(),
+                dimensions[0] as u64 * dimensions[1] as u64,
+                BufferUsage::transfer_destination(),
+                false,
+            )
+            .unwrap()
+        };
         let state = RenderTargetState::Ready;
         let bound_subrenderer = None;
 
@@ -350,14 +453,22 @@ impl PickerRenderTarget {
 
     pub fn start(&mut self) {
 
-        let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
+        let mut builder =
+            AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::Uint([0; 4]), ClearValue::Depth(1.0)]).unwrap();
+        builder
+            .begin_render_pass(
+                self.framebuffer.clone(),
+                SubpassContents::Inline,
+                [ClearValue::Uint([0; 4]), ClearValue::Depth(1.0)],
+            )
+            .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
 
     pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
+
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
@@ -372,7 +483,9 @@ impl PickerRenderTarget {
         let mut builder = self.state.take_builder();
 
         builder.end_render_pass().unwrap();
-        builder.copy_image_to_buffer(self.image.image().clone(), self.buffer.clone()).unwrap();
+        builder
+            .copy_image_to_buffer(self.image.image().clone(), self.buffer.clone())
+            .unwrap();
 
         let command_buffer = builder.build().unwrap();
         let fence = command_buffer
@@ -399,12 +512,21 @@ pub struct SingleRenderTarget<const F: Format, S: PartialEq> {
 
 impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2], sample_count: SampleCount, image_usage: ImageUsage, clear_value: ClearValue) -> Self {
+    pub fn new(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        render_pass: Arc<RenderPass>,
+        dimensions: [u32; 2],
+        sample_count: SampleCount,
+        image_usage: ImageUsage,
+        clear_value: ClearValue,
+    ) -> Self {
 
-        let image = ImageView::new(Arc::new(AttachmentImage::multisampled_with_usage(device.clone(), dimensions, sample_count, F, image_usage).unwrap())).unwrap();
-        let framebuffer = Framebuffer::start(render_pass.clone())
-            .add(image.clone()).unwrap()
-            .build().unwrap();
+        let image = ImageView::new(Arc::new(
+            AttachmentImage::multisampled_with_usage(device.clone(), dimensions, sample_count, F, image_usage).unwrap(),
+        ))
+        .unwrap();
+        let framebuffer = Framebuffer::start(render_pass).add(image.clone()).unwrap().build().unwrap();
 
         let state = RenderTargetState::Ready;
         let bound_subrenderer = None;
@@ -422,27 +544,36 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
 
     pub fn start(&mut self) {
 
-        let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
+        let mut builder =
+            AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
-        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [self.clear_value]).unwrap();
+        builder
+            .begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [self.clear_value])
+            .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
 
-    pub fn start_interface(&mut self, clear_interface: bool) { // TODO:
+    pub fn start_interface(&mut self, clear_interface: bool) {
 
-        let mut builder = AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
+        // TODO:
+
+        let mut builder =
+            AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
         if clear_interface {
             builder.clear_color_image(self.image.image().clone(), self.clear_value).unwrap();
         }
 
-        builder.begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::None]).unwrap();
+        builder
+            .begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [ClearValue::None])
+            .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
 
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
+
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
@@ -520,11 +651,15 @@ impl SwapchainHolder {
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
 
         let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
+
             Ok(r) => r,
+
             Err(AcquireError::OutOfDate) => {
+
                 self.recreate = true;
                 return Err(());
             }
+
             Err(e) => panic!("Failed to acquire next image: {:?}", e),
         };
 
@@ -548,13 +683,14 @@ impl SwapchainHolder {
 
     pub fn recreate_swapchain(&mut self) -> Viewport {
 
-        let swapchain_result = self.swapchain
+        let swapchain_result = self
+            .swapchain
             .recreate()
             .dimensions(self.window_size)
             .present_mode(self.present_mode)
             .build();
 
-        let (swapchain, swapchain_images) =  match swapchain_result {
+        let (swapchain, swapchain_images) = match swapchain_result {
             Ok(r) => r,
             //Err(SwapchainCreationError::UnsupportedDimensions) => return,
             Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
@@ -583,6 +719,7 @@ impl SwapchainHolder {
     }
 
     pub fn viewport(&self) -> Viewport {
+
         Viewport {
             origin: [0.0, 0.0],
             dimensions: self.window_size.map(|component| component as f32),
@@ -591,6 +728,7 @@ impl SwapchainHolder {
     }
 
     pub fn set_frame_limit(&mut self, limited: bool) {
+
         self.present_mode = match limited {
             true => PresentMode::Fifo,
             false => PresentMode::Mailbox,
@@ -599,6 +737,7 @@ impl SwapchainHolder {
     }
 
     pub fn update_window_size(&mut self, window_size: [u32; 2]) {
+
         self.window_size = window_size;
         self.invalidate_swapchain();
     }

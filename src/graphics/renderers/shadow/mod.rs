@@ -1,19 +1,22 @@
-mod geometry;
 mod entity;
+mod geometry;
 
 use std::sync::Arc;
-use vulkano::render_pass::RenderPass;
-use vulkano::{device::Device, format::Format};
-use vulkano::device::Queue;
+
+use cgmath::{Matrix4, Vector2, Vector3};
+use vulkano::device::{Device, Queue};
+use vulkano::format::Format;
 use vulkano::image::{ImageUsage, SampleCount};
-use cgmath::{ Vector2, Vector3, Matrix4 };
+use vulkano::render_pass::RenderPass;
 
-use super::{ Renderer, Camera, GeometryRenderer as GeometryRendererTrait, EntityRenderer as EntityRendererTrait, SingleRenderTarget, Texture, ModelVertexBuffer };
-
-use self::geometry::GeometryRenderer;
 use self::entity::EntityRenderer;
+use self::geometry::GeometryRenderer;
+use super::{
+    Camera, EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, ModelVertexBuffer, Renderer,
+    SingleRenderTarget, Texture,
+};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub enum ShadowSubrenderer {
     Geometry,
     Entity,
@@ -50,7 +53,7 @@ impl ShadowRenderer {
 
         let subpass = render_pass.clone().first_subpass();
         let geometry_renderer = GeometryRenderer::new(device.clone(), subpass.clone());
-        let entity_renderer = EntityRenderer::new(device.clone(), subpass.clone());
+        let entity_renderer = EntityRenderer::new(device.clone(), subpass);
 
         Self {
             device,
@@ -62,9 +65,10 @@ impl ShadowRenderer {
     }
 
     pub fn recreate_pipeline(&mut self) {
+
         let subpass = self.render_pass.clone().first_subpass();
         self.geometry_renderer.recreate_pipeline(self.device.clone(), subpass.clone());
-        self.entity_renderer.recreate_pipeline(self.device.clone(), subpass.clone());
+        self.entity_renderer.recreate_pipeline(self.device.clone(), subpass);
     }
 
     pub fn create_render_target(&self, size: u32) -> <Self as Renderer>::Target {
@@ -75,36 +79,75 @@ impl ShadowRenderer {
             ..ImageUsage::none()
         };
 
-        <Self as Renderer>::Target::new(self.device.clone(), self.queue.clone(), self.render_pass.clone(), [size; 2], SampleCount::Sample1, image_usage, vulkano::format::ClearValue::Depth(1.0))
+        <Self as Renderer>::Target::new(
+            self.device.clone(),
+            self.queue.clone(),
+            self.render_pass.clone(),
+            [size; 2],
+            SampleCount::Sample1,
+            image_usage,
+            vulkano::format::ClearValue::Depth(1.0),
+        )
     }
 }
 
 impl Renderer for ShadowRenderer {
+
     type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ShadowSubrenderer>;
 }
 
 impl GeometryRendererTrait for ShadowRenderer {
 
-    fn render_geometry(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: ModelVertexBuffer, textures: &Vec<Texture>, world_matrix: Matrix4<f32>)
-        where Self: Renderer
+    fn render_geometry(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        vertex_buffer: ModelVertexBuffer,
+        textures: &Vec<Texture>,
+        world_matrix: Matrix4<f32>,
+    ) where
+        Self: Renderer,
     {
+
         if render_target.bind_subrenderer(ShadowSubrenderer::Geometry) {
             self.geometry_renderer.bind_pipeline(render_target, camera);
         }
 
-        self.geometry_renderer.render(render_target, camera, vertex_buffer.clone(), textures, world_matrix);
+        self.geometry_renderer
+            .render(render_target, camera, vertex_buffer, textures, world_matrix);
     }
 }
 
 impl EntityRendererTrait for ShadowRenderer {
 
-    fn render_entity(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, texture: Texture, position: Vector3<f32>, origin: Vector3<f32>, scale: Vector2<f32>, cell_count: Vector2<usize>, cell_position: Vector2<usize>, _entity_id: usize)
-        where Self: Renderer
+    fn render_entity(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        texture: Texture,
+        position: Vector3<f32>,
+        origin: Vector3<f32>,
+        scale: Vector2<f32>,
+        cell_count: Vector2<usize>,
+        cell_position: Vector2<usize>,
+        _entity_id: usize,
+    ) where
+        Self: Renderer,
     {
+
         if render_target.bind_subrenderer(ShadowSubrenderer::Entity) {
             self.entity_renderer.bind_pipeline(render_target, camera);
         }
 
-        self.entity_renderer.render(render_target, camera, texture, position, origin, scale, cell_count, cell_position);
+        self.entity_renderer.render(
+            render_target,
+            camera,
+            texture,
+            position,
+            origin,
+            scale,
+            cell_count,
+            cell_position,
+        );
     }
 }

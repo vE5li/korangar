@@ -12,24 +12,22 @@ mod fragment_shader {
     }
 }
 
-use std::sync::Arc;
 use std::iter;
+use std::sync::Arc;
 
-use cgmath::{ Vector4, Vector2 };
-
+use cgmath::{Vector2, Vector4};
+use vulkano::buffer::BufferUsage;
 use vulkano::device::Device;
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::{ GraphicsPipeline, Pipeline };
-use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::viewport::{ Viewport, ViewportState };
+use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
+use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
+use vulkano::pipeline::{GraphicsPipeline, Pipeline};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
-use vulkano::buffer::BufferUsage;
-
-use crate::graphics::*;
 
 use self::vertex_shader::ty::Constants;
+use crate::graphics::*;
 
 pub struct RectangleRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -52,19 +50,31 @@ impl RectangleRenderer {
             ScreenVertex::new(Vector2::new(1.0, 0.0)),
             ScreenVertex::new(Vector2::new(1.0, 0.0)),
             ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 1.0))
+            ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
-        Self { pipeline, vertex_shader, fragment_shader, vertex_buffer }
+        Self {
+            pipeline,
+            vertex_shader,
+            fragment_shader,
+            vertex_buffer,
+        }
     }
 
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
 
-    fn create_pipeline(device: Arc<Device>, subpass: Subpass, viewport: Viewport, vertex_shader: &ShaderModule, fragment_shader: &ShaderModule) -> Arc<GraphicsPipeline> {
+    fn create_pipeline(
+        device: Arc<Device>,
+        subpass: Subpass,
+        viewport: Viewport,
+        vertex_shader: &ShaderModule,
+        fragment_shader: &ShaderModule,
+    ) -> Arc<GraphicsPipeline> {
+
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -77,7 +87,16 @@ impl RectangleRenderer {
             .unwrap()
     }
 
-    pub fn render(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target, window_size: Vector2<usize>, screen_position: Vector2<f32>, screen_size: Vector2<f32>, clip_size: Vector2<f32>, corner_radius: Vector4<f32>, color: Color) {
+    pub fn render(
+        &self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        window_size: Vector2<usize>,
+        screen_position: Vector2<f32>,
+        screen_size: Vector2<f32>,
+        clip_size: Vector2<f32>,
+        corner_radius: Vector4<f32>,
+        color: Color,
+    ) {
 
         let layout = self.pipeline.layout().clone();
 
@@ -86,7 +105,12 @@ impl RectangleRenderer {
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
 
         let pixel_size = 1.0 / window_size.y as f32;
-        let corner_radius = Vector4::new(corner_radius.x * pixel_size, corner_radius.y * pixel_size, corner_radius.z * pixel_size, corner_radius.w * pixel_size);
+        let corner_radius = Vector4::new(
+            corner_radius.x * pixel_size,
+            corner_radius.y * pixel_size,
+            corner_radius.z * pixel_size,
+            corner_radius.w * pixel_size,
+        );
 
         let constants = Constants {
             screen_position: screen_position.into(),
@@ -97,10 +121,13 @@ impl RectangleRenderer {
             _dummy0: [0, 0, 0, 0, 0, 0, 0, 0],
         };
 
-        render_target.state.get_builder()
+        render_target
+            .state
+            .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, self.vertex_buffer.clone())
-            .draw(6, 1, 0, 0).unwrap();
+            .draw(6, 1, 0, 0)
+            .unwrap();
     }
 }

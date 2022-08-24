@@ -1,30 +1,30 @@
-mod settings;
-mod layout;
-mod theme;
 mod event;
+mod layout;
 mod provider;
+mod settings;
+mod theme;
 #[macro_use]
 mod elements;
-mod windows;
 mod cursor;
+mod windows;
 
-use derive_new::new;
-use std::rc::Rc;
 use std::cell::RefCell;
-use vulkano::sync::GpuFuture;
+use std::rc::Rc;
+
 use cgmath::Vector2;
+use derive_new::new;
+use vulkano::sync::GpuFuture;
 
-use crate::graphics::{ Renderer, InterfaceRenderer, DeferredRenderer, Color };
-use crate::loaders::{ SpriteLoader, ActionLoader };
-
-pub use self::settings::InterfaceSettings;
-pub use self::layout::*;
-pub use self::theme::Theme;
-pub use self::event::*;
-pub use self::provider::StateProvider;
-pub use self::elements::*;
-pub use self::windows::*;
 pub use self::cursor::MouseCursor;
+pub use self::elements::*;
+pub use self::event::*;
+pub use self::layout::*;
+pub use self::provider::StateProvider;
+pub use self::settings::InterfaceSettings;
+pub use self::theme::Theme;
+pub use self::windows::*;
+use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer};
+use crate::loaders::{ActionLoader, SpriteLoader};
 
 #[derive(new)]
 struct DialogHandle {
@@ -47,7 +47,12 @@ pub struct Interface {
 
 impl Interface {
 
-    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, texture_future: &mut Box<dyn GpuFuture + 'static>, avalible_space: Size) -> Self {
+    pub fn new(
+        sprite_loader: &mut SpriteLoader,
+        action_loader: &mut ActionLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+        avalible_space: Size,
+    ) -> Self {
 
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
@@ -80,6 +85,7 @@ impl Interface {
 
     pub fn schedule_rerender_window(&mut self, window_index: usize) {
         if window_index < self.windows.len() {
+
             let (window, _reresolve, rerender) = &mut self.windows[window_index];
 
             match window.has_transparency(&self.theme) {
@@ -94,20 +100,20 @@ impl Interface {
         for (window, _reresolve, rerender) in &mut self.windows {
             if let Some(change_event) = window.update() {
                 match change_event {
+
                     ChangeEvent::Reresolve => self.reresolve = true,
+
                     ChangeEvent::Rerender => self.rerender = true,
-                    ChangeEvent::RerenderWindow => {
-                        match window.has_transparency(&self.theme) {
-                            true => self.rerender = true,
-                            false => *rerender = true,
-                        }
+
+                    ChangeEvent::RerenderWindow => match window.has_transparency(&self.theme) {
+                        true => self.rerender = true,
+                        false => *rerender = true,
                     },
                 }
             }
         }
 
         for (window, reresolve, rerender) in &mut self.windows {
-
             if self.reresolve || *reresolve {
 
                 let (_position, previous_size) = window.get_area();
@@ -130,10 +136,14 @@ impl Interface {
         self.rerender |= self.reresolve;
         self.reresolve = false;
 
-        (self.rerender, self.rerender | self.windows.iter().any(|(_window, _reresolve, rerender)| *rerender))
+        (
+            self.rerender,
+            self.rerender | self.windows.iter().any(|(_window, _reresolve, rerender)| *rerender),
+        )
     }
 
     pub fn update_window_size(&mut self, screen_size: Size) {
+
         self.avalible_space = screen_size;
         self.reresolve = true;
     }
@@ -144,7 +154,7 @@ impl Interface {
             match window.hovered_element(mouse_position) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
                 HoverInformation::Hovered | HoverInformation::Ignored => return (None, Some(window_index)),
-                HoverInformation::Missed=> {},
+                HoverInformation::Missed => {}
             }
         }
 
@@ -152,6 +162,7 @@ impl Interface {
     }
 
     pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
+
         let (window, reresolve, _rerender) = self.windows.remove(window_index);
         let new_window_index = self.windows.len();
         let has_transparency = window.has_transparency(&self.theme);
@@ -163,11 +174,13 @@ impl Interface {
     }
 
     pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
+
         let (_window, reresolve, _rerender) = &mut self.windows[window_index];
         hovered_element.borrow_mut().left_click(reresolve)
     }
 
     pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
+
         let (_window, reresolve, _rerender) = &mut self.windows[window_index];
         hovered_element.borrow_mut().right_click(reresolve)
     }
@@ -185,18 +198,20 @@ impl Interface {
     }
 
     pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) {
+
         let (window, _reresolve, rerender) = &mut self.windows[window_index];
         let has_transparency = window.has_transparency(&self.theme);
 
         if let Some(change_event) = element.borrow_mut().input_character(character) {
             match change_event {
+
                 ChangeEvent::Reresolve => self.reresolve = true,
+
                 ChangeEvent::Rerender => self.rerender = true,
-                ChangeEvent::RerenderWindow => {
-                    match has_transparency {
-                        true => self.rerender = true,
-                        false => *rerender = true,
-                    }
+
+                ChangeEvent::RerenderWindow => match has_transparency {
+                    true => self.rerender = true,
+                    false => *rerender = true,
                 },
             }
         }
@@ -212,6 +227,7 @@ impl Interface {
     }
 
     pub fn resize_window(&mut self, window_index: usize, growth: Size) {
+
         let (window, reresolve, _rerender) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
@@ -229,7 +245,6 @@ impl Interface {
     }
 
     fn flag_rerender_windows(&mut self, start_index: usize, area: Option<(Position, Size)>) {
-
         for window_index in start_index..self.windows.len() {
 
             let rerender = self.windows[window_index].2;
@@ -238,6 +253,7 @@ impl Interface {
             if rerender || area.map(is_hovering).unwrap_or(false) {
 
                 let (position, scale) = {
+
                     let (window, _reresolve, rerender) = &mut self.windows[window_index];
                     *rerender = true;
                     window.get_area()
@@ -248,7 +264,14 @@ impl Interface {
         }
     }
 
-    pub fn render(&mut self, render_target: &mut <InterfaceRenderer as Renderer>::Target, renderer: &InterfaceRenderer, state_provider: &StateProvider, hovered_element: Option<ElementCell>, focused_element: Option<ElementCell>) {
+    pub fn render(
+        &mut self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        renderer: &InterfaceRenderer,
+        state_provider: &StateProvider,
+        hovered_element: Option<ElementCell>,
+        focused_element: Option<ElementCell>,
+    ) {
 
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
         let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
@@ -259,7 +282,16 @@ impl Interface {
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if self.rerender || *rerender {
-                window.render(render_target, renderer, state_provider, &self.interface_settings, &self.theme, hovered_element, focused_element);
+
+                window.render(
+                    render_target,
+                    renderer,
+                    state_provider,
+                    &self.interface_settings,
+                    &self.theme,
+                    hovered_element,
+                    focused_element,
+                );
                 *rerender = false;
             }
         }
@@ -267,23 +299,62 @@ impl Interface {
         self.rerender = false;
     }
 
-    pub fn render_hover_text(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, text: &str, mouse_position: Position) {
+    pub fn render_hover_text(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        text: &str,
+        mouse_position: Position,
+    ) {
+
         let offset = Vector2::new(text.len() as f32 * -3.0, 20.0);
-        renderer.render_text(render_target, text, mouse_position + offset + Vector2::new(1.0, 1.0), Color::monochrome(0), 12.0); // move variables into theme
+        renderer.render_text(
+            render_target,
+            text,
+            mouse_position + offset + Vector2::new(1.0, 1.0),
+            Color::monochrome(0),
+            12.0,
+        ); // move variables into theme
         renderer.render_text(render_target, text, mouse_position + offset, Color::monochrome(255), 12.0); // move variables into theme
     }
 
-    pub fn render_frames_per_second(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, frames_per_second: usize) {
-        renderer.render_text(render_target, &frames_per_second.to_string(), *self.theme.overlay.text_offset * *self.interface_settings.scaling, *self.theme.overlay.foreground_color, *self.theme.overlay.font_size * *self.interface_settings.scaling);
+    pub fn render_frames_per_second(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        frames_per_second: usize,
+    ) {
+
+        renderer.render_text(
+            render_target,
+            &frames_per_second.to_string(),
+            *self.theme.overlay.text_offset * *self.interface_settings.scaling,
+            *self.theme.overlay.foreground_color,
+            *self.theme.overlay.font_size * *self.interface_settings.scaling,
+        );
     }
 
-    pub fn render_mouse_cursor(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, mouse_position: Position) {
-        self.mouse_cursor.render(render_target, renderer, mouse_position, *self.theme.cursor.color);
+    pub fn render_mouse_cursor(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        mouse_position: Position,
+    ) {
+        self.mouse_cursor
+            .render(render_target, renderer, mouse_position, *self.theme.cursor.color);
     }
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
-            Some(window_class) => self.windows.iter().any(|window| window.0.get_window_class().map_or(false, |other_window_class| window_class == other_window_class)),
+
+            Some(window_class) => self.windows.iter().any(|window| {
+
+                window
+                    .0
+                    .get_window_class()
+                    .map_or(false, |other_window_class| window_class == other_window_class)
+            }),
+
             None => false,
         }
     }
@@ -294,6 +365,7 @@ impl Interface {
 
     pub fn open_window(&mut self, prototype_window: &dyn PrototypeWindow) {
         if !self.window_exists(prototype_window.window_class()) {
+
             let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
             self.open_new_window(window);
         }
@@ -301,9 +373,11 @@ impl Interface {
 
     pub fn open_dialog_window(&mut self, text: String, npc_id: u32) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
+
             let mut elements = dialog_handle.elements.borrow_mut();
 
             if dialog_handle.clear {
+
                 elements.clear();
                 dialog_handle.clear = false;
             }
@@ -311,6 +385,7 @@ impl Interface {
             elements.push(DialogElement::Text(text));
             *dialog_handle.changed.borrow_mut() = true;
         } else {
+
             let (window, elements, changed) = DialogWindow::new(text, npc_id);
             self.dialog_handle = Some(DialogHandle::new(elements, changed, false));
             self.open_window(&window);
@@ -357,6 +432,7 @@ impl Interface {
     }
 
     pub fn close_dialog_window(&mut self) {
+
         self.close_window_with_class(DialogWindow::WINDOW_CLASS);
         self.dialog_handle = None;
     }
@@ -370,18 +446,29 @@ impl Interface {
     #[cfg(feature = "debug")]
     pub fn open_theme_viewer_window(&mut self) {
         if !self.window_exists(self.theme.window_class()) {
-            let window = self.theme.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
+
+            let window = self
+                .theme
+                .to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
             self.open_new_window(window);
         }
     }
 
     pub fn close_window(&mut self, window_index: usize) {
+
         self.windows.remove(window_index);
         self.rerender = true;
     }
 
     pub fn close_window_with_class(&mut self, window_class: &str) {
-        self.windows.retain(|window| !window.0.get_window_class().map_or(false, |other_window_class| window_class == other_window_class));
+
+        self.windows.retain(|window| {
+
+            !window
+                .0
+                .get_window_class()
+                .map_or(false, |other_window_class| window_class == other_window_class)
+        });
         self.rerender = true;
     }
 }

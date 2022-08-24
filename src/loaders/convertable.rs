@@ -1,4 +1,4 @@
-use cgmath::{ Vector2, Vector3, Vector4, Matrix3, Quaternion };
+use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 
 use crate::loaders::ByteStream;
 
@@ -14,11 +14,13 @@ pub trait ByteConvertable {
 impl ByteConvertable for u8 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "u8 may not have a length hint");
         byte_stream.next()
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "u8 may not have a length hint");
         vec![*self]
     }
@@ -27,11 +29,13 @@ impl ByteConvertable for u8 {
 impl ByteConvertable for u16 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "u16 may not have a length hint");
         Self::from_le_bytes([byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "u16 may not have a length hint");
         self.to_le_bytes().to_vec()
     }
@@ -40,11 +44,13 @@ impl ByteConvertable for u16 {
 impl ByteConvertable for u32 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "u32 may not have a length hint");
         Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "u32 may not have a length hint");
         self.to_le_bytes().to_vec()
     }
@@ -53,11 +59,22 @@ impl ByteConvertable for u32 {
 impl ByteConvertable for u64 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "u64 may not have a length hint");
-        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
+        Self::from_le_bytes([
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+        ])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "u64 may not have a length hint");
         self.to_le_bytes().to_vec()
     }
@@ -66,11 +83,13 @@ impl ByteConvertable for u64 {
 impl ByteConvertable for i8 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "i8 may not have a length hint");
         byte_stream.next() as i8
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "i8 may not have a length hint");
         vec![*self as u8]
     }
@@ -79,11 +98,13 @@ impl ByteConvertable for i8 {
 impl ByteConvertable for i16 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "i16 may not have a length hint");
         Self::from_le_bytes([byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "i16 may not have a length hint");
         self.to_le_bytes().to_vec()
     }
@@ -92,11 +113,13 @@ impl ByteConvertable for i16 {
 impl ByteConvertable for i32 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "i32 may not have a length hint");
         Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "i32 may not have a length hint");
         self.to_le_bytes().to_vec()
     }
@@ -105,11 +128,22 @@ impl ByteConvertable for i32 {
 impl ByteConvertable for i64 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "i64 may not have a length hint");
-        Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
+        Self::from_le_bytes([
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+            byte_stream.next(),
+        ])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "i64 may not have a length hint");
         self.to_le_bytes().to_vec()
     }
@@ -118,11 +152,13 @@ impl ByteConvertable for i64 {
 impl ByteConvertable for f32 {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "f32 may not have a length hint");
         Self::from_le_bytes([byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next()])
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "f32 may not have a length hint");
         self.to_ne_bytes().to_vec()
     }
@@ -131,13 +167,12 @@ impl ByteConvertable for f32 {
 impl<T: ByteConvertable, const SIZE: usize> ByteConvertable for [T; SIZE] {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         use std::mem::MaybeUninit;
 
         assert!(length_hint.is_none(), "array may not have a length hint");
 
-        let mut data: [MaybeUninit<T>; SIZE] = unsafe {
-            MaybeUninit::uninit().assume_init()
-        };
+        let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
 
         for element in &mut data[..] {
             *element = MaybeUninit::new(T::from_bytes(byte_stream, None));
@@ -154,14 +189,14 @@ impl<T: ByteConvertable, const SIZE: usize> ByteConvertable for [T; SIZE] {
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         assert!(length_hint.is_none(), "array may not have a length hint");
 
-        self
-            .iter()
-            .fold(Vec::new(), |mut bytes, value| {
-                bytes.extend(value.to_bytes(None));
-                bytes
-            })
+        self.iter().fold(Vec::new(), |mut bytes, value| {
+
+            bytes.extend(value.to_bytes(None));
+            bytes
+        })
     }
 }
 
@@ -173,11 +208,12 @@ impl ByteConvertable for String {
         let mut offset = 0;
 
         loop {
+
             offset += 1;
 
             match byte_stream.next() {
                 0 => break,
-                byte => value.push(byte as char)
+                byte => value.push(byte as char),
             }
         }
 
@@ -189,17 +225,19 @@ impl ByteConvertable for String {
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+
         use std::iter;
 
         match length_hint {
 
             Some(length) => {
+
                 assert!(self.len() <= length, "string is to long for the byte stream");
                 let padding = (0..length - self.len()).into_iter().map(|_| 0);
                 self.bytes().chain(padding).collect()
-            },
+            }
 
-            None => self.bytes().chain(iter::once(0)).collect(), 
+            None => self.bytes().chain(iter::once(0)).collect(),
         }
     }
 }
@@ -207,6 +245,7 @@ impl ByteConvertable for String {
 impl<T: ByteConvertable> ByteConvertable for Vec<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         let length = length_hint.expect("vector requires a size hint");
         let data = byte_stream.slice(length);
         let mut byte_stream = ByteStream::new(&data);
@@ -223,6 +262,7 @@ impl<T: ByteConvertable> ByteConvertable for Vec<T> {
 impl<T: ByteConvertable> ByteConvertable for Vector2<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "vector2 may not have a length hint");
 
         let first = T::from_bytes(byte_stream, None);
@@ -235,6 +275,7 @@ impl<T: ByteConvertable> ByteConvertable for Vector2<T> {
 impl<T: ByteConvertable> ByteConvertable for Vector3<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "vector3 may not have a length hint");
 
         let first = T::from_bytes(byte_stream, None);
@@ -248,6 +289,7 @@ impl<T: ByteConvertable> ByteConvertable for Vector3<T> {
 impl<T: ByteConvertable> ByteConvertable for Vector4<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "vector4 may not have a length hint");
 
         let first = T::from_bytes(byte_stream, None);
@@ -262,6 +304,7 @@ impl<T: ByteConvertable> ByteConvertable for Vector4<T> {
 impl<T: ByteConvertable> ByteConvertable for Quaternion<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "quaternion may not have a length hint");
 
         let first = T::from_bytes(byte_stream, None);
@@ -276,6 +319,7 @@ impl<T: ByteConvertable> ByteConvertable for Quaternion<T> {
 impl<T: ByteConvertable> ByteConvertable for Matrix3<T> {
 
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
         assert!(length_hint.is_none(), "matrix may not have a length hint");
 
         let c0r0 = T::from_bytes(byte_stream, None);
@@ -297,11 +341,11 @@ impl<T: ByteConvertable> ByteConvertable for Matrix3<T> {
 #[cfg(test)]
 mod default_string {
 
-    use crate::loaders::ByteStream;
-    use crate::loaders::ByteConvertable;
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[test]
     fn serialization_test() {
+
         let test_value = String::from("test");
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![116, 101, 115, 116, 0]);
@@ -309,6 +353,7 @@ mod default_string {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0]);
         let test_value = String::from_bytes(&mut byte_stream, None);
         assert_eq!(test_value.as_str(), "test");
@@ -319,11 +364,11 @@ mod default_string {
 #[cfg(test)]
 mod length_hint_string {
 
-    use crate::loaders::ByteStream;
-    use crate::loaders::ByteConvertable;
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[test]
     fn serialization_test() {
+
         let test_value = String::from("test");
         let data = test_value.to_bytes(Some(8));
         assert_eq!(data, vec![116, 101, 115, 116, 0, 0, 0, 0]);
@@ -331,6 +376,7 @@ mod length_hint_string {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = String::from_bytes(&mut byte_stream, Some(8));
         assert_eq!(test_value.as_str(), "test");
@@ -341,9 +387,10 @@ mod length_hint_string {
 #[cfg(test)]
 mod const_length_hint_string {
 
-    use procedural::*;
     use derive_new::new;
-    use crate::loaders::{ ByteStream, ByteConvertable };
+    use procedural::*;
+
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     const LENGTH: usize = 8;
 
@@ -355,6 +402,7 @@ mod const_length_hint_string {
 
     #[test]
     fn serialization_test() {
+
         let test_value = TestStruct::new("test".to_string());
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![116, 101, 115, 116, 0, 0, 0, 0]);
@@ -362,6 +410,7 @@ mod const_length_hint_string {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream, None);
         assert_eq!(test_value.string.as_str(), "test");
@@ -372,9 +421,10 @@ mod const_length_hint_string {
 #[cfg(test)]
 mod dynamic_length_hint_string {
 
-    use procedural::*;
     use derive_new::new;
-    use crate::loaders::{ ByteStream, ByteConvertable };
+    use procedural::*;
+
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[derive(Debug, PartialEq, ByteConvertable, new)]
     struct TestStruct {
@@ -385,6 +435,7 @@ mod dynamic_length_hint_string {
 
     #[test]
     fn serialization_test() {
+
         let test_value = TestStruct::new(4, "test".to_string());
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![4, 116, 101, 115, 116, 0, 0, 0, 0]);
@@ -392,6 +443,7 @@ mod dynamic_length_hint_string {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[4, 116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream, None);
         assert_eq!(test_value, TestStruct::new(4, "test".to_string()));
@@ -402,9 +454,10 @@ mod dynamic_length_hint_string {
 #[cfg(test)]
 mod default_struct {
 
-    use procedural::*;
     use derive_new::new;
-    use crate::loaders::{ ByteStream, ByteConvertable };
+    use procedural::*;
+
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[derive(Debug, PartialEq, ByteConvertable, new)]
     struct TestStruct {
@@ -415,6 +468,7 @@ mod default_struct {
 
     #[test]
     fn serialization_test() {
+
         let test_value = TestStruct::new(16, 3000, -1);
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![16, 184, 11, 255, 255, 255, 255]);
@@ -422,6 +476,7 @@ mod default_struct {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[16, 184, 11, 255, 255, 255, 255]);
         let test_value = TestStruct::from_bytes(&mut byte_stream, None);
         assert_eq!(test_value, TestStruct::new(16, 3000, -1));
@@ -515,7 +570,8 @@ mod version_struct_bigger {
 mod default_enum {
 
     use procedural::*;
-    use crate::loaders::{ ByteStream, ByteConvertable };
+
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[derive(ByteConvertable)]
     enum TestEnum {
@@ -526,6 +582,7 @@ mod default_enum {
 
     #[test]
     fn serialization_test() {
+
         let test_value = TestEnum::Second;
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![1]);
@@ -533,6 +590,7 @@ mod default_enum {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[1]);
         let test_value = TestEnum::from_bytes(&mut byte_stream, None);
         assert!(matches!(test_value, TestEnum::Second));
@@ -544,7 +602,8 @@ mod default_enum {
 mod numeric_value_enum {
 
     use procedural::*;
-    use crate::loaders::{ ByteStream, ByteConvertable };
+
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[derive(ByteConvertable)]
     enum TestEnum {
@@ -558,6 +617,7 @@ mod numeric_value_enum {
 
     #[test]
     fn serialization_test() {
+
         let test_value = TestEnum::Second;
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![10]);
@@ -565,6 +625,7 @@ mod numeric_value_enum {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[10]);
         let test_value = TestEnum::from_bytes(&mut byte_stream, None);
         assert!(matches!(test_value, TestEnum::Second));
@@ -576,7 +637,8 @@ mod numeric_value_enum {
 mod numeric_type_enum {
 
     use procedural::*;
-    use crate::loaders::{ ByteStream, ByteConvertable };
+
+    use crate::loaders::{ByteConvertable, ByteStream};
 
     #[derive(ByteConvertable)]
     #[numeric_type(u16)]
@@ -588,6 +650,7 @@ mod numeric_type_enum {
 
     #[test]
     fn serialization_test() {
+
         let test_value = TestEnum::Second;
         let data = test_value.to_bytes(None);
         assert_eq!(data, vec![1, 0]);
@@ -595,6 +658,7 @@ mod numeric_type_enum {
 
     #[test]
     fn deserialization_test() {
+
         let mut byte_stream = ByteStream::new(&[1, 0]);
         let test_value = TestEnum::from_bytes(&mut byte_stream, None);
         assert!(matches!(test_value, TestEnum::Second));

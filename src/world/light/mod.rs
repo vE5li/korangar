@@ -1,6 +1,6 @@
-use procedural::*;
-use derive_new::new;
 use cgmath::Vector3;
+use derive_new::new;
+use procedural::*;
 
 use crate::graphics::*;
 
@@ -19,13 +19,19 @@ impl LightSource {
         self.position += offset;
     }
 
-    pub fn render_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+    pub fn render_light(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    ) {
         renderer.point_light(render_target, camera, self.position, self.color, self.range);
     }
 
     #[cfg(feature = "debug")]
     pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
-        where T: Renderer + MarkerRenderer
+    where
+        T: Renderer + MarkerRenderer,
     {
         renderer.render_marker(render_target, camera, self.position, hovered);
     }

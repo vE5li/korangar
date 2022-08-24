@@ -1,0 +1,12 @@
+edition = "2021"
+version = "Two"
+max_width = 140
+fn_call_width = 80
+condense_wildcard_suffixes = true
+format_macro_matchers = true
+format_strings = true
+imports_granularity = "Module"
+reorder_impl_items = true
+group_imports = "StdExternalCrate"
+use_field_init_shorthand = true
+additional_empty_lines = true

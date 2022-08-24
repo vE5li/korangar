@@ -1,10 +1,13 @@
 use proc_macro2::TokenStream;
-use syn::{ Attribute, DataStruct, Fields, LitStr };
 use quote::quote;
+use syn::{Attribute, DataStruct, Fields, LitStr};
 
 use crate::utils::get_unique_attribute;
 
-pub fn prototype_element_helper(data_struct: DataStruct, mut attributes: Vec<Attribute>) -> (Vec<TokenStream>, TokenStream, Option<TokenStream>) {
+pub fn prototype_element_helper(
+    data_struct: DataStruct,
+    mut attributes: Vec<Attribute>,
+) -> (Vec<TokenStream>, TokenStream, Option<TokenStream>) {
 
     let Fields::Named(named_fields) = data_struct.fields else {
         panic!("only named fields may be derived");

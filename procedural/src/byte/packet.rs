@@ -1,11 +1,16 @@
 use proc_macro::TokenStream as InterfaceTokenStream;
-use syn::{ Ident, Fields, DataStruct, Attribute, Generics };
 use quote::quote;
+use syn::{Attribute, DataStruct, Fields, Generics, Ident};
 
 use super::helper::byte_convertable_helper;
 use crate::utils::*;
 
-pub fn derive_packet_struct(data_struct: DataStruct, generics: Generics, mut attributes: Vec<Attribute>, name: Ident) -> InterfaceTokenStream {
+pub fn derive_packet_struct(
+    data_struct: DataStruct,
+    generics: Generics,
+    mut attributes: Vec<Attribute>,
+    name: Ident,
+) -> InterfaceTokenStream {
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -54,5 +59,6 @@ pub fn derive_packet_struct(data_struct: DataStruct, generics: Generics, mut att
                 result
             }
         }
-    }.into()
+    }
+    .into()
 }

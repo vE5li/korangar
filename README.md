@@ -29,3 +29,7 @@ Once the client starts, you will hopefully be asked for a username and a passwor
 After logging in, you will be able to create a new character. If the character creation fails, it could be that you are using invalid characters in the name (e.g. `_`).
 
 I have created a [Discord server](https://discord.gg/2CqRZsvKja) for any problems you may encounter while setting up or running the client. I also plan to post updates about the development on there for anyone interested.
+
+# Contributing
+
+Korangar code should be formatted using [this fork](https://github.com/vE5li/rustfmt) of rustfmt.

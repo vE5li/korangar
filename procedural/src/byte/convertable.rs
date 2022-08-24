@@ -1,7 +1,7 @@
 use proc_macro::TokenStream as InterfaceTokenStream;
-use syn::{ Ident, Fields, DataStruct, DataEnum, Attribute, Generics };
 use proc_macro2::Span;
 use quote::quote;
+use syn::{Attribute, DataEnum, DataStruct, Fields, Generics, Ident};
 
 use super::helper::byte_convertable_helper;
 use crate::utils::*;
@@ -29,16 +29,22 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
                 [#(#to_bytes_implementations),*].concat()
             }
         }
-    }.into()
+    }
+    .into()
 }
 
-pub fn derive_byte_convertable_enum(data_enum: DataEnum, generics: Generics, mut attributes: Vec<Attribute>, name: Ident) -> InterfaceTokenStream {
+pub fn derive_byte_convertable_enum(
+    data_enum: DataEnum,
+    generics: Generics,
+    mut attributes: Vec<Attribute>,
+    name: Ident,
+) -> InterfaceTokenStream {
 
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let numeric_type = get_unique_attribute(&mut attributes, "numeric_type")
         .map(|attribute| attribute.parse_args().unwrap())
-        .unwrap_or(Ident::new("u8", Span::call_site()));
+        .unwrap_or_else(|| Ident::new("u8", Span::call_site()));
 
     let mut current_index = 0usize;
     let mut indices = Vec::new();
@@ -47,6 +53,7 @@ pub fn derive_byte_convertable_enum(data_enum: DataEnum, generics: Generics, mut
     for mut variant in data_enum.variants.into_iter() {
 
         if let Some(attribute) = get_unique_attribute(&mut variant.attrs, "numeric_value") {
+
             current_index = attribute
                 .parse_args::<syn::LitInt>()
                 .expect("numeric_value requires an integer value")
@@ -77,5 +84,6 @@ pub fn derive_byte_convertable_enum(data_enum: DataEnum, generics: Generics, mut
                 }
             }
         }
-    }.into()
+    }
+    .into()
 }

@@ -2,21 +2,21 @@
 #![feature(extend_one)]
 #![feature(drain_filter)]
 
-mod utils;
-mod constraint;
-mod toggle;
 mod byte;
+mod constraint;
 mod prototype;
+mod toggle;
+mod utils;
 
 use proc_macro::TokenStream as InterfaceTokenStream;
 use proc_macro2::TokenStream;
-use syn::{ Data, DeriveInput, parse };
 use quote::quote;
+use syn::{parse, Data, DeriveInput};
 
-use self::constraint::*;
-use self::toggle::*;
 use self::byte::*;
+use self::constraint::*;
 use self::prototype::*;
+use self::toggle::*;
 
 #[proc_macro]
 pub fn constraint(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
@@ -39,7 +39,8 @@ pub fn debug_condition(condition: InterfaceTokenStream, conditional: InterfaceTo
         if execute {
             #conditional
         }
-    }.into()
+    }
+    .into()
 }
 
 #[proc_macro_derive(toggle, attributes(toggle))]
@@ -54,10 +55,27 @@ pub fn derive_toggle(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
     }
 }
 
-#[proc_macro_derive(ByteConvertable, attributes(length_hint, repeating, numeric_type, numeric_value, version, version_smaller, version_equals_or_above))]
+#[proc_macro_derive(
+    ByteConvertable,
+    attributes(
+        length_hint,
+        repeating,
+        numeric_type,
+        numeric_value,
+        version,
+        version_smaller,
+        version_equals_or_above
+    )
+)]
 pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 
-    let DeriveInput { ident, attrs, data, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let DeriveInput {
+        ident,
+        attrs,
+        data,
+        generics,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
         Data::Struct(data_struct) => derive_byte_convertable_struct(data_struct, generics, ident),
@@ -70,7 +88,13 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
 #[proc_macro_derive(Packet, attributes(header, length_hint, repeating))]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 
-    let DeriveInput { ident, generics, data, attrs, .. } = parse(token_stream).expect("failed to parse token stream");
+    let DeriveInput {
+        ident,
+        generics,
+        data,
+        attrs,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
         Data::Struct(data_struct) => derive_packet_struct(data_struct, generics, attrs, ident),
@@ -82,7 +106,13 @@ pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
 #[proc_macro_derive(PrototypeElement, attributes(name, hidden_element, event_button))]
 pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 
-    let DeriveInput { ident, attrs, data, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let DeriveInput {
+        ident,
+        attrs,
+        data,
+        generics,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
         Data::Struct(data_struct) => derive_prototype_element_struct(data_struct, generics, attrs, ident),
@@ -94,7 +124,13 @@ pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> Interface
 #[proc_macro_derive(PrototypeWindow, attributes(name, hidden_element, event_button, window_title, window_class))]
 pub fn derive_prototype_window(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 
-    let DeriveInput { ident, attrs, data, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let DeriveInput {
+        ident,
+        attrs,
+        data,
+        generics,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
         Data::Struct(data_struct) => derive_prototype_window_struct(data_struct, generics, attrs, ident),

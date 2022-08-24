@@ -1,7 +1,7 @@
-use proc_macro2::{ TokenStream, Punct };
-use syn::Lit;
-use syn::parse::ParseStream;
+use proc_macro2::{Punct, TokenStream};
 use quote::quote;
+use syn::parse::ParseStream;
+use syn::Lit;
 
 #[derive(Debug)]
 struct Dimension {
@@ -9,6 +9,7 @@ struct Dimension {
 }
 
 impl syn::parse::Parse for Dimension {
+
     fn parse(input: ParseStream) -> Result<Self, syn::Error> {
 
         let lookahead = input.lookahead1();
@@ -26,16 +27,18 @@ impl syn::parse::Parse for Dimension {
 
             quote!(crate::interface::Dimension::Flexible)
         } else {
+
             let literal: Lit = input.parse()?;
 
             match literal {
-                Lit::Float(..) | Lit::Int(..) => {},
+                Lit::Float(..) | Lit::Int(..) => {}
                 _ => panic!("literal must be a float or an integer"),
             }
 
             let lookahead = input.lookahead1();
 
             if lookahead.peek(syn::Token![%]) {
+
                 input.parse::<Punct>()?;
                 quote!(crate::interface::Dimension::Relative(#literal as f32))
             } else {
@@ -43,7 +46,7 @@ impl syn::parse::Parse for Dimension {
             }
         };
 
-        Ok(Dimension { stream: TokenStream::from(expanded) })
+        Ok(Dimension { stream: expanded })
     }
 }
 
@@ -52,11 +55,13 @@ pub struct SizeConstraint {
 }
 
 impl syn::parse::Parse for SizeConstraint {
+
     fn parse(input: syn::parse::ParseStream) -> Result<Self, syn::Error> {
 
         let first_dimension: Dimension = input.parse().unwrap();
 
         let (width, minimum_width) = if input.lookahead1().peek(syn::Token![>]) {
+
             input.parse::<Punct>().unwrap();
             let second_dimension: Dimension = input.parse().unwrap();
 
@@ -66,12 +71,14 @@ impl syn::parse::Parse for SizeConstraint {
             let minimum_width = quote!(Some(#minimum_width));
             (width, minimum_width)
         } else {
+
             let minimum_width = quote!(None);
             let width = first_dimension.stream;
             (width, minimum_width)
         };
 
         let maximum_width = if input.lookahead1().peek(syn::Token![<]) {
+
             input.parse::<Punct>().unwrap();
             let second_dimension: Dimension = input.parse().unwrap();
             let maximum_width = second_dimension.stream;
@@ -80,12 +87,16 @@ impl syn::parse::Parse for SizeConstraint {
             quote!(None)
         };
 
-        assert!(input.lookahead1().peek(syn::Token![,]), "constraint expected comma after first dimension");
+        assert!(
+            input.lookahead1().peek(syn::Token![,]),
+            "constraint expected comma after first dimension"
+        );
         input.parse::<Punct>().unwrap();
 
         let first_dimension: Dimension = input.parse().unwrap();
 
         let (height, minimum_height) = if input.lookahead1().peek(syn::Token![>]) {
+
             input.parse::<Punct>().unwrap();
             let second_dimension: Dimension = input.parse().unwrap();
 
@@ -95,12 +106,14 @@ impl syn::parse::Parse for SizeConstraint {
             let minimum_height = quote!(Some(#minimum_height));
             (height, minimum_height)
         } else {
+
             let minimum_height = quote!(None);
             let height = first_dimension.stream;
             (height, minimum_height)
         };
 
         let maximum_height = if input.lookahead1().peek(syn::Token![<]) {
+
             input.parse::<Punct>().unwrap();
             let second_dimension: Dimension = input.parse().unwrap();
             let maximum_height = second_dimension.stream;
@@ -120,6 +133,6 @@ impl syn::parse::Parse for SizeConstraint {
             }
         };
 
-        Ok(SizeConstraint { stream: TokenStream::from(expanded) })
+        Ok(SizeConstraint { stream: expanded })
     }
 }

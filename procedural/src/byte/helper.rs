@@ -1,6 +1,6 @@
-use proc_macro2::{ TokenStream, TokenTree, Group };
-use syn::FieldsNamed;
+use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::quote;
+use syn::FieldsNamed;
 
 use crate::utils::*;
 
@@ -12,6 +12,7 @@ fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
     while let Some(token) = iterator.next() {
 
         if let TokenTree::Group(group) = &token {
+
             let delimiter = group.delimiter();
             let new_group_stream = remove_self_from_stream(group.stream());
             let new_group = Group::new(delimiter, new_group_stream);
@@ -21,6 +22,7 @@ fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
 
         if let TokenTree::Ident(ident) = &token {
             if &ident.to_string() == "self" {
+
                 // remove the '.' after self
                 iterator.next().expect("expected a token after self");
                 continue;
@@ -46,14 +48,14 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
 
         let length_hint = get_unique_attribute(&mut field.attrs, "length_hint")
-            .map(|attribute| attribute.tokens.into())
+            .map(|attribute| attribute.tokens)
             .map(|length_hint: TokenStream| quote!(((#length_hint) as usize).into()))
             .unwrap_or(quote!(None));
 
         let from_length_hint = remove_self_from_stream(length_hint.clone());
 
-        let repeating: Option<TokenStream> = get_unique_attribute(&mut field.attrs, "repeating")
-            .map(|attribute| remove_self_from_stream(attribute.tokens).into());
+        let repeating: Option<TokenStream> =
+            get_unique_attribute(&mut field.attrs, "repeating").map(|attribute| remove_self_from_stream(attribute.tokens));
 
         let version_smaller = get_unique_attribute(&mut field.attrs, "version_smaller")
             .map(|attribute| attribute.parse_args().expect("failed to parse version"))
@@ -65,7 +67,10 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
             .map(|version: PacketSignature| (version.first, version.second))
             .map(|(major, minor)| quote!(equals_or_above(#major, #minor)));
 
-        assert!(version_smaller.is_none() || version_equals_or_above.is_none(), "version restriction may only be specified once");
+        assert!(
+            version_smaller.is_none() || version_equals_or_above.is_none(),
+            "version restriction may only be specified once"
+        );
         let version_function = version_smaller.or(version_equals_or_above);
         let version_restricted = version_function.is_some();
         let is_repeating = repeating.is_some();
@@ -83,7 +88,7 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
         let from_implementation = match version_function {
 
             Some(function) => {
-                quote!{
+                quote! {
                     let #field_name = match byte_stream.get_version().#function {
                         true => Some(#from_implementation),
                         false => None,

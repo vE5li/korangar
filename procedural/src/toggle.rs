@@ -1,6 +1,6 @@
 use proc_macro::TokenStream as InterfaceTokenStream;
-use syn::{ Ident, Fields, DataStruct, Generics };
 use quote::quote;
+use syn::{DataStruct, Fields, Generics, Ident};
 
 use crate::utils::get_unique_attribute;
 
@@ -11,7 +11,8 @@ pub fn derive_toggle_struct(data_struct: DataStruct, generics: Generics, name: I
         panic!("only named fields may be derived");
     };
 
-    let toggle_fields: Vec<Ident> = named_fields.named
+    let toggle_fields: Vec<Ident> = named_fields
+        .named
         .into_iter()
         .filter_map(|mut field| get_unique_attribute(&mut field.attrs, "toggle").map(|_| field.ident.unwrap()))
         .collect();
@@ -27,5 +28,6 @@ pub fn derive_toggle_struct(data_struct: DataStruct, generics: Generics, name: I
                 self.#toggle_fields = !self.#toggle_fields;
             })*
         }
-    }.into()
+    }
+    .into()
 }

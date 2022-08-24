@@ -1,5 +1,5 @@
-mod helper;
 mod element;
+mod helper;
 mod window;
 
 pub use self::element::*;

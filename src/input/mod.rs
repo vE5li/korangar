@@ -263,7 +263,7 @@ impl InputSystem {
             if let Some(_window_index) = window_index {
                 // TODO: scroll window
             } else if !lock_actions {
-                events.push(UserEvent::CameraZoom(-self.scroll_delta));
+                events.push(UserEvent::CameraZoom(self.scroll_delta));
             }
         }
 

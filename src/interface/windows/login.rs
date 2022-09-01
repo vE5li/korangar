@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ops::Not;
 use std::rc::Rc;
 
 use derive_new::new;
@@ -48,9 +49,29 @@ impl PrototypeWindow for LoginWindow {
             Box::new(move || UserEvent::LogIn(username.borrow().clone(), password.borrow().clone()))
         };
 
+        let username_action = {
+
+            let username = username.clone();
+            Box::new(move || /*username.borrow().is_empty().not().then_some(ChangeEvent::FocusNext)*/ None)
+        };
+
+        let password_action = {
+
+            let username = username.clone();
+            let password = password.clone();
+
+            Box::new(move || {
+                match password.borrow().is_empty() {
+                    _ if username.borrow().is_empty() => None, //Some(ChangeEvent::FocusPrevious),
+                    true => None,
+                    false => None, //Some(ChangeEvent::LeftClickNext),
+                }
+            })
+        };
+
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24, false>::new(username, "username")),
-            cell!(InputField::<24, true>::new(password, "password")),
+            cell!(InputField::<24, false>::new(username, "username", username_action)),
+            cell!(InputField::<24, true>::new(password, "password", password_action)),
             cell!(StateButton::new(
                 "remember username",
                 UserEvent::ToggleRemeberUsername,

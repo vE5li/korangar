@@ -15,7 +15,7 @@ mod fragment_shader {
 use std::iter;
 use std::sync::Arc;
 
-use cgmath::Vector2;
+use cgmath::{Vector2, Vector4};
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Device;
@@ -111,7 +111,7 @@ impl SpriteRenderer {
         texture: Texture,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         texture_position: Vector2<f32>,
         texture_size: Vector2<f32>,
         color: Color,
@@ -135,7 +135,6 @@ impl SpriteRenderer {
             texture_position: texture_position.into(),
             texture_size: texture_size.into(),
             color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
-            _dummy0: [0, 0, 0, 0, 0, 0, 0, 0],
         };
 
         render_target
@@ -156,7 +155,7 @@ impl SpriteRenderer {
         window_size: Vector2<usize>,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         smooth: bool,
     ) {
@@ -185,7 +184,7 @@ impl SpriteRenderer {
         window_size: Vector2<usize>,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         column_count: usize,
         cell_index: usize,

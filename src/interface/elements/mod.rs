@@ -15,6 +15,7 @@ pub use self::containers::*;
 pub use self::miscellanious::*;
 pub use self::mutable::PrototypeMutableElement;
 pub use self::mutable_range::PrototypeMutableRangeElement;
-pub use self::prototype::PrototypeElement;
+//pub use self::prototype::PrototypeElement;
+pub use self::prototype::*;
 pub use self::values::*;
 pub use self::wrappers::*;

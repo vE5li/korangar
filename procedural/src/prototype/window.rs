@@ -11,7 +11,7 @@ pub fn derive_prototype_window_struct(
     name: Ident,
 ) -> InterfaceTokenStream {
 
-    let (initializers, window_title, window_class) = prototype_element_helper(data_struct, attributes);
+    let (initializers, window_title, window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let (window_class_option, window_class_ref_option) = window_class
@@ -26,7 +26,8 @@ pub fn derive_prototype_window_struct(
             }
 
             fn to_window(&self, window_cache: &crate::interface::WindowCache, interface_settings: &crate::interface::InterfaceSettings, avalible_space: crate::interface::Size) -> std::boxed::Box<dyn crate::interface::Window + 'static> {
-                let elements: Vec<crate::interface::ElementCell> = vec![#(#initializers),*];
+                let scroll_view = crate::interface::ScrollView::new(vec![#(#initializers),*], constraint!(100%, ?));
+                let elements: Vec<crate::interface::ElementCell> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
                 let size_constraint = constraint!(200 > 300 < 400, 100 > ? < 80%);
                 std::boxed::Box::new(crate::interface::FramedWindow::new(window_cache, interface_settings, avalible_space, #window_title.to_string(), #window_class_option, elements, size_constraint))
             }

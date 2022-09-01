@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ops::Not;
 use std::rc::Rc;
 
 use derive_new::new;
@@ -45,8 +46,17 @@ impl PrototypeWindow for CharacterCreationWindow {
             Box::new(move || UserEvent::CreateCharacter(slot, name.borrow().clone()))
         };
 
+        let input_action = {
+
+            let name = name.clone();
+            Box::new(move || {
+                //name.borrow().is_empty().not().then_some(ChangeEvent::FocusNext)
+                None
+            })
+        };
+
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24, false>::new(name, "character name")),
+            cell!(InputField::<24, false>::new(name, "character name", input_action)),
             cell!(FormButton::new("done", selector, action)),
         ];
 

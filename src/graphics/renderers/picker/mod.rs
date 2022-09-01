@@ -1,5 +1,7 @@
 mod entity;
 mod geometry;
+#[cfg(feature = "debug")]
+mod marker;
 mod tile;
 
 use std::sync::Arc;
@@ -12,12 +14,14 @@ use vulkano::render_pass::RenderPass;
 
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
+#[cfg(feature = "debug")]
+use self::marker::MarkerRenderer;
 use self::tile::TileRenderer;
-use super::{
-    Camera, EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, ModelVertexBuffer, PickerRenderTarget,
-    Renderer, Texture,
-};
-use crate::graphics::TileVertexBuffer;
+#[cfg(feature = "debug")]
+use crate::graphics::MarkerRenderer as MarkerRendererTrait;
+use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+#[cfg(feature = "debug")]
+use crate::world::MarkerIdentifier;
 
 #[derive(PartialEq, Eq)]
 pub enum PickerSubrenderer {
@@ -32,6 +36,8 @@ pub struct PickerRenderer {
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     tile_renderer: TileRenderer,
+    #[cfg(feature = "debug")]
+    marker_renderer: MarkerRenderer,
     dimensions: [u32; 2],
 }
 
@@ -65,7 +71,9 @@ impl PickerRenderer {
         let subpass = render_pass.clone().first_subpass();
         let geometry_renderer = GeometryRenderer::new(device.clone(), subpass.clone(), viewport.clone());
         let entity_renderer = EntityRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let tile_renderer = TileRenderer::new(device.clone(), subpass, viewport);
+        let tile_renderer = TileRenderer::new(device.clone(), subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
+        let marker_renderer = MarkerRenderer::new(device.clone(), subpass, viewport);
 
         Self {
             device,
@@ -74,6 +82,8 @@ impl PickerRenderer {
             geometry_renderer,
             entity_renderer,
             tile_renderer,
+            #[cfg(feature = "debug")]
+            marker_renderer,
             dimensions,
         }
     }
@@ -85,7 +95,10 @@ impl PickerRenderer {
             .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone(), false);
         self.entity_renderer
             .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
-        self.tile_renderer.recreate_pipeline(self.device.clone(), subpass, viewport);
+        self.tile_renderer
+            .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
+        self.marker_renderer.recreate_pipeline(self.device.clone(), subpass, viewport);
         self.dimensions = dimensions;
     }
 
@@ -145,6 +158,7 @@ impl EntityRendererTrait for PickerRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
+        mirror: bool,
         entity_id: usize,
     ) where
         Self: Renderer,
@@ -164,6 +178,32 @@ impl EntityRendererTrait for PickerRenderer {
             cell_count,
             cell_position,
             entity_id,
+            mirror,
         );
+    }
+}
+
+#[cfg(feature = "debug")]
+impl MarkerRendererTrait for PickerRenderer {
+
+    fn render_marker(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        position: Vector3<f32>,
+        _hovered: bool,
+    ) where
+        Self: Renderer,
+    {
+
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
+
+        if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
+
+            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
+            self.marker_renderer
+                .render(render_target, screen_position, screen_size, marker_identifier);
+        }
     }
 }

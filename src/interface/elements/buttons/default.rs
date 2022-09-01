@@ -1,6 +1,5 @@
 use cgmath::Vector2;
 use derive_new::new;
-use num::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::UserEvent;
@@ -11,13 +10,19 @@ pub struct Button {
     text: &'static str,
     event: UserEvent,
     menu_button: bool,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    #[new(default)]
+    state: ElementState,
 }
 
 impl Element for Button {
+
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
 
@@ -26,24 +31,11 @@ impl Element for Button {
             false => &theme.button.size_constraint,
         };
 
-        let (size, position) = placement_resolver.allocate(size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+        self.state.resolve(placement_resolver, size_constraint);
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
-        let absolute_position = mouse_position - self.cached_position;
-
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
-        {
-            return HoverInformation::Hovered;
-        }
-
-        HoverInformation::Missed
+        self.state.hovered_element(mouse_position)
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
@@ -58,48 +50,28 @@ impl Element for Button {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
-        {
+        let background_color = match self.is_element_self(hovered_element) {
+            true => *theme.button.hovered_background_color,
+            false => *theme.button.background_color,
+        };
 
-            true => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.button.border_radius * *interface_settings.scaling,
-                *theme.button.hovered_background_color,
-            ),
+        renderer.render_background(*theme.button.border_radius, background_color);
 
-            false => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.button.border_radius * *interface_settings.scaling,
-                *theme.button.background_color,
-            ),
-        }
-
-        let offset = Vector2::new(
-            0.0,
-            (self.cached_size.y - *theme.button.font_size * *interface_settings.scaling) / 2.0,
-        );
         renderer.render_text(
-            render_target,
             self.text,
-            absolute_position + offset + *theme.button.text_offset * *interface_settings.scaling,
-            clip_size,
+            *theme.button.text_offset,
             *theme.button.foreground_color,
-            *theme.button.font_size * *interface_settings.scaling,
+            *theme.button.font_size,
         );
     }
 }

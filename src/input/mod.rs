@@ -260,8 +260,10 @@ impl InputSystem {
         }
 
         if self.scroll_delta != 0.0 {
-            if let Some(_window_index) = window_index {
-                // TODO: scroll window
+            if let Some(window_index) = window_index {
+                if let Some(element) = &hovered_element {
+                    interface.scroll_element(element, window_index, self.scroll_delta);
+                }
             } else if !lock_actions {
                 events.push(UserEvent::CameraZoom(self.scroll_delta));
             }
@@ -269,8 +271,45 @@ impl InputSystem {
 
         let characters = self.input_buffer.drain(..);
 
-        if let Some((focused_element, focused_window)) = &self.focused_element {
-            characters.for_each(|character| interface.input_character_element(focused_element, *focused_window, character));
+        if let Some((focused_element, focused_window)) = &mut self.focused_element {
+
+            if self.keys[15].pressed() {
+
+                let new_focused_element = focused_element
+                    .borrow()
+                    .focus_next(focused_element.clone(), None, shift_down.into());
+
+                if let Some(new_focused_element) = new_focused_element {
+                    *focused_element = new_focused_element;
+                }
+            }
+
+            if self.keys[28].pressed() {
+
+                let action = interface.left_click_element(focused_element, *focused_window);
+
+                if let Some(ClickAction::Event(event)) = &action {
+                    println!("{:?}", event);
+                }
+
+                if let Some(action) = action {
+                    // TODO: remove and replace with proper event
+                    match action {
+                        ClickAction::Event(event) => events.push(event),
+                        ClickAction::OpenWindow(prototype_window) => interface.open_window(prototype_window.as_ref()),
+                        ClickAction::CloseWindow => interface.close_window(*focused_window),
+                        _ => panic!(),
+                    }
+                }
+            }
+
+            for character in characters {
+                match character {
+                    // ignore since we need to handle tab knowing the state of shift
+                    '\t' => {}
+                    valid => interface.input_character_element(focused_element, *focused_window, valid),
+                }
+            }
         } else {
 
             if self.keys[1].pressed() {
@@ -363,8 +402,13 @@ impl InputSystem {
 
                     if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
                         match picker_target {
+
                             PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
+
                             PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
+
+                            #[cfg(feature = "debug")]
+                            PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
                         }
                     }
 

@@ -1,5 +1,4 @@
 use derive_new::new;
-use num::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
@@ -7,13 +6,19 @@ use crate::interface::{Element, *};
 #[derive(new)]
 pub struct StaticLabel {
     label: String,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    #[new(default)]
+    state: ElementState,
 }
 
 impl Element for StaticLabel {
+
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
@@ -21,9 +26,7 @@ impl Element for StaticLabel {
         let width = self.label.len() as f32 * 8.0 + theme.label.text_offset.x * *interface_settings.scaling * 2.0;
         size_constraint.width = Dimension::Absolute(width);
 
-        let (size, position) = placement_resolver.allocate(&size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+        self.state.resolve(placement_resolver, &size_constraint);
     }
 
     fn render(
@@ -34,29 +37,23 @@ impl Element for StaticLabel {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        renderer.render_rectangle(
-            render_target,
-            absolute_position,
-            self.cached_size,
-            clip_size,
-            *theme.label.border_radius * *interface_settings.scaling,
-            *theme.label.background_color,
-        );
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+
+        renderer.render_background(*theme.label.border_radius, *theme.label.background_color);
+
         renderer.render_text(
-            render_target,
             &self.label,
-            absolute_position + *theme.label.text_offset * *interface_settings.scaling,
-            clip_size,
+            *theme.label.text_offset,
             *theme.label.foreground_color,
-            *theme.label.font_size * *interface_settings.scaling,
+            *theme.label.font_size,
         );
     }
 }

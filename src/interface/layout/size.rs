@@ -1,7 +1,8 @@
-use cgmath::Vector2;
+use cgmath::{Vector2, Vector4};
 use derive_new::new;
 
 pub type Size = Vector2<f32>;
+pub type ClipSize = Vector4<f32>;
 pub type Position = Vector2<f32>;
 
 #[derive(Copy, Clone, new)]

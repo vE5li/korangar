@@ -11,7 +11,7 @@ pub fn derive_prototype_element_struct(
     name: Ident,
 ) -> InterfaceTokenStream {
 
-    let (initializers, _window_title, _window_class) = prototype_element_helper(data_struct, attributes);
+    let (initializers, _window_title, _window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     quote! {

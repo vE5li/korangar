@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use cgmath::{Vector2, Vector3, Vector4};
+use cgmath::{Array, Vector2, Vector3, Vector4};
 use num::traits::NumOps;
 use num::{NumCast, Zero};
 
@@ -11,7 +11,15 @@ pub trait PrototypeMutableRangeElement<T> {
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell;
 }
 
-impl<T> PrototypeMutableRangeElement<T> for f32 {
+// workaround for not having negative trait bounds or better specialization
+pub trait IsVector {}
+
+impl !IsVector for f32 {}
+impl<T> IsVector for Vector2<T> {}
+impl<T> IsVector for Vector3<T> {}
+impl<T> IsVector for Vector4<T> {}
+
+impl PrototypeMutableRangeElement<f32> for f32 {
 
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
 
@@ -30,51 +38,17 @@ impl<T> PrototypeMutableRangeElement<T> for f32 {
     }
 }
 
-impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> PrototypeMutableRangeElement<Vector2<T>> for Vector2<T> {
+impl<T> PrototypeMutableRangeElement<T> for T
+where
+    T: Array + ElementDisplay + IsVector + Copy + PartialEq + 'static, // TODO: !f32 or something
+    T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
+{
 
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
 
         let elements: Vec<ElementCell> = vec![
             cell!(StaticLabel::new(display.clone())),
-            cell!(MutableVector2Value::new(
-                display,
-                self as *const Self,
-                minimum,
-                maximum,
-                change_event
-            )),
-        ];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> PrototypeMutableRangeElement<Vector3<T>> for Vector3<T> {
-
-    fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
-
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
-            cell!(MutableVector3Value::new(
-                display,
-                self as *const Self,
-                minimum,
-                maximum,
-                change_event
-            )),
-        ];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> PrototypeMutableRangeElement<Vector4<T>> for Vector4<T> {
-
-    fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
-
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
-            cell!(MutableVector4Value::new(
+            cell!(MutableVectorValue::new(
                 display,
                 self as *const Self,
                 minimum,

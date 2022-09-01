@@ -1,4 +1,4 @@
-use cgmath::Vector2;
+use cgmath::{Vector2, Vector4};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{
@@ -26,9 +26,19 @@ impl FramedWindow {
     ) -> Self {
 
         let drag_button = cell!(DragButton::new(window_title));
-        let close_button = cell!(CloseButton::new());
+        let close_button = cell!(CloseButton::default());
         elements.insert(0, close_button);
         elements.insert(0, drag_button);
+
+        let elements: Vec<ElementCell> = vec![cell!(Container::new(elements, Container::DEFAULT_SIZE))];
+
+        // very imporant: give every element a link to its parent to allow propagation of events such as
+        // scrolling
+        elements.iter().for_each(|element| {
+
+            let weak_element = Rc::downgrade(element);
+            element.borrow_mut().link_back(weak_element, None);
+        });
 
         let (cached_position, cached_size) = window_class
             .as_ref()
@@ -79,6 +89,7 @@ impl Window for FramedWindow {
             true => None,
             false => Some(self.size.y),
         };
+
         let mut placement_resolver = PlacementResolver::new(
             PartialSize::new(self.size.x, height),
             Vector2::new(0.0, 0.0),
@@ -88,7 +99,7 @@ impl Window for FramedWindow {
         );
 
         self.elements
-            .iter_mut()
+            .iter()
             .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
 
         if self.size_constraint.height.is_flexible() {
@@ -132,9 +143,8 @@ impl Window for FramedWindow {
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
-                    HoverInformation::Element(element) => return HoverInformation::Element(element),
-                    HoverInformation::Ignored => return HoverInformation::Ignored,
                     HoverInformation::Missed => {}
+                    hover_information => return hover_information,
                 }
             }
 
@@ -203,11 +213,18 @@ impl Window for FramedWindow {
         focused_element: Option<&dyn Element>,
     ) {
 
+        let clip_size = Vector4::new(
+            self.position.x,
+            self.position.y,
+            self.position.x + self.size.x,
+            self.position.y + self.size.y,
+        );
+
         renderer.render_rectangle(
             render_target,
             self.position,
             self.size,
-            self.position + self.size,
+            clip_size,
             *theme.window.border_radius,
             *theme.window.background_color,
         );
@@ -220,7 +237,7 @@ impl Window for FramedWindow {
                 interface_settings,
                 theme,
                 self.position,
-                self.position + self.size,
+                clip_size,
                 hovered_element,
                 focused_element,
                 false,

@@ -83,6 +83,10 @@ impl Interface {
         self.theme.save(&self.interface_settings.theme_file);
     }
 
+    pub fn schedule_rerender(&mut self) {
+        self.rerender = true;
+    }
+
     pub fn schedule_rerender_window(&mut self, window_index: usize) {
         if window_index < self.windows.len() {
 
@@ -109,6 +113,8 @@ impl Interface {
                         true => self.rerender = true,
                         false => *rerender = true,
                     },
+
+                    _ => panic!(),
                 }
             }
         }
@@ -136,6 +142,10 @@ impl Interface {
         self.rerender |= self.reresolve;
         self.reresolve = false;
 
+        if !self.rerender {
+            self.flag_rerender_windows(0, None);
+        }
+
         (
             self.rerender,
             self.rerender | self.windows.iter().any(|(_window, _reresolve, rerender)| *rerender),
@@ -153,7 +163,7 @@ impl Interface {
         for (window_index, (window, _reresolve, _rerender)) in self.windows.iter().enumerate().rev() {
             match window.hovered_element(mouse_position) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
-                HoverInformation::Hovered | HoverInformation::Ignored => return (None, Some(window_index)),
+                HoverInformation::Hovered => return (None, Some(window_index)),
                 HoverInformation::Missed => {}
             }
         }
@@ -193,6 +203,21 @@ impl Interface {
                 ChangeEvent::Reresolve => self.reresolve = true,
                 ChangeEvent::Rerender => self.rerender = true,
                 ChangeEvent::RerenderWindow => panic!(),
+                _ => panic!(),
+            }
+        }
+    }
+
+    pub fn scroll_element(&mut self, element: &ElementCell, window_index: usize, scroll_delta: f32) {
+
+        let (_, _, rerender) = &mut self.windows[window_index];
+
+        if let Some(change_event) = element.borrow_mut().scroll(scroll_delta) {
+            match change_event {
+                ChangeEvent::Reresolve => self.reresolve = true,
+                ChangeEvent::Rerender => self.rerender = true,
+                ChangeEvent::RerenderWindow => *rerender = true,
+                _ => panic!(),
             }
         }
     }
@@ -213,6 +238,11 @@ impl Interface {
                     true => self.rerender = true,
                     false => *rerender = true,
                 },
+                /*ChangeEvent::FocusNext => println!("focus next"),
+
+                ChangeEvent::FocusPrevious => println!("focus previous"),
+
+                ChangeEvent::LeftClickNext => println!("left click next"),*/
             }
         }
     }
@@ -255,6 +285,13 @@ impl Interface {
                 let (position, scale) = {
 
                     let (window, _reresolve, rerender) = &mut self.windows[window_index];
+
+                    if window.has_transparency(&self.theme) {
+
+                        self.rerender = true;
+                        return;
+                    }
+
                     *rerender = true;
                     window.get_area()
                 };
@@ -275,10 +312,6 @@ impl Interface {
 
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
         let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
-
-        if !self.rerender {
-            self.flag_rerender_windows(0, None);
-        }
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if self.rerender || *rerender {
@@ -431,12 +464,6 @@ impl Interface {
         }
     }
 
-    pub fn close_dialog_window(&mut self) {
-
-        self.close_window_with_class(DialogWindow::WINDOW_CLASS);
-        self.dialog_handle = None;
-    }
-
     pub fn handle_result<T>(&mut self, result: Result<T, String>) {
         if let Err(message) = result {
             self.open_window(&ErrorWindow::new(message));
@@ -456,19 +483,39 @@ impl Interface {
 
     pub fn close_window(&mut self, window_index: usize) {
 
-        self.windows.remove(window_index);
+        let (window, ..) = self.windows.remove(window_index);
         self.rerender = true;
+
+        // drop window in another thread to avoid frame drops when deallocation a large amount of
+        // elements
+
+        #[allow(dead_code)]
+        struct WindowSender {
+            window: Box<dyn Window>,
+        }
+
+        unsafe impl Send for WindowSender {}
+        unsafe impl Sync for WindowSender {}
+
+        let window_sender = WindowSender { window };
+        std::thread::spawn(move || drop(window_sender));
     }
 
     pub fn close_window_with_class(&mut self, window_class: &str) {
 
-        self.windows.retain(|window| {
+        let index = self
+            .windows
+            .iter()
+            .map(|(window, ..)| window.get_window_class())
+            .position(|class_option| class_option.contains(&window_class))
+            .unwrap();
 
-            !window
-                .0
-                .get_window_class()
-                .map_or(false, |other_window_class| window_class == other_window_class)
-        });
-        self.rerender = true;
+        self.close_window(index);
+    }
+
+    pub fn close_dialog_window(&mut self) {
+
+        self.close_window_with_class(DialogWindow::WINDOW_CLASS);
+        self.dialog_handle = None;
     }
 }

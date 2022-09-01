@@ -1,5 +1,7 @@
 mod ambient;
 #[cfg(feature = "debug")]
+mod r#box;
+#[cfg(feature = "debug")]
 mod buffer;
 mod directional;
 mod entity;
@@ -26,6 +28,8 @@ use winit::window::Window;
 
 use self::ambient::AmbientLightRenderer;
 #[cfg(feature = "debug")]
+use self::r#box::BoxRenderer;
+#[cfg(feature = "debug")]
 use self::buffer::BufferRenderer;
 use self::directional::DirectionalLightRenderer;
 use self::entity::EntityRenderer;
@@ -36,17 +40,18 @@ use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
-use crate::graphics::{
-    Camera, Color, DeferredRenderTarget, EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, ImageBuffer,
-    ModelVertexBuffer, RenderSettings, Renderer, ScreenVertex, ScreenVertexBuffer, Texture, WaterVertexBuffer,
-};
+use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
 use crate::loaders::TextureLoader;
+#[cfg(feature = "debug")]
+use crate::world::{BoundingBox, MarkerIdentifier};
 
 #[derive(PartialEq, Eq)]
 pub enum DeferredSubrenderer {
     Geometry,
     Entity,
     PointLight,
+    #[cfg(feature = "debug")]
+    BoundingBox,
 }
 
 pub struct DeferredRenderer {
@@ -65,6 +70,8 @@ pub struct DeferredRenderer {
     sprite_renderer: SpriteRenderer,
     #[cfg(feature = "debug")]
     buffer_renderer: BufferRenderer,
+    #[cfg(feature = "debug")]
+    box_renderer: BoxRenderer,
     screen_vertex_buffer: ScreenVertexBuffer,
     billboard_vertex_buffer: ScreenVertexBuffer,
     font_map: Texture,
@@ -133,6 +140,8 @@ impl DeferredRenderer {
         let geometry_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
         let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
 
+        let mut texture_future = now(device.clone()).boxed();
+
         let geometry_renderer = GeometryRenderer::new(device.clone(), geometry_subpass.clone(), viewport.clone());
         let entity_renderer = EntityRenderer::new(device.clone(), geometry_subpass.clone(), viewport.clone());
         let water_renderer = WaterRenderer::new(device.clone(), geometry_subpass, viewport.clone());
@@ -142,9 +151,19 @@ impl DeferredRenderer {
         let water_light_renderer = WaterLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let overlay_renderer = OverlayRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
         let rectangle_renderer = RectangleRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let sprite_renderer = SpriteRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let sprite_renderer = SpriteRenderer::new(
+            device.clone(),
+            lighting_subpass.clone(),
+            viewport.clone(),
+            #[cfg(feature = "debug")]
+            texture_loader,
+            #[cfg(feature = "debug")]
+            &mut texture_future,
+        );
         #[cfg(feature = "debug")]
-        let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass, viewport);
+        let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
+        let box_renderer = BoxRenderer::new(device.clone(), lighting_subpass, viewport);
 
         let vertices = vec![
             ScreenVertex::new(Vector2::new(-1.0, -1.0)),
@@ -164,7 +183,6 @@ impl DeferredRenderer {
         let billboard_vertex_buffer =
             CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
-        let mut texture_future = now(device.clone()).boxed();
         let font_map = texture_loader.get("font.png", &mut texture_future).unwrap();
 
         texture_future.flush().unwrap();
@@ -186,6 +204,8 @@ impl DeferredRenderer {
             sprite_renderer,
             #[cfg(feature = "debug")]
             buffer_renderer,
+            #[cfg(feature = "debug")]
+            box_renderer,
             screen_vertex_buffer,
             billboard_vertex_buffer,
             font_map,
@@ -220,7 +240,9 @@ impl DeferredRenderer {
             .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
         self.buffer_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass, viewport);
+            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+        #[cfg(feature = "debug")]
+        self.box_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, viewport);
         self.dimensions = dimensions;
     }
 
@@ -319,6 +341,8 @@ impl DeferredRenderer {
     ) {
 
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        render_target.unbind_subrenderer();
         self.sprite_renderer
             .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, true);
     }
@@ -333,6 +357,8 @@ impl DeferredRenderer {
     ) {
 
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        render_target.unbind_subrenderer();
 
         for character in text.as_bytes() {
 
@@ -361,6 +387,8 @@ impl DeferredRenderer {
     ) {
 
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        render_target.unbind_subrenderer();
         self.rectangle_renderer.render(render_target, window_size, position, size, color);
     }
 
@@ -387,6 +415,22 @@ impl DeferredRenderer {
             Vector2::new((BAR_SIZE / maximum) * current, 5.0),
             color,
         );
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_bounding_box(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        transform: &Transform,
+        bounding_box: &BoundingBox,
+    ) {
+
+        if render_target.bind_subrenderer(DeferredSubrenderer::BoundingBox) {
+            self.box_renderer.bind_pipeline(render_target, camera);
+        }
+
+        self.box_renderer.render(render_target, camera, transform, bounding_box);
     }
 
     #[cfg(feature = "debug")]
@@ -448,6 +492,7 @@ impl EntityRendererTrait for DeferredRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
+        mirror: bool,
         _entity_id: usize,
     ) where
         Self: Renderer,
@@ -466,6 +511,32 @@ impl EntityRendererTrait for DeferredRenderer {
             scale,
             cell_count,
             cell_position,
+            mirror,
         );
+    }
+}
+
+#[cfg(feature = "debug")]
+impl MarkerRenderer for DeferredRenderer {
+
+    fn render_marker(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        position: Vector3<f32>,
+        hovered: bool,
+    ) where
+        Self: Renderer,
+    {
+
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
+
+        if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
+
+            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
+            self.sprite_renderer
+                .render_marker(render_target, marker_identifier, screen_position, screen_size, hovered);
+        }
     }
 }

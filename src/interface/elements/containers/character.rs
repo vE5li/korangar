@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use num::Zero;
 use procedural::*;
@@ -15,9 +15,7 @@ pub struct CharacterPreview {
     move_request: Rc<RefCell<Option<usize>>>,
     changed: Rc<RefCell<bool>>,
     slot: usize,
-    elements: Vec<ElementCell>,
-    cached_size: Size,
-    cached_position: Position,
+    state: ContainerState,
 }
 
 impl CharacterPreview {
@@ -82,57 +80,40 @@ impl CharacterPreview {
     ) -> Self {
 
         let elements = Self::get_elements(&characters, &move_request, slot);
-        let cached_size = Size::zero();
-        let cached_position = Position::zero();
+        let state = ContainerState::new(elements);
 
         Self {
             characters,
             move_request,
             changed,
             slot,
-            elements,
-            cached_size,
-            cached_position,
+            state,
         }
     }
 
     fn has_character(&self) -> bool {
-        self.elements.len() > 1 // TODO:
+        self.state.elements.len() > 1 // TODO:
     }
 }
 
 impl Element for CharacterPreview {
 
+    fn get_state(&self) -> &ElementState {
+        &self.state.state
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state.state
+    }
+
+    fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
+        self.state.link_back(weak_self, weak_parent);
+    }
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let size_constraint = &constraint!(20%, 150);
-
-        let (mut size, position) = placement_resolver.allocate(size_constraint);
-        let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::new(3.0, 3.0));
-        inner_placement_resolver.set_gaps(Size::new(10.0, 3.0));
-
-        self.elements.iter_mut().for_each(|element| {
-
-            element
-                .borrow_mut()
-                .resolve(&mut inner_placement_resolver, interface_settings, theme)
-        });
-
-        if size_constraint.height.is_flexible() {
-
-            let final_height = inner_placement_resolver.final_height();
-            let final_height = size_constraint.validated_height(
-                final_height,
-                placement_resolver.get_avalible().y,
-                placement_resolver.get_avalible().y,
-                *interface_settings.scaling,
-            );
-            size.y = Some(final_height);
-            placement_resolver.register_height(final_height);
-        }
-
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+        self.state.resolve(placement_resolver, interface_settings, theme, size_constraint);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -148,7 +129,7 @@ impl Element for CharacterPreview {
             self.slot,
         );
 
-        ChangeEvent::Reresolve.into()
+        Some(ChangeEvent::Reresolve)
     }
 
     fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
@@ -172,28 +153,7 @@ impl Element for CharacterPreview {
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
-        let absolute_position = mouse_position - self.cached_position;
-
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
-        {
-
-            for element in &self.elements {
-                match element.borrow().hovered_element(absolute_position) {
-                    HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
-                    HoverInformation::Element(element) => return HoverInformation::Element(element),
-                    HoverInformation::Ignored => return HoverInformation::Ignored,
-                    HoverInformation::Missed => {}
-                }
-            }
-
-            return HoverInformation::Hovered;
-        }
-
-        HoverInformation::Missed
+        self.state.hovered_element::<true>(mouse_position)
     }
 
     fn render(
@@ -204,51 +164,32 @@ impl Element for CharacterPreview {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
-        {
+        let background_color = match self.is_element_self(hovered_element) {
+            true => *theme.button.hovered_background_color,
+            false => *theme.button.background_color,
+        };
 
-            true => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.button.border_radius * *interface_settings.scaling,
-                *theme.button.hovered_background_color,
-            ),
+        renderer.render_background(*theme.button.border_radius, background_color);
 
-            false => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.button.border_radius * *interface_settings.scaling,
-                *theme.button.background_color,
-            ),
-        }
-
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        self.elements.iter().for_each(|element| {
-
-            element.borrow().render(
-                render_target,
-                renderer,
-                state_provider,
-                interface_settings,
-                theme,
-                absolute_position,
-                clip_size,
-                hovered_element,
-                focused_element,
-                second_theme,
-            )
-        });
+        self.state.render(
+            &mut renderer,
+            state_provider,
+            interface_settings,
+            theme,
+            hovered_element,
+            focused_element,
+            second_theme,
+        );
     }
 }

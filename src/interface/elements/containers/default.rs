@@ -1,87 +1,113 @@
-use derive_new::new;
-use num::Zero;
+use std::rc::Weak;
+
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
 
-#[derive(new)]
 pub struct Container {
-    elements: Vec<ElementCell>,
+    state: ContainerState,
     size_constraint: SizeConstraint,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
 }
 
 impl Container {
 
     pub const DEFAULT_SIZE: SizeConstraint = constraint!(100%, ?);
+
+    pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
+
+        Self {
+            state: ContainerState {
+                elements,
+                state: Default::default(),
+            },
+            size_constraint,
+        }
+    }
 }
 
 impl Element for Container {
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn get_state(&self) -> &ElementState {
+        &self.state.state
+    }
 
-        let (mut size, position) = placement_resolver.allocate(&self.size_constraint);
-        let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::zero());
-        inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state.state
+    }
 
-        self.elements.iter_mut().for_each(|element| {
+    fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
+        self.state.link_back(weak_self, weak_parent);
+    }
 
-            element
-                .borrow_mut()
-                .resolve(&mut inner_placement_resolver, interface_settings, theme)
-        });
+    fn focus_next(
+        &self,
+        self_cell: Rc<RefCell<dyn Element>>,
+        caller_cell: Option<Rc<RefCell<dyn Element>>>,
+        focus_mode: FocusMode,
+    ) -> Option<Rc<RefCell<dyn Element>>> {
 
-        if self.size_constraint.height.is_flexible() {
+        if let Some(caller_cell) = caller_cell {
 
-            let final_height = inner_placement_resolver.final_height();
-            let final_height = self.size_constraint.validated_height(
-                final_height,
-                placement_resolver.get_avalible().y,
-                placement_resolver.get_avalible().y,
-                *interface_settings.scaling,
-            );
-            size.y = Some(final_height);
-            placement_resolver.register_height(final_height);
+            let position = self
+                .state
+                .elements
+                .iter()
+                .position(|element| element.borrow().is_element_self(Some(&*caller_cell.borrow())));
+
+            println!("{:?}", position);
+
+            if let Some(position) = position {
+                match position + 1 == self.state.elements.len() {
+
+                    true => {
+
+                        println!("HERE: {}", self.state.state.parent_element.is_some());
+                        if let Some(parent_element) = &self.state.state.parent_element {
+
+                            let parent_element = parent_element.upgrade().unwrap();
+                            let next_element = parent_element
+                                .borrow()
+                                .focus_next(parent_element.clone(), Some(self_cell), focus_mode);
+                            return next_element;
+                        }
+
+                        return Some(self.state.elements[0].clone());
+                    }
+
+                    false => return self.state.elements[position + 1].clone().into(),
+                }
+            }
+
+            panic!("when did this happen? implement correct behavior");
         }
 
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+        // getting here means the container itself is currently being focused and we want to call
+        // it's parent container focus_next (if possible) to get the next sibling element
+        if let Some(parent_element) = &self.state.state.parent_element {
+
+            let parent_element = parent_element.upgrade().unwrap();
+            let next_element = parent_element
+                .borrow()
+                .focus_next(parent_element.clone(), Some(self_cell), focus_mode);
+            return next_element;
+        }
+
+        // TODO: check if element is focusable
+        Some(self.state.elements[0].clone())
+    }
+
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+        self.state
+            .resolve(placement_resolver, interface_settings, theme, &self.size_constraint);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
-        self.elements
-            .iter_mut()
-            .map(|element| element.borrow_mut().update())
-            .fold(None, |current, other| {
-                current.zip_with(other, ChangeEvent::combine).or(current).or(other)
-            })
+        self.state.update()
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
-        let absolute_position = mouse_position - self.cached_position;
-
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
-        {
-            for element in &self.elements {
-                match element.borrow().hovered_element(absolute_position) {
-                    HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
-                    HoverInformation::Element(element) => return HoverInformation::Element(element),
-                    HoverInformation::Ignored => return HoverInformation::Ignored,
-                    HoverInformation::Missed => {}
-                }
-            }
-        }
-
-        HoverInformation::Missed
+        self.state.hovered_element::<false>(mouse_position)
     }
 
     fn render(
@@ -92,28 +118,25 @@ impl Element for Container {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        self.elements.iter().for_each(|element| {
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-            element.borrow().render(
-                render_target,
-                renderer,
-                state_provider,
-                interface_settings,
-                theme,
-                absolute_position,
-                clip_size,
-                hovered_element,
-                focused_element,
-                second_theme,
-            )
-        });
+        self.state.render(
+            &mut renderer,
+            state_provider,
+            interface_settings,
+            theme,
+            hovered_element,
+            focused_element,
+            second_theme,
+        );
     }
 }

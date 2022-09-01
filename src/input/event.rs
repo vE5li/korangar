@@ -1,5 +1,7 @@
 use cgmath::Vector2;
 
+use crate::world::MarkerIdentifier;
+
 #[derive(Clone, Debug)]
 pub enum UserEvent {
     LogIn(String, String),
@@ -25,9 +27,12 @@ pub enum UserEvent {
     RequestPlayerMove(Vector2<usize>),
     RequestPlayerInteract(u32),
     RequestWarpToMap(String, Vector2<usize>),
+    SendMessage(String),
     NextDialog(u32),
     CloseDialog(u32),
     ChooseDialogOption(u32, i8),
+    #[cfg(feature = "debug")]
+    OpenMarkerDetails(MarkerIdentifier),
     #[cfg(feature = "debug")]
     OpenRenderSettingsWindow,
     #[cfg(feature = "debug")]

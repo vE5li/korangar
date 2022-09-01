@@ -11,10 +11,7 @@ use vulkano::render_pass::RenderPass;
 
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
-use super::{
-    Camera, EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, ModelVertexBuffer, Renderer,
-    SingleRenderTarget, Texture,
-};
+use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
 
 #[derive(PartialEq, Eq)]
 pub enum ShadowSubrenderer {
@@ -62,13 +59,6 @@ impl ShadowRenderer {
             geometry_renderer,
             entity_renderer,
         }
-    }
-
-    pub fn recreate_pipeline(&mut self) {
-
-        let subpass = self.render_pass.clone().first_subpass();
-        self.geometry_renderer.recreate_pipeline(self.device.clone(), subpass.clone());
-        self.entity_renderer.recreate_pipeline(self.device.clone(), subpass);
     }
 
     pub fn create_render_target(&self, size: u32) -> <Self as Renderer>::Target {
@@ -130,6 +120,7 @@ impl EntityRendererTrait for ShadowRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
+        mirror: bool,
         _entity_id: usize,
     ) where
         Self: Renderer,
@@ -148,6 +139,7 @@ impl EntityRendererTrait for ShadowRenderer {
             scale,
             cell_count,
             cell_position,
+            mirror,
         );
     }
 }

@@ -12,10 +12,9 @@ use crate::interface::{Element, *};
 pub struct InputField<const LENGTH: usize, const HIDDEN: bool> {
     display: Rc<RefCell<String>>,
     ghost_text: &'static str,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    action: Box<dyn Fn() -> Option<ChangeEvent>>,
+    #[new(default)]
+    state: ElementState,
 }
 
 impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
@@ -47,26 +46,20 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
 
 impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HIDDEN> {
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
 
-        let (size, position) = placement_resolver.allocate(&theme.input.size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
+
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+        self.state.resolve(placement_resolver, &theme.input.size_constraint);
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
-        let absolute_position = mouse_position - self.cached_position;
-
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
-        {
-            return HoverInformation::Hovered;
-        }
-
-        HoverInformation::Missed
+        self.state.hovered_element(mouse_position)
     }
 
     fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
@@ -76,6 +69,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
     fn input_character(&mut self, character: char) -> Option<ChangeEvent> {
         match character {
             '\u{8}' => self.remove_character(),
+            '\r' => (self.action)(),
             character => self.add_character(character),
         }
     }
@@ -88,20 +82,19 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
         let display: &String = &RefCell::borrow(&self.display);
-        let is_hovererd =
-            matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()));
-        let is_focused =
-            matches!(focused_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()));
+        let is_hovererd = self.is_element_self(hovered_element);
+        let is_focused = self.is_element_self(focused_element);
 
         let text = if display.is_empty() && !is_focused {
             self.ghost_text.to_string()
@@ -127,35 +120,20 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
             *theme.input.text_color
         };
 
-        renderer.render_rectangle(
-            render_target,
-            absolute_position,
-            self.cached_size,
-            clip_size,
-            *theme.input.border_radius * *interface_settings.scaling,
-            background_color,
-        );
-        renderer.render_text(
-            render_target,
-            &text,
-            absolute_position,
-            clip_size,
-            text_color,
-            *theme.input.font_size * *interface_settings.scaling,
-        );
+        renderer.render_background(*theme.input.border_radius, background_color);
+
+        renderer.render_text(&text, Vector2::zero(), text_color, *theme.input.font_size);
 
         if is_focused {
 
             let cursor_offset = *theme.input.cursor_offset * *interface_settings.scaling;
+
             renderer.render_rectangle(
-                render_target,
-                absolute_position
-                    + Vector2::new(
-                        cursor_offset + text.len() as f32 * *theme.input.font_size * *interface_settings.scaling * 0.5,
-                        0.0,
-                    ),
-                Vector2::new(*theme.input.cursor_width, self.cached_size.y),
-                clip_size,
+                Vector2::new(
+                    cursor_offset + text.len() as f32 * *theme.input.font_size * *interface_settings.scaling * 0.5,
+                    0.0,
+                ),
+                Vector2::new(*theme.input.cursor_width, self.state.cached_size.y),
                 Vector4::from_value(0.0),
                 *theme.input.text_color,
             );

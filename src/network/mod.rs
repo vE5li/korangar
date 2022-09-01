@@ -1081,6 +1081,13 @@ struct UpdateStatusPacket3 {
 }
 
 #[derive(Debug, Packet)]
+#[header(0xb0, 0x00)]
+struct UpdateStatusPacket4 {
+    #[length_hint(6)]
+    pub status_type: StatusType,
+}
+
+#[derive(Debug, Packet)]
 #[header(0x3a, 0x01)]
 struct UpdateAttackRangePacket {
     pub attack_range: u16,
@@ -1114,6 +1121,13 @@ enum Action {
 struct RequestActionPacket {
     pub value: u32,
     pub action: Action,
+}
+
+#[derive(Debug, Packet, new)]
+#[header(0xf3, 0x00)]
+struct GlobalMessagePacket {
+    pub packet_length: u16,
+    pub message: String,
 }
 
 #[derive(Debug, Packet)]
@@ -1814,6 +1828,7 @@ pub struct NetworkingSystem {
     login_keep_alive_timer: NetworkTimer,
     character_keep_alive_timer: NetworkTimer,
     map_keep_alive_timer: NetworkTimer,
+    player_name: String,
 }
 
 impl NetworkingSystem {
@@ -1832,8 +1847,9 @@ impl NetworkingSystem {
         let login_keep_alive_timer = NetworkTimer::new(Duration::from_secs(58));
         let character_keep_alive_timer = NetworkTimer::new(Duration::from_secs(10));
         let map_keep_alive_timer = NetworkTimer::new(Duration::from_secs(4));
+        let player_name = String::new();
 
-        login_stream.set_read_timeout(Duration::from_secs(20).into()).unwrap();
+        login_stream.set_read_timeout(Duration::from_secs(1).into()).unwrap();
 
         Self {
             login_settings,
@@ -1847,6 +1863,7 @@ impl NetworkingSystem {
             login_keep_alive_timer,
             character_keep_alive_timer,
             map_keep_alive_timer,
+            player_name,
         }
     }
 
@@ -2054,7 +2071,22 @@ impl NetworkingSystem {
         let map_stream = self.map_stream.as_mut()?;
         map_stream.set_read_timeout(Duration::from_micros(1).into()).unwrap();
         let response_lenght = map_stream.read(&mut buffer).ok()?;
-        buffer[..response_lenght].to_vec().into()
+
+        match response_lenght {
+
+            // TODO: make sure this will always work
+            1400 => {
+
+                let mut first_buffer = buffer[..response_lenght].to_vec();
+                let mut second_buffer = self.try_get_data_from_map_server().unwrap();
+                first_buffer.append(&mut second_buffer);
+
+                println!("combined {}", first_buffer.len());
+                return Some(first_buffer);
+            }
+
+            length => Some(buffer[..length].to_vec()),
+        }
     }
 
     pub fn keep_alive(&mut self, delta_time: f64, client_tick: u32) {
@@ -2203,6 +2235,8 @@ impl NetworkingSystem {
             .cloned()
             .unwrap();
 
+        self.player_name = character_information.name.clone();
+
         Ok((
             change_map_packet.map_name.replace(".gat", ""),
             Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
@@ -2290,6 +2324,16 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(RequestActionPacket::new(entity_id, Action::Attack));
     }
 
+    pub fn send_message(&mut self, message: String) {
+
+        let complete_message = format!("{} : {}", self.player_name, message);
+
+        self.send_packet_to_map_server(GlobalMessagePacket::new(
+            complete_message.bytes().count() as u16 + 5,
+            complete_message,
+        ));
+    }
+
     pub fn start_dialog(&mut self, npc_id: u32) {
         self.send_packet_to_map_server(StartDialogPacket::new(npc_id));
     }
@@ -2361,6 +2405,8 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateStatus(packet.status_type));
                 } else if let Ok(packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateStatus(packet.status_type));
+                } else if let Ok(packet) = UpdateStatusPacket4::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateStatus(packet.status_type));
                 } else if let Ok(_packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) {

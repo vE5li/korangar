@@ -102,8 +102,6 @@ impl RectangleRenderer {
         let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
 
-        let _pixel_size = 1.0 / window_size.y as f32;
-
         let constants = Constants {
             screen_position: screen_position.into(),
             screen_size: screen_size.into(),

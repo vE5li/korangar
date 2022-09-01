@@ -1,15 +1,132 @@
 use std::fmt::Display;
 use std::rc::Rc;
 
-use cgmath::{Quaternion, Vector2, Vector3};
+use cgmath::{Quaternion, Rad, Vector2, Vector3, Vector4};
 
-use crate::graphics::{Color, ModelVertexBuffer, Texture};
-use crate::interface::{ElementCell, SizeConstraint, *};
-use crate::loaders::Version;
+use crate::graphics::Color;
+use crate::interface::{ElementCell, *};
 
 pub trait PrototypeElement {
 
     fn to_element(&self, display: String) -> ElementCell;
+}
+
+pub trait ElementDisplay {
+
+    fn display(&self) -> String;
+}
+
+// workaround for not having negative trait bounds or better specialization
+auto trait NoDisplay {}
+impl<T> !NoDisplay for Vector2<T> {}
+impl<T> !NoDisplay for Vector3<T> {}
+impl<T> !NoDisplay for Vector4<T> {}
+impl<T> !NoDisplay for Quaternion<T> {}
+impl<T> !NoDisplay for Rad<T> {}
+
+impl<T> ElementDisplay for T
+where
+    T: Display + NoDisplay,
+{
+
+    fn display(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl<T: ElementDisplay> ElementDisplay for Vector2<T> {
+
+    fn display(&self) -> String {
+        format!("{:.1}, {:.1}", self.x.display(), self.y.display())
+    }
+}
+
+impl<T: ElementDisplay> ElementDisplay for Vector3<T> {
+
+    fn display(&self) -> String {
+        format!("{:.1}, {:.1}, {:.1}", self.x.display(), self.y.display(), self.z.display())
+    }
+}
+
+impl<T: ElementDisplay> ElementDisplay for Vector4<T> {
+
+    fn display(&self) -> String {
+
+        format!(
+            "{:.1}, {:.1}, {:.1}, {:.1}",
+            self.x.display(),
+            self.y.display(),
+            self.z.display(),
+            self.w.display()
+        )
+    }
+}
+
+impl<T: ElementDisplay> ElementDisplay for Quaternion<T> {
+
+    fn display(&self) -> String {
+
+        format!(
+            "{:.1}, {:.1}, {:.1} - {:.1}",
+            self.v.x.display(),
+            self.v.y.display(),
+            self.v.z.display(),
+            self.s.display()
+        )
+    }
+}
+
+impl<T: ElementDisplay> ElementDisplay for Rad<T> {
+
+    fn display(&self) -> String {
+        self.0.display()
+    }
+}
+
+/*impl ElementDisplay for ModelVertexBuffer {
+
+    fn display(&self) -> String {
+
+        use vulkano::buffer::BufferAccess;
+
+        let identifier = self.inner().buffer.key();
+        let size = self.inner().buffer.size();
+        format!("{} ({})", identifier, size)
+    }
+}
+
+impl ElementDisplay for Texture {
+
+    fn display(&self) -> String {
+
+        use vulkano::{Handle, VulkanObject};
+
+        let identifier = self.internal_object().as_raw();
+        format!("0x{:x}", identifier)
+    }
+}*/
+
+// workaround for not having negative trait bounds or better specialization
+auto trait NoPrototype {}
+impl<T> !NoPrototype for std::sync::Arc<T> {}
+impl<T> !NoPrototype for Option<T> {}
+impl<T, const N: usize> !NoPrototype for [T; N] {}
+impl<T> !NoPrototype for Vec<T> {}
+impl<T> !NoPrototype for Rc<T> {}
+
+impl NoPrototype for String {}
+
+impl<T> PrototypeElement for T
+where
+    T: ElementDisplay + NoPrototype,
+{
+
+    fn to_element(&self, display: String) -> ElementCell {
+
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display.clone())), cell!(StringValue::new(self.display()))];
+
+        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+    }
 }
 
 impl PrototypeElement for SizeConstraint {
@@ -19,43 +136,6 @@ impl PrototypeElement for SizeConstraint {
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
         cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Vector2<T> {
-
-    fn to_element(&self, display: String) -> ElementCell {
-
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(Vector2Value::new(*self))];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Vector3<T> {
-
-    fn to_element(&self, display: String) -> ElementCell {
-
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(Vector3Value::new(*self))];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl<T: PrototypeElement + Copy + Display + 'static> PrototypeElement for Quaternion<T> {
-
-    fn to_element(&self, display: String) -> ElementCell {
-
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(QuaternionValue::new(*self))];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl<T: PrototypeElement> PrototypeElement for cgmath::Rad<T> {
-
-    fn to_element(&self, display: String) -> ElementCell {
-        self.0.to_element(display)
     }
 }
 
@@ -124,78 +204,3 @@ impl<T: PrototypeElement> PrototypeElement for Rc<T> {
         (**self).to_element(display)
     }
 }
-
-impl PrototypeElement for ModelVertexBuffer {
-
-    fn to_element(&self, display: String) -> ElementCell {
-
-        use vulkano::buffer::BufferAccess;
-
-        let identifier = self.inner().buffer.key();
-        let size = self.inner().buffer.size();
-
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(StringValue::new(format!("{} ({})", identifier, size))),
-        ];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-impl PrototypeElement for Texture {
-
-    fn to_element(&self, display: String) -> ElementCell {
-
-        use vulkano::{Handle, VulkanObject};
-
-        let identifier = self.internal_object().as_raw();
-
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display)),
-            cell!(StringValue::new(format!("0x{:x}", identifier))),
-        ];
-
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
-    }
-}
-
-macro_rules! implement_prototype_element {
-    ($ty:ident) => {
-        impl PrototypeElement for $ty {
-
-            fn to_element(&self, display: String) -> ElementCell {
-
-                let elements: Vec<ElementCell> = vec![
-                    cell!(StaticLabel::new(display.clone())),
-                    cell!(StringValue::new(self.to_string())),
-                ];
-
-                cell!(Container::new(elements, Container::DEFAULT_SIZE))
-            }
-        }
-    };
-}
-
-implement_prototype_element!(u8);
-implement_prototype_element!(u16);
-implement_prototype_element!(u32);
-implement_prototype_element!(u64);
-implement_prototype_element!(u128);
-
-implement_prototype_element!(i8);
-implement_prototype_element!(i16);
-implement_prototype_element!(i32);
-implement_prototype_element!(i64);
-implement_prototype_element!(i128);
-
-implement_prototype_element!(f32);
-implement_prototype_element!(f64);
-
-implement_prototype_element!(usize);
-implement_prototype_element!(isize);
-
-implement_prototype_element!(bool);
-
-implement_prototype_element!(String);
-implement_prototype_element!(Version);

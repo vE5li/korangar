@@ -16,6 +16,7 @@ layout(push_constant) uniform Constants {
     vec2 texture_position;
     vec2 texture_size;
     uint identifier;
+    bool mirror;
 } constants;
 
 void main() {

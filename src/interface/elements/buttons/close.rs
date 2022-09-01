@@ -1,39 +1,30 @@
-use derive_new::new;
-use num::Zero;
-
 use crate::graphics::{InterfaceRenderer, Renderer};
-use crate::interface::{Element, *};
+use crate::interface::*;
 
-#[derive(new)]
+#[derive(Default)]
 pub struct CloseButton {
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    state: ElementState,
 }
 
 impl Element for CloseButton {
 
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let (size, position) = placement_resolver.allocate_right(&theme.close_button.size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+        self.state.cached_size = size.finalize();
+        self.state.cached_position = position;
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
-        let absolute_position = mouse_position - self.cached_position;
-
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
-        {
-            return HoverInformation::Hovered;
-        }
-
-        HoverInformation::Missed
+        self.state.hovered_element(mouse_position)
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
@@ -48,42 +39,26 @@ impl Element for CloseButton {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
-        {
+        let background_color = match self.is_element_self(hovered_element) {
+            true => *theme.close_button.hovered_background_color,
+            false => *theme.close_button.background_color,
+        };
 
-            true => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.close_button.border_radius * *interface_settings.scaling,
-                *theme.close_button.hovered_background_color,
-            ),
-
-            false => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.close_button.border_radius * *interface_settings.scaling,
-                *theme.close_button.background_color,
-            ),
-        }
+        renderer.render_background(*theme.close_button.border_radius, background_color);
 
         renderer.render_text(
-            render_target,
             "X",
-            absolute_position + *theme.close_button.text_offset * *interface_settings.scaling,
-            clip_size,
+            *theme.close_button.text_offset,
             *theme.close_button.foreground_color,
             *theme.close_button.font_size * *interface_settings.scaling,
         );

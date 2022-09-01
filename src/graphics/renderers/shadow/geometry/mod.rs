@@ -63,10 +63,6 @@ impl GeometryRenderer {
         }
     }
 
-    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass) {
-        self.pipeline = Self::create_pipeline(device, subpass, &self.vertex_shader, &self.fragment_shader);
-    }
-
     fn create_pipeline(
         device: Arc<Device>,
         subpass: Subpass,

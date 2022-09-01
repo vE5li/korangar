@@ -2,7 +2,11 @@ use cgmath::Vector3;
 use derive_new::new;
 use procedural::*;
 
-use crate::graphics::{Camera, MarkerRenderer, Renderer};
+#[cfg(feature = "debug")]
+use crate::graphics::MarkerRenderer;
+use crate::graphics::{Camera, Renderer};
+#[cfg(feature = "debug")]
+use crate::world::MarkerIdentifier;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 #[window_title("Effect Source")]
@@ -20,10 +24,16 @@ impl EffectSource {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
-    where
+    pub fn render_marker<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        hovered: bool,
+    ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, self.position, hovered);
+        renderer.render_marker(render_target, camera, marker_identifier, self.position, hovered);
     }
 }

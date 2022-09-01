@@ -16,6 +16,7 @@ layout(push_constant) uniform Constants {
     mat4 world;
     vec2 texture_position;
     vec2 texture_size;
+    bool mirror;
 } constants;
 
 vec3 rotateY(vec3 vector, float angle) {
@@ -34,5 +35,10 @@ vec3 rotateY(vec3 vector, float angle) {
 void main() {
     gl_Position = matrices.projection * matrices.view * constants.world * vec4(position, 1.0);
     texture_coordinates_out = constants.texture_position + texture_coordinates * constants.texture_size;
+
+    if (constants.mirror) {
+        texture_coordinates_out.x = 1 - texture_coordinates_out.x;
+    }
+
     normal_out = rotateY(vec3(-matrices.view[2][0], 0.0, -matrices.view[2][2]), position.x);
 }

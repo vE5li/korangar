@@ -1,31 +1,35 @@
-use derive_new::new;
-use num::Zero;
-
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
 
-#[derive(new)]
 pub struct ColorValue {
     color: Color,
-    #[new(default)]
-    cached_values: String,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    display: String,
+    state: ElementState,
+}
+
+impl ColorValue {
+
+    pub fn new(color: Color) -> Self {
+
+        let display = format!("{}, {}, {}, {}", color.red, color.green, color.blue, color.alpha);
+        let state = ElementState::default();
+
+        Self { color, display, state }
+    }
 }
 
 impl Element for ColorValue {
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
 
-        let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
-        self.cached_values = format!(
-            "{}, {}, {}, {}",
-            self.color.red, self.color.green, self.color.blue, self.color.alpha
-        );
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
+
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+        self.state.resolve(placement_resolver, &theme.value.size_constraint);
     }
 
     fn render(
@@ -36,29 +40,23 @@ impl Element for ColorValue {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        renderer.render_rectangle(
-            render_target,
-            absolute_position,
-            self.cached_size,
-            clip_size,
-            *theme.value.border_radius * *interface_settings.scaling,
-            self.color,
-        );
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+
+        renderer.render_background(*theme.value.border_radius, self.color);
+
         renderer.render_text(
-            render_target,
-            &self.cached_values,
-            absolute_position + *theme.value.text_offset * *interface_settings.scaling,
-            clip_size,
+            &self.display,
+            *theme.value.text_offset,
             self.color.invert(),
-            *theme.value.font_size * *interface_settings.scaling,
+            *theme.value.font_size,
         );
     }
 }

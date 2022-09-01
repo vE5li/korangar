@@ -175,6 +175,7 @@ impl EntityRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
+        mirror: bool,
     ) {
 
         let image_dimensions = Vector2::<u32>::from(texture.image().dimensions().width_height());
@@ -200,6 +201,7 @@ impl EntityRenderer {
             world: world_matrix.into(),
             texture_position: [texture_position.x, texture_position.y],
             texture_size: [texture_size.x, texture_size.y],
+            mirror: mirror as u32,
         };
 
         render_target

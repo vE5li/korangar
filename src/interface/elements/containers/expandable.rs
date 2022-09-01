@@ -1,3 +1,6 @@
+use std::rc::Weak;
+
+use derive_new::new;
 use num::Zero;
 use procedural::*;
 
@@ -6,33 +9,43 @@ use crate::interface::{Element, *};
 
 pub struct Expandable {
     display: String,
-    elements: Vec<ElementCell>,
     expanded: bool,
     open_size_constraint: SizeConstraint,
     closed_size_constraint: SizeConstraint,
-    cached_size: Size,
     cached_closed_size: Size,
-    cached_position: Position,
+    state: ContainerState,
 }
 
 impl Expandable {
 
     pub fn new(display: String, elements: Vec<ElementCell>, expanded: bool) -> Self {
 
+        let state = ContainerState::new(elements);
+
         Self {
             display,
             expanded,
             open_size_constraint: constraint!(100%, ?),
             closed_size_constraint: constraint!(100%, 18),
-            cached_size: Size::zero(),
             cached_closed_size: Size::zero(),
-            cached_position: Position::zero(),
-            elements,
+            state,
         }
     }
 }
 
 impl Element for Expandable {
+
+    fn get_state(&self) -> &ElementState {
+        &self.state.state
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state.state
+    }
+
+    fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
+        self.state.link_back(weak_self, weak_parent);
+    }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
@@ -58,7 +71,7 @@ impl Element for Expandable {
             );
             inner_placement_resolver.set_gaps(*theme.expandable.gaps);
 
-            self.elements.iter_mut().for_each(|element| {
+            self.state.elements.iter_mut().for_each(|element| {
 
                 element
                     .borrow_mut()
@@ -82,9 +95,9 @@ impl Element for Expandable {
             }
         }
 
-        self.cached_size = size.finalize();
         self.cached_closed_size = closed_size;
-        self.cached_position = position;
+        self.state.state.cached_size = size.finalize();
+        self.state.state.cached_position = position;
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -93,39 +106,30 @@ impl Element for Expandable {
             return None;
         }
 
-        self.elements
-            .iter_mut()
-            .map(|element| element.borrow_mut().update())
-            .fold(None, |current, event| {
-                current.zip_with(event, ChangeEvent::combine).or(current).or(event)
-            })
+        self.state.update()
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
 
-        let absolute_position = mouse_position - self.cached_position;
+        let absolute_position = mouse_position - self.state.state.cached_position;
 
         if absolute_position.x >= 0.0
             && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
+            && absolute_position.x <= self.state.state.cached_size.x
+            && absolute_position.y <= self.state.state.cached_size.y
         {
 
             if self.expanded {
-                for element in &self.elements {
+                for element in &self.state.elements {
                     match element.borrow().hovered_element(absolute_position) {
                         HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
-                        HoverInformation::Element(element) => return HoverInformation::Element(element),
-                        HoverInformation::Ignored => return HoverInformation::Ignored,
                         HoverInformation::Missed => {}
+                        hover_information => return hover_information,
                     }
                 }
             }
 
-            match absolute_position.x <= self.cached_closed_size.x && absolute_position.y <= self.cached_closed_size.y {
-                true => return HoverInformation::Hovered,
-                false => return HoverInformation::Ignored,
-            }
+            return HoverInformation::Hovered;
         }
 
         HoverInformation::Missed
@@ -146,76 +150,54 @@ impl Element for Expandable {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
         let background_color = match second_theme {
             true => *theme.expandable.second_background_color,
             false => *theme.expandable.background_color,
         };
 
-        renderer.render_rectangle(
-            render_target,
-            absolute_position,
-            self.cached_size,
-            clip_size,
-            *theme.expandable.border_radius * *interface_settings.scaling,
-            background_color,
-        );
+        renderer.render_background(*theme.button.border_radius, background_color);
+
         renderer.render_expand_arrow(
-            render_target,
-            absolute_position + *theme.expandable.icon_offset * *interface_settings.scaling,
-            *theme.expandable.icon_size * *interface_settings.scaling,
-            clip_size,
+            *theme.expandable.icon_offset,
+            *theme.expandable.icon_size,
             *theme.expandable.foreground_color,
             self.expanded,
         );
 
-        match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
-        {
+        let foreground_color = match self.is_element_self(hovered_element) {
+            true => *theme.expandable.hovered_foreground_color,
+            false => *theme.expandable.foreground_color,
+        };
 
-            true => renderer.render_text(
-                render_target,
-                &self.display,
-                absolute_position + *theme.expandable.text_offset * *interface_settings.scaling,
-                clip_size,
-                *theme.expandable.hovered_foreground_color,
-                *theme.expandable.font_size * *interface_settings.scaling,
-            ),
-
-            false => renderer.render_text(
-                render_target,
-                &self.display,
-                absolute_position + *theme.expandable.text_offset * *interface_settings.scaling,
-                clip_size,
-                *theme.expandable.foreground_color,
-                *theme.expandable.font_size * *interface_settings.scaling,
-            ),
-        }
+        renderer.render_text(
+            &self.display,
+            *theme.expandable.text_offset,
+            foreground_color,
+            *theme.expandable.font_size,
+        );
 
         if self.expanded {
 
-            self.elements.iter().for_each(|element| {
-
-                element.borrow().render(
-                    render_target,
-                    renderer,
-                    state_provider,
-                    interface_settings,
-                    theme,
-                    absolute_position,
-                    clip_size,
-                    hovered_element,
-                    focused_element,
-                    !second_theme,
-                )
-            });
+            self.state.render(
+                &mut renderer,
+                state_provider,
+                interface_settings,
+                theme,
+                hovered_element,
+                focused_element,
+                !second_theme,
+            );
         }
     }
 }

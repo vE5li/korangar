@@ -3,30 +3,36 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use cgmath::Vector2;
 use derive_new::new;
 use procedural::*;
 
+use super::Sprite;
 #[cfg(feature = "debug")]
 use crate::debug::*;
+use crate::graphics::Texture;
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 
-#[derive(Clone, PrototypeElement)]
-pub struct Actions {}
-/*    start_time: u32,
-    duration: u32,
-    factor: u32,
-    action: usize,
-    next_action: usize,
-    event: usize,
+//pub enum Animations {
+//}
+
+pub struct AnimationState {
+    pub action: usize,
+}
+
+#[derive(PrototypeElement)]
+pub struct Actions {
+    actions: Vec<Action>,
+    delays: Vec<f32>,
 }
 
 impl Actions {
 
-    pub fn render(&self, client_tick: u32) {
+    /*pub fn update(&mut self, client_tick: u32) {
 
         let mut time = client_tick - self.start_time;
 
-        if (self.duration > 0 && time > self.duration) {
+        if self.duration > 0 && time > self.duration {
 
             self.action = self.next_action;
             self.start_time = client_tick;
@@ -35,14 +41,48 @@ impl Actions {
             time = 0;
         }
 
+        self.time = time;
+    }*/
 
+    pub fn render(&self, sprite: &Sprite, animation_state: &AnimationState, camera_direction: usize) -> (Texture, bool) {
+
+        let direction = camera_direction % 8;
+        let aa = animation_state.action * 8 + direction;
+        let a = &self.actions[aa % self.actions.len()];
+        let fs = &a.motions[0];
+
+        (
+            sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone(),
+            fs.sprite_clips[0].mirror_on != 0,
+        )
+
+        /*let direction = 0;
+        let camera_direction = 0;
+        let fdir = (direction + camera_direction) % 8;
+
+        let aa = self.action * 8 + fdir;
+        let a = &self.actions[aa % self.actions.len()];
+        let delay = self.delays[aa % self.delays.len()];
+
+        let factor = match self.factor {
+            0 => delay as usize,
+            factor => delay as usize * factor as usize / 100,
+        };
+
+        let frame = match self.duration > 0 {
+            true => self.time as usize * a.motions.len() / self.duration as usize,
+            false => self.time as usize / factor,
+        };
+
+        let fs = &a.motions[frame % a.motions.len()];
+
+        sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone()*/
     }
-}*/
+}
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 struct SpriteClip {
-    pub x: i32,
-    pub y: i32,
+    pub position: Vector2<i32>,
     pub sprite_number: u32,
     pub mirror_on: u32,
     #[version_equals_or_above(2, 0)]
@@ -63,15 +103,14 @@ struct SpriteClip {
     pub height: Option<u32>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 struct AttachPoint {
     pub ignored: u32,
-    pub x: i32,
-    pub y: i32,
+    pub position: Vector2<i32>,
     pub attribute: u32,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 struct Motion {
     pub range1: [i32; 4], // maybe just skip this?
     pub range2: [i32; 4], // maybe just skip this?
@@ -87,20 +126,20 @@ struct Motion {
     pub attach_points: Vec<AttachPoint>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 struct Action {
     pub motion_count: u32,
     #[repeating(self.motion_count)]
     pub motions: Vec<Motion>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 struct Event {
     #[length_hint(40)]
     pub name: String,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Debug, ByteConvertable, PrototypeElement)]
 struct ActionsData {
     #[version]
     pub version: Version,
@@ -138,10 +177,17 @@ impl ActionLoader {
             return Err(format!("failed to read magic number from {}", path));
         }
 
-        let _actions_data = ActionsData::from_bytes(&mut byte_stream, None);
-        //println!("{:#?}", actions_data);
+        let actions_data = ActionsData::from_bytes(&mut byte_stream, None);
 
-        let sprite = Arc::new(Actions {});
+        let delays = actions_data
+            .delays
+            .unwrap_or_else(|| actions_data.actions.iter().map(|_| 0.0).collect());
+
+        let sprite = Arc::new(Actions {
+            actions: actions_data.actions,
+            delays,
+        });
+
         self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]

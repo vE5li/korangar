@@ -116,6 +116,11 @@ pub enum MarkerIdentifier {
     Entity(usize),
 }
 
+impl MarkerIdentifier {
+
+    pub const SIZE: f32 = 1.5;
+}
+
 #[derive(PrototypeElement, PrototypeWindow, new)]
 #[window_title("Map Viewer")]
 #[window_class("map_viewer")]
@@ -264,16 +269,14 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn resolve_marker<'a>(&'a self, _entities: &'a Arc<Vec<Arc<Entity>>>, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
+    pub fn resolve_marker<'a>(&'a self, entities: &'a Vec<Entity>, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
         match marker_identifier {
             MarkerIdentifier::Object(index) => &self.objects[index],
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
-            //MarkerIdentifier::Particle(index, particle_index) => &self.effect_sources[index].particles[particle_index],
-            MarkerIdentifier::Particle(..) => panic!(),
-            //MarkerIdentifier::Entity(index) => entities[index].as_ref(),
-            MarkerIdentifier::Entity(..) => panic!(),
+            MarkerIdentifier::Particle(..) => panic!(), // TODO: implement properly
+            MarkerIdentifier::Entity(index) => &entities[index],
         }
     }
 
@@ -284,8 +287,8 @@ impl Map {
         renderer: &T,
         camera: &dyn Camera,
         render_settings: &RenderSettings,
-        entities: &Vec<Entity>,
-        marker_identifier: Option<MarkerIdentifier>,
+        entities: &[Entity],
+        hovered_marker_identifier: Option<MarkerIdentifier>,
     ) where
         T: Renderer + MarkerRenderer,
     {
@@ -294,11 +297,14 @@ impl Map {
 
             self.objects.iter().enumerate().for_each(|(index, object)| {
 
+                let marker_identifier = MarkerIdentifier::Object(index);
+
                 object.render_marker(
                     render_target,
                     renderer,
                     camera,
-                    marker_identifier.contains(&MarkerIdentifier::Object(index)),
+                    marker_identifier,
+                    hovered_marker_identifier.contains(&marker_identifier),
                 )
             });
         }
@@ -307,11 +313,14 @@ impl Map {
 
             self.light_sources.iter().enumerate().for_each(|(index, light_source)| {
 
+                let marker_identifier = MarkerIdentifier::LightSource(index);
+
                 light_source.render_marker(
                     render_target,
                     renderer,
                     camera,
-                    marker_identifier.contains(&MarkerIdentifier::LightSource(index)),
+                    marker_identifier,
+                    hovered_marker_identifier.contains(&marker_identifier),
                 )
             });
         }
@@ -320,11 +329,14 @@ impl Map {
 
             self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| {
 
+                let marker_identifier = MarkerIdentifier::SoundSource(index);
+
                 sound_source.render_marker(
                     render_target,
                     renderer,
                     camera,
-                    marker_identifier.contains(&MarkerIdentifier::SoundSource(index)),
+                    marker_identifier,
+                    hovered_marker_identifier.contains(&marker_identifier),
                 )
             });
         }
@@ -333,30 +345,30 @@ impl Map {
 
             self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| {
 
+                let marker_identifier = MarkerIdentifier::EffectSource(index);
+
                 effect_source.render_marker(
                     render_target,
                     renderer,
                     camera,
-                    marker_identifier.contains(&MarkerIdentifier::EffectSource(index)),
+                    marker_identifier,
+                    hovered_marker_identifier.contains(&marker_identifier),
                 )
             });
         }
-
-        /*if render_settings.show_particle_markers {
-            for (index, effect_source) in self.effect_sources.iter().enumerate() {
-                effect_source.particles.iter().enumerate().for_each(|(particle_index, particle)| particle.render_marker(render_target, renderer, camera, marker_identifier.contains(&MarkerIdentifier::Particle(particle_index, index))));
-            }
-        }*/
 
         if render_settings.show_entity_markers {
 
             entities.iter().enumerate().for_each(|(index, entity)| {
 
+                let marker_identifier = MarkerIdentifier::Entity(index);
+
                 entity.render_marker(
                     render_target,
                     renderer,
                     camera,
-                    matches!(marker_identifier, Some(MarkerIdentifier::Entity(x)) if x == index),
+                    marker_identifier,
+                    hovered_marker_identifier.contains(&marker_identifier),
                 )
             });
         }

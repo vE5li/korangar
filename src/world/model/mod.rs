@@ -35,13 +35,13 @@ impl Model {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_bounding_box<T>(
+    pub fn render_bounding_box(
         &self,
-        _render_target: &mut <DeferredRenderer as Renderer>::Target,
-        _renderer: &DeferredRenderer,
-        _camera: &dyn Camera,
-        _root_transform: &Transform,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        root_transform: &Transform,
     ) {
-        //renderer.render_bounding_box(render_target, camera, &root_transform, &self.bounding_box);
+        renderer.render_bounding_box(render_target, camera, &root_transform, &self.bounding_box);
     }
 }

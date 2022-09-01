@@ -1,40 +1,56 @@
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use derive_new::new;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, NumberWindow, *};
 
-#[derive(new)]
 pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> {
     name: String,
     inner_pointer: *const T,
     minimum_value: T,
     maximum_value: T,
     change_event: Option<ChangeEvent>,
-    #[new(value = "T::zero()")]
     cached_inner: T,
-    #[new(default)]
     cached_values: String,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    state: ElementState,
+}
+
+impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> MutableNumberValue<T> {
+
+    pub fn new(name: String, inner_pointer: *const T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
+
+        let cached_inner = unsafe { *inner_pointer };
+        let cached_values = format!("{:.1}", cached_inner);
+        let state = ElementState::default();
+
+        Self {
+            name,
+            inner_pointer,
+            minimum_value,
+            maximum_value,
+            change_event,
+            cached_inner,
+            cached_values,
+            state,
+        }
+    }
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element for MutableNumberValue<T> {
 
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-
-        let (size, position) = placement_resolver.allocate(&theme.value.size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
-
-        //self.cached_inner = unsafe { *self.inner_pointer };
-        //self.cached_values = format!("{:.1}", self.cached_inner);
+        self.state.resolve(placement_resolver, &theme.value.size_constraint);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -52,18 +68,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
-        let absolute_position = mouse_position - self.cached_position;
-
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
-        {
-            return HoverInformation::Hovered;
-        }
-
-        HoverInformation::Missed
+        self.state.hovered_element(mouse_position)
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
@@ -85,44 +90,28 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        match matches!(hovered_element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
-        {
+        let background_color = match self.is_element_self(hovered_element) {
+            true => *theme.value.hovered_background_color,
+            false => *theme.value.background_color,
+        };
 
-            true => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.value.border_radius * *interface_settings.scaling,
-                *theme.value.hovered_background_color,
-            ),
-
-            false => renderer.render_rectangle(
-                render_target,
-                absolute_position,
-                self.cached_size,
-                clip_size,
-                *theme.value.border_radius * *interface_settings.scaling,
-                *theme.value.background_color,
-            ),
-        }
+        renderer.render_background(*theme.value.border_radius, background_color);
 
         renderer.render_text(
-            render_target,
             &self.cached_values,
-            absolute_position + *theme.value.text_offset * *interface_settings.scaling,
-            clip_size,
+            *theme.value.text_offset,
             *theme.value.foreground_color,
-            *theme.value.font_size * *interface_settings.scaling,
+            *theme.value.font_size,
         );
     }
 }

@@ -3,13 +3,24 @@ mod debug;
 mod player;
 mod shadow;
 
-use cgmath::{Matrix4, Vector2, Vector3, Vector4};
+use cgmath::{InnerSpace, Matrix4, Vector2, Vector3, Vector4};
 
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
 pub use self::player::PlayerCamera;
 pub use self::shadow::ShadowCamera;
 use crate::graphics::{SmoothedValue, Transform};
+
+fn direction(vector: Vector2<f32>) -> usize {
+
+    let inverted = false;
+    let k = ((f32::atan2(vector.normalize().x, vector.y) * (180.0 / std::f32::consts::PI) + 360.0 - 22.5) / 45.0) as usize;
+
+    match inverted {
+        true => (k + 5) & 7,
+        false => !k & 7,
+    }
+}
 
 pub trait Camera {
 
@@ -28,4 +39,6 @@ pub trait Camera {
     fn distance_to(&self, position: Vector3<f32>) -> f32;
 
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32>;
+
+    fn get_camera_direction(&self) -> usize;
 }

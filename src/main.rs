@@ -5,6 +5,9 @@
 #![feature(arc_unwrap_or_clone)]
 #![feature(option_result_contains)]
 #![feature(proc_macro_hygiene)]
+#![feature(negative_impls)]
+#![feature(iter_intersperse)]
+#![feature(auto_traits)]
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -505,6 +508,10 @@ fn main() {
 
                             render_settings.toggle_frame_limit();
                             swapchain_holder.set_frame_limit(render_settings.frame_limit);
+
+                            // for some reason the interface buffer becomes messaged up when
+                            // changing the present mode, so we need to render it again
+                            interface.schedule_rerender();
                         }
 
                         UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
@@ -592,6 +599,8 @@ fn main() {
 
                         UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
 
+                        UserEvent::SendMessage(message) => networking_system.send_message(message),
+
                         UserEvent::NextDialog(npc_id) => networking_system.next_dialog(npc_id),
 
                         UserEvent::CloseDialog(npc_id) => {
@@ -601,6 +610,11 @@ fn main() {
                         }
 
                         UserEvent::ChooseDialogOption(npc_id, option) => networking_system.choose_dialog_option(npc_id, option),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::OpenMarkerDetails(marker_identifier) => {
+                            interface.open_window(map.resolve_marker(&entities, marker_identifier))
+                        }
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
@@ -841,6 +855,11 @@ fn main() {
                 let screen_target = &mut screen_targets[image_number];
                 let window_size = swapchain_holder.window_size_f32();
                 let entities = &entities[..];
+                #[cfg(feature = "debug")]
+                let hovered_marker_identifier = match mouse_target {
+                    Some(PickerTarget::Marker(marker_identifier)) => Some(marker_identifier),
+                    _ => None,
+                };
 
                 thread_pool.in_place_scope(|scope| {
 
@@ -857,6 +876,16 @@ fn main() {
                         entities
                             .iter()
                             .for_each(|entity| entity.render(picker_target, &picker_renderer, current_camera));
+
+                        #[cfg(feature = "debug")]
+                        map.render_markers(
+                            picker_target,
+                            &picker_renderer,
+                            current_camera,
+                            &render_settings,
+                            entities,
+                            hovered_marker_identifier,
+                        );
 
                         picker_target.finish();
                     });
@@ -927,6 +956,21 @@ fn main() {
 
                         #[debug_condition(render_settings.show_water && !render_settings.show_buffers())]
                         map.water_light(screen_target, &deferred_renderer, current_camera);
+
+                        #[cfg(feature = "debug")]
+                        map.render_markers(
+                            screen_target,
+                            &deferred_renderer,
+                            current_camera,
+                            &render_settings,
+                            entities,
+                            hovered_marker_identifier,
+                        );
+
+                        #[cfg(feature = "debug")]
+                        if let Some(marker_identifier) = hovered_marker_identifier {
+                            map.render_marker_box(screen_target, &deferred_renderer, current_camera, marker_identifier);
+                        }
 
                         particle_holder.render(screen_target, &deferred_renderer, current_camera, window_size, entities);
                     });

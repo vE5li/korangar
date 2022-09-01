@@ -209,4 +209,10 @@ impl Camera for DebugCamera {
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32> {
         self.screen_to_world_matrix
     }
+
+    fn get_camera_direction(&self) -> usize {
+
+        let view_direction = self.view_direction();
+        super::direction(Vector2::new(view_direction.x, view_direction.z))
+    }
 }

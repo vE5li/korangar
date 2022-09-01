@@ -304,7 +304,7 @@ impl Default for CursorTheme {
 }
 
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
-#[window_title("theme viewer")]
+#[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
 pub struct Theme {
     #[event_button("reload theme", ReloadTheme)]

@@ -93,7 +93,7 @@ impl RectangleRenderer {
         window_size: Vector2<usize>,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         corner_radius: Vector4<f32>,
         color: Color,
     ) {
@@ -118,7 +118,6 @@ impl RectangleRenderer {
             clip_size: clip_size.into(),
             corner_radius: corner_radius.into(),
             color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
-            _dummy0: [0, 0, 0, 0, 0, 0, 0, 0],
         };
 
         render_target

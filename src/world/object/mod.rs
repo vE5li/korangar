@@ -5,7 +5,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::*;
-use crate::world::model::*;
+use crate::world::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 pub struct Object {
@@ -29,25 +29,27 @@ impl Object {
             .render_geometry(render_target, renderer, camera, &self.transform, client_tick);
     }
 
-    pub fn get_bounding_box(&self) -> BoundingBox {
-        self.model.bounding_box
-    }
-
     #[cfg(feature = "debug")]
     pub fn render_bounding_box(
         &self,
-        _render_target: &mut <DeferredRenderer as Renderer>::Target,
-        _renderer: &DeferredRenderer,
-        _camera: &dyn Camera,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
     ) {
-        //self.model.render_bounding_box(render_target, renderer, camera, &self.transform);
+        self.model.render_bounding_box(render_target, renderer, camera, &self.transform);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
-    where
+    pub fn render_marker<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        hovered: bool,
+    ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, self.transform.position, hovered);
+        renderer.render_marker(render_target, camera, marker_identifier, self.transform.position, hovered);
     }
 }

@@ -1,11 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cgmath::{Array, Vector2};
+use cgmath::{Array, Vector2, Vector4};
 use derive_new::new;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::input::UserEvent;
 use crate::interface::{Element, Position, PrototypeWindow, Size, SizeConstraint, StateProvider, Window, WindowCache, *};
 use crate::network::ChatMessage;
 
@@ -42,6 +43,7 @@ pub struct ChatWindow {
     size_constraint: SizeConstraint,
     size: Vector2<f32>,
     messages: Rc<RefCell<Vec<ChatMessage>>>,
+    elements: Vec<ElementCell>,
     cached_message_count: usize,
 }
 
@@ -74,11 +76,56 @@ impl ChatWindow {
 
         let cached_message_count = messages.borrow().len();
 
+        let input_text = Rc::new(RefCell::new(String::new()));
+
+        let button_selector = {
+
+            let input_text = input_text.clone();
+            Box::new(move || !input_text.borrow().is_empty())
+        };
+
+        let button_action = {
+
+            let input_text = input_text.clone();
+            Box::new(move || {
+
+                let message = input_text.borrow_mut().drain(..).collect();
+                UserEvent::SendMessage(message)
+            })
+        };
+
+        let input_action = {
+
+            let input_text = input_text.clone();
+            Box::new(move || {
+                //input_text.borrow().is_empty().not().then_some(ChangeEvent::LeftClickNext)
+                None
+            })
+        };
+
+        let elements: Vec<ElementCell> = vec![
+            cell!(InputField::<30, false>::new(
+                input_text,
+                "write message or command",
+                input_action
+            )) as _,
+            cell!(FormButton::new("send", button_selector, button_action)) as _,
+        ];
+
+        // very imporant: give every element a link to its parent to allow propagation of events such as
+        // scrolling
+        elements.iter().for_each(|element| {
+
+            let weak_element = Rc::downgrade(element);
+            element.borrow_mut().link_back(weak_element, None);
+        });
+
         Self {
             position,
             size_constraint,
             size,
             messages,
+            elements,
             cached_message_count,
         }
     }
@@ -96,10 +143,25 @@ impl Window for ChatWindow {
 
     fn resolve(
         &mut self,
-        _interface_settings: &InterfaceSettings,
-        _theme: &Theme,
-        _avalible_space: Size,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        avalible_space: Size,
     ) -> (Option<&str>, Vector2<f32>, Size) {
+
+        let mut placement_resolver = PlacementResolver::new(
+            PartialSize::new(self.size.x, self.size.y.into()),
+            Vector2::new(0.0, 0.0),
+            *theme.window.border_size,
+            *theme.window.gaps,
+            *interface_settings.scaling,
+        );
+
+        self.elements
+            .iter_mut()
+            .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
+
+        self.validate_position(avalible_space);
+
         (Self::WINDOW_CLASS.into(), self.position, self.size)
     }
 
@@ -124,7 +186,15 @@ impl Window for ChatWindow {
             && absolute_position.x <= self.size.x
             && absolute_position.y <= self.size.y
         {
-            // TODO
+
+            for element in &self.elements {
+                match element.borrow().hovered_element(absolute_position) {
+                    HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
+                    HoverInformation::Element(element) => return HoverInformation::Element(element),
+                    HoverInformation::Missed => {}
+                }
+            }
+
             return HoverInformation::Hovered;
         }
 
@@ -181,25 +251,30 @@ impl Window for ChatWindow {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        _state_provider: &StateProvider,
+        state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &Theme,
-        _hovered_element: Option<&dyn Element>,
-        _focused_element: Option<&dyn Element>,
+        hovered_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
     ) {
+
+        let clip_size = Vector4::new(
+            self.position.x,
+            self.position.y,
+            self.position.x + self.size.x,
+            self.position.y + self.size.y,
+        );
+        let scaled_font_size = *theme.chat.font_size * *interface_settings.scaling;
+        let scaled_shadow_offset = 1.0 * *interface_settings.scaling;
 
         renderer.render_rectangle(
             render_target,
             self.position,
             self.size,
-            self.position + self.size,
+            clip_size,
             *theme.chat.border_radius,
             *theme.chat.background_color,
         );
-
-        let clip_size = self.position + self.size;
-        let scaled_font_size = *theme.chat.font_size * *interface_settings.scaling;
-        let scaled_shadow_offset = 1.0 * *interface_settings.scaling;
 
         for (message_index, message) in self.messages.borrow().iter().enumerate() {
 
@@ -211,6 +286,7 @@ impl Window for ChatWindow {
                 Color::monochrome(0),
                 scaled_font_size,
             );
+
             renderer.render_text(
                 render_target,
                 &message.text,
@@ -220,5 +296,21 @@ impl Window for ChatWindow {
                 scaled_font_size,
             );
         }
+
+        self.elements.iter().for_each(|element| {
+
+            element.borrow().render(
+                render_target,
+                renderer,
+                state_provider,
+                interface_settings,
+                theme,
+                self.position,
+                clip_size,
+                hovered_element,
+                focused_element,
+                false,
+            )
+        });
     }
 }

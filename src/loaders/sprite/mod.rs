@@ -18,6 +18,7 @@ use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {
+    #[hidden_element]
     pub textures: Vec<Texture>,
 }
 

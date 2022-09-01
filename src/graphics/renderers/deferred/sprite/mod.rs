@@ -27,22 +27,41 @@ use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
 use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
 use vulkano::shader::ShaderModule;
+use vulkano::sync::GpuFuture;
 
 use self::vertex_shader::ty::Constants;
 use crate::graphics::*;
+use crate::loaders::TextureLoader;
+use crate::world::MarkerIdentifier;
 
 pub struct SpriteRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
     vertex_buffer: ScreenVertexBuffer,
+    #[cfg(feature = "debug")]
+    object_marker_texture: Texture,
+    #[cfg(feature = "debug")]
+    light_source_marker_texture: Texture,
+    #[cfg(feature = "debug")]
+    sound_source_marker_texture: Texture,
+    #[cfg(feature = "debug")]
+    effect_source_marker_texture: Texture,
+    #[cfg(feature = "debug")]
+    entity_marker_texture: Texture,
     nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
 }
 
 impl SpriteRenderer {
 
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(
+        device: Arc<Device>,
+        subpass: Subpass,
+        viewport: Viewport,
+        #[cfg(feature = "debug")] texture_loader: &mut TextureLoader,
+        #[cfg(feature = "debug")] texture_future: &mut Box<dyn GpuFuture + 'static>,
+    ) -> Self {
 
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
@@ -58,6 +77,17 @@ impl SpriteRenderer {
         ];
 
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+
+        #[cfg(feature = "debug")]
+        let object_marker_texture = texture_loader.get("object.png", texture_future).unwrap();
+        #[cfg(feature = "debug")]
+        let light_source_marker_texture = texture_loader.get("light.png", texture_future).unwrap();
+        #[cfg(feature = "debug")]
+        let sound_source_marker_texture = texture_loader.get("sound.png", texture_future).unwrap();
+        #[cfg(feature = "debug")]
+        let effect_source_marker_texture = texture_loader.get("effect.png", texture_future).unwrap();
+        #[cfg(feature = "debug")]
+        let entity_marker_texture = texture_loader.get("entity.png", texture_future).unwrap();
 
         let nearest_sampler = Sampler::start(device.clone())
             .filter(Filter::Nearest)
@@ -76,6 +106,16 @@ impl SpriteRenderer {
             vertex_shader,
             fragment_shader,
             vertex_buffer,
+            #[cfg(feature = "debug")]
+            object_marker_texture,
+            #[cfg(feature = "debug")]
+            light_source_marker_texture,
+            #[cfg(feature = "debug")]
+            sound_source_marker_texture,
+            #[cfg(feature = "debug")]
+            effect_source_marker_texture,
+            #[cfg(feature = "debug")]
+            entity_marker_texture,
             nearest_sampler,
             linear_sampler,
         }
@@ -179,7 +219,39 @@ impl SpriteRenderer {
         );
     }
 
-    /*pub fn render_direct(&self, builder: &mut CommandBuilder, texture: Texture, screen_position: Vector2<f32>, screen_size: Vector2<f32>, color: Color, smooth: bool) {
-        self.build(builder, texture, screen_position, screen_size, Vector2::new(0.0, 0.0), Vector2::new(1.0, 1.0), color, smooth);
-    }*/
+    #[cfg(feature = "debug")]
+    pub fn render_marker(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        marker_identifier: MarkerIdentifier,
+        screen_position: Vector2<f32>,
+        screen_size: Vector2<f32>,
+        hovered: bool,
+    ) {
+
+        let (texture, color) = match marker_identifier {
+            MarkerIdentifier::Object(..) if hovered => (self.object_marker_texture.clone(), Color::rgb(235, 180, 52)),
+            MarkerIdentifier::Object(..) => (self.object_marker_texture.clone(), Color::rgb(235, 103, 52)),
+            MarkerIdentifier::LightSource(..) if hovered => (self.light_source_marker_texture.clone(), Color::rgb(150, 52, 235)),
+            MarkerIdentifier::LightSource(..) => (self.light_source_marker_texture.clone(), Color::rgb(52, 235, 217)),
+            MarkerIdentifier::SoundSource(..) if hovered => (self.sound_source_marker_texture.clone(), Color::rgb(128, 52, 235)),
+            MarkerIdentifier::SoundSource(..) => (self.sound_source_marker_texture.clone(), Color::rgb(235, 52, 140)),
+            MarkerIdentifier::EffectSource(..) if hovered => (self.effect_source_marker_texture.clone(), Color::rgb(235, 52, 52)),
+            MarkerIdentifier::EffectSource(..) => (self.effect_source_marker_texture.clone(), Color::rgb(52, 235, 156)),
+            MarkerIdentifier::Entity(..) if hovered => (self.entity_marker_texture.clone(), Color::rgb(235, 92, 52)),
+            MarkerIdentifier::Entity(..) => (self.entity_marker_texture.clone(), Color::rgb(189, 235, 52)),
+            _ => panic!(),
+        };
+
+        self.build(
+            render_target,
+            texture,
+            screen_position,
+            screen_size,
+            Vector2::new(0.0, 0.0),
+            Vector2::new(1.0, 1.0),
+            color,
+            true,
+        );
+    }
 }

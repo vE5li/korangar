@@ -10,19 +10,22 @@ pub struct Text {
     color: Color,
     font_size: f32,
     size_constraint: SizeConstraint,
-    #[new(value = "Size::zero()")]
-    cached_size: Size,
-    #[new(value = "Position::zero()")]
-    cached_position: Position,
+    #[new(default)]
+    state: ElementState,
 }
 
 impl Element for Text {
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn get_state(&self) -> &ElementState {
+        &self.state
+    }
 
-        let (size, position) = placement_resolver.allocate(&self.size_constraint);
-        self.cached_size = size.finalize();
-        self.cached_position = position;
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        &mut self.state
+    }
+
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+        self.state.resolve(placement_resolver, &self.size_constraint);
     }
 
     fn render(
@@ -33,21 +36,16 @@ impl Element for Text {
         interface_settings: &InterfaceSettings,
         _theme: &Theme,
         parent_position: Position,
-        clip_size: Size,
+        clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
-        let absolute_position = parent_position + self.cached_position;
-        let clip_size = clip_size.zip(absolute_position + self.cached_size, f32::min);
-        renderer.render_text(
-            render_target,
-            &self.display,
-            absolute_position,
-            clip_size,
-            self.color,
-            self.font_size * *interface_settings.scaling,
-        );
+        let mut renderer = self
+            .state
+            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+
+        renderer.render_text(&self.display, Vector2::zero(), self.color, self.font_size);
     }
 }

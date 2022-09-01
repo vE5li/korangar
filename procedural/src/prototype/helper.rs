@@ -7,6 +7,7 @@ use crate::utils::get_unique_attribute;
 pub fn prototype_element_helper(
     data_struct: DataStruct,
     mut attributes: Vec<Attribute>,
+    name: String,
 ) -> (Vec<TokenStream>, TokenStream, Option<TokenStream>) {
 
     let Fields::Named(named_fields) = data_struct.fields else {
@@ -16,7 +17,7 @@ pub fn prototype_element_helper(
     let window_title = get_unique_attribute(&mut attributes, "window_title")
         .map(|attribute| attribute.parse_args().expect("failed to parse window title"))
         .map(|window_title: LitStr| quote!(#window_title))
-        .unwrap_or(quote!("#ident"));
+        .unwrap_or(quote!(#name));
 
     let window_class = get_unique_attribute(&mut attributes, "window_class")
         .map(|attribute| attribute.parse_args().expect("failed to parse window class"))

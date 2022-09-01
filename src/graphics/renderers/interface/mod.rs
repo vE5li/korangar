@@ -129,7 +129,7 @@ impl InterfaceRenderer {
         texture: Texture,
         position: Vector2<f32>,
         size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         smooth: bool,
     ) {
@@ -145,7 +145,7 @@ impl InterfaceRenderer {
         texture: Texture,
         position: Vector2<f32>,
         size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         column_count: usize,
         cell_index: usize,
@@ -172,7 +172,7 @@ impl InterfaceRenderer {
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         position: Vector2<f32>,
         size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         corner_radius: Vector4<f32>,
         color: Color,
     ) {
@@ -187,32 +187,17 @@ impl InterfaceRenderer {
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         position: Vector2<f32>,
         size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         checked: bool,
     ) {
-        match checked {
 
-            true => self.render_sprite(
-                render_target,
-                self.checked_box_texture.clone(),
-                position,
-                size,
-                clip_size,
-                color,
-                true,
-            ),
+        let texture = match checked {
+            true => self.checked_box_texture.clone(),
+            false => self.unchecked_box_texture.clone(),
+        };
 
-            false => self.render_sprite(
-                render_target,
-                self.unchecked_box_texture.clone(),
-                position,
-                size,
-                clip_size,
-                color,
-                true,
-            ),
-        }
+        self.render_sprite(render_target, texture, position, size, clip_size, color, true);
     }
 
     pub fn render_expand_arrow(
@@ -220,32 +205,17 @@ impl InterfaceRenderer {
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         position: Vector2<f32>,
         size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         expanded: bool,
     ) {
-        match expanded {
 
-            true => self.render_sprite(
-                render_target,
-                self.expanded_arrow_texture.clone(),
-                position,
-                size,
-                clip_size,
-                color,
-                true,
-            ),
+        let texture = match expanded {
+            true => self.expanded_arrow_texture.clone(),
+            false => self.collapsed_arrow_texture.clone(),
+        };
 
-            false => self.render_sprite(
-                render_target,
-                self.collapsed_arrow_texture.clone(),
-                position,
-                size,
-                clip_size,
-                color,
-                true,
-            ),
-        }
+        self.render_sprite(render_target, texture, position, size, clip_size, color, true);
     }
 
     pub fn render_text(
@@ -253,7 +223,7 @@ impl InterfaceRenderer {
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         text: &str,
         mut position: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
         font_size: f32,
     ) {
@@ -275,7 +245,7 @@ impl InterfaceRenderer {
         }
     }
 
-    /*pub fn render_text_new(&self, text: &str, position: Vector2<f32>, clip_size: Vector2<f32>, color: Color, font_size: f32) {
+    /*pub fn render_text_new(&self, text: &str, position: Vector2<f32>, clip_size: Vector4<f32>, color: Color, font_size: f32) {
         self.text_renderer.render(&mut current_frame.builder, self.window_size, position, Vector2::from_value(font_size), clip_size, color);
     }*/
 
@@ -285,7 +255,7 @@ impl InterfaceRenderer {
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         position: Vector2<f32>,
         size: Vector2<f32>,
-        clip_size: Vector2<f32>,
+        clip_size: Vector4<f32>,
         color: Color,
     ) {
 

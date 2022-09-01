@@ -3,6 +3,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::*;
+use crate::world::MarkerIdentifier;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 #[window_title("Light Source")]
@@ -29,10 +30,16 @@ impl LightSource {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
-    where
+    pub fn render_marker<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        hovered: bool,
+    ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, self.position, hovered);
+        renderer.render_marker(render_target, camera, marker_identifier, self.position, hovered);
     }
 }

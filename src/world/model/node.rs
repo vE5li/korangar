@@ -61,7 +61,9 @@ impl BoundingBox {
 pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
+    #[hidden_element]
     pub vertex_buffer: ModelVertexBuffer,
+    #[hidden_element]
     pub textures: Vec<Texture>,
     pub child_nodes: Vec<Node>,
     pub rotation_keyframes: Vec<RotationKeyframeData>,

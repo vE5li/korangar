@@ -7,15 +7,21 @@ use procedural::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 #[cfg(feature = "debug")]
 use vulkano::device::Device;
+use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
 
 use crate::database::Database;
-use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, MarkerRenderer, Renderer};
+#[cfg(feature = "debug")]
+use crate::graphics::MarkerRenderer;
+use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{ModelVertexBuffer, NativeModelVertex};
-use crate::loaders::{ActionLoader, Actions, Sprite, SpriteLoader};
+use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
+use crate::loaders::{ActionLoader, Actions, AnimationState, Sprite, SpriteLoader};
 use crate::network::{CharacterInformation, EntityData, StatusType};
 use crate::world::Map;
+#[cfg(feature = "debug")]
+use crate::world::MarkerIdentifier;
 
 pub enum ResourceState<T> {
     Avalible(T),
@@ -40,9 +46,11 @@ pub struct Movement {
     starting_timestamp: u32,
     #[cfg(feature = "debug")]
     #[new(default)]
+    #[hidden_element]
     pub steps_vertex_buffer: Option<ModelVertexBuffer>,
 }
 
+#[derive(PrototypeElement)]
 pub struct Common {
     pub entity_id: u32,
     pub job_id: usize,
@@ -54,7 +62,10 @@ pub struct Common {
     pub sprite: Arc<Sprite>,
     pub actions: Arc<Actions>,
     pub position: Vector3<f32>,
+    #[hidden_element]
     details: ResourceState<String>,
+    #[hidden_element]
+    animation_state: AnimationState,
 }
 
 impl Common {
@@ -81,6 +92,7 @@ impl Common {
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
         let details = ResourceState::Unavalible;
+        let animation_state = AnimationState { action: 0 };
 
         Self {
             position,
@@ -93,6 +105,7 @@ impl Common {
             sprite,
             actions,
             details,
+            animation_state,
         }
     }
 
@@ -408,28 +421,40 @@ impl Common {
         T: Renderer + EntityRenderer,
     {
 
+        let camera_direction = camera.get_camera_direction();
+        let (texture, mirror) = self.actions.render(&self.sprite, &self.animation_state, camera_direction);
+        let texture_height = (texture.image().dimensions().height() as f32 / 10.0) * 0.2;
+
         renderer.render_entity(
             render_target,
             camera,
-            self.sprite.textures[0].clone(),
+            texture,
             self.position,
-            Vector3::new(0.0, 3.0, 0.0),
+            Vector3::new(0.0, texture_height, 0.0),
             Vector2::from_value(1.0),
             Vector2::new(1, 1),
             Vector2::new(0, 0),
+            mirror,
             self.entity_id as usize,
         );
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
-    where
+    pub fn render_marker<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        hovered: bool,
+    ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, self.position, hovered);
+        renderer.render_marker(render_target, camera, marker_identifier, self.position, hovered);
     }
 }
 
+#[derive(PrototypeWindow)]
 pub struct Player {
     common: Common,
     pub spell_points: usize,
@@ -533,6 +558,7 @@ impl Player {
     }
 }
 
+#[derive(PrototypeWindow)]
 pub struct Npc {
     common: Common,
 }
@@ -588,6 +614,8 @@ impl Npc {
     }
 }
 
+// TODO:
+//#[derive(PrototypeWindow)]
 pub enum Entity {
     Player(Player),
     Npc(Npc),
@@ -672,11 +700,18 @@ impl Entity {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, hovered: bool)
-    where
+    pub fn render_marker<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        hovered: bool,
+    ) where
         T: Renderer + MarkerRenderer,
     {
-        self.get_common().render_marker(render_target, renderer, camera, hovered);
+        self.get_common()
+            .render_marker(render_target, renderer, camera, marker_identifier, hovered);
     }
 
     pub fn render_status(
@@ -689,6 +724,21 @@ impl Entity {
         match self {
             Self::Player(player) => player.render_status(render_target, renderer, camera, window_size),
             Self::Npc(npc) => npc.render_status(render_target, renderer, camera, window_size),
+        }
+    }
+}
+
+impl PrototypeWindow for Entity {
+
+    fn to_window(
+        &self,
+        window_cache: &WindowCache,
+        interface_settings: &InterfaceSettings,
+        avalible_space: Size,
+    ) -> Box<dyn Window + 'static> {
+        match self {
+            Entity::Player(player) => player.to_window(window_cache, interface_settings, avalible_space),
+            Entity::Npc(npc) => npc.to_window(window_cache, interface_settings, avalible_space),
         }
     }
 }

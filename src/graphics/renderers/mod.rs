@@ -31,6 +31,7 @@ use self::picker::PickerSubrenderer;
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
 use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
+use crate::world::MarkerIdentifier;
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     color_op: BlendOp::Add,
@@ -89,6 +90,7 @@ pub trait EntityRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
+        mirror: bool,
         entity_id: usize,
     ) where
         Self: Renderer;
@@ -98,11 +100,8 @@ pub trait EntityRenderer {
 pub enum PickerTarget {
     Tile(u16, u16),
     Entity(u32),
-    /*ObjectMarker(u16),
-    LightSoorceMarker(u16),
-    SoundSourceMarker(u16),
-    EffectSourceMarker(u16),
-    ParticleMarker(u16, u8),*/
+    #[cfg(feature = "debug")]
+    Marker(MarkerIdentifier),
 }
 
 impl From<u32> for PickerTarget {
@@ -114,6 +113,31 @@ impl From<u32> for PickerTarget {
             let x = ((data >> 16) as u16) ^ (1 << 15);
             let y = data as u16;
             return Self::Tile(x, y);
+        }
+
+        #[cfg(feature = "debug")]
+        if data >> 24 == 10 {
+            return Self::Marker(MarkerIdentifier::Object(data as usize & 0xfff));
+        }
+
+        #[cfg(feature = "debug")]
+        if data >> 24 == 11 {
+            return Self::Marker(MarkerIdentifier::LightSource(data as usize & 0xfff));
+        }
+
+        #[cfg(feature = "debug")]
+        if data >> 24 == 12 {
+            return Self::Marker(MarkerIdentifier::SoundSource(data as usize & 0xfff));
+        }
+
+        #[cfg(feature = "debug")]
+        if data >> 24 == 13 {
+            return Self::Marker(MarkerIdentifier::EffectSource(data as usize & 0xfff));
+        }
+
+        #[cfg(feature = "debug")]
+        if data >> 24 == 14 {
+            return Self::Marker(MarkerIdentifier::Entity(data as usize & 0xfff));
         }
 
         let entity_id = match data >> 24 == 5 {
@@ -141,14 +165,31 @@ impl From<PickerTarget> for u32 {
                 true => entity_id | (5 << 24),
                 false => entity_id,
             },
+
+            #[cfg(feature = "debug")]
+            PickerTarget::Marker(marker_identifier) => match marker_identifier {
+                MarkerIdentifier::Object(index) => (10 << 24) | (index as u32 & 0xfff),
+                MarkerIdentifier::LightSource(index) => (11 << 24) | (index as u32 & 0xfff),
+                MarkerIdentifier::SoundSource(index) => (12 << 24) | (index as u32 & 0xfff),
+                MarkerIdentifier::EffectSource(index) => (13 << 24) | (index as u32 & 0xfff),
+                MarkerIdentifier::Entity(index) => (14 << 24) | (index as u32 & 0xfff),
+                _ => panic!(),
+            },
         }
     }
 }
 
+#[cfg(feature = "debug")]
 pub trait MarkerRenderer {
 
-    fn render_marker(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, position: Vector3<f32>, hovered: bool)
-    where
+    fn render_marker(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        marker_identifier: MarkerIdentifier,
+        position: Vector3<f32>,
+        hovered: bool,
+    ) where
         Self: Renderer;
 }
 
@@ -429,6 +470,7 @@ impl PickerRenderTarget {
             .unwrap();
 
         let buffer = unsafe {
+
             CpuAccessibleBuffer::uninitialized_array(
                 device.clone(),
                 dimensions[0] as u64 * dimensions[1] as u64,
@@ -577,10 +619,6 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
-    }
-
-    pub fn unbind_subrenderer(&mut self) {
-        self.bound_subrenderer = None;
     }
 
     pub fn finish(&mut self) {

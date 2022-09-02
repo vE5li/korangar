@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use cgmath::Matrix4;
 use cgmath::Vector3;
 use derive_new::new;
 use procedural::*;
@@ -16,7 +17,6 @@ pub struct Object {
 }
 
 impl Object {
-
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.transform.position += offset;
     }
@@ -27,6 +27,14 @@ impl Object {
     {
         self.model
             .render_geometry(render_target, renderer, camera, &self.transform, client_tick);
+    }
+
+    pub fn get_world_matrix(&self, client_tick: u32) -> Matrix4<f32> {
+        self.model.get_world_matrix(&self.transform, client_tick)
+    }
+
+    pub fn get_bounding_box(&self) -> BoundingBox {
+        self.model.get_bounding_box()
     }
 
     #[cfg(feature = "debug")]

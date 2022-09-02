@@ -1,9 +1,12 @@
+use std::ops::Mul;
+
 use cgmath::{Array, Matrix4, SquareMatrix, Vector3, Vector4};
 use derive_new::new;
 use procedural::*;
 
 use crate::graphics::{Camera, GeometryRenderer, ModelVertexBuffer, Renderer, Texture, Transform};
 use crate::loaders::RotationKeyframeData;
+use crate::system::multiply_matrix4_and_vector3;
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]
 pub struct BoundingBox {
@@ -23,13 +26,8 @@ impl BoundingBox {
 
         for position in vertex_positions {
 
-            smallest.x = smallest.x.min(position.x);
-            smallest.y = smallest.y.min(position.y);
-            smallest.z = smallest.z.min(position.z);
-
-            biggest.x = biggest.x.max(position.x);
-            biggest.y = biggest.y.max(position.y);
-            biggest.z = biggest.z.max(position.z);
+            smallest = smallest.zip(position, f32::min);
+            biggest = biggest.zip(position, f32::max);
         }
 
         Self { smallest, biggest }
@@ -52,8 +50,42 @@ impl BoundingBox {
 
     pub fn extend(&mut self, other: &Self) {
 
-        self.biggest = self.biggest.zip(other.biggest, f32::max);
         self.smallest = self.smallest.zip(other.smallest, f32::min);
+        self.biggest = self.biggest.zip(other.biggest, f32::max);
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct AxisAlignedBox {
+    pub corners: [Vector3<f32>; 8],
+}
+
+impl From<BoundingBox> for AxisAlignedBox {
+
+    fn from(bounding_box: BoundingBox) -> Self {
+
+        let corners = [
+            Vector3::new(bounding_box.smallest.x, bounding_box.smallest.y, bounding_box.smallest.z),
+            Vector3::new(bounding_box.smallest.x, bounding_box.smallest.y, bounding_box.biggest.z),
+            Vector3::new(bounding_box.smallest.x, bounding_box.biggest.y, bounding_box.smallest.z),
+            Vector3::new(bounding_box.smallest.x, bounding_box.biggest.y, bounding_box.biggest.z),
+            Vector3::new(bounding_box.biggest.x, bounding_box.smallest.y, bounding_box.smallest.z),
+            Vector3::new(bounding_box.biggest.x, bounding_box.smallest.y, bounding_box.biggest.z),
+            Vector3::new(bounding_box.biggest.x, bounding_box.biggest.y, bounding_box.smallest.z),
+            Vector3::new(bounding_box.biggest.x, bounding_box.biggest.y, bounding_box.biggest.z),
+        ];
+
+        Self { corners }
+    }
+}
+
+impl Mul<Matrix4<f32>> for AxisAlignedBox {
+
+    type Output = Self;
+
+    fn mul(self, rhs: Matrix4<f32>) -> Self::Output {
+        let corners = self.corners.map(|corner| multiply_matrix4_and_vector3(&rhs, corner));
+        Self { corners }
     }
 }
 

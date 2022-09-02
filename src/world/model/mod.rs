@@ -1,10 +1,11 @@
 mod node;
 mod shading;
 
+use cgmath::Matrix4;
 use derive_new::new;
 use procedural::*;
 
-pub use self::node::{BoundingBox, Node};
+pub use self::node::{BoundingBox, AxisAlignedBox, Node};
 pub use self::shading::ShadingType;
 use crate::graphics::{Camera, DeferredRenderer, GeometryRenderer, Renderer, Transform};
 #[cfg(feature = "debug")]
@@ -19,7 +20,6 @@ pub struct Model {
 }
 
 impl Model {
-
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,
@@ -32,6 +32,14 @@ impl Model {
     {
         self.root_node
             .render_geometry(render_target, renderer, camera, root_transform, client_tick);
+    }
+
+    pub fn get_world_matrix(&self, transform: &Transform, client_tick: u32) -> Matrix4<f32> {
+        self.root_node.world_matrix(transform, client_tick)
+    }
+
+    pub fn get_bounding_box(&self) -> BoundingBox {
+        self.bounding_box
     }
 
     #[cfg(feature = "debug")]

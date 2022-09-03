@@ -81,5 +81,5 @@ macro_rules! choose_physical_device {
 pub fn multiply_matrix4_and_vector3(matrix: &Matrix4<f32>, vector: Vector3<f32>) -> Vector3<f32> {
 
     let adjusted_vector = matrix * vector.extend(1.0);
-    adjusted_vector.truncate()
+    (adjusted_vector / adjusted_vector.w).truncate()
 }

@@ -967,6 +967,8 @@ fn main() {
                             hovered_marker_identifier,
                         );
 
+                        map.render_bounding(screen_target, &deferred_renderer, current_camera, client_tick);
+
                         #[cfg(feature = "debug")]
                         if let Some(marker_identifier) = hovered_marker_identifier {
                             map.render_marker_box(screen_target, &deferred_renderer, current_camera, marker_identifier);

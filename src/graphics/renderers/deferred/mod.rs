@@ -424,13 +424,14 @@ impl DeferredRenderer {
         camera: &dyn Camera,
         transform: &Transform,
         bounding_box: &BoundingBox,
+        color: Color,
     ) {
 
         if render_target.bind_subrenderer(DeferredSubrenderer::BoundingBox) {
             self.box_renderer.bind_pipeline(render_target, camera);
         }
 
-        self.box_renderer.render(render_target, camera, transform, bounding_box);
+        self.box_renderer.render(render_target, camera, transform, bounding_box, color);
     }
 
     #[cfg(feature = "debug")]

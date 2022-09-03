@@ -178,6 +178,7 @@ impl BoxRenderer {
         camera: &dyn Camera,
         transform: &Transform,
         bounding_box: &BoundingBox,
+        color: Color,
     ) {
 
         let layout = self.pipeline.layout().clone();
@@ -198,6 +199,7 @@ impl BoxRenderer {
 
         let constants = Constants {
             world: world_matrix.into(),
+            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
         };
 
         render_target

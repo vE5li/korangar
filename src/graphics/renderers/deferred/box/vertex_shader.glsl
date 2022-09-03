@@ -8,6 +8,7 @@ layout(set = 0, binding = 0) uniform Matrices {
 
 layout(push_constant) uniform Constants {
     mat4 world;
+    vec3 color;
 } constants;
 
 void main() {

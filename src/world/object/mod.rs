@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::Matrix4;
-use cgmath::Vector3;
+use cgmath::{Matrix4, Vector3};
 use derive_new::new;
 use procedural::*;
 
@@ -17,6 +16,7 @@ pub struct Object {
 }
 
 impl Object {
+
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.transform.position += offset;
     }

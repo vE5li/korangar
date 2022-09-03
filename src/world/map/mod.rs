@@ -15,11 +15,13 @@ use crate::world::*;
 
 // MOVE
 fn get_value(day_timer: f32, offset: f32, p: f32) -> f32 {
+
     let sin = (day_timer + offset).sin();
     sin.abs().powf(2.0 - p) / sin
 }
 
 fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
+
     let red = get_value(day_timer, offset, ps[0]);
     let green = get_value(day_timer, offset, ps[1]);
     let blue = get_value(day_timer, offset, ps[2]);
@@ -27,6 +29,7 @@ fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
 }
 
 fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
+
     Color::rgb(
         (base_color.red_f32() * channels.x) as u8,
         (base_color.green_f32() * channels.y) as u8,
@@ -35,18 +38,21 @@ fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
 }
 
 fn get_ambient_light_color(ambient_color: Color, day_timer: f32) -> Color {
+
     let sun_offset = 0.0;
     let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.35 + Vector3::from_value(0.65)) * 255.0;
     color_from_channel(ambient_color, ambient_channels)
 }
 
 fn get_directional_light_color_intensity(directional_color: Color, intensity: f32, day_timer: f32) -> (Color, f32) {
+
     let sun_offset = 0.0;
     let moon_offset = std::f32::consts::PI;
 
     let directional_channels = get_channels(day_timer, sun_offset, [0.8, 0.0, 0.25]) * 255.0;
 
     if directional_channels.x.is_sign_positive() {
+
         let directional_color = color_from_channel(directional_color, directional_channels);
         return (directional_color, f32::min(intensity * 1.2, 1.0));
     }
@@ -58,6 +64,7 @@ fn get_directional_light_color_intensity(directional_color: Color, intensity: f3
 }
 
 pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
+
     let sun_offset = -std::f32::consts::FRAC_PI_2;
     let c = (day_timer + sun_offset).cos();
     let s = (day_timer + sun_offset).sin();
@@ -110,6 +117,7 @@ pub enum MarkerIdentifier {
 }
 
 impl MarkerIdentifier {
+
     pub const SIZE: f32 = 1.5;
 }
 
@@ -142,6 +150,7 @@ pub struct Map {
 }
 
 impl Map {
+
     pub fn x_in_bounds(&self, x: usize) -> bool {
         x <= self.width
     }
@@ -151,6 +160,7 @@ impl Map {
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Vector3<f32> {
+
         let height = self.get_tile(position).average_height();
         Vector3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
@@ -163,6 +173,7 @@ impl Map {
     where
         T: Renderer + GeometryRenderer,
     {
+
         renderer.render_geometry(
             render_target,
             camera,
@@ -176,14 +187,18 @@ impl Map {
     where
         T: Renderer + GeometryRenderer,
     {
+
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
 
+        let mut count = 0;
+
         for object in &self.objects {
+
             let world_matrix = object.get_world_matrix(client_tick);
             let bounding_box = object.get_bounding_box();
 
             let axis_aligned_box = AxisAlignedBox::from(bounding_box);
-            let transformed_box = axis_aligned_box * (view_matrix * world_matrix);
+            let transformed_box = axis_aligned_box * (projection_matrix * view_matrix * world_matrix);
 
             let bounding_box = BoundingBox::new(transformed_box.corners);
 
@@ -194,9 +209,66 @@ impl Map {
                 && bounding_box.biggest.z > -1.0
                 && bounding_box.smallest.z < 1.0
             {
+
+                count += 1;
                 object.render_geometry(render_target, renderer, camera, client_tick);
             }
         }
+
+        //println!("{count}");
+    }
+
+    pub fn render_bounding(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        client_tick: u32,
+    ) {
+
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+
+        for object in &self.objects {
+
+            let world_matrix = object.get_world_matrix(client_tick);
+            let bounding_box = object.get_bounding_box();
+
+            let axis_aligned_box = AxisAlignedBox::from(bounding_box);
+            let transformed_box = axis_aligned_box * (projection_matrix * view_matrix * world_matrix);
+
+            let bounding_box = BoundingBox::new(transformed_box.corners);
+
+            let color = match bounding_box.biggest.x > -1.0
+                && bounding_box.smallest.x < 1.0
+                && bounding_box.biggest.y > -1.0
+                && bounding_box.smallest.y < 1.0
+                && bounding_box.biggest.z > -1.0
+                && bounding_box.smallest.z < 1.0
+            {
+                true => Color::rgb(255, 255, 0),
+                false => Color::rgb(255, 0, 255),
+            };
+
+            renderer.render_bounding_box(
+                render_target,
+                camera,
+                &Transform::position(bounding_box.center()),
+                &bounding_box,
+                color,
+            );
+        }
+
+        let bounding_box = BoundingBox {
+            smallest: Vector3::from_value(-1.0),
+            biggest: Vector3::from_value(1.0),
+        };
+        renderer.render_bounding_box(
+            render_target,
+            camera,
+            &Transform::position(bounding_box.center()),
+            &bounding_box,
+            Color::rgb(0, 255, 0),
+        );
     }
 
     pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {
@@ -216,6 +288,7 @@ impl Map {
     }
 
     pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
+
         let ambient_color = get_ambient_light_color(self.light_settings.ambient_color, day_timer);
         renderer.ambient_light(render_target, ambient_color);
     }
@@ -229,6 +302,7 @@ impl Map {
         light_matrix: Matrix4<f32>,
         day_timer: f32,
     ) {
+
         let light_direction = get_light_direction(day_timer);
         let (directional_color, intensity) = get_directional_light_color_intensity(
             self.light_settings.diffuse_color,
@@ -253,6 +327,7 @@ impl Map {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
+
         self.light_sources
             .iter()
             .for_each(|light_source| light_source.render_light(render_target, renderer, camera));
@@ -296,8 +371,11 @@ impl Map {
     ) where
         T: Renderer + MarkerRenderer,
     {
+
         if render_settings.show_object_markers {
+
             self.objects.iter().enumerate().for_each(|(index, object)| {
+
                 let marker_identifier = MarkerIdentifier::Object(index);
 
                 object.render_marker(
@@ -311,7 +389,9 @@ impl Map {
         }
 
         if render_settings.show_light_markers {
+
             self.light_sources.iter().enumerate().for_each(|(index, light_source)| {
+
                 let marker_identifier = MarkerIdentifier::LightSource(index);
 
                 light_source.render_marker(
@@ -325,7 +405,9 @@ impl Map {
         }
 
         if render_settings.show_sound_markers {
+
             self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| {
+
                 let marker_identifier = MarkerIdentifier::SoundSource(index);
 
                 sound_source.render_marker(
@@ -339,7 +421,9 @@ impl Map {
         }
 
         if render_settings.show_effect_markers {
+
             self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| {
+
                 let marker_identifier = MarkerIdentifier::EffectSource(index);
 
                 effect_source.render_marker(
@@ -353,7 +437,9 @@ impl Map {
         }
 
         if render_settings.show_entity_markers {
+
             entities.iter().enumerate().for_each(|(index, entity)| {
+
                 let marker_identifier = MarkerIdentifier::Entity(index);
 
                 entity.render_marker(

@@ -84,6 +84,7 @@ impl Mul<Matrix4<f32>> for AxisAlignedBox {
     type Output = Self;
 
     fn mul(self, rhs: Matrix4<f32>) -> Self::Output {
+
         let corners = self.corners.map(|corner| multiply_matrix4_and_vector3(&rhs, corner));
         Self { corners }
     }

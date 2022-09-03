@@ -5,8 +5,10 @@ use cgmath::Matrix4;
 use derive_new::new;
 use procedural::*;
 
-pub use self::node::{BoundingBox, AxisAlignedBox, Node};
+pub use self::node::{AxisAlignedBox, BoundingBox, Node};
 pub use self::shading::ShadingType;
+#[cfg(feature = "debug")]
+use crate::graphics::Color;
 use crate::graphics::{Camera, DeferredRenderer, GeometryRenderer, Renderer, Transform};
 #[cfg(feature = "debug")]
 use crate::loaders::ModelData;
@@ -20,6 +22,7 @@ pub struct Model {
 }
 
 impl Model {
+
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,
@@ -50,6 +53,6 @@ impl Model {
         camera: &dyn Camera,
         root_transform: &Transform,
     ) {
-        renderer.render_bounding_box(render_target, camera, &root_transform, &self.bounding_box);
+        renderer.render_bounding_box(render_target, camera, &root_transform, &self.bounding_box, Color::monochrome(0));
     }
 }

@@ -18,6 +18,7 @@ pub trait ElementDisplay {
 
 // workaround for not having negative trait bounds or better specialization
 auto trait NoDisplay {}
+impl !NoDisplay for f32 {}
 impl<T> !NoDisplay for Vector2<T> {}
 impl<T> !NoDisplay for Vector3<T> {}
 impl<T> !NoDisplay for Vector4<T> {}
@@ -34,17 +35,24 @@ where
     }
 }
 
+impl ElementDisplay for f32 {
+
+    fn display(&self) -> String {
+        format!("{:.1}", self)
+    }
+}
+
 impl<T: ElementDisplay> ElementDisplay for Vector2<T> {
 
     fn display(&self) -> String {
-        format!("{:.1}, {:.1}", self.x.display(), self.y.display())
+        format!("{}, {}", self.x.display(), self.y.display())
     }
 }
 
 impl<T: ElementDisplay> ElementDisplay for Vector3<T> {
 
     fn display(&self) -> String {
-        format!("{:.1}, {:.1}, {:.1}", self.x.display(), self.y.display(), self.z.display())
+        format!("{}, {}, {}", self.x.display(), self.y.display(), self.z.display())
     }
 }
 
@@ -53,7 +61,7 @@ impl<T: ElementDisplay> ElementDisplay for Vector4<T> {
     fn display(&self) -> String {
 
         format!(
-            "{:.1}, {:.1}, {:.1}, {:.1}",
+            "{}, {}, {}, {}",
             self.x.display(),
             self.y.display(),
             self.z.display(),

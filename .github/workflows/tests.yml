@@ -1,10 +1,10 @@
 on: [push]
 
-name: test
+name: Tests
 
 jobs:
   check:
-    name: Test
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

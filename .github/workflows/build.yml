@@ -1,6 +1,6 @@
 on: [push]
 
-name: build
+name: Build
 
 jobs:
   check:

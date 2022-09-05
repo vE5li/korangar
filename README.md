@@ -8,14 +8,6 @@
 
 Korangar is a Ragnarok Online client written in Rust using Vulkan. It features real-time lighting with drop shadows and a dynamic day-night cycle. It also adds a completely new and very customizable user interface and removes limitations of the official client, such as the fixed aspect ratio.
 
-Here are some pictures of the current progress:
-
-_Geffen_
-<img align="left" alt="" src=".github/geffen.jpg" />
-
-_Lighthalzen_
-<img align="left" alt="" src=".github/lighthalzen.jpg" />
-
 # Running
 
 *Disclaimer*: Korangar is still very early in development. There are a ton of issues, and it is everything but feature-complete. It's poorly optimized, so you will need a good device to run it. It also uses some Vulkan features without checking for support first, so i doubt that it will even launch on many older cards.

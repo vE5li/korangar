@@ -1,12 +1,15 @@
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{Array, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3, Vector4};
+use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Rad, SquareMatrix, Vector2, Vector3, Vector4};
 
 use super::{Camera, SmoothedValue};
 use crate::graphics::Transform;
 
 const ZOOM_SPEED: f32 = 2.0;
 const ROTATION_SPEED: f32 = 0.02;
+const MINIMUM_ZOOM: f32 = 150.0;
+const MAXIMUM_ZOOM: f32 = 600.0;
+const DEFAULT_ZOOM: f32 = 400.0;
 
 pub struct PlayerCamera {
     focus_position: Point3<f32>,
@@ -32,7 +35,7 @@ impl PlayerCamera {
             world_to_screen_matrix: Matrix4::from_value(0.0),
             screen_to_world_matrix: Matrix4::from_value(0.0),
             view_angle: SmoothedValue::new(FRAC_PI_2, 0.01, 15.0),
-            zoom: SmoothedValue::new(400.0, 0.01, 5.0),
+            zoom: SmoothedValue::new(DEFAULT_ZOOM, 0.01, 5.0),
             aspect_ratio: 0.0,
         }
     }
@@ -42,8 +45,7 @@ impl PlayerCamera {
     }
 
     pub fn soft_zoom(&mut self, zoom_factor: f32) {
-        self.zoom.move_desired(zoom_factor * ZOOM_SPEED);
-        // clamp selection
+        self.zoom.move_desired_clamp(zoom_factor * ZOOM_SPEED, MINIMUM_ZOOM, MAXIMUM_ZOOM);
     }
 
     pub fn soft_rotate(&mut self, rotation: f32) {
@@ -126,24 +128,13 @@ impl Camera for PlayerCamera {
         let right_vector = self.look_up_vector.cross(direction).normalize();
         let up_vector = direction.cross(right_vector).normalize();
 
-        let rotation_matrix = Matrix4::new(
-            right_vector.x,
-            right_vector.y,
-            right_vector.z,
-            0.0,
-            up_vector.x,
-            up_vector.y,
-            up_vector.z,
-            0.0,
-            direction.x,
-            direction.y,
-            direction.z,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
+        let rotation_matrix = Matrix4::from_cols(
+            right_vector.extend(0.0),
+            up_vector.extend(0.0),
+            direction.extend(0.0),
+            Vector3::from_value(0.0).extend(1.0),
         );
+
         let translation_matrix = Matrix4::from_translation(position);
         let origin_matrix = Matrix4::from_translation(origin);
         let scale_matrix = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
@@ -175,9 +166,7 @@ impl Camera for PlayerCamera {
     }
 
     fn distance_to(&self, position: Vector3<f32>) -> f32 {
-
-        let delta = self.camera_position() - position;
-        delta.map(|component| component * component).sum().sqrt()
+        self.camera_position().distance(Point3::from_vec(position))
     }
 
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32> {

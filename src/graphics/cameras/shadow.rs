@@ -1,4 +1,4 @@
-use cgmath::{Array, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4};
+use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, SquareMatrix, Vector2, Vector3, Vector4};
 
 use super::Camera;
 use crate::graphics::Transform;
@@ -104,24 +104,13 @@ impl Camera for ShadowCamera {
         let right_vector = self.look_up_vector.cross(direction).normalize();
         let up_vector = direction.cross(right_vector).normalize();
 
-        let rotation_matrix = Matrix4::new(
-            right_vector.x,
-            right_vector.y,
-            right_vector.z,
-            0.0,
-            up_vector.x,
-            up_vector.y,
-            up_vector.z,
-            0.0,
-            direction.x,
-            direction.y,
-            direction.z,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
+        let rotation_matrix = Matrix4::from_cols(
+            right_vector.extend(0.0),
+            up_vector.extend(0.0),
+            direction.extend(0.0),
+            Vector3::from_value(0.0).extend(1.0),
         );
+
         let translation_matrix = Matrix4::from_translation(position);
         let origin_matrix = Matrix4::from_translation(origin);
         let scale_matrix = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
@@ -153,9 +142,7 @@ impl Camera for ShadowCamera {
     }
 
     fn distance_to(&self, position: Vector3<f32>) -> f32 {
-
-        let delta = self.camera_position() - position;
-        delta.map(|component| component * component).sum().sqrt()
+        self.camera_position().distance(Point3::from_vec(position))
     }
 
     fn get_screen_to_world_matrix(&self) -> Matrix4<f32> {

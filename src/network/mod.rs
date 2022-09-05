@@ -1081,13 +1081,6 @@ struct UpdateStatusPacket3 {
 }
 
 #[derive(Debug, Packet)]
-#[header(0xb0, 0x00)]
-struct UpdateStatusPacket4 {
-    #[length_hint(6)]
-    pub status_type: StatusType,
-}
-
-#[derive(Debug, Packet)]
 #[header(0x3a, 0x01)]
 struct UpdateAttackRangePacket {
     pub attack_range: u16,
@@ -2405,8 +2398,6 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = UpdateStatusPacket2::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateStatus(packet.status_type));
                 } else if let Ok(packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) {
-                    events.push(NetworkEvent::UpdateStatus(packet.status_type));
-                } else if let Ok(packet) = UpdateStatusPacket4::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateStatus(packet.status_type));
                 } else if let Ok(_packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) {

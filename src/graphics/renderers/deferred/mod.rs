@@ -536,6 +536,8 @@ impl MarkerRenderer for DeferredRenderer {
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
 
             let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
+
+            render_target.unbind_subrenderer();
             self.sprite_renderer
                 .render_marker(render_target, marker_identifier, screen_position, screen_size, hovered);
         }

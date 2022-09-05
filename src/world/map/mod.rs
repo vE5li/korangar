@@ -1,8 +1,7 @@
 mod tile;
 
-use std::sync::Arc;
-
-use cgmath::{Array, Matrix4, SquareMatrix, Vector2, Vector3};
+use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
 use procedural::*;
 
@@ -183,92 +182,81 @@ impl Map {
         );
     }
 
-    pub fn render_objects<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
-    where
+    pub fn render_objects<T>(
+        &self,
+        render_target: &mut T::Target,
+        renderer: &T,
+        camera: &dyn Camera,
+        client_tick: u32,
+        #[cfg(feature = "debug")] frustum_culling: bool,
+    ) where
         T: Renderer + GeometryRenderer,
     {
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-
-        let mut count = 0;
+        let frustum = Frustum::from_matrix4(projection_matrix * view_matrix).unwrap();
+        let standard_box = OrientedBox::default();
 
         for object in &self.objects {
 
-            let world_matrix = object.get_world_matrix(client_tick);
-            let bounding_box = object.get_bounding_box();
+            #[cfg(feature = "debug")]
+            if !frustum_culling {
 
-            let axis_aligned_box = AxisAlignedBox::from(bounding_box);
-            let transformed_box = axis_aligned_box * (projection_matrix * view_matrix * world_matrix);
-
-            let bounding_box = BoundingBox::new(transformed_box.corners);
-
-            if bounding_box.biggest.x > -1.0
-                && bounding_box.smallest.x < 1.0
-                && bounding_box.biggest.y > -1.0
-                && bounding_box.smallest.y < 1.0
-                && bounding_box.biggest.z > -1.0
-                && bounding_box.smallest.z < 1.0
-            {
-
-                count += 1;
                 object.render_geometry(render_target, renderer, camera, client_tick);
+                continue;
             }
-        }
 
-        //println!("{count}");
+            let bounding_box_matrix = object.get_bounding_box_matrix();
+            let oriented_bounding_box = standard_box.transform(bounding_box_matrix);
+            let bounding_box = BoundingBox::new(oriented_bounding_box.corners);
+            let collision_bounding_box = Aabb3 {
+                min: Point3::from_vec(bounding_box.smallest),
+                max: Point3::from_vec(bounding_box.biggest),
+            };
+            let culled = matches!(frustum.contains(&collision_bounding_box), Relation::Out);
+
+            if !culled {
+                object.render_geometry(render_target, renderer, camera, client_tick);
+            };
+        }
     }
 
+    #[cfg(feature = "debug")]
     pub fn render_bounding(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        client_tick: u32,
+        player_camera: &dyn Camera,
+        frustum_culling: bool,
     ) {
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let (view_matrix, projection_matrix) = player_camera.view_projection_matrices();
+        let frustum = Frustum::from_matrix4(projection_matrix * view_matrix).unwrap();
+        let standard_box = OrientedBox::default();
 
         for object in &self.objects {
 
-            let world_matrix = object.get_world_matrix(client_tick);
-            let bounding_box = object.get_bounding_box();
+            let bounding_box_matrix = object.get_bounding_box_matrix();
+            let oriented_bounding_box = standard_box.transform(bounding_box_matrix);
+            let bounding_box = BoundingBox::new(oriented_bounding_box.corners);
+            let collision_bounding_box = Aabb3 {
+                min: Point3::from_vec(bounding_box.smallest),
+                max: Point3::from_vec(bounding_box.biggest),
+            };
+            let culled = matches!(frustum.contains(&collision_bounding_box), Relation::Out);
 
-            let axis_aligned_box = AxisAlignedBox::from(bounding_box);
-            let transformed_box = axis_aligned_box * (projection_matrix * view_matrix * world_matrix);
-
-            let bounding_box = BoundingBox::new(transformed_box.corners);
-
-            let color = match bounding_box.biggest.x > -1.0
-                && bounding_box.smallest.x < 1.0
-                && bounding_box.biggest.y > -1.0
-                && bounding_box.smallest.y < 1.0
-                && bounding_box.biggest.z > -1.0
-                && bounding_box.smallest.z < 1.0
-            {
+            let color = match !frustum_culling || !culled {
                 true => Color::rgb(255, 255, 0),
                 false => Color::rgb(255, 0, 255),
             };
 
-            renderer.render_bounding_box(
-                render_target,
-                camera,
-                &Transform::position(bounding_box.center()),
-                &bounding_box,
-                color,
-            );
-        }
+            let offset = bounding_box.size().y / 2.0;
+            let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
+            let transform = Transform::position(position);
 
-        let bounding_box = BoundingBox {
-            smallest: Vector3::from_value(-1.0),
-            biggest: Vector3::from_value(1.0),
-        };
-        renderer.render_bounding_box(
-            render_target,
-            camera,
-            &Transform::position(bounding_box.center()),
-            &bounding_box,
-            Color::rgb(0, 255, 0),
-        );
+            renderer.render_bounding_box(render_target, camera, &transform, &bounding_box, color);
+        }
     }
 
     pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {

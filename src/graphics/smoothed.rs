@@ -35,6 +35,10 @@ impl SmoothedValue {
         self.desired += offset;
     }
 
+    pub fn move_desired_clamp(&mut self, offset: f32, minimum: f32, maximum: f32) {
+        self.desired = (self.desired + offset).clamp(minimum, maximum);
+    }
+
     pub fn get_current(&self) -> f32 {
         self.current
     }

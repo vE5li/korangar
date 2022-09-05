@@ -17,7 +17,7 @@ _Lighthalzen_
 
 # Running
 
-*Disclaimer*: Korangar is still very early in development. There are a ton of issues, and it is everything but feature-complete. It's very poorly optimized, so you will need a good device to run it. It also uses some Vulkan features without checking for support first, so i doubt that it will even launch on many older cards.
+*Disclaimer*: Korangar is still very early in development. There are a ton of issues, and it is everything but feature-complete. It's poorly optimized, so you will need a good device to run it. It also uses some Vulkan features without checking for support first, so i doubt that it will even launch on many older cards.
 
 That being said, you can already get through the tutorial mostly as intended and "walk" around (walk in quotes because there are no proper sprite animations yet, so it's more like sliding).
 

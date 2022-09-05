@@ -1,6 +1,6 @@
 use std::ops::Mul;
 
-use cgmath::{Array, Matrix4, SquareMatrix, Vector3, Vector4};
+use cgmath::{Array, EuclideanSpace, Matrix4, MetricSpace, Point3, SquareMatrix, Vector3, Vector4};
 use derive_new::new;
 use procedural::*;
 
@@ -56,14 +56,44 @@ impl BoundingBox {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct AxisAlignedBox {
+pub struct OrientedBox {
     pub corners: [Vector3<f32>; 8],
 }
 
-impl From<BoundingBox> for AxisAlignedBox {
+impl OrientedBox {
+
+    pub fn transform(self, transform_matrix: Matrix4<f32>) -> Self {
+
+        let corners = self.corners.map(|corner| multiply_matrix4_and_vector3(&transform_matrix, corner));
+        Self { corners }
+    }
+}
+
+impl Default for OrientedBox {
+
+    fn default() -> Self {
+
+        // TODO: check if this might just need to be 4 points
+        let corners = [
+            Vector3::new(-1.0, -1.0, -1.0),
+            Vector3::new(-1.0, -1.0, 1.0),
+            Vector3::new(-1.0, 1.0, -1.0),
+            Vector3::new(-1.0, 1.0, 1.0),
+            Vector3::new(1.0, -1.0, -1.0),
+            Vector3::new(1.0, -1.0, 1.0),
+            Vector3::new(1.0, 1.0, -1.0),
+            Vector3::new(1.0, 1.0, 1.0),
+        ];
+
+        Self { corners }
+    }
+}
+
+impl From<BoundingBox> for OrientedBox {
 
     fn from(bounding_box: BoundingBox) -> Self {
 
+        // TODO: check if this might just need to be 4 points
         let corners = [
             Vector3::new(bounding_box.smallest.x, bounding_box.smallest.y, bounding_box.smallest.z),
             Vector3::new(bounding_box.smallest.x, bounding_box.smallest.y, bounding_box.biggest.z),
@@ -75,17 +105,6 @@ impl From<BoundingBox> for AxisAlignedBox {
             Vector3::new(bounding_box.biggest.x, bounding_box.biggest.y, bounding_box.biggest.z),
         ];
 
-        Self { corners }
-    }
-}
-
-impl Mul<Matrix4<f32>> for AxisAlignedBox {
-
-    type Output = Self;
-
-    fn mul(self, rhs: Matrix4<f32>) -> Self::Output {
-
-        let corners = self.corners.map(|corner| multiply_matrix4_and_vector3(&rhs, corner));
         Self { corners }
     }
 }

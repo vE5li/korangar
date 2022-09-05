@@ -11,6 +11,12 @@ pub struct RenderSettings {
     pub show_frames_per_second: bool,
     #[toggle]
     #[new(value = "true")]
+    pub frustum_culling: bool,
+    #[toggle]
+    #[new(default)]
+    pub show_bounding_boxes: bool,
+    #[toggle]
+    #[new(value = "true")]
     pub show_map: bool,
     #[toggle]
     #[new(value = "true")]

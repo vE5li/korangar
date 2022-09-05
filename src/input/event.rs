@@ -32,6 +32,10 @@ pub enum UserEvent {
     CloseDialog(u32),
     ChooseDialogOption(u32, i8),
     #[cfg(feature = "debug")]
+    ToggleFrustumCulling,
+    #[cfg(feature = "debug")]
+    ToggleShowBoundingBoxes,
+    #[cfg(feature = "debug")]
     OpenMarkerDetails(MarkerIdentifier),
     #[cfg(feature = "debug")]
     OpenRenderSettingsWindow,

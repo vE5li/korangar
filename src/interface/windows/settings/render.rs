@@ -19,6 +19,8 @@ fn general_expandable() -> ElementCell {
         render_state_button!("debug camera", UserEvent::ToggleUseDebugCamera, use_debug_camera),
         render_state_button!("show fps", UserEvent::ToggleShowFramesPerSecond, show_frames_per_second),
         render_state_button!("show wireframe", UserEvent::ToggleShowWireframe, show_wireframe),
+        render_state_button!("frustum culling", UserEvent::ToggleFrustumCulling, frustum_culling),
+        render_state_button!("show bounding boxes", UserEvent::ToggleShowBoundingBoxes, show_bounding_boxes),
     ];
 
     cell!(Expandable::new("general".to_string(), buttons, true))

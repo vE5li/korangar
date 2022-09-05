@@ -612,6 +612,12 @@ fn main() {
                         UserEvent::ChooseDialogOption(npc_id, option) => networking_system.choose_dialog_option(npc_id, option),
 
                         #[cfg(feature = "debug")]
+                        UserEvent::ToggleFrustumCulling => render_settings.toggle_frustum_culling(),
+
+                        #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowBoundingBoxes => render_settings.toggle_show_bounding_boxes(),
+
+                        #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {
                             interface.open_window(map.resolve_marker(&entities, marker_identifier))
                         }
@@ -837,17 +843,19 @@ fn main() {
                     fence.cleanup_finished();
                 }
 
+                player_camera.generate_view_projection(swapchain_holder.window_size());
+                directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
                 #[cfg(feature = "debug")]
-                let current_camera: &mut (dyn Camera + Send + Sync) = match render_settings.use_debug_camera {
-                    true => &mut debug_camera,
-                    false => &mut player_camera,
+                debug_camera.generate_view_projection(swapchain_holder.window_size());
+
+                #[cfg(feature = "debug")]
+                let current_camera: &(dyn Camera + Send + Sync) = match render_settings.use_debug_camera {
+                    true => &debug_camera,
+                    false => &player_camera,
                 };
 
                 #[cfg(not(feature = "debug"))]
-                let current_camera: &mut (dyn Camera + Send + Sync) = &mut player_camera;
-
-                current_camera.generate_view_projection(swapchain_holder.window_size());
-                directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
+                let current_camera: &(dyn Camera + Send + Sync) = &player_camera;
 
                 let image_number = swapchain_holder.get_image_number();
                 let client_tick = game_timer.get_client_tick();
@@ -905,6 +913,8 @@ fn main() {
                             &shadow_renderer,
                             &directional_shadow_camera,
                             client_tick,
+                            #[cfg(feature = "debug")]
+                            render_settings.frustum_culling,
                         );
 
                         #[debug_condition(render_settings.show_entities)]
@@ -923,7 +933,14 @@ fn main() {
                         map.render_ground(screen_target, &deferred_renderer, current_camera);
 
                         #[debug_condition(render_settings.show_objects)]
-                        map.render_objects(screen_target, &deferred_renderer, current_camera, client_tick);
+                        map.render_objects(
+                            screen_target,
+                            &deferred_renderer,
+                            current_camera,
+                            client_tick,
+                            #[cfg(feature = "debug")]
+                            render_settings.frustum_culling,
+                        );
 
                         #[debug_condition(render_settings.show_entities)]
                         entities
@@ -967,7 +984,17 @@ fn main() {
                             hovered_marker_identifier,
                         );
 
-                        map.render_bounding(screen_target, &deferred_renderer, current_camera, client_tick);
+                        #[cfg(feature = "debug")]
+                        if render_settings.show_bounding_boxes {
+
+                            map.render_bounding(
+                                screen_target,
+                                &deferred_renderer,
+                                current_camera,
+                                &player_camera,
+                                render_settings.frustum_culling,
+                            );
+                        }
 
                         #[cfg(feature = "debug")]
                         if let Some(marker_identifier) = hovered_marker_identifier {

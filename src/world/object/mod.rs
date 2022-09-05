@@ -29,8 +29,8 @@ impl Object {
             .render_geometry(render_target, renderer, camera, &self.transform, client_tick);
     }
 
-    pub fn get_world_matrix(&self, client_tick: u32) -> Matrix4<f32> {
-        self.model.get_world_matrix(&self.transform, client_tick)
+    pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
+        self.model.get_bounding_box_matrix(&self.transform)
     }
 
     pub fn get_bounding_box(&self) -> BoundingBox {

@@ -34,7 +34,7 @@ use vulkano::shader::ShaderModule;
 use self::fragment_shader::SpecializationConstants;
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
-use crate::world::BoundingBox;
+use crate::world::{BoundingBox, Model};
 
 pub struct BoxRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -182,20 +182,8 @@ impl BoxRenderer {
     ) {
 
         let layout = self.pipeline.layout().clone();
-        let size = bounding_box.size() / 2.0;
-        let scale = size.zip(transform.scale, f32::mul);
-        let position = transform.position;
 
-        let offset_matrix = Matrix4::from_translation(Vector3::new(0.0, scale.y, 0.0));
-
-        let rotation_matrix = Matrix4::from_angle_z(-transform.rotation.z)
-            * Matrix4::from_angle_x(-transform.rotation.x)
-            * Matrix4::from_angle_y(transform.rotation.y);
-
-        let world_matrix = Matrix4::from_translation(position)
-            * rotation_matrix
-            * offset_matrix
-            * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+        let world_matrix = Model::bounding_box_matrix(bounding_box, transform);
 
         let constants = Constants {
             world: world_matrix.into(),

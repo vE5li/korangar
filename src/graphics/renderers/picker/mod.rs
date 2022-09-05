@@ -202,6 +202,8 @@ impl MarkerRendererTrait for PickerRenderer {
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
 
             let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
+
+            render_target.unbind_subrenderer();
             self.marker_renderer
                 .render(render_target, screen_position, screen_size, marker_identifier);
         }

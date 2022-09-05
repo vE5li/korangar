@@ -60,7 +60,7 @@ impl Element for CloseButton {
             "X",
             *theme.close_button.text_offset,
             *theme.close_button.foreground_color,
-            *theme.close_button.font_size * *interface_settings.scaling,
+            *theme.close_button.font_size,
         );
     }
 }

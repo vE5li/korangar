@@ -360,8 +360,8 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.left_mouse_button.down()
-                && !self.left_mouse_button.pressed()
+            if self.right_mouse_button.down()
+                && !self.right_mouse_button.pressed()
                 && self.mouse_input_mode.is_none()
                 && render_settings.use_debug_camera
             {
@@ -411,7 +411,7 @@ impl InputSystem {
 
                     let picker_target = PickerTarget::from(pixel);
 
-                    if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() && !lock_actions {
+                    if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
                         match picker_target {
 
                             PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),

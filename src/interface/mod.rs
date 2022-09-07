@@ -15,7 +15,7 @@ use cgmath::Vector2;
 use derive_new::new;
 use vulkano::sync::GpuFuture;
 
-pub use self::cursor::MouseCursor;
+pub use self::cursor::*;
 pub use self::elements::*;
 pub use self::event::*;
 pub use self::layout::*;
@@ -99,7 +99,15 @@ impl Interface {
         }
     }
 
-    pub fn update(&mut self) -> (bool, bool) {
+    // TODO: this is just a workaround until i find a better solution to make the cursor always look
+    // correct.
+    pub fn set_start_time(&mut self, client_tick: u32) {
+        self.mouse_cursor.set_start_time(client_tick);
+    }
+
+    pub fn update(&mut self, client_tick: u32) -> (bool, bool) {
+
+        self.mouse_cursor.update(client_tick);
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if let Some(change_event) = window.update() {
@@ -517,5 +525,9 @@ impl Interface {
 
         self.close_window_with_class(DialogWindow::WINDOW_CLASS);
         self.dialog_handle = None;
+    }
+
+    pub fn set_mouse_cursor_state(&mut self, state: MouseCursorState, client_tick: u32) {
+        self.mouse_cursor.set_state(state, client_tick)
     }
 }

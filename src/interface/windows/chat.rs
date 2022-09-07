@@ -104,11 +104,7 @@ impl ChatWindow {
         };
 
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<30, false>::new(
-                input_text,
-                "write message or command",
-                input_action
-            )) as _,
+            cell!(InputField::<30>::new(input_text, "write message or command", input_action)) as _,
             cell!(FormButton::new("send", button_selector, button_action)) as _,
         ];
 

@@ -1235,7 +1235,7 @@ struct MovingEntityAppearedPacket {
     pub accessory3: u16,
     pub head_palette: u16,
     pub body_palette: u16,
-    pub head_dir: u16,
+    pub head_direction: u16,
     pub robe: u16,
     pub guild_id: u32, // may be reversed - or completely wrong
     pub emblem_version: u16,
@@ -1276,7 +1276,7 @@ struct EntityAppearedPacket {
     pub accessory3: u16,
     pub head_palette: u16,
     pub body_palette: u16,
-    pub head_dir: u16,
+    pub head_direction: u16,
     pub robe: u16,
     pub guild_id: u32, // may be reversed - or completely wrong
     pub emblem_version: u16,
@@ -1306,6 +1306,7 @@ pub struct EntityData {
     pub destination: Option<Vector2<usize>>,
     pub health_points: i32,
     pub maximum_health_points: i32,
+    pub head_direction: usize,
 }
 
 impl EntityData {
@@ -1320,6 +1321,7 @@ impl EntityData {
             destination: None,
             health_points: character_information.health_points as i32,
             maximum_health_points: character_information.maximum_health_points as i32,
+            head_direction: 0, // TODO: get correct rotation
         }
     }
 }
@@ -1336,6 +1338,7 @@ impl From<EntityAppearedPacket> for EntityData {
             destination: None,
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
+            head_direction: packet.head_direction as usize,
         }
     }
 }
@@ -1354,6 +1357,7 @@ impl From<MovingEntityAppearedPacket> for EntityData {
             destination: Some(destination),
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
+            head_direction: packet.head_direction as usize,
         }
     }
 }

@@ -50,6 +50,16 @@ pub struct Movement {
     pub steps_vertex_buffer: Option<ModelVertexBuffer>,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum EntityType {
+    Warp,
+    Hidden,
+    Player,
+    Npc,
+    Monster,
+    Unknown,
+}
+
 #[derive(PrototypeElement)]
 pub struct Common {
     pub entity_id: u32,
@@ -57,10 +67,14 @@ pub struct Common {
     pub health_points: usize,
     pub maximum_health_points: usize,
     pub movement_speed: usize,
+    pub head_direction: usize,
 
+    #[hidden_element]
+    pub entity_type: EntityType,
     pub active_movement: Option<Movement>,
     pub sprite: Arc<Sprite>,
     pub actions: Arc<Actions>,
+    pub grid_position: Vector2<usize>,
     pub position: Vector3<f32>,
     #[hidden_element]
     details: ResourceState<String>,
@@ -77,28 +91,52 @@ impl Common {
         map: &Map,
         database: &Database,
         entity_data: EntityData,
+        client_tick: u32,
     ) -> Self {
 
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
-        let position = map.get_world_position(entity_data.position);
+        let grid_position = entity_data.position;
+        let position = map.get_world_position(grid_position);
+        let head_direction = entity_data.head_direction;
 
         let movement_speed = entity_data.movement_speed as usize;
         let health_points = entity_data.health_points as usize;
         let maximum_health_points = entity_data.maximum_health_points as usize;
 
         let active_movement = None;
-        let file_path = format!("npc\\{}", database.job_name_from_id(job_id));
+
+        let entity_type = match job_id {
+            45 => EntityType::Warp,
+            111 => EntityType::Hidden, // TODO: check that this is correct
+            // 111 | 139 => None,
+            0..=44 | 4000..=5999 => EntityType::Player,
+            0..=999 => EntityType::Npc,
+            0..=3999 => EntityType::Monster,
+            _ => EntityType::Unknown,
+        };
+
+        let file_path = match entity_type {
+            EntityType::Player => format!("¸ó½ºÅÍ\\{}", database.job_name_from_id(job_id)),
+            EntityType::Npc => format!("npc\\{}", database.job_name_from_id(job_id)),
+            EntityType::Monster => format!("¸ó½ºÅÍ\\{}", database.job_name_from_id(job_id)),
+            EntityType::Warp | EntityType::Hidden => format!("npc\\{}", database.job_name_from_id(job_id)), // TODO: change
+            EntityType::Unknown => format!("npc\\{}", database.job_name_from_id(job_id)),                   // TODO:
+        };
+
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
         let details = ResourceState::Unavalible;
-        let animation_state = AnimationState { action: 0 };
+        let animation_state = AnimationState::new(client_tick);
 
         Self {
+            grid_position,
             position,
             entity_id,
             job_id,
+            head_direction,
             active_movement,
+            entity_type,
             movement_speed,
             health_points,
             maximum_health_points,
@@ -111,11 +149,13 @@ impl Common {
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
 
+        self.grid_position = position;
         self.position = map.get_world_position(position);
         self.active_movement = None;
     }
 
     pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: u32) {
+
         if let Some(active_movement) = self.active_movement.take() {
 
             let last_step = active_movement.steps.last().unwrap();
@@ -124,6 +164,7 @@ impl Common {
 
                 let position = Vector2::new(last_step.0.x, last_step.0.y);
                 self.set_position(map, position);
+                self.animation_state.idle(client_tick);
             } else {
 
                 let mut last_step_index = 0;
@@ -133,6 +174,20 @@ impl Common {
 
                 let last_step = active_movement.steps[last_step_index];
                 let next_step = active_movement.steps[last_step_index + 1];
+
+                let array = (last_step.0 - next_step.0).map(|c| c as isize);
+                let array: &[isize; 2] = array.as_ref();
+                self.head_direction = match array {
+                    [0, 1] => 0,
+                    [1, 1] => 1,
+                    [1, 0] => 2,
+                    [1, -1] => 3,
+                    [0, -1] => 4,
+                    [-1, -1] => 5,
+                    [-1, 0] => 6,
+                    [-1, 1] => 7,
+                    _ => panic!("impossible step"),
+                };
 
                 let last_step_position = map.get_world_position(last_step.0);
                 let next_step_position = map.get_world_position(next_step.0);
@@ -148,6 +203,8 @@ impl Common {
                 self.active_movement = active_movement.into();
             }
         }
+
+        self.animation_state.update(client_tick);
     }
 
     pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
@@ -240,6 +297,7 @@ impl Common {
                 .collect();
 
             self.active_movement = Movement::new(steps, starting_timestamp).into();
+            self.animation_state.walk(self.movement_speed, starting_timestamp);
         }
     }
 
@@ -422,7 +480,9 @@ impl Common {
     {
 
         let camera_direction = camera.get_camera_direction();
-        let (texture, mirror) = self.actions.render(&self.sprite, &self.animation_state, camera_direction);
+        let (texture, mirror) = self
+            .actions
+            .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
         let texture_height = (texture.image().dimensions().height() as f32 / 10.0) * 0.2;
 
         renderer.render_entity(
@@ -473,6 +533,7 @@ impl Player {
         database: &Database,
         character_information: CharacterInformation,
         player_position: Vector2<usize>,
+        client_tick: u32,
     ) -> Self {
 
         let spell_points = character_information.spell_points as usize;
@@ -486,6 +547,7 @@ impl Player {
             map,
             database,
             EntityData::from_character(character_information, player_position),
+            client_tick,
         );
 
         Self {
@@ -572,9 +634,18 @@ impl Npc {
         map: &Map,
         database: &Database,
         entity_data: EntityData,
+        client_tick: u32,
     ) -> Self {
 
-        let common = Common::new(sprite_loader, action_loader, texture_future, map, database, entity_data);
+        let common = Common::new(
+            sprite_loader,
+            action_loader,
+            texture_future,
+            map,
+            database,
+            entity_data,
+            client_tick,
+        );
 
         Self { common }
     }
@@ -594,6 +665,10 @@ impl Npc {
         camera: &dyn Camera,
         window_size: Vector2<f32>,
     ) {
+
+        if self.common.entity_type != EntityType::Monster {
+            return;
+        }
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
@@ -645,6 +720,10 @@ impl Entity {
         self.get_common().job_id
     }
 
+    pub fn get_entity_type(&self) -> EntityType {
+        self.get_common().entity_type
+    }
+
     pub fn are_details_unavalible(&self) -> bool {
         match &self.get_common().details {
             ResourceState::Unavalible => true,
@@ -662,6 +741,10 @@ impl Entity {
 
     pub fn get_details(&self) -> Option<&String> {
         self.get_common().details.as_option()
+    }
+
+    pub fn get_grid_position(&self) -> Vector2<usize> {
+        self.get_common().grid_position
     }
 
     pub fn get_position(&self) -> Vector3<f32> {

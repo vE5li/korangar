@@ -70,7 +70,7 @@ impl PrototypeWindow for LoginWindow {
         };
 
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24, false>::new(username, "username", username_action)),
+            cell!(InputField::<24>::new(username, "username", username_action)),
             cell!(InputField::<24, true>::new(password, "password", password_action)),
             cell!(StateButton::new(
                 "remember username",

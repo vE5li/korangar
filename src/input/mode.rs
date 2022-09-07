@@ -5,6 +5,7 @@ pub enum MouseInputMode {
     ResizeInterface(usize),
     DragElement((ElementCell, usize)),
     ClickInterface,
+    RotateCamera,
     None,
 }
 

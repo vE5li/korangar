@@ -9,7 +9,7 @@ use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
 
 #[derive(new)]
-pub struct InputField<const LENGTH: usize, const HIDDEN: bool> {
+pub struct InputField<const LENGTH: usize, const HIDDEN: bool = false> {
     display: Rc<RefCell<String>>,
     ghost_text: &'static str,
     action: Box<dyn Fn() -> Option<ChangeEvent>>,

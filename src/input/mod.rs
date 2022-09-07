@@ -12,7 +12,7 @@ pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
 use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
-use crate::interface::{ClickAction, ElementCell, Interface};
+use crate::interface::{ClickAction, ElementCell, Interface, MouseCursorState};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;
@@ -135,14 +135,12 @@ impl InputSystem {
         picker_target: &mut PickerRenderTarget,
         render_settings: &RenderSettings,
         window_size: Vector2<usize>,
+        client_tick: u32,
     ) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
 
         let mut events = Vec::new();
         let mut mouse_target = None;
-        let (mut hovered_element, mut window_index) = match self.mouse_input_mode.is_none() {
-            true => interface.hovered_element(self.new_mouse_position),
-            false => (None, None),
-        };
+        let (mut hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position);
 
         let shift_down = self.keys[42].down();
 
@@ -156,7 +154,6 @@ impl InputSystem {
         }
 
         if shift_down {
-
             if let Some(window_index) = &mut window_index {
 
                 if self.left_mouse_button.pressed() {
@@ -171,11 +168,9 @@ impl InputSystem {
                     self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
             }
-
-            hovered_element = None;
         }
 
-        if let Some(window_index) = &mut window_index {
+        if let Some(window_index) = &mut window_index && self.mouse_input_mode.is_none() {
             if (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down {
 
                 *window_index = interface.move_window_to_top(*window_index);
@@ -232,31 +227,52 @@ impl InputSystem {
             }
         }
 
-        if let MouseInputMode::DragElement((element, window_index)) = &self.mouse_input_mode {
-            if self.mouse_delta != Vector2::new(0.0, 0.0) {
-                interface.drag_element(element, *window_index, self.mouse_delta);
-            }
-        }
-
-        if let MouseInputMode::MoveInterface(identifier) = &self.mouse_input_mode {
-            if self.mouse_delta != Vector2::new(0.0, 0.0) {
-                interface.move_window(*identifier, self.mouse_delta);
-            }
-        }
-
-        if let MouseInputMode::ResizeInterface(identifier) = &self.mouse_input_mode {
-            if self.mouse_delta != Vector2::new(0.0, 0.0) {
-                interface.resize_window(*identifier, self.mouse_delta);
-            }
-        }
-
         if self.right_mouse_button.down()
             && !self.right_mouse_button.pressed()
             && self.mouse_input_mode.is_none()
             && self.mouse_delta.x != 0.0
             && !lock_actions
         {
-            events.push(UserEvent::CameraRotate(self.mouse_delta.x));
+            self.mouse_input_mode = MouseInputMode::RotateCamera;
+        }
+
+        if !self.mouse_input_mode.is_none() || shift_down {
+            hovered_element = None;
+        }
+
+        match &self.mouse_input_mode {
+
+            MouseInputMode::DragElement((element, window_index)) => {
+
+                if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                    interface.drag_element(element, *window_index, self.mouse_delta);
+                }
+                interface.set_mouse_cursor_state(MouseCursorState::Grab, client_tick);
+            }
+
+            MouseInputMode::MoveInterface(identifier) => {
+
+                if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                    interface.move_window(*identifier, self.mouse_delta);
+                }
+                interface.set_mouse_cursor_state(MouseCursorState::Grab, client_tick);
+            }
+
+            MouseInputMode::ResizeInterface(identifier) => {
+                if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                    interface.resize_window(*identifier, self.mouse_delta);
+                }
+            }
+
+            MouseInputMode::RotateCamera => {
+
+                events.push(UserEvent::CameraRotate(self.mouse_delta.x));
+                interface.set_mouse_cursor_state(MouseCursorState::RotateCamera, client_tick);
+            }
+
+            MouseInputMode::ClickInterface => interface.set_mouse_cursor_state(MouseCursorState::Click, client_tick),
+
+            MouseInputMode::None => {}
         }
 
         if self.scroll_delta != 0.0 {
@@ -378,12 +394,7 @@ impl InputSystem {
             }
         }
 
-        // to fix redrawing twice when clicking on elements
-        if !self.mouse_input_mode.is_none() {
-            hovered_element = None;
-        }
-
-        if window_index.is_none() {
+        if window_index.is_none() && self.mouse_input_mode.is_none() {
 
             if let Some(fence) = picker_target.state.try_take_fence() {
                 fence.wait(None).unwrap();
@@ -415,6 +426,17 @@ impl InputSystem {
                     mouse_target = Some(picker_target);
                 }
             }
+        }
+
+        // TODO: this will fail if the user hovers over an entity that changes the cursor and then
+        // immediately over a different one that doesn't, because main wont set the default cursor
+        if self.mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(_))) {
+            interface.set_mouse_cursor_state(MouseCursorState::Default, client_tick);
+        }
+
+        // to fix redrawing twice when clicking on elements
+        if !self.mouse_input_mode.is_none() {
+            hovered_element = None;
         }
 
         // check if the hovered element changed from last frame

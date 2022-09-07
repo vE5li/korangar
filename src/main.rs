@@ -8,6 +8,7 @@
 #![feature(negative_impls)]
 #![feature(iter_intersperse)]
 #![feature(auto_traits)]
+#![feature(let_chains)]
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -25,6 +26,7 @@ mod world;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use cgmath::Vector2;
 use chrono::prelude::*;
 use database::Database;
 use procedural::debug_condition;
@@ -329,10 +331,11 @@ fn main() {
                 input_system.update_delta();
 
                 let delta_time = game_timer.update();
+                let client_tick = game_timer.get_client_tick();
 
                 day_timer += delta_time as f32 / TIME_FACTOR;
 
-                networking_system.keep_alive(delta_time, game_timer.get_client_tick());
+                networking_system.keep_alive(delta_time, client_tick);
 
                 let network_events = networking_system.network_events();
                 let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
@@ -340,6 +343,7 @@ fn main() {
                     &mut picker_targets[swapchain_holder.get_image_number()],
                     &render_settings,
                     swapchain_holder.window_size(),
+                    client_tick,
                 );
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
@@ -350,6 +354,13 @@ fn main() {
 
                         networking_system.request_entity_details(entity_id);
                         entity.set_details_requested();
+                    }
+
+                    match entity.get_entity_type() {
+                        EntityType::Npc => interface.set_mouse_cursor_state(MouseCursorState::Dialog, client_tick),
+                        EntityType::Warp => interface.set_mouse_cursor_state(MouseCursorState::Warp, client_tick),
+                        EntityType::Monster => interface.set_mouse_cursor_state(MouseCursorState::Attack, client_tick),
+                        _ => {} // TODO: fill other entity types
                     }
                 }
 
@@ -367,6 +378,7 @@ fn main() {
                                 &map,
                                 &database,
                                 entity_appeared_data,
+                                game_timer.get_client_tick(),
                             );
                             let npc = Entity::Npc(npc);
                             entities.push(npc);
@@ -409,6 +421,9 @@ fn main() {
 
                             particle_holder.clear();
                             networking_system.map_loaded();
+                            // TODO: this is just a workaround until i find a better solution to make the cursor always look
+                            // correct.
+                            interface.set_start_time(game_timer.get_client_tick());
                         }
 
                         NetworkEvent::UpdateClientTick(client_tick) => {
@@ -544,6 +559,7 @@ fn main() {
                                         &database,
                                         character_information,
                                         player_position,
+                                        client_tick,
                                     );
                                     let player = Entity::Player(player);
 
@@ -552,6 +568,9 @@ fn main() {
 
                                     particle_holder.clear();
                                     networking_system.map_loaded();
+                                    // TODO: this is just a workaround until i find a better solution to make the cursor always look
+                                    // correct.
+                                    interface.set_start_time(client_tick);
                                     game_timer.set_client_tick(client_tick);
                                 }
 
@@ -587,12 +606,11 @@ fn main() {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
-
-                                let job = entity.get_job();
-
-                                match job > 1002 && job < 1010 {
-                                    true => networking_system.request_player_attack(entity_id),
-                                    false => networking_system.start_dialog(entity_id),
+                                match entity.get_entity_type() {
+                                    EntityType::Npc => networking_system.start_dialog(entity_id),
+                                    EntityType::Monster => networking_system.request_player_attack(entity_id),
+                                    EntityType::Warp => networking_system.request_player_move(entity.get_grid_position()),
+                                    _ => {} // TODO: add other interactions
                                 }
                             }
                         }
@@ -687,7 +705,7 @@ fn main() {
 
                             render_settings.toggle_show_wireframe();
                             swapchain_holder.invalidate_swapchain();
-                            
+
                             // for some reason the interface buffer becomes messaged up when
                             // recreating the swapchain, so we need to render it again
                             interface.schedule_rerender();
@@ -787,7 +805,7 @@ fn main() {
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
 
-                let (clear_interface, rerender_interface) = interface.update();
+                let (clear_interface, rerender_interface) = interface.update(game_timer.get_client_tick());
 
                 networking_system.changes_applied();
 
@@ -887,6 +905,7 @@ fn main() {
                         #[debug_condition(render_settings.show_entities)]
                         entities
                             .iter()
+                            .skip(1)
                             .for_each(|entity| entity.render(picker_target, &picker_renderer, current_camera));
 
                         #[cfg(feature = "debug")]

@@ -56,7 +56,7 @@ impl PrototypeWindow for CharacterCreationWindow {
         };
 
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24, false>::new(name, "character name", input_action)),
+            cell!(InputField::<24>::new(name, "character name", input_action)),
             cell!(FormButton::new("done", selector, action)),
         ];
 

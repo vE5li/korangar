@@ -81,7 +81,7 @@ impl MouseCursor {
 
         // TODO: figure out how this is actually supposed to work
         let direction = match self.animation_state.action {
-            0 | 2 => 0,
+            0 | 2 | 4 => 0,
             _ => 7,
         };
 

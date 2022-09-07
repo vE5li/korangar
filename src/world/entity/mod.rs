@@ -147,11 +147,12 @@ impl Common {
         }
     }
 
-    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
+    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: u32) {
 
         self.grid_position = position;
         self.position = map.get_world_position(position);
         self.active_movement = None;
+        self.animation_state.idle(client_tick);
     }
 
     pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: u32) {
@@ -163,8 +164,7 @@ impl Common {
             if client_tick > last_step.1 {
 
                 let position = Vector2::new(last_step.0.x, last_step.0.y);
-                self.set_position(map, position);
-                self.animation_state.idle(client_tick);
+                self.set_position(map, position, client_tick);
             } else {
 
                 let mut last_step_index = 0;
@@ -751,8 +751,8 @@ impl Entity {
         self.get_common().position
     }
 
-    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>) {
-        self.get_common_mut().set_position(map, position);
+    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: u32) {
+        self.get_common_mut().set_position(map, position, client_tick);
     }
 
     pub fn update_health(&mut self, health_points: usize, maximum_health_points: usize) {

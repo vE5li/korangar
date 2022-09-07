@@ -417,7 +417,7 @@ fn main() {
                                 .get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name))
                                 .unwrap();
 
-                            entities[0].set_position(&map, player_position);
+                            entities[0].set_position(&map, player_position, game_timer.get_client_tick());
 
                             particle_holder.clear();
                             networking_system.map_loaded();

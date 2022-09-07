@@ -77,7 +77,7 @@ impl Database {
         result
             .next()
             .map(|name: Result<String, _>| name.unwrap().to_lowercase())
-            .unwrap_or("1_f_maria".to_string())
+            .unwrap_or("b_novice".to_string())
         //.expect(&format!("failed to find actor with id {} in database", id))
     }
 

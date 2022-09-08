@@ -20,7 +20,7 @@ rusttype = { version = "0.9.2", features = ["gpu_cache"] }
 yazi = "0.1.4"
 image = "0.24.2"
 pathfinding = "2.2.2"
-rusqlite = "0.27.0"
+rusqlite = { version = "0.27.0", features = ["bundled"] }
 chrono = "0.4"
 lazy_static = { version = "1.4.0", optional = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }

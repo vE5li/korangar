@@ -26,7 +26,6 @@ mod world;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cgmath::Vector2;
 use chrono::prelude::*;
 use database::Database;
 use procedural::debug_condition;

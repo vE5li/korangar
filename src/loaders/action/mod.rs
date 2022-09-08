@@ -159,7 +159,7 @@ impl Actions {
             let zoom2 = sprite_clip.zoom2.unwrap_or(Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;
-            let final_position = position + (-(final_size / 2.0) + offset);
+            let final_position = position + offset - final_size / 2.0;
 
             renderer.render_sprite(render_target, texture.clone(), final_position, final_size, color);
         }

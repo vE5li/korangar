@@ -5,7 +5,7 @@ use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
 
 use crate::graphics::{Color, DeferredRenderer, Renderer};
-use crate::loaders::{ActionLoader, Actions, AnimationState, Sprite, SpriteLoader};
+use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum MouseCursorState {
@@ -34,13 +34,14 @@ pub struct MouseCursor {
 impl MouseCursor {
 
     pub fn new(
+        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
     ) -> Self {
 
-        let sprite = sprite_loader.get("cursors.spr", texture_future).unwrap();
-        let actions = action_loader.get("cursors.act").unwrap();
+        let sprite = sprite_loader.get("cursors.spr", game_file_loader, texture_future).unwrap();
+        let actions = action_loader.get("cursors.act", game_file_loader).unwrap();
         let animation_state = AnimationState::new(0);
 
         Self {

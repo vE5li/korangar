@@ -138,7 +138,6 @@ struct SpriteData {
 
 #[derive(new)]
 pub struct SpriteLoader {
-    game_file_loader: Rc<RefCell<GameFileLoader>>,
     device: Arc<Device>,
     queue: Arc<Queue>,
     #[new(default)]
@@ -147,12 +146,17 @@ pub struct SpriteLoader {
 
 impl SpriteLoader {
 
-    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Sprite>, String> {
+    fn load(
+        &mut self,
+        path: &str,
+        game_file_loader: &mut GameFileLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+    ) -> Result<Arc<Sprite>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}{}{}", MAGENTA, path, NONE));
 
-        let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\sprite\\{}", path))?;
+        let bytes = game_file_loader.get(&format!("data\\sprite\\{}", path))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         if byte_stream.string(2).as_str() != "SP" {
@@ -237,10 +241,15 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Arc<Sprite>, String> {
+    pub fn get(
+        &mut self,
+        path: &str,
+        game_file_loader: &mut GameFileLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+    ) -> Result<Arc<Sprite>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path, texture_future),
+            None => self.load(path, game_file_loader, texture_future),
         }
     }
 }

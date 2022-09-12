@@ -41,7 +41,7 @@ use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
-use crate::loaders::TextureLoader;
+use crate::loaders::{GameFileLoader, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::world::{BoundingBox, MarkerIdentifier};
 
@@ -86,6 +86,7 @@ impl DeferredRenderer {
         swapchain_format: Format,
         viewport: Viewport,
         dimensions: [u32; 2],
+        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
     ) -> Self {
 
@@ -156,6 +157,8 @@ impl DeferredRenderer {
             lighting_subpass.clone(),
             viewport.clone(),
             #[cfg(feature = "debug")]
+            game_file_loader,
+            #[cfg(feature = "debug")]
             texture_loader,
             #[cfg(feature = "debug")]
             &mut texture_future,
@@ -183,7 +186,7 @@ impl DeferredRenderer {
         let billboard_vertex_buffer =
             CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
-        let font_map = texture_loader.get("font.png", &mut texture_future).unwrap();
+        let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
 
         texture_future.flush().unwrap();
         texture_future.cleanup_finished();

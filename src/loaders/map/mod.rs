@@ -166,7 +166,6 @@ struct MapData {
 
 #[derive(new)]
 pub struct MapLoader {
-    game_file_loader: Rc<RefCell<GameFileLoader>>,
     device: Arc<Device>,
     #[new(default)]
     cache: HashMap<String, Arc<Map>>,
@@ -176,9 +175,10 @@ impl MapLoader {
 
     fn load(
         &mut self,
+        resource_file: String,
+        game_file_loader: &mut GameFileLoader,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
-        resource_file: &str,
     ) -> Result<Arc<Map>, String> {
 
         #[cfg(feature = "debug")]
@@ -186,11 +186,11 @@ impl MapLoader {
 
         let mut texture_future = now(self.device.clone()).boxed();
 
-        let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\{}", resource_file))?;
+        let bytes = game_file_loader.get(&format!("data\\{}.rsw", resource_file))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         if byte_stream.string(4) != "GRSW" {
-            return Err(format!("failed to read magic number from {}", resource_file));
+            return Err(format!("failed to read magic number from {}.rsw", resource_file));
         }
 
         let resource_version = byte_stream.version();
@@ -299,7 +299,13 @@ impl MapLoader {
                         // offset the objects slightly to avoid depth buffer fighting
                         let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
 
-                        let model = model_loader.get(texture_loader, &mut texture_future, &model_name, reverse_order)?;
+                        let model = model_loader.get(
+                            game_file_loader,
+                            texture_loader,
+                            &mut texture_future,
+                            &model_name,
+                            reverse_order,
+                        )?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, model, transform);
                         objects.push(object);
@@ -314,7 +320,13 @@ impl MapLoader {
                         let array: [f32; 3] = scale.into();
                         let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
 
-                        let model = model_loader.get(texture_loader, &mut texture_future, &model_name, reverse_order)?;
+                        let model = model_loader.get(
+                            game_file_loader,
+                            texture_loader,
+                            &mut texture_future,
+                            &model_name,
+                            reverse_order,
+                        )?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(None, model_name, model, transform);
                         objects.push(object);
@@ -382,9 +394,9 @@ impl MapLoader {
         // TODO;
 
         #[cfg(feature = "debug")]
-        byte_stream.assert_empty(resource_file);
+        byte_stream.assert_empty(&resource_file);
 
-        let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\{}", ground_file))?;
+        let bytes = game_file_loader.get(&format!("data\\{}", ground_file))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(4);
@@ -409,7 +421,7 @@ impl MapLoader {
         for _index in 0..texture_count {
 
             let texture_name = byte_stream.string(texture_name_length as usize);
-            let texture = texture_loader.get(&texture_name, &mut texture_future)?;
+            let texture = texture_loader.get(&texture_name, game_file_loader, &mut texture_future)?;
             textures.push(texture);
         }
 
@@ -498,7 +510,7 @@ impl MapLoader {
 
         if let Some(gat_file) = gat_file {
 
-            let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\{}", gat_file))?;
+            let bytes = game_file_loader.get(&format!("data\\{}", gat_file))?;
             let mut byte_stream = ByteStream::new(&bytes);
 
             let magic = byte_stream.string(4);
@@ -825,7 +837,7 @@ impl MapLoader {
             tile_vertex_buffer.unwrap(),
         ));
 
-        self.cache.insert(resource_file.to_string(), map.clone());
+        self.cache.insert(resource_file, map.clone());
 
         texture_future.flush().unwrap();
         texture_future.cleanup_finished();
@@ -838,13 +850,14 @@ impl MapLoader {
 
     pub fn get(
         &mut self,
+        resource_file: String,
+        game_file_loader: &mut GameFileLoader,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
-        resource_file: &str,
     ) -> Result<Arc<Map>, String> {
-        match self.cache.get(resource_file) {
+        match self.cache.get(&resource_file) {
             Some(map) => Ok(map.clone()),
-            None => self.load(model_loader, texture_loader, resource_file),
+            None => self.load(resource_file, game_file_loader, model_loader, texture_loader),
         }
     }
 }

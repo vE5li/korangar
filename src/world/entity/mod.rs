@@ -10,14 +10,13 @@ use vulkano::device::Device;
 use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
 
-use crate::database::Database;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
 use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{ModelVertexBuffer, NativeModelVertex};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
-use crate::loaders::{ActionLoader, Actions, AnimationState, Sprite, SpriteLoader};
+use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{CharacterInformation, EntityData, StatusType};
 use crate::world::Map;
 #[cfg(feature = "debug")]
@@ -85,11 +84,12 @@ pub struct Common {
 impl Common {
 
     pub fn new(
+        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
+        script_loader: &ScriptLoader,
         map: &Map,
-        database: &Database,
         entity_data: EntityData,
         client_tick: u32,
     ) -> Self {
@@ -117,15 +117,17 @@ impl Common {
         };
 
         let file_path = match entity_type {
-            EntityType::Player => format!("¸ó½ºÅÍ\\{}", database.job_name_from_id(job_id)),
-            EntityType::Npc => format!("npc\\{}", database.job_name_from_id(job_id)),
-            EntityType::Monster => format!("¸ó½ºÅÍ\\{}", database.job_name_from_id(job_id)),
-            EntityType::Warp | EntityType::Hidden => format!("npc\\{}", database.job_name_from_id(job_id)), // TODO: change
-            EntityType::Unknown => format!("npc\\{}", database.job_name_from_id(job_id)),                   // TODO:
+            EntityType::Player => format!("¸ó½ºÅÍ\\b_{}", script_loader.get_job_name_from_id(job_id)),
+            EntityType::Npc => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)),
+            EntityType::Monster => format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(job_id)),
+            EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
+            EntityType::Unknown => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)),                   // TODO:
         };
 
-        let sprite = sprite_loader.get(&format!("{}.spr", file_path), texture_future).unwrap();
-        let actions = action_loader.get(&format!("{}.act", file_path)).unwrap();
+        let sprite = sprite_loader
+            .get(&format!("{}.spr", file_path), game_file_loader, texture_future)
+            .unwrap();
+        let actions = action_loader.get(&format!("{}.act", file_path), game_file_loader).unwrap();
         let details = ResourceState::Unavalible;
         let animation_state = AnimationState::new(client_tick);
 
@@ -526,11 +528,12 @@ pub struct Player {
 impl Player {
 
     pub fn new(
+        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
+        script_loader: &ScriptLoader,
         map: &Map,
-        database: &Database,
         character_information: CharacterInformation,
         player_position: Vector2<usize>,
         client_tick: u32,
@@ -541,11 +544,12 @@ impl Player {
         let maximum_spell_points = character_information.maximum_spell_points as usize;
         let maximum_activity_points = 0;
         let common = Common::new(
+            game_file_loader,
             sprite_loader,
             action_loader,
             texture_future,
+            script_loader,
             map,
-            database,
             EntityData::from_character(character_information, player_position),
             client_tick,
         );
@@ -628,21 +632,23 @@ pub struct Npc {
 impl Npc {
 
     pub fn new(
+        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
+        script_loader: &ScriptLoader,
         map: &Map,
-        database: &Database,
         entity_data: EntityData,
         client_tick: u32,
     ) -> Self {
 
         let common = Common::new(
+            game_file_loader,
             sprite_loader,
             action_loader,
             texture_future,
+            script_loader,
             map,
-            database,
             entity_data,
             client_tick,
         );

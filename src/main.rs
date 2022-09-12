@@ -16,7 +16,6 @@ mod debug;
 mod input;
 #[macro_use]
 mod system;
-mod database;
 mod graphics;
 mod interface;
 mod loaders;
@@ -27,7 +26,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use chrono::prelude::*;
-use database::Database;
 use procedural::debug_condition;
 use vulkano::device::Device;
 #[cfg(feature = "debug")]
@@ -127,14 +125,18 @@ fn main() {
     game_file_loader.add_archive("rdata.grf".to_string());
     game_file_loader.add_archive("korangar.grf".to_string());
 
-    let game_file_loader = Rc::new(RefCell::new(game_file_loader));
+    // patch precompiled lua files to lua 5.1 64 bit
+    game_file_loader.patch();
+    game_file_loader.add_archive("lua_files.grf".to_string());
+
     let _font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
 
-    let mut model_loader = ModelLoader::new(game_file_loader.clone(), device.clone());
-    let mut texture_loader = TextureLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
-    let mut map_loader = MapLoader::new(game_file_loader.clone(), device.clone());
-    let mut sprite_loader = SpriteLoader::new(game_file_loader.clone(), device.clone(), queue.clone());
-    let mut action_loader = ActionLoader::new(game_file_loader);
+    let mut model_loader = ModelLoader::new(device.clone());
+    let mut texture_loader = TextureLoader::new(device.clone(), queue.clone());
+    let mut map_loader = MapLoader::new(device.clone());
+    let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone());
+    let mut action_loader = ActionLoader::default();
+    let script_loader = ScriptLoader::new(&mut game_file_loader);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -143,7 +145,12 @@ fn main() {
     let timer = Timer::new("load resources");
 
     let mut map = map_loader
-        .get(&mut model_loader, &mut texture_loader, "pay_dun00.rsw")
+        .get(
+            "pay_dun00".to_string(),
+            &mut game_file_loader,
+            &mut model_loader,
+            &mut texture_loader,
+        )
         .expect("failed to load initial map");
 
     // interesting: ma_zif07, ama_dun01
@@ -169,6 +176,7 @@ fn main() {
         swapchain_holder.swapchain_format(),
         viewport.clone(),
         swapchain_holder.window_size_u32(),
+        &mut game_file_loader,
         &mut texture_loader,
     );
     let mut interface_renderer = InterfaceRenderer::new(
@@ -176,6 +184,7 @@ fn main() {
         queue.clone(),
         viewport.clone(),
         swapchain_holder.window_size_u32(),
+        &mut game_file_loader,
         &mut texture_loader,
     );
     let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport, swapchain_holder.window_size_u32());
@@ -216,6 +225,7 @@ fn main() {
     let mut texture_future = now(device.clone()).boxed();
 
     let mut interface = Interface::new(
+        &mut game_file_loader,
         &mut sprite_loader,
         &mut action_loader,
         &mut texture_future,
@@ -267,7 +277,6 @@ fn main() {
 
     let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220));
     let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
-    let database = Database::new();
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
@@ -371,11 +380,12 @@ fn main() {
                         NetworkEvent::AddEntity(entity_appeared_data) => {
 
                             let npc = Npc::new(
+                                &mut game_file_loader,
                                 &mut sprite_loader,
                                 &mut action_loader,
                                 &mut texture_future,
+                                &script_loader,
                                 &map,
-                                &database,
                                 entity_appeared_data,
                                 game_timer.get_client_tick(),
                             );
@@ -413,7 +423,7 @@ fn main() {
                             }
 
                             map = map_loader
-                                .get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name))
+                                .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
                                 .unwrap();
 
                             entities[0].set_position(&map, player_position, game_timer.get_client_tick());
@@ -478,15 +488,19 @@ fn main() {
 
                         NetworkEvent::AddChoiceButtons(choices) => interface.add_choice_buttons(choices),
 
-                        NetworkEvent::AddQuestEffect(quest_effect) => {
-                            particle_holder.add_quest_icon(&mut texture_loader, &mut texture_future, &map, quest_effect)
-                        }
+                        NetworkEvent::AddQuestEffect(quest_effect) => particle_holder.add_quest_icon(
+                            &mut game_file_loader,
+                            &mut texture_loader,
+                            &mut texture_future,
+                            &map,
+                            quest_effect,
+                        ),
 
                         NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
 
                         NetworkEvent::Inventory(inventory) => {
                             for stack in inventory {
-                                println!("item: {}", database.itme_name_from_id(stack));
+                                println!("item: {}", script_loader.get_item_name_from_id(stack));
                             }
                         }
                     }
@@ -547,15 +561,16 @@ fn main() {
                                     interface.open_window(&PrototypeChatWindow::new(chat_messages.clone()));
 
                                     map = map_loader
-                                        .get(&mut model_loader, &mut texture_loader, &format!("{}.rsw", map_name))
+                                        .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
                                         .unwrap();
 
                                     let player = Player::new(
+                                        &mut game_file_loader,
                                         &mut sprite_loader,
                                         &mut action_loader,
                                         &mut texture_future,
+                                        &script_loader,
                                         &map,
-                                        &database,
                                         character_information,
                                         player_position,
                                         client_tick,

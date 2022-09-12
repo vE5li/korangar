@@ -6,7 +6,7 @@ use rand::{thread_rng, Rng};
 use vulkano::sync::GpuFuture;
 
 use crate::graphics::*;
-use crate::loaders::TextureLoader;
+use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::{QuestColor, QuestEffectPacket};
 use crate::world::*;
 
@@ -81,6 +81,7 @@ pub struct QuestIcon {
 impl QuestIcon {
 
     pub fn new(
+        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
         map: &Map,
@@ -92,6 +93,7 @@ impl QuestIcon {
         let texture = texture_loader
             .get(
                 &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1 /* 1 - 3 */),
+                game_file_loader,
                 texture_future,
             )
             .unwrap();
@@ -146,6 +148,7 @@ impl ParticleHolder {
 
     pub fn add_quest_icon(
         &mut self,
+        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
         map: &Map,
@@ -154,7 +157,7 @@ impl ParticleHolder {
 
         self.quest_icons.insert(
             quest_effect.entity_id,
-            QuestIcon::new(texture_loader, texture_future, map, quest_effect),
+            QuestIcon::new(game_file_loader, texture_loader, texture_future, map, quest_effect),
         );
     }
 

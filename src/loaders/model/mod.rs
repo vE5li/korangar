@@ -103,7 +103,6 @@ pub struct ModelData {
 
 #[derive(new)]
 pub struct ModelLoader {
-    game_file_loader: Rc<RefCell<GameFileLoader>>,
     device: Arc<Device>,
     #[new(default)]
     cache: HashMap<(String, bool), Arc<Model>>,
@@ -294,6 +293,7 @@ impl ModelLoader {
 
     fn load(
         &mut self,
+        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
         model_file: &str,
@@ -303,7 +303,7 @@ impl ModelLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", MAGENTA, model_file, NONE));
 
-        let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\model\\{}", model_file))?;
+        let bytes = game_file_loader.get(&format!("data\\model\\{}", model_file))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(4);
@@ -322,7 +322,7 @@ impl ModelLoader {
         let textures = model_data
             .texture_names
             .iter()
-            .map(|texture_name| texture_loader.get(texture_name, texture_future).unwrap())
+            .map(|texture_name| texture_loader.get(texture_name, game_file_loader, texture_future).unwrap())
             .collect();
 
         let root_node = model_data
@@ -359,6 +359,7 @@ impl ModelLoader {
 
     pub fn get(
         &mut self,
+        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
         model_file: &str,
@@ -367,7 +368,7 @@ impl ModelLoader {
         match self.cache.get(&(model_file.to_string(), reverse_order)) {
             // kinda dirty
             Some(model) => Ok(model.clone()),
-            None => self.load(texture_loader, texture_future, model_file, reverse_order),
+            None => self.load(game_file_loader, texture_loader, texture_future, model_file, reverse_order),
         }
     }
 }

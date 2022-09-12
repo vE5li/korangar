@@ -14,7 +14,7 @@ use vulkano::sync::{now, GpuFuture};
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use crate::graphics::{Color, Renderer, SingleRenderTarget, Texture};
-use crate::loaders::TextureLoader;
+use crate::loaders::{GameFileLoader, TextureLoader};
 
 pub struct InterfaceRenderer {
     device: Arc<Device>,
@@ -39,6 +39,7 @@ impl InterfaceRenderer {
         queue: Arc<Queue>,
         viewport: Viewport,
         dimensions: [u32; 2],
+        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
     ) -> Self {
 
@@ -64,13 +65,21 @@ impl InterfaceRenderer {
         let sprite_renderer = SpriteRenderer::new(device.clone(), subpass, viewport);
 
         let mut texture_future = now(device.clone()).boxed();
-        let font_map = texture_loader.get("font.png", &mut texture_future).unwrap();
+        let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
         #[cfg(feature = "debug")]
-        let debug_icon_texture = texture_loader.get("debug_icon.png", &mut texture_future).unwrap();
-        let checked_box_texture = texture_loader.get("checked_box.png", &mut texture_future).unwrap();
-        let unchecked_box_texture = texture_loader.get("unchecked_box.png", &mut texture_future).unwrap();
-        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", &mut texture_future).unwrap();
-        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", &mut texture_future).unwrap();
+        let debug_icon_texture = texture_loader.get("debug_icon.png", game_file_loader, &mut texture_future).unwrap();
+        let checked_box_texture = texture_loader
+            .get("checked_box.png", game_file_loader, &mut texture_future)
+            .unwrap();
+        let unchecked_box_texture = texture_loader
+            .get("unchecked_box.png", game_file_loader, &mut texture_future)
+            .unwrap();
+        let expanded_arrow_texture = texture_loader
+            .get("expanded_arrow.png", game_file_loader, &mut texture_future)
+            .unwrap();
+        let collapsed_arrow_texture = texture_loader
+            .get("collapsed_arrow.png", game_file_loader, &mut texture_future)
+            .unwrap();
 
         texture_future.flush().unwrap();
         texture_future.cleanup_finished();

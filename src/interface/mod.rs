@@ -24,7 +24,7 @@ pub use self::settings::InterfaceSettings;
 pub use self::theme::Theme;
 pub use self::windows::*;
 use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer};
-use crate::loaders::{ActionLoader, SpriteLoader};
+use crate::loaders::{ActionLoader, GameFileLoader, SpriteLoader};
 
 #[derive(new)]
 struct DialogHandle {
@@ -48,6 +48,7 @@ pub struct Interface {
 impl Interface {
 
     pub fn new(
+        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
@@ -58,7 +59,7 @@ impl Interface {
         let interface_settings = InterfaceSettings::new();
         let theme = Theme::new(&interface_settings.theme_file);
         let dialog_handle = None;
-        let mouse_cursor = MouseCursor::new(sprite_loader, action_loader, texture_future);
+        let mouse_cursor = MouseCursor::new(game_file_loader, sprite_loader, action_loader, texture_future);
 
         Self {
             windows: Vec::new(),

@@ -5,7 +5,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Array, Vector2, Zero};
-use derive_new::new;
 use procedural::*;
 use vulkano::image::ImageAccess;
 
@@ -238,21 +237,19 @@ struct ActionsData {
     pub delays: Option<Vec<f32>>,
 }
 
-#[derive(new)]
+#[derive(Default)]
 pub struct ActionLoader {
-    game_file_loader: Rc<RefCell<GameFileLoader>>,
-    #[new(default)]
     cache: HashMap<String, Arc<Actions>>,
 }
 
 impl ActionLoader {
 
-    fn load(&mut self, path: &str) -> Result<Arc<Actions>, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}{}{}", MAGENTA, path, NONE));
 
-        let bytes = self.game_file_loader.borrow_mut().get(&format!("data\\sprite\\{}", path))?;
+        let bytes = game_file_loader.get(&format!("data\\sprite\\{}", path))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         if byte_stream.string(2).as_str() != "AC" {
@@ -278,10 +275,10 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Arc<Actions>, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path),
+            None => self.load(path, game_file_loader),
         }
     }
 }

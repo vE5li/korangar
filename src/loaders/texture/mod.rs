@@ -20,7 +20,6 @@ use crate::loaders::GameFileLoader;
 
 #[derive(new)]
 pub struct TextureLoader {
-    game_file_loader: Rc<RefCell<GameFileLoader>>,
     device: Arc<Device>,
     queue: Arc<Queue>,
     #[new(value = "HashMap::new()")]
@@ -29,7 +28,12 @@ pub struct TextureLoader {
 
 impl TextureLoader {
 
-    fn load(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Texture, String> {
+    fn load(
+        &mut self,
+        path: &str,
+        game_file_loader: &mut GameFileLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+    ) -> Result<Texture, String> {
 
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}{}{}", MAGENTA, path, NONE));
@@ -41,7 +45,7 @@ impl TextureLoader {
             extension => return Err(format!("unsupported file format {}", extension)),
         };
 
-        let file_data = self.game_file_loader.borrow_mut().get(&format!("data\\texture\\{}", path))?;
+        let file_data = game_file_loader.get(&format!("data\\texture\\{}", path))?;
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
         let mut image_buffer = reader
             .decode()
@@ -85,10 +89,15 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(&mut self, path: &str, texture_future: &mut Box<dyn GpuFuture + 'static>) -> Result<Texture, String> {
+    pub fn get(
+        &mut self,
+        path: &str,
+        game_file_loader: &mut GameFileLoader,
+        texture_future: &mut Box<dyn GpuFuture + 'static>,
+    ) -> Result<Texture, String> {
         match self.cache.get(path) {
             Some(texture) => Ok(texture.clone()),
-            None => self.load(path, texture_future),
+            None => self.load(path, game_file_loader, texture_future),
         }
     }
 }

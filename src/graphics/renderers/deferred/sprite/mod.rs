@@ -31,7 +31,7 @@ use vulkano::sync::GpuFuture;
 
 use self::vertex_shader::ty::Constants;
 use crate::graphics::*;
-use crate::loaders::TextureLoader;
+use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::world::MarkerIdentifier;
 
 pub struct SpriteRenderer {
@@ -59,6 +59,7 @@ impl SpriteRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
+        #[cfg(feature = "debug")] game_file_loader: &mut GameFileLoader,
         #[cfg(feature = "debug")] texture_loader: &mut TextureLoader,
         #[cfg(feature = "debug")] texture_future: &mut Box<dyn GpuFuture + 'static>,
     ) -> Self {
@@ -79,15 +80,15 @@ impl SpriteRenderer {
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
 
         #[cfg(feature = "debug")]
-        let object_marker_texture = texture_loader.get("object.png", texture_future).unwrap();
+        let object_marker_texture = texture_loader.get("object.png", game_file_loader, texture_future).unwrap();
         #[cfg(feature = "debug")]
-        let light_source_marker_texture = texture_loader.get("light.png", texture_future).unwrap();
+        let light_source_marker_texture = texture_loader.get("light.png", game_file_loader, texture_future).unwrap();
         #[cfg(feature = "debug")]
-        let sound_source_marker_texture = texture_loader.get("sound.png", texture_future).unwrap();
+        let sound_source_marker_texture = texture_loader.get("sound.png", game_file_loader, texture_future).unwrap();
         #[cfg(feature = "debug")]
-        let effect_source_marker_texture = texture_loader.get("effect.png", texture_future).unwrap();
+        let effect_source_marker_texture = texture_loader.get("effect.png", game_file_loader, texture_future).unwrap();
         #[cfg(feature = "debug")]
-        let entity_marker_texture = texture_loader.get("entity.png", texture_future).unwrap();
+        let entity_marker_texture = texture_loader.get("entity.png", game_file_loader, texture_future).unwrap();
 
         let nearest_sampler = Sampler::start(device.clone())
             .filter(Filter::Nearest)

@@ -246,12 +246,14 @@ impl GameFileLoader {
 
         let lua_files: Vec<String> = self.lua_files.drain(..).collect();
         let mut lua_archive = GameArchive::default();
-        let bytecode_format = Format::default_with_size_t(8);
+        let bytecode_format = Format::default();
 
         for file_name in lua_files {
 
             let bytes = self.get(&file_name).unwrap();
 
+            // Try to unify all bytecode to Lua 5.1 and possibly 64 bit, If the operation fails the
+            // file might not actually be bytecode but rather source code so don't add it.
             if let Ok(bytes) = unify(bytes, bytecode_format) {
                 lua_archive.add_file(file_name, bytes);
             }

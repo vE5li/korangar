@@ -1,3 +1,10 @@
-/target
+# Rust
+target/
 procedural/target
 Cargo.lock
+
+# Korangar
+client/
+data.grf
+rdata.grf
+lua_files.grf

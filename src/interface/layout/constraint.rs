@@ -4,6 +4,28 @@ use serde::{Deserialize, Serialize};
 use crate::interface::{Dimension, PartialSize, Position, Size};
 
 #[derive(Copy, Clone, Serialize, Deserialize, new)]
+pub struct DimensionConstraint {
+    pub size: Dimension,
+    pub minimum_size: Option<Dimension>,
+    pub maximum_size: Option<Dimension>,
+}
+
+impl DimensionConstraint {
+
+    pub fn add_width(&self, width_constraint: DimensionConstraint) -> SizeConstraint {
+
+        SizeConstraint {
+            width: width_constraint.size,
+            minimum_width: width_constraint.minimum_size,
+            maximum_width: width_constraint.maximum_size,
+            height: self.size,
+            minimum_height: self.minimum_size,
+            maximum_height: self.maximum_size,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize, new)]
 pub struct SizeConstraint {
     pub width: Dimension,
     pub minimum_width: Option<Dimension>,

@@ -19,6 +19,11 @@ use self::prototype::*;
 use self::toggle::*;
 
 #[proc_macro]
+pub fn dimension(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    parse::<DimensionConstraint>(token_stream).unwrap().stream.into()
+}
+
+#[proc_macro]
 pub fn constraint(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     parse::<SizeConstraint>(token_stream).unwrap().stream.into()
 }

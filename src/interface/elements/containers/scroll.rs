@@ -17,10 +17,7 @@ impl ScrollView {
     pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
 
         let scroll = 0.0;
-        let state = ContainerState {
-            elements,
-            state: Default::default(),
-        };
+        let state = ContainerState::new(elements);
 
         Self {
             scroll,
@@ -42,6 +39,18 @@ impl Element for ScrollView {
 
     fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
         self.state.link_back(weak_self, weak_parent);
+    }
+
+    fn is_focusable(&self) -> bool {
+        self.state.is_focusable::<false>()
+    }
+
+    fn focus_next(&self, self_cell: ElementCell, caller_cell: Option<ElementCell>, focus: Focus) -> Option<ElementCell> {
+        self.state.focus_next::<false>(self_cell, caller_cell, focus)
+    }
+
+    fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
+        self.state.restore_focus(self_cell)
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {

@@ -45,7 +45,7 @@ impl Element for StateButton {
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
-        _focused_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
@@ -54,7 +54,7 @@ impl Element for StateButton {
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
         //let background_color = theme.button.background.choose(self.is_element_self(hovered_element), self.is_element_self(focused_element));
-        let background_color = match self.is_element_self(hovered_element) {
+        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.button.hovered_background_color,
             false => *theme.button.background_color,
         };

@@ -130,6 +130,16 @@ impl Window for FramedWindow {
             })
     }
 
+    fn first_focused_element(&self) -> Option<ElementCell> {
+
+        let element_cell = self.elements[0].clone();
+        self.elements[0].borrow().focus_next(element_cell, None, Focus::downwards())
+    }
+
+    fn restore_focus(&self) -> Option<ElementCell> {
+        self.elements[0].borrow().restore_focus(self.elements[0].clone())
+    }
+
     fn hovered_element(&self, mouse_position: Vector2<f32>) -> HoverInformation {
 
         let absolute_position = mouse_position - self.position;

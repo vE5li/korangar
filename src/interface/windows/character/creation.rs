@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::ops::Not;
 use std::rc::Rc;
 
 use derive_new::new;
@@ -7,6 +6,9 @@ use procedural::*;
 
 use crate::input::UserEvent;
 use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+
+const MINIMUM_NAME_LENGTH: usize = 4;
+const MAXIMUM_NAME_LENGTH: usize = 24;
 
 #[derive(new)]
 pub struct CharacterCreationWindow {
@@ -36,7 +38,7 @@ impl PrototypeWindow for CharacterCreationWindow {
         let selector = {
 
             let name = name.clone();
-            Box::new(move || !name.borrow().is_empty())
+            Box::new(move || name.borrow().len() >= MINIMUM_NAME_LENGTH)
         };
 
         let action = {
@@ -46,18 +48,16 @@ impl PrototypeWindow for CharacterCreationWindow {
             Box::new(move || UserEvent::CreateCharacter(slot, name.borrow().clone()))
         };
 
-        let input_action = {
-
-            let name = name.clone();
-            Box::new(move || {
-                //name.borrow().is_empty().not().then_some(ChangeEvent::FocusNext)
-                None
-            })
-        };
+        let input_action = Box::new(move || Some(ClickAction::FocusNext(FocusMode::FocusNext)));
 
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24>::new(name, "character name", input_action)),
-            cell!(FormButton::new("done", selector, action)),
+            cell!(InputField::<MAXIMUM_NAME_LENGTH>::new(
+                name,
+                "character name",
+                input_action,
+                dimension!(100%)
+            )),
+            cell!(FormButton::new("done", selector, action, dimension!(50%))),
         ];
 
         Box::from(FramedWindow::new(

@@ -52,7 +52,14 @@ impl PrototypeWindow for LoginWindow {
         let username_action = {
 
             let username = username.clone();
-            Box::new(move || /*username.borrow().is_empty().not().then_some(ChangeEvent::FocusNext)*/ None)
+            Box::new(move || {
+
+                username
+                    .borrow()
+                    .is_empty()
+                    .not()
+                    .then_some(ClickAction::FocusNext(FocusMode::FocusNext))
+            })
         };
 
         let password_action = {
@@ -60,18 +67,27 @@ impl PrototypeWindow for LoginWindow {
             let username = username.clone();
             let password = password.clone();
 
-            Box::new(move || {
-                match password.borrow().is_empty() {
-                    _ if username.borrow().is_empty() => None, //Some(ChangeEvent::FocusPrevious),
-                    true => None,
-                    false => None, //Some(ChangeEvent::LeftClickNext),
-                }
+            Box::new(move || match password.borrow().is_empty() {
+
+                _ if username.borrow().is_empty() => Some(ClickAction::FocusNext(FocusMode::FocusPrevious)),
+
+                true => None,
+
+                false => Some(ClickAction::Event(UserEvent::LogIn(
+                    username.borrow().clone(),
+                    password.borrow().clone(),
+                ))),
             })
         };
 
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24>::new(username, "username", username_action)),
-            cell!(InputField::<24, true>::new(password, "password", password_action)),
+            cell!(InputField::<24>::new(username, "username", username_action, dimension!(100%))),
+            cell!(InputField::<24, true>::new(
+                password,
+                "password",
+                password_action,
+                dimension!(100%)
+            )),
             cell!(StateButton::new(
                 "remember username",
                 UserEvent::ToggleRemeberUsername,
@@ -82,7 +98,7 @@ impl PrototypeWindow for LoginWindow {
                 UserEvent::ToggleRemeberPassword,
                 Box::new(|state_provider| state_provider.login_settings.remember_password)
             )),
-            cell!(FormButton::new("log in", selector, action)),
+            cell!(FormButton::new("log in", selector, action, dimension!(100%))),
         ];
 
         Box::from(FramedWindow::new(

@@ -1,5 +1,4 @@
 use derive_new::new;
-use num::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::UserEvent;
@@ -10,6 +9,7 @@ pub struct FormButton {
     text: &'static str,
     selector: Box<dyn Fn() -> bool>,
     action: Box<dyn Fn() -> UserEvent>,
+    width_constraint: DimensionConstraint,
     #[new(default)]
     state: ElementState,
 }
@@ -24,8 +24,14 @@ impl Element for FormButton {
         &mut self.state
     }
 
+    fn is_focusable(&self) -> bool {
+        (self.selector)()
+    }
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-        self.state.resolve(placement_resolver, &theme.button.size_constraint);
+
+        let size_constraint = theme.button.height_constraint.add_width(self.width_constraint);
+        self.state.resolve(placement_resolver, &size_constraint);
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
@@ -46,7 +52,7 @@ impl Element for FormButton {
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
-        _focused_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
@@ -54,26 +60,22 @@ impl Element for FormButton {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
+        let disabled = !(self.selector)();
+
         //let background_color = theme.button.background.choose(self.is_element_self(hovered_element), self.is_element_self(focused_element));
-        let background_color = match self.is_element_self(hovered_element) {
+        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
+            _ if disabled => *theme.button.disabled_background_color,
             true => *theme.button.hovered_background_color,
             false => *theme.button.background_color,
         };
 
         renderer.render_background(*theme.button.border_radius, background_color);
 
-        renderer.render_checkbox(
-            *theme.button.icon_offset,
-            *theme.button.icon_size,
-            *theme.button.foreground_color,
-            (self.selector)(),
-        );
+        let foreground_color = match disabled {
+            true => *theme.button.disabled_foreground_color,
+            false => *theme.button.foreground_color,
+        };
 
-        renderer.render_text(
-            self.text,
-            *theme.button.icon_text_offset,
-            *theme.button.foreground_color,
-            *theme.button.font_size,
-        );
+        renderer.render_text(self.text, *theme.button.text_offset, foreground_color, *theme.button.font_size);
     }
 }

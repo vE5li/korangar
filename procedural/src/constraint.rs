@@ -136,3 +136,52 @@ impl syn::parse::Parse for SizeConstraint {
         Ok(SizeConstraint { stream: expanded })
     }
 }
+
+pub struct DimensionConstraint {
+    pub stream: TokenStream,
+}
+
+impl syn::parse::Parse for DimensionConstraint {
+
+    fn parse(input: syn::parse::ParseStream) -> Result<Self, syn::Error> {
+
+        let first_dimension: Dimension = input.parse().unwrap();
+
+        let (size, minimum_size) = if input.lookahead1().peek(syn::Token![>]) {
+
+            input.parse::<Punct>().unwrap();
+            let second_dimension: Dimension = input.parse().unwrap();
+
+            let minimum_size = first_dimension.stream;
+            let size = second_dimension.stream;
+
+            let minimum_size = quote!(Some(#minimum_size));
+            (size, minimum_size)
+        } else {
+
+            let minimum_size = quote!(None);
+            let size = first_dimension.stream;
+            (size, minimum_size)
+        };
+
+        let maximum_size = if input.lookahead1().peek(syn::Token![<]) {
+
+            input.parse::<Punct>().unwrap();
+            let second_dimension: Dimension = input.parse().unwrap();
+            let maximum_size = second_dimension.stream;
+            quote!(Some(#maximum_size))
+        } else {
+            quote!(None)
+        };
+
+        let expanded = quote! {
+            crate::interface::DimensionConstraint {
+                size: #size,
+                minimum_size: #minimum_size,
+                maximum_size: #maximum_size,
+            }
+        };
+
+        Ok(DimensionConstraint { stream: expanded })
+    }
+}

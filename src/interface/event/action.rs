@@ -1,8 +1,10 @@
 use crate::input::UserEvent;
-use crate::interface::PrototypeWindow;
+use crate::interface::{ChangeEvent, FocusMode, PrototypeWindow};
 
 pub enum ClickAction {
     FocusElement,
+    FocusNext(FocusMode),
+    ChangeEvent(ChangeEvent),
     Event(UserEvent),
     DragElement,
     MoveInterface,

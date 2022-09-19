@@ -18,6 +18,10 @@ pub trait Window {
 
     fn update(&mut self) -> Option<ChangeEvent>;
 
+    fn first_focused_element(&self) -> Option<ElementCell>;
+
+    fn restore_focus(&self) -> Option<ElementCell>;
+
     fn hovered_element(&self, mouse_position: Vector2<f32>) -> HoverInformation;
 
     fn get_area(&self) -> (Position, Size);

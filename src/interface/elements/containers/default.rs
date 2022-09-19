@@ -17,10 +17,7 @@ impl Container {
     pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
 
         Self {
-            state: ContainerState {
-                elements,
-                state: Default::default(),
-            },
+            state: ContainerState::new(elements),
             size_constraint,
         }
     }
@@ -40,61 +37,16 @@ impl Element for Container {
         self.state.link_back(weak_self, weak_parent);
     }
 
-    fn focus_next(
-        &self,
-        self_cell: Rc<RefCell<dyn Element>>,
-        caller_cell: Option<Rc<RefCell<dyn Element>>>,
-        focus_mode: FocusMode,
-    ) -> Option<Rc<RefCell<dyn Element>>> {
+    fn is_focusable(&self) -> bool {
+        self.state.is_focusable::<false>()
+    }
 
-        if let Some(caller_cell) = caller_cell {
+    fn focus_next(&self, self_cell: ElementCell, caller_cell: Option<ElementCell>, focus: Focus) -> Option<ElementCell> {
+        self.state.focus_next::<false>(self_cell, caller_cell, focus)
+    }
 
-            let position = self
-                .state
-                .elements
-                .iter()
-                .position(|element| element.borrow().is_element_self(Some(&*caller_cell.borrow())));
-
-            println!("{:?}", position);
-
-            if let Some(position) = position {
-                match position + 1 == self.state.elements.len() {
-
-                    true => {
-
-                        println!("HERE: {}", self.state.state.parent_element.is_some());
-                        if let Some(parent_element) = &self.state.state.parent_element {
-
-                            let parent_element = parent_element.upgrade().unwrap();
-                            let next_element = parent_element
-                                .borrow()
-                                .focus_next(parent_element.clone(), Some(self_cell), focus_mode);
-                            return next_element;
-                        }
-
-                        return Some(self.state.elements[0].clone());
-                    }
-
-                    false => return self.state.elements[position + 1].clone().into(),
-                }
-            }
-
-            panic!("when did this happen? implement correct behavior");
-        }
-
-        // getting here means the container itself is currently being focused and we want to call
-        // it's parent container focus_next (if possible) to get the next sibling element
-        if let Some(parent_element) = &self.state.state.parent_element {
-
-            let parent_element = parent_element.upgrade().unwrap();
-            let next_element = parent_element
-                .borrow()
-                .focus_next(parent_element.clone(), Some(self_cell), focus_mode);
-            return next_element;
-        }
-
-        // TODO: check if element is focusable
-        Some(self.state.elements[0].clone())
+    fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
+        self.state.restore_focus(self_cell)
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {

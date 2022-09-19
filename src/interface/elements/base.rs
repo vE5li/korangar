@@ -7,6 +7,7 @@ use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::interface::*;
 
 pub type ElementCell = Rc<RefCell<dyn Element>>;
+pub type WeakElementCell = Weak<RefCell<dyn Element>>;
 
 macro_rules! cell {
     ($element:expr) => {
@@ -203,11 +204,36 @@ impl ElementState {
     }
 }
 
+#[derive(Clone, Copy, new)]
+pub struct Focus {
+    pub mode: FocusMode,
+    #[new(default)]
+    pub downwards: bool,
+}
+
+impl Focus {
+
+    pub fn downwards() -> Self {
+
+        Self {
+            mode: FocusMode::FocusNext,
+            downwards: true,
+        }
+    }
+
+    pub fn to_downwards(self) -> Self {
+
+        Focus {
+            mode: self.mode,
+            downwards: true,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FocusMode {
     FocusNext,
     FocusPrevious,
-    //FocusBelow,
-    // ..
 }
 
 impl From<bool> for FocusMode {
@@ -230,24 +256,32 @@ pub trait Element {
         self.get_state_mut().link_back(weak_parent);
     }
 
+    fn is_focusable(&self) -> bool {
+        true
+    }
+
     fn focus_next(
         &self,
         self_cell: Rc<RefCell<dyn Element>>,
         _caller_cell: Option<Rc<RefCell<dyn Element>>>,
-        focus_mode: FocusMode,
+        focus: Focus,
     ) -> Option<Rc<RefCell<dyn Element>>> {
+
+        if focus.downwards {
+            return Some(self_cell);
+        }
 
         self.get_state().parent_element.as_ref().and_then(|parent_element| {
 
             let parent_element = parent_element.upgrade().unwrap();
-            let next_element = parent_element
-                .borrow()
-                .focus_next(parent_element.clone(), Some(self_cell), focus_mode);
+            let next_element = parent_element.borrow().focus_next(parent_element.clone(), Some(self_cell), focus);
             next_element
         })
     }
 
-    //fn focus_traversable() -> bool;
+    fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
+        Some(self_cell)
+    }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme);
 
@@ -275,7 +309,7 @@ pub trait Element {
         None
     }
 
-    fn input_character(&mut self, _character: char) -> Option<ChangeEvent> {
+    fn input_character(&mut self, _character: char) -> Option<ClickAction> {
         None
     }
 

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::ops::Not;
 use std::rc::Rc;
 
 use cgmath::{Array, Vector2, Vector4};
@@ -42,9 +43,7 @@ pub struct ChatWindow {
     position: Vector2<f32>,
     size_constraint: SizeConstraint,
     size: Vector2<f32>,
-    messages: Rc<RefCell<Vec<ChatMessage>>>,
     elements: Vec<ElementCell>,
-    cached_message_count: usize,
 }
 
 impl ChatWindow {
@@ -72,9 +71,7 @@ impl ChatWindow {
 
         let position = cached_position
             .map(|position| size_constraint.validated_position(position, size, avalible_space))
-            .unwrap_or(Vector2::new(0.0, avalible_space.y - size.y));
-
-        let cached_message_count = messages.borrow().len();
+            .unwrap_or_else(|| Vector2::new(0.0, avalible_space.y - size.y));
 
         let input_text = Rc::new(RefCell::new(String::new()));
 
@@ -89,7 +86,7 @@ impl ChatWindow {
             let input_text = input_text.clone();
             Box::new(move || {
 
-                let message = input_text.borrow_mut().drain(..).collect();
+                let message: String = input_text.borrow_mut().drain(..).collect();
                 UserEvent::SendMessage(message)
             })
         };
@@ -98,14 +95,24 @@ impl ChatWindow {
 
             let input_text = input_text.clone();
             Box::new(move || {
-                //input_text.borrow().is_empty().not().then_some(ChangeEvent::LeftClickNext)
-                None
+
+                let message: String = input_text.borrow_mut().drain(..).collect();
+                message
+                    .is_empty()
+                    .not()
+                    .then_some(ClickAction::Event(UserEvent::SendMessage(message)))
             })
         };
 
         let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<30>::new(input_text, "write message or command", input_action)) as _,
-            cell!(FormButton::new("send", button_selector, button_action)) as _,
+            cell!(InputField::<30>::new(
+                input_text,
+                "write message or command",
+                input_action,
+                dimension!(75%)
+            )) as _,
+            cell!(FormButton::new("send", button_selector, button_action, dimension!(25%))) as _,
+            cell!(ScrollView::new(vec![cell!(Chat::new(messages))], constraint!(100%, ?))),
         ];
 
         // very imporant: give every element a link to its parent to allow propagation of events such as
@@ -120,9 +127,7 @@ impl ChatWindow {
             position,
             size_constraint,
             size,
-            messages,
             elements,
-            cached_message_count,
         }
     }
 }
@@ -163,13 +168,21 @@ impl Window for ChatWindow {
 
     fn update(&mut self) -> Option<ChangeEvent> {
 
-        let messages = self.messages.borrow();
-        if messages.len() != self.cached_message_count {
+        self.elements
+            .iter_mut()
+            .map(|element| element.borrow_mut().update())
+            .fold(None, |current, other| {
+                current.zip_with(other, ChangeEvent::combine).or(current).or(other)
+            })
+    }
 
-            self.cached_message_count = messages.len();
-            return ChangeEvent::RerenderWindow.into();
-        }
+    fn first_focused_element(&self) -> Option<ElementCell> {
 
+        let element_cell = self.elements[0].clone();
+        self.elements[0].borrow().focus_next(element_cell, None, Focus::downwards())
+    }
+
+    fn restore_focus(&self) -> Option<ElementCell> {
         None
     }
 
@@ -260,8 +273,6 @@ impl Window for ChatWindow {
             self.position.x + self.size.x,
             self.position.y + self.size.y,
         );
-        let scaled_font_size = *theme.chat.font_size * *interface_settings.scaling;
-        let scaled_shadow_offset = 1.0 * *interface_settings.scaling;
 
         renderer.render_rectangle(
             render_target,
@@ -271,27 +282,6 @@ impl Window for ChatWindow {
             *theme.chat.border_radius,
             *theme.chat.background_color,
         );
-
-        for (message_index, message) in self.messages.borrow().iter().enumerate() {
-
-            renderer.render_text(
-                render_target,
-                &message.text,
-                self.position + Vector2::new(0.0, message_index as f32 * scaled_font_size) + Vector2::from_value(scaled_shadow_offset),
-                clip_size,
-                Color::monochrome(0),
-                scaled_font_size,
-            );
-
-            renderer.render_text(
-                render_target,
-                &message.text,
-                self.position + Vector2::new(0.0, message_index as f32 * scaled_font_size),
-                clip_size,
-                message.color,
-                scaled_font_size,
-            );
-        }
 
         self.elements.iter().for_each(|element| {
 

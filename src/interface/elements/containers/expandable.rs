@@ -1,6 +1,5 @@
 use std::rc::Weak;
 
-use derive_new::new;
 use num::Zero;
 use procedural::*;
 
@@ -45,6 +44,19 @@ impl Element for Expandable {
 
     fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
         self.state.link_back(weak_self, weak_parent);
+    }
+
+    fn is_focusable(&self) -> bool {
+        self.state.is_focusable::<true>()
+    }
+
+    fn focus_next(&self, self_cell: ElementCell, caller_cell: Option<ElementCell>, focus: Focus) -> Option<ElementCell> {
+        // TODO: fix collapsed elements being focusable
+        self.state.focus_next::<true>(self_cell, caller_cell, focus)
+    }
+
+    fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
+        self.state.restore_focus(self_cell)
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
@@ -175,7 +187,7 @@ impl Element for Expandable {
             self.expanded,
         );
 
-        let foreground_color = match self.is_element_self(hovered_element) {
+        let foreground_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.expandable.hovered_foreground_color,
             false => *theme.expandable.foreground_color,
         };

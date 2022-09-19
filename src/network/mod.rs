@@ -252,6 +252,14 @@ struct LoginFailedPacket {
     pub reason: LoginFailedReason,
 }
 
+#[derive(Debug, Packet)]
+#[header(0x40, 0x08)]
+struct MapServerUnavaliblePacket {
+    pub packet_length: u16,
+    #[length_hint(self.packet_length - 4)]
+    pub unknown: String,
+}
+
 #[derive(Debug, ByteConvertable)]
 pub enum LoginFailedReason2 {
     UnregisteredId,
@@ -2184,10 +2192,14 @@ impl NetworkingSystem {
 
         if let Ok(login_failed_packet) = LoginFailedPacket::try_from_bytes(&mut byte_stream) {
             match login_failed_packet.reason {
-                LoginFailedReason::ServerClosed => return Err("server closed".to_string()),
-                LoginFailedReason::AlreadyLoggedIn => return Err("someone has already logged in with this id".to_string()),
-                LoginFailedReason::AlreadyOnline => return Err("already online".to_string()),
+                LoginFailedReason::ServerClosed => return Err("Server closed".to_string()),
+                LoginFailedReason::AlreadyLoggedIn => return Err("Someone has already logged in with this ID".to_string()),
+                LoginFailedReason::AlreadyOnline => return Err("Already online".to_string()),
             }
+        }
+
+        if let Ok(map_server_unavalible_packet) = MapServerUnavaliblePacket::try_from_bytes(&mut byte_stream) {
+            return Err("Map server currently unavalible".to_string());
         }
 
         let character_selection_success_packet = CharacterSelectionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();

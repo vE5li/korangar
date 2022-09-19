@@ -110,6 +110,14 @@ impl Element for CharacterPreview {
         self.state.link_back(weak_self, weak_parent);
     }
 
+    fn is_focusable(&self) -> bool {
+        self.state.is_focusable::<true>()
+    }
+
+    fn focus_next(&self, self_cell: ElementCell, caller_cell: Option<ElementCell>, focus: Focus) -> Option<ElementCell> {
+        self.state.focus_next::<true>(self_cell, caller_cell, focus)
+    }
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let size_constraint = &constraint!(20%, 150);
@@ -122,12 +130,19 @@ impl Element for CharacterPreview {
             return None;
         }
 
+        let weak_parent = self.state.state.parent_element.clone();
+        let weak_self = self.state.elements[0].borrow().get_state().parent_element.clone().unwrap();
+
         *self = Self::new(
             self.characters.clone(),
             self.move_request.clone(),
             self.changed.clone(),
             self.slot,
         );
+
+        // important: link back after creating elements, otherwise focus navigation and scrolling
+        // would break
+        self.state.link_back(weak_self, weak_parent);
 
         Some(ChangeEvent::Reresolve)
     }
@@ -175,7 +190,7 @@ impl Element for CharacterPreview {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        let background_color = match self.is_element_self(hovered_element) {
+        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.button.hovered_background_color,
             false => *theme.button.background_color,
         };

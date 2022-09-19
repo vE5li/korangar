@@ -137,6 +137,16 @@ where
     }
 }
 
+impl PrototypeElement for DimensionConstraint {
+
+    fn to_element(&self, display: String) -> ElementCell {
+
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
+
+        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+    }
+}
+
 impl PrototypeElement for SizeConstraint {
 
     fn to_element(&self, display: String) -> ElementCell {

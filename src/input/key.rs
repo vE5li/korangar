@@ -1,14 +1,8 @@
-use derive_new::new;
-
-#[derive(Copy, Clone, Debug, new)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Key {
-    #[new(default)]
     is_down: bool,
-    #[new(default)]
     was_down: bool,
-    #[new(default)]
     is_pressed: bool,
-    #[new(default)]
     is_released: bool,
 }
 

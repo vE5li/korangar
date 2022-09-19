@@ -12,14 +12,15 @@ use crate::interface::{Element, *};
 pub struct InputField<const LENGTH: usize, const HIDDEN: bool = false> {
     display: Rc<RefCell<String>>,
     ghost_text: &'static str,
-    action: Box<dyn Fn() -> Option<ChangeEvent>>,
+    action: Box<dyn Fn() -> Option<ClickAction>>,
+    width_constraint: DimensionConstraint,
     #[new(default)]
     state: ElementState,
 }
 
 impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
 
-    fn remove_character(&mut self) -> Option<ChangeEvent> {
+    fn remove_character(&mut self) -> Option<ClickAction> {
 
         let mut display = self.display.borrow_mut();
 
@@ -28,10 +29,10 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
         }
 
         display.pop();
-        Some(ChangeEvent::RerenderWindow)
+        Some(ClickAction::ChangeEvent(ChangeEvent::RerenderWindow))
     }
 
-    fn add_character(&mut self, character: char) -> Option<ChangeEvent> {
+    fn add_character(&mut self, character: char) -> Option<ClickAction> {
 
         let mut display = self.display.borrow_mut();
 
@@ -40,7 +41,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
         }
 
         display.push(character);
-        Some(ChangeEvent::RerenderWindow)
+        Some(ClickAction::ChangeEvent(ChangeEvent::RerenderWindow))
     }
 }
 
@@ -55,7 +56,9 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-        self.state.resolve(placement_resolver, &theme.input.size_constraint);
+
+        let size_constraint = theme.input.height_constraint.add_width(self.width_constraint);
+        self.state.resolve(placement_resolver, &size_constraint);
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
@@ -66,7 +69,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         Some(ClickAction::FocusElement)
     }
 
-    fn input_character(&mut self, character: char) -> Option<ChangeEvent> {
+    fn input_character(&mut self, character: char) -> Option<ClickAction> {
         match character {
             '\u{8}' => self.remove_character(),
             '\r' => (self.action)(),

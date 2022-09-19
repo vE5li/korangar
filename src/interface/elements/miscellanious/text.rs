@@ -28,6 +28,10 @@ impl Element for Text {
         self.state.resolve(placement_resolver, &self.size_constraint);
     }
 
+    fn is_focusable(&self) -> bool {
+        false
+    }
+
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,

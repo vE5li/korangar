@@ -9,7 +9,7 @@ mod cursor;
 mod windows;
 
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use cgmath::Vector2;
 use derive_new::new;
@@ -24,6 +24,7 @@ pub use self::settings::InterfaceSettings;
 pub use self::theme::Theme;
 pub use self::windows::*;
 use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer};
+use crate::input::FocusState;
 use crate::loaders::{ActionLoader, GameFileLoader, SpriteLoader};
 
 #[derive(new)]
@@ -106,7 +107,7 @@ impl Interface {
         self.mouse_cursor.set_start_time(client_tick);
     }
 
-    pub fn update(&mut self, client_tick: u32) -> (bool, bool) {
+    pub fn update(&mut self, focus_state: &mut FocusState, client_tick: u32) -> (bool, bool) {
 
         self.mouse_cursor.update(client_tick);
 
@@ -128,11 +129,18 @@ impl Interface {
             }
         }
 
-        for (window, reresolve, rerender) in &mut self.windows {
+        let mut restore_focus = false;
+
+        for (window_index, (window, reresolve, rerender)) in self.windows.iter_mut().enumerate() {
             if self.reresolve || *reresolve {
 
                 let (_position, previous_size) = window.get_area();
                 let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.avalible_space);
+
+                // should only ever be the last window
+                if let Some(focused_index) = focus_state.focused_window() && focused_index == window_index {
+                    restore_focus = true;
+                }
 
                 if let Some(window_class) = window_class {
                     self.window_cache.register_window(window_class, new_position, new_size);
@@ -146,6 +154,10 @@ impl Interface {
                 }
                 *reresolve = false;
             }
+        }
+
+        if restore_focus {
+            self.restore_focus(focus_state);
         }
 
         self.rerender |= self.reresolve;
@@ -195,13 +207,15 @@ impl Interface {
     pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
 
         let (_window, reresolve, _rerender) = &mut self.windows[window_index];
-        hovered_element.borrow_mut().left_click(reresolve)
+        hovered_element.borrow_mut().left_click(reresolve) // TODO: add same change_event check as
+        // for input character ?
     }
 
     pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
 
         let (_window, reresolve, _rerender) = &mut self.windows[window_index];
-        hovered_element.borrow_mut().right_click(reresolve)
+        hovered_element.borrow_mut().right_click(reresolve) // TODO: add same change_event check as
+        // for input character ?
     }
 
     pub fn drag_element(&mut self, element: &ElementCell, _window_index: usize, mouse_delta: Position) {
@@ -231,29 +245,31 @@ impl Interface {
         }
     }
 
-    pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) {
+    pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) -> Option<ClickAction> {
 
         let (window, _reresolve, rerender) = &mut self.windows[window_index];
         let has_transparency = window.has_transparency(&self.theme);
 
-        if let Some(change_event) = element.borrow_mut().input_character(character) {
-            match change_event {
+        if let Some(click_event) = element.borrow_mut().input_character(character) {
+            match click_event {
 
-                ChangeEvent::Reresolve => self.reresolve = true,
+                ClickAction::ChangeEvent(change_event) => match change_event {
 
-                ChangeEvent::Rerender => self.rerender = true,
+                    ChangeEvent::Reresolve => self.reresolve = true,
 
-                ChangeEvent::RerenderWindow => match has_transparency {
-                    true => self.rerender = true,
-                    false => *rerender = true,
+                    ChangeEvent::Rerender => self.rerender = true,
+
+                    ChangeEvent::RerenderWindow => match has_transparency {
+                        true => self.rerender = true,
+                        false => *rerender = true,
+                    },
                 },
-                /*ChangeEvent::FocusNext => println!("focus next"),
 
-                ChangeEvent::FocusPrevious => println!("focus previous"),
-
-                ChangeEvent::LeftClickNext => println!("left click next"),*/
+                other => return Some(other),
             }
         }
+
+        None
     }
 
     pub fn move_window(&mut self, window_index: usize, offset: Position) {
@@ -401,19 +417,21 @@ impl Interface {
         }
     }
 
-    fn open_new_window(&mut self, window: Box<dyn Window + 'static>) {
+    fn open_new_window(&mut self, focus_state: &mut FocusState, window: Box<dyn Window + 'static>) {
+
         self.windows.push((window, true, true));
+        focus_state.remove_focus();
     }
 
-    pub fn open_window(&mut self, prototype_window: &dyn PrototypeWindow) {
+    pub fn open_window(&mut self, focus_state: &mut FocusState, prototype_window: &dyn PrototypeWindow) {
         if !self.window_exists(prototype_window.window_class()) {
 
             let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
-            self.open_new_window(window);
+            self.open_new_window(focus_state, window);
         }
     }
 
-    pub fn open_dialog_window(&mut self, text: String, npc_id: u32) {
+    pub fn open_dialog_window(&mut self, focus_state: &mut FocusState, text: String, npc_id: u32) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
 
             let mut elements = dialog_handle.elements.borrow_mut();
@@ -430,7 +448,7 @@ impl Interface {
 
             let (window, elements, changed) = DialogWindow::new(text, npc_id);
             self.dialog_handle = Some(DialogHandle::new(elements, changed, false));
-            self.open_window(&window);
+            self.open_window(focus_state, &window);
         }
     }
 
@@ -473,24 +491,24 @@ impl Interface {
         }
     }
 
-    pub fn handle_result<T>(&mut self, result: Result<T, String>) {
+    pub fn handle_result<T>(&mut self, focus_state: &mut FocusState, result: Result<T, String>) {
         if let Err(message) = result {
-            self.open_window(&ErrorWindow::new(message));
+            self.open_window(focus_state, &ErrorWindow::new(message));
         }
     }
 
     #[cfg(feature = "debug")]
-    pub fn open_theme_viewer_window(&mut self) {
+    pub fn open_theme_viewer_window(&mut self, focus_state: &mut FocusState) {
         if !self.window_exists(self.theme.window_class()) {
 
             let window = self
                 .theme
                 .to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
-            self.open_new_window(window);
+            self.open_new_window(focus_state, window);
         }
     }
 
-    pub fn close_window(&mut self, window_index: usize) {
+    pub fn close_window(&mut self, focus_state: &mut FocusState, window_index: usize) {
 
         let (window, ..) = self.windows.remove(window_index);
         self.rerender = true;
@@ -508,9 +526,12 @@ impl Interface {
 
         let window_sender = WindowSender { window };
         std::thread::spawn(move || drop(window_sender));
+
+        // TODO: only if tab mode
+        self.restore_focus(focus_state);
     }
 
-    pub fn close_window_with_class(&mut self, window_class: &str) {
+    pub fn close_window_with_class(&mut self, focus_state: &mut FocusState, window_class: &str) {
 
         let index = self
             .windows
@@ -519,16 +540,40 @@ impl Interface {
             .position(|class_option| class_option.contains(&window_class))
             .unwrap();
 
-        self.close_window(index);
+        self.close_window(focus_state, index);
     }
 
-    pub fn close_dialog_window(&mut self) {
+    pub fn close_dialog_window(&mut self, focus_state: &mut FocusState) {
 
-        self.close_window_with_class(DialogWindow::WINDOW_CLASS);
+        self.close_window_with_class(focus_state, DialogWindow::WINDOW_CLASS);
         self.dialog_handle = None;
     }
 
     pub fn set_mouse_cursor_state(&mut self, state: MouseCursorState, client_tick: u32) {
         self.mouse_cursor.set_state(state, client_tick)
+    }
+
+    pub fn first_focused_element(&self, focus_state: &mut FocusState) {
+
+        if self.windows.is_empty() {
+            return;
+        }
+
+        let window_index = self.windows.len() - 1;
+        let element = self.windows.last().unwrap().0.first_focused_element();
+
+        focus_state.set_focused_element(element, window_index);
+    }
+
+    pub fn restore_focus(&self, focus_state: &mut FocusState) {
+
+        if self.windows.is_empty() {
+            return;
+        }
+
+        let window_index = self.windows.len() - 1;
+        let element = self.windows.last().unwrap().0.restore_focus();
+
+        focus_state.set_focused_element(element, window_index);
     }
 }

@@ -12,7 +12,9 @@ use crate::interface::*;
 pub struct ButtonTheme {
     pub background_color: Mutable<Color, RERENDER>,
     pub hovered_background_color: Mutable<Color, RERENDER>,
+    pub disabled_background_color: Mutable<Color, RERENDER>,
     pub foreground_color: Mutable<Color, RERENDER>,
+    pub disabled_foreground_color: Mutable<Color, RERENDER>,
     pub debug_foreground_color: Mutable<Color, RERENDER>,
     pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
     pub icon_offset: MutableRange<Vector2<f32>, RERENDER>,
@@ -20,6 +22,8 @@ pub struct ButtonTheme {
     pub icon_text_offset: MutableRange<Vector2<f32>, RERENDER>,
     pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
     pub font_size: MutableRange<f32, RERENDER>,
+    pub height_constraint: DimensionConstraint,
+    // TODO: remove
     pub size_constraint: SizeConstraint,
     pub menu_size_constraint: SizeConstraint,
 }
@@ -31,7 +35,9 @@ impl Default for ButtonTheme {
         Self {
             background_color: Mutable::new(Color::monochrome(100)),
             hovered_background_color: Mutable::new(Color::rgb(140, 120, 140)),
+            disabled_background_color: Mutable::new(Color::monochrome(70)),
             foreground_color: Mutable::new(Color::monochrome(200)),
+            disabled_foreground_color: Mutable::new(Color::monochrome(140)),
             debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
             icon_offset: MutableRange::new(Vector2::new(7.0, 2.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
@@ -39,6 +45,7 @@ impl Default for ButtonTheme {
             icon_text_offset: MutableRange::new(Vector2::new(20.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
+            height_constraint: dimension!(16),
             size_constraint: constraint!(40 > 100%, 16),
             menu_size_constraint: constraint!(40 > 100%, 20),
         }
@@ -246,7 +253,7 @@ pub struct InputTheme {
     pub font_size: MutableRange<f32, RERENDER>,
     pub cursor_offset: MutableRange<f32, RERENDER>,
     pub cursor_width: MutableRange<f32, RERENDER>,
-    pub size_constraint: SizeConstraint,
+    pub height_constraint: DimensionConstraint,
 }
 
 impl Default for InputTheme {
@@ -264,7 +271,7 @@ impl Default for InputTheme {
             font_size: MutableRange::new(14.0, 6.0, 50.0),
             cursor_offset: MutableRange::new(4.0, 2.0, 10.0),
             cursor_width: MutableRange::new(3.0, 2.0, 30.0),
-            size_constraint: constraint!(100%, 15),
+            height_constraint: dimension!(15),
         }
     }
 }

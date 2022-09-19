@@ -27,6 +27,10 @@ impl Element for Headline {
         &mut self.state
     }
 
+    fn is_focusable(&self) -> bool {
+        false
+    }
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
         self.state.resolve(placement_resolver, &self.size_constraint);
     }

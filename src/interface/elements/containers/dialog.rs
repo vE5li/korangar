@@ -72,6 +72,8 @@ impl Element for DialogContainer {
         self.state.link_back(weak_self, weak_parent);
     }
 
+    // TODO: focus related things
+
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let size_constraint = &constraint!(100%, ?);
@@ -86,6 +88,8 @@ impl Element for DialogContainer {
 
         *self = Self::new(self.dialog_elements.clone(), self.changed.clone(), self.npc_id);
         *self.changed.borrow_mut() = false;
+
+        // TODO: link back like in character container
 
         Some(ChangeEvent::Reresolve)
     }

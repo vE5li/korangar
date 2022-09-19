@@ -23,6 +23,10 @@ impl Element for CloseButton {
         self.state.cached_position = position;
     }
 
+    fn is_focusable(&self) -> bool {
+        false
+    }
+
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
         self.state.hovered_element(mouse_position)
     }
@@ -41,7 +45,7 @@ impl Element for CloseButton {
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
-        _focused_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
         _second_theme: bool,
     ) {
 
@@ -49,7 +53,7 @@ impl Element for CloseButton {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        let background_color = match self.is_element_self(hovered_element) {
+        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.close_button.hovered_background_color,
             false => *theme.close_button.background_color,
         };

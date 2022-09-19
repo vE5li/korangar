@@ -24,6 +24,10 @@ impl Element for DragButton {
         self.state.resolve(placement_resolver, &theme.window.title_size_constraint);
     }
 
+    fn is_focusable(&self) -> bool {
+        false
+    }
+
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
         self.state.hovered_element(mouse_position)
     }

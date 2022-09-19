@@ -2,7 +2,7 @@ mod event;
 mod key;
 mod mode;
 
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use cgmath::Vector2;
 use winit::dpi::PhysicalPosition;
@@ -12,10 +12,78 @@ pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
 use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
-use crate::interface::{ClickAction, ElementCell, Interface, MouseCursorState};
+use crate::interface::{ClickAction, ElementCell, Focus, FocusMode, Interface, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;
+
+#[derive(Default)]
+pub struct FocusState {
+    focused_element: Option<(WeakElementCell, usize)>,
+    previous_hovered_element: Option<(WeakElementCell, usize)>,
+    previous_focused_element: Option<(WeakElementCell, usize)>,
+}
+
+impl FocusState {
+
+    pub fn remove_focus(&mut self) {
+        self.focused_element = None;
+    }
+
+    pub fn set_focused_element(&mut self, element: Option<ElementCell>, window_index: usize) {
+        self.focused_element = element.as_ref().map(Rc::downgrade).zip(Some(window_index));
+    }
+
+    pub fn update_focused_element(&mut self, element: Option<ElementCell>, window_index: usize) {
+        if let Some(element) = element {
+            self.focused_element = Some((Rc::downgrade(&element), window_index));
+        }
+    }
+
+    pub fn get_focused_element(&self) -> Option<(ElementCell, usize)> {
+
+        let (element, index) = self.focused_element.clone().unzip();
+        element.as_ref().and_then(Weak::upgrade).zip(index)
+    }
+
+    pub fn did_hovered_element_change(&self, hovered_element: &Option<ElementCell>) -> bool {
+
+        self.previous_hovered_element
+            .as_ref()
+            .zip(hovered_element.as_ref())
+            .map(|(previous, current)| !Weak::ptr_eq(&previous.0, &Rc::downgrade(current)))
+            .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some())
+    }
+
+    pub fn did_focused_element_change(&self) -> bool {
+
+        self.previous_focused_element
+            .as_ref()
+            .zip(self.focused_element.as_ref())
+            .map(|(previous, current)| !Weak::ptr_eq(&previous.0, &current.0))
+            .unwrap_or(self.previous_focused_element.is_some() || self.focused_element.is_some())
+    }
+
+    pub fn previous_hovered_window(&self) -> Option<usize> {
+        self.previous_hovered_element.as_ref().map(|(_, index)| index).cloned()
+    }
+
+    pub fn focused_window(&self) -> Option<usize> {
+        self.focused_element.as_ref().map(|(_, index)| index).cloned()
+    }
+
+    pub fn previous_focused_window(&self) -> Option<usize> {
+        self.previous_focused_element.as_ref().map(|(_, index)| index).cloned()
+    }
+
+    pub fn update(&mut self, hovered_element: &Option<ElementCell>, window_index: Option<usize>) -> Option<ElementCell> {
+
+        self.previous_hovered_element = hovered_element.as_ref().map(Rc::downgrade).zip(window_index);
+        self.previous_focused_element = self.focused_element.clone();
+
+        self.focused_element.clone().and_then(|(weak_element, _)| weak_element.upgrade())
+    }
+}
 
 pub struct InputSystem {
     previous_mouse_position: Vector2<f32>,
@@ -28,9 +96,6 @@ pub struct InputSystem {
     right_mouse_button: Key,
     keys: [Key; KEY_COUNT],
     mouse_input_mode: MouseInputMode,
-    previous_hovered_element: Option<(ElementCell, usize)>,
-    focused_element: Option<(ElementCell, usize)>,
-    previous_focused_element: Option<(ElementCell, usize)>,
     input_buffer: Vec<char>,
 }
 
@@ -46,14 +111,11 @@ impl InputSystem {
         let new_scroll_position = 0.0;
         let scroll_delta = 0.0;
 
-        let left_mouse_button = Key::new();
-        let right_mouse_button = Key::new();
-        let keys = [Key::new(); KEY_COUNT];
+        let left_mouse_button = Key::default();
+        let right_mouse_button = Key::default();
+        let keys = [Key::default(); KEY_COUNT];
 
         let mouse_input_mode = MouseInputMode::None;
-        let previous_hovered_element = None;
-        let focused_element = None;
-        let previous_focused_element = None;
         let input_buffer = Vec::new();
 
         Self {
@@ -67,9 +129,6 @@ impl InputSystem {
             right_mouse_button,
             keys,
             mouse_input_mode,
-            previous_hovered_element,
-            focused_element,
-            previous_focused_element,
             input_buffer,
         }
     }
@@ -80,7 +139,6 @@ impl InputSystem {
         self.right_mouse_button.reset();
         self.keys.iter_mut().for_each(|key| key.reset());
         self.mouse_input_mode = MouseInputMode::None;
-        self.focused_element = None;
     }
 
     pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
@@ -132,6 +190,7 @@ impl InputSystem {
     pub fn user_events(
         &mut self,
         interface: &mut Interface,
+        focus_state: &mut FocusState,
         picker_target: &mut PickerRenderTarget,
         render_settings: &RenderSettings,
         window_size: Vector2<usize>,
@@ -150,7 +209,7 @@ impl InputSystem {
         let lock_actions = false;
 
         if self.left_mouse_button.pressed() || self.right_mouse_button.pressed() {
-            self.focused_element = None;
+            focus_state.remove_focus();
         }
 
         if shift_down {
@@ -170,36 +229,49 @@ impl InputSystem {
             }
         }
 
-        if let Some(window_index) = &mut window_index && self.mouse_input_mode.is_none() {
-            if (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down {
+        let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;
+        if let Some(window_index) = &mut window_index && self.mouse_input_mode.is_none() && condition {
 
-                *window_index = interface.move_window_to_top(*window_index);
-                self.mouse_input_mode = MouseInputMode::ClickInterface;
+            *window_index = interface.move_window_to_top(*window_index);
+            self.mouse_input_mode = MouseInputMode::ClickInterface;
 
-                if let Some(hovered_element) = &hovered_element {
+            if let Some(hovered_element) = &hovered_element {
 
-                    let action = match self.left_mouse_button.pressed() {
-                        true => interface.left_click_element(hovered_element, *window_index),
-                        false => interface.right_click_element(hovered_element, *window_index),
-                    };
+                let action = match self.left_mouse_button.pressed() {
+                    true => interface.left_click_element(hovered_element, *window_index),
+                    false => interface.right_click_element(hovered_element, *window_index),
+                };
 
-                    if let Some(action) = action {
-                        match action {
+                if let Some(action) = action {
+                    match action {
 
-                            ClickAction::FocusElement => self.focused_element = Some((hovered_element.clone(), *window_index)),
+                        ClickAction::ChangeEvent(..) => {}
 
-                            ClickAction::Event(event) => events.push(event),
+                        ClickAction::FocusElement => {
 
-                            ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
+                            let element_cell = hovered_element.clone();
+                            let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::downwards()); // TODO: check
+                            focus_state.set_focused_element(new_focused_element, *window_index);
+                        },
 
-                            ClickAction::DragElement => {
-                                self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
-                            }
+                        ClickAction::FocusNext(focus_mode) => {
 
-                            ClickAction::OpenWindow(prototype_window) => interface.open_window(prototype_window.as_ref()),
+                            let element_cell = hovered_element.clone();
+                            let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
+                            focus_state.update_focused_element(new_focused_element, *window_index);
+                        },
 
-                            ClickAction::CloseWindow => interface.close_window(*window_index),
+                        ClickAction::Event(event) => events.push(event),
+
+                        ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
+
+                        ClickAction::DragElement => {
+                            self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
                         }
+
+                        ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
+
+                        ClickAction::CloseWindow => interface.close_window(focus_state, *window_index),
                     }
                 }
             }
@@ -287,46 +359,92 @@ impl InputSystem {
 
         let characters = self.input_buffer.drain(..);
 
-        if let Some((focused_element, focused_window)) = &mut self.focused_element {
+        if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
+
+            // this will currently not affect the following statements, which is a bit strange
+            if self.keys[1].pressed() {
+                focus_state.remove_focus();
+            }
 
             if self.keys[15].pressed() {
 
                 let new_focused_element = focused_element
                     .borrow()
-                    .focus_next(focused_element.clone(), None, shift_down.into());
+                    .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
 
-                if let Some(new_focused_element) = new_focused_element {
-                    *focused_element = new_focused_element;
-                }
+                focus_state.update_focused_element(new_focused_element, *focused_window);
             }
 
             if self.keys[28].pressed() {
 
                 let action = interface.left_click_element(focused_element, *focused_window);
 
-                if let Some(ClickAction::Event(event)) = &action {
-                    println!("{:?}", event);
-                }
-
                 if let Some(action) = action {
                     // TODO: remove and replace with proper event
                     match action {
                         ClickAction::Event(event) => events.push(event),
-                        ClickAction::OpenWindow(prototype_window) => interface.open_window(prototype_window.as_ref()),
-                        ClickAction::CloseWindow => interface.close_window(*focused_window),
-                        _ => panic!(),
+                        ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
+                        ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
+                        _ => {}
                     }
                 }
             }
+        }
 
+        if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
             for character in characters {
                 match character {
+
                     // ignore since we need to handle tab knowing the state of shift
                     '\t' => {}
-                    valid => interface.input_character_element(focused_element, *focused_window, valid),
+
+                    '\x1b' => {}
+
+                    valid => {
+                        if let Some(action) = interface.input_character_element(focused_element, *focused_window, valid) {
+                            match action {
+
+                                // is handled in the interface
+                                ClickAction::ChangeEvent(..) => {}
+
+                                ClickAction::FocusElement => {
+
+                                    let element_cell = focused_element.clone();
+                                    let new_focused_element = focused_element.borrow().focus_next(element_cell, None, Focus::downwards());
+
+                                    focus_state.set_focused_element(new_focused_element, *focused_window);
+                                }
+
+                                ClickAction::FocusNext(focus_mode) => {
+
+                                    let element_cell = focused_element.clone();
+                                    let new_focused_element =
+                                        focused_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
+
+                                    focus_state.update_focused_element(new_focused_element, *focused_window);
+                                }
+
+                                ClickAction::Event(event) => events.push(event),
+
+                                ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
+
+                                ClickAction::DragElement => {
+                                    self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
+                                }
+
+                                ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
+
+                                ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
+                            }
+                        }
+                    }
                 }
             }
         } else {
+
+            if self.keys[15].pressed() {
+                interface.first_focused_element(focus_state);
+            }
 
             if self.keys[1].pressed() {
                 events.push(UserEvent::OpenMenuWindow);
@@ -439,18 +557,10 @@ impl InputSystem {
             hovered_element = None;
         }
 
-        // check if the hovered element changed from last frame
-        let rerender_hovered = self
-            .previous_hovered_element
-            .as_ref()
-            .zip(hovered_element.as_ref())
-            .map(|(previous, current)| !Rc::ptr_eq(&previous.0, current))
-            .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some());
+        if focus_state.did_hovered_element_change(&hovered_element) {
 
-        if rerender_hovered {
-
-            if let Some((_element, window_index)) = &self.previous_hovered_element {
-                interface.schedule_rerender_window(*window_index);
+            if let Some(window_index) = focus_state.previous_hovered_window() {
+                interface.schedule_rerender_window(window_index);
             }
 
             if let Some(window_index) = window_index {
@@ -458,42 +568,20 @@ impl InputSystem {
             }
         }
 
-        // check if the focused element changed from last frame
-        let rerender_focused = self
-            .previous_focused_element
-            .as_ref()
-            .zip(self.focused_element.as_ref())
-            .map(|(previous, current)| !Rc::ptr_eq(&previous.0, &current.0))
-            .unwrap_or(self.previous_focused_element.is_some() || self.focused_element.is_some());
+        if focus_state.did_focused_element_change() {
 
-        if rerender_focused {
-
-            if let Some((_element, window_index)) = &self.previous_focused_element {
-                interface.schedule_rerender_window(*window_index);
+            if let Some(window_index) = focus_state.previous_focused_window() {
+                interface.schedule_rerender_window(window_index);
             }
 
-            if let Some((_element, window_index)) = &self.focused_element {
-                interface.schedule_rerender_window(*window_index);
+            if let Some(window_index) = focus_state.focused_window() {
+                interface.schedule_rerender_window(window_index);
             }
         }
 
-        self.previous_hovered_element = hovered_element.clone().zip(window_index);
-        self.previous_focused_element = self.focused_element.clone();
+        let focused_element = focus_state.update(&hovered_element, window_index);
 
-        (
-            events,
-            hovered_element,
-            self.focused_element.clone().map(|(element, _)| element),
-            mouse_target,
-        )
-    }
-
-    pub fn unused_left_click(&self) -> bool {
-        self.left_mouse_button.pressed() && self.mouse_input_mode.is_none()
-    }
-
-    pub fn set_interface_clicked(&mut self) {
-        self.mouse_input_mode = MouseInputMode::ClickInterface;
+        (events, hovered_element, focused_element, mouse_target)
     }
 
     pub fn mouse_position(&self) -> Vector2<f32> {

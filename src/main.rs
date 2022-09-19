@@ -41,7 +41,7 @@ use winit::window::WindowBuilder;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::*;
-use crate::input::{InputSystem, UserEvent};
+use crate::input::{FocusState, InputSystem, UserEvent};
 use crate::interface::*;
 use crate::loaders::*;
 use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
@@ -231,6 +231,7 @@ fn main() {
         &mut texture_future,
         swapchain_holder.window_size_f32(),
     );
+    let mut focus_state = FocusState::default();
     let mut input_system = InputSystem::new();
     let mut render_settings = RenderSettings::new();
 
@@ -261,7 +262,10 @@ fn main() {
 
     let mut networking_system = NetworkingSystem::new();
 
-    interface.open_window(&LoginWindow::new(networking_system.get_login_settings().clone()));
+    interface.open_window(
+        &mut focus_state,
+        &LoginWindow::new(networking_system.get_login_settings().clone()),
+    );
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -305,7 +309,9 @@ fn main() {
                 ..
             } => {
                 if !focused {
+
                     input_system.reset();
+                    focus_state.remove_focus();
                 }
             }
 
@@ -348,6 +354,7 @@ fn main() {
                 let network_events = networking_system.network_events();
                 let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
                     &mut interface,
+                    &mut focus_state,
                     &mut picker_targets[swapchain_holder.get_image_number()],
                     &render_settings,
                     swapchain_holder.window_size(),
@@ -480,7 +487,7 @@ fn main() {
                             player.update_status(status_type);
                         }
 
-                        NetworkEvent::OpenDialog(text, npc_id) => interface.open_dialog_window(text, npc_id),
+                        NetworkEvent::OpenDialog(text, npc_id) => interface.open_dialog_window(&mut focus_state, text, npc_id),
 
                         NetworkEvent::AddNextButton => interface.add_next_button(),
 
@@ -513,11 +520,13 @@ fn main() {
 
                             Ok(character_selection_window) => {
 
-                                interface.close_window_with_class(LoginWindow::WINDOW_CLASS);
-                                interface.open_window(&character_selection_window);
+                                // TODO: this will do one unnecessary restore_focus. check if
+                                // that will be problematic
+                                interface.close_window_with_class(&mut focus_state, LoginWindow::WINDOW_CLASS);
+                                interface.open_window(&mut focus_state, &character_selection_window);
                             }
 
-                            Err(message) => interface.open_window(&ErrorWindow::new(message)),
+                            Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                         },
 
                         UserEvent::LogOut => networking_system.log_out().unwrap(),
@@ -542,11 +551,13 @@ fn main() {
                             interface.schedule_rerender();
                         }
 
-                        UserEvent::OpenMenuWindow => interface.open_window(&MenuWindow::default()),
+                        UserEvent::OpenMenuWindow => interface.open_window(&mut focus_state, &MenuWindow::default()),
 
-                        UserEvent::OpenGraphicsSettingsWindow => interface.open_window(&GraphicsSettingsWindow::default()),
+                        UserEvent::OpenGraphicsSettingsWindow => {
+                            interface.open_window(&mut focus_state, &GraphicsSettingsWindow::default())
+                        }
 
-                        UserEvent::OpenAudioSettingsWindow => interface.open_window(&AudioSettingsWindow::default()),
+                        UserEvent::OpenAudioSettingsWindow => interface.open_window(&mut focus_state, &AudioSettingsWindow::default()),
 
                         UserEvent::ReloadTheme => interface.reload_theme(),
 
@@ -557,8 +568,10 @@ fn main() {
 
                                 Ok((map_name, player_position, character_information, client_tick)) => {
 
-                                    interface.close_window_with_class(CharacterSelectionWindow::WINDOW_CLASS);
-                                    interface.open_window(&PrototypeChatWindow::new(chat_messages.clone()));
+                                    // TODO: this will do one unnecessary restore_focus. check if
+                                    // that will be problematic
+                                    interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
+                                    interface.open_window(&mut focus_state, &PrototypeChatWindow::new(chat_messages.clone()));
 
                                     map = map_loader
                                         .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
@@ -588,21 +601,21 @@ fn main() {
                                     game_timer.set_client_tick(client_tick);
                                 }
 
-                                Err(message) => interface.open_window(&ErrorWindow::new(message)),
+                                Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                             }
                         }
 
                         UserEvent::OpenCharacterCreationWindow(character_slot) => {
-                            interface.open_window(&CharacterCreationWindow::new(character_slot))
+                            interface.open_window(&mut focus_state, &CharacterCreationWindow::new(character_slot))
                         }
 
                         UserEvent::CreateCharacter(character_slot, name) => match networking_system.crate_character(character_slot, name) {
-                            Ok(..) => interface.close_window_with_class(CharacterCreationWindow::WINDOW_CLASS),
-                            Err(message) => interface.open_window(&ErrorWindow::new(message)),
+                            Ok(..) => interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS),
+                            Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                         },
 
                         UserEvent::DeleteCharacter(character_id) => {
-                            interface.handle_result(networking_system.delete_character(character_id))
+                            interface.handle_result(&mut focus_state, networking_system.delete_character(character_id))
                         }
 
                         UserEvent::RequestSwitchCharacterSlot(origin_slot) => networking_system.request_switch_character_slot(origin_slot),
@@ -610,7 +623,7 @@ fn main() {
                         UserEvent::CancelSwitchCharacterSlot => networking_system.cancel_switch_character_slot(),
 
                         UserEvent::SwitchCharacterSlot(destination_slot) => {
-                            interface.handle_result(networking_system.switch_character_slot(destination_slot))
+                            interface.handle_result(&mut focus_state, networking_system.switch_character_slot(destination_slot))
                         }
 
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
@@ -631,14 +644,20 @@ fn main() {
 
                         UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
 
-                        UserEvent::SendMessage(message) => networking_system.send_message(message),
+                        UserEvent::SendMessage(message) => {
+
+                            networking_system.send_message(message);
+                            // TODO: maybe find a better solution for unfocusing the message box if
+                            // this becomes problematic
+                            focus_state.remove_focus();
+                        }
 
                         UserEvent::NextDialog(npc_id) => networking_system.next_dialog(npc_id),
 
                         UserEvent::CloseDialog(npc_id) => {
 
                             networking_system.close_dialog(npc_id);
-                            interface.close_dialog_window();
+                            interface.close_dialog_window(&mut focus_state);
                         }
 
                         UserEvent::ChooseDialogOption(npc_id, option) => networking_system.choose_dialog_option(npc_id, option),
@@ -651,20 +670,20 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {
-                            interface.open_window(map.resolve_marker(&entities, marker_identifier))
+                            interface.open_window(&mut focus_state, map.resolve_marker(&entities, marker_identifier))
                         }
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenRenderSettingsWindow => interface.open_window(&RenderSettingsWindow::default()),
+                        UserEvent::OpenRenderSettingsWindow => interface.open_window(&mut focus_state, &RenderSettingsWindow::default()),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapDataWindow => interface.open_window(map.to_prototype_window()),
+                        UserEvent::OpenMapDataWindow => interface.open_window(&mut focus_state, map.to_prototype_window()),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapsWindow => interface.open_window(&MapsWindow::default()),
+                        UserEvent::OpenMapsWindow => interface.open_window(&mut focus_state, &MapsWindow::default()),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenTimeWindow => interface.open_window(&TimeWindow::default()),
+                        UserEvent::OpenTimeWindow => interface.open_window(&mut focus_state, &TimeWindow::default()),
 
                         #[cfg(feature = "debug")]
                         UserEvent::SetDawn => day_timer = 0.0,
@@ -679,10 +698,10 @@ fn main() {
                         UserEvent::SetMidnight => day_timer = -std::f32::consts::FRAC_PI_2,
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(),
+                        UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(&mut focus_state),
 
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenProfilerWindow => interface.open_window(&ProfilerWindow::default()),
+                        UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::default()),
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
@@ -819,7 +838,7 @@ fn main() {
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
 
-                let (clear_interface, rerender_interface) = interface.update(game_timer.get_client_tick());
+                let (clear_interface, rerender_interface) = interface.update(&mut focus_state, game_timer.get_client_tick());
 
                 networking_system.changes_applied();
 
@@ -882,7 +901,9 @@ fn main() {
                 player_camera.generate_view_projection(swapchain_holder.window_size());
                 directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
                 #[cfg(feature = "debug")]
-                debug_camera.generate_view_projection(swapchain_holder.window_size());
+                if render_settings.use_debug_camera {
+                    debug_camera.generate_view_projection(swapchain_holder.window_size());
+                }
 
                 #[cfg(feature = "debug")]
                 let current_camera: &(dyn Camera + Send + Sync) = match render_settings.use_debug_camera {

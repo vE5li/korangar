@@ -15,11 +15,14 @@ use vulkano::sync::{now, GpuFuture};
 use crate::debug::*;
 use crate::graphics::Texture;
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
+use crate::interface::{PrototypeElement, ElementCell};
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {
     #[hidden_element]
     pub textures: Vec<Texture>,
+    #[cfg(feature = "debug")]
+    sprite_data: SpriteData,
 }
 
 //impl Sprite {
@@ -28,7 +31,7 @@ pub struct Sprite {
 //    }
 //}
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct EncodedData(pub Vec<u8>);
 
 impl ByteConvertable for EncodedData {
@@ -75,7 +78,14 @@ impl ByteConvertable for EncodedData {
     }
 }
 
-#[derive(Debug, ByteConvertable)]
+impl PrototypeElement for EncodedData {
+
+    fn to_element(&self, display: String) -> ElementCell {
+        self.0.to_element(display)
+    }
+}
+
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct PaletteImageData {
     pub width: u16,
     pub height: u16,
@@ -87,7 +97,7 @@ struct PaletteImageData {
     pub raw_data: Option<Vec<u8>>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct RgbaImageData {
     pub width: u16,
     pub height: u16,
@@ -95,7 +105,7 @@ struct RgbaImageData {
     pub data: Vec<u8>,
 }
 
-#[derive(Copy, Clone, Debug, Default, ByteConvertable)]
+#[derive(Copy, Clone, Debug, Default, ByteConvertable, PrototypeElement)]
 struct PaletteColor {
     pub red: u8,
     pub green: u8,
@@ -116,12 +126,12 @@ impl PaletteColor {
     }
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct Palette {
     pub colors: [PaletteColor; 256],
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct SpriteData {
     #[version]
     pub version: Version,
@@ -164,6 +174,8 @@ impl SpriteLoader {
         }
 
         let sprite_data = SpriteData::from_bytes(&mut byte_stream, None);
+        #[cfg(feature = "debug")]
+        let cloned_sprite_data = sprite_data.clone();
 
         assert!(byte_stream.is_empty());
 
@@ -184,9 +196,12 @@ impl SpriteLoader {
                     self.queue.clone(),
                 )
                 .unwrap();
+
                 let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
                 let combined_future = inner_future.join(future).boxed();
+
                 *texture_future = combined_future;
+
                 image
             })
             .collect();
@@ -219,9 +234,12 @@ impl SpriteLoader {
                     self.queue.clone(),
                 )
                 .unwrap();
+
                 let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
                 let combined_future = inner_future.join(future).boxed();
+
                 *texture_future = combined_future;
+
                 image
             })
             .collect();
@@ -232,7 +250,11 @@ impl SpriteLoader {
             .map(|image| ImageView::new(Arc::new(image)).unwrap())
             .collect();
 
-        let sprite = Arc::new(Sprite { textures });
+        let sprite = Arc::new(Sprite {
+            textures,
+            #[cfg(feature = "debug")]
+            sprite_data: cloned_sprite_data,
+        });
         self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]

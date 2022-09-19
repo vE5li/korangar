@@ -31,6 +31,10 @@ function get_job_name_from_id(id)
             return string.sub(k, 6)
         end
 
+        if string.sub(k, 1, 6) == "JT_C1_" then
+            return string.sub(k, 7)
+        end
+
         return string.sub(k, 4)
     end
   end
@@ -53,7 +57,12 @@ end
         let globals = self.state.globals();
 
         let print: Function = globals.get("get_job_name_from_id").unwrap();
-        print.call::<_, LuaString>(job_id).unwrap().to_str().unwrap().to_owned()
+        print
+            .call::<_, LuaString>(job_id)
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace("CHONCHON", "chocho") // TODO: find a way to do this properly
     }
 
     // TODO: move this to a different class that utilizes the script loader

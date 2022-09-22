@@ -23,6 +23,7 @@ pub fn derive_packet_struct(
         .map(|attribute| attribute.parse_args::<PacketSignature>())
         .expect("packet needs to specify a signature")
         .expect("failed to parse packet header");
+    let is_ping = get_unique_attribute(&mut attributes, "ping").is_some();
 
     let (first, second) = (packet_signature.first, packet_signature.second);
     let (from_bytes_implementations, implemented_fields, to_bytes_implementations) = byte_convertable_helper(named_fields);
@@ -33,6 +34,7 @@ pub fn derive_packet_struct(
         impl #impl_generics crate::network::Packet for #name #type_generics #where_clause {
 
             const PACKET_NAME: &'static str = #packet_name;
+            const IS_PING: bool = #is_ping;
 
             fn header() -> [u8; 2] {
                 [#first, #second]
@@ -57,7 +59,7 @@ pub fn derive_packet_struct(
 
                 #[cfg(feature = "debug_network")]
                 if let Ok(packet) = &result {
-                    byte_stream.incoming_packet(packet, Self::PACKET_NAME);
+                    byte_stream.incoming_packet(packet, Self::PACKET_NAME, Self::IS_PING);
                 }
 
                 result

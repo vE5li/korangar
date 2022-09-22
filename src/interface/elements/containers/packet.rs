@@ -7,6 +7,42 @@ use procedural::*;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
 
+pub struct TrackedState<T> {
+    inner: T,
+    changed: bool,
+}
+
+impl<T> TrackedState<T> {
+
+    pub fn new(inner: T) -> TrackedState<T> {
+        Self { inner, changed: false }
+    }
+
+    pub fn get(&self) -> &T {
+        &self.inner
+    }
+
+    pub fn consume_changed(&mut self) -> bool {
+
+        let changed = self.changed;
+        self.changed = false;
+        changed
+    }
+}
+
+// TODO: uncomment once rust supports this
+//impl<T: Not> TrackedState<T>
+//where T::Output = T
+
+impl TrackedState<bool> {
+
+    pub fn toggle(&mut self) {
+
+        self.inner = !self.inner;
+        self.changed = true;
+    }
+}
+
 enum Direction {
     Incoming,
     Outgoing,
@@ -25,27 +61,34 @@ impl Display for Direction {
 pub struct PacketEntry {
     element: Box<dyn PrototypeElement>,
     name: &'static str,
+    is_ping: bool,
     direction: Direction,
 }
 
 impl PacketEntry {
 
-    pub fn new_incoming(element: &(impl PrototypeElement + Clone + 'static), name: &'static str) -> Self {
+    pub fn new_incoming(element: &(impl PrototypeElement + Clone + 'static), name: &'static str, is_ping: bool) -> Self {
 
         Self {
             element: Box::new(element.clone()),
             name,
+            is_ping,
             direction: Direction::Incoming,
         }
     }
 
-    pub fn new_outgoing(element: &(impl PrototypeElement + Clone + 'static), name: &'static str) -> Self {
+    pub fn new_outgoing(element: &(impl PrototypeElement + Clone + 'static), name: &'static str, is_ping: bool) -> Self {
 
         Self {
             element: Box::new(element.clone()),
             name,
+            is_ping,
             direction: Direction::Outgoing,
         }
+    }
+
+    fn is_ping(&self) -> bool {
+        self.is_ping
     }
 
     fn to_element(&self) -> ElementCell {
@@ -56,11 +99,10 @@ impl PacketEntry {
 pub struct PacketView {
     packets: Rc<RefCell<Vec<PacketEntry>>>,
     cleared: Rc<RefCell<bool>>,
-    //show_pings: Rc<RefCell<bool>>,
+    show_pings: Rc<RefCell<TrackedState<bool>>>,
     update: Rc<RefCell<bool>>,
     weak_self: Option<WeakElementCell>,
     cached_packet_count: usize,
-    //cached_show_pings: bool,
     state: ContainerState,
 }
 
@@ -69,12 +111,11 @@ impl PacketView {
     pub fn new(
         packets: Rc<RefCell<Vec<PacketEntry>>>,
         cleared: Rc<RefCell<bool>>,
-        //show_pings: Rc<RefCell<bool>>,
+        show_pings: Rc<RefCell<TrackedState<bool>>>,
         update: Rc<RefCell<bool>>,
     ) -> Self {
 
         let weak_self = None;
-        //let cached_show_pings = *show_pings.borrow();
         let (elements, cached_packet_count) = {
 
             let packets = packets.borrow();
@@ -87,11 +128,10 @@ impl PacketView {
         Self {
             packets,
             cleared,
-            //show_pings,
+            show_pings,
             update,
             weak_self,
             cached_packet_count,
-            //cached_show_pings,
             state: ContainerState::new(elements),
         }
     }
@@ -138,25 +178,34 @@ impl Element for PacketView {
 
     fn update(&mut self) -> Option<ChangeEvent> {
 
-        if !*self.update.borrow() {
-            return None;
-        }
-
-        let packet_count = self.packets.borrow().len();
         let mut reresolve = false;
+        let mut packet_count = match *self.update.borrow() {
+            true => self.packets.borrow().len(),
+            false => self.cached_packet_count,
+        };
 
         if *self.cleared.borrow() {
 
             self.state.elements.clear();
             self.cached_packet_count = 0;
             *self.cleared.borrow_mut() = false;
+            packet_count = 0;
+            reresolve = true;
+        }
+
+        if self.show_pings.borrow_mut().consume_changed() {
+
+            self.state.elements.clear();
+            self.cached_packet_count = 0;
             reresolve = true;
         }
 
         if self.cached_packet_count < packet_count {
 
-            let mut new_elements: Vec<ElementCell> = self.packets.borrow()[self.cached_packet_count..]
+            let show_pings = *self.show_pings.borrow().get();
+            let mut new_elements: Vec<ElementCell> = self.packets.borrow()[self.cached_packet_count..packet_count]
                 .iter()
+                .filter(|entry| show_pings || !entry.is_ping())
                 .map(PacketEntry::to_element)
                 .collect();
 

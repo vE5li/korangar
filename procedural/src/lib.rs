@@ -90,7 +90,7 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
 }
 
 /// Derive the Packet trait. A packet header must be specified and all fields must implement ByteConvertable.
-#[proc_macro_derive(Packet, attributes(header, length_hint, repeating))]
+#[proc_macro_derive(Packet, attributes(header, ping, length_hint, repeating))]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 
     let DeriveInput {

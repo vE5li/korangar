@@ -18,7 +18,7 @@ pub use self::default::Container;
 pub use self::dialog::{DialogContainer, DialogElement};
 pub use self::expandable::Expandable;
 #[cfg(feature = "debug_network")]
-pub use self::packet::{PacketEntry, PacketView};
+pub use self::packet::{PacketEntry, PacketView, TrackedState};
 pub use self::scroll::ScrollView;
 use crate::interface::*;
 

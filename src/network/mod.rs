@@ -25,8 +25,8 @@ use crate::loaders::{ByteConvertable, ByteStream};
 /// the first two bytes will be the size of the packet in bytes *including* the header. Packets are sent in little endian.
 pub trait Packet: PrototypeElement + Clone {
 
-    // TODO: find a nice way to do this
     const PACKET_NAME: &'static str;
+    const IS_PING: bool;
 
     fn header() -> [u8; 2];
 
@@ -333,6 +333,7 @@ struct CharacterCreationFailedPacket {
 /// Sent by the client to the login server every 60 seconds to keep the connection alive.
 #[derive(Clone, Debug, Default, Packet, PrototypeElement)]
 #[header(0x00, 0x02)]
+#[ping]
 struct LoginServerKeepalivePacket {
     pub user_id: [u8; 24],
 }
@@ -1185,12 +1186,14 @@ struct DamagePacket {
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x7f, 0x00)]
+#[ping]
 struct ServerTickPacket {
     pub client_tick: u32,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x60, 0x03)]
+#[ping]
 struct RequestServerTickPacket {
     pub client_tick: u32,
 }
@@ -1774,6 +1777,7 @@ struct MapLoadedPacket {}
 
 #[derive(Clone, Debug, Default, Packet, PrototypeElement)]
 #[header(0x87, 0x01)]
+#[ping]
 struct CharacterServerKeepalivePacket {
     pub account_id: u32,
 }
@@ -2050,7 +2054,7 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         self.packet_history
             .borrow_mut()
-            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME));
+            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
 
         let packet_bytes = packet.to_bytes();
         self.login_stream
@@ -2066,7 +2070,7 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         self.packet_history
             .borrow_mut()
-            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME));
+            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
 
         let packet_bytes = packet.to_bytes();
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
@@ -2083,7 +2087,7 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         self.packet_history
             .borrow_mut()
-            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME));
+            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
 
         let packet_bytes = packet.to_bytes();
         let map_stream = self.map_stream.as_mut().expect("no map server connection");

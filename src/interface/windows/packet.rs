@@ -8,7 +8,7 @@ use crate::interface::*;
 pub struct PacketWindow {
     packets: Rc<RefCell<Vec<PacketEntry>>>,
     cleared: Rc<RefCell<bool>>,
-    show_pings: Rc<RefCell<bool>>,
+    show_pings: Rc<RefCell<TrackedState<bool>>>,
     update: Rc<RefCell<bool>>,
 }
 
@@ -19,13 +19,13 @@ impl PacketWindow {
     pub fn new(packets: Rc<RefCell<Vec<PacketEntry>>>) -> Self {
 
         let cleared = Rc::new(RefCell::new(false));
-        let pings = Rc::new(RefCell::new(false));
+        let show_pings = Rc::new(RefCell::new(TrackedState::new(false)));
         let update = Rc::new(RefCell::new(true));
 
         Self {
             packets,
             cleared,
-            show_pings: pings,
+            show_pings,
             update,
         }
     }
@@ -47,7 +47,8 @@ impl PrototypeWindow for PacketWindow {
         let elements: Vec<ElementCell> = vec![cell!(PacketView::new(
             self.packets.clone(),
             self.cleared.clone(),
-            self.update.clone()
+            self.show_pings.clone(),
+            self.update.clone(),
         ))];
 
         let clear_selector = {
@@ -71,19 +72,14 @@ impl PrototypeWindow for PacketWindow {
         let ping_selector = {
 
             let show_pings = self.show_pings.clone();
-            move |_: &StateProvider| *show_pings.borrow()
+            move |_: &StateProvider| *show_pings.borrow().get()
         };
 
         let ping_action = {
 
             let show_pings = self.show_pings.clone();
 
-            move || {
-
-                let mut show_pings = show_pings.borrow_mut();
-                let current_state = *show_pings;
-                *show_pings = !current_state;
-            }
+            move || show_pings.borrow_mut().toggle()
         };
 
         let update_selector = {
@@ -109,19 +105,19 @@ impl PrototypeWindow for PacketWindow {
                 .with_static_text("clear")
                 .with_disabled_selector(clear_selector)
                 .with_closure(clear_action)
-                .with_width(dimension!(33%))
+                .with_width(dimension!(33.33%))
                 .wrap(),
             StateButton::default()
                 .with_static_text("show pings")
                 .with_selector(ping_selector)
                 .with_closure(ping_action)
-                .with_width(dimension!(33%))
+                .with_width(dimension!(33.33%))
                 .wrap(),
             StateButton::default()
                 .with_static_text("update")
                 .with_selector(update_selector)
                 .with_closure(update_action)
-                .with_width(dimension!(33%))
+                .with_width(dimension!(!))
                 .wrap(),
             cell!(ScrollView::new(elements, constraint!(100%, ?))),
         ];

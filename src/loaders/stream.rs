@@ -184,13 +184,13 @@ impl<'b> ByteStream<'b> {
     }
 
     #[cfg(feature = "debug_network")]
-    pub fn incoming_packet(&mut self, packet: &(impl Packet + 'static), name: &'static str) {
-        self.packet_history.push(PacketEntry::new_incoming(packet, name));
+    pub fn incoming_packet(&mut self, packet: &(impl Packet + 'static), name: &'static str, is_ping: bool) {
+        self.packet_history.push(PacketEntry::new_incoming(packet, name, is_ping));
     }
 
     #[cfg(feature = "debug_network")]
     pub fn incoming_unknown_packet(&mut self, bytes: Vec<u8>) {
-        self.packet_history.push(PacketEntry::new_incoming(&bytes, "UNKNOWN"));
+        self.packet_history.push(PacketEntry::new_incoming(&bytes, "UNKNOWN", false));
     }
 
     #[cfg(feature = "debug_network")]

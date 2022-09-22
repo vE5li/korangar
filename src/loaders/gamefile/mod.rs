@@ -252,7 +252,7 @@ impl GameFileLoader {
 
             // Try to unify all bytecode to Lua 5.1 and possibly 64 bit, If the operation fails the
             // file might not actually be bytecode but rather source code so don't add it.
-            if let Ok(bytes) = unify(bytes, bytecode_format) {
+            if let Ok(bytes) = unify(&bytes, bytecode_format) {
                 lua_archive.add_file(file_name, bytes);
             }
         }

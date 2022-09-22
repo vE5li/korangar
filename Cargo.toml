@@ -23,8 +23,8 @@ pathfinding = "2.2.2"
 chrono = "0.4"
 lazy_static = { version = "1.4.0", optional = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
-lunify = { git = "https://github.com/ve5li/lunify.git" }
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
+lunify = "0.1.1"
 
 [features]
 local = []

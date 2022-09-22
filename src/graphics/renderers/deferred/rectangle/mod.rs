@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",

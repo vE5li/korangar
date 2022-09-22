@@ -57,7 +57,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
 
-        let size_constraint = theme.input.height_constraint.add_width(self.width_constraint);
+        let size_constraint = self.width_constraint.add_height(theme.input.height_constraint);
         self.state.resolve(placement_resolver, &size_constraint);
     }
 

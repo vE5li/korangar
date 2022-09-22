@@ -21,20 +21,16 @@ impl Object {
         self.transform.position += offset;
     }
 
-    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32)
+    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32, time: f32)
     where
         T: Renderer + GeometryRenderer,
     {
         self.model
-            .render_geometry(render_target, renderer, camera, &self.transform, client_tick);
+            .render_geometry(render_target, renderer, camera, &self.transform, client_tick, time);
     }
 
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
         self.model.get_bounding_box_matrix(&self.transform)
-    }
-
-    pub fn get_bounding_box(&self) -> BoundingBox {
-        self.model.get_bounding_box()
     }
 
     #[cfg(feature = "debug")]

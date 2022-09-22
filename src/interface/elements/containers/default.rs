@@ -1,25 +1,36 @@
 use std::rc::Weak;
 
+use cgmath::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
 
 pub struct Container {
+    size_constraint: Option<SizeConstraint>,
+    border_size: Option<Vector2<f32>>,
     state: ContainerState,
-    size_constraint: SizeConstraint,
 }
 
 impl Container {
 
-    pub const DEFAULT_SIZE: SizeConstraint = constraint!(100%, ?);
-
-    pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
+    pub fn new(elements: Vec<ElementCell>) -> Self {
 
         Self {
             state: ContainerState::new(elements),
-            size_constraint,
+            border_size: None,
+            size_constraint: None,
         }
+    }
+
+    pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
+
+        self.size_constraint = Some(size_constraint);
+        self
+    }
+
+    pub fn wrap(self) -> ElementCell {
+        Rc::new(RefCell::new(self))
     }
 }
 
@@ -50,8 +61,12 @@ impl Element for Container {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+
+        let size_constraint = self.size_constraint.as_ref().unwrap_or(&constraint!(100%, ?));
+        let border = self.border_size.unwrap_or_else(Vector2::zero);
+
         self.state
-            .resolve(placement_resolver, interface_settings, theme, &self.size_constraint);
+            .resolve(placement_resolver, interface_settings, theme, size_constraint, border);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

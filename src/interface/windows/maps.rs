@@ -2,7 +2,7 @@ use cgmath::Vector2;
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(Default)]
 pub struct MapsWindow {}
@@ -55,10 +55,10 @@ impl PrototypeWindow for MapsWindow {
             .into_iter()
             .map(|(name, position)| {
 
-                cell!(EventButton::new(
-                    name.to_string(),
-                    UserEvent::RequestWarpToMap(format!("{}.gat", name), position)
-                )) as ElementCell
+                Button::default()
+                    .with_dynamic_text(name.to_owned())
+                    .with_event(UserEvent::RequestWarpToMap(format!("{}.gat", name), position))
+                    .wrap()
             })
             .collect();
 

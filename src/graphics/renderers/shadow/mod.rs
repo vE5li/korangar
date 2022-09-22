@@ -93,14 +93,15 @@ impl GeometryRendererTrait for ShadowRenderer {
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
-        textures: &Vec<Texture>,
+        textures: &[Texture],
         world_matrix: Matrix4<f32>,
+        time: f32,
     ) where
         Self: Renderer,
     {
 
         if render_target.bind_subrenderer(ShadowSubrenderer::Geometry) {
-            self.geometry_renderer.bind_pipeline(render_target, camera);
+            self.geometry_renderer.bind_pipeline(render_target, camera, time);
         }
 
         self.geometry_renderer

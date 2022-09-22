@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -55,36 +59,42 @@ impl EntityRenderer {
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 0.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(-1.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 1.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(1.0, -2.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 0.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(1.0, -2.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 0.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(-1.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 1.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(1.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 1.0),
                 0,
+                0.0,
             ),
         ];
 

@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
-use std::str::from_utf8;
 
 use derive_new::new;
 use procedural::*;

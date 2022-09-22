@@ -2,6 +2,8 @@ mod character;
 mod default;
 mod dialog;
 mod expandable;
+#[cfg(feature = "debug_network")]
+mod packet;
 mod scroll;
 
 use std::cell::Cell;
@@ -15,6 +17,8 @@ pub use self::character::CharacterPreview;
 pub use self::default::Container;
 pub use self::dialog::{DialogContainer, DialogElement};
 pub use self::expandable::Expandable;
+#[cfg(feature = "debug_network")]
+pub use self::packet::{PacketEntry, PacketView};
 pub use self::scroll::ScrollView;
 use crate::interface::*;
 
@@ -45,11 +49,14 @@ impl ContainerState {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         size_constraint: &SizeConstraint,
+        border: Vector2<f32>,
     ) {
 
-        let (mut size, position) = placement_resolver.allocate(&size_constraint);
-        let mut inner_placement_resolver = placement_resolver.derive(Position::zero(), Size::zero());
-        inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
+        let (mut size, position) = placement_resolver.allocate(size_constraint);
+        let mut inner_placement_resolver = placement_resolver.derive(size, Position::zero(), border);
+
+        // TODO: add ability to pass this in (by calling .with_gaps(..) on the container)
+        //inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
 
         self.elements.iter_mut().for_each(|element| {
 

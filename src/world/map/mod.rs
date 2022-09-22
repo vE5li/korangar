@@ -168,7 +168,7 @@ impl Map {
         &self.tiles[position.x + position.y * self.width]
     }
 
-    pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
+    pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, time: f32)
     where
         T: Renderer + GeometryRenderer,
     {
@@ -179,6 +179,7 @@ impl Map {
             self.ground_vertex_buffer.clone(),
             &self.ground_textures,
             Matrix4::identity(),
+            time,
         );
     }
 
@@ -188,6 +189,7 @@ impl Map {
         renderer: &T,
         camera: &dyn Camera,
         client_tick: u32,
+        time: f32,
         #[cfg(feature = "debug")] frustum_culling: bool,
     ) where
         T: Renderer + GeometryRenderer,
@@ -202,7 +204,7 @@ impl Map {
             #[cfg(feature = "debug")]
             if !frustum_culling {
 
-                object.render_geometry(render_target, renderer, camera, client_tick);
+                object.render_geometry(render_target, renderer, camera, client_tick, time);
                 continue;
             }
 
@@ -216,7 +218,7 @@ impl Map {
             let culled = matches!(frustum.contains(&collision_bounding_box), Relation::Out);
 
             if !culled {
-                object.render_geometry(render_target, renderer, camera, client_tick);
+                object.render_geometry(render_target, renderer, camera, client_tick, time);
             };
         }
     }
@@ -336,13 +338,24 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn resolve_marker<'a>(&'a self, entities: &'a Vec<Entity>, marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
+    pub fn render_overlay_tiles(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    ) {
+        renderer.render_overlay_tiles(render_target, camera, self.tile_vertex_buffer.clone());
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn resolve_marker<'a>(&'a self, entities: &'a [Entity], marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow {
         match marker_identifier {
             MarkerIdentifier::Object(index) => &self.objects[index],
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
-            MarkerIdentifier::Particle(..) => panic!(), // TODO: implement properly
+            MarkerIdentifier::Particle(..) => panic!(),
+            // TODO: implement properly
             MarkerIdentifier::Entity(index) => &entities[index],
         }
     }

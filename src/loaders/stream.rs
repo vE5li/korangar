@@ -1,18 +1,30 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use cgmath::{Matrix3, Vector3};
 use derive_new::new;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::Color;
+#[cfg(feature = "debug_network")]
+use crate::interface::PacketEntry;
+#[cfg(feature = "debug")]
+use crate::interface::PrototypeElement;
 use crate::loaders::Version;
+#[cfg(feature = "debug")]
+use crate::network::Packet;
 
-#[derive(Clone, new)]
+#[derive(new)]
 pub struct ByteStream<'b> {
     data: &'b [u8],
     #[new(default)]
     offset: usize,
     #[new(default)]
     version: Option<Version>,
+    #[cfg(feature = "debug_network")]
+    #[new(default)]
+    packet_history: Vec<PacketEntry>,
 }
 
 impl<'b> ByteStream<'b> {
@@ -140,23 +152,6 @@ impl<'b> ByteStream<'b> {
         Vector3::new(x, -y, z)
     }
 
-    pub fn matrix3(&mut self) -> Matrix3<f32> {
-
-        let c0r0 = self.float32();
-        let c0r1 = self.float32();
-        let c0r2 = self.float32();
-
-        let c1r0 = self.float32();
-        let c1r1 = self.float32();
-        let c1r2 = self.float32();
-
-        let c2r0 = self.float32();
-        let c2r1 = self.float32();
-        let c2r2 = self.float32();
-
-        Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2)
-    }
-
     pub fn color(&mut self) -> Color {
 
         let red = self.float32();
@@ -179,13 +174,28 @@ impl<'b> ByteStream<'b> {
         value
     }
 
-    pub fn remaining(&mut self) -> Vec<u8> {
+    pub fn remaining_bytes(&mut self) -> Vec<u8> {
         // temporary ?
         self.slice(self.data.len() - self.offset)
     }
 
     pub fn skip(&mut self, count: usize) {
         self.offset += count;
+    }
+
+    #[cfg(feature = "debug_network")]
+    pub fn incoming_packet(&mut self, packet: &(impl Packet + 'static), name: &'static str) {
+        self.packet_history.push(PacketEntry::new_incoming(packet, name));
+    }
+
+    #[cfg(feature = "debug_network")]
+    pub fn incoming_unknown_packet(&mut self, bytes: Vec<u8>) {
+        self.packet_history.push(PacketEntry::new_incoming(&bytes, "UNKNOWN"));
+    }
+
+    #[cfg(feature = "debug_network")]
+    pub fn transfer_packet_history(&mut self, packet_history: &mut Vec<PacketEntry>) {
+        packet_history.append(&mut self.packet_history);
     }
 
     #[cfg(feature = "debug")]

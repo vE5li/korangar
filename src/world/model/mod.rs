@@ -1,5 +1,4 @@
 mod node;
-mod shading;
 
 use std::ops::Mul;
 
@@ -8,7 +7,6 @@ use derive_new::new;
 use procedural::*;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};
-pub use self::shading::ShadingType;
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
 use crate::graphics::{Camera, DeferredRenderer, GeometryRenderer, Renderer, Transform};
@@ -32,11 +30,12 @@ impl Model {
         camera: &dyn Camera,
         root_transform: &Transform,
         client_tick: u32,
+        time: f32,
     ) where
         T: Renderer + GeometryRenderer,
     {
         self.root_node
-            .render_geometry(render_target, renderer, camera, root_transform, client_tick);
+            .render_geometry(render_target, renderer, camera, root_transform, client_tick, time);
     }
 
     pub fn bounding_box_matrix(bounding_box: &BoundingBox, transform: &Transform) -> Matrix4<f32> {
@@ -69,10 +68,6 @@ impl Model {
         Matrix4::from_translation(position) * rotation_matrix * offset_matrix * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
     }
 
-    pub fn get_bounding_box(&self) -> BoundingBox {
-        self.bounding_box
-    }
-
     #[cfg(feature = "debug")]
     pub fn render_bounding_box(
         &self,
@@ -81,6 +76,6 @@ impl Model {
         camera: &dyn Camera,
         root_transform: &Transform,
     ) {
-        renderer.render_bounding_box(render_target, camera, &root_transform, &self.bounding_box, Color::monochrome(0));
+        renderer.render_bounding_box(render_target, camera, root_transform, &self.bounding_box, Color::monochrome(0));
     }
 }

@@ -1,9 +1,7 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{
-    ElementCell, FramedWindow, InterfaceSettings, PrototypeElement, PrototypeWindow, Size, StateButton, StateProvider, Window, WindowCache,
-};
+use crate::interface::*;
 
 #[derive(Default)]
 pub struct GraphicsSettingsWindow {}
@@ -27,12 +25,11 @@ impl PrototypeWindow for GraphicsSettingsWindow {
     ) -> Box<dyn Window + 'static> {
 
         let elements: Vec<ElementCell> = vec![
-            {
-
-                // TODO: replace with macro
-                let selector = Box::new(|state_provider: &StateProvider| state_provider.render_settings.frame_limit);
-                cell!(StateButton::new("framerate limit", UserEvent::ToggleFrameLimit, selector))
-            },
+            StateButton::default()
+                .with_static_text("framerate limit")
+                .with_selector(|state_provider| state_provider.render_settings.frame_limit)
+                .with_event(UserEvent::ToggleFrameLimit)
+                .wrap(),
             interface_settings.to_element("interface settings".to_string()),
         ];
 

@@ -2,11 +2,11 @@ use std::cell::RefCell;
 use std::ops::Not;
 use std::rc::Rc;
 
-use cgmath::{Array, Vector2, Vector4};
+use cgmath::{Vector2, Vector4};
 use derive_new::new;
 use procedural::*;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::UserEvent;
 use crate::interface::{Element, Position, PrototypeWindow, Size, SizeConstraint, StateProvider, Window, WindowCache, *};
 use crate::network::ChatMessage;
@@ -78,17 +78,19 @@ impl ChatWindow {
         let button_selector = {
 
             let input_text = input_text.clone();
-            Box::new(move || !input_text.borrow().is_empty())
+
+            move || !input_text.borrow().is_empty()
         };
 
         let button_action = {
 
             let input_text = input_text.clone();
-            Box::new(move || {
+
+            move || {
 
                 let message: String = input_text.borrow_mut().drain(..).collect();
-                UserEvent::SendMessage(message)
-            })
+                Some(ClickAction::Event(UserEvent::SendMessage(message)))
+            }
         };
 
         let input_action = {
@@ -111,7 +113,12 @@ impl ChatWindow {
                 input_action,
                 dimension!(75%)
             )) as _,
-            cell!(FormButton::new("send", button_selector, button_action, dimension!(25%))) as _,
+            Button::default()
+                .with_static_text("send")
+                .with_disabled_selector(button_selector)
+                .with_action_closure(button_action)
+                .with_width(dimension!(25%))
+                .wrap(),
             cell!(ScrollView::new(vec![cell!(Chat::new(messages))], constraint!(100%, ?))),
         ];
 

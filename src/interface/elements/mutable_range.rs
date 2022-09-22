@@ -34,7 +34,7 @@ impl PrototypeMutableRangeElement<f32> for f32 {
             )),
         ];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -57,6 +57,6 @@ where
             )),
         ];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }

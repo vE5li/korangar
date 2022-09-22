@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -18,7 +22,6 @@ use std::sync::Arc;
 use cgmath::Vector2;
 use vulkano::buffer::BufferUsage;
 use vulkano::device::Device;
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};

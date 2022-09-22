@@ -1,13 +1,13 @@
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use cgmath::{Array, Vector2};
+use cgmath::Array;
 use derive_new::new;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
 use procedural::*;
 
-use crate::interface::{ChangeEvent, ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(new)]
 pub struct VectorWindow<T>
@@ -43,7 +43,7 @@ where
         for index in 0..<T as Array>::len() {
 
             let label = LABELS[index].to_string();
-            let pointer = unsafe { &inner_value[index] as *const T::Element };
+            let pointer = &inner_value[index] as *const T::Element;
 
             elements.push(cell!(Headline::new(label, Headline::DEFAULT_SIZE)) as _);
             elements.push(cell!(Slider::new(

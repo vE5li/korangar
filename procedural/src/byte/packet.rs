@@ -18,6 +18,7 @@ pub fn derive_packet_struct(
         panic!("only named fields may be derived");
     };
 
+    let packet_name = name.to_string();
     let packet_signature = get_unique_attribute(&mut attributes, "header")
         .map(|attribute| attribute.parse_args::<PacketSignature>())
         .expect("packet needs to specify a signature")
@@ -31,6 +32,8 @@ pub fn derive_packet_struct(
 
         impl #impl_generics crate::network::Packet for #name #type_generics #where_clause {
 
+            const PACKET_NAME: &'static str = #packet_name;
+
             fn header() -> [u8; 2] {
                 [#first, #second]
             }
@@ -43,6 +46,7 @@ pub fn derive_packet_struct(
         impl #impl_generics #name #type_generics #where_clause {
 
             fn try_from_bytes(byte_stream: &mut crate::loaders::ByteStream) -> Result<Self, String> {
+
                 let result = match byte_stream.match_signature(Self::header()) {
                     true => {
                         #(#from_bytes_implementations)*
@@ -53,7 +57,7 @@ pub fn derive_packet_struct(
 
                 #[cfg(feature = "debug_network")]
                 if let Ok(packet) = &result {
-                    print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, packet);
+                    byte_stream.incoming_packet(packet, Self::PACKET_NAME);
                 }
 
                 result

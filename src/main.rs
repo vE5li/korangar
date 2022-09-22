@@ -1,3 +1,5 @@
+#![allow(incomplete_features)]
+#![allow(clippy::too_many_arguments)]
 #![feature(unzip_option)]
 #![feature(option_zip)]
 #![feature(let_else)]
@@ -277,6 +279,7 @@ fn main() {
     const TIME_FACTOR: f32 = 1000.0;
     let local: DateTime<Local> = Local::now();
     let mut day_timer = (local.hour() as f32 / TIME_FACTOR * 60.0 * 60.0) + (local.minute() as f32 / TIME_FACTOR * 60.0);
+    let mut animation_timer = 0.0;
     //
 
     let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220));
@@ -348,6 +351,7 @@ fn main() {
                 let client_tick = game_timer.get_client_tick();
 
                 day_timer += delta_time as f32 / TIME_FACTOR;
+                animation_timer += delta_time as f32;
 
                 networking_system.keep_alive(delta_time, client_tick);
 
@@ -703,6 +707,11 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::default()),
 
+                        #[cfg(feature = "debug_network")]
+                        UserEvent::OpenPacketWindow => {
+                            interface.open_window(&mut focus_state, &PacketWindow::new(networking_system.packets()))
+                        }
+
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
 
@@ -846,7 +855,12 @@ fn main() {
 
                     let viewport = swapchain_holder.recreate_swapchain();
 
-                    deferred_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
+                    deferred_renderer.recreate_pipeline(
+                        viewport.clone(),
+                        swapchain_holder.window_size_u32(),
+                        #[cfg(feature = "debug")]
+                        render_settings.show_wireframe,
+                    );
                     interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     picker_renderer.recreate_pipeline(viewport, swapchain_holder.window_size_u32());
 
@@ -883,8 +897,8 @@ fn main() {
                 let wait_for_previous = rerender_interface;
 
                 if wait_for_previous {
-                    for index in 0..screen_targets.len() {
-                        if let Some(mut fence) = screen_targets[index].state.try_take_fence() {
+                    for screen_target in &mut screen_targets {
+                        if let Some(mut fence) = screen_target.state.try_take_fence() {
 
                             fence.wait(None).unwrap();
                             fence.cleanup_finished();
@@ -963,7 +977,12 @@ fn main() {
                         directional_shadow_target.start();
 
                         #[debug_condition(render_settings.show_map)]
-                        map.render_ground(directional_shadow_target, &shadow_renderer, &directional_shadow_camera);
+                        map.render_ground(
+                            directional_shadow_target,
+                            &shadow_renderer,
+                            &directional_shadow_camera,
+                            animation_timer,
+                        );
 
                         #[debug_condition(render_settings.show_objects)]
                         map.render_objects(
@@ -971,6 +990,7 @@ fn main() {
                             &shadow_renderer,
                             &directional_shadow_camera,
                             client_tick,
+                            animation_timer,
                             #[cfg(feature = "debug")]
                             render_settings.frustum_culling,
                         );
@@ -988,7 +1008,12 @@ fn main() {
                         screen_target.start();
 
                         #[debug_condition(render_settings.show_map)]
-                        map.render_ground(screen_target, &deferred_renderer, current_camera);
+                        map.render_ground(screen_target, &deferred_renderer, current_camera, animation_timer);
+
+                        #[cfg(feature = "debug")]
+                        if render_settings.show_map_tiles {
+                            map.render_overlay_tiles(screen_target, &deferred_renderer, current_camera);
+                        }
 
                         #[debug_condition(render_settings.show_objects)]
                         map.render_objects(
@@ -996,6 +1021,7 @@ fn main() {
                             &deferred_renderer,
                             current_camera,
                             client_tick,
+                            animation_timer,
                             #[cfg(feature = "debug")]
                             render_settings.frustum_culling,
                         );
@@ -1006,7 +1032,7 @@ fn main() {
                             .for_each(|entity| entity.render(screen_target, &deferred_renderer, current_camera));
 
                         #[debug_condition(render_settings.show_water)]
-                        map.render_water(screen_target, &deferred_renderer, current_camera, day_timer);
+                        map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
 
                         screen_target.lighting_pass();
 

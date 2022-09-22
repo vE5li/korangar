@@ -1,4 +1,4 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 use cgmath::{Vector2, Vector4, Zero};

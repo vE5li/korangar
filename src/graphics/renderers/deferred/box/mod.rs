@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -13,25 +17,20 @@ mod fragment_shader {
 }
 
 use std::iter;
-use std::ops::Mul;
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
-use vulkano::buffer::{BufferAccess, BufferUsage};
+use cgmath::{Vector2, Vector3};
+use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Device;
-use vulkano::image::ImageViewAbstract;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::rasterization::{CullMode, PolygonMode, RasterizationState};
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint, StateMode};
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
 use vulkano::shader::ShaderModule;
 
-use self::fragment_shader::SpecializationConstants;
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
 use crate::world::{BoundingBox, Model};
@@ -59,48 +58,56 @@ impl BoxRenderer {
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 0.0),
                 0,
+                0.0,
             ), // bottom left front
             ModelVertex::new(
                 Vector3::new(-1.0, 1.0, -1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 1.0),
                 0,
+                0.0,
             ), // top left front
             ModelVertex::new(
                 Vector3::new(1.0, -1.0, -1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 0.0),
                 0,
+                0.0,
             ), // bottom right front
             ModelVertex::new(
                 Vector3::new(1.0, 1.0, -1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 1.0),
                 0,
+                0.0,
             ), // top right front
             ModelVertex::new(
                 Vector3::new(-1.0, -1.0, 1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 0.0),
                 0,
+                0.0,
             ), // bottom left back
             ModelVertex::new(
                 Vector3::new(-1.0, 1.0, 1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 1.0),
                 0,
+                0.0,
             ), // top left back
             ModelVertex::new(
                 Vector3::new(1.0, -1.0, 1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 0.0),
                 0,
+                0.0,
             ), // bottom right back
             ModelVertex::new(
                 Vector3::new(1.0, 1.0, 1.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 1.0),
                 0,
+                0.0,
             ), // top right back
         ];
 
@@ -175,7 +182,6 @@ impl BoxRenderer {
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        camera: &dyn Camera,
         transform: &Transform,
         bounding_box: &BoundingBox,
         color: Color,

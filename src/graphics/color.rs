@@ -90,7 +90,7 @@ impl Color {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub struct ColorBGR {
     pub blue: u8,
     pub green: u8,
@@ -106,7 +106,7 @@ impl From<ColorBGR> for Color {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub struct ColorRGB {
     pub red: u8,
     pub green: u8,

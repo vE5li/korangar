@@ -39,14 +39,20 @@ impl PrototypeWindow for LoginWindow {
 
             let username = username.clone();
             let password = password.clone();
-            Box::new(move || !username.borrow().is_empty() && !password.borrow().is_empty())
+            move || !username.borrow().is_empty() && !password.borrow().is_empty()
         };
 
         let action = {
 
             let username = username.clone();
             let password = password.clone();
-            Box::new(move || UserEvent::LogIn(username.borrow().clone(), password.borrow().clone()))
+            move || {
+
+                Some(ClickAction::Event(UserEvent::LogIn(
+                    username.borrow().clone(),
+                    password.borrow().clone(),
+                )))
+            }
         };
 
         let username_action = {
@@ -88,17 +94,23 @@ impl PrototypeWindow for LoginWindow {
                 password_action,
                 dimension!(100%)
             )),
-            cell!(StateButton::new(
-                "remember username",
-                UserEvent::ToggleRemeberUsername,
-                Box::new(|state_provider| state_provider.login_settings.remember_username)
-            )),
-            cell!(StateButton::new(
-                "remember password",
-                UserEvent::ToggleRemeberPassword,
-                Box::new(|state_provider| state_provider.login_settings.remember_password)
-            )),
-            cell!(FormButton::new("log in", selector, action, dimension!(100%))),
+            StateButton::default()
+                .with_static_text("remember username")
+                .with_selector(|state_provider| state_provider.login_settings.remember_username)
+                .with_event(UserEvent::ToggleRemeberUsername)
+                .with_transparent_background()
+                .wrap(),
+            StateButton::default()
+                .with_static_text("remember password")
+                .with_selector(|state_provider| state_provider.login_settings.remember_password)
+                .with_event(UserEvent::ToggleRemeberPassword)
+                .with_transparent_background()
+                .wrap(),
+            Button::default()
+                .with_static_text("log in")
+                .with_disabled_selector(selector)
+                .with_action_closure(action)
+                .wrap(),
         ];
 
         Box::from(FramedWindow::new(

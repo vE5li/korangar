@@ -38,14 +38,16 @@ impl PrototypeWindow for CharacterCreationWindow {
         let selector = {
 
             let name = name.clone();
-            Box::new(move || name.borrow().len() >= MINIMUM_NAME_LENGTH)
+
+            move || name.borrow().len() >= MINIMUM_NAME_LENGTH
         };
 
         let action = {
 
             let slot = self.slot;
             let name = name.clone();
-            Box::new(move || UserEvent::CreateCharacter(slot, name.borrow().clone()))
+
+            move || Some(ClickAction::Event(UserEvent::CreateCharacter(slot, name.borrow().clone())))
         };
 
         let input_action = Box::new(move || Some(ClickAction::FocusNext(FocusMode::FocusNext)));
@@ -57,7 +59,12 @@ impl PrototypeWindow for CharacterCreationWindow {
                 input_action,
                 dimension!(100%)
             )),
-            cell!(FormButton::new("done", selector, action, dimension!(50%))),
+            Button::default()
+                .with_static_text("done")
+                .with_disabled_selector(selector)
+                .with_action_closure(action)
+                .with_width(dimension!(50%))
+                .wrap(),
         ];
 
         Box::from(FramedWindow::new(

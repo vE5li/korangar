@@ -12,7 +12,7 @@ pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
 use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
-use crate::interface::{ClickAction, ElementCell, Focus, FocusMode, Interface, MouseCursorState, WeakElementCell};
+use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;

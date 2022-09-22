@@ -1,15 +1,16 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{
-    ElementCell, Expandable, FramedWindow, InterfaceSettings, PrototypeWindow, Size, StateButton, StateProvider, Window, WindowCache,
-};
+use crate::interface::{ElementCell, Expandable, FramedWindow, InterfaceSettings, PrototypeWindow, Size, StateButton, Window, WindowCache};
 
 macro_rules! render_state_button {
     ($display:expr, $event:expr, $selector:ident) => {{
 
-        let selector = Box::new(|state_provider: &StateProvider| state_provider.render_settings.$selector);
-        cell!(StateButton::new($display, $event, selector))
+        StateButton::default()
+            .with_static_text($display)
+            .with_selector(|state_provider| state_provider.render_settings.$selector)
+            .with_event($event)
+            .wrap()
     }};
 }
 

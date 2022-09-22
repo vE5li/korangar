@@ -1,8 +1,6 @@
 mod resource;
 
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Deg, Vector2, Vector3};
@@ -575,18 +573,21 @@ impl MapLoader {
                         first_normal,
                         first_texture_coordinates,
                         tile_type_index as i32,
+                        0.0,
                     ));
                     tile_vertices.push(ModelVertex::new(
                         second_position,
                         first_normal,
                         second_texture_coordinates,
                         tile_type_index as i32,
+                        0.0,
                     ));
                     tile_vertices.push(ModelVertex::new(
                         third_position,
                         first_normal,
                         third_texture_coordinates,
                         tile_type_index as i32,
+                        0.0,
                     ));
 
                     tile_vertices.push(ModelVertex::new(
@@ -594,18 +595,21 @@ impl MapLoader {
                         second_normal,
                         first_texture_coordinates,
                         tile_type_index as i32,
+                        0.0,
                     ));
                     tile_vertices.push(ModelVertex::new(
                         third_position,
                         second_normal,
                         third_texture_coordinates,
                         tile_type_index as i32,
+                        0.0,
                     ));
                     tile_vertices.push(ModelVertex::new(
                         fourth_position,
                         second_normal,
                         fourth_texture_coordinates,
                         tile_type_index as i32,
+                        0.0,
                     ));
 
                     let first_position = Vector3::new(offset.x, upper_left_height, offset.y);
@@ -706,18 +710,21 @@ impl MapLoader {
                             first_normal,
                             first_texture_coordinates,
                             ground_surface.texture_index,
+                            0.0,
                         ));
                         native_ground_vertices.push(NativeModelVertex::new(
                             second_position,
                             first_normal,
                             second_texture_coordinates,
                             ground_surface.texture_index,
+                            0.0,
                         ));
                         native_ground_vertices.push(NativeModelVertex::new(
                             third_position,
                             first_normal,
                             third_texture_coordinates,
                             ground_surface.texture_index,
+                            0.0,
                         ));
 
                         native_ground_vertices.push(NativeModelVertex::new(
@@ -725,18 +732,21 @@ impl MapLoader {
                             second_normal,
                             first_texture_coordinates,
                             ground_surface.texture_index,
+                            0.0,
                         ));
                         native_ground_vertices.push(NativeModelVertex::new(
                             third_position,
                             second_normal,
                             third_texture_coordinates,
                             ground_surface.texture_index,
+                            0.0,
                         ));
                         native_ground_vertices.push(NativeModelVertex::new(
                             fourth_position,
                             second_normal,
                             fourth_texture_coordinates,
                             ground_surface.texture_index,
+                            0.0,
                         ));
                     }
                 }

@@ -1,10 +1,8 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Mul;
-use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::{Array, Vector2, Zero};
+use cgmath::{Array, Vector2};
 use procedural::*;
 use vulkano::image::ImageAccess;
 
@@ -155,7 +153,7 @@ impl Actions {
                 .unwrap_or_else(|| texture.image().dimensions().width_height().into())
                 .map(|component| component as f32);
             let zoom = sprite_clip.zoom.unwrap_or(1.0);
-            let zoom2 = sprite_clip.zoom2.unwrap_or(Vector2::from_value(1.0));
+            let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;
             let final_position = position + offset - final_size / 2.0;

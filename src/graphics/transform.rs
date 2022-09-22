@@ -13,15 +13,6 @@ pub struct Transform {
 
 impl Transform {
 
-    pub fn new() -> Self {
-
-        Self {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-            scale: Vector3::new(1.0, 1.0, 1.0),
-        }
-    }
-
     pub fn from(position: Vector3<f32>, rotation: Vector3<Deg<f32>>, scale: Vector3<f32>) -> Self {
 
         let rotation = rotation.map(|degrees| degrees.into());
@@ -34,15 +25,6 @@ impl Transform {
             position,
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
             scale: Vector3::new(1.0, 1.0, 1.0),
-        }
-    }
-
-    pub fn scale(scale: Vector3<f32>) -> Self {
-
-        Self {
-            position: Vector3::new(0.0, 0.0, 0.0),
-            rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
-            scale,
         }
     }
 }

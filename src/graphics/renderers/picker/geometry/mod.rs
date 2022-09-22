@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -115,7 +119,7 @@ impl GeometryRenderer {
         render_target: &mut <PickerRenderer as Renderer>::Target,
         _camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
-        textures: &Vec<Texture>,
+        textures: &[Texture],
         world_matrix: Matrix4<f32>,
     ) {
 

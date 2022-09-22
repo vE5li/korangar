@@ -12,15 +12,15 @@ pub struct DimensionConstraint {
 
 impl DimensionConstraint {
 
-    pub fn add_width(&self, width_constraint: DimensionConstraint) -> SizeConstraint {
+    pub fn add_height(&self, height_constraint: DimensionConstraint) -> SizeConstraint {
 
         SizeConstraint {
-            width: width_constraint.size,
-            minimum_width: width_constraint.minimum_size,
-            maximum_width: width_constraint.maximum_size,
-            height: self.size,
-            minimum_height: self.minimum_size,
-            maximum_height: self.maximum_size,
+            width: self.size,
+            minimum_width: self.minimum_size,
+            maximum_width: self.maximum_size,
+            height: height_constraint.size,
+            minimum_height: height_constraint.minimum_size,
+            maximum_height: height_constraint.maximum_size,
         }
     }
 }

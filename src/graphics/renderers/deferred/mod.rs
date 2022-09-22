@@ -15,7 +15,7 @@ mod water_light;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, SquareMatrix, Vector2, Vector3};
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
@@ -72,6 +72,8 @@ pub struct DeferredRenderer {
     buffer_renderer: BufferRenderer,
     #[cfg(feature = "debug")]
     box_renderer: BoxRenderer,
+    #[cfg(feature = "debug")]
+    tile_textures: [Texture; 7],
     screen_vertex_buffer: ScreenVertexBuffer,
     billboard_vertex_buffer: ScreenVertexBuffer,
     font_map: Texture,
@@ -188,6 +190,17 @@ impl DeferredRenderer {
 
         let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
 
+        #[cfg(feature = "debug")]
+        let tile_textures = [
+            texture_loader.get("0.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("1.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("2.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("3.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("4.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("5.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("6.png", game_file_loader, &mut texture_future).unwrap(),
+        ];
+
         texture_future.flush().unwrap();
         texture_future.cleanup_finished();
 
@@ -209,6 +222,8 @@ impl DeferredRenderer {
             buffer_renderer,
             #[cfg(feature = "debug")]
             box_renderer,
+            #[cfg(feature = "debug")]
+            tile_textures,
             screen_vertex_buffer,
             billboard_vertex_buffer,
             font_map,
@@ -216,13 +231,18 @@ impl DeferredRenderer {
         }
     }
 
-    pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
+    pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
 
         let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
         let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
 
-        self.geometry_renderer
-            .recreate_pipeline(self.device.clone(), geometry_subpass.clone(), viewport.clone(), false); // set wireframe dynamically
+        self.geometry_renderer.recreate_pipeline(
+            self.device.clone(),
+            geometry_subpass.clone(),
+            viewport.clone(),
+            #[cfg(feature = "debug")]
+            wireframe,
+        );
         self.entity_renderer
             .recreate_pipeline(self.device.clone(), geometry_subpass.clone(), viewport.clone());
         self.water_renderer
@@ -421,6 +441,24 @@ impl DeferredRenderer {
     }
 
     #[cfg(feature = "debug")]
+    pub fn render_overlay_tiles(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        vertex_buffer: ModelVertexBuffer,
+    ) {
+
+        self.render_geometry(
+            render_target,
+            camera,
+            vertex_buffer,
+            &self.tile_textures,
+            Matrix4::identity(),
+            0.0,
+        );
+    }
+
+    #[cfg(feature = "debug")]
     pub fn render_bounding_box(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -434,7 +472,7 @@ impl DeferredRenderer {
             self.box_renderer.bind_pipeline(render_target, camera);
         }
 
-        self.box_renderer.render(render_target, camera, transform, bounding_box, color);
+        self.box_renderer.render(render_target, transform, bounding_box, color);
     }
 
     #[cfg(feature = "debug")]
@@ -469,14 +507,15 @@ impl GeometryRendererTrait for DeferredRenderer {
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
-        textures: &Vec<Texture>,
+        textures: &[Texture],
         world_matrix: Matrix4<f32>,
+        time: f32,
     ) where
         Self: Renderer,
     {
 
         if render_target.bind_subrenderer(DeferredSubrenderer::Geometry) {
-            self.geometry_renderer.bind_pipeline(render_target, camera);
+            self.geometry_renderer.bind_pipeline(render_target, camera, time);
         }
 
         self.geometry_renderer

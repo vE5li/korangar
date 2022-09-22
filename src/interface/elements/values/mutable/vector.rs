@@ -1,8 +1,7 @@
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use cgmath::{Array, Vector2, Vector3, Vector4};
-use derive_new::new;
+use cgmath::Array;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
 

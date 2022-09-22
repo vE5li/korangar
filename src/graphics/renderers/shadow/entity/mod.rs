@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -33,8 +37,6 @@ use crate::graphics::*;
 
 pub struct EntityRenderer {
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
     vertex_buffer: ModelVertexBuffer,
     matrices_buffer: CpuBufferPool<Matrices>,
     nearest_sampler: Arc<Sampler>,
@@ -54,36 +56,42 @@ impl EntityRenderer {
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 0.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(-1.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 1.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(1.0, -2.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 0.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(1.0, -2.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 0.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(-1.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(1.0, 1.0),
                 0,
+                0.0,
             ),
             ModelVertex::new(
                 Vector3::new(1.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 Vector2::new(0.0, 1.0),
                 0,
+                0.0,
             ),
         ];
 
@@ -98,16 +106,10 @@ impl EntityRenderer {
 
         Self {
             pipeline,
-            vertex_shader,
-            fragment_shader,
             vertex_buffer,
             matrices_buffer,
             nearest_sampler,
         }
-    }
-
-    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass) {
-        self.pipeline = Self::create_pipeline(device, subpass, &self.vertex_shader, &self.fragment_shader);
     }
 
     fn create_pipeline(

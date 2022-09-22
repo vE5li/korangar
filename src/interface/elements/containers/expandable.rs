@@ -78,6 +78,7 @@ impl Element for Expandable {
         if self.expanded {
 
             let mut inner_placement_resolver = placement_resolver.derive(
+                size,
                 Position::new(0.0, closed_size.y) + *theme.expandable.element_offset * *interface_settings.scaling,
                 *theme.expandable.border_size,
             );

@@ -125,9 +125,9 @@ impl FontLoader {
                     AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap()
                 });
 
-                let pixels: Vec<i8> = data.iter().copied().map(|value| value as i8).collect();
+                let pixels = data.iter().map(|&value| value as i8);
+                let buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), buffer_usage, false, pixels).unwrap();
 
-                let buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), buffer_usage, false, pixels.into_iter()).unwrap();
                 builder
                     .copy_buffer_to_image_dimensions(
                         buffer,

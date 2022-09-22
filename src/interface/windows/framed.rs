@@ -30,7 +30,7 @@ impl FramedWindow {
         elements.insert(0, close_button);
         elements.insert(0, drag_button);
 
-        let elements: Vec<ElementCell> = vec![cell!(Container::new(elements, Container::DEFAULT_SIZE))];
+        let elements = vec![Container::new(elements).wrap()];
 
         // very imporant: give every element a link to its parent to allow propagation of events such as
         // scrolling

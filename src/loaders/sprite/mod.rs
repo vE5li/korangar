@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use derive_new::new;
@@ -14,8 +12,8 @@ use vulkano::sync::{now, GpuFuture};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::Texture;
+use crate::interface::{ElementCell, PrototypeElement};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
-use crate::interface::{PrototypeElement, ElementCell};
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {
@@ -24,12 +22,6 @@ pub struct Sprite {
     #[cfg(feature = "debug")]
     sprite_data: SpriteData,
 }
-
-//impl Sprite {
-//
-//    pub fn render(renderer: &mut Renderer, motion: &Motion, position: Vector2<usize>, mirror: bool, ext: bool, , opacity: u8) {
-//    }
-//}
 
 #[derive(Clone, Debug)]
 struct EncodedData(pub Vec<u8>);
@@ -115,14 +107,14 @@ struct PaletteColor {
 
 impl PaletteColor {
 
-    pub fn to_data(&self, index: u8) -> u32 {
+    pub fn color_bytes(&self, index: u8) -> [u8; 4] {
 
         let alpha = match index {
             0 => 0,
-            _other => 255,
+            _ => 255,
         };
 
-        (self.red as u32) | ((self.green as u32) << 8) | ((self.blue as u32) << 16) | (alpha << 24)
+        [self.red, self.green, self.blue, alpha]
     }
 }
 
@@ -179,9 +171,33 @@ impl SpriteLoader {
 
         assert!(byte_stream.is_empty());
 
-        let rgba_images: Vec<Arc<ImmutableImage>> = sprite_data
+        let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
+        // the default palette is
+
+        let rgba_images/*: Vec<Arc<ImmutableImage>>*/ = sprite_data
             .rgba_image_data
-            .into_iter()
+            .into_iter();
+
+        let palette_images = sprite_data.palette_image_data.into_iter().map(|image_data| {
+
+            // decode palette image data if necessary
+            let data: Vec<u8> = image_data
+                .encoded_data
+                .map(|encoded| encoded.0)
+                .unwrap_or_else(|| image_data.raw_data.unwrap())
+                .iter()
+                .flat_map(|palette_index| palette.colors[*palette_index as usize].color_bytes(*palette_index))
+                .collect();
+
+            RgbaImageData {
+                width: image_data.width,
+                height: image_data.height,
+                data,
+            }
+        });
+
+        let textures = rgba_images
+            .chain(palette_images)
             .map(|image_data| {
 
                 let (image, future) = ImmutableImage::from_iter(
@@ -202,52 +218,8 @@ impl SpriteLoader {
 
                 *texture_future = combined_future;
 
-                image
+                ImageView::new(Arc::new(image)).unwrap()
             })
-            .collect();
-
-        let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
-        // the default palette is
-
-        let palette_images: Vec<Arc<ImmutableImage>> = sprite_data
-            .palette_image_data
-            .into_iter()
-            .map(|image_data| {
-
-                let data: Vec<u32> = image_data
-                    .encoded_data
-                    .map(|encoded| encoded.0)
-                    .unwrap_or_else(|| image_data.raw_data.unwrap())
-                    .iter()
-                    .map(|palette_index| palette.colors[*palette_index as usize].to_data(*palette_index))
-                    .collect();
-
-                let (image, future) = ImmutableImage::from_iter(
-                    data.into_iter(),
-                    ImageDimensions::Dim2d {
-                        width: image_data.width as u32,
-                        height: image_data.height as u32,
-                        array_layers: 1,
-                    },
-                    MipmapsCount::One,
-                    Format::R8G8B8A8_SRGB,
-                    self.queue.clone(),
-                )
-                .unwrap();
-
-                let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
-                let combined_future = inner_future.join(future).boxed();
-
-                *texture_future = combined_future;
-
-                image
-            })
-            .collect();
-
-        let textures = rgba_images
-            .into_iter()
-            .chain(palette_images.into_iter())
-            .map(|image| ImageView::new(Arc::new(image)).unwrap())
             .collect();
 
         let sprite = Arc::new(Sprite {
@@ -255,6 +227,7 @@ impl SpriteLoader {
             #[cfg(feature = "debug")]
             sprite_data: cloned_sprite_data,
         });
+
         self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]

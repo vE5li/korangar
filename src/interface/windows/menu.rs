@@ -1,7 +1,7 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(Default)]
 pub struct MenuWindow {}
@@ -24,23 +24,59 @@ impl PrototypeWindow for MenuWindow {
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(Button::new("graphics settings", UserEvent::OpenGraphicsSettingsWindow, true)),
-            cell!(Button::new("audio settings", UserEvent::OpenAudioSettingsWindow, true)),
+        let elements = vec![
+            Button::default()
+                .with_static_text("graphics settings")
+                .with_event(UserEvent::OpenGraphicsSettingsWindow)
+                .wrap(),
+            Button::default()
+                .with_static_text("audio settings")
+                .with_event(UserEvent::OpenAudioSettingsWindow)
+                .wrap(),
             #[cfg(feature = "debug")]
-            cell!(DebugButton::new("render settings", UserEvent::OpenRenderSettingsWindow, true)),
+            Button::default()
+                .with_static_text("render settings")
+                .with_event(UserEvent::OpenRenderSettingsWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
             #[cfg(feature = "debug")]
-            cell!(DebugButton::new("map viewer", UserEvent::OpenMapDataWindow, true)),
+            Button::default()
+                .with_static_text("map viewer")
+                .with_event(UserEvent::OpenMapDataWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
             #[cfg(feature = "debug")]
-            cell!(DebugButton::new("maps", UserEvent::OpenMapsWindow, true)),
+            Button::default()
+                .with_static_text("maps")
+                .with_event(UserEvent::OpenMapsWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
             #[cfg(feature = "debug")]
-            cell!(DebugButton::new("time", UserEvent::OpenTimeWindow, true)),
+            Button::default()
+                .with_static_text("time")
+                .with_event(UserEvent::OpenTimeWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
             #[cfg(feature = "debug")]
-            cell!(DebugButton::new("theme viewer", UserEvent::OpenThemeViewerWindow, true)),
+            Button::default()
+                .with_static_text("theme viewer")
+                .with_event(UserEvent::OpenThemeViewerWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
             #[cfg(feature = "debug")]
-            cell!(DebugButton::new("profiler", UserEvent::OpenProfilerWindow, true)),
-            cell!(Button::new("log out", UserEvent::LogOut, true)),
-            cell!(Button::new("exit korangar", UserEvent::Exit, true)),
+            Button::default()
+                .with_static_text("profiler")
+                .with_event(UserEvent::OpenProfilerWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
+            #[cfg(feature = "debug_network")]
+            Button::default()
+                .with_static_text("packets")
+                .with_event(UserEvent::OpenPacketWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
+            Button::default().with_static_text("log out").with_event(UserEvent::LogOut).wrap(),
+            Button::default().with_static_text("exit").with_event(UserEvent::Exit).wrap(),
         ];
 
         Box::from(FramedWindow::new(

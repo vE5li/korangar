@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -33,8 +37,6 @@ use crate::graphics::*;
 
 pub struct GeometryRenderer {
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
     matrices_buffer: CpuBufferPool<Matrices>,
     nearest_sampler: Arc<Sampler>,
 }
@@ -56,8 +58,6 @@ impl GeometryRenderer {
 
         Self {
             pipeline,
-            vertex_shader,
-            fragment_shader,
             matrices_buffer,
             nearest_sampler,
         }
@@ -82,7 +82,7 @@ impl GeometryRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
+    pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -90,6 +90,7 @@ impl GeometryRenderer {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view_projection: (projection_matrix * view_matrix).into(),
+            time,
         };
 
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
@@ -121,7 +122,7 @@ impl GeometryRenderer {
         render_target: &mut <ShadowRenderer as Renderer>::Target,
         _camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
-        textures: &Vec<Texture>,
+        textures: &[Texture],
         world_matrix: Matrix4<f32>,
     ) {
 

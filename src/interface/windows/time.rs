@@ -25,10 +25,13 @@ impl PrototypeWindow for TimeWindow {
     ) -> Box<dyn Window + 'static> {
 
         let elements: Vec<ElementCell> = vec![
-            cell!(Button::new("set dawn", UserEvent::SetDawn, false)),
-            cell!(Button::new("set noon", UserEvent::SetNoon, false)),
-            cell!(Button::new("set dusk", UserEvent::SetDusk, false)),
-            cell!(Button::new("set midnight", UserEvent::SetMidnight, false)),
+            Button::default().with_static_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
+            Button::default().with_static_text("set noon").with_event(UserEvent::SetNoon).wrap(),
+            Button::default().with_static_text("set dusk").with_event(UserEvent::SetDusk).wrap(),
+            Button::default()
+                .with_static_text("set midnight")
+                .with_event(UserEvent::SetMidnight)
+                .wrap(),
         ];
 
         Box::from(FramedWindow::new(

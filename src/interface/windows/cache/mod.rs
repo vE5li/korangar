@@ -66,11 +66,15 @@ impl WindowCache {
     }
 
     pub fn update_position(&mut self, identifier: &str, position: Vector2<f32>) {
-        self.entries.get_mut(identifier).map(|entry| entry.position = position);
+        if let Some(entry) = self.entries.get_mut(identifier) {
+            entry.position = position;
+        }
     }
 
     pub fn update_size(&mut self, identifier: &str, size: Size) {
-        self.entries.get_mut(identifier).map(|entry| entry.size = size);
+        if let Some(entry) = self.entries.get_mut(identifier) {
+            entry.size = size;
+        }
     }
 
     pub fn get_window_state(&self, identifier: &str) -> Option<(Position, Size)> {

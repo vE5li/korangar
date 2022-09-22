@@ -121,7 +121,7 @@ pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> Interface
 
     match data {
         Data::Struct(data_struct) => derive_prototype_element_struct(data_struct, generics, attrs, ident),
-        Data::Enum(..) => panic!("enum types may not be derived"),
+        Data::Enum(data_enum) => derive_prototype_element_enum(data_enum, generics, ident),
         Data::Union(..) => panic!("union types may not be derived"),
     }
 }

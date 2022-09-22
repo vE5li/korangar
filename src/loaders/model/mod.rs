@@ -1,6 +1,4 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
@@ -112,8 +110,8 @@ impl ModelLoader {
 
     fn add_vertices(
         native_vertices: &mut Vec<NativeModelVertex>,
-        vertex_positions: &Vec<Vector3<f32>>,
-        texture_coordinates: &Vec<Vector2<f32>>,
+        vertex_positions: &[Vector3<f32>],
+        texture_coordinates: &[Vector2<f32>],
         texture_index: u16,
         reverse_vertices: bool,
         reverse_normal: bool,
@@ -125,23 +123,25 @@ impl ModelLoader {
         };
 
         if reverse_vertices {
-            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates.clone()).rev() {
+            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates).rev() {
 
                 native_vertices.push(NativeModelVertex::new(
                     vertex_position,
                     normal,
-                    texture_coordinates,
+                    *texture_coordinates,
                     texture_index as i32,
+                    0.0, // TODO: actually add wind affinity
                 ));
             }
         } else {
-            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates.clone()) {
+            for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates) {
 
                 native_vertices.push(NativeModelVertex::new(
                     vertex_position,
                     normal,
-                    texture_coordinates,
+                    *texture_coordinates,
                     texture_index as i32,
+                    0.0, // TODO: actually add wind affinity
                 ));
             }
         }

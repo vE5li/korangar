@@ -27,6 +27,7 @@ lunify = { git = "https://github.com/ve5li/lunify.git" }
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
 
 [features]
+local = []
 debug = ["lazy_static"]
 debug_network = ["debug"]
 unicode = ["debug"]

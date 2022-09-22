@@ -1,16 +1,75 @@
-use derive_new::new;
+use procedural::dimension;
 
+use super::{ElementEvent, ElementText};
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::UserEvent;
 use crate::interface::{Element, *};
 
-#[derive(new)]
+#[derive(Default)]
 pub struct StateButton {
-    text: &'static str,
-    event: UserEvent,
-    selector: Box<dyn Fn(&StateProvider) -> bool>,
-    #[new(default)]
+    text: Option<ElementText>,
+    selector: Option<Box<dyn Fn(&StateProvider) -> bool>>,
+    event: Option<ElementEvent>,
+    width_constraint: Option<DimensionConstraint>,
+    transparent_background: bool,
     state: ElementState,
+}
+
+impl StateButton {
+
+    pub fn with_static_text(mut self, text: &'static str) -> Self {
+
+        self.text = Some(ElementText::Static(text));
+        self
+    }
+
+    pub fn with_dynamic_text(mut self, text: String) -> Self {
+
+        self.text = Some(ElementText::Dynamic(text));
+        self
+    }
+
+    pub fn with_selector(mut self, selector: impl Fn(&StateProvider) -> bool + 'static) -> Self {
+
+        self.selector = Some(Box::new(selector));
+        self
+    }
+
+    pub fn with_event(mut self, event: UserEvent) -> Self {
+
+        self.event = Some(ElementEvent::Event(event));
+        self
+    }
+
+    pub fn with_action_closure(mut self, event_closure: impl Fn() -> Option<ClickAction> + 'static) -> Self {
+
+        self.event = Some(ElementEvent::ActionClosure(Box::new(event_closure)));
+        self
+    }
+
+    pub fn with_closure(mut self, closure: impl Fn() + 'static) -> Self {
+
+        self.event = Some(ElementEvent::Closure(Box::new(closure)));
+        self
+    }
+
+    pub fn with_transparent_background(mut self) -> Self {
+
+        self.transparent_background = true;
+        self
+    }
+
+    pub fn with_width(mut self, width_constraint: DimensionConstraint) -> Self {
+
+        self.width_constraint = Some(width_constraint);
+        self
+    }
+
+    pub fn wrap(self) -> ElementCell {
+
+        assert!(self.selector.is_some(), "state buttons need a selector");
+        Rc::new(RefCell::new(self))
+    }
 }
 
 impl Element for StateButton {
@@ -24,7 +83,14 @@ impl Element for StateButton {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-        self.state.resolve(placement_resolver, &theme.button.size_constraint);
+
+        let size_constraint = self
+            .width_constraint
+            .as_ref()
+            .unwrap_or(&dimension!(100%))
+            .add_height(theme.button.height_constraint);
+
+        self.state.resolve(placement_resolver, &size_constraint);
     }
 
     fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
@@ -32,7 +98,7 @@ impl Element for StateButton {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::Event(self.event.clone()))
+        self.event.as_ref().and_then(ElementEvent::execute)
     }
 
     fn render(
@@ -53,26 +119,38 @@ impl Element for StateButton {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        //let background_color = theme.button.background.choose(self.is_element_self(hovered_element), self.is_element_self(focused_element));
-        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => *theme.button.hovered_background_color,
-            false => *theme.button.background_color,
-        };
+        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
 
-        renderer.render_background(*theme.button.border_radius, background_color);
+        if !self.transparent_background {
+
+            let background_color = match highlighted {
+                true => *theme.button.hovered_background_color,
+                false => *theme.button.background_color,
+            };
+
+            renderer.render_background(*theme.button.border_radius, background_color);
+        }
+
+        let foreground_color = match self.transparent_background && highlighted {
+            true => *theme.button.hovered_foreground_color,
+            false => *theme.button.foreground_color,
+        };
 
         renderer.render_checkbox(
             *theme.button.icon_offset,
             *theme.button.icon_size,
-            *theme.button.foreground_color,
-            (self.selector)(state_provider),
+            foreground_color,
+            (self.selector.as_ref().unwrap())(state_provider),
         );
 
-        renderer.render_text(
-            self.text,
-            *theme.button.icon_text_offset,
-            *theme.button.foreground_color,
-            *theme.button.font_size,
-        );
+        if let Some(text) = &self.text {
+
+            renderer.render_text(
+                text.get_str(),
+                *theme.button.icon_text_offset,
+                foreground_color,
+                *theme.button.font_size,
+            );
+        }
     }
 }

@@ -15,13 +15,18 @@ pub use self::login::LoginSettings;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Color, ColorBGR, ColorRGB};
-use crate::interface::CharacterSelectionWindow;
+#[cfg(feature = "debug_network")]
+use crate::interface::PacketEntry;
+use crate::interface::{CharacterSelectionWindow, ElementCell, PrototypeElement};
 use crate::loaders::{ByteConvertable, ByteStream};
 
 /// Base trait that all packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size, followed by the packet data. If the packet does not have a fixed size,
 /// the first two bytes will be the size of the packet in bytes *including* the header. Packets are sent in little endian.
-pub trait Packet {
+pub trait Packet: PrototypeElement + Clone {
+
+    // TODO: find a nice way to do this
+    const PACKET_NAME: &'static str;
 
     fn header() -> [u8; 2];
 
@@ -65,7 +70,7 @@ pub struct ChatMessage {
     pub color: Color,
 }
 
-#[derive(Copy, Clone, Debug, ByteConvertable)]
+#[derive(Copy, Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum Sex {
     Male,
     Female,
@@ -76,7 +81,7 @@ pub enum Sex {
 /// Sent by the client to the login server.
 /// The very first packet sent when logging in, it is sent after the user has
 /// entered email and password.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x64, 0x00)]
 struct LoginServerLoginPacket {
     /// Unused
@@ -95,7 +100,7 @@ struct LoginServerLoginPacket {
 /// After receiving this packet, the client will connect to one of the character servers
 /// provided by this packet.
 #[allow(dead_code)]
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc4, 0x0a)]
 struct LoginServerLoginSuccessPacket {
     pub packet_length: u16,
@@ -117,7 +122,7 @@ struct LoginServerLoginSuccessPacket {
 /// Sent by the character server as a response to [CharacterServerLoginPacket] succeeding.
 /// Provides basic information about the number of avalible character slots.
 #[allow(dead_code)]
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x2d, 0x08)]
 struct CharacterServerLoginSuccessPacket {
     /// Always 29 on rAthena
@@ -131,7 +136,7 @@ struct CharacterServerLoginSuccessPacket {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x6b, 0x00)]
 struct Packet6b00 {
     pub unused: u16,
@@ -142,14 +147,14 @@ struct Packet6b00 {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x18, 0x0b)]
 struct Packet180b {
     /// Possibly inventory related
     pub unknown: u16,
 }
 
-#[derive(Debug, new)]
+#[derive(Clone, Debug, new, PrototypeElement)]
 pub struct WorldPosition {
     pub x: usize,
     pub y: usize,
@@ -192,7 +197,7 @@ impl ByteConvertable for WorldPosition {
     }
 }
 
-#[derive(Debug, new)]
+#[derive(Clone, Debug, new, PrototypeElement)]
 pub struct WorldPosition2 {
     pub x1: usize,
     pub y1: usize,
@@ -226,7 +231,7 @@ impl ByteConvertable for WorldPosition2 {
 
 /// Sent by the map server as a response to [MapServerLoginPacket] succeeding.
 #[allow(dead_code)]
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xeb, 0x02)]
 struct MapServerLoginSuccessPacket {
     pub client_tick: u32,
@@ -236,7 +241,7 @@ struct MapServerLoginSuccessPacket {
     pub font: u16,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum LoginFailedReason {
     #[numeric_value(1)]
     ServerClosed,
@@ -246,13 +251,13 @@ pub enum LoginFailedReason {
     AlreadyOnline,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x81, 0x00)]
 struct LoginFailedPacket {
     pub reason: LoginFailedReason,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x40, 0x08)]
 struct MapServerUnavaliblePacket {
     pub packet_length: u16,
@@ -260,7 +265,7 @@ struct MapServerUnavaliblePacket {
     pub unknown: String,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum LoginFailedReason2 {
     UnregisteredId,
     IncorrectPassword,
@@ -273,20 +278,20 @@ pub enum LoginFailedReason2 {
     CompanyAccountLimitReached,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x3e, 0x08)]
 struct LoginFailedPacket2 {
     pub reason: LoginFailedReason2,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum CharacterSelectionFailedReason {
     RejectedFromServer,
 }
 
 /// Sent by the character server as a response to [SelectCharacterPacket] failing.
 /// Provides a reason for the character selection failing.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x6c, 0x00)]
 struct CharacterSelectionFailedPacket {
     pub reason: CharacterSelectionFailedReason,
@@ -294,7 +299,7 @@ struct CharacterSelectionFailedPacket {
 
 /// Sent by the character server as a response to [SelectCharacterPacket] succeeding.
 /// Provides a map server to connect to, along with the ID of our selected character.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc5, 0x0a)]
 struct CharacterSelectionSuccessPacket {
     pub character_id: u32,
@@ -307,7 +312,7 @@ struct CharacterSelectionSuccessPacket {
     pub unknown: [u8; 128],
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum CharacterCreationFailedReason {
     CharacterNameAlreadyUsed,
     NotOldEnough,
@@ -319,14 +324,14 @@ pub enum CharacterCreationFailedReason {
 
 /// Sent by the character server as a response to [CreateCharacterPacket] failing.
 /// Provides a reason for the character creation failing.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x6e, 0x00)]
 struct CharacterCreationFailedPacket {
     pub reason: CharacterCreationFailedReason,
 }
 
 /// Sent by the client to the login server every 60 seconds to keep the connection alive.
-#[derive(Debug, Default, Packet)]
+#[derive(Clone, Debug, Default, Packet, PrototypeElement)]
 #[header(0x00, 0x02)]
 struct LoginServerKeepalivePacket {
     pub user_id: [u8; 24],
@@ -341,7 +346,7 @@ impl ByteConvertable for Ipv4Addr {
     }
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct CharacterServerInformation {
     pub server_ip: Ipv4Addr,
     pub server_port: u16,
@@ -355,7 +360,7 @@ struct CharacterServerInformation {
 /// Sent by the client to the character server after after successfully logging into the login
 /// server.
 /// Attempts to log into the character server using the provided information.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x65, 0x00)]
 struct CharacterServerLoginPacket {
     pub account_id: u32,
@@ -368,7 +373,7 @@ struct CharacterServerLoginPacket {
 
 /// Sent by the client to the map server after after successfully selecting a character.
 /// Attempts to log into the map server using the provided information.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x36, 0x04)]
 struct MapServerLoginPacket {
     pub account_id: u32,
@@ -380,7 +385,7 @@ struct MapServerLoginPacket {
     pub unknown: [u8; 4],
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x83, 0x02)]
 struct Packet8302 {
     pub entity_id: u32,
@@ -389,7 +394,7 @@ struct Packet8302 {
 /// Sent by the client to the character server when the player tries to create
 /// a new character.
 /// Attempts to create a new character in an empty slot using the provided information.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x39, 0x0a)]
 struct CreateCharacterPacket {
     #[length_hint(24)]
@@ -403,7 +408,7 @@ struct CreateCharacterPacket {
     pub sex: Sex,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub struct CharacterInformation {
     pub character_id: u32,
     pub experience: i64,
@@ -455,7 +460,7 @@ pub struct CharacterInformation {
 
 /// Sent by the character server as a response to [CreateCharacterPacket] succeeding.
 /// Provides all character information of the newly created character.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x6f, 0x0b)]
 struct CreateCharacterSuccessPacket {
     pub character_information: CharacterInformation,
@@ -463,13 +468,13 @@ struct CreateCharacterSuccessPacket {
 
 /// Sent by the client to the character server.
 /// Requests a list of every character associated with the account.
-#[derive(Debug, Default, Packet)]
+#[derive(Clone, Debug, Default, Packet, PrototypeElement)]
 #[header(0xa1, 0x09)]
 struct RequestCharacterListPacket {}
 
 /// Sent by the character server as a response to [RequestCharacterListPacket] succeeding.
 /// Provides the requested list of character information.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x72, 0x0b)]
 struct RequestCharacterListSuccessPacket {
     pub packet_length: u16,
@@ -479,7 +484,7 @@ struct RequestCharacterListSuccessPacket {
 
 /// Sent by the client to the map server when the player wants to move.
 /// Attempts to path the player towards the provided position.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x81, 0x08)]
 struct RequestPlayerMovePacket {
     pub position: WorldPosition,
@@ -488,7 +493,7 @@ struct RequestPlayerMovePacket {
 /// Sent by the client to the map server when the player wants to warp.
 /// Attempts to warp the player to a specific position on a specific map using the
 /// provided information.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x40, 0x01)]
 struct RequestWarpToMapPacket {
     #[length_hint(16)]
@@ -501,7 +506,7 @@ struct RequestWarpToMapPacket {
 /// Informs the client that an entity is pathing towards a new position.
 /// Provides the initial position and destination of the movement, as well as a
 /// timestamp of when it started (for synchronization).
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x86, 0x00)]
 struct EntityMovePacket {
     pub entity_id: u32,
@@ -509,7 +514,7 @@ struct EntityMovePacket {
     pub timestamp: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x88, 0x00)]
 struct EntityStopMovePacket {
     pub entity_id: u32,
@@ -521,7 +526,7 @@ struct EntityStopMovePacket {
 /// Informs the client that the player is pathing towards a new position.
 /// Provides the initial position and destination of the movement, as well as a
 /// timestamp of when it started (for synchronization).
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x87, 0x00)]
 struct PlayerMovePacket {
     pub timestamp: u32,
@@ -532,7 +537,7 @@ struct PlayerMovePacket {
 /// character.
 /// Attempts to delete a character from the user account using the provided
 /// information.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xfb, 0x01)]
 struct DeleteCharacterPacket {
     character_id: u32,
@@ -545,7 +550,7 @@ struct DeleteCharacterPacket {
     pub unknown: [u8; 10],
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum CharacterDeletionFailedReason {
     NotAllowed,
     CharacterNotFound,
@@ -554,20 +559,20 @@ pub enum CharacterDeletionFailedReason {
 
 /// Sent by the character server as a response to [DeleteCharacterPacket] failing.
 /// Provides a reason for the character deletion failing.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x70, 0x00)]
 struct CharacterDeletionFailedPacket {
     pub reason: CharacterDeletionFailedReason,
 }
 
 /// Sent by the character server as a response to [DeleteCharacterPacket] succeeding.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x6f, 0x00)]
 struct CharacterDeletionSuccessPacket {}
 
 /// Sent by the client to the character server when the user selects a character.
 /// Attempts to select the character in the specified slot.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x66, 0x00)]
 struct SelectCharacterPacket {
     pub selected_slot: u8,
@@ -575,7 +580,7 @@ struct SelectCharacterPacket {
 
 /// Sent by the map server to the client when there is a new chat message from the server.
 /// Provides the message to be displayed in the chat window.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x8e, 0x00)]
 struct ServerMessagePacket {
     pub packet_length: u16,
@@ -585,7 +590,7 @@ struct ServerMessagePacket {
 
 /// Sent by the client to the map server when the user hovers over an entity.
 /// Attempts to fetch additional information about the entity, such as the display name.
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x68, 0x03)]
 struct RequestDetailsPacket {
     pub entity_id: u32,
@@ -593,7 +598,7 @@ struct RequestDetailsPacket {
 
 /// Sent by the map server to the client as a response to [RequestDetailsPacket].
 /// Provides additional information about the player.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x30, 0x0a)]
 struct RequestPlayerDetailsSuccessPacket {
     pub entity_id: u32,
@@ -610,7 +615,7 @@ struct RequestPlayerDetailsSuccessPacket {
 
 /// Sent by the map server to the client as a response to [RequestDetailsPacket].
 /// Provides additional information about the entity.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xdf, 0x0a)]
 struct RequestEntityDetailsSuccessPacket {
     pub entity_id: u32,
@@ -621,13 +626,13 @@ struct RequestEntityDetailsSuccessPacket {
     pub title: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xe7, 0x09)]
 struct NewMailStatusPacket {
     pub new_avalible: u8,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct AchievementData {
     pub acheivement_id: u32,
     pub is_completed: u8,
@@ -636,7 +641,7 @@ struct AchievementData {
     pub got_rewarded: u8,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x24, 0x0a)]
 struct AchievementUpdatePacket {
     pub total_score: u32,
@@ -646,7 +651,7 @@ struct AchievementUpdatePacket {
     pub acheivement_data: AchievementData,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x23, 0x0a)]
 struct AchievementListPacket {
     pub packet_length: u16,
@@ -659,13 +664,13 @@ struct AchievementListPacket {
     pub acheivement_data: Vec<AchievementData>,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xde, 0x0a)]
 struct CriticalWeightUpdatePacket {
     pub packet_length: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xd7, 0x01)]
 struct SpriteChangePacket {
     pub entity_id: u32,
@@ -674,7 +679,7 @@ struct SpriteChangePacket {
     pub value2: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x08, 0x0b)]
 struct InventoyStartPacket {
     pub packet_length: u16,
@@ -683,21 +688,21 @@ struct InventoyStartPacket {
     pub inventory_name: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x0b, 0x0b)]
 struct InventoyEndPacket {
     pub inventory_type: u8,
     pub flag: u8, // maybe char ?
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct ItemOptions {
     pub index: u16,
     pub value: u16,
     pub parameter: u8,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct RegularItemInformation {
     pub index: u16,
     pub item_id: u32,
@@ -709,7 +714,7 @@ struct RegularItemInformation {
     pub fags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x09, 0x0b)]
 struct RegularItemListPacket {
     pub packet_length: u16,
@@ -718,7 +723,7 @@ struct RegularItemListPacket {
     pub item_information: Vec<RegularItemInformation>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct EquippableItemInformation {
     pub index: u16,
     pub item_id: u32,
@@ -736,7 +741,7 @@ struct EquippableItemInformation {
     pub fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x39, 0x0b)]
 struct EquippableItemListPacket {
     pub packet_length: u16,
@@ -745,14 +750,14 @@ struct EquippableItemListPacket {
     pub item_information: Vec<EquippableItemInformation>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct EquippableSwitchItemInformation {
     /// is in actually index + 2
     pub index: u16,
     pub position: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x9b, 0x0a)]
 struct EquippableSwitchItemListPacket {
     pub packet_length: u16,
@@ -760,7 +765,7 @@ struct EquippableSwitchItemListPacket {
     pub item_information: Vec<EquippableSwitchItemInformation>,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x9b, 0x09)]
 struct MapTypePacket {
     pub map_type: u16,
@@ -770,7 +775,7 @@ struct MapTypePacket {
 /// Sent by the map server to the client when there is a new chat message from ??.
 /// Provides the message to be displayed in the chat window, as well as information on how
 /// the message should be displayed.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc3, 0x01)]
 struct BroadcastMessagePacket {
     pub packet_length: u16,
@@ -786,7 +791,7 @@ struct BroadcastMessagePacket {
 /// Sent by the map server to the client when there is a new chat message from an entity.
 /// Provides the message to be displayed in the chat window, the color of the message,
 /// and the ID of the entity it originated from.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc1, 0x02)]
 struct EntityMessagePacket {
     pub packet_length: u16,
@@ -796,7 +801,7 @@ struct EntityMessagePacket {
     pub message: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc0, 0x00)]
 struct DisplayEmotionPacket {
     pub entity_id: u32,
@@ -807,7 +812,7 @@ struct DisplayEmotionPacket {
 /// [UpdateStatusPacket1], [UpdateStatusPacket2], and [UpdateStatusPacket3].
 /// All UpdateStatusPackets do the same, they just have different sizes correlating
 /// to the space the updated value requires.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum StatusType {
     Weight(u32),
     MaximumWeight(u32),
@@ -840,12 +845,12 @@ pub enum StatusType {
     JobExperience(u64),
     NextBaseExperience(u64),
     NextJobExperience(u64),
-    SP_USTR(u8),
-    SP_UAGI(u8),
-    SP_UVIT(u8),
-    SP_UINT(u8),
-    SP_UDEX(u8),
-    SP_ULUK(u8),
+    SpUstr(u8),
+    SpUagi(u8),
+    SpUvit(u8),
+    SpUint(u8),
+    SpUdex(u8),
+    SpUluk(u8),
     Strength(u32, u32),
     Agility(u32, u32),
     Vitality(u32, u32),
@@ -862,12 +867,12 @@ pub enum StatusType {
     Spell(u32, u32),
     Concentration(u32, u32),
     Creativity(u32, u32),
-    SP_UPOW(u8),
-    SP_USTA(u8),
-    SP_UWIS(u8),
-    SP_USPL(u8),
-    SP_UCON(u8),
-    SP_UCRT(u8),
+    SpUpow(u8),
+    SpUsta(u8),
+    SpUwis(u8),
+    SpUspl(u8),
+    SpUcon(u8),
+    SpUcrt(u8),
     PhysicalAttack(u32),
     SpellMagicAttack(u32),
     Resistance(u32),
@@ -931,17 +936,17 @@ impl ByteConvertable for StatusType {
 
             25 => Self::MaximumWeight(u32::from_bytes(&mut byte_stream, None)),
 
-            32 => Self::SP_USTR(u8::from_bytes(&mut byte_stream, None)),
+            32 => Self::SpUstr(u8::from_bytes(&mut byte_stream, None)),
 
-            33 => Self::SP_UAGI(u8::from_bytes(&mut byte_stream, None)),
+            33 => Self::SpUagi(u8::from_bytes(&mut byte_stream, None)),
 
-            34 => Self::SP_UVIT(u8::from_bytes(&mut byte_stream, None)),
+            34 => Self::SpUvit(u8::from_bytes(&mut byte_stream, None)),
 
-            35 => Self::SP_UINT(u8::from_bytes(&mut byte_stream, None)),
+            35 => Self::SpUint(u8::from_bytes(&mut byte_stream, None)),
 
-            36 => Self::SP_UDEX(u8::from_bytes(&mut byte_stream, None)),
+            36 => Self::SpUdex(u8::from_bytes(&mut byte_stream, None)),
 
-            37 => Self::SP_ULUK(u8::from_bytes(&mut byte_stream, None)),
+            37 => Self::SpUluk(u8::from_bytes(&mut byte_stream, None)),
 
             41 => Self::Attack1(u32::from_bytes(&mut byte_stream, None)),
 
@@ -1007,24 +1012,32 @@ impl ByteConvertable for StatusType {
 
             233 => Self::MaximumActivityPoints(u32::from_bytes(&mut byte_stream, None)),
 
-            247 => Self::SP_UPOW(u8::from_bytes(&mut byte_stream, None)),
+            247 => Self::SpUpow(u8::from_bytes(&mut byte_stream, None)),
 
-            248 => Self::SP_USTA(u8::from_bytes(&mut byte_stream, None)),
+            248 => Self::SpUsta(u8::from_bytes(&mut byte_stream, None)),
 
-            249 => Self::SP_UWIS(u8::from_bytes(&mut byte_stream, None)),
+            249 => Self::SpUwis(u8::from_bytes(&mut byte_stream, None)),
 
-            250 => Self::SP_USPL(u8::from_bytes(&mut byte_stream, None)),
+            250 => Self::SpUspl(u8::from_bytes(&mut byte_stream, None)),
 
-            251 => Self::SP_UCON(u8::from_bytes(&mut byte_stream, None)),
+            251 => Self::SpUcon(u8::from_bytes(&mut byte_stream, None)),
 
-            252 => Self::SP_UCRT(u8::from_bytes(&mut byte_stream, None)),
+            252 => Self::SpUcrt(u8::from_bytes(&mut byte_stream, None)),
 
             invalid => panic!("invalid status code {}", invalid),
         }
     }
 }
 
-#[derive(Debug, Packet)]
+// TODO: make StatusType derivable
+impl PrototypeElement for StatusType {
+
+    fn to_element(&self, display: String) -> ElementCell {
+        "<todo>".to_element(display)
+    }
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb0, 0x00)]
 struct UpdateStatusPacket {
     #[length_hint(6)]
@@ -1034,7 +1047,7 @@ struct UpdateStatusPacket {
 /// Sent by the character server to the client when loading onto a new map.
 /// This packet is ignored by Korangar since all of the provided values are set
 /// again individually using the UpdateStatusPackets.
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xbd, 0x00)]
 struct InitialStatusPacket {
     pub status_points: u16,
@@ -1067,34 +1080,34 @@ struct InitialStatusPacket {
     pub bonus_attack_speed: u16,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x41, 0x01)]
 struct UpdateStatusPacket1 {
     #[length_hint(12)]
     pub status_type: StatusType,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xcb, 0x0a)]
 struct UpdateStatusPacket2 {
     #[length_hint(10)]
     pub status_type: StatusType,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xbe, 0x00)]
 struct UpdateStatusPacket3 {
     #[length_hint(3)]
     pub status_type: StatusType,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x3a, 0x01)]
 struct UpdateAttackRangePacket {
     pub attack_range: u16,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xd4, 0x08)]
 struct SwitchCharacterSlotPacket {
     pub origin_slot: u16,
@@ -1104,7 +1117,7 @@ struct SwitchCharacterSlotPacket {
     pub remaining_moves: u16,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 enum Action {
     Attack,
     PickUpItem,
@@ -1117,21 +1130,21 @@ enum Action {
     TouchSkill,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x37, 0x04)]
 struct RequestActionPacket {
     pub value: u32,
     pub action: Action,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xf3, 0x00)]
 struct GlobalMessagePacket {
     pub packet_length: u16,
     pub message: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x39, 0x01)]
 struct RequestPlayerAttackFailedPacket {
     pub target_entity_id: u32,
@@ -1142,7 +1155,7 @@ struct RequestPlayerAttackFailedPacket {
     pub attack_range: u16,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x77, 0x09)]
 struct UpdateEntityHealthPointsPacket {
     pub entity_id: u32,
@@ -1150,11 +1163,11 @@ struct UpdateEntityHealthPointsPacket {
     pub maximum_health_points: u32,
 }
 
-/*#[derive(Debug, ByteConvertable)]
+/*#[derive(Clone, Debug, ByteConvertable)]
 enum DamageType {
 }*/
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc8, 0x08)]
 struct DamagePacket {
     pub source_entity_id: u32,
@@ -1170,26 +1183,26 @@ struct DamagePacket {
     pub damage_amount2: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x7f, 0x00)]
 struct ServerTickPacket {
     pub client_tick: u32,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x60, 0x03)]
 struct RequestServerTickPacket {
     pub client_tick: u32,
 }
 
-#[derive(Debug, PartialEq, Eq, ByteConvertable)]
+#[derive(Clone, Debug, PartialEq, Eq, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 pub enum SwitchCharacterSlotResponseStatus {
     Success,
     Error,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x70, 0x0b)]
 struct SwitchCharacterSlotResponsePacket {
     pub unknown: u16, // is always 8 ?
@@ -1197,7 +1210,7 @@ struct SwitchCharacterSlotResponsePacket {
     pub remaining_moves: u16,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x91, 0x00)]
 struct ChangeMapPacket {
     #[length_hint(16)]
@@ -1206,7 +1219,7 @@ struct ChangeMapPacket {
     pub y: u16,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 enum DissapearanceReason {
     OutOfSight,
     Died,
@@ -1215,14 +1228,14 @@ enum DissapearanceReason {
     TrickDead,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x80, 0x00)]
 struct EntityDisappearedPacket {
     pub entity_id: u32,
     pub reason: DissapearanceReason,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xfd, 0x09)]
 struct MovingEntityAppearedPacket {
     pub packet_length: u16,
@@ -1264,7 +1277,7 @@ struct MovingEntityAppearedPacket {
     pub name: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xff, 0x09)]
 struct EntityAppearedPacket {
     pub packet_length: u16,
@@ -1370,7 +1383,7 @@ impl From<MovingEntityAppearedPacket> for EntityData {
     }
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct SkillInformation {
     pub skill_id: u16,
     pub skill_type: u32,
@@ -1382,7 +1395,7 @@ struct SkillInformation {
     pub upgraded: u8,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x0f, 0x01)]
 struct UpdateSkillTreePacket {
     pub packet_length: u16,
@@ -1390,14 +1403,14 @@ struct UpdateSkillTreePacket {
     pub skill_information: Vec<SkillInformation>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct HotkeyData {
     pub is_skill: u8,
     pub skill_id: u32,
     pub quantity_or_skill_level: u16,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x20, 0x0b)]
 struct UpdateHotkeysPacket {
     pub rotate: u8,
@@ -1405,26 +1418,26 @@ struct UpdateHotkeysPacket {
     pub hotkeys: [HotkeyData; 38],
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc9, 0x02)]
 struct UpdatePartyInvitationStatePacket {
     pub allowed: u8, // always 0 on rAthena
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xda, 0x02)]
 struct UpdateShowEquipPacket {
     pub open_equip_window: u8,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xd9, 0x02)]
 struct UpdateConfigurationPacket {
     pub config_type: u32,
     pub value: u32, // only enabled and disabled ?
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xe2, 0x08)]
 struct NavigateToMonsterPacket {
     pub target_type: u8, // 3 - entity; 0 - coordinates; 1 - coordinates but fails if you're alweady on the map
@@ -1437,7 +1450,7 @@ struct NavigateToMonsterPacket {
     pub target_monster_id: u16,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u32)]
 enum MarkerType {
     DisplayFor15Seconds,
@@ -1445,7 +1458,7 @@ enum MarkerType {
     RemoveMark,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x44, 0x01)]
 struct MarkMinimapPositionPacket {
     pub npc_id: u32,
@@ -1455,19 +1468,19 @@ struct MarkMinimapPositionPacket {
     pub color: ColorRGB,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb5, 0x00)]
 struct NextButtonPacket {
     pub entity_id: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb6, 0x00)]
 struct CloseButtonPacket {
     pub entity_id: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb7, 0x00)]
 struct DialogMenuPacket {
     pub packet_length: u16,
@@ -1476,14 +1489,14 @@ struct DialogMenuPacket {
     pub message: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xf3, 0x01)]
 struct DisplaySpecialEffectPacket {
     pub entity_id: u32,
     pub effect_id: u32,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xcb, 0x09)]
 struct DisplaySkillEffectPacket {
     pub skill_id: u16,
@@ -1493,7 +1506,7 @@ struct DisplaySkillEffectPacket {
     pub result: u8,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x83, 0x09)]
 struct StatusChangePacket {
     pub index: u16,
@@ -1504,7 +1517,7 @@ struct StatusChangePacket {
     pub value: [u32; 3],
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct ObjectiveDetails1 {
     pub hunt_identification: u32,
     pub objective_type: u32,
@@ -1516,7 +1529,7 @@ struct ObjectiveDetails1 {
     pub mob_name: String,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xf9, 0x09)]
 struct QuestNotificationPacket1 {
     pub quest_id: u32,
@@ -1528,7 +1541,7 @@ struct QuestNotificationPacket1 {
     pub objective_details: [ObjectiveDetails1; 3],
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct HuntingObjective {
     pub quest_id: u32,
     pub mob_id: u32,
@@ -1536,7 +1549,7 @@ struct HuntingObjective {
     pub current_count: u16,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xfe, 0x08)]
 struct HuntingQuestNotificationPacket {
     pub packet_length: u16,
@@ -1544,7 +1557,7 @@ struct HuntingQuestNotificationPacket {
     pub objective_details: Vec<HuntingObjective>,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xfa, 0x09)]
 struct HuntingQuestUpdateObjectivePacket {
     pub packet_length: u16,
@@ -1553,13 +1566,13 @@ struct HuntingQuestUpdateObjectivePacket {
     pub objective_details: Vec<HuntingObjective>,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb4, 0x02)]
 struct QuestRemovedPacket {
     pub quest_id: u32,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct QuestDetails {
     pub hunt_identification: u32,
     pub objective_type: u32,
@@ -1572,7 +1585,7 @@ struct QuestDetails {
     pub mob_name: String,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct Quest {
     pub quest_id: u32,
     pub active: u8,
@@ -1583,7 +1596,7 @@ struct Quest {
     pub objective_details: Vec<QuestDetails>,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xf8, 0x09)]
 struct QuestListPacket {
     pub packet_length: u16,
@@ -1592,7 +1605,7 @@ struct QuestListPacket {
     pub quests: Vec<Quest>,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u32)]
 enum VisualEffect {
     BaseLevelUp,
@@ -1607,14 +1620,14 @@ enum VisualEffect {
     BaseLevelUpTaekwon,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x9b, 0x01)]
 struct VisualEffectPacket {
     pub entity_id: u32,
     pub effect: VisualEffect,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 enum ExperienceType {
     #[numeric_value(1)]
@@ -1622,14 +1635,14 @@ enum ExperienceType {
     JobExperience,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 enum ExperienceSource {
     Regular,
     Quest,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xcc, 0x0a)]
 struct DisplayGainedExperiencePacket {
     pub account_id: u32,
@@ -1638,7 +1651,7 @@ struct DisplayGainedExperiencePacket {
     pub experience_source: ExperienceSource,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 enum ImageLocation {
     BottomLeft,
     BottomMiddle,
@@ -1649,7 +1662,7 @@ enum ImageLocation {
     ClearAll,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb3, 0x01)]
 struct DisplayImagePacket {
     #[length_hint(64)]
@@ -1657,7 +1670,7 @@ struct DisplayImagePacket {
     pub location: ImageLocation,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x29, 0x02)]
 struct StateChangePacket {
     pub entity_id: u32,
@@ -1667,7 +1680,7 @@ struct StateChangePacket {
     pub is_pk_mode_on: u8,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x41, 0x0b)]
 struct ItemPickupPacket {
     pub index: u16,
@@ -1688,7 +1701,7 @@ struct ItemPickupPacket {
     pub enchantment_level: u8,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 enum RemoveItemReason {
     Normal,
@@ -1701,7 +1714,7 @@ enum RemoveItemReason {
     ConsumedByFourSpiritAnalysis,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xfa, 0x07)]
 struct RemoveItemFromInventoryPacket {
     pub remove_reason: RemoveItemReason,
@@ -1710,7 +1723,7 @@ struct RemoveItemFromInventoryPacket {
 }
 
 // TODO: improve names
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 pub enum QuestEffect {
     Quest,
@@ -1728,7 +1741,7 @@ pub enum QuestEffect {
     None,
 }
 
-#[derive(Debug, ByteConvertable)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 pub enum QuestColor {
     Yellow,
@@ -1737,7 +1750,7 @@ pub enum QuestColor {
     Purple,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x46, 0x04)]
 pub struct QuestEffectPacket {
     pub entity_id: u32,
@@ -1746,7 +1759,7 @@ pub struct QuestEffectPacket {
     pub color: QuestColor,
 }
 
-#[derive(Debug, Packet)]
+#[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb4, 0x00)]
 struct NpcDialogPacket {
     pub packet_length: u16,
@@ -1755,17 +1768,17 @@ struct NpcDialogPacket {
     pub text: String,
 }
 
-#[derive(Debug, Default, Packet)]
+#[derive(Clone, Debug, Default, Packet, PrototypeElement)]
 #[header(0x7d, 0x00)]
 struct MapLoadedPacket {}
 
-#[derive(Debug, Default, Packet)]
+#[derive(Clone, Debug, Default, Packet, PrototypeElement)]
 #[header(0x87, 0x01)]
 struct CharacterServerKeepalivePacket {
     pub account_id: u32,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x90, 0x00)]
 struct StartDialogPacket {
     pub npc_id: u32,
@@ -1773,19 +1786,19 @@ struct StartDialogPacket {
     pub dialog_type: u8,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xb9, 0x00)]
 struct NextDialogPacket {
     pub npc_id: u32,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x46, 0x01)]
 struct CloseDialogPacket {
     pub npc_id: u32,
 }
 
-#[derive(Debug, Packet, new)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xb8, 0x00)]
 struct ChooseDialogOptionPacket {
     pub npc_id: u32,
@@ -1834,14 +1847,21 @@ pub struct NetworkingSystem {
     character_keep_alive_timer: NetworkTimer,
     map_keep_alive_timer: NetworkTimer,
     player_name: String,
+    #[cfg(feature = "debug_network")]
+    packet_history: Rc<RefCell<Vec<PacketEntry>>>,
 }
 
 impl NetworkingSystem {
 
     pub fn new() -> Self {
 
+        let login_server_ip = match cfg!(feature = "local") {
+            true => "127.0.0.1:6900",
+            false => "167.235.227.244:6900",
+        };
+
         let login_settings = LoginSettings::new();
-        let login_stream = TcpStream::connect("167.235.227.244:6900").expect("failed to connect to login server");
+        let login_stream = TcpStream::connect(login_server_ip).expect("failed to connect to login server");
 
         let character_stream = None;
         let map_stream = None;
@@ -1853,6 +1873,8 @@ impl NetworkingSystem {
         let character_keep_alive_timer = NetworkTimer::new(Duration::from_secs(10));
         let map_keep_alive_timer = NetworkTimer::new(Duration::from_secs(4));
         let player_name = String::new();
+        #[cfg(feature = "debug_network")]
+        let packet_history = Rc::new(RefCell::new(Vec::new()));
 
         login_stream.set_read_timeout(Duration::from_secs(1).into()).unwrap();
 
@@ -1869,6 +1891,8 @@ impl NetworkingSystem {
             character_keep_alive_timer,
             map_keep_alive_timer,
             player_name,
+            #[cfg(feature = "debug_network")]
+            packet_history,
         }
     }
 
@@ -1948,6 +1972,9 @@ impl NetworkingSystem {
             .write_all(&character_server_login_packet.to_bytes())
             .map_err(|_| "failed to send packet to character server")?;
 
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
+
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
@@ -1969,6 +1996,9 @@ impl NetworkingSystem {
 
         self.send_packet_to_character_server(RequestCharacterListPacket::default());
 
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
+
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
@@ -1986,6 +2016,9 @@ impl NetworkingSystem {
             // clear in case it was previously saved
             false => String::new(),
         };
+
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
 
         #[cfg(feature = "debug_network")]
         timer.stop();
@@ -2009,10 +2042,15 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    fn send_packet_to_login_server(&mut self, packet: impl Packet + Debug) {
+    fn send_packet_to_login_server<T>(&mut self, packet: T)
+    where
+        T: Packet + 'static,
+    {
 
         #[cfg(feature = "debug_network")]
-        print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
+        self.packet_history
+            .borrow_mut()
+            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME));
 
         let packet_bytes = packet.to_bytes();
         self.login_stream
@@ -2020,10 +2058,15 @@ impl NetworkingSystem {
             .expect("failed to send packet to login server");
     }
 
-    fn send_packet_to_character_server(&mut self, packet: impl Packet + Debug) {
+    fn send_packet_to_character_server<T>(&mut self, packet: T)
+    where
+        T: Packet + 'static,
+    {
 
         #[cfg(feature = "debug_network")]
-        print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
+        self.packet_history
+            .borrow_mut()
+            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME));
 
         let packet_bytes = packet.to_bytes();
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
@@ -2032,10 +2075,15 @@ impl NetworkingSystem {
             .expect("failed to send packet to character server");
     }
 
-    fn send_packet_to_map_server(&mut self, packet: impl Packet + Debug) {
+    fn send_packet_to_map_server<T>(&mut self, packet: T)
+    where
+        T: Packet + 'static,
+    {
 
         #[cfg(feature = "debug_network")]
-        print_debug!("{}outgoing packet{}: {:?}", RED, NONE, packet);
+        self.packet_history
+            .borrow_mut()
+            .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME));
 
         let packet_bytes = packet.to_bytes();
         let map_stream = self.map_stream.as_mut().expect("no map server connection");
@@ -2087,7 +2135,7 @@ impl NetworkingSystem {
                 first_buffer.append(&mut second_buffer);
 
                 println!("combined {}", first_buffer.len());
-                return Some(first_buffer);
+                Some(first_buffer)
             }
 
             length => Some(buffer[..length].to_vec()),
@@ -2140,6 +2188,9 @@ impl NetworkingSystem {
 
         let create_character_success_packet = CreateCharacterSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
+
         self.characters
             .borrow_mut()
             .push(create_character_success_packet.character_information);
@@ -2165,6 +2216,9 @@ impl NetworkingSystem {
         }
 
         CharacterDeletionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
+
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
 
         self.characters
             .borrow_mut()
@@ -2219,10 +2273,16 @@ impl NetworkingSystem {
             login_data.sex,
         ));
 
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
+
         let response = self.get_data_from_map_server();
         let mut byte_stream = ByteStream::new(&response);
 
         let _packet8302 = Packet8302::try_from_bytes(&mut byte_stream).unwrap();
+
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
 
         let response = self.get_data_from_map_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -2245,6 +2305,9 @@ impl NetworkingSystem {
             .unwrap();
 
         self.player_name = character_information.name.clone();
+
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
 
         Ok((
             change_map_packet.map_name.replace(".gat", ""),
@@ -2291,10 +2354,6 @@ impl NetworkingSystem {
                 for _index in 0..character_count {
 
                     let character_information = CharacterInformation::from_bytes(&mut byte_stream, None);
-
-                    #[cfg(feature = "debug_network")]
-                    print_debug!("{}incoming packet{}: {:?}", YELLOW, NONE, character_information);
-
                     characters.push(character_information);
                 }
 
@@ -2303,6 +2362,9 @@ impl NetworkingSystem {
 
             SwitchCharacterSlotResponseStatus::Error => return Err("failed to move character to a different slot".to_string()),
         }
+
+        #[cfg(feature = "debug_network")]
+        byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
 
         *self.move_request.borrow_mut() = None;
         *self.changed.borrow_mut() = true;
@@ -2338,7 +2400,7 @@ impl NetworkingSystem {
         let complete_message = format!("{} : {}", self.player_name, message);
 
         self.send_packet_to_map_server(GlobalMessagePacket::new(
-            complete_message.bytes().count() as u16 + 5,
+            complete_message.bytes().len() as u16 + 5,
             complete_message,
         ));
     }
@@ -2510,13 +2572,25 @@ impl NetworkingSystem {
                 } else {
 
                     #[cfg(feature = "debug_network")]
-                    println!("{}unhandled{}: {:x?}", RED, NONE, byte_stream.remaining());
+                    {
+
+                        let remaining_bytes = byte_stream.remaining_bytes();
+                        byte_stream.incoming_unknown_packet(remaining_bytes);
+                    }
 
                     break;
                 }
             }
+
+            #[cfg(feature = "debug_network")]
+            byte_stream.transfer_packet_history(&mut self.packet_history.borrow_mut());
         }
 
         events
+    }
+
+    #[cfg(feature = "debug_network")]
+    pub fn packets(&self) -> Rc<RefCell<Vec<PacketEntry>>> {
+        self.packet_history.clone()
     }
 }

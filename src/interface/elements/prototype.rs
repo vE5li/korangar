@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::net::Ipv4Addr;
 use std::rc::Rc;
 
 use cgmath::{Quaternion, Rad, Vector2, Vector3, Vector4};
@@ -24,6 +25,7 @@ impl<T> !NoDisplay for Vector3<T> {}
 impl<T> !NoDisplay for Vector4<T> {}
 impl<T> !NoDisplay for Quaternion<T> {}
 impl<T> !NoDisplay for Rad<T> {}
+impl !NoDisplay for Ipv4Addr {}
 
 impl<T> ElementDisplay for T
 where
@@ -91,6 +93,13 @@ impl<T: ElementDisplay> ElementDisplay for Rad<T> {
     }
 }
 
+impl ElementDisplay for Ipv4Addr {
+
+    fn display(&self) -> String {
+        self.to_string()
+    }
+}
+
 /*impl ElementDisplay for ModelVertexBuffer {
 
     fn display(&self) -> String {
@@ -123,6 +132,7 @@ impl<T> !NoPrototype for Vec<T> {}
 impl<T> !NoPrototype for Rc<T> {}
 
 impl NoPrototype for String {}
+impl NoPrototype for Ipv4Addr {}
 
 impl<T> PrototypeElement for T
 where
@@ -131,9 +141,9 @@ where
 
     fn to_element(&self, display: String) -> ElementCell {
 
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display.clone())), cell!(StringValue::new(self.display()))];
+        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(StringValue::new(self.display()))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -143,7 +153,7 @@ impl PrototypeElement for DimensionConstraint {
 
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -153,7 +163,7 @@ impl PrototypeElement for SizeConstraint {
 
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -174,7 +184,7 @@ impl<T: PrototypeElement> PrototypeElement for Option<T> {
 
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(StringValue::new("none".to_string()))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -212,7 +222,7 @@ impl PrototypeElement for Color {
 
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(ColorValue::new(*self))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 

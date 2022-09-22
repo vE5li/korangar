@@ -9,12 +9,20 @@ pub struct NativeModelVertex {
     pub normal: Vector3<f32>,
     pub texture_coordinates: Vector2<f32>,
     pub texture_index: i32,
+    pub wind_affinity: f32,
 }
 
 impl NativeModelVertex {
 
-    fn to_vertex(self) -> ModelVertex {
-        ModelVertex::new(self.position, self.normal, self.texture_coordinates, self.texture_index)
+    fn convert_to_vertex(self) -> ModelVertex {
+
+        ModelVertex::new(
+            self.position,
+            self.normal,
+            self.texture_coordinates,
+            self.texture_index,
+            self.wind_affinity,
+        )
     }
 
     pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
@@ -31,9 +39,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.to_vertex());
-            vertices.push(second_partial.to_vertex());
-            vertices.push(third_partial.to_vertex());
+            vertices.push(first_partial.convert_to_vertex());
+            vertices.push(second_partial.convert_to_vertex());
+            vertices.push(third_partial.convert_to_vertex());
         }
 
         vertices

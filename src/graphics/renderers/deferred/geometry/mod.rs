@@ -1,3 +1,5 @@
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
@@ -5,6 +7,8 @@ mod vertex_shader {
     }
 }
 
+// TODO: remove once no longer needed
+#[allow(clippy::needless_question_mark)]
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
@@ -49,7 +53,15 @@ impl GeometryRenderer {
 
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader, false);
+        let pipeline = Self::create_pipeline(
+            device.clone(),
+            subpass,
+            viewport,
+            &vertex_shader,
+            &fragment_shader,
+            #[cfg(feature = "debug")]
+            false,
+        );
         let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
 
         let nearest_sampler = Sampler::start(device.clone())
@@ -76,8 +88,23 @@ impl GeometryRenderer {
         }
     }
 
-    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport, wireframe: bool) {
-        self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader, wireframe);
+    pub fn recreate_pipeline(
+        &mut self,
+        device: Arc<Device>,
+        subpass: Subpass,
+        viewport: Viewport,
+        #[cfg(feature = "debug")] wireframe: bool,
+    ) {
+
+        self.pipeline = Self::create_pipeline(
+            device,
+            subpass,
+            viewport,
+            &self.vertex_shader,
+            &self.fragment_shader,
+            #[cfg(feature = "debug")]
+            wireframe,
+        );
     }
 
     fn create_pipeline(
@@ -86,18 +113,23 @@ impl GeometryRenderer {
         viewport: Viewport,
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
-        wireframe: bool,
+        #[cfg(feature = "debug")] wireframe: bool,
     ) -> Arc<GraphicsPipeline> {
 
+        #[cfg(feature = "debug")]
         let polygon_mode = match wireframe {
             true => PolygonMode::Line,
             false => PolygonMode::Fill,
         };
 
+        #[cfg(feature = "debug")]
         let specialization_constants = match wireframe {
             true => SpecializationConstants { additional_color: 1.0 },
             false => SpecializationConstants { additional_color: 0.0 },
         };
+
+        #[cfg(not(feature = "debug"))]
+        let (polygon_mode, specialization_constants) = (PolygonMode::Fill, SpecializationConstants { additional_color: 0.0 });
 
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
@@ -116,7 +148,7 @@ impl GeometryRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
+    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
 
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
@@ -124,6 +156,7 @@ impl GeometryRenderer {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view_projection: (projection_matrix * view_matrix).into(),
+            time,
         };
 
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
@@ -141,7 +174,7 @@ impl GeometryRenderer {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         _camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
-        textures: &Vec<Texture>,
+        textures: &[Texture],
         world_matrix: Matrix4<f32>,
     ) {
 

@@ -9,7 +9,7 @@ mod cursor;
 mod windows;
 
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use cgmath::Vector2;
 use derive_new::new;
@@ -123,8 +123,6 @@ impl Interface {
                         true => self.rerender = true,
                         false => *rerender = true,
                     },
-
-                    _ => panic!(),
                 }
             }
         }
@@ -226,7 +224,6 @@ impl Interface {
                 ChangeEvent::Reresolve => self.reresolve = true,
                 ChangeEvent::Rerender => self.rerender = true,
                 ChangeEvent::RerenderWindow => panic!(),
-                _ => panic!(),
             }
         }
     }
@@ -240,7 +237,6 @@ impl Interface {
                 ChangeEvent::Reresolve => self.reresolve = true,
                 ChangeEvent::Rerender => self.rerender = true,
                 ChangeEvent::RerenderWindow => *rerender = true,
-                _ => panic!(),
             }
         }
     }

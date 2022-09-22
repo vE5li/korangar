@@ -1,5 +1,6 @@
-use std::borrow::Borrow;
 use std::rc::Weak;
+
+use cgmath::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
@@ -54,8 +55,14 @@ impl Element for ScrollView {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-        self.state
-            .resolve(placement_resolver, interface_settings, theme, &self.size_constraint);
+
+        self.state.resolve(
+            placement_resolver,
+            interface_settings,
+            theme,
+            &self.size_constraint,
+            Vector2::zero(),
+        );
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

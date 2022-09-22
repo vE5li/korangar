@@ -10,6 +10,8 @@ mod login;
 mod maps;
 mod menu;
 mod mutable;
+#[cfg(feature = "debug_network")]
+mod packet;
 #[cfg(feature = "debug")]
 mod profiler;
 mod prototype;
@@ -29,6 +31,8 @@ pub use self::login::LoginWindow;
 pub use self::maps::MapsWindow;
 pub use self::menu::MenuWindow;
 pub use self::mutable::*;
+#[cfg(feature = "debug_network")]
+pub use self::packet::PacketWindow;
 #[cfg(feature = "debug")]
 pub use self::profiler::ProfilerWindow;
 pub use self::prototype::PrototypeWindow;

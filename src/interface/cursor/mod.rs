@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use cgmath::Vector2;
-use vulkano::image::ImageAccess;
 use vulkano::sync::GpuFuture;
 
 use crate::graphics::{Color, DeferredRenderer, Renderer};

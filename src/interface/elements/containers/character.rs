@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-use num::Zero;
+use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -53,14 +53,18 @@ impl CharacterPreview {
                     18.0,
                     constraint!(100%, 18)
                 )), // alignment!(center, top)
-                cell!(EventButton::new(
-                    "switch slot".to_string(),
-                    UserEvent::RequestSwitchCharacterSlot(slot)
-                )),
-                cell!(EventButton::new(
-                    "delete character".to_string(),
-                    UserEvent::DeleteCharacter(character_information.character_id as usize)
-                )),
+                Button::default()
+                    .with_static_text("switch")
+                    .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
+                    .with_width(dimension!(50%))
+                    .wrap(),
+                Button::default()
+                    .with_static_text("delete")
+                    .with_event(UserEvent::DeleteCharacter(character_information.character_id as usize))
+                    .with_background_color(|theme| *theme.close_button.background_color)
+                    .with_foreground_color(|theme| *theme.close_button.foreground_color)
+                    .with_width(dimension!(50%))
+                    .wrap(),
             ];
         }
 
@@ -121,7 +125,13 @@ impl Element for CharacterPreview {
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let size_constraint = &constraint!(20%, 150);
-        self.state.resolve(placement_resolver, interface_settings, theme, size_constraint);
+        self.state.resolve(
+            placement_resolver,
+            interface_settings,
+            theme,
+            size_constraint,
+            Vector2::from_value(4.0),
+        );
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

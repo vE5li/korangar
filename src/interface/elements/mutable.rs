@@ -15,7 +15,7 @@ impl PrototypeMutableElement for Color {
             cell!(MutableColorValue::new(display, self as *const Color, change_event)),
         ];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -25,7 +25,7 @@ impl PrototypeMutableElement for DimensionConstraint {
 
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }
 
@@ -35,6 +35,6 @@ impl PrototypeMutableElement for SizeConstraint {
 
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
-        cell!(Container::new(elements, Container::DEFAULT_SIZE))
+        Container::new(elements).wrap()
     }
 }

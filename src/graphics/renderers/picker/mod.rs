@@ -131,8 +131,9 @@ impl GeometryRendererTrait for PickerRenderer {
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
-        textures: &Vec<Texture>,
+        textures: &[Texture],
         world_matrix: Matrix4<f32>,
+        _time: f32,
     ) where
         Self: Renderer,
     {

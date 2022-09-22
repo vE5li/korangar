@@ -35,6 +35,10 @@ function get_job_name_from_id(id)
             return string.sub(k, 7)
         end
 
+        if string.sub(k, 1, 6) == "JT_C5_" then
+            return string.sub(k, 7)
+        end
+
         return string.sub(k, 4)
     end
   end

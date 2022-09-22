@@ -111,8 +111,8 @@ impl Common {
             111 => EntityType::Hidden, // TODO: check that this is correct
             // 111 | 139 => None,
             0..=44 | 4000..=5999 => EntityType::Player,
-            0..=999 => EntityType::Npc,
-            0..=3999 => EntityType::Monster,
+            46..=999 => EntityType::Npc,
+            1000..=3999 => EntityType::Monster,
             _ => EntityType::Unknown,
         };
 
@@ -279,7 +279,7 @@ impl Common {
                 successors
             }
 
-            fn to_vector(self) -> Vector2<usize> {
+            fn convert_to_vector(self) -> Vector2<usize> {
                 Vector2::new(self.0, self.1)
             }
         }
@@ -294,7 +294,7 @@ impl Common {
                 .map(|(index, pos)| {
 
                     let arrival_timestamp = starting_timestamp + index as u32 * self.movement_speed as u32;
-                    (pos.to_vector(), arrival_timestamp)
+                    (pos.convert_to_vector(), arrival_timestamp)
                 })
                 .collect();
 
@@ -437,18 +437,21 @@ impl Common {
                 first_normal,
                 texture_coordinates[0],
                 texture_index,
+                0.0,
             ));
             native_steps_vertices.push(NativeModelVertex::new(
                 second_position,
                 first_normal,
                 texture_coordinates[1],
                 texture_index,
+                0.0,
             ));
             native_steps_vertices.push(NativeModelVertex::new(
                 third_position,
                 first_normal,
                 texture_coordinates[2],
                 texture_index,
+                0.0,
             ));
 
             native_steps_vertices.push(NativeModelVertex::new(
@@ -456,18 +459,21 @@ impl Common {
                 second_normal,
                 texture_coordinates[0],
                 texture_index,
+                0.0,
             ));
             native_steps_vertices.push(NativeModelVertex::new(
                 third_position,
                 second_normal,
                 texture_coordinates[2],
                 texture_index,
+                0.0,
             ));
             native_steps_vertices.push(NativeModelVertex::new(
                 fourth_position,
                 second_normal,
                 texture_coordinates[3],
                 texture_index,
+                0.0,
             ));
         }
 

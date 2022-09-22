@@ -14,6 +14,7 @@ pub struct ButtonTheme {
     pub hovered_background_color: Mutable<Color, RERENDER>,
     pub disabled_background_color: Mutable<Color, RERENDER>,
     pub foreground_color: Mutable<Color, RERENDER>,
+    pub hovered_foreground_color: Mutable<Color, RERENDER>,
     pub disabled_foreground_color: Mutable<Color, RERENDER>,
     pub debug_foreground_color: Mutable<Color, RERENDER>,
     pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
@@ -23,9 +24,6 @@ pub struct ButtonTheme {
     pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
     pub font_size: MutableRange<f32, RERENDER>,
     pub height_constraint: DimensionConstraint,
-    // TODO: remove
-    pub size_constraint: SizeConstraint,
-    pub menu_size_constraint: SizeConstraint,
 }
 
 impl Default for ButtonTheme {
@@ -37,6 +35,7 @@ impl Default for ButtonTheme {
             hovered_background_color: Mutable::new(Color::rgb(140, 120, 140)),
             disabled_background_color: Mutable::new(Color::monochrome(70)),
             foreground_color: Mutable::new(Color::monochrome(200)),
+            hovered_foreground_color: Mutable::new(Color::rgb(220, 170, 215)),
             disabled_foreground_color: Mutable::new(Color::monochrome(140)),
             debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
@@ -46,8 +45,6 @@ impl Default for ButtonTheme {
             text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             height_constraint: dimension!(16),
-            size_constraint: constraint!(40 > 100%, 16),
-            menu_size_constraint: constraint!(40 > 100%, 20),
         }
     }
 }
@@ -78,7 +75,7 @@ impl Default for WindowTheme {
             title_border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
             border_size: MutableRange::new(Vector2::new(12.0, 6.0), Vector2::zero(), Vector2::new(30.0, 30.0)),
             text_offset: MutableRange::new(Vector2::new(5.0, -1.0), Vector2::zero(), Vector2::new(50.0, 30.0)),
-            gaps: MutableRange::new(Vector2::new(6.0, 8.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
+            gaps: MutableRange::new(Vector2::new(4.0, 5.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             title_size_constraint: constraint!(80%, 12),
         }

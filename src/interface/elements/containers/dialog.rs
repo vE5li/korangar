@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
+use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -29,13 +30,20 @@ impl DialogContainer {
 
             DialogElement::Text(text) => cell!(Text::new(text.clone(), Color::monochrome(255), 14.0, constraint!(100%, 14))),
 
-            DialogElement::NextButton => cell!(Button::new("next", UserEvent::NextDialog(npc_id), false)),
+            DialogElement::NextButton => Button::default()
+                .with_static_text("next")
+                .with_event(UserEvent::NextDialog(npc_id))
+                .wrap(),
 
-            DialogElement::CloseButton => cell!(Button::new("close", UserEvent::CloseDialog(npc_id), false)),
+            DialogElement::CloseButton => Button::default()
+                .with_static_text("next")
+                .with_event(UserEvent::CloseDialog(npc_id))
+                .wrap(),
 
-            DialogElement::ChoiceButton(text, index) => {
-                cell!(EventButton::new(text.clone(), UserEvent::ChooseDialogOption(npc_id, *index)))
-            }
+            DialogElement::ChoiceButton(text, index) => Button::default()
+                .with_dynamic_text(text.clone())
+                .with_event(UserEvent::ChooseDialogOption(npc_id, *index))
+                .wrap(),
         }
     }
 
@@ -77,7 +85,13 @@ impl Element for DialogContainer {
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
 
         let size_constraint = &constraint!(100%, ?);
-        self.state.resolve(placement_resolver, interface_settings, theme, size_constraint);
+        self.state.resolve(
+            placement_resolver,
+            interface_settings,
+            theme,
+            size_constraint,
+            Vector2::from_value(3.0),
+        );
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

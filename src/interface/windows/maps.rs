@@ -8,12 +8,10 @@ use crate::interface::*;
 pub struct MapsWindow {}
 
 impl MapsWindow {
-
     pub const WINDOW_CLASS: &'static str = "maps";
 }
 
 impl PrototypeWindow for MapsWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -24,7 +22,6 @@ impl PrototypeWindow for MapsWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let map_warps = [
             ("geffen", Vector2::new(119, 59)),
             ("alberta", Vector2::new(28, 234)),
@@ -54,7 +51,6 @@ impl PrototypeWindow for MapsWindow {
         let elements = map_warps
             .into_iter()
             .map(|(name, position)| {
-
                 Button::default()
                     .with_dynamic_text(name.to_owned())
                     .with_event(UserEvent::RequestWarpToMap(format!("{}.gat", name), position))

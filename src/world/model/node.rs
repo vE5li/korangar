@@ -13,17 +13,14 @@ pub struct BoundingBox {
 }
 
 impl BoundingBox {
-
     pub fn new<T>(vertex_positions: T) -> Self
     where
         T: IntoIterator<Item = Vector3<f32>>,
     {
-
         let mut smallest: Vector3<f32> = Vector3::from_value(f32::MAX);
         let mut biggest: Vector3<f32> = Vector3::from_value(-f32::MAX);
 
         for position in vertex_positions {
-
             smallest = smallest.zip(position, f32::min);
             biggest = biggest.zip(position, f32::max);
         }
@@ -32,7 +29,6 @@ impl BoundingBox {
     }
 
     pub fn uninitialized() -> Self {
-
         let smallest: Vector3<f32> = Vector3::from_value(f32::MAX);
         let biggest: Vector3<f32> = Vector3::from_value(-f32::MAX);
 
@@ -48,7 +44,6 @@ impl BoundingBox {
     }
 
     pub fn extend(&mut self, other: &Self) {
-
         self.smallest = self.smallest.zip(other.smallest, f32::min);
         self.biggest = self.biggest.zip(other.biggest, f32::max);
     }
@@ -60,18 +55,14 @@ pub struct OrientedBox {
 }
 
 impl OrientedBox {
-
     pub fn transform(self, transform_matrix: Matrix4<f32>) -> Self {
-
         let corners = self.corners.map(|corner| multiply_matrix4_and_vector3(&transform_matrix, corner));
         Self { corners }
     }
 }
 
 impl Default for OrientedBox {
-
     fn default() -> Self {
-
         // TODO: check if this might just need to be 4 points
         let corners = [
             Vector3::new(-1.0, -1.0, -1.0),
@@ -89,9 +80,7 @@ impl Default for OrientedBox {
 }
 
 impl From<BoundingBox> for OrientedBox {
-
     fn from(bounding_box: BoundingBox) -> Self {
-
         // TODO: check if this might just need to be 4 points
         let corners = [
             Vector3::new(bounding_box.smallest.x, bounding_box.smallest.y, bounding_box.smallest.z),
@@ -121,9 +110,7 @@ pub struct Node {
 }
 
 impl Node {
-
     fn animaton_matrix(&self, client_tick: u32) -> Matrix4<f32> {
-
         let last_step = self.rotation_keyframes.last().unwrap();
         let animation_tick = client_tick % last_step.frame;
 
@@ -145,7 +132,6 @@ impl Node {
     }
 
     pub fn world_matrix(&self, transform: &Transform, client_tick: u32) -> Matrix4<f32> {
-
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
             false => self.animaton_matrix(client_tick),
@@ -179,7 +165,6 @@ impl Node {
     ) where
         T: Renderer + GeometryRenderer,
     {
-
         renderer.render_geometry(
             render_target,
             camera,

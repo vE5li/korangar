@@ -41,9 +41,7 @@ pub struct WaterRenderer {
 }
 
 impl WaterRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -68,7 +66,6 @@ impl WaterRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         let depth_stencil_state = DepthStencilState {
             depth: Some(DepthState {
                 enable_dynamic: false,
@@ -98,7 +95,6 @@ impl WaterRenderer {
         vertex_buffer: WaterVertexBuffer,
         day_timer: f32,
     ) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 

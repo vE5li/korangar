@@ -41,9 +41,7 @@ pub struct RectangleRenderer {
 }
 
 impl RectangleRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -78,7 +76,6 @@ impl RectangleRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -101,7 +98,6 @@ impl RectangleRenderer {
         corner_radius: Vector4<f32>,
         color: Color,
     ) {
-
         let layout = self.pipeline.layout().clone();
 
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);

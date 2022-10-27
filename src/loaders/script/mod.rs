@@ -7,9 +7,7 @@ pub struct ScriptLoader {
 }
 
 impl ScriptLoader {
-
     pub fn new(game_file_loader: &mut GameFileLoader) -> Self {
-
         let state = Lua::new();
 
         let data = game_file_loader
@@ -54,7 +52,6 @@ end
 
     // TODO: move this to a different class that utilizes the script loader
     pub fn get_job_name_from_id(&self, job_id: usize) -> String {
-
         use mlua::prelude::*;
         use mlua::Function;
 
@@ -71,7 +68,6 @@ end
 
     // TODO: move this to a different class that utilizes the script loader
     pub fn get_item_name_from_id(&self, item_id: usize) -> String {
-
         use mlua::prelude::*;
 
         let globals = self.state.globals();
@@ -90,7 +86,6 @@ end
 
     // TODO: move this to a different class that utilizes the script loader
     pub fn get_item_resource_from_id(&self, item_id: usize) -> String {
-
         use mlua::prelude::*;
 
         let globals = self.state.globals();

@@ -35,7 +35,6 @@ pub fn increment_stack(size: usize) {
 }
 
 pub fn decrement_stack() {
-
     match STACK.try_lock() {
         Ok(ref mut mutex) => mutex.pop(),
         Err(..) => panic!(),

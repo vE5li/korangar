@@ -7,12 +7,10 @@ use crate::interface::*;
 pub struct MenuWindow {}
 
 impl MenuWindow {
-
     pub const WINDOW_CLASS: &'static str = "menu";
 }
 
 impl PrototypeWindow for MenuWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -23,7 +21,6 @@ impl PrototypeWindow for MenuWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements = vec![
             Button::default()
                 .with_static_text("graphics settings")

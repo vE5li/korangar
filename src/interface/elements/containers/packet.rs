@@ -15,7 +15,6 @@ enum Direction {
 }
 
 impl Display for Direction {
-
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
             Direction::Incoming => write!(f, "[in]"),
@@ -32,9 +31,7 @@ pub struct PacketEntry {
 }
 
 impl PacketEntry {
-
     pub fn new_incoming(element: &(impl PrototypeElement + Clone + 'static), name: &'static str, is_ping: bool) -> Self {
-
         Self {
             element: Box::new(element.clone()),
             name,
@@ -44,7 +41,6 @@ impl PacketEntry {
     }
 
     pub fn new_outgoing(element: &(impl PrototypeElement + Clone + 'static), name: &'static str, is_ping: bool) -> Self {
-
         Self {
             element: Box::new(element.clone()),
             name,
@@ -73,12 +69,9 @@ pub struct PacketView {
 }
 
 impl PacketView {
-
     pub fn new(packets: TrackedState<Vec<PacketEntry>>, cleared: Remote<()>, show_pings: Remote<bool>, update: Remote<bool>) -> Self {
-
         let weak_self = None;
         let (elements, cached_packet_count) = {
-
             let packets = packets.borrow();
             let elements = packets.iter().map(PacketEntry::to_element).collect();
             let cached_packet_count = packets.len();
@@ -103,7 +96,6 @@ impl PacketView {
 }
 
 impl Element for PacketView {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -113,7 +105,6 @@ impl Element for PacketView {
     }
 
     fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
-
         self.weak_self = Some(weak_self.clone());
         self.state.link_back(weak_self, weak_parent);
     }
@@ -131,7 +122,6 @@ impl Element for PacketView {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         self.state.resolve(
             placement_resolver,
             interface_settings,
@@ -142,7 +132,6 @@ impl Element for PacketView {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let mut reresolve = false;
         let mut packet_count = match *self.update.borrow() {
             true => self.packets.borrow().len(),
@@ -150,7 +139,6 @@ impl Element for PacketView {
         };
 
         if self.cleared.consume_changed() {
-
             self.state.elements.clear();
             self.cached_packet_count = 0;
             packet_count = 0;
@@ -158,14 +146,12 @@ impl Element for PacketView {
         }
 
         if self.show_pings.consume_changed() {
-
             self.state.elements.clear();
             self.cached_packet_count = 0;
             reresolve = true;
         }
 
         if self.cached_packet_count < packet_count {
-
             let show_pings = *self.show_pings.borrow();
             let mut new_elements: Vec<ElementCell> = self.packets.borrow()[self.cached_packet_count..packet_count]
                 .iter()
@@ -174,7 +160,6 @@ impl Element for PacketView {
                 .collect();
 
             new_elements.iter().for_each(|element| {
-
                 let weak_element = Rc::downgrade(element);
                 element.borrow_mut().link_back(weak_element, self.weak_self.clone());
             });
@@ -211,7 +196,6 @@ impl Element for PacketView {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

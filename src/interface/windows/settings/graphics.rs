@@ -7,12 +7,10 @@ use crate::interface::*;
 pub struct GraphicsSettingsWindow {}
 
 impl GraphicsSettingsWindow {
-
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 }
 
 impl PrototypeWindow for GraphicsSettingsWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -23,7 +21,6 @@ impl PrototypeWindow for GraphicsSettingsWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = vec![
             StateButton::default()
                 .with_static_text("framerate limit")

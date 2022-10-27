@@ -29,9 +29,7 @@ where
     T: Array + ElementDisplay + Copy + PartialEq + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
-
     pub fn new(name: String, inner_pointer: *const T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
-
         let cached_inner = unsafe { *inner_pointer };
         let cached_values = cached_inner.display();
         let state = ElementState::default();
@@ -54,7 +52,6 @@ where
     T: Array + ElementDisplay + Copy + PartialEq + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -68,11 +65,9 @@ where
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let current_value = unsafe { *self.inner_pointer };
 
         if self.cached_inner != current_value {
-
             self.cached_inner = current_value;
             self.cached_values = self.cached_inner.display();
             return Some(ChangeEvent::RerenderWindow);
@@ -89,7 +84,6 @@ where
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-
         let prototype_window = VectorWindow::new(
             self.name.clone(),
             self.inner_pointer,
@@ -115,7 +109,6 @@ where
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

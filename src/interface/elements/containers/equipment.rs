@@ -17,9 +17,7 @@ pub struct EquipmentContainer {
 }
 
 impl EquipmentContainer {
-
     pub fn new(items: Remote<Vec<Item>>) -> Self {
-
         const SLOT_POSITIONS: [EquipPosition; 9] = [
             EquipPosition::HeadTop,
             EquipPosition::HeadMiddle,
@@ -33,13 +31,11 @@ impl EquipmentContainer {
         ];
 
         let elements = {
-
             let items = items.borrow();
 
             (0..SLOT_POSITIONS.len())
                 .into_iter()
                 .map(|index| {
-
                     let slot = SLOT_POSITIONS[index];
 
                     let text = cell!(Text::new(
@@ -74,7 +70,6 @@ impl EquipmentContainer {
 }
 
 impl Element for EquipmentContainer {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -84,7 +79,6 @@ impl Element for EquipmentContainer {
     }
 
     fn link_back(&mut self, weak_self: WeakElementCell, weak_parent: Option<WeakElementCell>) {
-
         self.weak_self = Some(weak_self.clone());
         self.state.link_back(weak_self, weak_parent);
     }
@@ -102,7 +96,6 @@ impl Element for EquipmentContainer {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = &constraint!(100%, ?);
         self.state.resolve(
             placement_resolver,
@@ -114,9 +107,7 @@ impl Element for EquipmentContainer {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         if self.items.consume_changed() {
-
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.weak_self.take().unwrap();
 
@@ -152,7 +143,6 @@ impl Element for EquipmentContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

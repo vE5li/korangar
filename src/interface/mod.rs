@@ -49,7 +49,6 @@ pub struct Interface {
 }
 
 impl Interface {
-
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
@@ -57,7 +56,6 @@ impl Interface {
         texture_future: &mut Box<dyn GpuFuture + 'static>,
         avalible_space: Size,
     ) -> Self {
-
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
         let theme = Theme::new(&interface_settings.theme_file);
@@ -95,7 +93,6 @@ impl Interface {
 
     pub fn schedule_rerender_window(&mut self, window_index: usize) {
         if window_index < self.windows.len() {
-
             let (window, _reresolve, rerender) = &mut self.windows[window_index];
 
             match window.has_transparency(&self.theme) {
@@ -112,17 +109,13 @@ impl Interface {
     }
 
     pub fn update(&mut self, focus_state: &mut FocusState, client_tick: u32) -> (bool, bool) {
-
         self.mouse_cursor.update(client_tick);
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if let Some(change_event) = window.update() {
                 match change_event {
-
                     ChangeEvent::Reresolve => self.reresolve = true,
-
                     ChangeEvent::Rerender => self.rerender = true,
-
                     ChangeEvent::RerenderWindow => match window.has_transparency(&self.theme) {
                         true => self.rerender = true,
                         false => *rerender = true,
@@ -135,7 +128,6 @@ impl Interface {
 
         for (window_index, (window, reresolve, rerender)) in self.windows.iter_mut().enumerate() {
             if self.reresolve || *reresolve {
-
                 let (_position, previous_size) = window.get_area();
                 let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.avalible_space);
 
@@ -176,13 +168,11 @@ impl Interface {
     }
 
     pub fn update_window_size(&mut self, screen_size: Size) {
-
         self.avalible_space = screen_size;
         self.reresolve = true;
     }
 
     pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> (Option<ElementCell>, Option<usize>) {
-
         for (window_index, (window, _reresolve, _rerender)) in self.windows.iter().enumerate().rev() {
             match window.hovered_element(mouse_position, mouse_mode) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
@@ -195,7 +185,6 @@ impl Interface {
     }
 
     pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
-
         let (window, reresolve, _rerender) = self.windows.remove(window_index);
         let new_window_index = self.windows.len();
         let has_transparency = window.has_transparency(&self.theme);
@@ -207,14 +196,12 @@ impl Interface {
     }
 
     pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
-
         let (_window, reresolve, _rerender) = &mut self.windows[window_index];
         hovered_element.borrow_mut().left_click(reresolve) // TODO: add same change_event check as
         // for input character ?
     }
 
     pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
-
         let (_window, reresolve, _rerender) = &mut self.windows[window_index];
         hovered_element.borrow_mut().right_click(reresolve) // TODO: add same change_event check as
         // for input character ?
@@ -233,7 +220,6 @@ impl Interface {
     }
 
     pub fn scroll_element(&mut self, element: &ElementCell, window_index: usize, scroll_delta: f32) {
-
         let (_, _, rerender) = &mut self.windows[window_index];
 
         if let Some(change_event) = element.borrow_mut().scroll(scroll_delta) {
@@ -246,25 +232,19 @@ impl Interface {
     }
 
     pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) -> Option<ClickAction> {
-
         let (window, _reresolve, rerender) = &mut self.windows[window_index];
         let has_transparency = window.has_transparency(&self.theme);
 
         if let Some(click_event) = element.borrow_mut().input_character(character) {
             match click_event {
-
                 ClickAction::ChangeEvent(change_event) => match change_event {
-
                     ChangeEvent::Reresolve => self.reresolve = true,
-
                     ChangeEvent::Rerender => self.rerender = true,
-
                     ChangeEvent::RerenderWindow => match has_transparency {
                         true => self.rerender = true,
                         false => *rerender = true,
                     },
                 },
-
                 other => return Some(other),
             }
         }
@@ -273,7 +253,6 @@ impl Interface {
     }
 
     pub fn move_window(&mut self, window_index: usize, offset: Position) {
-
         if let Some((window_class, position)) = self.windows[window_index].0.offset(self.avalible_space, offset) {
             self.window_cache.update_position(window_class, position);
         }
@@ -282,14 +261,12 @@ impl Interface {
     }
 
     pub fn resize_window(&mut self, window_index: usize, growth: Size) {
-
         let (window, reresolve, _rerender) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
         let (window_class, new_size) = window.resize(&self.interface_settings, &self.theme, self.avalible_space, growth);
 
         if previous_size != new_size {
-
             if let Some(window_class) = window_class {
                 self.window_cache.update_size(window_class, new_size);
             }
@@ -301,18 +278,14 @@ impl Interface {
 
     fn flag_rerender_windows(&mut self, start_index: usize, area: Option<(Position, Size)>) {
         for window_index in start_index..self.windows.len() {
-
             let rerender = self.windows[window_index].2;
             let is_hovering = |(position, scale)| self.windows[window_index].0.hovers_area(position, scale);
 
             if rerender || area.map(is_hovering).unwrap_or(false) {
-
                 let (position, scale) = {
-
                     let (window, _reresolve, rerender) = &mut self.windows[window_index];
 
                     if window.has_transparency(&self.theme) {
-
                         self.rerender = true;
                         return;
                     }
@@ -335,13 +308,11 @@ impl Interface {
         focused_element: Option<ElementCell>,
         mouse_mode: &MouseInputMode,
     ) {
-
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
         let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
 
         for (window, _reresolve, rerender) in &mut self.windows {
             if self.rerender || *rerender {
-
                 window.render(
                     render_target,
                     renderer,
@@ -366,7 +337,6 @@ impl Interface {
         text: &str,
         mouse_position: Position,
     ) {
-
         let offset = Vector2::new(text.len() as f32 * -3.0, 20.0);
         renderer.render_text(
             render_target,
@@ -384,7 +354,6 @@ impl Interface {
         renderer: &DeferredRenderer,
         frames_per_second: usize,
     ) {
-
         renderer.render_text(
             render_target,
             &frames_per_second.to_string(),
@@ -402,7 +371,6 @@ impl Interface {
         grabbed_item: Option<Texture>,
     ) {
         if !self.mouse_cursor_hidden {
-
             self.mouse_cursor.render(
                 render_target,
                 renderer,
@@ -416,28 +384,23 @@ impl Interface {
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
-
             Some(window_class) => self.windows.iter().any(|window| {
-
                 window
                     .0
                     .get_window_class()
                     .map_or(false, |other_window_class| window_class == other_window_class)
             }),
-
             None => false,
         }
     }
 
     fn open_new_window(&mut self, focus_state: &mut FocusState, window: Box<dyn Window + 'static>) {
-
         self.windows.push((window, true, true));
         focus_state.remove_focus();
     }
 
     pub fn open_window(&mut self, focus_state: &mut FocusState, prototype_window: &dyn PrototypeWindow) {
         if !self.window_exists(prototype_window.window_class()) {
-
             let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
             self.open_new_window(focus_state, window);
         }
@@ -445,11 +408,8 @@ impl Interface {
 
     pub fn open_dialog_window(&mut self, focus_state: &mut FocusState, text: String, npc_id: u32) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-
             dialog_handle.elements.with_mut(|elements, changed| {
-
                 if dialog_handle.clear {
-
                     elements.clear();
                     dialog_handle.clear = false;
                 }
@@ -458,7 +418,6 @@ impl Interface {
                 changed();
             });
         } else {
-
             let (window, elements) = DialogWindow::new(text, npc_id);
             self.dialog_handle = Some(DialogHandle::new(elements, false));
             self.open_window(focus_state, &window);
@@ -467,7 +426,6 @@ impl Interface {
 
     pub fn add_next_button(&mut self) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-
             dialog_handle.elements.push(DialogElement::NextButton);
             dialog_handle.clear = true;
         }
@@ -475,9 +433,7 @@ impl Interface {
 
     pub fn add_close_button(&mut self) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-
             dialog_handle.elements.with_mut(|elements, changed| {
-
                 elements.retain(|element| *element != DialogElement::NextButton);
                 elements.push(DialogElement::CloseButton);
                 changed();
@@ -487,9 +443,7 @@ impl Interface {
 
     pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-
             dialog_handle.elements.with_mut(move |elements, changed| {
-
                 elements.retain(|element| *element != DialogElement::NextButton);
 
                 choices
@@ -512,7 +466,6 @@ impl Interface {
     #[cfg(feature = "debug")]
     pub fn open_theme_viewer_window(&mut self, focus_state: &mut FocusState) {
         if !self.window_exists(self.theme.window_class()) {
-
             let window = self
                 .theme
                 .to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
@@ -522,7 +475,6 @@ impl Interface {
     }
 
     pub fn close_window(&mut self, focus_state: &mut FocusState, window_index: usize) {
-
         let (window, ..) = self.windows.remove(window_index);
         self.rerender = true;
 
@@ -545,7 +497,6 @@ impl Interface {
     }
 
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState, window_class: &str) {
-
         let index = self
             .windows
             .iter()
@@ -557,7 +508,6 @@ impl Interface {
     }
 
     pub fn close_dialog_window(&mut self, focus_state: &mut FocusState) {
-
         self.close_window_with_class(focus_state, DialogWindow::WINDOW_CLASS);
         self.dialog_handle = None;
     }
@@ -567,7 +517,6 @@ impl Interface {
     }
 
     pub fn first_focused_element(&self, focus_state: &mut FocusState) {
-
         if self.windows.is_empty() {
             return;
         }
@@ -579,7 +528,6 @@ impl Interface {
     }
 
     pub fn restore_focus(&self, focus_state: &mut FocusState) {
-
         if self.windows.is_empty() {
             return;
         }

@@ -61,12 +61,10 @@ pub const INTERFACE_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
 };
 
 pub trait Renderer {
-
     type Target;
 }
 
 pub trait GeometryRenderer {
-
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -80,7 +78,6 @@ pub trait GeometryRenderer {
 }
 
 pub trait EntityRenderer {
-
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -106,11 +103,8 @@ pub enum PickerTarget {
 }
 
 impl From<u32> for PickerTarget {
-
     fn from(data: u32) -> Self {
-
         if data >> 31 == 1 {
-
             let x = ((data >> 16) as u16) ^ (1 << 15);
             let y = data as u16;
             return Self::Tile(x, y);
@@ -151,22 +145,17 @@ impl From<u32> for PickerTarget {
 }
 
 impl From<PickerTarget> for u32 {
-
     fn from(picker_target: PickerTarget) -> Self {
         match picker_target {
-
             PickerTarget::Tile(x, y) => {
-
                 let mut encoded = ((x as u32) << 16) | y as u32;
                 encoded |= 1 << 31;
                 encoded
             }
-
             PickerTarget::Entity(entity_id) => match entity_id >> 24 == 0 {
                 true => entity_id | (5 << 24),
                 false => entity_id,
             },
-
             #[cfg(feature = "debug")]
             PickerTarget::Marker(marker_identifier) => match marker_identifier {
                 MarkerIdentifier::Object(index) => (10 << 24) | (index as u32 & 0xfff),
@@ -182,7 +171,6 @@ impl From<PickerTarget> for u32 {
 
 #[cfg(feature = "debug")]
 pub trait MarkerRenderer {
-
     fn render_marker(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -205,9 +193,7 @@ pub enum RenderTargetState {
 unsafe impl Send for RenderTargetState {}
 
 impl RenderTargetState {
-
     pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
-
         let RenderTargetState::Rendering(builder) = self else {
             panic!("render target is not in the render state");
         };
@@ -216,7 +202,6 @@ impl RenderTargetState {
     }
 
     pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
-
         let RenderTargetState::Rendering(builder) = std::mem::replace(self, RenderTargetState::Ready) else {
             panic!("render target is not in the render state");
         };
@@ -225,7 +210,6 @@ impl RenderTargetState {
     }
 
     pub fn take_semaphore(&mut self) -> SemaphoreSignalFuture<Box<dyn GpuFuture>> {
-
         let RenderTargetState::Semaphore(semaphore) = std::mem::replace(self, RenderTargetState::Ready) else {
             panic!("render target is not in the semaphore state");
         };
@@ -234,7 +218,6 @@ impl RenderTargetState {
     }
 
     pub fn try_take_semaphore(&mut self) -> Option<Box<dyn GpuFuture>> {
-
         if let RenderTargetState::Ready = self {
             return None;
         }
@@ -247,7 +230,6 @@ impl RenderTargetState {
     }
 
     pub fn try_take_fence(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
-
         if let RenderTargetState::Ready = self {
             return None;
         }
@@ -273,7 +255,6 @@ pub struct DeferredRenderTarget {
 }
 
 impl DeferredRenderTarget {
-
     pub fn new(
         device: Arc<Device>,
         queue: Arc<Queue>,
@@ -281,7 +262,6 @@ impl DeferredRenderTarget {
         swapchain_image: Arc<SwapchainImage<Window>>,
         dimensions: [u32; 2],
     ) -> Self {
-
         let color_image_usage = ImageUsage {
             sampled: true,
             color_attachment: true,
@@ -372,29 +352,23 @@ impl DeferredRenderTarget {
     }
 
     pub fn start(&mut self) {
-
         let mut builder =
             AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
         builder
-            .begin_render_pass(
-                self.framebuffer.clone(),
-                SubpassContents::Inline,
-                [
-                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
-                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
-                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
-                    ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
-                    ClearValue::Depth(1.0),
-                ],
-            )
+            .begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [
+                ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                ClearValue::Float([0.0, 0.0, 0.0, 1.0]),
+                ClearValue::Depth(1.0),
+            ])
             .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
 
     pub fn bind_subrenderer(&mut self, subrenderer: DeferredSubrenderer) -> bool {
-
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
@@ -409,7 +383,6 @@ impl DeferredRenderTarget {
     }
 
     pub fn finish(&mut self, swapchain: Arc<Swapchain<Window>>, semaphore: Box<dyn GpuFuture>, image_number: usize) {
-
         let mut builder = self.state.take_builder();
 
         builder.end_render_pass().unwrap();
@@ -440,9 +413,7 @@ pub struct PickerRenderTarget {
 }
 
 impl PickerRenderTarget {
-
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2]) -> Self {
-
         let image_usage = ImageUsage {
             sampled: true,
             transfer_source: true,
@@ -472,7 +443,6 @@ impl PickerRenderTarget {
             .unwrap();
 
         let buffer = unsafe {
-
             CpuAccessibleBuffer::uninitialized_array(
                 device.clone(),
                 dimensions[0] as u64 * dimensions[1] as u64,
@@ -496,23 +466,20 @@ impl PickerRenderTarget {
     }
 
     pub fn start(&mut self) {
-
         let mut builder =
             AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
         builder
-            .begin_render_pass(
-                self.framebuffer.clone(),
-                SubpassContents::Inline,
-                [ClearValue::Uint([0; 4]), ClearValue::Depth(1.0)],
-            )
+            .begin_render_pass(self.framebuffer.clone(), SubpassContents::Inline, [
+                ClearValue::Uint([0; 4]),
+                ClearValue::Depth(1.0),
+            ])
             .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
 
     pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
-
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
@@ -523,7 +490,6 @@ impl PickerRenderTarget {
     }
 
     pub fn finish(&mut self) {
-
         let mut builder = self.state.take_builder();
 
         builder.end_render_pass().unwrap();
@@ -555,7 +521,6 @@ pub struct SingleRenderTarget<const F: Format, S: PartialEq> {
 }
 
 impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
-
     pub fn new(
         device: Arc<Device>,
         queue: Arc<Queue>,
@@ -565,7 +530,6 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
         image_usage: ImageUsage,
         clear_value: ClearValue,
     ) -> Self {
-
         let image = ImageView::new(Arc::new(
             AttachmentImage::multisampled_with_usage(device.clone(), dimensions, sample_count, F, image_usage).unwrap(),
         ))
@@ -587,7 +551,6 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
     }
 
     pub fn start(&mut self) {
-
         let mut builder =
             AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
 
@@ -599,7 +562,6 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
     }
 
     pub fn start_interface(&mut self, clear_interface: bool) {
-
         // TODO:
 
         let mut builder =
@@ -617,14 +579,12 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S> {
     }
 
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
-
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
     }
 
     pub fn finish(&mut self) {
-
         let mut builder = self.state.take_builder();
 
         builder.end_render_pass().unwrap();
@@ -653,9 +613,7 @@ pub struct SwapchainHolder {
 }
 
 impl SwapchainHolder {
-
     pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>) -> Self {
-
         let window_size: [u32; 2] = surface.window().inner_size().into();
         let capabilities = surface.capabilities(*physical_device).expect("failed to get surface capabilities");
         let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
@@ -689,17 +647,12 @@ impl SwapchainHolder {
     }
 
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
-
         let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
-
             Ok(r) => r,
-
             Err(AcquireError::OutOfDate) => {
-
                 self.recreate = true;
                 return Err(());
             }
-
             Err(e) => panic!("Failed to acquire next image: {:?}", e),
         };
 
@@ -722,7 +675,6 @@ impl SwapchainHolder {
     }
 
     pub fn recreate_swapchain(&mut self) -> Viewport {
-
         let swapchain_result = self
             .swapchain
             .recreate()
@@ -759,7 +711,6 @@ impl SwapchainHolder {
     }
 
     pub fn viewport(&self) -> Viewport {
-
         Viewport {
             origin: [0.0, 0.0],
             dimensions: self.window_size.map(|component| component as f32),
@@ -768,7 +719,6 @@ impl SwapchainHolder {
     }
 
     pub fn set_frame_limit(&mut self, limited: bool) {
-
         self.present_mode = match limited {
             true => PresentMode::Fifo,
             false => PresentMode::Mailbox,
@@ -777,7 +727,6 @@ impl SwapchainHolder {
     }
 
     pub fn update_window_size(&mut self, window_size: [u32; 2]) {
-
         self.window_size = window_size;
         self.invalidate_swapchain();
     }

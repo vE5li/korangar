@@ -25,9 +25,7 @@ pub struct AnimationState {
 }
 
 impl AnimationState {
-
     pub fn new(client_tick: u32) -> Self {
-
         Self {
             action: 0,
             start_time: client_tick,
@@ -38,7 +36,6 @@ impl AnimationState {
     }
 
     pub fn idle(&mut self, client_tick: u32) {
-
         self.action = 0;
         self.start_time = client_tick;
         self.duration = None;
@@ -46,7 +43,6 @@ impl AnimationState {
     }
 
     pub fn walk(&mut self, movement_speed: usize, client_tick: u32) {
-
         self.action = 1;
         self.start_time = client_tick;
         self.duration = None;
@@ -54,13 +50,12 @@ impl AnimationState {
     }
 
     pub fn update(&mut self, client_tick: u32) {
-
         let mut time = client_tick - self.start_time;
 
-        // TODO: make everything have a duration so that we can update the start_time from time to
-        // time so that animations won't start to drop frames as soon as start_time - client_tick
-        // can no longer be stored in an f32 accurately. When fixed remove
-        // set_start_time in MouseCursor.
+        // TODO: make everything have a duration so that we can update the start_time
+        // from time to time so that animations won't start to drop frames as
+        // soon as start_time - client_tick can no longer be stored in an f32
+        // accurately. When fixed remove set_start_time in MouseCursor.
         if let Some(duration) = self.duration && time > duration {
 
             //self.action = self.next_action;
@@ -81,7 +76,6 @@ pub struct Actions {
 }
 
 impl Actions {
-
     pub fn render(
         &self,
         sprite: &Sprite,
@@ -89,7 +83,6 @@ impl Actions {
         camera_direction: usize,
         head_direction: usize,
     ) -> (Texture, Vector2<f32>, bool) {
-
         let direction = (camera_direction + head_direction) % 8;
         let aa = animation_state.action * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
@@ -104,8 +97,8 @@ impl Actions {
             .duration
             .map(|duration| animation_state.time * a.motions.len() as u32 / duration)
             .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
-        // TODO: work out how to avoid losing digits when casting timg to an f32. When fixed remove
-        // set_start_time in MouseCursor.
+        // TODO: work out how to avoid losing digits when casting timg to an f32. When
+        // fixed remove set_start_time in MouseCursor.
 
         let fs = &a.motions[frame as usize % a.motions.len()];
 
@@ -131,7 +124,6 @@ impl Actions {
         color: Color,
         interface_settings: &InterfaceSettings,
     ) {
-
         let direction = camera_direction % 8;
         let aa = animation_state.action * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
@@ -146,13 +138,12 @@ impl Actions {
             .duration
             .map(|duration| animation_state.time * a.motions.len() as u32 / duration)
             .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
-        // TODO: work out how to avoid losing digits when casting timg to an f32. When fixed remove
-        // set_start_time in MouseCursor.
+        // TODO: work out how to avoid losing digits when casting timg to an f32. When
+        // fixed remove set_start_time in MouseCursor.
 
         let fs = &a.motions[frame as usize % a.motions.len()];
 
         for sprite_clip in &fs.sprite_clips {
-
             let texture = &sprite.textures[sprite_clip.sprite_number as usize];
             let offset = sprite_clip.position.map(|component| component as f32);
             let dimesions = sprite_clip
@@ -248,9 +239,7 @@ pub struct ActionLoader {
 }
 
 impl ActionLoader {
-
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
-
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}{}{}", MAGENTA, path, NONE));
 

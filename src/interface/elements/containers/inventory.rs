@@ -16,11 +16,8 @@ pub struct InventoryContainer {
 }
 
 impl InventoryContainer {
-
     pub fn new(items: Remote<Vec<Item>>) -> Self {
-
         let elements = {
-
             let items = items.borrow();
 
             (0..40)
@@ -43,7 +40,6 @@ impl InventoryContainer {
 }
 
 impl Element for InventoryContainer {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -53,7 +49,6 @@ impl Element for InventoryContainer {
     }
 
     fn link_back(&mut self, weak_self: WeakElementCell, weak_parent: Option<WeakElementCell>) {
-
         self.weak_self = Some(weak_self.clone());
         self.state.link_back(weak_self, weak_parent);
     }
@@ -71,7 +66,6 @@ impl Element for InventoryContainer {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = &constraint!(100%, ?);
         self.state.resolve(
             placement_resolver,
@@ -83,9 +77,7 @@ impl Element for InventoryContainer {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         if self.items.consume_changed() {
-
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.weak_self.take().unwrap();
 
@@ -109,7 +101,6 @@ impl Element for InventoryContainer {
     }
 
     fn drop_item(&mut self, item_source: ItemSource, item: Item) -> Option<ItemMove> {
-
         Some(ItemMove {
             source: item_source,
             destination: ItemSource::Inventory,
@@ -131,7 +122,6 @@ impl Element for InventoryContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

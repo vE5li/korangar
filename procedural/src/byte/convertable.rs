@@ -7,7 +7,6 @@ use super::helper::byte_convertable_helper;
 use crate::utils::*;
 
 pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
-
     let Fields::Named(named_fields) = data_struct.fields else {
         panic!("only named fields may be derived");
     };
@@ -39,7 +38,6 @@ pub fn derive_byte_convertable_enum(
     mut attributes: Vec<Attribute>,
     name: Ident,
 ) -> InterfaceTokenStream {
-
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let numeric_type = get_unique_attribute(&mut attributes, "numeric_type")
@@ -51,9 +49,7 @@ pub fn derive_byte_convertable_enum(
     let mut values = Vec::new();
 
     for mut variant in data_enum.variants.into_iter() {
-
         if let Some(attribute) = get_unique_attribute(&mut variant.attrs, "numeric_value") {
-
             current_index = attribute
                 .parse_args::<syn::LitInt>()
                 .expect("numeric_value requires an integer value")

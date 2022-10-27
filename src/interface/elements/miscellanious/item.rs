@@ -18,14 +18,12 @@ pub struct ItemBox {
 }
 
 impl ItemBox {
-
     pub fn wrap(self) -> ElementCell {
         Rc::new(RefCell::new(self))
     }
 }
 
 impl Element for ItemBox {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -50,9 +48,7 @@ impl Element for ItemBox {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-
         if let Some(item) = &self.item {
-
             println!("item with id: {}", item.item_id);
             return Some(ClickAction::MoveItem(self.source, item.clone()));
         }
@@ -61,7 +57,6 @@ impl Element for ItemBox {
     }
 
     fn drop_item(&mut self, item_source: ItemSource, item: Item) -> Option<ItemMove> {
-
         Some(ItemMove {
             source: item_source,
             destination: self.source,
@@ -83,7 +78,6 @@ impl Element for ItemBox {
         mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
@@ -99,7 +93,6 @@ impl Element for ItemBox {
         renderer.render_background(Vector4::from_value(5.0), background_color);
 
         if let Some(item) = &self.item {
-
             renderer.render_sprite(
                 item.texture.clone(),
                 Vector2::zero(),

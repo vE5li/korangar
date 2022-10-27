@@ -9,7 +9,6 @@ pub fn prototype_element_helper(
     mut attributes: Vec<Attribute>,
     name: String,
 ) -> (Vec<TokenStream>, TokenStream, Option<TokenStream>) {
-
     let Fields::Named(named_fields) = data_struct.fields else {
         panic!("only named fields may be derived");
     };
@@ -26,7 +25,6 @@ pub fn prototype_element_helper(
     let mut initializers = vec![];
 
     for mut field in named_fields.named {
-
         if get_unique_attribute(&mut field.attrs, "hidden_element").is_some() {
             continue;
         }

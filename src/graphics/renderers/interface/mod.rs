@@ -33,7 +33,6 @@ pub struct InterfaceRenderer {
 }
 
 impl InterfaceRenderer {
-
     pub fn new(
         device: Arc<Device>,
         queue: Arc<Queue>,
@@ -42,7 +41,6 @@ impl InterfaceRenderer {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
     ) -> Self {
-
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -102,7 +100,6 @@ impl InterfaceRenderer {
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
-
         let subpass = self.render_pass.clone().first_subpass();
 
         self.rectangle_renderer
@@ -112,7 +109,6 @@ impl InterfaceRenderer {
     }
 
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
-
         let image_usage = ImageUsage {
             sampled: true,
             transfer_destination: true,
@@ -142,7 +138,6 @@ impl InterfaceRenderer {
         color: Color,
         smooth: bool,
     ) {
-
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
         self.sprite_renderer
             .render(render_target, texture, window_size, position, size, clip_size, color, smooth);
@@ -160,7 +155,6 @@ impl InterfaceRenderer {
         cell_index: usize,
         smooth: bool,
     ) {
-
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
         self.sprite_renderer.render_indexed(
             render_target,
@@ -185,7 +179,6 @@ impl InterfaceRenderer {
         corner_radius: Vector4<f32>,
         color: Color,
     ) {
-
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
         self.rectangle_renderer
             .render(render_target, window_size, position, size, clip_size, corner_radius, color);
@@ -200,7 +193,6 @@ impl InterfaceRenderer {
         color: Color,
         checked: bool,
     ) {
-
         let texture = match checked {
             true => self.checked_box_texture.clone(),
             false => self.unchecked_box_texture.clone(),
@@ -218,7 +210,6 @@ impl InterfaceRenderer {
         color: Color,
         expanded: bool,
     ) {
-
         let texture = match expanded {
             true => self.expanded_arrow_texture.clone(),
             false => self.collapsed_arrow_texture.clone(),
@@ -237,7 +228,6 @@ impl InterfaceRenderer {
         font_size: f32,
     ) {
         for character in text.as_bytes() {
-
             let index = (*character as usize).saturating_sub(31);
             self.render_sprite_indexed(
                 render_target,
@@ -267,7 +257,6 @@ impl InterfaceRenderer {
         clip_size: Vector4<f32>,
         color: Color,
     ) {
-
         self.render_sprite(
             render_target,
             self.debug_icon_texture.clone(),
@@ -281,6 +270,5 @@ impl InterfaceRenderer {
 }
 
 impl Renderer for InterfaceRenderer {
-
     type Target = SingleRenderTarget<{ Format::R8G8B8A8_SRGB }, ()>;
 }

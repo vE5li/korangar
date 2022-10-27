@@ -44,9 +44,7 @@ pub struct DirectionalLightRenderer {
 }
 
 impl DirectionalLightRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -78,7 +76,6 @@ impl DirectionalLightRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -102,7 +99,6 @@ impl DirectionalLightRenderer {
         color: Color,
         intensity: f32,
     ) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -112,16 +108,13 @@ impl DirectionalLightRenderer {
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
 
-        let set = PersistentDescriptorSet::new(
-            descriptor_layout,
-            [
-                WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
-                WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
-                WriteDescriptorSet::image_view(2, render_target.depth_image.clone()),
-                WriteDescriptorSet::image_view_sampler(3, shadow_image, self.linear_sampler.clone()),
-                WriteDescriptorSet::buffer(4, matrices_subbuffer),
-            ],
-        )
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
+            WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
+            WriteDescriptorSet::image_view(2, render_target.depth_image.clone()),
+            WriteDescriptorSet::image_view_sampler(3, shadow_image, self.linear_sampler.clone()),
+            WriteDescriptorSet::buffer(4, matrices_subbuffer),
+        ])
         .unwrap();
 
         let constants = Constants {

@@ -5,7 +5,7 @@ use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::{UserEvent, MouseInputMode};
+use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::{Element, *};
 
 #[derive(Clone, PartialEq, Eq)]
@@ -23,22 +23,17 @@ pub struct DialogContainer {
 }
 
 impl DialogContainer {
-
     fn to_element(dialog_element: &DialogElement, npc_id: u32) -> ElementCell {
         match dialog_element {
-
             DialogElement::Text(text) => cell!(Text::new(text.clone(), Color::monochrome(255), 14.0, constraint!(100%, 14))),
-
             DialogElement::NextButton => Button::default()
                 .with_static_text("next")
                 .with_event(UserEvent::NextDialog(npc_id))
                 .wrap(),
-
             DialogElement::CloseButton => Button::default()
                 .with_static_text("close")
                 .with_event(UserEvent::CloseDialog(npc_id))
                 .wrap(),
-
             DialogElement::ChoiceButton(text, index) => Button::default()
                 .with_dynamic_text(text.clone())
                 .with_event(UserEvent::ChooseDialogOption(npc_id, *index))
@@ -47,7 +42,6 @@ impl DialogContainer {
     }
 
     pub fn new(dialog_elements: Remote<Vec<DialogElement>>, npc_id: u32) -> Self {
-
         let elements = dialog_elements
             .borrow()
             .iter()
@@ -69,7 +63,6 @@ impl DialogContainer {
 }
 
 impl Element for DialogContainer {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -85,7 +78,6 @@ impl Element for DialogContainer {
     // TODO: focus related things
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = &constraint!(100%, ?);
         self.state.resolve(
             placement_resolver,
@@ -97,9 +89,7 @@ impl Element for DialogContainer {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         if self.dialog_elements.consume_changed() {
-
             *self = Self::new(self.dialog_elements.clone(), self.npc_id);
 
             // TODO: link back like in character container
@@ -128,7 +118,6 @@ impl Element for DialogContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

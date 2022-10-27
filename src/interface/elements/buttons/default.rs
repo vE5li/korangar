@@ -17,57 +17,47 @@ pub struct Button {
 }
 
 impl Button {
-
     pub fn with_static_text(mut self, text: &'static str) -> Self {
-
         self.text = Some(ElementText::Static(text));
         self
     }
 
     pub fn with_dynamic_text(mut self, text: String) -> Self {
-
         self.text = Some(ElementText::Dynamic(text));
         self
     }
 
     pub fn with_event(mut self, event: UserEvent) -> Self {
-
         self.event = Some(ElementEvent::Event(event));
         self
     }
 
     pub fn with_action_closure(mut self, event_closure: impl Fn() -> Option<ClickAction> + 'static) -> Self {
-
         self.event = Some(ElementEvent::ActionClosure(Box::new(event_closure)));
         self
     }
 
     pub fn with_closure(mut self, closure: impl FnMut() + 'static) -> Self {
-
         self.event = Some(ElementEvent::Closure(Box::new(closure)));
         self
     }
 
     pub fn with_disabled_selector(mut self, disabled_selector: impl Fn() -> bool + 'static) -> Self {
-
         self.disabled_selector = Some(Box::new(disabled_selector));
         self
     }
 
     pub fn with_foreground_color(mut self, foreground_color: impl Fn(&Theme) -> Color + 'static) -> Self {
-
         self.foreground_color = Some(Box::new(foreground_color));
         self
     }
 
     pub fn with_background_color(mut self, background_color: impl Fn(&Theme) -> Color + 'static) -> Self {
-
         self.background_color = Some(Box::new(background_color));
         self
     }
 
     pub fn with_width(mut self, width_constraint: DimensionConstraint) -> Self {
-
         self.width_constraint = Some(width_constraint);
         self
     }
@@ -82,7 +72,6 @@ impl Button {
 }
 
 impl Element for Button {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -96,7 +85,6 @@ impl Element for Button {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = self
             .width_constraint
             .as_ref()
@@ -114,7 +102,6 @@ impl Element for Button {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-
         if self.is_disabled() {
             return None;
         }
@@ -136,7 +123,6 @@ impl Element for Button {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
@@ -152,11 +138,9 @@ impl Element for Button {
         renderer.render_background(*theme.button.border_radius, background_color);
 
         if let Some(text) = &self.text {
-
             let foreground_color = if disabled {
                 *theme.button.disabled_foreground_color
             } else {
-
                 self.foreground_color
                     .as_ref()
                     .map(|closure| closure(theme))

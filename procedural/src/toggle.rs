@@ -5,7 +5,6 @@ use syn::{DataStruct, Fields, Generics, Ident};
 use crate::utils::get_unique_attribute;
 
 pub fn derive_toggle_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
-
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let Fields::Named(named_fields) = data_struct.fields else {
         panic!("only named fields may be derived");

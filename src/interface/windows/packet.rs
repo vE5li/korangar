@@ -13,11 +13,9 @@ pub struct PacketWindow {
 }
 
 impl PacketWindow {
-
     pub const WINDOW_CLASS: &'static str = "network";
 
     pub fn new(packets: TrackedState<Vec<PacketEntry>>) -> Self {
-
         let cleared = TrackedState::new(());
         let show_pings = TrackedState::new(false);
         let update = TrackedState::new(true);
@@ -32,7 +30,6 @@ impl PacketWindow {
 }
 
 impl PrototypeWindow for PacketWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -43,7 +40,6 @@ impl PrototypeWindow for PacketWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = vec![
             PacketView::new(
                 self.packets.clone(),
@@ -55,18 +51,15 @@ impl PrototypeWindow for PacketWindow {
         ];
 
         let clear_selector = {
-
             let packets = self.packets.clone();
             move || !packets.borrow().is_empty()
         };
 
         let clear_action = {
-
             let mut packets = self.packets.clone();
             let mut cleared = self.cleared.clone();
 
             move || {
-
                 packets.clear();
                 cleared.update();
             }

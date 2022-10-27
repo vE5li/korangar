@@ -11,7 +11,6 @@ pub struct StringValue {
 }
 
 impl Element for StringValue {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -38,7 +37,6 @@ impl Element for StringValue {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

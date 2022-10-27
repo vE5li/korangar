@@ -17,14 +17,12 @@ pub struct NumberWindow<T> {
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow for NumberWindow<T> {
-
     fn to_window(
         &self,
         window_cache: &WindowCache,
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = vec![
             cell!(Headline::new("value".to_string(), Headline::DEFAULT_SIZE)),
             cell!(Slider::new(

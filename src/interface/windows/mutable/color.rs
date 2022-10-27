@@ -12,14 +12,12 @@ pub struct ColorWindow {
 }
 
 impl PrototypeWindow for ColorWindow {
-
     fn to_window(
         &self,
         window_cache: &WindowCache,
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let rgb_elements: Vec<ElementCell> = vec![
             cell!(Headline::new("red".to_string(), Headline::DEFAULT_SIZE)),
             cell!(Slider::new(

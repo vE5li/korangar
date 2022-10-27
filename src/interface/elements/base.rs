@@ -27,13 +27,11 @@ pub struct ElementRenderer<'a> {
 }
 
 impl<'a> ElementRenderer<'a> {
-
     pub fn set_scroll(&mut self, scroll: f32) {
         self.position.y -= scroll;
     }
 
     pub fn render_background(&mut self, border_radius: Vector4<f32>, color: Color) {
-
         self.renderer.render_rectangle(
             self.render_target,
             self.position,
@@ -45,7 +43,6 @@ impl<'a> ElementRenderer<'a> {
     }
 
     pub fn render_rectangle(&mut self, position: Position, size: Size, border_radius: Vector4<f32>, color: Color) {
-
         self.renderer.render_rectangle(
             self.render_target,
             self.position + position,
@@ -57,7 +54,6 @@ impl<'a> ElementRenderer<'a> {
     }
 
     pub fn render_text(&mut self, text: &str, offset: Position, foreground_color: Color, font_size: f32) {
-
         self.renderer.render_text(
             self.render_target,
             text,
@@ -69,7 +65,6 @@ impl<'a> ElementRenderer<'a> {
     }
 
     pub fn render_checkbox(&mut self, offset: Position, size: Size, color: Color, checked: bool) {
-
         self.renderer.render_checkbox(
             self.render_target,
             self.position + offset * *self.interface_settings.scaling,
@@ -81,7 +76,6 @@ impl<'a> ElementRenderer<'a> {
     }
 
     pub fn render_expand_arrow(&mut self, offset: Position, size: Size, color: Color, expanded: bool) {
-
         self.renderer.render_expand_arrow(
             self.render_target,
             self.position + offset * *self.interface_settings.scaling,
@@ -94,7 +88,6 @@ impl<'a> ElementRenderer<'a> {
 
     #[cfg(feature = "debug")]
     pub fn render_debug_icon(&mut self, offset: Position, size: Size, color: Color) {
-
         self.renderer.render_debug_icon(
             self.render_target,
             self.position + offset * *self.interface_settings.scaling,
@@ -105,7 +98,6 @@ impl<'a> ElementRenderer<'a> {
     }
 
     pub fn render_sprite(&mut self, texture: Texture, offset: Position, size: Size, color: Color) {
-
         self.renderer.render_sprite(
             self.render_target,
             texture,
@@ -128,7 +120,6 @@ impl<'a> ElementRenderer<'a> {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         element.render(
             self.render_target,
             self.renderer,
@@ -152,9 +143,7 @@ pub struct ElementState {
 }
 
 impl Default for ElementState {
-
     fn default() -> Self {
-
         Self {
             cached_size: Size::zero(),
             cached_position: Position::zero(),
@@ -164,20 +153,17 @@ impl Default for ElementState {
 }
 
 impl ElementState {
-
     pub fn link_back(&mut self, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
         self.parent_element = weak_parent;
     }
 
     pub fn resolve(&mut self, placement_resolver: &mut PlacementResolver, size_constraint: &SizeConstraint) {
-
         let (size, position) = placement_resolver.allocate(size_constraint);
         self.cached_size = size.finalize();
         self.cached_position = position;
     }
 
     pub fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-
         let absolute_position = mouse_position - self.cached_position;
 
         if absolute_position.x >= 0.0
@@ -199,7 +185,6 @@ impl ElementState {
         parent_position: Position,
         clip_size: ClipSize,
     ) -> ElementRenderer<'a> {
-
         let position = parent_position + self.cached_position;
         let size = self.cached_size;
 
@@ -229,9 +214,7 @@ pub struct Focus {
 }
 
 impl Focus {
-
     pub fn downwards() -> Self {
-
         Self {
             mode: FocusMode::FocusNext,
             downwards: true,
@@ -239,7 +222,6 @@ impl Focus {
     }
 
     pub fn to_downwards(self) -> Self {
-
         Focus {
             mode: self.mode,
             downwards: true,
@@ -254,7 +236,6 @@ pub enum FocusMode {
 }
 
 impl From<bool> for FocusMode {
-
     fn from(reverse: bool) -> Self {
         match reverse {
             true => Self::FocusPrevious,
@@ -264,7 +245,6 @@ impl From<bool> for FocusMode {
 }
 
 pub trait Element {
-
     fn get_state(&self) -> &ElementState;
 
     fn get_state_mut(&mut self) -> &mut ElementState;
@@ -283,13 +263,11 @@ pub trait Element {
         _caller_cell: Option<Rc<RefCell<dyn Element>>>,
         focus: Focus,
     ) -> Option<Rc<RefCell<dyn Element>>> {
-
         if focus.downwards {
             return Some(self_cell);
         }
 
         self.get_state().parent_element.as_ref().and_then(|parent_element| {
-
             let parent_element = parent_element.upgrade().unwrap();
             let next_element = parent_element.borrow().focus_next(parent_element.clone(), Some(self_cell), focus);
             next_element
@@ -335,7 +313,6 @@ pub trait Element {
     }
 
     fn scroll(&mut self, delta: f32) -> Option<ChangeEvent> {
-
         self.get_state()
             .parent_element
             .as_ref()

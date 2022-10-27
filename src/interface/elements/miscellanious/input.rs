@@ -20,9 +20,7 @@ pub struct InputField<const LENGTH: usize, const HIDDEN: bool = false> {
 }
 
 impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
-
     fn remove_character(&mut self) -> Option<ClickAction> {
-
         let mut display = self.display.borrow_mut();
 
         if display.is_empty() {
@@ -34,7 +32,6 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
     }
 
     fn add_character(&mut self, character: char) -> Option<ClickAction> {
-
         let mut display = self.display.borrow_mut();
 
         if display.len() >= LENGTH {
@@ -47,7 +44,6 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
 }
 
 impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HIDDEN> {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -57,7 +53,6 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = self.width_constraint.add_height(theme.input.height_constraint);
         self.state.resolve(placement_resolver, &size_constraint);
     }
@@ -95,7 +90,6 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
@@ -133,7 +127,6 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         renderer.render_text(&text, Vector2::zero(), text_color, *theme.input.font_size);
 
         if is_focused {
-
             let cursor_offset = *theme.input.cursor_offset * *interface_settings.scaling;
 
             renderer.render_rectangle(

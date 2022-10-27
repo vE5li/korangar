@@ -15,12 +15,10 @@ pub struct LoginWindow {
 }
 
 impl LoginWindow {
-
     pub const WINDOW_CLASS: &'static str = "login";
 }
 
 impl PrototypeWindow for LoginWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -31,23 +29,19 @@ impl PrototypeWindow for LoginWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let username = Rc::new(RefCell::new(self.login_settings.username.clone()));
         let password = Rc::new(RefCell::new(self.login_settings.password.clone()));
 
         let selector = {
-
             let username = username.clone();
             let password = password.clone();
             move || !username.borrow().is_empty() && !password.borrow().is_empty()
         };
 
         let action = {
-
             let username = username.clone();
             let password = password.clone();
             move || {
-
                 Some(ClickAction::Event(UserEvent::LogIn(
                     username.borrow().clone(),
                     password.borrow().clone(),
@@ -56,10 +50,8 @@ impl PrototypeWindow for LoginWindow {
         };
 
         let username_action = {
-
             let username = username.clone();
             Box::new(move || {
-
                 username
                     .borrow()
                     .is_empty()
@@ -69,16 +61,12 @@ impl PrototypeWindow for LoginWindow {
         };
 
         let password_action = {
-
             let username = username.clone();
             let password = password.clone();
 
             Box::new(move || match password.borrow().is_empty() {
-
                 _ if username.borrow().is_empty() => Some(ClickAction::FocusNext(FocusMode::FocusPrevious)),
-
                 true => None,
-
                 false => Some(ClickAction::Event(UserEvent::LogIn(
                     username.borrow().clone(),
                     password.borrow().clone(),

@@ -3,11 +3,10 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2};
 use vulkano::sync::GpuFuture;
 
+use super::InterfaceSettings;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
 use crate::inventory::Item;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
-
-use super::InterfaceSettings;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum MouseCursorState {
@@ -34,14 +33,12 @@ pub struct MouseCursor {
 }
 
 impl MouseCursor {
-
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
     ) -> Self {
-
         let sprite = sprite_loader.get("cursors.spr", game_file_loader, texture_future).unwrap();
         let actions = action_loader.get("cursors.act", game_file_loader).unwrap();
         let animation_state = AnimationState::new(0);
@@ -57,14 +54,13 @@ impl MouseCursor {
         self.animation_state.update(client_tick);
     }
 
-    // TODO: this is just a workaround until i find a better solution to make the cursor always look
-    // correct.
+    // TODO: this is just a workaround until i find a better solution to make the
+    // cursor always look correct.
     pub fn set_start_time(&mut self, client_tick: u32) {
         self.animation_state.start_time = client_tick;
     }
 
     pub fn set_state(&mut self, state: MouseCursorState, client_tick: u32) {
-
         let new_state = state as usize;
 
         if self.animation_state.action != new_state {
@@ -83,9 +79,7 @@ impl MouseCursor {
         color: Color,
         interface_settings: &InterfaceSettings,
     ) {
-
         if let Some(item) = grabbed_item {
-
             renderer.render_sprite(
                 render_target,
                 item,

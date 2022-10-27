@@ -1,6 +1,6 @@
 use proc_macro::TokenStream as InterfaceTokenStream;
 use quote::quote;
-use syn::{Attribute, DataStruct, Generics, Ident, DataEnum};
+use syn::{Attribute, DataEnum, DataStruct, Generics, Ident};
 
 use super::helper::prototype_element_helper;
 
@@ -10,7 +10,6 @@ pub fn derive_prototype_element_struct(
     attributes: Vec<Attribute>,
     name: Ident,
 ) -> InterfaceTokenStream {
-
     let (initializers, _window_title, _window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -25,19 +24,13 @@ pub fn derive_prototype_element_struct(
     .into()
 }
 
-pub fn derive_prototype_element_enum(
-    data_enum: DataEnum,
-    generics: Generics,
-    name: Ident,
-) -> InterfaceTokenStream {
-
+pub fn derive_prototype_element_enum(data_enum: DataEnum, generics: Generics, name: Ident) -> InterfaceTokenStream {
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let mut variants = Vec::new();
     let mut variant_strings = Vec::new();
 
     for variant in data_enum.variants.into_iter() {
-
         variants.push(variant.ident.clone());
         variant_strings.push(variant.ident.to_string());
     }

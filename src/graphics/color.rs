@@ -10,9 +10,7 @@ pub struct Color {
 }
 
 impl Color {
-
     pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
-
         Self {
             red,
             green,
@@ -22,7 +20,6 @@ impl Color {
     }
 
     pub fn rgb_f32(red: f32, green: f32, blue: f32) -> Self {
-
         let red = (red * 255.0) as u8;
         let green = (green * 255.0) as u8;
         let blue = (blue * 255.0) as u8;
@@ -40,7 +37,6 @@ impl Color {
     }
 
     pub const fn monochrome(brightness: u8) -> Self {
-
         Self {
             red: brightness,
             green: brightness,
@@ -71,14 +67,12 @@ impl Color {
 
     pub fn shade(&self) -> Self {
         match (self.red as usize) + (self.green as usize) + (self.blue as usize) > 382 {
-
             true => Self::rgba(
                 self.red.saturating_sub(40),
                 self.green.saturating_sub(40),
                 self.blue.saturating_sub(40),
                 self.alpha,
             ),
-
             false => Self::rgba(
                 self.red.saturating_add(40),
                 self.green.saturating_add(40),
@@ -99,7 +93,6 @@ pub struct ColorBGR {
 }
 
 impl From<ColorBGR> for Color {
-
     fn from(color: ColorBGR) -> Self {
         Self::rgb(color.red, color.green, color.blue)
     }
@@ -115,7 +108,6 @@ pub struct ColorRGB {
 }
 
 impl From<ColorRGB> for Color {
-
     fn from(color: ColorRGB) -> Self {
         Self::rgb(color.red, color.green, color.blue)
     }

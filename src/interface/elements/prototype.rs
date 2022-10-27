@@ -8,12 +8,10 @@ use crate::graphics::Color;
 use crate::interface::{ElementCell, *};
 
 pub trait PrototypeElement {
-
     fn to_element(&self, display: String) -> ElementCell;
 }
 
 pub trait ElementDisplay {
-
     fn display(&self) -> String;
 }
 
@@ -31,37 +29,31 @@ impl<T> ElementDisplay for T
 where
     T: Display + NoDisplay,
 {
-
     fn display(&self) -> String {
         self.to_string()
     }
 }
 
 impl ElementDisplay for f32 {
-
     fn display(&self) -> String {
         format!("{:.1}", self)
     }
 }
 
 impl<T: ElementDisplay> ElementDisplay for Vector2<T> {
-
     fn display(&self) -> String {
         format!("{}, {}", self.x.display(), self.y.display())
     }
 }
 
 impl<T: ElementDisplay> ElementDisplay for Vector3<T> {
-
     fn display(&self) -> String {
         format!("{}, {}, {}", self.x.display(), self.y.display(), self.z.display())
     }
 }
 
 impl<T: ElementDisplay> ElementDisplay for Vector4<T> {
-
     fn display(&self) -> String {
-
         format!(
             "{}, {}, {}, {}",
             self.x.display(),
@@ -73,9 +65,7 @@ impl<T: ElementDisplay> ElementDisplay for Vector4<T> {
 }
 
 impl<T: ElementDisplay> ElementDisplay for Quaternion<T> {
-
     fn display(&self) -> String {
-
         format!(
             "{:.1}, {:.1}, {:.1} - {:.1}",
             self.v.x.display(),
@@ -87,14 +77,12 @@ impl<T: ElementDisplay> ElementDisplay for Quaternion<T> {
 }
 
 impl<T: ElementDisplay> ElementDisplay for Rad<T> {
-
     fn display(&self) -> String {
         self.0.display()
     }
 }
 
 impl ElementDisplay for Ipv4Addr {
-
     fn display(&self) -> String {
         self.to_string()
     }
@@ -138,9 +126,7 @@ impl<T> PrototypeElement for T
 where
     T: ElementDisplay + NoPrototype,
 {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(StringValue::new(self.display()))];
 
         Container::new(elements).wrap()
@@ -148,9 +134,7 @@ where
 }
 
 impl PrototypeElement for DimensionConstraint {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
         Container::new(elements).wrap()
@@ -158,9 +142,7 @@ impl PrototypeElement for DimensionConstraint {
 }
 
 impl PrototypeElement for SizeConstraint {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
 
         Container::new(elements).wrap()
@@ -168,16 +150,13 @@ impl PrototypeElement for SizeConstraint {
 }
 
 impl<T: PrototypeElement> PrototypeElement for std::sync::Arc<T> {
-
     fn to_element(&self, display: String) -> ElementCell {
         self.as_ref().to_element(display)
     }
 }
 
 impl<T: PrototypeElement> PrototypeElement for Option<T> {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         if let Some(value) = self {
             return value.to_element(display);
         }
@@ -189,9 +168,7 @@ impl<T: PrototypeElement> PrototypeElement for Option<T> {
 }
 
 impl<T: PrototypeElement, const SIZE: usize> PrototypeElement for [T; SIZE] {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         let elements = self
             .iter()
             .enumerate()
@@ -203,9 +180,7 @@ impl<T: PrototypeElement, const SIZE: usize> PrototypeElement for [T; SIZE] {
 }
 
 impl<T: PrototypeElement> PrototypeElement for Vec<T> {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         let elements = self
             .iter()
             .enumerate()
@@ -217,9 +192,7 @@ impl<T: PrototypeElement> PrototypeElement for Vec<T> {
 }
 
 impl PrototypeElement for Color {
-
     fn to_element(&self, display: String) -> ElementCell {
-
         let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(ColorValue::new(*self))];
 
         Container::new(elements).wrap()
@@ -227,7 +200,6 @@ impl PrototypeElement for Color {
 }
 
 impl<T: PrototypeElement> PrototypeElement for Rc<T> {
-
     fn to_element(&self, display: String) -> ElementCell {
         (**self).to_element(display)
     }

@@ -10,14 +10,12 @@ pub struct ErrorWindow {
 }
 
 impl PrototypeWindow for ErrorWindow {
-
     fn to_window(
         &self,
         window_cache: &WindowCache,
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = vec![cell!(Text::new(
             self.message.clone(),
             Color::rgb(220, 100, 100),

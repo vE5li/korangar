@@ -42,7 +42,6 @@ pub struct Inventory {
 }
 
 impl Inventory {
-
     pub fn fill(
         &mut self,
         game_file_loader: &mut GameFileLoader,
@@ -51,11 +50,9 @@ impl Inventory {
         script_loader: &ScriptLoader,
         item_data: Vec<(usize, usize, EquipPosition, EquipPosition)>,
     ) {
-
         let items = item_data
             .into_iter()
             .map(|item_data| {
-
                 let resource_name = script_loader.get_item_resource_from_id(item_data.1);
                 let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
                 let texture = texture_loader.get(&full_path, game_file_loader, texture_future).unwrap();
@@ -83,9 +80,7 @@ impl Inventory {
         equip_position: EquipPosition,
         equipped_position: EquipPosition,
     ) {
-
         self.items.with_mut(|items, changed| {
-
             // set changed ahead of time since we might exit early
             changed();
 
@@ -110,9 +105,7 @@ impl Inventory {
     }
 
     pub fn update_equipped_position(&mut self, index: u16, equipped_position: EquipPosition) {
-
         self.items.with_mut(|items, changed| {
-
             items.iter_mut().find(|item| item.index == index).unwrap().equipped_position = equipped_position;
             changed();
         });

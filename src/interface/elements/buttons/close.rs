@@ -8,7 +8,6 @@ pub struct CloseButton {
 }
 
 impl Element for CloseButton {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -18,7 +17,6 @@ impl Element for CloseButton {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let (size, position) = placement_resolver.allocate_right(&theme.close_button.size_constraint);
         self.state.cached_size = size.finalize();
         self.state.cached_position = position;
@@ -53,7 +51,6 @@ impl Element for CloseButton {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

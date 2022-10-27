@@ -14,9 +14,7 @@ pub struct ShadowCamera {
 }
 
 impl ShadowCamera {
-
     pub fn new() -> Self {
-
         Self {
             focus_position: Point3::new(0.0, 0.0, 0.0),
             look_up_vector: Vector3::new(0.0, -1.0, 0.0),
@@ -37,14 +35,12 @@ impl ShadowCamera {
     }
 
     fn camera_position(&self) -> Point3<f32> {
-
         let direction = crate::world::get_light_direction(self.day_timer).normalize();
         let scaled_direction = direction * 100.0;
         self.focus_position + scaled_direction
     }
 
     fn view_direction(&self) -> Vector3<f32> {
-
         let camera_position = self.camera_position();
         Vector3::new(
             self.focus_position.x - camera_position.x,
@@ -55,13 +51,11 @@ impl ShadowCamera {
     }
 
     fn world_to_clip_space(&self, world_space_position: Vector3<f32>) -> Vector4<f32> {
-
         let position = Vector4::new(world_space_position.x, world_space_position.y, world_space_position.z, 1.0);
         self.world_to_screen_matrix * position
     }
 
     fn clip_to_screen_space(&self, clip_space_position: Vector4<f32>) -> Vector2<f32> {
-
         Vector2::new(
             clip_space_position.x / clip_space_position.w + 1.0,
             clip_space_position.y / clip_space_position.w + 1.0,
@@ -70,9 +64,7 @@ impl ShadowCamera {
 }
 
 impl Camera for ShadowCamera {
-
     fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
-
         let bounds = Vector4::new(-300.0, 300.0, -300.0, 300.0);
         let z_near = -1000.0;
         let z_far = 500.0;
@@ -88,7 +80,6 @@ impl Camera for ShadowCamera {
     }
 
     fn transform_matrix(&self, transform: &Transform) -> Matrix4<f32> {
-
         let translation_matrix = Matrix4::from_translation(transform.position);
         let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y)
@@ -99,7 +90,6 @@ impl Camera for ShadowCamera {
     }
 
     fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
-
         let direction = self.view_direction();
         let right_vector = self.look_up_vector.cross(direction).normalize();
         let up_vector = direction.cross(right_vector).normalize();
@@ -119,7 +109,6 @@ impl Camera for ShadowCamera {
     }
 
     fn billboard_coordinates(&self, position: Vector3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {
-
         let view_direction = self.view_direction();
         let right_vector = self.look_up_vector.cross(view_direction).normalize();
         let up_vector = view_direction.cross(right_vector).normalize();
@@ -131,7 +120,6 @@ impl Camera for ShadowCamera {
     }
 
     fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (Vector2<f32>, Vector2<f32>) {
-
         let top_left_position = self.clip_to_screen_space(top_left_position);
         let bottom_right_position = self.clip_to_screen_space(bottom_right_position);
 
@@ -150,7 +138,6 @@ impl Camera for ShadowCamera {
     }
 
     fn get_camera_direction(&self) -> usize {
-
         let view_direction = self.view_direction();
         super::direction(Vector2::new(view_direction.x, view_direction.z))
     }

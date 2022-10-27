@@ -17,9 +17,7 @@ pub struct PlacementResolver {
 }
 
 impl PlacementResolver {
-
     pub fn new(mut avalible_space: PartialSize, base_position: Position, border: Size, gaps: Size, scaling: f32) -> Self {
-
         avalible_space.x -= border.x * scaling * 2.0;
         avalible_space.y = avalible_space.y.map(|height| height - border.y * scaling * 2.0);
 
@@ -41,7 +39,6 @@ impl PlacementResolver {
     }
 
     pub fn derive(&self, mut avalible_space: PartialSize, offset: Position, border: Size) -> Self {
-
         avalible_space.x -= offset.x + border.x * self.scaling * 2.0;
         avalible_space.y = avalible_space.y.map(|height| height - border.y * self.scaling * 2.0);
 
@@ -73,7 +70,6 @@ impl PlacementResolver {
     }
 
     pub fn get_remaining(&self) -> PartialSize {
-
         let remaining_width = self.avalible_space.x - self.horizontal_accumulator;
         let remaining_height = self
             .avalible_space
@@ -84,7 +80,6 @@ impl PlacementResolver {
     }
 
     pub fn newline(&mut self) {
-
         self.total_height += self.vertical_offset + self.gaps.y * self.scaling;
         self.base_position.y += self.vertical_offset + self.gaps.y * self.scaling;
         self.horizontal_accumulator = 0.0;
@@ -96,7 +91,6 @@ impl PlacementResolver {
     }
 
     pub fn allocate(&mut self, size_constraint: &SizeConstraint) -> (PartialSize, Position) {
-
         let is_width_absolute = size_constraint.width.is_absolute();
         let gaps_add = match is_width_absolute {
             true => self.gaps.x * 2.0,
@@ -108,7 +102,6 @@ impl PlacementResolver {
         let mut gaps_subtract = 0.0;
 
         if remaining.x < size.x - REMAINDER_THRESHHOLD {
-
             self.newline();
             remaining = self.get_remaining();
 
@@ -121,7 +114,7 @@ impl PlacementResolver {
 
         if self.horizontal_accumulator > ELEMENT_THRESHHOLD {
             match is_width_absolute {
-                true => {},
+                true => {}
                 false => gaps_subtract += self.gaps.x * self.scaling,
             }
         }
@@ -139,7 +132,7 @@ impl PlacementResolver {
 
         if remaining.x - size.x > ELEMENT_THRESHHOLD {
             match is_width_absolute {
-                true => {},
+                true => {}
                 false => gaps_subtract += self.gaps.x * self.scaling,
             }
         }
@@ -149,12 +142,10 @@ impl PlacementResolver {
     }
 
     pub fn allocate_right(&mut self, size_constraint: &SizeConstraint) -> (PartialSize, Position) {
-
         let mut remaining = self.get_remaining();
         let mut size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
 
         if remaining.x < size.x - REMAINDER_THRESHHOLD + self.gaps.x * self.scaling {
-
             self.newline();
             remaining = self.get_remaining();
 

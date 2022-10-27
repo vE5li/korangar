@@ -6,9 +6,7 @@ pub enum ChangeEvent {
 }
 
 impl ChangeEvent {
-
     pub fn combine(self, other: Self) -> Self {
-
         let precedence = |&event: &ChangeEvent| match event {
             ChangeEvent::Reresolve => 0,
             ChangeEvent::Rerender => 1,

@@ -85,11 +85,8 @@ pub struct ModelString {
 }
 
 impl ByteConvertable for ModelString {
-
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-
         let inner = if byte_stream.get_version().equals_or_above(2, 2) {
-
             let length = u32::from_bytes(byte_stream, None) as usize;
             let mut inner = String::from_bytes(byte_stream, Some(length));
             // need to remove the last character for some reason
@@ -136,7 +133,6 @@ pub struct ModelLoader {
 }
 
 impl ModelLoader {
-
     fn add_vertices(
         native_vertices: &mut Vec<NativeModelVertex>,
         vertex_positions: &[Vector3<f32>],
@@ -145,7 +141,6 @@ impl ModelLoader {
         reverse_vertices: bool,
         reverse_normal: bool,
     ) {
-
         let normal = match reverse_normal {
             true => NativeModelVertex::calculate_normal(vertex_positions[0], vertex_positions[1], vertex_positions[2]),
             false => NativeModelVertex::calculate_normal(vertex_positions[2], vertex_positions[1], vertex_positions[0]),
@@ -153,7 +148,6 @@ impl ModelLoader {
 
         if reverse_vertices {
             for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates).rev() {
-
                 native_vertices.push(NativeModelVertex::new(
                     vertex_position,
                     normal,
@@ -164,7 +158,6 @@ impl ModelLoader {
             }
         } else {
             for (vertex_position, texture_coordinates) in vertex_positions.iter().copied().zip(texture_coordinates) {
-
                 native_vertices.push(NativeModelVertex::new(
                     vertex_position,
                     normal,
@@ -177,7 +170,6 @@ impl ModelLoader {
     }
 
     fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool) -> Vec<NativeModelVertex> {
-
         let mut native_vertices = Vec::new();
 
         let array: [f32; 3] = node.scale.into();
@@ -188,7 +180,6 @@ impl ModelLoader {
         }
 
         for face in &node.faces {
-
             // collect into tiny vec instead ?
             let vertex_positions: Vec<Vector3<f32>> = face
                 .vertex_position_indices
@@ -215,7 +206,6 @@ impl ModelLoader {
             );
 
             if face.two_sided != 0 {
-
                 Self::add_vertices(
                     &mut native_vertices,
                     &vertex_positions,
@@ -231,7 +221,6 @@ impl ModelLoader {
     }
 
     fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
-
         let main = Matrix4::from_translation(node.translation1) * Matrix4::from(node.offset_matrix);
 
         let scale_matrix = Matrix4::from_nonuniform_scale(node.scale.x, node.scale.y, node.scale.z);
@@ -258,7 +247,6 @@ impl ModelLoader {
         root_node_name: &ModelString,
         reverse_order: bool,
     ) -> Node {
-
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
         let vertices = NativeModelVertex::to_vertices(Self::make_vertices(current_node, &main_matrix, reverse_order));
         let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
@@ -273,7 +261,6 @@ impl ModelLoader {
         main_bounding_box.extend(&bounding_box);
 
         let final_matrix = match current_node.node_name == *root_node_name {
-
             true => {
                 Matrix4::from_translation(-Vector3::new(
                     bounding_box.center().x,
@@ -281,7 +268,6 @@ impl ModelLoader {
                     bounding_box.center().z,
                 )) * transform_matrix
             }
-
             false => transform_matrix,
         };
 
@@ -297,7 +283,6 @@ impl ModelLoader {
             .filter(|node| node.parent_node_name == current_node.node_name)
             .filter(|node| node.parent_node_name != node.node_name)
             .map(|node| {
-
                 Self::process_node_mesh(
                     device.clone(),
                     node,
@@ -328,7 +313,6 @@ impl ModelLoader {
         model_file: &str,
         reverse_order: bool,
     ) -> Result<Arc<Model>, String> {
-
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", MAGENTA, model_file, NONE));
 

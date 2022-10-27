@@ -39,9 +39,7 @@ pub struct AmbientLightRenderer {
 }
 
 impl AmbientLightRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
@@ -64,7 +62,6 @@ impl AmbientLightRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -78,17 +75,13 @@ impl AmbientLightRenderer {
     }
 
     pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, vertex_buffer: ScreenVertexBuffer, color: Color) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
-        let set = PersistentDescriptorSet::new(
-            descriptor_layout,
-            [
-                WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
-                WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
-            ],
-        )
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
+            WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
+        ])
         .unwrap();
 
         let constants = Constants {

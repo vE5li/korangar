@@ -11,11 +11,9 @@ macro_rules! print_debug_prefix {
 }
 
 pub fn print_indented(message: String, newline: bool) {
-
     let offset = message_offset();
 
     if stack_size() > 0 {
-
         if get_message_count() == 0 {
             println!(" {} started", ARROW);
         }
@@ -39,7 +37,6 @@ pub fn print_indented(message: String, newline: bool) {
 }
 
 pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
-
     let message_type = if message.ty.general {
         "general"
     } else if message.ty.validation {

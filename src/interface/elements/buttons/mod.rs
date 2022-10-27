@@ -16,7 +16,6 @@ enum ElementText {
 }
 
 impl ElementText {
-
     pub fn get_str(&self) -> &str {
         match self {
             Self::Static(text) => text,
@@ -32,16 +31,11 @@ enum ElementEvent {
 }
 
 impl ElementEvent {
-
     pub fn execute(&mut self) -> Option<ClickAction> {
         match self {
-
             Self::Event(user_event) => Some(ClickAction::Event(user_event.clone())),
-
             Self::ActionClosure(action_closure) => action_closure(),
-
             Self::Closure(closure) => {
-
                 closure();
                 None
             }

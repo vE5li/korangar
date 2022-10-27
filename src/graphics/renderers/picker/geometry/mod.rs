@@ -45,9 +45,7 @@ pub struct GeometryRenderer {
 }
 
 impl GeometryRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader, false);
@@ -81,7 +79,6 @@ impl GeometryRenderer {
         fragment_shader: &ShaderModule,
         _wireframe: bool,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -95,7 +92,6 @@ impl GeometryRenderer {
     }
 
     pub fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -122,7 +118,6 @@ impl GeometryRenderer {
         textures: &[Texture],
         world_matrix: Matrix4<f32>,
     ) {
-
         if textures.is_empty() {
             return;
         }
@@ -143,10 +138,9 @@ impl GeometryRenderer {
             samplers.push((textures[0].clone() as _, self.linear_sampler.clone()));
         }
 
-        let set = PersistentDescriptorSet::new(
-            descriptor_layout,
-            [WriteDescriptorSet::image_view_sampler_array(0, 0, samplers)],
-        )
+        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler_array(
+            0, 0, samplers,
+        )])
         .unwrap();
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();

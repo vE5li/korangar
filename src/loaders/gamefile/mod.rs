@@ -21,7 +21,6 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
-
     pub fn validate_version(&self) {
         assert_eq!(self.version, 0x200, "invalid grf version");
     }
@@ -42,7 +41,6 @@ pub struct FileTable {
 }
 
 impl FileTable {
-
     pub fn get_compressed_size(&self) -> usize {
         self.compressed_size as usize
     }
@@ -67,9 +65,7 @@ pub struct GameArchive {
 }
 
 impl GameArchive {
-
     pub fn load(path: &str, lua_files: &mut Vec<String>) -> Self {
-
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {}{}{}", MAGENTA, path, NONE));
 
@@ -96,7 +92,6 @@ impl GameArchive {
         let mut files = HashMap::with_capacity(file_count);
 
         for _index in 0..file_count {
-
             let file_information = FileInformation::from_bytes(&mut byte_stream, None);
             let file_name = file_information.file_name.to_lowercase();
 
@@ -110,12 +105,12 @@ impl GameArchive {
         #[cfg(feature = "debug")]
         timer.stop();
 
-        // TODO: only take 64..? bytes so that loaded game archives can be extended aswell
+        // TODO: only take 64..? bytes so that loaded game archives can be extended
+        // aswell
         Self::new(files, bytes)
     }
 
     pub fn save(&mut self, file_name: &str) {
-
         let file_table_offset = self.data.len() as u32;
         let reserved_files = 0;
         let raw_file_count = self.files.len() as u32 + 7;
@@ -148,7 +143,6 @@ impl GameArchive {
     }
 
     fn load_data(&self, file_path: &str) -> Option<Vec<u8>> {
-
         let file_information = self.files.get(file_path)?;
 
         let mut byte_stream = ByteStream::new(&self.data);
@@ -168,7 +162,6 @@ impl GameArchive {
     }
 
     pub fn add_file(&mut self, path: String, data: Vec<u8>) {
-
         let compressed = compress(&data, Format::Zlib, CompressionLevel::Default).unwrap();
 
         let file_name = path.clone();
@@ -199,15 +192,12 @@ pub struct GameFileLoader {
 }
 
 impl GameFileLoader {
-
     pub fn add_archive(&mut self, path: String) {
-
         let game_archive = GameArchive::load(&path, &mut self.lua_files);
         self.archives.insert(0, game_archive);
     }
 
     pub fn get(&mut self, path: &str) -> Result<Vec<u8>, String> {
-
         let result = self
             .archives
             .iter_mut() // convert this to a multithreaded iter ?
@@ -215,7 +205,6 @@ impl GameFileLoader {
             .ok_or(format!("failed to find file {}", path));
 
         if result.is_err() {
-
             // TEMP
 
             #[cfg(feature = "debug")]
@@ -235,7 +224,6 @@ impl GameFileLoader {
     }
 
     pub fn patch(&mut self) {
-
         use lunify::{unify, Format};
 
         if Path::new("lua_files.grf").exists() {
@@ -247,11 +235,11 @@ impl GameFileLoader {
         let bytecode_format = Format::default();
 
         for file_name in lua_files {
-
             let bytes = self.get(&file_name).unwrap();
 
-            // Try to unify all bytecode to Lua 5.1 and possibly 64 bit, If the operation fails the
-            // file might not actually be bytecode but rather source code so don't add it.
+            // Try to unify all bytecode to Lua 5.1 and possibly 64 bit, If the operation
+            // fails the file might not actually be bytecode but rather source
+            // code so don't add it.
             if let Ok(bytes) = unify(&bytes, bytecode_format) {
                 lua_archive.add_file(file_name, bytes);
             }

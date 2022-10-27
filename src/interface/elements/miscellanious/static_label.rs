@@ -11,7 +11,6 @@ pub struct StaticLabel {
 }
 
 impl Element for StaticLabel {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -21,7 +20,6 @@ impl Element for StaticLabel {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let mut size_constraint = theme.label.size_constraint;
         let width = self.label.len() as f32 * 8.0 + theme.label.text_offset.x * *interface_settings.scaling * 2.0;
         size_constraint.width = Dimension::Absolute(width);
@@ -43,7 +41,6 @@ impl Element for StaticLabel {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

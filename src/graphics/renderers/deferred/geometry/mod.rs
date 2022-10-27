@@ -48,9 +48,7 @@ pub struct GeometryRenderer {
 }
 
 impl GeometryRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(
@@ -95,7 +93,6 @@ impl GeometryRenderer {
         viewport: Viewport,
         #[cfg(feature = "debug")] wireframe: bool,
     ) {
-
         self.pipeline = Self::create_pipeline(
             device,
             subpass,
@@ -115,7 +112,6 @@ impl GeometryRenderer {
         fragment_shader: &ShaderModule,
         #[cfg(feature = "debug")] wireframe: bool,
     ) -> Arc<GraphicsPipeline> {
-
         #[cfg(feature = "debug")]
         let polygon_mode = match wireframe {
             true => PolygonMode::Line,
@@ -149,7 +145,6 @@ impl GeometryRenderer {
     }
 
     pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -177,7 +172,6 @@ impl GeometryRenderer {
         textures: &[Texture],
         world_matrix: Matrix4<f32>,
     ) {
-
         if textures.is_empty() {
             return;
         }
@@ -198,14 +192,11 @@ impl GeometryRenderer {
             textures.push(textures[0].clone());
         }
 
-        let set = PersistentDescriptorSet::new(
-            descriptor_layout,
-            [
-                WriteDescriptorSet::sampler(0, self.nearest_sampler.clone()),
-                WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
-                WriteDescriptorSet::image_view_array(2, 0, textures),
-            ],
-        )
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::sampler(0, self.nearest_sampler.clone()),
+            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
+            WriteDescriptorSet::image_view_array(2, 0, textures),
+        ])
         .unwrap();
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();

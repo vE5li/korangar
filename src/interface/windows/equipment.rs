@@ -9,12 +9,10 @@ pub struct EquipmentWindow {
 }
 
 impl EquipmentWindow {
-
     pub const WINDOW_CLASS: &'static str = "equipment";
 }
 
 impl PrototypeWindow for EquipmentWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -25,7 +23,6 @@ impl PrototypeWindow for EquipmentWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements = vec![EquipmentContainer::new(self.items.new_remote()).wrap()];
 
         Box::from(FramedWindow::new(

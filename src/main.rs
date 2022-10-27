@@ -52,7 +52,6 @@ use crate::system::{get_device_extensions, get_instance_extensions, get_layers, 
 use crate::world::*;
 
 fn main() {
-
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
@@ -297,70 +296,56 @@ fn main() {
 
     events_loop.run(move |event, _, control_flow| {
         match event {
-
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
             } => *control_flow = ControlFlow::Exit,
-
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
-
                 let window_size = surface.window().inner_size();
                 interface.update_window_size(Size::new(window_size.width as f32, window_size.height as f32));
                 swapchain_holder.update_window_size(window_size.into());
             }
-
             Event::WindowEvent {
                 event: WindowEvent::Focused(focused),
                 ..
             } => {
                 if !focused {
-
                     input_system.reset();
                     focus_state.remove_focus();
                 }
             }
-
             Event::WindowEvent {
                 event: WindowEvent::CursorLeft { .. },
                 ..
             } => interface.hide_mouse_cursor(),
-
             Event::WindowEvent {
                 event: WindowEvent::CursorEntered { .. },
                 ..
             } => interface.show_mouse_cursor(),
-
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
                 ..
             } => input_system.update_mouse_position(position),
-
             Event::WindowEvent {
                 event: WindowEvent::MouseInput { button, state, .. },
                 ..
             } => input_system.update_mouse_buttons(button, state),
-
             Event::WindowEvent {
                 event: WindowEvent::MouseWheel { delta, .. },
                 ..
             } => input_system.update_mouse_wheel(delta),
-
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
             } => input_system.update_keyboard(input.scancode as usize, input.state),
-
             Event::WindowEvent {
                 event: WindowEvent::ReceivedCharacter(character),
                 ..
             } => input_system.buffer_character(character),
-
             Event::RedrawEventsCleared => {
-
                 input_system.update_delta();
 
                 let delta_time = game_timer.update();
@@ -382,11 +367,9 @@ fn main() {
                 );
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-
                     let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id).unwrap();
 
                     if entity.are_details_unavalible() {
-
                         networking_system.request_entity_details(entity_id);
                         entity.set_details_requested();
                     }
@@ -403,9 +386,7 @@ fn main() {
 
                 for event in network_events {
                     match event {
-
                         NetworkEvent::AddEntity(entity_appeared_data) => {
-
                             let npc = Npc::new(
                                 &mut game_file_loader,
                                 &mut sprite_loader,
@@ -419,32 +400,24 @@ fn main() {
                             let npc = Entity::Npc(npc);
                             entities.push(npc);
                         }
-
                         NetworkEvent::RemoveEntity(entity_id) => {
                             entities.retain(|entity| entity.get_entity_id() != entity_id);
                         }
-
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
-
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
-
                                 entity.move_from_to(&map, position_from, position_to, starting_timestamp);
                                 #[cfg(feature = "debug")]
                                 entity.generate_steps_vertex_buffer(device.clone(), &map);
                             }
                         }
-
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
-
                             entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
                             #[cfg(feature = "debug")]
                             entities[0].generate_steps_vertex_buffer(device.clone(), &map);
                         }
-
                         NetworkEvent::ChangeMap(map_name, player_position) => {
-
                             while entities.len() > 1 {
                                 entities.pop();
                             }
@@ -461,26 +434,20 @@ fn main() {
                             // cursor always look correct.
                             interface.set_start_time(game_timer.get_client_tick());
                         }
-
                         NetworkEvent::UpdateClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
                         }
-
                         NetworkEvent::ChatMessage(message) => {
                             chat_messages.borrow_mut().push(message);
                         }
-
                         NetworkEvent::UpdateEntityDetails(entity_id, name) => {
-
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
                                 entity.set_details(name);
                             }
                         }
-
                         NetworkEvent::DamageEffect(entity_id, damage_amount) => {
-
                             let entity = entities
                                 .iter()
                                 .find(|entity| entity.get_entity_id() == entity_id)
@@ -488,33 +455,24 @@ fn main() {
 
                             particle_holder.spawn_particle(Box::new(DamageNumber::new(entity.get_position(), damage_amount.to_string())));
                         }
-
                         NetworkEvent::UpdateEntityHealth(entity_id, health_points, maximum_health_points) => {
-
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
                                 entity.update_health(health_points, maximum_health_points);
                             }
                         }
-
                         NetworkEvent::UpdateStatus(status_type) => {
-
                             let Entity::Player(player) = &mut entities[0] else {
                                 panic!();
                             };
 
                             player.update_status(status_type);
                         }
-
                         NetworkEvent::OpenDialog(text, npc_id) => interface.open_dialog_window(&mut focus_state, text, npc_id),
-
                         NetworkEvent::AddNextButton => interface.add_next_button(),
-
                         NetworkEvent::AddCloseButton => interface.add_close_button(),
-
                         NetworkEvent::AddChoiceButtons(choices) => interface.add_choice_buttons(choices),
-
                         NetworkEvent::AddQuestEffect(quest_effect) => particle_holder.add_quest_icon(
                             &mut game_file_loader,
                             &mut texture_loader,
@@ -522,11 +480,8 @@ fn main() {
                             &map,
                             quest_effect,
                         ),
-
                         NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
-
                         NetworkEvent::Inventory(item_data) => {
-
                             player_inventory.fill(
                                 &mut game_file_loader,
                                 &mut texture_loader,
@@ -535,9 +490,7 @@ fn main() {
                                 item_data,
                             );
                         }
-
                         NetworkEvent::AddIventoryItem(item_index, item_data, equip_position, equipped_position) => {
-
                             player_inventory.add_item(
                                 &mut game_file_loader,
                                 &mut texture_loader,
@@ -549,7 +502,6 @@ fn main() {
                                 equipped_position,
                             );
                         }
-
                         NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                             player_inventory.update_equipped_position(index, equipped_position);
                         }
@@ -558,34 +510,22 @@ fn main() {
 
                 for event in user_events {
                     match event {
-
                         UserEvent::LogIn(username, password) => match networking_system.log_in(username, password) {
-
                             Ok(character_selection_window) => {
-
                                 // TODO: this will do one unnecessary restore_focus. check if
                                 // that will be problematic
                                 interface.close_window_with_class(&mut focus_state, LoginWindow::WINDOW_CLASS);
                                 interface.open_window(&mut focus_state, &character_selection_window);
                             }
-
                             Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                         },
-
                         UserEvent::LogOut => networking_system.log_out().unwrap(),
-
                         UserEvent::Exit => *control_flow = ControlFlow::Exit,
-
                         UserEvent::ToggleRemeberUsername => networking_system.toggle_remember_username(),
-
                         UserEvent::ToggleRemeberPassword => networking_system.toggle_remember_password(),
-
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
-
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
-
                         UserEvent::ToggleFrameLimit => {
-
                             render_settings.toggle_frame_limit();
                             swapchain_holder.set_frame_limit(render_settings.frame_limit);
 
@@ -593,32 +533,22 @@ fn main() {
                             // recreating the swapchain, so we need to render it again
                             interface.schedule_rerender();
                         }
-
                         UserEvent::OpenMenuWindow => interface.open_window(&mut focus_state, &MenuWindow::default()),
-
                         UserEvent::OpenInventoryWindow => {
                             interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_item_state()))
                         }
-
                         UserEvent::OpenEquipmentWindow => {
                             interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_item_state()))
                         }
-
                         UserEvent::OpenGraphicsSettingsWindow => {
                             interface.open_window(&mut focus_state, &GraphicsSettingsWindow::default())
                         }
-
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&mut focus_state, &AudioSettingsWindow::default()),
-
                         UserEvent::ReloadTheme => interface.reload_theme(),
-
                         UserEvent::SaveTheme => interface.save_theme(),
-
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot, &chat_messages) {
-
                                 Ok((map_name, player_position, character_information, client_tick)) => {
-
                                     // TODO: this will do one unnecessary restore_focus. check if
                                     // that will be problematic
                                     interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
@@ -652,36 +582,26 @@ fn main() {
                                     interface.set_start_time(client_tick);
                                     game_timer.set_client_tick(client_tick);
                                 }
-
                                 Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                             }
                         }
-
                         UserEvent::OpenCharacterCreationWindow(character_slot) => {
                             interface.open_window(&mut focus_state, &CharacterCreationWindow::new(character_slot))
                         }
-
                         UserEvent::CreateCharacter(character_slot, name) => match networking_system.crate_character(character_slot, name) {
                             Ok(..) => interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS),
                             Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                         },
-
                         UserEvent::DeleteCharacter(character_id) => {
                             interface.handle_result(&mut focus_state, networking_system.delete_character(character_id))
                         }
-
                         UserEvent::RequestSwitchCharacterSlot(origin_slot) => networking_system.request_switch_character_slot(origin_slot),
-
                         UserEvent::CancelSwitchCharacterSlot => networking_system.cancel_switch_character_slot(),
-
                         UserEvent::SwitchCharacterSlot(destination_slot) => {
                             interface.handle_result(&mut focus_state, networking_system.switch_character_slot(destination_slot))
                         }
-
                         UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
-
                         UserEvent::RequestPlayerInteract(entity_id) => {
-
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 
                             if let Some(entity) = entity {
@@ -693,126 +613,88 @@ fn main() {
                                 }
                             }
                         }
-
                         UserEvent::RequestWarpToMap(map_name, position) => networking_system.request_warp_to_map(map_name, position),
-
                         UserEvent::SendMessage(message) => {
-
                             networking_system.send_message(message);
                             // TODO: maybe find a better solution for unfocusing the message box if
                             // this becomes problematic
                             focus_state.remove_focus();
                         }
-
                         UserEvent::NextDialog(npc_id) => networking_system.next_dialog(npc_id),
-
                         UserEvent::CloseDialog(npc_id) => {
-
                             networking_system.close_dialog(npc_id);
                             interface.close_dialog_window(&mut focus_state);
                         }
-
                         UserEvent::ChooseDialogOption(npc_id, option) => {
-
                             networking_system.choose_dialog_option(npc_id, option);
 
                             if option == -1 {
                                 interface.close_dialog_window(&mut focus_state);
                             }
                         }
-
                         UserEvent::MoveItem(item_move) => match (item_move.source, item_move.destination) {
-
                             (ItemSource::Inventory, ItemSource::Equipment { position }) => {
                                 networking_system.request_item_equip(item_move.item.index, position);
                             }
-
                             (ItemSource::Equipment { .. }, ItemSource::Inventory) => {
                                 networking_system.request_item_unequip(item_move.item.index);
                             }
-
                             _ => {}
                         },
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleFrustumCulling => render_settings.toggle_frustum_culling(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowBoundingBoxes => render_settings.toggle_show_bounding_boxes(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {
                             interface.open_window(&mut focus_state, map.resolve_marker(&entities, marker_identifier))
                         }
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(&mut focus_state, &RenderSettingsWindow::default()),
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapDataWindow => interface.open_window(&mut focus_state, map.to_prototype_window()),
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&mut focus_state, &MapsWindow::default()),
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenTimeWindow => interface.open_window(&mut focus_state, &TimeWindow::default()),
-
                         #[cfg(feature = "debug")]
                         UserEvent::SetDawn => day_timer = 0.0,
-
                         #[cfg(feature = "debug")]
                         UserEvent::SetNoon => day_timer = std::f32::consts::FRAC_PI_2,
-
                         #[cfg(feature = "debug")]
                         UserEvent::SetDusk => day_timer = std::f32::consts::PI,
-
                         #[cfg(feature = "debug")]
                         UserEvent::SetMidnight => day_timer = -std::f32::consts::FRAC_PI_2,
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(&mut focus_state),
-
                         #[cfg(feature = "debug")]
                         UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::default()),
-
                         #[cfg(feature = "debug_network")]
                         UserEvent::OpenPacketWindow => {
                             interface.open_window(&mut focus_state, &PacketWindow::new(networking_system.packets()))
                         }
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraLookAround(offset) => debug_camera.look_around(offset),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveForward => debug_camera.move_forward(delta_time as f32),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveBackward => debug_camera.move_backward(delta_time as f32),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveLeft => debug_camera.move_left(delta_time as f32),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveRight => debug_camera.move_right(delta_time as f32),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraMoveUp => debug_camera.move_up(delta_time as f32),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraAccelerate => debug_camera.accelerate(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::CameraDecelerate => debug_camera.decelerate(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowFramesPerSecond => render_settings.toggle_show_frames_per_second(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWireframe => {
-
                             render_settings.toggle_show_wireframe();
                             swapchain_holder.invalidate_swapchain();
 
@@ -820,76 +702,52 @@ fn main() {
                             // recreating the swapchain, so we need to render it again
                             interface.schedule_rerender();
                         }
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowObjects => render_settings.toggle_show_objects(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowEntities => render_settings.toggle_show_entities(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWater => render_settings.toggle_show_water(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowAmbientLight => render_settings.toggle_show_ambient_light(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDirectionalLight => render_settings.toggle_show_directional_light(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPointLights => render_settings.toggle_show_point_lights(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowParticleLights => render_settings.toggle_show_particle_lights(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDirectionalShadows => render_settings.toggle_show_directional_shadows(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowObjectMarkers => render_settings.toggle_show_object_markers(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowLightMarkers => render_settings.toggle_show_light_markers(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowSoundMarkers => render_settings.toggle_show_sound_markers(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowEffectMarkers => render_settings.toggle_show_effect_markers(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowParticleMarkers => render_settings.toggle_show_particle_markers(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowEntityMarkers => render_settings.toggle_show_entity_markers(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMapTiles => render_settings.toggle_show_map_tiles(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPathing => render_settings.toggle_show_pathing(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDiffuseBuffer => render_settings.toggle_show_diffuse_buffer(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowNormalBuffer => render_settings.toggle_show_normal_buffer(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWaterBuffer => render_settings.toggle_show_water_buffer(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDepthBuffer => render_settings.toggle_show_depth_buffer(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowShadowBuffer => render_settings.toggle_show_shadow_buffer(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowPickerBuffer => render_settings.toggle_show_picker_buffer(),
-
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowFontAtlas => render_settings.toggle_show_font_atlas(),
                     }
@@ -906,7 +764,6 @@ fn main() {
                     .for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
 
                 if !entities.is_empty() {
-
                     let player_position = entities[0].get_position();
                     player_camera.set_focus_point(player_position);
                     directional_shadow_camera.set_focus_point(player_position);
@@ -918,7 +775,6 @@ fn main() {
                 let (clear_interface, rerender_interface) = interface.update(&mut focus_state, game_timer.get_client_tick());
 
                 if swapchain_holder.is_swapchain_invalid() {
-
                     let viewport = swapchain_holder.recreate_swapchain();
 
                     deferred_renderer.recreate_pipeline(
@@ -951,7 +807,6 @@ fn main() {
                 }
 
                 if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
-
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
@@ -965,7 +820,6 @@ fn main() {
                 if wait_for_previous {
                     for screen_target in &mut screen_targets {
                         if let Some(mut fence) = screen_target.state.try_take_fence() {
-
                             fence.wait(None).unwrap();
                             fence.cleanup_finished();
                         }
@@ -973,7 +827,6 @@ fn main() {
                 }
 
                 if let Some(mut fence) = texture_fence {
-
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
@@ -1007,9 +860,7 @@ fn main() {
                 };
 
                 thread_pool.in_place_scope(|scope| {
-
                     scope.spawn(|_| {
-
                         let picker_target = &mut picker_targets[image_number];
 
                         picker_target.start();
@@ -1037,7 +888,6 @@ fn main() {
                     });
 
                     scope.spawn(|_| {
-
                         let directional_shadow_target = &mut directional_shadow_targets[image_number];
 
                         directional_shadow_target.start();
@@ -1070,7 +920,6 @@ fn main() {
                     });
 
                     scope.spawn(|_| {
-
                         screen_target.start();
 
                         #[debug_condition(render_settings.show_map)]
@@ -1136,7 +985,6 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         if render_settings.show_bounding_boxes {
-
                             map.render_bounding(
                                 screen_target,
                                 &deferred_renderer,
@@ -1155,7 +1003,6 @@ fn main() {
                     });
 
                     if rerender_interface {
-
                         interface_target.start_interface(clear_interface);
 
                         let state_provider = &StateProvider::new(&render_settings, networking_system.get_login_settings());
@@ -1174,7 +1021,6 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_buffers() {
-
                     let picker_target = &mut picker_targets[image_number];
 
                     if let Some(fence) = picker_target.state.try_take_fence() {
@@ -1190,15 +1036,12 @@ fn main() {
                 }
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-
                     let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
                     if let Some(entity) = entity {
-
                         entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
 
                         if let Some(name) = &entity.get_details() {
-
                             let name = name.split('#').next().unwrap();
                             interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.get_mouse_position());
                         }
@@ -1216,7 +1059,6 @@ fn main() {
                 }
 
                 if render_settings.show_interface {
-
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
 
                     let grabbed_item = match input_system.get_mouse_mode() {
@@ -1246,7 +1088,6 @@ fn main() {
 
                 screen_target.finish(swapchain_holder.get_swapchain(), combined_future, image_number);
             }
-
             _ignored => (),
         }
     });

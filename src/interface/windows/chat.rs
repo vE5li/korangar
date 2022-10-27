@@ -7,7 +7,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
-use crate::input::{UserEvent, MouseInputMode};
+use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::{Element, Position, PrototypeWindow, Size, SizeConstraint, StateProvider, Window, WindowCache, *};
 use crate::network::ChatMessage;
 
@@ -17,7 +17,6 @@ pub struct PrototypeChatWindow {
 }
 
 impl PrototypeWindow for PrototypeChatWindow {
-
     fn window_class(&self) -> Option<&str> {
         ChatWindow::WINDOW_CLASS.into()
     }
@@ -28,7 +27,6 @@ impl PrototypeWindow for PrototypeChatWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         Box::from(ChatWindow::new(
             window_cache,
             interface_settings,
@@ -47,7 +45,6 @@ pub struct ChatWindow {
 }
 
 impl ChatWindow {
-
     pub const WINDOW_CLASS: &'static str = "chat";
 
     pub fn new(
@@ -57,13 +54,11 @@ impl ChatWindow {
         messages: Rc<RefCell<Vec<ChatMessage>>>,
         size_constraint: SizeConstraint,
     ) -> Self {
-
         let (cached_position, cached_size) = window_cache.get_window_state(Self::WINDOW_CLASS).unzip();
 
         let size = cached_size
             .map(|size| size_constraint.validated_size(size, avalible_space, *interface_settings.scaling))
             .unwrap_or_else(|| {
-
                 size_constraint
                     .resolve(avalible_space, avalible_space, *interface_settings.scaling)
                     .finalize_or(0.0)
@@ -76,28 +71,23 @@ impl ChatWindow {
         let input_text = Rc::new(RefCell::new(String::new()));
 
         let button_selector = {
-
             let input_text = input_text.clone();
 
             move || !input_text.borrow().is_empty()
         };
 
         let button_action = {
-
             let input_text = input_text.clone();
 
             move || {
-
                 let message: String = input_text.borrow_mut().drain(..).collect();
                 Some(ClickAction::Event(UserEvent::SendMessage(message)))
             }
         };
 
         let input_action = {
-
             let input_text = input_text.clone();
             Box::new(move || {
-
                 let message: String = input_text.borrow_mut().drain(..).collect();
                 message
                     .is_empty()
@@ -122,10 +112,9 @@ impl ChatWindow {
             cell!(ScrollView::new(vec![cell!(Chat::new(messages))], constraint!(100%, ?))),
         ];
 
-        // very imporant: give every element a link to its parent to allow propagation of events such as
-        // scrolling
+        // very imporant: give every element a link to its parent to allow propagation
+        // of events such as scrolling
         elements.iter().for_each(|element| {
-
             let weak_element = Rc::downgrade(element);
             element.borrow_mut().link_back(weak_element, None);
         });
@@ -140,7 +129,6 @@ impl ChatWindow {
 }
 
 impl Window for ChatWindow {
-
     fn get_window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -155,7 +143,6 @@ impl Window for ChatWindow {
         theme: &Theme,
         avalible_space: Size,
     ) -> (Option<&str>, Vector2<f32>, Size) {
-
         let mut placement_resolver = PlacementResolver::new(
             PartialSize::new(self.size.x, self.size.y.into()),
             Vector2::new(0.0, 0.0),
@@ -174,7 +161,6 @@ impl Window for ChatWindow {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         self.elements
             .iter_mut()
             .map(|element| element.borrow_mut().update())
@@ -184,7 +170,6 @@ impl Window for ChatWindow {
     }
 
     fn first_focused_element(&self) -> Option<ElementCell> {
-
         let element_cell = self.elements[0].clone();
         self.elements[0].borrow().focus_next(element_cell, None, Focus::downwards())
     }
@@ -194,7 +179,6 @@ impl Window for ChatWindow {
     }
 
     fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
-
         let absolute_position = mouse_position - self.position;
 
         if absolute_position.x >= 0.0
@@ -202,7 +186,6 @@ impl Window for ChatWindow {
             && absolute_position.x <= self.size.x
             && absolute_position.y <= self.size.y
         {
-
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position, mouse_mode) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
@@ -222,7 +205,6 @@ impl Window for ChatWindow {
     }
 
     fn hovers_area(&self, position: Position, size: Size) -> bool {
-
         let self_combined = self.position + self.size;
         let area_combined = position + size;
 
@@ -233,7 +215,6 @@ impl Window for ChatWindow {
     }
 
     fn offset(&mut self, avalible_space: Size, offset: Position) -> Option<(&str, Position)> {
-
         self.position += offset;
         self.validate_position(avalible_space);
         (Self::WINDOW_CLASS, self.position).into()
@@ -250,14 +231,12 @@ impl Window for ChatWindow {
         avalible_space: Size,
         growth: Size,
     ) -> (Option<&str>, Size) {
-
         self.size += growth;
         self.validate_size(interface_settings, avalible_space);
         (Self::WINDOW_CLASS.into(), self.size)
     }
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {
-
         self.size = self
             .size_constraint
             .validated_size(self.size, avalible_space, *interface_settings.scaling);
@@ -274,7 +253,6 @@ impl Window for ChatWindow {
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
     ) {
-
         let clip_size = Vector4::new(
             self.position.x,
             self.position.y,
@@ -292,7 +270,6 @@ impl Window for ChatWindow {
         );
 
         self.elements.iter().for_each(|element| {
-
             element.borrow().render(
                 render_target,
                 renderer,

@@ -17,9 +17,7 @@ pub struct Expandable {
 }
 
 impl Expandable {
-
     pub fn new(display: String, elements: Vec<ElementCell>, expanded: bool) -> Self {
-
         let state = ContainerState::new(elements);
 
         Self {
@@ -34,7 +32,6 @@ impl Expandable {
 }
 
 impl Element for Expandable {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -61,7 +58,6 @@ impl Element for Expandable {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let closed_size = self
             .closed_size_constraint
             .resolve_partial(
@@ -77,7 +73,6 @@ impl Element for Expandable {
         };
 
         if self.expanded {
-
             let mut inner_placement_resolver = placement_resolver.derive(
                 size,
                 Position::new(0.0, closed_size.y) + *theme.expandable.element_offset * *interface_settings.scaling,
@@ -86,14 +81,12 @@ impl Element for Expandable {
             inner_placement_resolver.set_gaps(*theme.expandable.gaps);
 
             self.state.elements.iter_mut().for_each(|element| {
-
                 element
                     .borrow_mut()
                     .resolve(&mut inner_placement_resolver, interface_settings, theme)
             });
 
             if self.open_size_constraint.height.is_flexible() {
-
                 let final_height = inner_placement_resolver.final_height()
                     + closed_size.y
                     + theme.expandable.element_offset.y * *interface_settings.scaling
@@ -115,7 +108,6 @@ impl Element for Expandable {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         if !self.expanded {
             return None;
         }
@@ -124,7 +116,6 @@ impl Element for Expandable {
     }
 
     fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
-
         let absolute_position = mouse_position - self.state.state.cached_position;
 
         if absolute_position.x >= 0.0
@@ -132,7 +123,6 @@ impl Element for Expandable {
             && absolute_position.x <= self.state.state.cached_size.x
             && absolute_position.y <= self.state.state.cached_size.y
         {
-
             if self.expanded {
                 for element in &self.state.elements {
                     match element.borrow().hovered_element(absolute_position, mouse_mode) {
@@ -152,7 +142,6 @@ impl Element for Expandable {
     }
 
     fn left_click(&mut self, force_update: &mut bool) -> Option<ClickAction> {
-
         self.expanded = !self.expanded;
         *force_update = true;
         None
@@ -172,7 +161,6 @@ impl Element for Expandable {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state
@@ -205,7 +193,6 @@ impl Element for Expandable {
         );
 
         if self.expanded {
-
             self.state.render(
                 &mut renderer,
                 state_provider,

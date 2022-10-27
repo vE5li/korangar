@@ -14,9 +14,7 @@ pub struct InterfaceSettings {
 }
 
 impl Default for InterfaceSettings {
-
     fn default() -> Self {
-
         let scaling = MutableRange::new(1.0, 0.7, 1.7);
         let theme_file = "client/themes/theme.ron".to_string();
         Self { scaling, theme_file }
@@ -24,11 +22,8 @@ impl Default for InterfaceSettings {
 }
 
 impl InterfaceSettings {
-
     pub fn new() -> Self {
-
         Self::load().unwrap_or_else(|| {
-
             #[cfg(feature = "debug")]
             print_debug!("failed to load interface settings from {}filename{}", MAGENTA, NONE);
 
@@ -37,7 +32,6 @@ impl InterfaceSettings {
     }
 
     pub fn load() -> Option<Self> {
-
         #[cfg(feature = "debug")]
         print_debug!("loading interface settings from {}filename{}", MAGENTA, NONE);
 
@@ -47,7 +41,6 @@ impl InterfaceSettings {
     }
 
     pub fn save(&self) {
-
         #[cfg(feature = "debug")]
         print_debug!("saving interface settings to {}filename{}", MAGENTA, NONE);
 
@@ -57,7 +50,6 @@ impl InterfaceSettings {
 }
 
 impl Drop for InterfaceSettings {
-
     fn drop(&mut self) {
         self.save();
     }

@@ -12,9 +12,7 @@ pub struct Chat {
 }
 
 impl Chat {
-
     pub fn new(messages: Rc<RefCell<Vec<ChatMessage>>>) -> Self {
-
         let cached_message_count = messages.borrow().len();
         let state = ElementState::default();
 
@@ -27,7 +25,6 @@ impl Chat {
 }
 
 impl Element for Chat {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -41,7 +38,6 @@ impl Element for Chat {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let mut size_constraint = constraint!(100%, 0);
         size_constraint.height = Dimension::Absolute(self.messages.borrow().len() as f32 * *theme.chat.font_size);
 
@@ -49,11 +45,9 @@ impl Element for Chat {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let messages = self.messages.borrow();
 
         if messages.len() != self.cached_message_count {
-
             self.cached_message_count = messages.len();
             return Some(ChangeEvent::Reresolve); // TODO: reresolve window would be preferred
         }
@@ -75,13 +69,11 @@ impl Element for Chat {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
         for (message_index, message) in self.messages.borrow().iter().enumerate() {
-
             renderer.render_text(
                 &message.text,
                 Vector2::new(0.0, message_index as f32 * *theme.chat.font_size) + Vector2::from_value(0.2),

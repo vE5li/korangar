@@ -8,9 +8,7 @@ pub struct ColorValue {
 }
 
 impl ColorValue {
-
     pub fn new(color: Color) -> Self {
-
         let display = format!("{}, {}, {}, {}", color.red, color.green, color.blue, color.alpha);
         let state = ElementState::default();
 
@@ -19,7 +17,6 @@ impl ColorValue {
 }
 
 impl Element for ColorValue {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -46,7 +43,6 @@ impl Element for ColorValue {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

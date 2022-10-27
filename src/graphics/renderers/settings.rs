@@ -117,9 +117,7 @@ pub struct RenderSettings {
 
 #[cfg(feature = "debug")]
 impl RenderSettings {
-
     pub fn show_buffers(&self) -> bool {
-
         self.show_diffuse_buffer
             || self.show_normal_buffer
             || self.show_water_buffer

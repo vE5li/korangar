@@ -13,9 +13,7 @@ pub struct NativeModelVertex {
 }
 
 impl NativeModelVertex {
-
     fn convert_to_vertex(self) -> ModelVertex {
-
         ModelVertex::new(
             self.position,
             self.normal,
@@ -26,12 +24,10 @@ impl NativeModelVertex {
     }
 
     pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
-
         let mut vertices = Vec::new();
         let mut drain_iterator = native_vertices.drain(..);
 
         while let Some(mut first_partial) = drain_iterator.next() {
-
             let mut second_partial = drain_iterator.next().unwrap();
             let mut third_partial = drain_iterator.next().unwrap();
 
@@ -48,7 +44,6 @@ impl NativeModelVertex {
     }
 
     pub fn calculate_normal(first_position: Vector3<f32>, second_position: Vector3<f32>, third_position: Vector3<f32>) -> Vector3<f32> {
-
         let delta_position_1 = second_position - first_position;
         let delta_position_2 = third_position - first_position;
         delta_position_1.cross(delta_position_2)

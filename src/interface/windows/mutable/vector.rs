@@ -27,21 +27,18 @@ where
     T: Array,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
-
     fn to_window(
         &self,
         window_cache: &WindowCache,
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         const LABELS: [char; 4] = ['x', 'y', 'z', 'w'];
 
         let mut elements = Vec::new();
         let inner_value = unsafe { &*self.inner_pointer };
 
         for index in 0..<T as Array>::len() {
-
             let label = LABELS[index].to_string();
             let pointer = &inner_value[index] as *const T::Element;
 

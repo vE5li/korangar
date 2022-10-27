@@ -27,14 +27,12 @@ pub struct TextureLoader {
 }
 
 impl TextureLoader {
-
     fn load(
         &mut self,
         path: &str,
         game_file_loader: &mut GameFileLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
     ) -> Result<Texture, String> {
-
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}{}{}", MAGENTA, path, NONE));
 
@@ -53,7 +51,6 @@ impl TextureLoader {
             .to_rgba8();
 
         if image_format == ImageFormat::Bmp {
-
             image_buffer
                 .pixels_mut()
                 .filter(|pixel| pixel.0[0] == 255 && pixel.0[1] == 0 && pixel.0[2] == 255)

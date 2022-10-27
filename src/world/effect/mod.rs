@@ -18,7 +18,6 @@ pub struct EffectSource {
 }
 
 impl EffectSource {
-
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.position += offset;
     }

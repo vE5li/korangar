@@ -10,7 +10,6 @@ const CLIFF: u8 = 0b00001000;
 pub struct TileType(u8);
 
 impl TileType {
-
     pub fn new(type_index: u8) -> Self {
         match type_index {
             0 => Self(WALKABLE),
@@ -43,7 +42,6 @@ pub struct Tile {
 }
 
 impl Tile {
-
     pub fn is_walkable(&self) -> bool {
         self.tile_type.is_walkable()
     }

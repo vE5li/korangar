@@ -27,9 +27,7 @@ pub struct Sprite {
 struct EncodedData(pub Vec<u8>);
 
 impl ByteConvertable for EncodedData {
-
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-
         let image_size = length_hint.unwrap();
 
         if image_size == 0 {
@@ -41,12 +39,10 @@ impl ByteConvertable for EncodedData {
         let mut next = 0;
 
         while next < image_size && encoded > 0 {
-
             let byte = byte_stream.next();
             encoded -= 1;
 
             if byte == 0 {
-
                 let length = usize::max(byte_stream.next() as usize, 1);
                 encoded -= 1;
 
@@ -56,7 +52,6 @@ impl ByteConvertable for EncodedData {
 
                 next += length;
             } else {
-
                 data[next] = byte;
                 next += 1;
             }
@@ -71,7 +66,6 @@ impl ByteConvertable for EncodedData {
 }
 
 impl PrototypeElement for EncodedData {
-
     fn to_element(&self, display: String) -> ElementCell {
         self.0.to_element(display)
     }
@@ -106,9 +100,7 @@ struct PaletteColor {
 }
 
 impl PaletteColor {
-
     pub fn color_bytes(&self, index: u8) -> [u8; 4] {
-
         let alpha = match index {
             0 => 0,
             _ => 255,
@@ -147,14 +139,12 @@ pub struct SpriteLoader {
 }
 
 impl SpriteLoader {
-
     fn load(
         &mut self,
         path: &str,
         game_file_loader: &mut GameFileLoader,
         texture_future: &mut Box<dyn GpuFuture + 'static>,
     ) -> Result<Arc<Sprite>, String> {
-
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}{}{}", MAGENTA, path, NONE));
 
@@ -179,7 +169,6 @@ impl SpriteLoader {
             .into_iter();
 
         let palette_images = sprite_data.palette_image_data.into_iter().map(|image_data| {
-
             // decode palette image data if necessary
             let data: Vec<u8> = image_data
                 .encoded_data
@@ -199,7 +188,6 @@ impl SpriteLoader {
         let textures = rgba_images
             .chain(palette_images)
             .map(|image_data| {
-
                 let (image, future) = ImmutableImage::from_iter(
                     image_data.data.iter().cloned(),
                     ImageDimensions::Dim2d {

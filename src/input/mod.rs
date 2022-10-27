@@ -25,7 +25,6 @@ pub struct FocusState {
 }
 
 impl FocusState {
-
     pub fn remove_focus(&mut self) {
         self.focused_element = None;
     }
@@ -41,13 +40,11 @@ impl FocusState {
     }
 
     pub fn get_focused_element(&self) -> Option<(ElementCell, usize)> {
-
         let (element, index) = self.focused_element.clone().unzip();
         element.as_ref().and_then(Weak::upgrade).zip(index)
     }
 
     pub fn did_hovered_element_change(&self, hovered_element: &Option<ElementCell>) -> bool {
-
         self.previous_hovered_element
             .as_ref()
             .zip(hovered_element.as_ref())
@@ -56,7 +53,6 @@ impl FocusState {
     }
 
     pub fn did_focused_element_change(&self) -> bool {
-
         self.previous_focused_element
             .as_ref()
             .zip(self.focused_element.as_ref())
@@ -77,7 +73,6 @@ impl FocusState {
     }
 
     pub fn update(&mut self, hovered_element: &Option<ElementCell>, window_index: Option<usize>) -> Option<ElementCell> {
-
         self.previous_hovered_element = hovered_element.as_ref().map(Rc::downgrade).zip(window_index);
         self.previous_focused_element = self.focused_element.clone();
 
@@ -100,9 +95,7 @@ pub struct InputSystem {
 }
 
 impl InputSystem {
-
     pub fn new() -> Self {
-
         let previous_mouse_position = Vector2::new(0.0, 0.0);
         let new_mouse_position = Vector2::new(0.0, 0.0);
         let mouse_delta = Vector2::new(0.0, 0.0);
@@ -134,7 +127,6 @@ impl InputSystem {
     }
 
     pub fn reset(&mut self) {
-
         self.left_mouse_button.reset();
         self.right_mouse_button.reset();
         self.keys.iter_mut().for_each(|key| key.reset());
@@ -146,7 +138,6 @@ impl InputSystem {
     }
 
     pub fn update_mouse_buttons(&mut self, button: MouseButton, state: ElementState) {
-
         let pressed = matches!(state, ElementState::Pressed);
 
         match button {
@@ -164,7 +155,6 @@ impl InputSystem {
     }
 
     pub fn update_keyboard(&mut self, code: usize, state: ElementState) {
-
         let pressed = matches!(state, ElementState::Pressed);
         self.keys[code].set_down(pressed);
         //println!("code: {}", code);
@@ -175,7 +165,6 @@ impl InputSystem {
     }
 
     pub fn update_delta(&mut self) {
-
         self.mouse_delta = self.new_mouse_position - self.previous_mouse_position;
         self.previous_mouse_position = self.new_mouse_position;
 
@@ -196,7 +185,6 @@ impl InputSystem {
         window_size: Vector2<usize>,
         client_tick: u32,
     ) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
-
         let mut events = Vec::new();
         let mut mouse_target = None;
         let (mut hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
@@ -214,15 +202,12 @@ impl InputSystem {
 
         if shift_down {
             if let Some(window_index) = &mut window_index {
-
                 if self.left_mouse_button.pressed() {
-
                     *window_index = interface.move_window_to_top(*window_index);
                     self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
                 }
 
                 if self.right_mouse_button.pressed() {
-
                     *window_index = interface.move_window_to_top(*window_index);
                     self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
@@ -291,7 +276,6 @@ impl InputSystem {
                     false => self.mouse_input_mode = MouseInputMode::None,
                 }
             } else {
-
                 let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
                 // Needs to rerender because some elements will render differently
                 // based on the mouse input mode.
@@ -328,39 +312,29 @@ impl InputSystem {
         }
 
         match &self.mouse_input_mode {
-
             MouseInputMode::DragElement((element, window_index)) => {
-
                 if self.mouse_delta != Vector2::new(0.0, 0.0) {
                     interface.drag_element(element, *window_index, self.mouse_delta);
                 }
                 interface.set_mouse_cursor_state(MouseCursorState::Grab, client_tick);
             }
-
             MouseInputMode::MoveInterface(identifier) => {
-
                 if self.mouse_delta != Vector2::new(0.0, 0.0) {
                     interface.move_window(*identifier, self.mouse_delta);
                 }
                 interface.set_mouse_cursor_state(MouseCursorState::Grab, client_tick);
             }
-
             MouseInputMode::ResizeInterface(identifier) => {
                 if self.mouse_delta != Vector2::new(0.0, 0.0) {
                     interface.resize_window(*identifier, self.mouse_delta);
                 }
             }
-
             MouseInputMode::RotateCamera => {
-
                 events.push(UserEvent::CameraRotate(self.mouse_delta.x));
                 interface.set_mouse_cursor_state(MouseCursorState::RotateCamera, client_tick);
             }
-
             MouseInputMode::ClickInterface => interface.set_mouse_cursor_state(MouseCursorState::Click, client_tick),
-
             MouseInputMode::None => {}
-
             MouseInputMode::MoveItem(..) | MouseInputMode::MoveSkill(..) => {}
         }
 
@@ -377,7 +351,6 @@ impl InputSystem {
         let characters = self.input_buffer.drain(..);
 
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
-
             // this will currently not affect the following statements, which is a bit
             // strange
             if self.keys[1].pressed() {
@@ -385,7 +358,6 @@ impl InputSystem {
             }
 
             if self.keys[15].pressed() {
-
                 let new_focused_element = focused_element
                     .borrow()
                     .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
@@ -394,7 +366,6 @@ impl InputSystem {
             }
 
             if self.keys[28].pressed() {
-
                 let action = interface.left_click_element(focused_element, *focused_window);
 
                 if let Some(action) = action {
@@ -412,49 +383,35 @@ impl InputSystem {
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
             for character in characters {
                 match character {
-
                     // ignore since we need to handle tab knowing the state of shift
                     '\t' => {}
-
                     '\x1b' => {}
-
                     valid => {
                         if let Some(action) = interface.input_character_element(focused_element, *focused_window, valid) {
                             match action {
-
                                 // is handled in the interface
                                 ClickAction::ChangeEvent(..) => {}
-
                                 ClickAction::FocusElement => {
-
                                     let element_cell = focused_element.clone();
                                     let new_focused_element = focused_element.borrow().focus_next(element_cell, None, Focus::downwards());
 
                                     focus_state.set_focused_element(new_focused_element, *focused_window);
                                 }
-
                                 ClickAction::FocusNext(focus_mode) => {
-
                                     let element_cell = focused_element.clone();
                                     let new_focused_element =
                                         focused_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
 
                                     focus_state.update_focused_element(new_focused_element, *focused_window);
                                 }
-
                                 ClickAction::Event(event) => events.push(event),
-
                                 ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
-
                                 ClickAction::DragElement => {
                                     self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
                                 }
-
                                 // TODO: should just move immediately ?
                                 ClickAction::MoveItem(..) => {}
-
                                 ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
-
                                 ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
                             }
                         }
@@ -462,7 +419,6 @@ impl InputSystem {
                 }
             }
         } else {
-
             if self.keys[15].pressed() {
                 interface.first_focused_element(focus_state);
             }
@@ -507,7 +463,6 @@ impl InputSystem {
 
             #[cfg(feature = "debug")]
             if self.keys[33].pressed() {
-
                 events.push(UserEvent::ToggleUseDebugCamera);
                 events.push(UserEvent::CameraDecelerate);
             }
@@ -548,7 +503,6 @@ impl InputSystem {
         }
 
         if window_index.is_none() && self.mouse_input_mode.is_none() {
-
             if let Some(fence) = picker_target.state.try_take_fence() {
                 fence.wait(None).unwrap();
             }
@@ -557,20 +511,15 @@ impl InputSystem {
             let lock = picker_target.buffer.read().unwrap();
 
             if sample_index < lock.len() {
-
                 let pixel = lock[sample_index];
 
                 if pixel != 0 {
-
                     let picker_target = PickerTarget::from(pixel);
 
                     if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
                         match picker_target {
-
                             PickerTarget::Tile(x, y) => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
-
                             PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
-
                             #[cfg(feature = "debug")]
                             PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
                         }
@@ -589,7 +538,6 @@ impl InputSystem {
         }
 
         if focus_state.did_hovered_element_change(&hovered_element) {
-
             if let Some(window_index) = focus_state.previous_hovered_window() {
                 interface.schedule_rerender_window(window_index);
             }
@@ -600,7 +548,6 @@ impl InputSystem {
         }
 
         if focus_state.did_focused_element_change() {
-
             if let Some(window_index) = focus_state.previous_focused_window() {
                 interface.schedule_rerender_window(window_index);
             }

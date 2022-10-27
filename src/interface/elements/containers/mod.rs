@@ -1,9 +1,9 @@
 mod character;
 mod default;
 mod dialog;
+mod equipment;
 mod expandable;
 mod inventory;
-mod equipment;
 #[cfg(feature = "debug_network")]
 mod packet;
 mod scroll;
@@ -18,9 +18,9 @@ use derive_new::new;
 pub use self::character::CharacterPreview;
 pub use self::default::Container;
 pub use self::dialog::{DialogContainer, DialogElement};
+pub use self::equipment::EquipmentContainer;
 pub use self::expandable::Expandable;
 pub use self::inventory::InventoryContainer;
-pub use self::equipment::EquipmentContainer;
 #[cfg(feature = "debug_network")]
 pub use self::packet::{PacketEntry, PacketView};
 pub use self::scroll::ScrollView;
@@ -37,12 +37,9 @@ pub struct ContainerState {
 }
 
 impl ContainerState {
-
     pub fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
-
         self.state.link_back(weak_parent);
         self.elements.iter().for_each(|element| {
-
             let weak_element = Rc::downgrade(element);
             element.borrow_mut().link_back(weak_element, Some(weak_self.clone()));
         });
@@ -56,22 +53,19 @@ impl ContainerState {
         size_constraint: &SizeConstraint,
         border: Vector2<f32>,
     ) {
-
         let (mut size, position) = placement_resolver.allocate(size_constraint);
         let mut inner_placement_resolver = placement_resolver.derive(size, Position::zero(), border);
 
-        // TODO: add ability to pass this in (by calling .with_gaps(..) on the container)
-        //inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
+        // TODO: add ability to pass this in (by calling .with_gaps(..) on the
+        // container) inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
 
         self.elements.iter_mut().for_each(|element| {
-
             element
                 .borrow_mut()
                 .resolve(&mut inner_placement_resolver, interface_settings, theme)
         });
 
         if size_constraint.height.is_flexible() {
-
             let final_height = inner_placement_resolver.final_height();
             let final_height = size_constraint.validated_height(
                 final_height,
@@ -88,7 +82,6 @@ impl ContainerState {
     }
 
     fn get_next_element(&self, start_index: usize, focus_mode: FocusMode, wrapped_around: &mut bool) -> Option<ElementCell> {
-
         if self.elements.is_empty() {
             return None;
         }
@@ -97,12 +90,10 @@ impl ContainerState {
         let mut index = start_index;
 
         loop {
-
             let element = self.elements[index].borrow();
 
             // TODO: add focus up, down etc
             if element.is_focusable() {
-
                 *wrapped_around |= match focus_mode {
                     FocusMode::FocusNext => index < start_index,
                     FocusMode::FocusPrevious => index > start_index,
@@ -133,13 +124,9 @@ impl ContainerState {
         caller_cell: Option<ElementCell>,
         focus: Focus,
     ) -> Option<ElementCell> {
-
         if focus.downwards {
-
             if SELF_FOCUS {
-
                 if focus.mode == FocusMode::FocusPrevious {
-
                     let element = self
                         .get_next_element(self.elements.len().saturating_sub(1), focus.mode, &mut false)
                         .and_then(|element| element.borrow().focus_next(element.clone(), Some(self_cell.clone()), focus));
@@ -164,7 +151,6 @@ impl ContainerState {
         }
 
         if let Some(caller_cell) = caller_cell {
-
             // find focused element
             let position = self
                 .elements
@@ -172,7 +158,6 @@ impl ContainerState {
                 .position(|element| element.borrow().is_element_self(Some(&*caller_cell.borrow())));
 
             if let Some(position) = position {
-
                 let offset_position = match focus.mode {
                     FocusMode::FocusNext => position.add(1) % self.elements.len(),
                     FocusMode::FocusPrevious => position.wrapping_sub(1).min(self.elements.len() - 1),
@@ -187,22 +172,18 @@ impl ContainerState {
                 let cached_index = self.focus_cache.get();
 
                 if wrapped_around {
-
                     if focus.mode == FocusMode::FocusPrevious && SELF_FOCUS {
-
                         self.focus_cache.take();
                         return Some(self_cell);
                     }
 
                     if let Some(parent_element) = &self.state.parent_element {
-
                         let parent_element = parent_element.upgrade().unwrap();
                         let next_element = parent_element
                             .borrow()
                             .focus_next(parent_element.clone(), Some(self_cell.clone()), focus);
 
                         if next_element.is_some() {
-
                             // important to clear here since this element might be used as a fallback if the
                             // next sibling is removed.
                             self.focus_cache.take();
@@ -230,7 +211,6 @@ impl ContainerState {
         let focusable_element = self
             .get_next_element(start_index, focus.mode, &mut wrapped_around)
             .and_then(|element| {
-
                 element
                     .borrow()
                     .focus_next(element.clone(), Some(self_cell.clone()), focus.to_downwards())
@@ -260,7 +240,6 @@ impl ContainerState {
     }
 
     fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
-
         if let Some(index) = self.focus_cache.get() && !self.elements.is_empty() {
 
             let focused_element = self.elements[0..index.add(1).min(self.elements.len())].iter().rev().find_map(|element| element.borrow().restore_focus(element.clone()));
@@ -275,7 +254,6 @@ impl ContainerState {
     }
 
     pub fn update(&mut self) -> Option<ChangeEvent> {
-
         self.elements
             .iter_mut()
             .map(|element| element.borrow_mut().update())
@@ -285,7 +263,6 @@ impl ContainerState {
     }
 
     pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode, hoverable: bool) -> HoverInformation {
-
         let absolute_position = mouse_position - self.state.cached_position;
 
         if absolute_position.x >= 0.0
@@ -293,7 +270,6 @@ impl ContainerState {
             && absolute_position.x <= self.state.cached_size.x
             && absolute_position.y <= self.state.cached_size.y
         {
-
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position, mouse_mode) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
@@ -321,9 +297,7 @@ impl ContainerState {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         self.elements.iter().for_each(|element| {
-
             renderer.render_element(
                 &*element.borrow(),
                 state_provider,

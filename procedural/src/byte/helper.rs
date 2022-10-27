@@ -5,14 +5,11 @@ use syn::FieldsNamed;
 use crate::utils::*;
 
 fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
-
     let mut new_stream = TokenStream::new();
     let mut iterator = token_stream.into_iter();
 
     while let Some(token) = iterator.next() {
-
         if let TokenTree::Group(group) = &token {
-
             let delimiter = group.delimiter();
             let new_group_stream = remove_self_from_stream(group.stream());
             let new_group = Group::new(delimiter, new_group_stream);
@@ -22,7 +19,6 @@ fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
 
         if let TokenTree::Ident(ident) = &token {
             if &ident.to_string() == "self" {
-
                 // remove the '.' after self
                 iterator.next().expect("expected a token after self");
                 continue;
@@ -36,13 +32,11 @@ fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
 }
 
 pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>) {
-
     let mut from_bytes_implementations = vec![];
     let mut implemented_fields = vec![];
     let mut to_bytes_implementations = vec![];
 
     for mut field in named_fields.named {
-
         let field_name = field.ident.unwrap();
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
@@ -84,9 +78,9 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
             None => from_implementation,
         };
 
-        // wrap the potentially looped implementation in an option if it has a version restriction
+        // wrap the potentially looped implementation in an option if it has a version
+        // restriction
         let from_implementation = match version_function {
-
             Some(function) => {
                 quote! {
                     let #field_name = match byte_stream.get_version().#function {
@@ -95,7 +89,6 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
                     };
                 }
             }
-
             None => quote!(let #field_name = #from_implementation;),
         };
 

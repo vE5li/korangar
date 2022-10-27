@@ -7,7 +7,6 @@ pub enum ResourceType {
 }
 
 impl ResourceType {
-
     pub fn from(index: i32) -> Self {
         match index {
             1 => ResourceType::Object,

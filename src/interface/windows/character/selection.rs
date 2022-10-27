@@ -12,12 +12,10 @@ pub struct CharacterSelectionWindow {
 }
 
 impl CharacterSelectionWindow {
-
     pub const WINDOW_CLASS: &'static str = "character_selection";
 }
 
 impl PrototypeWindow for CharacterSelectionWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -28,11 +26,9 @@ impl PrototypeWindow for CharacterSelectionWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = (0..self.slot_count)
             .into_iter()
             .map(|slot| {
-
                 cell!(CharacterPreview::new(
                     self.characters.new_remote(),
                     self.move_request.new_remote(),

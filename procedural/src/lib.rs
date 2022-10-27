@@ -29,7 +29,6 @@ pub fn constraint(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
 
 #[proc_macro_attribute]
 pub fn debug_condition(condition: InterfaceTokenStream, conditional: InterfaceTokenStream) -> InterfaceTokenStream {
-
     let condition = TokenStream::from(condition);
     let conditional = TokenStream::from(conditional);
 
@@ -49,7 +48,6 @@ pub fn debug_condition(condition: InterfaceTokenStream, conditional: InterfaceTo
 
 #[proc_macro_derive(toggle, attributes(toggle))]
 pub fn derive_toggle(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-
     let DeriveInput { ident, generics, data, .. } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
@@ -72,7 +70,6 @@ pub fn derive_toggle(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
     )
 )]
 pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-
     let DeriveInput {
         ident,
         attrs,
@@ -88,10 +85,10 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
     }
 }
 
-/// Derive the Packet trait. A packet header must be specified and all fields must implement ByteConvertable.
+/// Derive the Packet trait. A packet header must be specified and all fields
+/// must implement ByteConvertable.
 #[proc_macro_derive(Packet, attributes(header, ping, length_hint, repeating))]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-
     let DeriveInput {
         ident,
         generics,
@@ -109,7 +106,6 @@ pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
 
 #[proc_macro_derive(PrototypeElement, attributes(name, hidden_element, event_button))]
 pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-
     let DeriveInput {
         ident,
         attrs,
@@ -127,7 +123,6 @@ pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> Interface
 
 #[proc_macro_derive(PrototypeWindow, attributes(name, hidden_element, event_button, window_title, window_class))]
 pub fn derive_prototype_window(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-
     let DeriveInput {
         ident,
         attrs,

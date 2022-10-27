@@ -9,12 +9,10 @@ pub struct InventoryWindow {
 }
 
 impl InventoryWindow {
-
     pub const WINDOW_CLASS: &'static str = "invetory";
 }
 
 impl PrototypeWindow for InventoryWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -25,7 +23,6 @@ impl PrototypeWindow for InventoryWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements = vec![InventoryContainer::new(self.items.new_remote()).wrap()];
 
         Box::from(FramedWindow::new(

@@ -28,9 +28,7 @@ pub struct ByteStream<'b> {
 }
 
 impl<'b> ByteStream<'b> {
-
     pub fn next(&mut self) -> u8 {
-
         assert!(self.offset < self.data.len(), "byte stream is shorter than expected");
         let byte = self.data[self.offset];
         self.offset += 1;
@@ -38,7 +36,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn peek(&self, index: usize) -> u8 {
-
         assert!(self.offset + index < self.data.len(), "byte stream is shorter than expected");
         self.data[self.offset + index]
     }
@@ -56,7 +53,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn match_signature(&mut self, signature: [u8; 2]) -> bool {
-
         if self.data.len() - self.offset < 2 {
             return false;
         }
@@ -71,7 +67,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn version(&mut self) -> Version {
-
         let major = self.next();
         let minor = self.next();
 
@@ -83,7 +78,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn integer16(&mut self) -> i16 {
-
         let mut value = 0;
 
         value |= self.next() as i16;
@@ -93,7 +87,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn integer32(&mut self) -> i32 {
-
         let mut value = 0;
 
         value |= self.next() as i32;
@@ -105,15 +98,12 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn string(&mut self, count: usize) -> String {
-
         let mut value = String::new();
 
         for index in 0..count {
-
             let byte = self.next();
 
             if byte == 0 {
-
                 self.skip(count - index - 1);
                 break;
             }
@@ -125,7 +115,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn float32(&mut self) -> f32 {
-
         let first = self.next();
         let second = self.next();
         let third = self.next();
@@ -135,7 +124,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn vector3(&mut self) -> Vector3<f32> {
-
         let x = self.float32();
         let y = self.float32();
         let z = self.float32();
@@ -144,7 +132,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn vector3_flipped(&mut self) -> Vector3<f32> {
-
         let x = self.float32();
         let y = self.float32();
         let z = self.float32();
@@ -153,7 +140,6 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn color(&mut self) -> Color {
-
         let red = self.float32();
         let green = self.float32();
         let blue = self.float32();
@@ -162,11 +148,9 @@ impl<'b> ByteStream<'b> {
     }
 
     pub fn slice(&mut self, count: usize) -> Vec<u8> {
-
         let mut value = Vec::new();
 
         for _index in 0..count {
-
             let byte = self.next();
             value.push(byte);
         }
@@ -200,7 +184,6 @@ impl<'b> ByteStream<'b> {
 
     #[cfg(feature = "debug")]
     pub fn assert_empty(&self, file_name: &str) {
-
         let remaining = self.data.len() - self.offset;
 
         if remaining != 0 {

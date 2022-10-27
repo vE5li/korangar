@@ -16,7 +16,6 @@ pub struct FramedWindow {
 }
 
 impl FramedWindow {
-
     pub fn new(
         window_cache: &WindowCache,
         interface_settings: &InterfaceSettings,
@@ -27,7 +26,6 @@ impl FramedWindow {
         size_constraint: SizeConstraint,
         closeable: bool,
     ) -> Self {
-
         if closeable {
             let close_button = cell!(CloseButton::default());
             elements.insert(0, close_button);
@@ -43,10 +41,9 @@ impl FramedWindow {
 
         let elements = vec![Container::new(elements).wrap()];
 
-        // very imporant: give every element a link to its parent to allow propagation of events such as
-        // scrolling
+        // very imporant: give every element a link to its parent to allow propagation
+        // of events such as scrolling
         elements.iter().for_each(|element| {
-
             let weak_element = Rc::downgrade(element);
             element.borrow_mut().link_back(weak_element, None);
         });
@@ -59,7 +56,6 @@ impl FramedWindow {
         let size = cached_size
             .map(|size| size_constraint.validated_size(size, avalible_space, *interface_settings.scaling))
             .unwrap_or_else(|| {
-
                 size_constraint
                     .resolve(avalible_space, avalible_space, *interface_settings.scaling)
                     .finalize_or(0.0)
@@ -80,7 +76,6 @@ impl FramedWindow {
 }
 
 impl Window for FramedWindow {
-
     fn get_window_class(&self) -> Option<&str> {
         self.window_class.as_deref()
     }
@@ -95,7 +90,6 @@ impl Window for FramedWindow {
         theme: &Theme,
         avalible_space: Size,
     ) -> (Option<&str>, Vector2<f32>, Size) {
-
         let height = match self.size_constraint.height.is_flexible() {
             true => None,
             false => Some(self.size.y),
@@ -114,7 +108,6 @@ impl Window for FramedWindow {
             .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
 
         if self.size_constraint.height.is_flexible() {
-
             let final_height = theme.window.border_size.y + placement_resolver.final_height();
             let final_height = self.size_constraint.validated_height(
                 final_height,
@@ -132,7 +125,6 @@ impl Window for FramedWindow {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         self.elements
             .iter_mut()
             .map(|element| element.borrow_mut().update())
@@ -142,7 +134,6 @@ impl Window for FramedWindow {
     }
 
     fn first_focused_element(&self) -> Option<ElementCell> {
-
         let element_cell = self.elements[0].clone();
         self.elements[0].borrow().focus_next(element_cell, None, Focus::downwards())
     }
@@ -152,7 +143,6 @@ impl Window for FramedWindow {
     }
 
     fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
-
         let absolute_position = mouse_position - self.position;
 
         if absolute_position.x >= 0.0
@@ -160,7 +150,6 @@ impl Window for FramedWindow {
             && absolute_position.x <= self.size.x
             && absolute_position.y <= self.size.y
         {
-
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position, mouse_mode) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
@@ -180,7 +169,6 @@ impl Window for FramedWindow {
     }
 
     fn hovers_area(&self, position: Position, size: Size) -> bool {
-
         let self_combined = self.position + self.size;
         let area_combined = position + size;
 
@@ -191,7 +179,6 @@ impl Window for FramedWindow {
     }
 
     fn offset(&mut self, avalible_space: Size, offset: Position) -> Option<(&str, Position)> {
-
         self.position += offset;
         self.validate_position(avalible_space);
         self.window_class
@@ -210,14 +197,12 @@ impl Window for FramedWindow {
         avalible_space: Size,
         growth: Size,
     ) -> (Option<&str>, Size) {
-
         self.size += growth;
         self.validate_size(interface_settings, avalible_space);
         (self.window_class.as_deref(), self.size)
     }
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {
-
         self.size = self
             .size_constraint
             .validated_size(self.size, avalible_space, *interface_settings.scaling);
@@ -234,7 +219,6 @@ impl Window for FramedWindow {
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
     ) {
-
         let clip_size = Vector4::new(
             self.position.x,
             self.position.y,
@@ -251,7 +235,6 @@ impl Window for FramedWindow {
             *theme.window.background_color,
         );
         self.elements.iter().for_each(|element| {
-
             element.borrow().render(
                 render_target,
                 renderer,

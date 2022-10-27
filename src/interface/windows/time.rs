@@ -7,12 +7,10 @@ use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWi
 pub struct TimeWindow {}
 
 impl TimeWindow {
-
     pub const WINDOW_CLASS: &'static str = "time";
 }
 
 impl PrototypeWindow for TimeWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -23,7 +21,6 @@ impl PrototypeWindow for TimeWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = vec![
             Button::default().with_static_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
             Button::default().with_static_text("set noon").with_event(UserEvent::SetNoon).wrap(),

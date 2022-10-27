@@ -6,9 +6,7 @@ pub struct SmoothedValue {
 }
 
 impl SmoothedValue {
-
     pub fn new(value: f32, threshhold: f32, speed: f32) -> Self {
-
         let current = value;
         let desired = value;
         Self {
@@ -21,11 +19,9 @@ impl SmoothedValue {
 
     pub fn update(&mut self, delta_time: f64) {
         if self.desired >= self.current + self.threshhold {
-
             let new_current = self.current + ((self.desired - self.current) * self.speed * delta_time as f32);
             self.current = self.desired.min(new_current);
         } else if self.desired <= self.current - self.threshhold {
-
             let new_current = self.current - ((self.current - self.desired) * self.speed * delta_time as f32);
             self.current = self.desired.max(new_current);
         }

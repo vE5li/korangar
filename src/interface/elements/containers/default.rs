@@ -14,9 +14,7 @@ pub struct Container {
 }
 
 impl Container {
-
     pub fn new(elements: Vec<ElementCell>) -> Self {
-
         Self {
             state: ContainerState::new(elements),
             border_size: None,
@@ -36,7 +34,6 @@ impl Container {
 }
 
 impl Element for Container {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -62,7 +59,6 @@ impl Element for Container {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = self.size_constraint.as_ref().unwrap_or(&constraint!(100%, ?));
         let border = self.border_size.unwrap_or_else(Vector2::zero);
 
@@ -92,7 +88,6 @@ impl Element for Container {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

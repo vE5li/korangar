@@ -41,9 +41,7 @@ pub struct TileRenderer {
 }
 
 impl TileRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -68,7 +66,6 @@ impl TileRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<TileVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -82,7 +79,6 @@ impl TileRenderer {
     }
 
     pub fn render(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 

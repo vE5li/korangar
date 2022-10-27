@@ -17,11 +17,8 @@ pub struct WindowCache {
 }
 
 impl WindowCache {
-
     pub fn new() -> Self {
-
         Self::load().unwrap_or_else(|| {
-
             #[cfg(feature = "debug")]
             print_debug!(
                 "failed to load window cache from {}filename{}. creating empty cache",
@@ -34,7 +31,6 @@ impl WindowCache {
     }
 
     pub fn load() -> Option<Self> {
-
         #[cfg(feature = "debug")]
         print_debug!("loading window cache from {}filename{}", MAGENTA, NONE);
 
@@ -45,7 +41,6 @@ impl WindowCache {
     }
 
     pub fn save(&self) {
-
         #[cfg(feature = "debug")]
         print_debug!("saving window cache to {}filename{}", MAGENTA, NONE);
 
@@ -55,11 +50,9 @@ impl WindowCache {
 
     pub fn register_window(&mut self, identifier: &str, position: Position, size: Size) {
         if let Some(entry) = self.entries.get_mut(identifier) {
-
             entry.position = position;
             entry.size = size;
         } else {
-
             let entry = WindowState::new(position, size);
             self.entries.insert(identifier.to_string(), entry);
         }
@@ -83,7 +76,6 @@ impl WindowCache {
 }
 
 impl Drop for WindowCache {
-
     fn drop(&mut self) {
         self.save();
     }

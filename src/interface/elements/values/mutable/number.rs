@@ -20,9 +20,7 @@ pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + D
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> MutableNumberValue<T> {
-
     pub fn new(name: String, inner_pointer: *const T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
-
         let cached_inner = unsafe { *inner_pointer };
         let cached_values = format!("{:.1}", cached_inner);
         let state = ElementState::default();
@@ -41,7 +39,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Mutable
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element for MutableNumberValue<T> {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -55,11 +52,9 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let current_value = unsafe { *self.inner_pointer };
 
         if self.cached_inner != current_value {
-
             self.cached_inner = current_value;
             self.cached_values = format!("{:.1}", self.cached_inner);
             return Some(ChangeEvent::RerenderWindow);
@@ -76,7 +71,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-
         Some(ClickAction::OpenWindow(Box::new(NumberWindow::new(
             self.name.clone(),
             self.inner_pointer,
@@ -100,7 +94,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

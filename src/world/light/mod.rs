@@ -15,7 +15,6 @@ pub struct LightSource {
 }
 
 impl LightSource {
-
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.position += offset;
     }

@@ -16,7 +16,6 @@ pub struct Object {
 }
 
 impl Object {
-
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.transform.position += offset;
     }

@@ -45,9 +45,7 @@ pub struct SpriteRenderer {
 }
 
 impl SpriteRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -96,7 +94,6 @@ impl SpriteRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -121,7 +118,6 @@ impl SpriteRenderer {
         color: Color,
         smooth: bool,
     ) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -163,7 +159,6 @@ impl SpriteRenderer {
         color: Color,
         smooth: bool,
     ) {
-
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
         let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
@@ -194,7 +189,6 @@ impl SpriteRenderer {
         cell_index: usize,
         smooth: bool,
     ) {
-
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
         let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);

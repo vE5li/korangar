@@ -19,7 +19,6 @@ pub struct GameTimer {
 }
 
 impl GameTimer {
-
     pub fn set_client_tick(&mut self, client_tick: u32) {
         self.client_tick = client_tick;
     }
@@ -29,7 +28,6 @@ impl GameTimer {
     }
 
     pub fn update(&mut self) -> f64 {
-
         let new_elapsed = self.global_timer.elapsed().as_secs_f64();
         let delta_time = new_elapsed - self.previous_elapsed;
 
@@ -38,7 +36,6 @@ impl GameTimer {
         self.previous_elapsed = new_elapsed;
 
         if self.accumulate_second > 1.0 {
-
             self.frames_per_second = self.frame_counter;
             self.accumulate_second -= 1.0;
             self.frame_counter = 0;

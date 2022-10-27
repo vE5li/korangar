@@ -29,7 +29,6 @@ pub enum ResourceState<T> {
 }
 
 impl<T> ResourceState<T> {
-
     pub fn as_option(&self) -> Option<&T> {
         match self {
             ResourceState::Avalible(value) => Some(value),
@@ -81,7 +80,6 @@ pub struct Common {
 }
 
 impl Common {
-
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
@@ -92,7 +90,6 @@ impl Common {
         entity_data: EntityData,
         client_tick: u32,
     ) -> Self {
-
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
         let grid_position = entity_data.position;
@@ -148,7 +145,6 @@ impl Common {
     }
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: u32) {
-
         self.grid_position = position;
         self.position = map.get_world_position(position);
         self.active_movement = None;
@@ -156,17 +152,13 @@ impl Common {
     }
 
     pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: u32) {
-
         if let Some(active_movement) = self.active_movement.take() {
-
             let last_step = active_movement.steps.last().unwrap();
 
             if client_tick > last_step.1 {
-
                 let position = Vector2::new(last_step.0.x, last_step.0.y);
                 self.set_position(map, position, client_tick);
             } else {
-
                 let mut last_step_index = 0;
                 while active_movement.steps[last_step_index + 1].1 < client_tick {
                     last_step_index += 1;
@@ -208,16 +200,13 @@ impl Common {
     }
 
     pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
-
         use pathfinding::prelude::bfs;
 
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         struct Pos(usize, usize);
 
         impl Pos {
-
             fn successors(&self, map: &Map) -> Vec<Pos> {
-
                 let &Pos(x, y) = self;
                 let mut successors = Vec::new();
 
@@ -285,12 +274,10 @@ impl Common {
         let result = bfs(&Pos(from.x, from.y), |p| p.successors(map), |p| *p == Pos(to.x, to.y));
 
         if let Some(path) = result {
-
             let steps: Vec<(Vector2<usize>, u32)> = path
                 .into_iter()
                 .enumerate()
                 .map(|(index, pos)| {
-
                     let arrival_timestamp = starting_timestamp + index as u32 * self.movement_speed as u32;
                     (pos.convert_to_vector(), arrival_timestamp)
                 })
@@ -307,9 +294,7 @@ impl Common {
         step: Vector2<usize>,
         index: usize,
     ) -> ([Vector2<f32>; 4], i32) {
-
         if steps.len() - 1 == index {
-
             return (
                 [
                     Vector2::new(0.0, 1.0),
@@ -324,7 +309,6 @@ impl Common {
         let delta = steps[index + 1].0.map(|component| component as isize) - step.map(|component| component as isize);
 
         match delta {
-
             Vector2 { x: 1, y: 0 } => (
                 [
                     Vector2::new(0.0, 0.0),
@@ -334,7 +318,6 @@ impl Common {
                 ],
                 1,
             ),
-
             Vector2 { x: -1, y: 0 } => (
                 [
                     Vector2::new(1.0, 0.0),
@@ -344,7 +327,6 @@ impl Common {
                 ],
                 1,
             ),
-
             Vector2 { x: 0, y: 1 } => (
                 [
                     Vector2::new(0.0, 0.0),
@@ -354,7 +336,6 @@ impl Common {
                 ],
                 1,
             ),
-
             Vector2 { x: 0, y: -1 } => (
                 [
                     Vector2::new(1.0, 0.0),
@@ -364,7 +345,6 @@ impl Common {
                 ],
                 1,
             ),
-
             Vector2 { x: 1, y: 1 } => (
                 [
                     Vector2::new(0.0, 1.0),
@@ -374,7 +354,6 @@ impl Common {
                 ],
                 2,
             ),
-
             Vector2 { x: -1, y: 1 } => (
                 [
                     Vector2::new(0.0, 0.0),
@@ -384,7 +363,6 @@ impl Common {
                 ],
                 2,
             ),
-
             Vector2 { x: 1, y: -1 } => (
                 [
                     Vector2::new(1.0, 1.0),
@@ -394,7 +372,6 @@ impl Common {
                 ],
                 2,
             ),
-
             Vector2 { x: -1, y: -1 } => (
                 [
                     Vector2::new(1.0, 0.0),
@@ -404,19 +381,16 @@ impl Common {
                 ],
                 2,
             ),
-
             _other => panic!("incorrent pathing"),
         }
     }
 
     #[cfg(feature = "debug")]
     pub fn generate_steps_vertex_buffer(&mut self, device: Arc<Device>, map: &Map) {
-
         let mut native_steps_vertices = Vec::new();
         let mut active_movement = self.active_movement.as_mut().unwrap();
 
         for (index, (step, _)) in active_movement.steps.iter().cloned().enumerate() {
-
             let tile = map.get_tile(step);
             let offset = Vector2::new(step.x as f32 * 5.0, step.y as f32 * 5.0);
 
@@ -484,13 +458,13 @@ impl Common {
     where
         T: Renderer + EntityRenderer,
     {
-
         let camera_direction = camera.get_camera_direction();
         let (texture, position, mirror) = self
             .actions
             .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
 
-        //let texture_height = (texture.image().dimensions().height() as f32 / 10.0) * 0.2;
+        //let texture_height = (texture.image().dimensions().height() as f32 / 10.0) *
+        // 0.2;
 
         renderer.render_entity(
             render_target,
@@ -531,7 +505,6 @@ pub struct Player {
 }
 
 impl Player {
-
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
@@ -543,7 +516,6 @@ impl Player {
         player_position: Vector2<usize>,
         client_tick: u32,
     ) -> Self {
-
         let spell_points = character_information.spell_points as usize;
         let activity_points = 0;
         let maximum_spell_points = character_information.maximum_spell_points as usize;
@@ -595,7 +567,6 @@ impl Player {
         camera: &dyn Camera,
         window_size: Vector2<f32>,
     ) {
-
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
         let screen_position = Vector2::new(
@@ -635,7 +606,6 @@ pub struct Npc {
 }
 
 impl Npc {
-
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
@@ -646,7 +616,6 @@ impl Npc {
         entity_data: EntityData,
         client_tick: u32,
     ) -> Self {
-
         let common = Common::new(
             game_file_loader,
             sprite_loader,
@@ -676,7 +645,6 @@ impl Npc {
         camera: &dyn Camera,
         window_size: Vector2<f32>,
     ) {
-
         if self.common.entity_type != EntityType::Monster {
             return;
         }
@@ -708,7 +676,6 @@ pub enum Entity {
 }
 
 impl Entity {
-
     fn get_common(&self) -> &Common {
         match self {
             Self::Player(player) => player.get_common(),
@@ -767,7 +734,6 @@ impl Entity {
     }
 
     pub fn update_health(&mut self, health_points: usize, maximum_health_points: usize) {
-
         let common = self.get_common_mut();
         common.health_points = health_points;
         common.maximum_health_points = maximum_health_points;
@@ -823,7 +789,6 @@ impl Entity {
 }
 
 impl PrototypeWindow for Entity {
-
     fn to_window(
         &self,
         window_cache: &WindowCache,

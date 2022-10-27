@@ -8,12 +8,10 @@ use crate::interface::*;
 pub struct CharacterOverviewWindow {}
 
 impl CharacterOverviewWindow {
-
     pub const WINDOW_CLASS: &'static str = "character_overview";
 }
 
 impl PrototypeWindow for CharacterOverviewWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -24,7 +22,6 @@ impl PrototypeWindow for CharacterOverviewWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements = vec![
             /*Text::default()
                 .with_dynamic_text(|| format!("base level: {}", player.get_base_level()))

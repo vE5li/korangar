@@ -15,9 +15,7 @@ pub struct ScrollView {
 }
 
 impl ScrollView {
-
     pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
-
         let scroll = 0.0;
         let state = ContainerState::new(elements);
 
@@ -30,7 +28,6 @@ impl ScrollView {
 }
 
 impl Element for ScrollView {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -56,7 +53,6 @@ impl Element for ScrollView {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         self.state.resolve(
             placement_resolver,
             interface_settings,
@@ -71,11 +67,14 @@ impl Element for ScrollView {
     }
 
     fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
-        self.state.hovered_element(mouse_position + Vector2::new(0.0, self.scroll), mouse_mode, mouse_mode.is_none())
+        self.state.hovered_element(
+            mouse_position + Vector2::new(0.0, self.scroll),
+            mouse_mode,
+            mouse_mode.is_none(),
+        )
     }
 
     fn scroll(&mut self, delta: f32) -> Option<ChangeEvent> {
-
         self.scroll -= delta * SCROLL_SPEED;
         self.scroll = self.scroll.max(0.0);
         Some(ChangeEvent::RerenderWindow)
@@ -95,7 +94,6 @@ impl Element for ScrollView {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

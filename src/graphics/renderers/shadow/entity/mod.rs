@@ -43,9 +43,7 @@ pub struct EntityRenderer {
 }
 
 impl EntityRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, &vertex_shader, &fragment_shader);
@@ -118,7 +116,6 @@ impl EntityRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -132,7 +129,6 @@ impl EntityRenderer {
     }
 
     pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -179,7 +175,6 @@ impl EntityRenderer {
         cell_position: Vector2<usize>,
         mirror: bool,
     ) {
-
         let image_dimensions = Vector2::<u32>::from(texture.image().dimensions().width_height());
         let size = Vector2::new(
             image_dimensions.x as f32 * scale.x / 10.0,
@@ -189,10 +184,11 @@ impl EntityRenderer {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
 
-        let set = PersistentDescriptorSet::new(
-            descriptor_layout,
-            [WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone())],
-        )
+        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(
+            0,
+            texture,
+            self.nearest_sampler.clone(),
+        )])
         .unwrap();
 
         let world_matrix = camera.billboard_matrix(position, origin, size);

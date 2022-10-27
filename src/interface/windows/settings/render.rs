@@ -5,7 +5,6 @@ use crate::interface::{ElementCell, Expandable, FramedWindow, InterfaceSettings,
 
 macro_rules! render_state_button {
     ($display:expr, $event:expr, $selector:ident) => {{
-
         StateButton::default()
             .with_static_text($display)
             .with_selector(|state_provider| state_provider.render_settings.$selector)
@@ -15,7 +14,6 @@ macro_rules! render_state_button {
 }
 
 fn general_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("debug camera", UserEvent::ToggleUseDebugCamera, use_debug_camera),
         render_state_button!("show fps", UserEvent::ToggleShowFramesPerSecond, show_frames_per_second),
@@ -28,7 +26,6 @@ fn general_expandable() -> ElementCell {
 }
 
 fn map_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("show map", UserEvent::ToggleShowMap, show_map),
         render_state_button!("show objects", UserEvent::ToggleShowObjects, show_objects),
@@ -40,7 +37,6 @@ fn map_expandable() -> ElementCell {
 }
 
 fn lighting_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("ambient light", UserEvent::ToggleShowAmbientLight, show_ambient_light),
         render_state_button!(
@@ -56,7 +52,6 @@ fn lighting_expandable() -> ElementCell {
 }
 
 fn shadows_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![render_state_button!(
         "directional shadows",
         UserEvent::ToggleShowDirectionalShadows,
@@ -67,7 +62,6 @@ fn shadows_expandable() -> ElementCell {
 }
 
 fn markers_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("object markers", UserEvent::ToggleShowObjectMarkers, show_object_markers),
         render_state_button!("light markers", UserEvent::ToggleShowLightMarkers, show_light_markers),
@@ -81,7 +75,6 @@ fn markers_expandable() -> ElementCell {
 }
 
 fn grid_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("map tiles", UserEvent::ToggleShowMapTiles, show_map_tiles),
         render_state_button!("pathing", UserEvent::ToggleShowPathing, show_pathing),
@@ -91,7 +84,6 @@ fn grid_expandable() -> ElementCell {
 }
 
 fn buffers_expandable() -> ElementCell {
-
     let buttons: Vec<ElementCell> = vec![
         render_state_button!("diffuse buffer", UserEvent::ToggleShowDiffuseBuffer, show_diffuse_buffer),
         render_state_button!("normal buffer", UserEvent::ToggleShowNormalBuffer, show_normal_buffer),
@@ -109,12 +101,10 @@ fn buffers_expandable() -> ElementCell {
 pub struct RenderSettingsWindow {}
 
 impl RenderSettingsWindow {
-
     pub const WINDOW_CLASS: &'static str = "render_settings";
 }
 
 impl PrototypeWindow for RenderSettingsWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -125,7 +115,6 @@ impl PrototypeWindow for RenderSettingsWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements: Vec<ElementCell> = vec![
             general_expandable(),
             map_expandable(),

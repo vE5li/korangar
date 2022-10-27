@@ -8,11 +8,9 @@ pub struct DialogWindow {
 }
 
 impl DialogWindow {
-
     pub const WINDOW_CLASS: &'static str = "dialog";
 
     pub fn new(text: String, npc_id: u32) -> (Self, TrackedState<Vec<DialogElement>>) {
-
         let elements = TrackedState::new(vec![DialogElement::Text(text)]);
 
         let dialog_window = Self {
@@ -25,7 +23,6 @@ impl DialogWindow {
 }
 
 impl PrototypeWindow for DialogWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -36,7 +33,6 @@ impl PrototypeWindow for DialogWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements = vec![DialogContainer::new(self.elements.new_remote(), self.npc_id).wrap()];
 
         Box::from(FramedWindow::new(

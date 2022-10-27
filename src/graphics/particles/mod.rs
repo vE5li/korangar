@@ -11,7 +11,6 @@ use crate::network::{QuestColor, QuestEffectPacket};
 use crate::world::*;
 
 pub trait Particle {
-
     fn update(&mut self, delta_time: f32) -> bool;
 
     fn render(
@@ -38,9 +37,7 @@ pub struct DamageNumber {
 }
 
 impl Particle for DamageNumber {
-
     fn update(&mut self, delta_time: f32) -> bool {
-
         self.velocity_y -= 200.0 * delta_time;
 
         self.position.y += self.velocity_y * delta_time;
@@ -58,7 +55,6 @@ impl Particle for DamageNumber {
         camera: &dyn Camera,
         window_size: Vector2<f32>,
     ) {
-
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
         let screen_position = Vector2::new(
@@ -79,7 +75,6 @@ pub struct QuestIcon {
 }
 
 impl QuestIcon {
-
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
@@ -87,7 +82,6 @@ impl QuestIcon {
         map: &Map,
         quest_effect: QuestEffectPacket,
     ) -> Self {
-
         let position = map.get_world_position(quest_effect.position.map(usize::from)) + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
@@ -114,7 +108,6 @@ impl QuestIcon {
         camera: &dyn Camera,
         window_size: Vector2<f32>,
     ) {
-
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
         let screen_position = Vector2::new(
@@ -141,7 +134,6 @@ pub struct ParticleHolder {
 }
 
 impl ParticleHolder {
-
     pub fn spawn_particle(&mut self, particle: Box<dyn Particle + Send + Sync>) {
         self.particles.push(particle);
     }
@@ -154,7 +146,6 @@ impl ParticleHolder {
         map: &Map,
         quest_effect: QuestEffectPacket,
     ) {
-
         self.quest_icons.insert(
             quest_effect.entity_id,
             QuestIcon::new(game_file_loader, texture_loader, texture_future, map, quest_effect),
@@ -166,7 +157,6 @@ impl ParticleHolder {
     }
 
     pub fn clear(&mut self) {
-
         self.particles.clear();
         self.quest_icons.clear();
     }
@@ -183,7 +173,6 @@ impl ParticleHolder {
         window_size: Vector2<f32>,
         entities: &[Entity],
     ) {
-
         self.particles
             .iter()
             .for_each(|particle| particle.render(render_target, renderer, camera, window_size));

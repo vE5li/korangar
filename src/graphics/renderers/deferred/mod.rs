@@ -81,7 +81,6 @@ pub struct DeferredRenderer {
 }
 
 impl DeferredRenderer {
-
     pub fn new(
         device: Arc<Device>,
         queue: Arc<Queue>,
@@ -91,7 +90,6 @@ impl DeferredRenderer {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
     ) -> Self {
-
         let render_pass = ordered_passes_renderpass!(device.clone(),
             attachments: {
                 output: {
@@ -232,7 +230,6 @@ impl DeferredRenderer {
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
-
         let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
         let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
 
@@ -270,7 +267,6 @@ impl DeferredRenderer {
     }
 
     pub fn create_render_target(&self, swapchain_image: Arc<SwapchainImage<Window>>) -> <Self as Renderer>::Target {
-
         <Self as Renderer>::Target::new(
             self.device.clone(),
             self.queue.clone(),
@@ -287,13 +283,11 @@ impl DeferredRenderer {
         vertex_buffer: WaterVertexBuffer,
         day_timer: f32,
     ) {
-
         render_target.unbind_subrenderer();
         self.water_renderer.render(render_target, camera, vertex_buffer, day_timer);
     }
 
     pub fn ambient_light(&self, render_target: &mut <Self as Renderer>::Target, color: Color) {
-
         render_target.unbind_subrenderer();
         self.ambient_light_renderer
             .render(render_target, self.screen_vertex_buffer.clone(), color);
@@ -309,7 +303,6 @@ impl DeferredRenderer {
         color: Color,
         intensity: f32,
     ) {
-
         render_target.unbind_subrenderer();
         self.directional_light_renderer.render(
             render_target,
@@ -331,7 +324,6 @@ impl DeferredRenderer {
         color: Color,
         range: f32,
     ) {
-
         if render_target.bind_subrenderer(DeferredSubrenderer::PointLight) {
             self.point_light_renderer
                 .bind_pipeline(render_target, camera, self.billboard_vertex_buffer.clone());
@@ -341,14 +333,12 @@ impl DeferredRenderer {
     }
 
     pub fn water_light(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
-
         render_target.unbind_subrenderer();
         self.water_light_renderer
             .render(render_target, camera, self.screen_vertex_buffer.clone(), water_level);
     }
 
     pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: ImageBuffer) {
-
         render_target.unbind_subrenderer();
         self.overlay_renderer
             .render(render_target, interface_image, self.screen_vertex_buffer.clone());
@@ -362,7 +352,6 @@ impl DeferredRenderer {
         size: Vector2<f32>,
         color: Color,
     ) {
-
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
 
         render_target.unbind_subrenderer();
@@ -378,13 +367,11 @@ impl DeferredRenderer {
         color: Color,
         font_size: f32,
     ) {
-
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
 
         render_target.unbind_subrenderer();
 
         for character in text.as_bytes() {
-
             let index = (*character as usize).saturating_sub(31);
             self.sprite_renderer.render_indexed(
                 render_target,
@@ -408,7 +395,6 @@ impl DeferredRenderer {
         size: Vector2<f32>,
         color: Color,
     ) {
-
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
 
         render_target.unbind_subrenderer();
@@ -423,7 +409,6 @@ impl DeferredRenderer {
         maximum: f32,
         current: f32,
     ) {
-
         const BAR_SIZE: f32 = 70.0;
         let offset = Vector2::new(BAR_SIZE / 2.0, 0.0);
         self.render_rectangle(
@@ -447,7 +432,6 @@ impl DeferredRenderer {
         camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
     ) {
-
         self.render_geometry(
             render_target,
             camera,
@@ -467,7 +451,6 @@ impl DeferredRenderer {
         bounding_box: &BoundingBox,
         color: Color,
     ) {
-
         if render_target.bind_subrenderer(DeferredSubrenderer::BoundingBox) {
             self.box_renderer.bind_pipeline(render_target, camera);
         }
@@ -483,7 +466,6 @@ impl DeferredRenderer {
         picker_image: ImageBuffer,
         render_settings: &RenderSettings,
     ) {
-
         render_target.unbind_subrenderer();
         self.buffer_renderer.render(
             render_target,
@@ -496,12 +478,10 @@ impl DeferredRenderer {
 }
 
 impl Renderer for DeferredRenderer {
-
     type Target = DeferredRenderTarget;
 }
 
 impl GeometryRendererTrait for DeferredRenderer {
-
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -513,7 +493,6 @@ impl GeometryRendererTrait for DeferredRenderer {
     ) where
         Self: Renderer,
     {
-
         if render_target.bind_subrenderer(DeferredSubrenderer::Geometry) {
             self.geometry_renderer.bind_pipeline(render_target, camera, time);
         }
@@ -524,7 +503,6 @@ impl GeometryRendererTrait for DeferredRenderer {
 }
 
 impl EntityRendererTrait for DeferredRenderer {
-
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -540,7 +518,6 @@ impl EntityRendererTrait for DeferredRenderer {
     ) where
         Self: Renderer,
     {
-
         if render_target.bind_subrenderer(DeferredSubrenderer::Entity) {
             self.entity_renderer.bind_pipeline(render_target, camera);
         }
@@ -561,7 +538,6 @@ impl EntityRendererTrait for DeferredRenderer {
 
 #[cfg(feature = "debug")]
 impl MarkerRenderer for DeferredRenderer {
-
     fn render_marker(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -572,11 +548,9 @@ impl MarkerRenderer for DeferredRenderer {
     ) where
         Self: Renderer,
     {
-
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
 
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
-
             let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
 
             render_target.unbind_subrenderer();

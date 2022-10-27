@@ -40,9 +40,7 @@ pub struct BufferRenderer {
 }
 
 impl BufferRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -72,7 +70,6 @@ impl BufferRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -92,22 +89,18 @@ impl BufferRenderer {
         vertex_buffer: ScreenVertexBuffer,
         render_settings: &RenderSettings,
     ) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
-        let set = PersistentDescriptorSet::new(
-            descriptor_layout,
-            [
-                WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
-                WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
-                WriteDescriptorSet::image_view(2, render_target.water_image.clone()),
-                WriteDescriptorSet::image_view(3, render_target.depth_image.clone()),
-                WriteDescriptorSet::image_view_sampler(4, picker_image, self.nearest_sampler.clone()),
-                WriteDescriptorSet::image_view_sampler(5, light_image, self.nearest_sampler.clone()),
-                //WriteDescriptorSet::image_view_sampler(6, light_image, self.nearest_sampler.clone()),
-            ],
-        )
+        let set = PersistentDescriptorSet::new(descriptor_layout, [
+            WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
+            WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
+            WriteDescriptorSet::image_view(2, render_target.water_image.clone()),
+            WriteDescriptorSet::image_view(3, render_target.depth_image.clone()),
+            WriteDescriptorSet::image_view_sampler(4, picker_image, self.nearest_sampler.clone()),
+            WriteDescriptorSet::image_view_sampler(5, light_image, self.nearest_sampler.clone()),
+            //WriteDescriptorSet::image_view_sampler(6, light_image, self.nearest_sampler.clone()),
+        ])
         .unwrap();
 
         let constants = Constants {

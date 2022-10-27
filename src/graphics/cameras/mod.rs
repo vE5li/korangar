@@ -12,7 +12,6 @@ pub use self::shadow::ShadowCamera;
 use crate::graphics::{SmoothedValue, Transform};
 
 fn direction(vector: Vector2<f32>) -> usize {
-
     let inverted = false;
     let k = ((f32::atan2(vector.normalize().x, vector.y) * (180.0 / std::f32::consts::PI) + 360.0 - 22.5) / 45.0) as usize;
 
@@ -23,7 +22,6 @@ fn direction(vector: Vector2<f32>) -> usize {
 }
 
 pub trait Camera {
-
     fn generate_view_projection(&mut self, window_size: Vector2<usize>);
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);

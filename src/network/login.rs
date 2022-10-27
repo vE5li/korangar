@@ -13,11 +13,8 @@ pub struct LoginSettings {
 }
 
 impl LoginSettings {
-
     pub fn new() -> Self {
-
         Self::load().unwrap_or_else(|| {
-
             #[cfg(feature = "debug")]
             print_debug!("failed to load login settings from {}filename{}", MAGENTA, NONE);
 
@@ -26,7 +23,6 @@ impl LoginSettings {
     }
 
     pub fn load() -> Option<Self> {
-
         #[cfg(feature = "debug")]
         print_debug!("loading login settings from {}filename{}", MAGENTA, NONE);
 
@@ -36,7 +32,6 @@ impl LoginSettings {
     }
 
     pub fn save(&self) {
-
         #[cfg(feature = "debug")]
         print_debug!("saving login settings to {}filename{}", MAGENTA, NONE);
 
@@ -46,7 +41,6 @@ impl LoginSettings {
 }
 
 impl Drop for LoginSettings {
-
     fn drop(&mut self) {
         self.save();
     }

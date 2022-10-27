@@ -26,7 +26,6 @@ use crate::loaders::{ByteConvertable, ByteStream};
 /// the first two bytes will be the size of the packet in bytes *including* the
 /// header. Packets are sent in little endian.
 pub trait Packet: PrototypeElement + Clone {
-
     const PACKET_NAME: &'static str;
     const IS_PING: bool;
 
@@ -68,7 +67,10 @@ pub enum NetworkEvent {
     RemoveQuestEffect(u32),
     Inventory(Vec<(usize, usize, EquipPosition, EquipPosition)>),
     AddIventoryItem(usize, usize, EquipPosition, EquipPosition),
-    UpdateEquippedPosition { index: u16, equipped_position: EquipPosition },
+    UpdateEquippedPosition {
+        index: u16,
+        equipped_position: EquipPosition,
+    },
 }
 
 #[derive(new)]
@@ -169,16 +171,13 @@ pub struct WorldPosition {
 }
 
 impl WorldPosition {
-
     pub fn to_vector(&self) -> Vector2<usize> {
         Vector2::new(self.x, self.y)
     }
 }
 
 impl ByteConvertable for WorldPosition {
-
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-
         assert!(length_hint.is_none());
         let coordinates = byte_stream.slice(3);
 
@@ -193,7 +192,6 @@ impl ByteConvertable for WorldPosition {
     }
 
     fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-
         assert!(length_hint.is_none());
         let mut coordinates = vec![0, 0, 0];
 
@@ -214,16 +212,13 @@ pub struct WorldPosition2 {
 }
 
 impl WorldPosition2 {
-
     pub fn to_vectors(&self) -> (Vector2<usize>, Vector2<usize>) {
         (Vector2::new(self.x1, self.y1), Vector2::new(self.x2, self.y2))
     }
 }
 
 impl ByteConvertable for WorldPosition2 {
-
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-
         assert!(length_hint.is_none());
         let coordinates: Vec<usize> = byte_stream.slice(6).into_iter().map(|byte| byte as usize).collect();
 
@@ -349,9 +344,7 @@ struct LoginServerKeepalivePacket {
 }
 
 impl ByteConvertable for Ipv4Addr {
-
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-
         assert!(length_hint.is_none());
         Ipv4Addr::new(byte_stream.next(), byte_stream.next(), byte_stream.next(), byte_stream.next())
     }
@@ -900,148 +893,80 @@ pub enum StatusType {
 }
 
 impl ByteConvertable for StatusType {
-
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-
         let data = byte_stream.slice(length_hint.unwrap());
         let mut byte_stream = ByteStream::new(&data);
 
         match u16::from_bytes(&mut byte_stream, None) {
-
             0 => Self::MovementSpeed(u32::from_bytes(&mut byte_stream, None)),
-
             1 => Self::BaseExperience(u64::from_bytes(&mut byte_stream, None)),
-
             2 => Self::JobExperience(u64::from_bytes(&mut byte_stream, None)),
-
             3 => Self::Karma(u32::from_bytes(&mut byte_stream, None)),
-
             4 => Self::Manner(u32::from_bytes(&mut byte_stream, None)),
-
             5 => Self::HealthPoints(u32::from_bytes(&mut byte_stream, None)),
-
             6 => Self::MaximumHealthPoints(u32::from_bytes(&mut byte_stream, None)),
-
             7 => Self::SpellPoints(u32::from_bytes(&mut byte_stream, None)),
-
             8 => Self::MaximumSpellPoints(u32::from_bytes(&mut byte_stream, None)),
-
             9 => Self::StatusPoint(u32::from_bytes(&mut byte_stream, None)),
-
             11 => Self::BaseLevel(u32::from_bytes(&mut byte_stream, None)),
-
             12 => Self::SkillPoint(u32::from_bytes(&mut byte_stream, None)),
-
             13 => Self::Strength(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             14 => Self::Agility(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             15 => Self::Vitality(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             16 => Self::Intelligence(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             17 => Self::Dexterity(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             18 => Self::Luck(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             20 => Self::Zeny(u32::from_bytes(&mut byte_stream, None)),
-
             22 => Self::NextBaseExperience(u64::from_bytes(&mut byte_stream, None)),
-
             23 => Self::NextJobExperience(u64::from_bytes(&mut byte_stream, None)),
-
             24 => Self::Weight(u32::from_bytes(&mut byte_stream, None)),
-
             25 => Self::MaximumWeight(u32::from_bytes(&mut byte_stream, None)),
-
             32 => Self::SpUstr(u8::from_bytes(&mut byte_stream, None)),
-
             33 => Self::SpUagi(u8::from_bytes(&mut byte_stream, None)),
-
             34 => Self::SpUvit(u8::from_bytes(&mut byte_stream, None)),
-
             35 => Self::SpUint(u8::from_bytes(&mut byte_stream, None)),
-
             36 => Self::SpUdex(u8::from_bytes(&mut byte_stream, None)),
-
             37 => Self::SpUluk(u8::from_bytes(&mut byte_stream, None)),
-
             41 => Self::Attack1(u32::from_bytes(&mut byte_stream, None)),
-
             42 => Self::Attack2(u32::from_bytes(&mut byte_stream, None)),
-
             43 => Self::MagicAttack1(u32::from_bytes(&mut byte_stream, None)),
-
             44 => Self::MagicAttack2(u32::from_bytes(&mut byte_stream, None)),
-
             45 => Self::Defense1(u32::from_bytes(&mut byte_stream, None)),
-
             46 => Self::Defense2(u32::from_bytes(&mut byte_stream, None)),
-
             47 => Self::MagicDefense1(u32::from_bytes(&mut byte_stream, None)),
-
             48 => Self::MagicDefense2(u32::from_bytes(&mut byte_stream, None)),
-
             49 => Self::Hit(u32::from_bytes(&mut byte_stream, None)),
-
             50 => Self::Flee1(u32::from_bytes(&mut byte_stream, None)),
-
             51 => Self::Flee2(u32::from_bytes(&mut byte_stream, None)),
-
             52 => Self::Critical(u32::from_bytes(&mut byte_stream, None)),
-
             53 => Self::AttackSpeed(u32::from_bytes(&mut byte_stream, None)),
-
             55 => Self::JobLevel(u32::from_bytes(&mut byte_stream, None)),
-
             99 => Self::CartInfo(
                 u16::from_bytes(&mut byte_stream, None),
                 u32::from_bytes(&mut byte_stream, None),
                 u32::from_bytes(&mut byte_stream, None),
             ),
-
             219 => Self::Power(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             220 => Self::Stamina(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             221 => Self::Wisdom(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             222 => Self::Spell(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             223 => Self::Concentration(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             224 => Self::Creativity(u32::from_bytes(&mut byte_stream, None), u32::from_bytes(&mut byte_stream, None)),
-
             225 => Self::PhysicalAttack(u32::from_bytes(&mut byte_stream, None)),
-
             226 => Self::SpellMagicAttack(u32::from_bytes(&mut byte_stream, None)),
-
             227 => Self::Resistance(u32::from_bytes(&mut byte_stream, None)),
-
             228 => Self::MagicResistance(u32::from_bytes(&mut byte_stream, None)),
-
             229 => Self::HealingPlus(u32::from_bytes(&mut byte_stream, None)),
-
             230 => Self::CriticalDamageRate(u32::from_bytes(&mut byte_stream, None)),
-
             231 => Self::TraitPoint(u32::from_bytes(&mut byte_stream, None)),
-
             232 => Self::ActivityPoints(u32::from_bytes(&mut byte_stream, None)),
-
             233 => Self::MaximumActivityPoints(u32::from_bytes(&mut byte_stream, None)),
-
             247 => Self::SpUpow(u8::from_bytes(&mut byte_stream, None)),
-
             248 => Self::SpUsta(u8::from_bytes(&mut byte_stream, None)),
-
             249 => Self::SpUwis(u8::from_bytes(&mut byte_stream, None)),
-
             250 => Self::SpUspl(u8::from_bytes(&mut byte_stream, None)),
-
             251 => Self::SpUcon(u8::from_bytes(&mut byte_stream, None)),
-
             252 => Self::SpUcrt(u8::from_bytes(&mut byte_stream, None)),
-
             invalid => panic!("invalid status code {}", invalid),
         }
     }
@@ -1049,7 +974,6 @@ impl ByteConvertable for StatusType {
 
 // TODO: make StatusType derivable
 impl PrototypeElement for StatusType {
-
     fn to_element(&self, display: String) -> ElementCell {
         "<todo>".to_element(display)
     }
@@ -1352,9 +1276,7 @@ pub struct EntityData {
 }
 
 impl EntityData {
-
     pub fn from_character(character_information: CharacterInformation, position: Vector2<usize>) -> Self {
-
         Self {
             entity_id: character_information.character_id,
             movement_speed: character_information.movement_speed as u16,
@@ -1369,9 +1291,7 @@ impl EntityData {
 }
 
 impl From<EntityAppearedPacket> for EntityData {
-
     fn from(packet: EntityAppearedPacket) -> Self {
-
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
@@ -1386,9 +1306,7 @@ impl From<EntityAppearedPacket> for EntityData {
 }
 
 impl From<MovingEntityAppearedPacket> for EntityData {
-
     fn from(packet: MovingEntityAppearedPacket) -> Self {
-
         let (origin, destination) = packet.position.to_vectors();
 
         Self {
@@ -1882,7 +1800,6 @@ pub enum EquipPosition {
 }
 
 impl EquipPosition {
-
     pub fn display_name(&self) -> &'static str {
         match self {
             EquipPosition::None => panic!(),
@@ -1967,9 +1884,7 @@ struct NetworkTimer {
 }
 
 impl NetworkTimer {
-
     pub fn update(&mut self, elapsed_time: f64) -> bool {
-
         self.accumulator += Duration::from_secs_f64(elapsed_time);
         let reset = self.accumulator > self.period;
 
@@ -2005,9 +1920,7 @@ pub struct NetworkingSystem {
 }
 
 impl NetworkingSystem {
-
     pub fn new() -> Self {
-
         let login_server_ip = match cfg!(feature = "local") {
             true => "127.0.0.1:6900",
             false => "167.235.227.244:6900",
@@ -2060,7 +1973,6 @@ impl NetworkingSystem {
     }
 
     pub fn log_in(&mut self, username: String, password: String) -> Result<CharacterSelectionWindow, String> {
-
         #[cfg(feature = "debug_network")]
         let timer = Timer::new("log in");
 
@@ -2182,7 +2094,6 @@ impl NetworkingSystem {
     }
 
     pub fn log_out(&mut self) -> Result<(), String> {
-
         #[cfg(feature = "debug_network")]
         let timer = Timer::new("log out");
 
@@ -2196,7 +2107,6 @@ impl NetworkingSystem {
     where
         T: Packet + 'static,
     {
-
         #[cfg(feature = "debug_network")]
         self.packet_history
             .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
@@ -2211,7 +2121,6 @@ impl NetworkingSystem {
     where
         T: Packet + 'static,
     {
-
         #[cfg(feature = "debug_network")]
         self.packet_history
             .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
@@ -2227,7 +2136,6 @@ impl NetworkingSystem {
     where
         T: Packet + 'static,
     {
-
         #[cfg(feature = "debug_network")]
         self.packet_history
             .push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
@@ -2238,7 +2146,6 @@ impl NetworkingSystem {
     }
 
     fn get_data_from_login_server(&mut self) -> Vec<u8> {
-
         let mut buffer = [0; 4096];
         let response_lenght = self
             .login_stream
@@ -2248,7 +2155,6 @@ impl NetworkingSystem {
     }
 
     fn get_data_from_character_server(&mut self) -> Vec<u8> {
-
         let mut buffer = [0; 4096];
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
         let response_lenght = character_stream
@@ -2258,7 +2164,6 @@ impl NetworkingSystem {
     }
 
     fn get_data_from_map_server(&mut self) -> Vec<u8> {
-
         let mut buffer = [0; 4096];
         let map_stream = self.map_stream.as_mut().expect("no map server connection");
         let response_lenght = map_stream.read(&mut buffer).expect("failed to get response from map server");
@@ -2266,17 +2171,14 @@ impl NetworkingSystem {
     }
 
     fn try_get_data_from_map_server(&mut self) -> Option<Vec<u8>> {
-
         let mut buffer = [0; 4096];
         let map_stream = self.map_stream.as_mut()?;
         map_stream.set_read_timeout(Duration::from_micros(1).into()).unwrap();
         let response_lenght = map_stream.read(&mut buffer).ok()?;
 
         match response_lenght {
-
             // TODO: make sure this will always work
             1400 => {
-
                 let mut first_buffer = buffer[..response_lenght].to_vec();
                 let mut second_buffer = self.try_get_data_from_map_server().unwrap();
                 first_buffer.append(&mut second_buffer);
@@ -2284,13 +2186,11 @@ impl NetworkingSystem {
                 println!("combined {}", first_buffer.len());
                 Some(first_buffer)
             }
-
             length => Some(buffer[..length].to_vec()),
         }
     }
 
     pub fn keep_alive(&mut self, delta_time: f64, client_tick: u32) {
-
         if self.login_keep_alive_timer.update(delta_time) {
             self.send_packet_to_login_server(LoginServerKeepalivePacket::default());
         }
@@ -2305,7 +2205,6 @@ impl NetworkingSystem {
     }
 
     pub fn crate_character(&mut self, slot: usize, name: String) -> Result<(), String> {
-
         let hair_color = 0;
         let hair_style = 0;
         let start_job = 0;
@@ -2320,15 +2219,11 @@ impl NetworkingSystem {
 
         if let Ok(character_creation_failed_packet) = CharacterCreationFailedPacket::try_from_bytes(&mut byte_stream) {
             match character_creation_failed_packet.reason {
-
                 CharacterCreationFailedReason::CharacterNameAlreadyUsed => return Err("character name is already used".to_string()),
-
                 CharacterCreationFailedReason::NotOldEnough => return Err("you are not old enough to create a character".to_string()),
-
                 CharacterCreationFailedReason::NotAllowedToUseSlot => {
                     return Err("you are not allowed to use that character slot".to_string());
                 }
-
                 CharacterCreationFailedReason::CharacterCerationFailed => return Err("character creation failed".to_string()),
             }
         }
@@ -2343,7 +2238,6 @@ impl NetworkingSystem {
     }
 
     pub fn delete_character(&mut self, character_id: usize) -> Result<(), String> {
-
         let email = "a@a.com".to_string();
 
         self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id as u32, email));
@@ -2373,7 +2267,6 @@ impl NetworkingSystem {
         slot: usize,
         chat_messages: &Rc<RefCell<Vec<ChatMessage>>>,
     ) -> Result<(String, Vector2<usize>, CharacterInformation, u32), String> {
-
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
         let response = self.get_data_from_character_server();
@@ -2467,7 +2360,6 @@ impl NetworkingSystem {
     }
 
     pub fn switch_character_slot(&mut self, destination_slot: usize) -> Result<(), String> {
-
         let origin_slot = self.move_request.take().unwrap();
 
         self.send_packet_to_character_server(SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16));
@@ -2478,9 +2370,7 @@ impl NetworkingSystem {
         let switch_character_slot_response_packet = SwitchCharacterSlotResponsePacket::try_from_bytes(&mut byte_stream).unwrap();
 
         match switch_character_slot_response_packet.status {
-
             SwitchCharacterSlotResponseStatus::Success => {
-
                 let _character_server_login_success_packet = CharacterServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
                 let _packet_006b = Packet6b00::try_from_bytes(&mut byte_stream).unwrap();
 
@@ -2488,7 +2378,6 @@ impl NetworkingSystem {
                 self.characters.clear();
 
                 for _index in 0..character_count {
-
                     let character_information = CharacterInformation::from_bytes(&mut byte_stream, None);
                     self.characters.push(character_information);
                 }
@@ -2496,7 +2385,6 @@ impl NetworkingSystem {
                 // packet_length and packet 0xa0 0x09 are left unread because we
                 // don't need them
             }
-
             SwitchCharacterSlotResponseStatus::Error => return Err("failed to move character to a different slot".to_string()),
         }
 
@@ -2528,7 +2416,6 @@ impl NetworkingSystem {
     }
 
     pub fn send_message(&mut self, message: String) {
-
         let complete_message = format!("{} : {}", self.player_name, message);
 
         self.send_packet_to_map_server(GlobalMessagePacket::new(
@@ -2562,29 +2449,23 @@ impl NetworkingSystem {
     }
 
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
-
         let mut events = Vec::new();
 
         while let Some(data) = self.try_get_data_from_map_server() {
-
             let mut byte_stream = ByteStream::new(&data);
 
             while !byte_stream.is_empty() {
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
-
                     let chat_message = ChatMessage::new(packet.message, packet.font_color.into());
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
-
                     let chat_message = ChatMessage::new(packet.message, Color::monochrome(255));
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
-
                     let chat_message = ChatMessage::new(packet.message, packet.color.into());
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(_packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) {
-
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::EntityMove(
                         packet.entity_id,
@@ -2594,11 +2475,9 @@ impl NetworkingSystem {
                     ));
                 } else if let Ok(_packet) = EntityStopMovePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = PlayerMovePacket::try_from_bytes(&mut byte_stream) {
-
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
                 } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) {
-
                     events.push(NetworkEvent::ChangeMap(
                         packet.map_name.replace(".gat", "").to_string(),
                         Vector2::new(packet.x as usize, packet.y as usize),
@@ -2624,17 +2503,26 @@ impl NetworkingSystem {
                 } else if let Ok(_packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) {
-
                     let mut item_data = Vec::new();
 
                     while InventoyEndPacket::try_from_bytes(&mut byte_stream).is_err() {
                         if let Ok(packet) = RegularItemListPacket::try_from_bytes(&mut byte_stream) {
                             for item_information in packet.item_information {
-                                item_data.push((item_information.index as usize - 2, item_information.item_id as usize, EquipPosition::None, EquipPosition::None)); // TODO: Don't add that data here, only equippable itemes need this data
+                                item_data.push((
+                                    item_information.index as usize - 2,
+                                    item_information.item_id as usize,
+                                    EquipPosition::None,
+                                    EquipPosition::None,
+                                )); // TODO: Don't add that data here, only equippable itemes need this data
                             }
                         } else if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
                             for item_information in packet.item_information {
-                                item_data.push((item_information.index as usize - 2, item_information.item_id as usize, item_information.equip_position, item_information.equipped_position));
+                                item_data.push((
+                                    item_information.index as usize - 2,
+                                    item_information.item_id as usize,
+                                    item_information.equip_position,
+                                    item_information.equipped_position,
+                                ));
                             }
                         } else {
                             panic!("unexpected packet with header: {:x?}", byte_stream.slice(2));
@@ -2657,7 +2545,6 @@ impl NetworkingSystem {
                 } else if let Ok(_packet) = CloseButtonPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddCloseButton);
                 } else if let Ok(packet) = DialogMenuPacket::try_from_bytes(&mut byte_stream) {
-
                     let choices = packet
                         .message
                         .split(':')
@@ -2679,14 +2566,18 @@ impl NetworkingSystem {
                 } else if let Ok(_packet) = DisplayImagePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_packet) = StateChangePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = QuestEffectPacket::try_from_bytes(&mut byte_stream) {
-
                     let event = match packet.effect {
                         QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
                         _ => NetworkEvent::AddQuestEffect(packet),
                     };
                     events.push(event);
                 } else if let Ok(packet) = ItemPickupPacket::try_from_bytes(&mut byte_stream) {
-                    events.push(NetworkEvent::AddIventoryItem(packet.index as usize - 2, packet.name_id as usize, packet.equip_position, EquipPosition::None));
+                    events.push(NetworkEvent::AddIventoryItem(
+                        packet.index as usize - 2,
+                        packet.name_id as usize,
+                        packet.equip_position,
+                        EquipPosition::None,
+                    ));
                 } else if let Ok(_packet) = RemoveItemFromInventoryPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
@@ -2695,7 +2586,6 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = RequestEntityDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
                 } else if let Ok(packet) = UpdateEntityHealthPointsPacket::try_from_bytes(&mut byte_stream) {
-
                     events.push(NetworkEvent::UpdateEntityHealth(
                         packet.entity_id,
                         packet.health_points as usize,
@@ -2703,7 +2593,6 @@ impl NetworkingSystem {
                     ));
                 } else if let Ok(_packet) = RequestPlayerAttackFailedPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = DamagePacket::try_from_bytes(&mut byte_stream) {
-
                     events.push(NetworkEvent::DamageEffect(
                         packet.destination_entity_id,
                         packet.damage_amount as usize,
@@ -2712,7 +2601,6 @@ impl NetworkingSystem {
                     events.push(NetworkEvent::OpenDialog(packet.text, packet.npc_id));
                 } else if let Ok(packet) = RequestEquipItemStatusPacket::try_from_bytes(&mut byte_stream) {
                     if let RequestEquipItemStatus::Success = packet.result {
-
                         events.push(NetworkEvent::UpdateEquippedPosition {
                             index: packet.inventory_index - 2,
                             equipped_position: packet.equipped_position,
@@ -2720,17 +2608,14 @@ impl NetworkingSystem {
                     }
                 } else if let Ok(packet) = RequestUnequipItemStatusPacket::try_from_bytes(&mut byte_stream) {
                     if let RequestUnequipItemStatus::Success = packet.result {
-
                         events.push(NetworkEvent::UpdateEquippedPosition {
                             index: packet.inventory_index - 2,
                             equipped_position: EquipPosition::None,
                         });
                     }
                 } else {
-
                     #[cfg(feature = "debug_network")]
                     {
-
                         let remaining_bytes = byte_stream.remaining_bytes();
                         byte_stream.incoming_unknown_packet(remaining_bytes);
                     }

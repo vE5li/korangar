@@ -15,7 +15,6 @@ pub struct Text {
 }
 
 impl Element for Text {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -46,7 +45,6 @@ impl Element for Text {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

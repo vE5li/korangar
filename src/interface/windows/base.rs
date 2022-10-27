@@ -5,7 +5,6 @@ use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 pub trait Window {
-
     fn get_window_class(&self) -> Option<&str>;
 
     fn has_transparency(&self, theme: &Theme) -> bool;

@@ -13,7 +13,6 @@ pub struct DragButton {
 }
 
 impl Element for DragButton {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -23,7 +22,6 @@ impl Element for DragButton {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = self.width_constraint.add_height(theme.window.title_height);
 
         self.state.resolve(placement_resolver, &size_constraint);
@@ -59,7 +57,6 @@ impl Element for DragButton {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

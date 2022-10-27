@@ -42,9 +42,7 @@ pub struct PickerRenderer {
 }
 
 impl PickerRenderer {
-
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
-
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -89,7 +87,6 @@ impl PickerRenderer {
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
-
         let subpass = self.render_pass.clone().first_subpass();
         self.geometry_renderer
             .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone(), false);
@@ -103,7 +100,6 @@ impl PickerRenderer {
     }
 
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
-
         <Self as Renderer>::Target::new(
             self.device.clone(),
             self.queue.clone(),
@@ -113,19 +109,16 @@ impl PickerRenderer {
     }
 
     pub fn render_tiles(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
-
         render_target.unbind_subrenderer();
         self.tile_renderer.render(render_target, camera, vertex_buffer);
     }
 }
 
 impl Renderer for PickerRenderer {
-
     type Target = PickerRenderTarget;
 }
 
 impl GeometryRendererTrait for PickerRenderer {
-
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -137,7 +130,6 @@ impl GeometryRendererTrait for PickerRenderer {
     ) where
         Self: Renderer,
     {
-
         if render_target.bind_subrenderer(PickerSubrenderer::Geometry) {
             self.geometry_renderer.bind_pipeline(render_target, camera);
         }
@@ -148,7 +140,6 @@ impl GeometryRendererTrait for PickerRenderer {
 }
 
 impl EntityRendererTrait for PickerRenderer {
-
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -164,7 +155,6 @@ impl EntityRendererTrait for PickerRenderer {
     ) where
         Self: Renderer,
     {
-
         if render_target.bind_subrenderer(PickerSubrenderer::Entity) {
             self.entity_renderer.bind_pipeline(render_target, camera);
         }
@@ -186,7 +176,6 @@ impl EntityRendererTrait for PickerRenderer {
 
 #[cfg(feature = "debug")]
 impl MarkerRendererTrait for PickerRenderer {
-
     fn render_marker(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -197,11 +186,9 @@ impl MarkerRendererTrait for PickerRenderer {
     ) where
         Self: Renderer,
     {
-
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
 
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
-
             let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
 
             render_target.unbind_subrenderer();

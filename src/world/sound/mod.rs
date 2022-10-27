@@ -20,7 +20,6 @@ pub struct SoundSource {
 }
 
 impl SoundSource {
-
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.position += offset;
     }

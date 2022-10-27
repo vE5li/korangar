@@ -22,7 +22,6 @@ pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -36,11 +35,9 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let current_value = unsafe { *self.value_pointer };
 
         if self.cached_value != current_value {
-
             self.cached_value = current_value;
             return Some(ChangeEvent::RerenderWindow);
         }
@@ -61,7 +58,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
     }
 
     fn drag(&mut self, mouse_delta: Position) -> Option<ChangeEvent> {
-
         let total_range = self.maximum_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap();
         let raw_value = self.cached_value.to_f32().unwrap() + (mouse_delta.x * total_range * 0.005);
         let new_value = clamp(
@@ -90,7 +86,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

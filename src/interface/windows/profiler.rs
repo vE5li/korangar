@@ -6,12 +6,10 @@ use crate::interface::{FramedWindow, InterfaceSettings, PrototypeWindow, Size, W
 pub struct ProfilerWindow {}
 
 impl ProfilerWindow {
-
     pub const WINDOW_CLASS: &'static str = "profiler";
 }
 
 impl PrototypeWindow for ProfilerWindow {
-
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -22,7 +20,6 @@ impl PrototypeWindow for ProfilerWindow {
         interface_settings: &InterfaceSettings,
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
-
         let elements = vec![];
 
         Box::from(FramedWindow::new(

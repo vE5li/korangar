@@ -12,9 +12,7 @@ pub struct MutableColorValue {
 }
 
 impl MutableColorValue {
-
     pub fn new(name: String, color_pointer: *const Color, change_event: Option<ChangeEvent>) -> Self {
-
         let cached_color = unsafe { *color_pointer };
         let cached_values = format!(
             "{}, {}, {}, {}",
@@ -34,7 +32,6 @@ impl MutableColorValue {
 }
 
 impl Element for MutableColorValue {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -48,11 +45,9 @@ impl Element for MutableColorValue {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let current_color = unsafe { *self.color_pointer };
 
         if self.cached_color != current_color {
-
             self.cached_color = current_color;
             self.cached_values = format!(
                 "{}, {}, {}, {}",
@@ -72,7 +67,6 @@ impl Element for MutableColorValue {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-
         Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(
             self.name.clone(),
             self.color_pointer,
@@ -94,7 +88,6 @@ impl Element for MutableColorValue {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

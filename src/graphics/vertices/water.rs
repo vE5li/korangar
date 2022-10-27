@@ -6,7 +6,6 @@ pub struct WaterVertex {
 }
 
 impl WaterVertex {
-
     pub fn new(position: Vector3<f32>) -> Self {
         Self { position: position.into() }
     }

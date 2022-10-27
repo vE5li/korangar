@@ -27,9 +27,7 @@ pub struct ButtonTheme {
 }
 
 impl Default for ButtonTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::monochrome(100)),
             hovered_background_color: Mutable::new(Color::rgb(140, 120, 140)),
@@ -64,9 +62,7 @@ pub struct WindowTheme {
 }
 
 impl Default for WindowTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::monochrome(40)),
             title_background_color: Mutable::new(Color::rgb(70, 60, 70)),
@@ -99,9 +95,7 @@ pub struct ExpandableTheme {
 }
 
 impl Default for ExpandableTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::monochrome(60)),
             second_background_color: Mutable::new(Color::monochrome(45)),
@@ -130,9 +124,7 @@ pub struct LabelTheme {
 }
 
 impl Default for LabelTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::monochrome(130)),
             foreground_color: Mutable::new(Color::monochrome(255)),
@@ -156,9 +148,7 @@ pub struct ValueTheme {
 }
 
 impl Default for ValueTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::rgb(100, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(130, 100, 120)),
@@ -183,9 +173,7 @@ pub struct CloseButtonTheme {
 }
 
 impl Default for CloseButtonTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::rgb(200, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(200, 140, 100)),
@@ -206,9 +194,7 @@ pub struct OverlayTheme {
 }
 
 impl Default for OverlayTheme {
-
     fn default() -> Self {
-
         Self {
             foreground_color: Mutable::new(Color::monochrome(220)),
             text_offset: MutableRange::new(Vector2::new(20.0, 10.0), Vector2::zero(), Vector2::new(1000.0, 500.0)),
@@ -226,9 +212,7 @@ pub struct SliderTheme {
 }
 
 impl Default for SliderTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::rgb(140, 80, 100)),
             rail_color: Mutable::new(Color::rgb(150, 130, 150)),
@@ -254,9 +238,7 @@ pub struct InputTheme {
 }
 
 impl Default for InputTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::monochrome(60)),
             hovered_background_color: Mutable::new(Color::monochrome(80)),
@@ -281,9 +263,7 @@ pub struct ChatTheme {
 }
 
 impl Default for ChatTheme {
-
     fn default() -> Self {
-
         Self {
             background_color: Mutable::new(Color::rgba(0, 0, 0, 170)),
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
@@ -298,9 +278,7 @@ pub struct CursorTheme {
 }
 
 impl Default for CursorTheme {
-
     fn default() -> Self {
-
         Self {
             color: Mutable::new(Color::monochrome(255)),
         }
@@ -327,11 +305,8 @@ pub struct Theme {
 }
 
 impl Theme {
-
     pub fn new(theme_file: &str) -> Self {
-
         Self::load(theme_file).unwrap_or_else(|| {
-
             #[cfg(feature = "debug")]
             print_debug!("failed to load theme from file {}{}{}", MAGENTA, theme_file, NONE);
 
@@ -340,7 +315,6 @@ impl Theme {
     }
 
     fn load(theme_file: &str) -> Option<Self> {
-
         #[cfg(feature = "debug")]
         print_debug!("loading theme from {}{}{}", MAGENTA, theme_file, NONE);
 
@@ -348,7 +322,6 @@ impl Theme {
     }
 
     pub fn reload(&mut self, theme_file: &str) -> bool {
-
         let Some(theme) = Self::load(theme_file) else {
 
             #[cfg(feature = "debug")]
@@ -362,7 +335,6 @@ impl Theme {
     }
 
     pub fn save(&self, theme_file: &str) {
-
         #[cfg(feature = "debug")]
         print_debug!("saving theme to {}{}{}", MAGENTA, theme_file, NONE);
 

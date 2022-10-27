@@ -22,7 +22,6 @@ pub struct Model {
 }
 
 impl Model {
-
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,
@@ -39,7 +38,6 @@ impl Model {
     }
 
     pub fn bounding_box_matrix(bounding_box: &BoundingBox, transform: &Transform) -> Matrix4<f32> {
-
         let size = bounding_box.size() / 2.0;
         let scale = size.zip(transform.scale, f32::mul);
         let position = transform.position;
@@ -54,7 +52,6 @@ impl Model {
     }
 
     pub fn get_bounding_box_matrix(&self, transform: &Transform) -> Matrix4<f32> {
-
         let size = self.bounding_box.size() / 2.0;
         let scale = size.zip(transform.scale, f32::mul);
         let position = transform.position;

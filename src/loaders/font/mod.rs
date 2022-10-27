@@ -24,24 +24,18 @@ pub struct FontLoader {
 }
 
 fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) -> Vec<PositionedGlyph<'static>> {
-
     let mut result = Vec::new();
     let v_metrics = font.v_metrics(scale);
     let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
     let mut caret = point(0.0, v_metrics.ascent);
     let mut last_glyph_id = None;
     for c in text.chars() {
-
         if c.is_control() {
-
             match c {
-
                 '\r' => {
                     caret = point(0.0, caret.y + advance_height);
                 }
-
                 '\n' => {}
-
                 _ => {}
             }
             continue;
@@ -54,7 +48,6 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
         let mut glyph = base_glyph.scaled(scale).positioned(caret);
         if let Some(bb) = glyph.pixel_bounding_box() {
             if bb.max.x > width as i32 {
-
                 caret = point(0.0, caret.y + advance_height);
                 glyph.set_position(caret);
                 last_glyph_id = None;
@@ -67,9 +60,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
 }
 
 impl FontLoader {
-
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader) -> Self {
-
         let scale = 1.0; // get dynamically
         let cache_size = Vector2::from_value((512.0 * scale) as u32);
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
@@ -104,7 +95,6 @@ impl FontLoader {
     }
 
     pub fn get(&mut self, text: &str) -> Vec<(PositionedGlyph, Rect<f32>)> {
-
         let scale = 1.0; // get dynamically
         let glyphs = layout_paragraph(&self.font, Scale::uniform(10.0 * scale), 500, text);
 
@@ -119,7 +109,6 @@ impl FontLoader {
 
         self.cache
             .cache_queued(|rect, data| {
-
                 println!("{:?} ({} - {})", rect, rect.width(), rect.height());
 
                 let builder = self.builder.get_or_insert_with(|| {
@@ -146,7 +135,6 @@ impl FontLoader {
         glyphs
             .into_iter()
             .filter_map(|glyph| {
-
                 self.cache
                     .rect_for(0, &glyph)
                     .unwrap()
@@ -156,7 +144,6 @@ impl FontLoader {
     }
 
     pub fn flush(&mut self) -> Box<dyn GpuFuture> {
-
         let Some(builder) = self.builder.take() else {
             return now(self.device.clone()).boxed();
         };

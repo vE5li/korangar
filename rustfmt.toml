@@ -11,4 +11,3 @@ group_imports = "StdExternalCrate"
 use_field_init_shorthand = true
 overflow_delimited_expr = true
 wrap_comments = true
-additional_empty_lines = true

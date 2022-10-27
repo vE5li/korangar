@@ -36,9 +36,7 @@ pub struct Surface {
 }
 
 impl Surface {
-
     pub fn new(u: [f32; 4], v: [f32; 4], texture_index: i32, light_map_index: i32, color: Color) -> Self {
-
         Self {
             u,
             v,
@@ -61,9 +59,7 @@ pub struct GroundTile {
 }
 
 impl GroundTile {
-
     pub fn get_lowest_point(&self) -> f32 {
-
         f32::max(
             self.lower_right_height,
             f32::max(
@@ -101,21 +97,18 @@ pub fn get_tile_height_at(tile: &GroundTile, point: Heights) -> f32 {
 
 pub fn tile_surface_alignment(surface_type: SurfaceType) -> [(Vector2<usize>, Heights); 4] {
     match surface_type {
-
         SurfaceType::Front => [
             (Vector2::new(0, 1), Heights::LowerLeft),
             (Vector2::new(1, 1), Heights::LowerRight),
             (Vector2::new(1, 1), Heights::UpperRight),
             (Vector2::new(0, 1), Heights::UpperLeft),
         ],
-
         SurfaceType::Right => [
             (Vector2::new(1, 1), Heights::LowerRight),
             (Vector2::new(1, 0), Heights::UpperRight),
             (Vector2::new(1, 0), Heights::UpperLeft),
             (Vector2::new(1, 1), Heights::LowerLeft),
         ],
-
         SurfaceType::Top => [
             (Vector2::new(0, 0), Heights::UpperLeft),
             (Vector2::new(1, 0), Heights::UpperRight),
@@ -170,7 +163,6 @@ pub struct MapLoader {
 }
 
 impl MapLoader {
-
     fn load(
         &mut self,
         resource_file: String,
@@ -178,7 +170,6 @@ impl MapLoader {
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, String> {
-
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", resource_file));
 
@@ -217,13 +208,11 @@ impl MapLoader {
         let mut water_settings = WaterSettings::new();
 
         if resource_version.equals_or_above(1, 3) {
-
             let water_level = byte_stream.float32();
             water_settings.water_level = -water_level;
         }
 
         if resource_version.equals_or_above(1, 8) {
-
             let water_type = byte_stream.integer32();
             let wave_height = byte_stream.float32();
             let wave_speed = byte_stream.float32();
@@ -236,7 +225,6 @@ impl MapLoader {
         }
 
         if resource_version.equals_or_above(1, 9) {
-
             let water_animation_speed = byte_stream.integer32();
             water_settings.water_animation_speed = water_animation_speed as usize;
         }
@@ -244,7 +232,6 @@ impl MapLoader {
         let mut light_settings = LightSettings::new();
 
         if resource_version.equals_or_above(1, 5) {
-
             let light_longitude = byte_stream.integer32();
             let light_latitude = byte_stream.integer32();
             let diffuse_color = byte_stream.color();
@@ -261,7 +248,6 @@ impl MapLoader {
         }
 
         if resource_version.equals_or_above(1, 6) {
-
             let _ground_top = byte_stream.integer32();
             let _ground_bottom = byte_stream.integer32();
             let _ground_left = byte_stream.integer32();
@@ -276,16 +262,12 @@ impl MapLoader {
         let mut effect_sources = Vec::new();
 
         for index in 0..object_count {
-
             let type_index = byte_stream.integer32();
             let resource_type = ResourceType::from(type_index);
 
             match resource_type {
-
                 ResourceType::Object => {
-
                     if resource_version.equals_or_above(1, 6) {
-
                         let name = byte_stream.string(40);
                         let _animation_type = byte_stream.integer32();
                         let _animation_speed = byte_stream.float32();
@@ -314,7 +296,6 @@ impl MapLoader {
 
                         objects.push(object);
                     } else {
-
                         let model_name = byte_stream.string(80);
                         let _node_name = byte_stream.string(80);
                         let position = byte_stream.vector3_flipped();
@@ -336,9 +317,7 @@ impl MapLoader {
                         objects.push(object);
                     }
                 }
-
                 ResourceType::LightSource => {
-
                     let name = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
                     let red = byte_stream.float32();
@@ -350,9 +329,7 @@ impl MapLoader {
 
                     light_sources.push(LightSource::new(name, position, color, range));
                 }
-
                 ResourceType::SoundSource => {
-
                     let name = byte_stream.string(80);
                     let sound_file = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
@@ -377,9 +354,7 @@ impl MapLoader {
                         cycle,
                     ));
                 }
-
                 ResourceType::EffectSource => {
-
                     let name = byte_stream.string(80);
                     let position = byte_stream.vector3_flipped();
                     let effect_type = byte_stream.integer32();
@@ -423,7 +398,6 @@ impl MapLoader {
         let mut textures = Vec::new();
 
         for _index in 0..texture_count {
-
             let texture_name = byte_stream.string(texture_name_length as usize);
             let texture = texture_loader.get(&texture_name, game_file_loader, &mut texture_future)?;
             textures.push(texture);
@@ -446,7 +420,6 @@ impl MapLoader {
         let mut surfaces = Vec::new();
 
         for _index in 0..surface_count {
-
             let u = [
                 byte_stream.float32(),
                 byte_stream.float32(),
@@ -471,7 +444,6 @@ impl MapLoader {
         let mut ground_tiles = Vec::new();
 
         for _index in 0..dimensions {
-
             let upper_left_height = byte_stream.float32();
             let upper_right_height = byte_stream.float32();
             let lower_left_height = byte_stream.float32();
@@ -513,7 +485,6 @@ impl MapLoader {
         let mut tile_picker_vertex_buffer = None;
 
         if let Some(gat_file) = gat_file {
-
             let bytes = game_file_loader.get(&format!("data\\{}", gat_file))?;
             let mut byte_stream = ByteStream::new(&bytes);
 
@@ -536,7 +507,6 @@ impl MapLoader {
 
             for y in 0..map_height {
                 for x in 0..map_width {
-
                     let upper_left_height = -byte_stream.float32();
                     let upper_right_height = -byte_stream.float32();
                     let lower_left_height = -byte_stream.float32();
@@ -651,15 +621,12 @@ impl MapLoader {
 
         for x in 0..width {
             for y in 0..height {
-
                 let current_tile = &ground_tiles[x + y * width];
 
                 for surface_type in [SurfaceType::Front, SurfaceType::Right, SurfaceType::Top].iter() {
-
                     let surface_index = tile_surface_index(current_tile, *surface_type);
 
                     if surface_index > -1 {
-
                         let surface_alignment = tile_surface_alignment(*surface_type);
                         let neighbor_tile_index = neighbor_tile_index(*surface_type);
 
@@ -758,7 +725,6 @@ impl MapLoader {
                 }
 
                 if -current_tile.get_lowest_point() < water_settings.water_level {
-
                     let first_position = Vector3::new(x as f32 * TILE_SIZE, water_settings.water_level, y as f32 * TILE_SIZE);
                     let second_position = Vector3::new(
                         TILE_SIZE + x as f32 * TILE_SIZE,
@@ -820,11 +786,9 @@ impl MapLoader {
             CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, ground_vertices.into_iter()).unwrap();
 
         let water_vertex_buffer = match !water_vertices.is_empty() {
-
             true => CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, water_vertices.into_iter())
                 .unwrap()
                 .into(),
-
             false => None,
         };
 

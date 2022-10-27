@@ -5,7 +5,7 @@ use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::{UserEvent, MouseInputMode};
+use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::*;
 use crate::network::CharacterInformation;
 
@@ -18,11 +18,8 @@ pub struct CharacterPreview {
 }
 
 impl CharacterPreview {
-
     fn get_elements(characters: &Remote<Vec<CharacterInformation>>, move_request: &Remote<Option<usize>>, slot: usize) -> Vec<ElementCell> {
-
         if let Some(origin_slot) = *move_request.borrow() {
-
             let text = match origin_slot == slot {
                 true => "click to cancel",
                 false => "switch",
@@ -40,7 +37,6 @@ impl CharacterPreview {
         let character_information = characters.iter().find(|character| character.character_number as usize == slot);
 
         if let Some(character_information) = character_information {
-
             return vec![
                 cell!(Text::new(
                     character_information.name.clone(),
@@ -72,7 +68,6 @@ impl CharacterPreview {
     }
 
     pub fn new(characters: Remote<Vec<CharacterInformation>>, move_request: Remote<Option<usize>>, slot: usize) -> Self {
-
         let elements = Self::get_elements(&characters, &move_request, slot);
         let state = ContainerState::new(elements);
 
@@ -90,7 +85,6 @@ impl CharacterPreview {
 }
 
 impl Element for CharacterPreview {
-
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -112,7 +106,6 @@ impl Element for CharacterPreview {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
-
         let size_constraint = &constraint!(20%, 150);
         self.state.resolve(
             placement_resolver,
@@ -124,21 +117,20 @@ impl Element for CharacterPreview {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-
         let characters_changed = self.characters.consume_changed();
         let move_request_changed = self.move_request.consume_changed();
 
         if characters_changed || move_request_changed {
-
             let weak_parent = self.state.state.parent_element.clone();
-            // Since the character container will always have at least one linked child element, we
-            // can get a reference to self there instead of storing it in self.
+            // Since the character container will always have at least one linked child
+            // element, we can get a reference to self there instead of storing
+            // it in self.
             let weak_self = self.state.elements[0].borrow().get_state().parent_element.clone().unwrap();
 
             *self = Self::new(self.characters.clone(), self.move_request.clone(), self.slot);
 
-            // important: link back after creating elements, otherwise focus navigation and scrolling
-            // would break
+            // important: link back after creating elements, otherwise focus navigation and
+            // scrolling would break
             self.state.link_back(weak_self, weak_parent);
 
             return Some(ChangeEvent::Reresolve); // TODO: ReresolveWindow
@@ -148,9 +140,7 @@ impl Element for CharacterPreview {
     }
 
     fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
-
         if let Some(origin_slot) = *self.move_request.borrow() {
-
             let event = match origin_slot == self.slot {
                 true => UserEvent::CancelSwitchCharacterSlot,
                 false => UserEvent::SwitchCharacterSlot(self.slot),
@@ -188,7 +178,6 @@ impl Element for CharacterPreview {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .state

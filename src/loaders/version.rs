@@ -11,9 +11,7 @@ pub struct Version {
 }
 
 impl ByteConvertable for Version {
-
     fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
-
         assert!(length_hint.is_none());
 
         // TODO: this should be the other way around?
@@ -25,7 +23,6 @@ impl ByteConvertable for Version {
 }
 
 impl Version {
-
     pub fn smaller(&self, major: u8, minor: u8) -> bool {
         self.major < major || (self.major == major && self.minor < minor)
     }
@@ -40,7 +37,6 @@ impl Version {
 }
 
 impl Display for Version {
-
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
         write!(formatter, "{}.{}", self.major, self.minor)
     }

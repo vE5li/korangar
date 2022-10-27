@@ -6,4 +6,4 @@ mod item;
 pub use self::action::ClickAction;
 pub use self::change::*;
 pub use self::hover::HoverInformation;
-pub use self::item::{ItemSource, ItemMove};
+pub use self::item::{ItemMove, ItemSource};

@@ -7,7 +7,6 @@ use num::{NumCast, Zero};
 use crate::interface::{ChangeEvent, ElementCell, *};
 
 pub trait PrototypeMutableRangeElement<T> {
-
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell;
 }
 
@@ -20,9 +19,7 @@ impl<T> IsVector for Vector3<T> {}
 impl<T> IsVector for Vector4<T> {}
 
 impl PrototypeMutableRangeElement<f32> for f32 {
-
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
-
         let elements: Vec<ElementCell> = vec![
             cell!(StaticLabel::new(display.clone())),
             cell!(MutableNumberValue::new(
@@ -43,9 +40,7 @@ where
     T: Array + ElementDisplay + IsVector + Copy + PartialEq + 'static, // TODO: !f32 or something
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
-
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
-
         let elements: Vec<ElementCell> = vec![
             cell!(StaticLabel::new(display.clone())),
             cell!(MutableVectorValue::new(

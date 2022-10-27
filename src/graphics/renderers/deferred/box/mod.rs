@@ -45,9 +45,7 @@ pub struct BoxRenderer {
 }
 
 impl BoxRenderer {
-
     pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
-
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -142,7 +140,6 @@ impl BoxRenderer {
         vertex_shader: &ShaderModule,
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
-
         GraphicsPipeline::start()
             .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
@@ -158,7 +155,6 @@ impl BoxRenderer {
     }
 
     pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
-
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
 
@@ -186,7 +182,6 @@ impl BoxRenderer {
         bounding_box: &BoundingBox,
         color: Color,
     ) {
-
         let layout = self.pipeline.layout().clone();
 
         let world_matrix = Model::bounding_box_matrix(bounding_box, transform);

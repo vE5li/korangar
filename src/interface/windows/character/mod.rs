@@ -1,7 +1,7 @@
 mod creation;
-mod selection;
 mod overview;
+mod selection;
 
 pub use self::creation::CharacterCreationWindow;
-pub use self::selection::CharacterSelectionWindow;
 pub use self::overview::CharacterOverviewWindow;
+pub use self::selection::CharacterSelectionWindow;

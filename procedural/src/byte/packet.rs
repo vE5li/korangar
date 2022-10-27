@@ -11,7 +11,6 @@ pub fn derive_packet_struct(
     mut attributes: Vec<Attribute>,
     name: Ident,
 ) -> InterfaceTokenStream {
-
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let Fields::Named(named_fields) = data_struct.fields else {

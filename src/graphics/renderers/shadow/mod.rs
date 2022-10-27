@@ -28,9 +28,7 @@ pub struct ShadowRenderer {
 }
 
 impl ShadowRenderer {
-
     pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
-
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -62,7 +60,6 @@ impl ShadowRenderer {
     }
 
     pub fn create_render_target(&self, size: u32) -> <Self as Renderer>::Target {
-
         let image_usage = ImageUsage {
             sampled: true,
             depth_stencil_attachment: true,
@@ -82,12 +79,10 @@ impl ShadowRenderer {
 }
 
 impl Renderer for ShadowRenderer {
-
     type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ShadowSubrenderer>;
 }
 
 impl GeometryRendererTrait for ShadowRenderer {
-
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -99,7 +94,6 @@ impl GeometryRendererTrait for ShadowRenderer {
     ) where
         Self: Renderer,
     {
-
         if render_target.bind_subrenderer(ShadowSubrenderer::Geometry) {
             self.geometry_renderer.bind_pipeline(render_target, camera, time);
         }
@@ -110,7 +104,6 @@ impl GeometryRendererTrait for ShadowRenderer {
 }
 
 impl EntityRendererTrait for ShadowRenderer {
-
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -126,7 +119,6 @@ impl EntityRendererTrait for ShadowRenderer {
     ) where
         Self: Renderer,
     {
-
         if render_target.bind_subrenderer(ShadowSubrenderer::Entity) {
             self.entity_renderer.bind_pipeline(render_target, camera);
         }

@@ -13,12 +13,10 @@ pub struct Headline {
 }
 
 impl Headline {
-
     pub const DEFAULT_SIZE: SizeConstraint = constraint!(100%, 12);
 }
 
 impl Element for Headline {
-
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -49,7 +47,6 @@ impl Element for Headline {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);

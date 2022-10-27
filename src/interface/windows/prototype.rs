@@ -1,7 +1,6 @@
 use crate::interface::{InterfaceSettings, Size, Window, WindowCache};
 
 pub trait PrototypeWindow {
-
     fn window_class(&self) -> Option<&str> {
         None
     }

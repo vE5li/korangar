@@ -7,7 +7,6 @@ use procedural::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 #[cfg(feature = "debug")]
 use vulkano::device::Device;
-
 use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]

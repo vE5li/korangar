@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::{Weak};
+use std::rc::Weak;
 
 use cgmath::Array;
 use procedural::*;

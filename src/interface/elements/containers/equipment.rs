@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cgmath::{Array};
+use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};

@@ -5,7 +5,6 @@ use vulkano::sync::GpuFuture;
 
 use super::InterfaceSettings;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
-
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
 
 #[derive(Copy, Clone, PartialEq, Eq)]

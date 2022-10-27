@@ -1,7 +1,4 @@
-
-
-
-use cgmath::{Vector3};
+use cgmath::Vector3;
 use derive_new::new;
 
 #[cfg(feature = "debug")]

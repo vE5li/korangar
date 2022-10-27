@@ -7,7 +7,6 @@ use crate::input::MouseInputMode;
 use crate::interface::*;
 use crate::inventory::Item;
 
-
 #[derive(new)]
 pub struct ItemBox {
     item: Option<Item>,

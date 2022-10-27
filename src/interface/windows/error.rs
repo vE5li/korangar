@@ -33,6 +33,7 @@ impl PrototypeWindow for ErrorWindow {
             None,
             elements,
             constraint!(300 > 400 < 500, ?),
+            true,
         ))
     }
 }

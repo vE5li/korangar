@@ -41,4 +41,8 @@ impl Dimension {
     pub fn is_remaining(&self) -> bool {
         matches!(self, Dimension::Remaining)
     }
+
+    pub fn is_absolute(&self) -> bool {
+        matches!(self, Dimension::Absolute(_))
+    }
 }

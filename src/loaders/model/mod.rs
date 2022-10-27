@@ -48,9 +48,9 @@ pub struct TextureCoordinateData {
 #[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct NodeData {
     #[length_hint(40)]
-    pub node_name: String,
+    pub node_name: ModelString,
     #[length_hint(40)]
-    pub parent_node_name: String,
+    pub parent_node_name: ModelString, // This is where 2.2 starts failing
     pub texture_count: u32,
     #[repeating(self.texture_count)]
     pub texture_indices: Vec<u32>,
@@ -79,6 +79,30 @@ pub struct NodeData {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PrototypeElement)]
+pub struct ModelString {
+    pub inner: String,
+}
+
+impl ByteConvertable for ModelString {
+
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+
+        let inner = if byte_stream.get_version().equals_or_above(2, 2) {
+
+            let length = u32::from_bytes(byte_stream, None) as usize;
+            let mut inner = String::from_bytes(byte_stream, Some(length));
+            // need to remove the last character for some reason
+            inner.pop();
+            inner
+        } else {
+            String::from_bytes(byte_stream, length_hint)
+        };
+
+        Self { inner }
+    }
+}
+
 #[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct ModelData {
     //#[version]
@@ -87,13 +111,18 @@ pub struct ModelData {
     pub shade_type: u32,
     #[version_equals_or_above(1, 4)]
     pub alpha: Option<u8>,
-    pub reserved: [u8; 16],
+    #[version_smaller(2, 2)]
+    pub reserved0: Option<[u8; 16]>,
+    #[version_equals_or_above(2, 2)]
+    pub reserved1: Option<[u8; 4]>,
     pub texture_count: u32,
     #[repeating(self.texture_count)]
     #[length_hint(40)]
-    pub texture_names: Vec<String>,
+    pub texture_names: Vec<ModelString>,
+    #[version_equals_or_above(2, 2)]
+    pub skip: Option<u32>,
     #[length_hint(40)]
-    pub root_node_name: String,
+    pub root_node_name: ModelString,
     pub node_count: u32,
     #[repeating(self.node_count)]
     pub nodes: Vec<NodeData>,
@@ -226,7 +255,7 @@ impl ModelLoader {
         textures: &Vec<Texture>,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut BoundingBox,
-        root_node_name: &str,
+        root_node_name: &ModelString,
         reverse_order: bool,
     ) -> Node {
 
@@ -243,7 +272,7 @@ impl ModelLoader {
         );
         main_bounding_box.extend(&bounding_box);
 
-        let final_matrix = match current_node.node_name.as_str() == root_node_name {
+        let final_matrix = match current_node.node_name == *root_node_name {
 
             true => {
                 Matrix4::from_translation(-Vector3::new(
@@ -322,13 +351,15 @@ impl ModelLoader {
         let textures = model_data
             .texture_names
             .iter()
-            .map(|texture_name| texture_loader.get(texture_name, game_file_loader, texture_future).unwrap())
+            .map(|texture_name| texture_loader.get(&texture_name.inner, game_file_loader, texture_future).unwrap())
             .collect();
+
+        let root_node_name = &model_data.root_node_name;
 
         let root_node = model_data
             .nodes
             .iter()
-            .find(|node_data| node_data.node_name == model_data.root_node_name)
+            .find(|node_data| &node_data.node_name == root_node_name)
             .expect("failed to find main node");
 
         let mut bounding_box = BoundingBox::uninitialized();
@@ -339,7 +370,7 @@ impl ModelLoader {
             &textures,
             &Matrix4::identity(),
             &mut bounding_box,
-            &model_data.root_node_name,
+            &root_node_name,
             reverse_order,
         );
         let model = Arc::new(Model::new(

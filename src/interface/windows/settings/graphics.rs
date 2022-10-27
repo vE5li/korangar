@@ -41,6 +41,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
             Self::WINDOW_CLASS.to_string().into(),
             elements,
             constraint!(200 > 250 < 300, ?),
+            true,
         ))
     }
 }

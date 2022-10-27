@@ -199,6 +199,7 @@ pub enum RenderTargetState {
     Rendering(AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
     Semaphore(SemaphoreSignalFuture<Box<dyn GpuFuture>>),
     Fence(FenceSignalFuture<Box<dyn GpuFuture>>),
+    OutOfDate,
 }
 
 unsafe impl Send for RenderTargetState {}
@@ -415,15 +416,15 @@ impl DeferredRenderTarget {
 
         let command_buffer = builder.build().unwrap();
 
-        let fence = semaphore
+        self.state = semaphore
             .then_execute(self.queue.clone(), command_buffer)
             .unwrap()
             .then_swapchain_present(self.queue.clone(), swapchain, image_number)
             .boxed()
             .then_signal_fence_and_flush()
-            .unwrap();
+            .map(RenderTargetState::Fence)
+            .unwrap_or(RenderTargetState::OutOfDate);
 
-        self.state = RenderTargetState::Fence(fence);
         self.bound_subrenderer = None;
     }
 }

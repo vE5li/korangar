@@ -43,6 +43,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
             None,
             elements,
             constraint!(200 > 250 < 300, ?),
+            true,
         ))
     }
 }

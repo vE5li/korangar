@@ -6,6 +6,7 @@ use num::traits::NumOps;
 use num::{clamp, NumCast, Zero};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 #[derive(new)]
@@ -47,8 +48,12 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         None
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        match mouse_mode {
+            MouseInputMode::None => self.state.hovered_element(mouse_position),
+            MouseInputMode::DragElement((element, _)) if self.is_element_self(Some(&*element.borrow())) => HoverInformation::Hovered,
+            _ => HoverInformation::Missed,
+        }
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
@@ -82,6 +87,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
 

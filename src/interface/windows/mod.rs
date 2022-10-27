@@ -5,6 +5,8 @@ mod chat;
 mod dialog;
 mod error;
 mod framed;
+mod inventory;
+mod equipment;
 mod login;
 #[cfg(feature = "debug")]
 mod maps;
@@ -26,6 +28,8 @@ pub use self::chat::*;
 pub use self::dialog::DialogWindow;
 pub use self::error::ErrorWindow;
 pub use self::framed::FramedWindow;
+pub use self::inventory::InventoryWindow;
+pub use self::equipment::EquipmentWindow;
 pub use self::login::LoginWindow;
 #[cfg(feature = "debug")]
 pub use self::maps::MapsWindow;

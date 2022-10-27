@@ -2,7 +2,7 @@ use procedural::dimension;
 
 use super::{ElementEvent, ElementText};
 use crate::graphics::{InterfaceRenderer, Renderer};
-use crate::input::UserEvent;
+use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::{Element, *};
 
 #[derive(Default)]
@@ -42,7 +42,7 @@ impl Button {
         self
     }
 
-    pub fn with_closure(mut self, closure: impl Fn() + 'static) -> Self {
+    pub fn with_closure(mut self, closure: impl FnMut() + 'static) -> Self {
 
         self.event = Some(ElementEvent::Closure(Box::new(closure)));
         self
@@ -106,8 +106,11 @@ impl Element for Button {
         self.state.resolve(placement_resolver, &size_constraint);
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        match mouse_mode {
+            MouseInputMode::None => self.state.hovered_element(mouse_position),
+            _ => HoverInformation::Missed,
+        }
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
@@ -116,7 +119,7 @@ impl Element for Button {
             return None;
         }
 
-        self.event.as_ref().and_then(ElementEvent::execute)
+        self.event.as_mut().and_then(ElementEvent::execute)
     }
 
     fn render(
@@ -130,6 +133,7 @@ impl Element for Button {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
 

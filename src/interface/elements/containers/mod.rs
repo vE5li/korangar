@@ -2,6 +2,8 @@ mod character;
 mod default;
 mod dialog;
 mod expandable;
+mod inventory;
+mod equipment;
 #[cfg(feature = "debug_network")]
 mod packet;
 mod scroll;
@@ -17,9 +19,12 @@ pub use self::character::CharacterPreview;
 pub use self::default::Container;
 pub use self::dialog::{DialogContainer, DialogElement};
 pub use self::expandable::Expandable;
+pub use self::inventory::InventoryContainer;
+pub use self::equipment::EquipmentContainer;
 #[cfg(feature = "debug_network")]
-pub use self::packet::{PacketEntry, PacketView, TrackedState};
+pub use self::packet::{PacketEntry, PacketView};
 pub use self::scroll::ScrollView;
+use crate::input::MouseInputMode;
 use crate::interface::*;
 
 #[derive(new)]
@@ -148,8 +153,13 @@ impl ContainerState {
                 return Some(self_cell);
             }
 
+            let start_index = match focus.mode {
+                FocusMode::FocusNext => 0,
+                FocusMode::FocusPrevious => self.elements.len().saturating_sub(1),
+            };
+
             return self
-                .get_next_element(0, focus.mode, &mut false)
+                .get_next_element(start_index, focus.mode, &mut false)
                 .and_then(|element| element.borrow().focus_next(element.clone(), Some(self_cell), focus));
         }
 
@@ -274,7 +284,7 @@ impl ContainerState {
             })
     }
 
-    pub fn hovered_element<const HOVERABLE: bool>(&self, mouse_position: Position) -> HoverInformation {
+    pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode, hoverable: bool) -> HoverInformation {
 
         let absolute_position = mouse_position - self.state.cached_position;
 
@@ -285,14 +295,14 @@ impl ContainerState {
         {
 
             for element in &self.elements {
-                match element.borrow().hovered_element(absolute_position) {
+                match element.borrow().hovered_element(absolute_position, mouse_mode) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
                     HoverInformation::Missed => {}
                     hover_information => return hover_information,
                 }
             }
 
-            if HOVERABLE {
+            if hoverable {
                 return HoverInformation::Hovered;
             }
         }
@@ -308,6 +318,7 @@ impl ContainerState {
         theme: &Theme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -320,6 +331,7 @@ impl ContainerState {
                 theme,
                 hovered_element,
                 focused_element,
+                mouse_mode,
                 second_theme,
             )
         });

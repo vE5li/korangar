@@ -38,7 +38,6 @@ impl PrototypeWindow for CharacterCreationWindow {
         let selector = {
 
             let name = name.clone();
-
             move || name.borrow().len() >= MINIMUM_NAME_LENGTH
         };
 
@@ -75,6 +74,7 @@ impl PrototypeWindow for CharacterCreationWindow {
             Self::WINDOW_CLASS.to_string().into(),
             elements,
             constraint!(200 > 250 < 300, ? < 80%),
+            true,
         ))
     }
 }

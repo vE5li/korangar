@@ -2,7 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 #![feature(unzip_option)]
 #![feature(option_zip)]
-#![feature(let_else)]
 #![feature(adt_const_params)]
 #![feature(arc_unwrap_or_clone)]
 #![feature(option_result_contains)]
@@ -20,6 +19,7 @@ mod input;
 mod system;
 mod graphics;
 mod interface;
+mod inventory;
 mod loaders;
 mod network;
 mod world;
@@ -43,8 +43,9 @@ use winit::window::WindowBuilder;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::*;
-use crate::input::{FocusState, InputSystem, UserEvent};
+use crate::input::{FocusState, InputSystem, MouseInputMode, UserEvent};
 use crate::interface::*;
+use crate::inventory::Inventory;
 use crate::loaders::*;
 use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
 use crate::system::{get_device_extensions, get_instance_extensions, get_layers, GameTimer};
@@ -131,7 +132,11 @@ fn main() {
     game_file_loader.patch();
     game_file_loader.add_archive("lua_files.grf".to_string());
 
-    let _font_loader = Rc::new(RefCell::new(FontLoader::new(device.clone(), queue.clone())));
+    let _font_loader = Rc::new(RefCell::new(FontLoader::new(
+        device.clone(),
+        queue.clone(),
+        &mut game_file_loader,
+    )));
 
     let mut model_loader = ModelLoader::new(device.clone());
     let mut texture_loader = TextureLoader::new(device.clone(), queue.clone());
@@ -274,6 +279,7 @@ fn main() {
 
     let mut particle_holder = ParticleHolder::default();
     let mut entities = Vec::<Entity>::new();
+    let mut player_inventory = Inventory::default();
 
     // move
     const TIME_FACTOR: f32 = 1000.0;
@@ -317,6 +323,16 @@ fn main() {
                     focus_state.remove_focus();
                 }
             }
+
+            Event::WindowEvent {
+                event: WindowEvent::CursorLeft { .. },
+                ..
+            } => interface.hide_mouse_cursor(),
+
+            Event::WindowEvent {
+                event: WindowEvent::CursorEntered { .. },
+                ..
+            } => interface.show_mouse_cursor(),
 
             Event::WindowEvent {
                 event: WindowEvent::CursorMoved { position, .. },
@@ -441,8 +457,8 @@ fn main() {
 
                             particle_holder.clear();
                             networking_system.map_loaded();
-                            // TODO: this is just a workaround until i find a better solution to make the cursor always look
-                            // correct.
+                            // TODO: this is just a workaround until i find a better solution to make the
+                            // cursor always look correct.
                             interface.set_start_time(game_timer.get_client_tick());
                         }
 
@@ -509,10 +525,33 @@ fn main() {
 
                         NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
 
-                        NetworkEvent::Inventory(inventory) => {
-                            for stack in inventory {
-                                println!("item: {}", script_loader.get_item_name_from_id(stack));
-                            }
+                        NetworkEvent::Inventory(item_data) => {
+
+                            player_inventory.fill(
+                                &mut game_file_loader,
+                                &mut texture_loader,
+                                &mut texture_future,
+                                &script_loader,
+                                item_data,
+                            );
+                        }
+
+                        NetworkEvent::AddIventoryItem(item_index, item_data, equip_position, equipped_position) => {
+
+                            player_inventory.add_item(
+                                &mut game_file_loader,
+                                &mut texture_loader,
+                                &mut texture_future,
+                                &script_loader,
+                                item_index,
+                                item_data,
+                                equip_position,
+                                equipped_position,
+                            );
+                        }
+
+                        NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
+                            player_inventory.update_equipped_position(index, equipped_position);
                         }
                     }
                 }
@@ -557,6 +596,14 @@ fn main() {
 
                         UserEvent::OpenMenuWindow => interface.open_window(&mut focus_state, &MenuWindow::default()),
 
+                        UserEvent::OpenInventoryWindow => {
+                            interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_item_state()))
+                        }
+
+                        UserEvent::OpenEquipmentWindow => {
+                            interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_item_state()))
+                        }
+
                         UserEvent::OpenGraphicsSettingsWindow => {
                             interface.open_window(&mut focus_state, &GraphicsSettingsWindow::default())
                         }
@@ -575,6 +622,7 @@ fn main() {
                                     // TODO: this will do one unnecessary restore_focus. check if
                                     // that will be problematic
                                     interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
+                                    interface.open_window(&mut focus_state, &CharacterOverviewWindow::new());
                                     interface.open_window(&mut focus_state, &PrototypeChatWindow::new(chat_messages.clone()));
 
                                     map = map_loader
@@ -599,8 +647,8 @@ fn main() {
 
                                     particle_holder.clear();
                                     networking_system.map_loaded();
-                                    // TODO: this is just a workaround until i find a better solution to make the cursor always look
-                                    // correct.
+                                    // TODO: this is just a workaround until i find a better solution to make the
+                                    // cursor always look correct.
                                     interface.set_start_time(client_tick);
                                     game_timer.set_client_tick(client_tick);
                                 }
@@ -664,7 +712,27 @@ fn main() {
                             interface.close_dialog_window(&mut focus_state);
                         }
 
-                        UserEvent::ChooseDialogOption(npc_id, option) => networking_system.choose_dialog_option(npc_id, option),
+                        UserEvent::ChooseDialogOption(npc_id, option) => {
+
+                            networking_system.choose_dialog_option(npc_id, option);
+
+                            if option == -1 {
+                                interface.close_dialog_window(&mut focus_state);
+                            }
+                        }
+
+                        UserEvent::MoveItem(item_move) => match (item_move.source, item_move.destination) {
+
+                            (ItemSource::Inventory, ItemSource::Equipment { position }) => {
+                                networking_system.request_item_equip(item_move.item.index, position);
+                            }
+
+                            (ItemSource::Equipment { .. }, ItemSource::Inventory) => {
+                                networking_system.request_item_unequip(item_move.item.index);
+                            }
+
+                            _ => {}
+                        },
 
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleFrustumCulling => render_settings.toggle_frustum_culling(),
@@ -848,8 +916,6 @@ fn main() {
                 directional_shadow_camera.update(day_timer);
 
                 let (clear_interface, rerender_interface) = interface.update(&mut focus_state, game_timer.get_client_tick());
-
-                networking_system.changes_applied();
 
                 if swapchain_holder.is_swapchain_invalid() {
 
@@ -1099,6 +1165,7 @@ fn main() {
                             state_provider,
                             hovered_element,
                             focused_element,
+                            input_system.get_mouse_mode(),
                         );
 
                         interface_target.finish();
@@ -1133,7 +1200,7 @@ fn main() {
                         if let Some(name) = &entity.get_details() {
 
                             let name = name.split('#').next().unwrap();
-                            interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.mouse_position());
+                            interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.get_mouse_position());
                         }
 
                         entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
@@ -1151,7 +1218,18 @@ fn main() {
                 if render_settings.show_interface {
 
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
-                    interface.render_mouse_cursor(screen_target, &deferred_renderer, input_system.mouse_position());
+
+                    let grabbed_item = match input_system.get_mouse_mode() {
+                        MouseInputMode::MoveItem(_, item) => Some(item.texture.clone()),
+                        _ => None,
+                    };
+
+                    interface.render_mouse_cursor(
+                        screen_target,
+                        &deferred_renderer,
+                        input_system.get_mouse_position(),
+                        grabbed_item,
+                    );
                 }
 
                 let interface_future = interface_target

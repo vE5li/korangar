@@ -56,7 +56,6 @@ pub enum EntityType {
     Player,
     Npc,
     Monster,
-    Unknown,
 }
 
 #[derive(PrototypeElement)]
@@ -113,7 +112,7 @@ impl Common {
             0..=44 | 4000..=5999 => EntityType::Player,
             46..=999 => EntityType::Npc,
             1000..=3999 => EntityType::Monster,
-            _ => EntityType::Unknown,
+            _ => EntityType::Npc,
         };
 
         let file_path = match entity_type {
@@ -121,7 +120,6 @@ impl Common {
             EntityType::Npc => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)),
             EntityType::Monster => format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(job_id)),
             EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
-            EntityType::Unknown => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)),                   // TODO:
         };
 
         let sprite = sprite_loader
@@ -488,17 +486,18 @@ impl Common {
     {
 
         let camera_direction = camera.get_camera_direction();
-        let (texture, mirror) = self
+        let (texture, position, mirror) = self
             .actions
             .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
-        let texture_height = (texture.image().dimensions().height() as f32 / 10.0) * 0.2;
+
+        //let texture_height = (texture.image().dimensions().height() as f32 / 10.0) * 0.2;
 
         renderer.render_entity(
             render_target,
             camera,
             texture,
             self.position,
-            Vector3::new(0.0, texture_height, 0.0),
+            Vector3::new(position.x, position.y, 0.0),
             Vector2::from_value(1.0),
             Vector2::new(1, 1),
             Vector2::new(0, 0),

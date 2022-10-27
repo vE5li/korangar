@@ -1,5 +1,6 @@
 use cgmath::Vector2;
 
+use crate::interface::ItemMove;
 use crate::world::MarkerIdentifier;
 
 #[derive(Clone, Debug)]
@@ -13,6 +14,8 @@ pub enum UserEvent {
     CameraRotate(f32),
     ToggleFrameLimit,
     OpenMenuWindow,
+    OpenInventoryWindow,
+    OpenEquipmentWindow,
     OpenGraphicsSettingsWindow,
     OpenAudioSettingsWindow,
     ReloadTheme,
@@ -31,6 +34,7 @@ pub enum UserEvent {
     NextDialog(u32),
     CloseDialog(u32),
     ChooseDialogOption(u32, i8),
+    MoveItem(ItemMove),
     #[cfg(feature = "debug")]
     ToggleFrustumCulling,
     #[cfg(feature = "debug")]

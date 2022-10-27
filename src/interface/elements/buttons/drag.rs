@@ -1,11 +1,13 @@
 use derive_new::new;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 #[derive(new)]
 pub struct DragButton {
     window_title: String,
+    width_constraint: DimensionConstraint,
     #[new(default)]
     state: ElementState,
 }
@@ -21,15 +23,22 @@ impl Element for DragButton {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
-        self.state.resolve(placement_resolver, &theme.window.title_size_constraint);
+
+        let size_constraint = self.width_constraint.add_height(theme.window.title_height);
+
+        self.state.resolve(placement_resolver, &size_constraint);
     }
 
     fn is_focusable(&self) -> bool {
         false
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        match mouse_mode {
+            MouseInputMode::None => self.state.hovered_element(mouse_position),
+            MouseInputMode::DragElement((element, _)) if self.is_element_self(Some(&*element.borrow())) => HoverInformation::Hovered,
+            _ => HoverInformation::Missed,
+        }
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
@@ -47,6 +56,7 @@ impl Element for DragButton {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
 

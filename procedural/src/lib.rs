@@ -1,4 +1,3 @@
-#![feature(let_else)]
 #![feature(extend_one)]
 #![feature(drain_filter)]
 

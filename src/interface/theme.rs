@@ -60,7 +60,7 @@ pub struct WindowTheme {
     pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
     pub gaps: MutableRange<Vector2<f32>, RERESOLVE>,
     pub font_size: MutableRange<f32, RERENDER>,
-    pub title_size_constraint: SizeConstraint,
+    pub title_height: DimensionConstraint,
 }
 
 impl Default for WindowTheme {
@@ -77,7 +77,7 @@ impl Default for WindowTheme {
             text_offset: MutableRange::new(Vector2::new(5.0, -1.0), Vector2::zero(), Vector2::new(50.0, 30.0)),
             gaps: MutableRange::new(Vector2::new(4.0, 5.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            title_size_constraint: constraint!(80%, 12),
+            title_height: dimension!(12),
         }
     }
 }

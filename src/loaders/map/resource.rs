@@ -14,7 +14,7 @@ impl ResourceType {
             2 => ResourceType::LightSource,
             3 => ResourceType::SoundSource,
             4 => ResourceType::EffectSource,
-            invalid => panic!("invalid object type {}", invalid),
+            _ => panic!("invalid object type {}", index),
         }
     }
 }

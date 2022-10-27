@@ -1,6 +1,7 @@
 use cgmath::Vector2;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 pub trait Window {
@@ -22,7 +23,7 @@ pub trait Window {
 
     fn restore_focus(&self) -> Option<ElementCell>;
 
-    fn hovered_element(&self, mouse_position: Vector2<f32>) -> HoverInformation;
+    fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation;
 
     fn get_area(&self) -> (Position, Size);
 
@@ -51,5 +52,6 @@ pub trait Window {
         theme: &Theme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
     );
 }

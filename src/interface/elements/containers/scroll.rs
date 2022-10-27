@@ -3,6 +3,7 @@ use std::rc::Weak;
 use cgmath::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 const SCROLL_SPEED: f32 = 0.8;
@@ -69,8 +70,8 @@ impl Element for ScrollView {
         self.state.update()
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element::<true>(mouse_position + Vector2::new(0.0, self.scroll))
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        self.state.hovered_element(mouse_position + Vector2::new(0.0, self.scroll), mouse_mode, mouse_mode.is_none())
     }
 
     fn scroll(&mut self, delta: f32) -> Option<ChangeEvent> {
@@ -91,6 +92,7 @@ impl Element for ScrollView {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -108,6 +110,7 @@ impl Element for ScrollView {
             theme,
             hovered_element,
             focused_element,
+            mouse_mode,
             second_theme,
         );
     }

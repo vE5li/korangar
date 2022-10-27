@@ -4,6 +4,7 @@ use num::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 pub struct Expandable {
@@ -122,7 +123,7 @@ impl Element for Expandable {
         self.state.update()
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
 
         let absolute_position = mouse_position - self.state.state.cached_position;
 
@@ -134,7 +135,7 @@ impl Element for Expandable {
 
             if self.expanded {
                 for element in &self.state.elements {
-                    match element.borrow().hovered_element(absolute_position) {
+                    match element.borrow().hovered_element(absolute_position, mouse_mode) {
                         HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
                         HoverInformation::Missed => {}
                         hover_information => return hover_information,
@@ -142,7 +143,9 @@ impl Element for Expandable {
                 }
             }
 
-            return HoverInformation::Hovered;
+            if mouse_mode.is_none() {
+                return HoverInformation::Hovered;
+            }
         }
 
         HoverInformation::Missed
@@ -166,6 +169,7 @@ impl Element for Expandable {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -209,6 +213,7 @@ impl Element for Expandable {
                 theme,
                 hovered_element,
                 focused_element,
+                mouse_mode,
                 !second_theme,
             );
         }

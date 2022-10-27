@@ -2,6 +2,7 @@ mod event;
 mod layout;
 mod provider;
 mod settings;
+mod state;
 mod theme;
 #[macro_use]
 mod elements;
@@ -21,16 +22,16 @@ pub use self::event::*;
 pub use self::layout::*;
 pub use self::provider::StateProvider;
 pub use self::settings::InterfaceSettings;
+pub use self::state::{Remote, TrackedState};
 pub use self::theme::Theme;
 pub use self::windows::*;
-use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer};
-use crate::input::FocusState;
+use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer, Texture};
+use crate::input::{FocusState, MouseInputMode};
 use crate::loaders::{ActionLoader, GameFileLoader, SpriteLoader};
 
 #[derive(new)]
 struct DialogHandle {
-    elements: Rc<RefCell<Vec<DialogElement>>>,
-    changed: Rc<RefCell<bool>>,
+    elements: TrackedState<Vec<DialogElement>>,
     clear: bool,
 }
 
@@ -42,6 +43,7 @@ pub struct Interface {
     theme: Theme,
     dialog_handle: Option<DialogHandle>,
     mouse_cursor: MouseCursor,
+    mouse_cursor_hidden: bool,
     reresolve: bool,
     rerender: bool,
 }
@@ -61,6 +63,7 @@ impl Interface {
         let theme = Theme::new(&interface_settings.theme_file);
         let dialog_handle = None;
         let mouse_cursor = MouseCursor::new(game_file_loader, sprite_loader, action_loader, texture_future);
+        let mouse_cursor_hidden = false;
 
         Self {
             windows: Vec::new(),
@@ -70,6 +73,7 @@ impl Interface {
             theme,
             dialog_handle,
             mouse_cursor,
+            mouse_cursor_hidden,
             reresolve: false,
             rerender: true, // set to true initially to clear the interface buffer
         }
@@ -101,8 +105,8 @@ impl Interface {
         }
     }
 
-    // TODO: this is just a workaround until i find a better solution to make the cursor always look
-    // correct.
+    // TODO: this is just a workaround until i find a better solution to make the
+    // cursor always look correct.
     pub fn set_start_time(&mut self, client_tick: u32) {
         self.mouse_cursor.set_start_time(client_tick);
     }
@@ -177,10 +181,10 @@ impl Interface {
         self.reresolve = true;
     }
 
-    pub fn hovered_element(&self, mouse_position: Position) -> (Option<ElementCell>, Option<usize>) {
+    pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> (Option<ElementCell>, Option<usize>) {
 
         for (window_index, (window, _reresolve, _rerender)) in self.windows.iter().enumerate().rev() {
-            match window.hovered_element(mouse_position) {
+            match window.hovered_element(mouse_position, mouse_mode) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
                 HoverInformation::Hovered => return (None, Some(window_index)),
                 HoverInformation::Missed => {}
@@ -329,6 +333,7 @@ impl Interface {
         state_provider: &StateProvider,
         hovered_element: Option<ElementCell>,
         focused_element: Option<ElementCell>,
+        mouse_mode: &MouseInputMode,
     ) {
 
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
@@ -345,6 +350,7 @@ impl Interface {
                     &self.theme,
                     hovered_element,
                     focused_element,
+                    mouse_mode,
                 );
                 *rerender = false;
             }
@@ -393,9 +399,19 @@ impl Interface {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         mouse_position: Position,
+        grabbed_item: Option<Texture>,
     ) {
-        self.mouse_cursor
-            .render(render_target, renderer, mouse_position, *self.theme.cursor.color);
+        if !self.mouse_cursor_hidden {
+
+            self.mouse_cursor.render(
+                render_target,
+                renderer,
+                mouse_position,
+                grabbed_item,
+                *self.theme.cursor.color,
+                &self.interface_settings,
+            );
+        }
     }
 
     fn window_exists(&self, window_class: Option<&str>) -> bool {
@@ -430,20 +446,21 @@ impl Interface {
     pub fn open_dialog_window(&mut self, focus_state: &mut FocusState, text: String, npc_id: u32) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
 
-            let mut elements = dialog_handle.elements.borrow_mut();
+            dialog_handle.elements.with_mut(|elements, changed| {
 
-            if dialog_handle.clear {
+                if dialog_handle.clear {
 
-                elements.clear();
-                dialog_handle.clear = false;
-            }
+                    elements.clear();
+                    dialog_handle.clear = false;
+                }
 
-            elements.push(DialogElement::Text(text));
-            *dialog_handle.changed.borrow_mut() = true;
+                elements.push(DialogElement::Text(text));
+                changed();
+            });
         } else {
 
-            let (window, elements, changed) = DialogWindow::new(text, npc_id);
-            self.dialog_handle = Some(DialogHandle::new(elements, changed, false));
+            let (window, elements) = DialogWindow::new(text, npc_id);
+            self.dialog_handle = Some(DialogHandle::new(elements, false));
             self.open_window(focus_state, &window);
         }
     }
@@ -451,39 +468,38 @@ impl Interface {
     pub fn add_next_button(&mut self) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
 
-            let mut elements = dialog_handle.elements.borrow_mut();
-            elements.push(DialogElement::NextButton);
-
-            *dialog_handle.changed.borrow_mut() = true;
+            dialog_handle.elements.push(DialogElement::NextButton);
             dialog_handle.clear = true;
         }
     }
 
     pub fn add_close_button(&mut self) {
-        if let Some(dialog_handle) = &self.dialog_handle {
+        if let Some(dialog_handle) = &mut self.dialog_handle {
 
-            let mut elements = dialog_handle.elements.borrow_mut();
-            elements.retain(|element| *element != DialogElement::NextButton);
-            elements.push(DialogElement::CloseButton);
+            dialog_handle.elements.with_mut(|elements, changed| {
 
-            *dialog_handle.changed.borrow_mut() = true;
+                elements.retain(|element| *element != DialogElement::NextButton);
+                elements.push(DialogElement::CloseButton);
+                changed();
+            });
         }
     }
 
     pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
-        if let Some(dialog_handle) = &self.dialog_handle {
+        if let Some(dialog_handle) = &mut self.dialog_handle {
 
-            let mut elements = dialog_handle.elements.borrow_mut();
-            elements.retain(|element| *element != DialogElement::NextButton);
+            dialog_handle.elements.with_mut(move |elements, changed| {
 
-            choices
-                .into_iter()
-                .enumerate()
-                .for_each(|(index, choice)| elements.push(DialogElement::ChoiceButton(choice, index as i8 + 1)));
+                elements.retain(|element| *element != DialogElement::NextButton);
 
-            elements.push(DialogElement::ChoiceButton("cancel".to_string(), -1));
+                choices
+                    .into_iter()
+                    .enumerate()
+                    .for_each(|(index, choice)| elements.push(DialogElement::ChoiceButton(choice, index as i8 + 1)));
 
-            *dialog_handle.changed.borrow_mut() = true;
+                elements.push(DialogElement::ChoiceButton("cancel".to_string(), -1));
+                changed();
+            });
         }
     }
 
@@ -500,6 +516,7 @@ impl Interface {
             let window = self
                 .theme
                 .to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
+
             self.open_new_window(focus_state, window);
         }
     }
@@ -509,8 +526,8 @@ impl Interface {
         let (window, ..) = self.windows.remove(window_index);
         self.rerender = true;
 
-        // drop window in another thread to avoid frame drops when deallocation a large amount of
-        // elements
+        // drop window in another thread to avoid frame drops when deallocation a large
+        // amount of elements
 
         #[allow(dead_code)]
         struct WindowSender {
@@ -571,5 +588,13 @@ impl Interface {
         let element = self.windows.last().unwrap().0.restore_focus();
 
         focus_state.set_focused_element(element, window_index);
+    }
+
+    pub fn hide_mouse_cursor(&mut self) {
+        self.mouse_cursor_hidden = true;
+    }
+
+    pub fn show_mouse_cursor(&mut self) {
+        self.mouse_cursor_hidden = false;
     }
 }

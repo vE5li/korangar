@@ -28,12 +28,12 @@ impl ElementText {
 enum ElementEvent {
     Event(UserEvent),
     ActionClosure(Box<dyn Fn() -> Option<ClickAction>>),
-    Closure(Box<dyn Fn()>),
+    Closure(Box<dyn FnMut()>),
 }
 
 impl ElementEvent {
 
-    pub fn execute(&self) -> Option<ClickAction> {
+    pub fn execute(&mut self) -> Option<ClickAction> {
         match self {
 
             Self::Event(user_event) => Some(ClickAction::Event(user_event.clone())),

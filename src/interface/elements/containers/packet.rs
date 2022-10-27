@@ -1,3 +1,4 @@
+use std::cell::Ref;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Weak;
 
@@ -5,43 +6,8 @@ use cgmath::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
-
-pub struct TrackedState<T> {
-    inner: T,
-    changed: bool,
-}
-
-impl<T> TrackedState<T> {
-
-    pub fn new(inner: T) -> TrackedState<T> {
-        Self { inner, changed: false }
-    }
-
-    pub fn get(&self) -> &T {
-        &self.inner
-    }
-
-    pub fn consume_changed(&mut self) -> bool {
-
-        let changed = self.changed;
-        self.changed = false;
-        changed
-    }
-}
-
-// TODO: uncomment once rust supports this
-//impl<T: Not> TrackedState<T>
-//where T::Output = T
-
-impl TrackedState<bool> {
-
-    pub fn toggle(&mut self) {
-
-        self.inner = !self.inner;
-        self.changed = true;
-    }
-}
 
 enum Direction {
     Incoming,
@@ -97,10 +63,10 @@ impl PacketEntry {
 }
 
 pub struct PacketView {
-    packets: Rc<RefCell<Vec<PacketEntry>>>,
-    cleared: Rc<RefCell<bool>>,
-    show_pings: Rc<RefCell<TrackedState<bool>>>,
-    update: Rc<RefCell<bool>>,
+    packets: TrackedState<Vec<PacketEntry>>,
+    cleared: Remote<()>,
+    show_pings: Remote<bool>,
+    update: Remote<bool>,
     weak_self: Option<WeakElementCell>,
     cached_packet_count: usize,
     state: ContainerState,
@@ -108,12 +74,7 @@ pub struct PacketView {
 
 impl PacketView {
 
-    pub fn new(
-        packets: Rc<RefCell<Vec<PacketEntry>>>,
-        cleared: Rc<RefCell<bool>>,
-        show_pings: Rc<RefCell<TrackedState<bool>>>,
-        update: Rc<RefCell<bool>>,
-    ) -> Self {
+    pub fn new(packets: TrackedState<Vec<PacketEntry>>, cleared: Remote<()>, show_pings: Remote<bool>, update: Remote<bool>) -> Self {
 
         let weak_self = None;
         let (elements, cached_packet_count) = {
@@ -134,6 +95,10 @@ impl PacketView {
             cached_packet_count,
             state: ContainerState::new(elements),
         }
+    }
+
+    pub fn wrap(self) -> ElementCell {
+        Rc::new(RefCell::new(self))
     }
 }
 
@@ -184,16 +149,15 @@ impl Element for PacketView {
             false => self.cached_packet_count,
         };
 
-        if *self.cleared.borrow() {
+        if self.cleared.consume_changed() {
 
             self.state.elements.clear();
             self.cached_packet_count = 0;
-            *self.cleared.borrow_mut() = false;
             packet_count = 0;
             reresolve = true;
         }
 
-        if self.show_pings.borrow_mut().consume_changed() {
+        if self.show_pings.consume_changed() {
 
             self.state.elements.clear();
             self.cached_packet_count = 0;
@@ -202,7 +166,7 @@ impl Element for PacketView {
 
         if self.cached_packet_count < packet_count {
 
-            let show_pings = *self.show_pings.borrow().get();
+            let show_pings = *self.show_pings.borrow();
             let mut new_elements: Vec<ElementCell> = self.packets.borrow()[self.cached_packet_count..packet_count]
                 .iter()
                 .filter(|entry| show_pings || !entry.is_ping())
@@ -221,13 +185,16 @@ impl Element for PacketView {
         }
 
         match reresolve {
-            true => Some(ChangeEvent::Reresolve),
+            true => Some(ChangeEvent::Reresolve), // TODO: ReresolveWindow
             false => None,
         }
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element::<false>(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        match mouse_mode {
+            MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
+            _ => HoverInformation::Missed,
+        }
     }
 
     fn render(
@@ -241,6 +208,7 @@ impl Element for PacketView {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -256,6 +224,7 @@ impl Element for PacketView {
             theme,
             hovered_element,
             focused_element,
+            mouse_mode,
             second_theme,
         );
     }

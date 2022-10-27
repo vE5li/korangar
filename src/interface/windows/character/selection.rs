@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use derive_new::new;
 use procedural::*;
 
@@ -9,9 +6,8 @@ use crate::network::CharacterInformation;
 
 #[derive(new)]
 pub struct CharacterSelectionWindow {
-    characters: Rc<RefCell<Vec<CharacterInformation>>>,
-    move_request: Rc<RefCell<Option<usize>>>,
-    changed: Rc<RefCell<bool>>,
+    characters: TrackedState<Vec<CharacterInformation>>,
+    move_request: TrackedState<Option<usize>>,
     slot_count: usize,
 }
 
@@ -38,9 +34,8 @@ impl PrototypeWindow for CharacterSelectionWindow {
             .map(|slot| {
 
                 cell!(CharacterPreview::new(
-                    self.characters.clone(),
-                    self.move_request.clone(),
-                    self.changed.clone(),
+                    self.characters.new_remote(),
+                    self.move_request.new_remote(),
                     slot
                 )) as ElementCell
             })
@@ -54,6 +49,7 @@ impl PrototypeWindow for CharacterSelectionWindow {
             Self::WINDOW_CLASS.to_string().into(),
             elements,
             constraint!(600, ?),
+            false,
         ))
     }
 }

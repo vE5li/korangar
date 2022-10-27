@@ -1,6 +1,8 @@
 use cgmath::{Vector2, Vector4};
+use procedural::dimension;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{
     CloseButton, DragButton, Element, ElementCell, PartialSize, Position, Size, SizeConstraint, StateProvider, Window, WindowCache, *,
 };
@@ -23,11 +25,20 @@ impl FramedWindow {
         window_class: Option<String>,
         mut elements: Vec<ElementCell>,
         size_constraint: SizeConstraint,
+        closeable: bool,
     ) -> Self {
 
-        let drag_button = cell!(DragButton::new(window_title));
-        let close_button = cell!(CloseButton::default());
-        elements.insert(0, close_button);
+        if closeable {
+            let close_button = cell!(CloseButton::default());
+            elements.insert(0, close_button);
+        }
+
+        let width_constraint = match closeable {
+            true => dimension!(70%),
+            false => dimension!(!),
+        };
+
+        let drag_button = cell!(DragButton::new(window_title, width_constraint));
         elements.insert(0, drag_button);
 
         let elements = vec![Container::new(elements).wrap()];
@@ -140,7 +151,7 @@ impl Window for FramedWindow {
         self.elements[0].borrow().restore_focus(self.elements[0].clone())
     }
 
-    fn hovered_element(&self, mouse_position: Vector2<f32>) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
 
         let absolute_position = mouse_position - self.position;
 
@@ -151,7 +162,7 @@ impl Window for FramedWindow {
         {
 
             for element in &self.elements {
-                match element.borrow().hovered_element(absolute_position) {
+                match element.borrow().hovered_element(absolute_position, mouse_mode) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
                     HoverInformation::Missed => {}
                     hover_information => return hover_information,
@@ -221,6 +232,7 @@ impl Window for FramedWindow {
         theme: &Theme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
     ) {
 
         let clip_size = Vector4::new(
@@ -250,6 +262,7 @@ impl Window for FramedWindow {
                 clip_size,
                 hovered_element,
                 focused_element,
+                mouse_mode,
                 false,
             )
         });

@@ -1,13 +1,9 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use procedural::*;
 
-use crate::interface::{DialogElement, ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 pub struct DialogWindow {
-    elements: Rc<RefCell<Vec<DialogElement>>>,
-    changed: Rc<RefCell<bool>>,
+    elements: TrackedState<Vec<DialogElement>>,
     npc_id: u32,
 }
 
@@ -15,18 +11,16 @@ impl DialogWindow {
 
     pub const WINDOW_CLASS: &'static str = "dialog";
 
-    pub fn new(text: String, npc_id: u32) -> (Self, Rc<RefCell<Vec<DialogElement>>>, Rc<RefCell<bool>>) {
+    pub fn new(text: String, npc_id: u32) -> (Self, TrackedState<Vec<DialogElement>>) {
 
-        let elements = Rc::new(RefCell::new(vec![DialogElement::Text(text)]));
-        let changed = Rc::new(RefCell::new(false));
+        let elements = TrackedState::new(vec![DialogElement::Text(text)]);
 
         let dialog_window = Self {
             elements: elements.clone(),
-            changed: changed.clone(),
             npc_id,
         };
 
-        (dialog_window, elements, changed)
+        (dialog_window, elements)
     }
 }
 
@@ -43,11 +37,7 @@ impl PrototypeWindow for DialogWindow {
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
 
-        let elements: Vec<ElementCell> = vec![cell!(DialogContainer::new(
-            self.elements.clone(),
-            self.changed.clone(),
-            self.npc_id
-        ))];
+        let elements = vec![DialogContainer::new(self.elements.new_remote(), self.npc_id).wrap()];
 
         Box::from(FramedWindow::new(
             window_cache,
@@ -57,6 +47,7 @@ impl PrototypeWindow for DialogWindow {
             Self::WINDOW_CLASS.to_string().into(),
             elements,
             constraint!(300 > 400 < 500, ?),
+            false,
         ))
     }
 }

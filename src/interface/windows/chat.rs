@@ -7,7 +7,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
-use crate::input::UserEvent;
+use crate::input::{UserEvent, MouseInputMode};
 use crate::interface::{Element, Position, PrototypeWindow, Size, SizeConstraint, StateProvider, Window, WindowCache, *};
 use crate::network::ChatMessage;
 
@@ -193,7 +193,7 @@ impl Window for ChatWindow {
         None
     }
 
-    fn hovered_element(&self, mouse_position: Vector2<f32>) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
 
         let absolute_position = mouse_position - self.position;
 
@@ -204,7 +204,7 @@ impl Window for ChatWindow {
         {
 
             for element in &self.elements {
-                match element.borrow().hovered_element(absolute_position) {
+                match element.borrow().hovered_element(absolute_position, mouse_mode) {
                     HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
                     HoverInformation::Element(element) => return HoverInformation::Element(element),
                     HoverInformation::Missed => {}
@@ -272,6 +272,7 @@ impl Window for ChatWindow {
         theme: &Theme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
     ) {
 
         let clip_size = Vector4::new(
@@ -302,6 +303,7 @@ impl Window for ChatWindow {
                 clip_size,
                 hovered_element,
                 focused_element,
+                mouse_mode,
                 false,
             )
         });

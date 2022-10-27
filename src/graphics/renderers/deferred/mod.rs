@@ -367,7 +367,7 @@ impl DeferredRenderer {
 
         render_target.unbind_subrenderer();
         self.sprite_renderer
-            .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, true);
+            .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, false);
     }
 
     pub fn render_text(

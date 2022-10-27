@@ -3,8 +3,10 @@ use std::rc::{Rc, Weak};
 
 use cgmath::{Vector2, Vector4, Zero};
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::{Color, InterfaceRenderer, Renderer, Texture};
+use crate::input::MouseInputMode;
 use crate::interface::*;
+use crate::inventory::Item;
 
 pub type ElementCell = Rc<RefCell<dyn Element>>;
 pub type WeakElementCell = Weak<RefCell<dyn Element>>;
@@ -102,6 +104,19 @@ impl<'a> ElementRenderer<'a> {
         );
     }
 
+    pub fn render_sprite(&mut self, texture: Texture, offset: Position, size: Size, color: Color) {
+
+        self.renderer.render_sprite(
+            self.render_target,
+            texture,
+            self.position + offset * *self.interface_settings.scaling,
+            size * *self.interface_settings.scaling,
+            self.clip_size,
+            color,
+            false,
+        );
+    }
+
     pub fn render_element(
         &mut self,
         element: &dyn Element,
@@ -110,6 +125,7 @@ impl<'a> ElementRenderer<'a> {
         theme: &Theme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -123,6 +139,7 @@ impl<'a> ElementRenderer<'a> {
             self.clip_size,
             hovered_element,
             focused_element,
+            mouse_mode,
             second_theme,
         )
     }
@@ -280,7 +297,7 @@ pub trait Element {
     }
 
     fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
-        Some(self_cell)
+        self.is_focusable().then_some(self_cell)
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme);
@@ -293,7 +310,7 @@ pub trait Element {
         matches!(element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
     }
 
-    fn hovered_element(&self, _mouse_position: Vector2<f32>) -> HoverInformation {
+    fn hovered_element(&self, _mouse_position: Vector2<f32>, _mouse_mode: &MouseInputMode) -> HoverInformation {
         HoverInformation::Missed
     }
 
@@ -310,6 +327,10 @@ pub trait Element {
     }
 
     fn input_character(&mut self, _character: char) -> Option<ClickAction> {
+        None
+    }
+
+    fn drop_item(&mut self, _item_source: ItemSource, _item: Item) -> Option<ItemMove> {
         None
     }
 
@@ -332,7 +353,8 @@ pub trait Element {
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
-        _focused_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     );
 }

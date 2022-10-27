@@ -40,6 +40,7 @@ impl Element for StaticLabel {
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
 

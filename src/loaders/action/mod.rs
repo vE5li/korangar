@@ -4,12 +4,13 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
 use procedural::*;
-use vulkano::image::ImageAccess;
+use vulkano::image::{ImageAccess, ImageViewAbstract};
 
 use super::Sprite;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
+use crate::interface::InterfaceSettings;
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 
 //pub enum Animations {
@@ -87,7 +88,7 @@ impl Actions {
         animation_state: &AnimationState,
         camera_direction: usize,
         head_direction: usize,
-    ) -> (Texture, bool) {
+    ) -> (Texture, Vector2<f32>, bool) {
 
         let direction = (camera_direction + head_direction) % 8;
         let aa = animation_state.action * 8 + direction;
@@ -108,8 +109,13 @@ impl Actions {
 
         let fs = &a.motions[frame as usize % a.motions.len()];
 
+        let texture = sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone();
+        let texture_size = texture.image().dimensions().width_height().map(|component| component as f32);
+        let offset = fs.sprite_clips[0].position.map(|component| component as f32);
+
         (
-            sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone(),
+            texture,
+            Vector2::new(-offset.x, offset.y + texture_size[1] / 2.0) / 10.0,
             fs.sprite_clips[0].mirror_on != 0,
         )
     }
@@ -123,6 +129,7 @@ impl Actions {
         position: Vector2<f32>,
         camera_direction: usize,
         color: Color,
+        interface_settings: &InterfaceSettings,
     ) {
 
         let direction = camera_direction % 8;
@@ -152,7 +159,7 @@ impl Actions {
                 .size
                 .unwrap_or_else(|| texture.image().dimensions().width_height().into())
                 .map(|component| component as f32);
-            let zoom = sprite_clip.zoom.unwrap_or(1.0);
+            let zoom = sprite_clip.zoom.unwrap_or(1.0) * *interface_settings.scaling;
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;

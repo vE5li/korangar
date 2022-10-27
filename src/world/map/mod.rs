@@ -70,12 +70,12 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
 
     match c.is_sign_positive() {
         true => Vector3::new(s, c, -0.5),
-        false => Vector3::new(s, -c, 0.5),
+        false => Vector3::new(s, -c, -0.5),
     }
 }
 //
 
-#[derive(PrototypeElement, new)]
+#[derive(Debug, PrototypeElement, new)]
 pub struct WaterSettings {
     #[new(value = "0.0")]
     pub water_level: f32,
@@ -91,7 +91,7 @@ pub struct WaterSettings {
     pub water_animation_speed: usize,
 }
 
-#[derive(PrototypeElement, new)]
+#[derive(Debug, PrototypeElement, new)]
 pub struct LightSettings {
     #[new(value = "0")]
     pub light_longitude: isize,

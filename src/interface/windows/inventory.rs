@@ -1,16 +1,19 @@
 use procedural::*;
 
-use crate::interface::{FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
+use crate::interface::*;
+use crate::inventory::Item;
 
-#[derive(Default)]
-pub struct ProfilerWindow {}
-
-impl ProfilerWindow {
-
-    pub const WINDOW_CLASS: &'static str = "profiler";
+#[derive(new)]
+pub struct InventoryWindow {
+    items: TrackedState<Vec<Item>>,
 }
 
-impl PrototypeWindow for ProfilerWindow {
+impl InventoryWindow {
+
+    pub const WINDOW_CLASS: &'static str = "invetory";
+}
+
+impl PrototypeWindow for InventoryWindow {
 
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
@@ -23,16 +26,16 @@ impl PrototypeWindow for ProfilerWindow {
         avalible_space: Size,
     ) -> Box<dyn Window + 'static> {
 
-        let elements = vec![];
+        let elements = vec![InventoryContainer::new(self.items.new_remote()).wrap()];
 
         Box::from(FramedWindow::new(
             window_cache,
             interface_settings,
             avalible_space,
-            "Profiler".to_string(),
+            "Inventory".to_string(),
             Self::WINDOW_CLASS.to_string().into(),
             elements,
-            constraint!(200 > 250 < 300, ?),
+            constraint!(300 > 400 < 500, ?),
             true,
         ))
     }

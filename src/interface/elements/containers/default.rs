@@ -4,6 +4,7 @@ use cgmath::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 pub struct Container {
@@ -23,11 +24,11 @@ impl Container {
         }
     }
 
-    pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
+    /*pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
 
         self.size_constraint = Some(size_constraint);
         self
-    }
+    }*/
 
     pub fn wrap(self) -> ElementCell {
         Rc::new(RefCell::new(self))
@@ -73,8 +74,8 @@ impl Element for Container {
         self.state.update()
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element::<false>(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        self.state.hovered_element(mouse_position, mouse_mode, false)
     }
 
     fn render(
@@ -88,6 +89,7 @@ impl Element for Container {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -103,6 +105,7 @@ impl Element for Container {
             theme,
             hovered_element,
             focused_element,
+            mouse_mode,
             second_theme,
         );
     }

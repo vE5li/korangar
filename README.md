@@ -1,6 +1,6 @@
 <img align="left" alt="" src=".github/logo.png" height="130" />
 
-# [Korangar](https://korangar.rs)
+# [Korangar](https://github.com/vE5li/korangar)
 
 [![Build](https://github.com/ve5li/korangar/workflows/Build/badge.svg)](https://github.com/ve5li/korangar/actions?query=workflow%3ABuild)
 [![Tests](https://github.com/ve5li/korangar/workflows/Tests/badge.svg)](https://github.com/ve5li/korangar/actions?query=workflow%3ATests)

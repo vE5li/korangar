@@ -1,11 +1,11 @@
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::UserEvent;
+use crate::input::{UserEvent, MouseInputMode};
 use crate::interface::{Element, *};
 
 #[derive(Clone, PartialEq, Eq)]
@@ -17,8 +17,7 @@ pub enum DialogElement {
 }
 
 pub struct DialogContainer {
-    dialog_elements: Rc<RefCell<Vec<DialogElement>>>,
-    changed: Rc<RefCell<bool>>,
+    dialog_elements: Remote<Vec<DialogElement>>,
     npc_id: u32,
     state: ContainerState,
 }
@@ -36,7 +35,7 @@ impl DialogContainer {
                 .wrap(),
 
             DialogElement::CloseButton => Button::default()
-                .with_static_text("next")
+                .with_static_text("close")
                 .with_event(UserEvent::CloseDialog(npc_id))
                 .wrap(),
 
@@ -47,7 +46,7 @@ impl DialogContainer {
         }
     }
 
-    pub fn new(dialog_elements: Rc<RefCell<Vec<DialogElement>>>, changed: Rc<RefCell<bool>>, npc_id: u32) -> Self {
+    pub fn new(dialog_elements: Remote<Vec<DialogElement>>, npc_id: u32) -> Self {
 
         let elements = dialog_elements
             .borrow()
@@ -59,10 +58,13 @@ impl DialogContainer {
 
         Self {
             dialog_elements,
-            changed,
             npc_id,
             state,
         }
+    }
+
+    pub fn wrap(self) -> ElementCell {
+        Rc::new(RefCell::new(self))
     }
 }
 
@@ -76,7 +78,7 @@ impl Element for DialogContainer {
         &mut self.state.state
     }
 
-    fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
+    fn link_back(&mut self, weak_self: WeakElementCell, weak_parent: Option<WeakElementCell>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -96,20 +98,20 @@ impl Element for DialogContainer {
 
     fn update(&mut self) -> Option<ChangeEvent> {
 
-        if !*self.changed.borrow() {
-            return None;
+        if self.dialog_elements.consume_changed() {
+
+            *self = Self::new(self.dialog_elements.clone(), self.npc_id);
+
+            // TODO: link back like in character container
+
+            return Some(ChangeEvent::Reresolve); // TODO: ReresolveWindow
         }
 
-        *self = Self::new(self.dialog_elements.clone(), self.changed.clone(), self.npc_id);
-        *self.changed.borrow_mut() = false;
-
-        // TODO: link back like in character container
-
-        Some(ChangeEvent::Reresolve)
+        None
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element::<false>(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        self.state.hovered_element(mouse_position, mouse_mode, false)
     }
 
     fn render(
@@ -123,6 +125,7 @@ impl Element for DialogContainer {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -138,6 +141,7 @@ impl Element for DialogContainer {
             theme,
             hovered_element,
             focused_element,
+            mouse_mode,
             second_theme,
         );
     }

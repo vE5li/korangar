@@ -6,6 +6,7 @@ use derive_new::new;
 use num::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 #[derive(new)]
@@ -61,8 +62,11 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         self.state.resolve(placement_resolver, &size_constraint);
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        match mouse_mode {
+            MouseInputMode::None => self.state.hovered_element(mouse_position),
+            _ => HoverInformation::Missed,
+        }
     }
 
     fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
@@ -88,6 +92,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
 

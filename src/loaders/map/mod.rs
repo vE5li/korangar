@@ -197,6 +197,10 @@ impl MapLoader {
             return Err(format!("invalid resource version {}", resource_version));
         }
 
+        if resource_version.equals_or_above(2, 2) {
+            let _unknown = byte_stream.slice(1);
+        }
+
         // INI file
         byte_stream.skip(40);
 
@@ -208,7 +212,7 @@ impl MapLoader {
         };
 
         // SRC file
-        byte_stream.skip(40);
+        let _src_file = byte_stream.slice(40);
 
         let mut water_settings = WaterSettings::new();
 
@@ -279,6 +283,7 @@ impl MapLoader {
             match resource_type {
 
                 ResourceType::Object => {
+
                     if resource_version.equals_or_above(1, 6) {
 
                         let name = byte_stream.string(40);
@@ -306,6 +311,7 @@ impl MapLoader {
                         )?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, model, transform);
+
                         objects.push(object);
                     } else {
 

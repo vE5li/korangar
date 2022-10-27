@@ -1,10 +1,13 @@
 use std::sync::Arc;
 
-use cgmath::Vector2;
+use cgmath::{Array, Vector2};
 use vulkano::sync::GpuFuture;
 
-use crate::graphics::{Color, DeferredRenderer, Renderer};
+use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
+use crate::inventory::Item;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
+
+use super::InterfaceSettings;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum MouseCursorState {
@@ -76,8 +79,21 @@ impl MouseCursor {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         mouse_position: Vector2<f32>,
+        grabbed_item: Option<Texture>,
         color: Color,
+        interface_settings: &InterfaceSettings,
     ) {
+
+        if let Some(item) = grabbed_item {
+
+            renderer.render_sprite(
+                render_target,
+                item,
+                mouse_position - Vector2::from_value(15.0 * *interface_settings.scaling),
+                Vector2::from_value(30.0 * *interface_settings.scaling),
+                Color::monochrome(255),
+            );
+        }
 
         // TODO: figure out how this is actually supposed to work
         let direction = match self.animation_state.action {
@@ -93,6 +109,7 @@ impl MouseCursor {
             mouse_position,
             direction,
             color,
+            interface_settings,
         );
     }
 }

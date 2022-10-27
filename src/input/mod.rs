@@ -12,7 +12,7 @@ pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
 use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
-use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
+use crate::interface::{ClickAction, ElementCell, Focus, Interface, ItemSource, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;
@@ -199,7 +199,7 @@ impl InputSystem {
 
         let mut events = Vec::new();
         let mut mouse_target = None;
-        let (mut hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position);
+        let (mut hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
 
         let shift_down = self.keys[42].down();
 
@@ -269,6 +269,13 @@ impl InputSystem {
                             self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
                         }
 
+                        ClickAction::MoveItem(item_source, item) => {
+                            self.mouse_input_mode = MouseInputMode::MoveItem(item_source, item);
+                            // Needs to rerender because some elements will render differently
+                            // based on the mouse input mode.
+                            interface.schedule_rerender();
+                        },
+
                         ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
 
                         ClickAction::CloseWindow => interface.close_window(focus_state, *window_index),
@@ -284,7 +291,19 @@ impl InputSystem {
                     false => self.mouse_input_mode = MouseInputMode::None,
                 }
             } else {
-                self.mouse_input_mode = MouseInputMode::None;
+
+                let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
+                // Needs to rerender because some elements will render differently
+                // based on the mouse input mode.
+                interface.schedule_rerender();
+
+                if let MouseInputMode::MoveItem(item_source, item) = mouse_input_mode {
+                    if let Some(hovered_element) = &hovered_element {
+                        if let Some(item_move) = hovered_element.borrow_mut().drop_item(item_source, item) {
+                            events.push(UserEvent::MoveItem(item_move));
+                        }
+                    }
+                }
             }
         }
 
@@ -306,10 +325,6 @@ impl InputSystem {
             && !lock_actions
         {
             self.mouse_input_mode = MouseInputMode::RotateCamera;
-        }
-
-        if !self.mouse_input_mode.is_none() || shift_down {
-            hovered_element = None;
         }
 
         match &self.mouse_input_mode {
@@ -345,6 +360,8 @@ impl InputSystem {
             MouseInputMode::ClickInterface => interface.set_mouse_cursor_state(MouseCursorState::Click, client_tick),
 
             MouseInputMode::None => {}
+
+            MouseInputMode::MoveItem(..) | MouseInputMode::MoveSkill(..) => {}
         }
 
         if self.scroll_delta != 0.0 {
@@ -361,7 +378,8 @@ impl InputSystem {
 
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
 
-            // this will currently not affect the following statements, which is a bit strange
+            // this will currently not affect the following statements, which is a bit
+            // strange
             if self.keys[1].pressed() {
                 focus_state.remove_focus();
             }
@@ -432,6 +450,9 @@ impl InputSystem {
                                     self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
                                 }
 
+                                // TODO: should just move immediately ?
+                                ClickAction::MoveItem(..) => {}
+
                                 ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
 
                                 ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
@@ -450,6 +471,10 @@ impl InputSystem {
                 events.push(UserEvent::OpenMenuWindow);
             }
 
+            if self.keys[23].pressed() {
+                events.push(UserEvent::OpenInventoryWindow);
+            }
+
             #[cfg(feature = "debug")]
             if self.keys[50].pressed() {
                 events.push(UserEvent::OpenMapsWindow);
@@ -458,6 +483,16 @@ impl InputSystem {
             #[cfg(feature = "debug")]
             if self.keys[19].pressed() {
                 events.push(UserEvent::OpenRenderSettingsWindow);
+            }
+
+            #[cfg(feature = "debug")]
+            if self.keys[20].pressed() {
+                events.push(UserEvent::OpenTimeWindow);
+            }
+
+            #[cfg(feature = "debug_network")]
+            if self.keys[49].pressed() {
+                events.push(UserEvent::OpenPacketWindow);
             }
 
             #[cfg(feature = "debug")]
@@ -546,15 +581,11 @@ impl InputSystem {
             }
         }
 
-        // TODO: this will fail if the user hovers over an entity that changes the cursor and then
-        // immediately over a different one that doesn't, because main wont set the default cursor
+        // TODO: this will fail if the user hovers over an entity that changes the
+        // cursor and then immediately over a different one that doesn't,
+        // because main wont set the default cursor
         if self.mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(_))) {
             interface.set_mouse_cursor_state(MouseCursorState::Default, client_tick);
-        }
-
-        // to fix redrawing twice when clicking on elements
-        if !self.mouse_input_mode.is_none() {
-            hovered_element = None;
         }
 
         if focus_state.did_hovered_element_change(&hovered_element) {
@@ -584,7 +615,11 @@ impl InputSystem {
         (events, hovered_element, focused_element, mouse_target)
     }
 
-    pub fn mouse_position(&self) -> Vector2<f32> {
+    pub fn get_mouse_position(&self) -> Vector2<f32> {
         self.new_mouse_position
+    }
+
+    pub fn get_mouse_mode(&self) -> &MouseInputMode {
+        &self.mouse_input_mode
     }
 }

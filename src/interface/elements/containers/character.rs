@@ -5,26 +5,21 @@ use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::UserEvent;
-use crate::interface::{Element, *};
+use crate::input::{UserEvent, MouseInputMode};
+use crate::interface::*;
 use crate::network::CharacterInformation;
 
 // TODO: rework all of this
 pub struct CharacterPreview {
-    characters: Rc<RefCell<Vec<CharacterInformation>>>,
-    move_request: Rc<RefCell<Option<usize>>>,
-    changed: Rc<RefCell<bool>>,
+    characters: Remote<Vec<CharacterInformation>>,
+    move_request: Remote<Option<usize>>,
     slot: usize,
     state: ContainerState,
 }
 
 impl CharacterPreview {
 
-    fn get_elements(
-        characters: &Rc<RefCell<Vec<CharacterInformation>>>,
-        move_request: &Rc<RefCell<Option<usize>>>,
-        slot: usize,
-    ) -> Vec<ElementCell> {
+    fn get_elements(characters: &Remote<Vec<CharacterInformation>>, move_request: &Remote<Option<usize>>, slot: usize) -> Vec<ElementCell> {
 
         if let Some(origin_slot) = *move_request.borrow() {
 
@@ -76,12 +71,7 @@ impl CharacterPreview {
         ))]
     }
 
-    pub fn new(
-        characters: Rc<RefCell<Vec<CharacterInformation>>>,
-        move_request: Rc<RefCell<Option<usize>>>,
-        changed: Rc<RefCell<bool>>,
-        slot: usize,
-    ) -> Self {
+    pub fn new(characters: Remote<Vec<CharacterInformation>>, move_request: Remote<Option<usize>>, slot: usize) -> Self {
 
         let elements = Self::get_elements(&characters, &move_request, slot);
         let state = ContainerState::new(elements);
@@ -89,7 +79,6 @@ impl CharacterPreview {
         Self {
             characters,
             move_request,
-            changed,
             slot,
             state,
         }
@@ -136,25 +125,26 @@ impl Element for CharacterPreview {
 
     fn update(&mut self) -> Option<ChangeEvent> {
 
-        if !*self.changed.borrow() {
-            return None;
+        let characters_changed = self.characters.consume_changed();
+        let move_request_changed = self.move_request.consume_changed();
+
+        if characters_changed || move_request_changed {
+
+            let weak_parent = self.state.state.parent_element.clone();
+            // Since the character container will always have at least one linked child element, we
+            // can get a reference to self there instead of storing it in self.
+            let weak_self = self.state.elements[0].borrow().get_state().parent_element.clone().unwrap();
+
+            *self = Self::new(self.characters.clone(), self.move_request.clone(), self.slot);
+
+            // important: link back after creating elements, otherwise focus navigation and scrolling
+            // would break
+            self.state.link_back(weak_self, weak_parent);
+
+            return Some(ChangeEvent::Reresolve); // TODO: ReresolveWindow
         }
 
-        let weak_parent = self.state.state.parent_element.clone();
-        let weak_self = self.state.elements[0].borrow().get_state().parent_element.clone().unwrap();
-
-        *self = Self::new(
-            self.characters.clone(),
-            self.move_request.clone(),
-            self.changed.clone(),
-            self.slot,
-        );
-
-        // important: link back after creating elements, otherwise focus navigation and scrolling
-        // would break
-        self.state.link_back(weak_self, weak_parent);
-
-        Some(ChangeEvent::Reresolve)
+        None
     }
 
     fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
@@ -177,8 +167,11 @@ impl Element for CharacterPreview {
         Some(ClickAction::Event(event))
     }
 
-    fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        self.state.hovered_element::<true>(mouse_position)
+    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+        match mouse_mode {
+            MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, true),
+            _ => HoverInformation::Missed,
+        }
     }
 
     fn render(
@@ -192,6 +185,7 @@ impl Element for CharacterPreview {
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
 
@@ -214,6 +208,7 @@ impl Element for CharacterPreview {
             theme,
             hovered_element,
             focused_element,
+            mouse_mode,
             second_theme,
         );
     }

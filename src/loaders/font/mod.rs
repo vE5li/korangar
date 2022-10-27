@@ -11,6 +11,7 @@ use vulkano::image::view::ImageView;
 use vulkano::image::{AttachmentImage, ImageUsage};
 use vulkano::sync::{now, GpuFuture};
 
+use super::GameFileLoader;
 use crate::graphics::{CommandBuilder, ImageBuffer};
 
 pub struct FontLoader {
@@ -67,7 +68,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
 
 impl FontLoader {
 
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader) -> Self {
 
         let scale = 1.0; // get dynamically
         let cache_size = Vector2::from_value((512.0 * scale) as u32);
@@ -83,8 +84,8 @@ impl FontLoader {
             Arc::new(AttachmentImage::with_usage(device.clone(), cache_size.into(), Format::R8G8B8A8_SRGB, image_usage).unwrap());
         let font_atlas = ImageView::new(font_atlas_image.clone()).unwrap();
 
-        let font_path = "raleway.medium.ttf";
-        let data = std::fs::read(font_path).unwrap();
+        let font_path = "data\\raleway.medium.ttf";
+        let data = game_file_loader.get(font_path).unwrap();
         let font = Font::try_from_vec(data).unwrap_or_else(|| {
             panic!("error constructing a Font from data at {:?}", font_path);
         });

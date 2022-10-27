@@ -9,8 +9,8 @@ use crate::debug::*;
 use crate::graphics::Color;
 #[cfg(feature = "debug_network")]
 use crate::interface::PacketEntry;
-#[cfg(feature = "debug")]
-use crate::interface::PrototypeElement;
+#[cfg(feature = "debug_network")]
+use crate::interface::TrackedState;
 use crate::loaders::Version;
 #[cfg(feature = "debug")]
 use crate::network::Packet;
@@ -194,7 +194,7 @@ impl<'b> ByteStream<'b> {
     }
 
     #[cfg(feature = "debug_network")]
-    pub fn transfer_packet_history(&mut self, packet_history: &mut Vec<PacketEntry>) {
+    pub fn transfer_packet_history(&mut self, packet_history: &mut TrackedState<Vec<PacketEntry>>) {
         packet_history.append(&mut self.packet_history);
     }
 

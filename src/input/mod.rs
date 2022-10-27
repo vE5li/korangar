@@ -12,7 +12,7 @@ pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
 use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
-use crate::interface::{ClickAction, ElementCell, Focus, Interface, ItemSource, MouseCursorState, WeakElementCell};
+use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = 128;
@@ -149,7 +149,7 @@ impl InputSystem {
 
     pub fn update_mouse_wheel(&mut self, delta: MouseScrollDelta) {
         match delta {
-            MouseScrollDelta::LineDelta(_x, y) => self.new_scroll_position += y as f32 * MOUSE_SCOLL_MULTIPLIER,
+            MouseScrollDelta::LineDelta(_x, y) => self.new_scroll_position += y * MOUSE_SCOLL_MULTIPLIER,
             MouseScrollDelta::PixelDelta(position) => self.new_scroll_position += position.y as f32,
         }
     }
@@ -187,7 +187,7 @@ impl InputSystem {
     ) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
         let mut events = Vec::new();
         let mut mouse_target = None;
-        let (mut hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
+        let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
 
         let shift_down = self.keys[42].down();
 

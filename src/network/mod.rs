@@ -2286,7 +2286,7 @@ impl NetworkingSystem {
             }
         }
 
-        if let Ok(map_server_unavalible_packet) = MapServerUnavaliblePacket::try_from_bytes(&mut byte_stream) {
+        if let Ok(_map_server_unavalible_packet) = MapServerUnavaliblePacket::try_from_bytes(&mut byte_stream) {
             return Err("Map server currently unavalible".to_string());
         }
 

@@ -354,7 +354,7 @@ impl ModelLoader {
             &textures,
             &Matrix4::identity(),
             &mut bounding_box,
-            &root_node_name,
+            root_node_name,
             reverse_order,
         );
         let model = Arc::new(Model::new(

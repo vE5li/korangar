@@ -166,7 +166,7 @@ impl GameArchive {
 
         let file_name = path.clone();
         let compressed_size = compressed.len() as u32;
-        let compressed_size_aligned = compressed_size as u32;
+        let compressed_size_aligned = compressed_size;
         let uncompressed_size = data.len() as u32;
         let flags = 1;
         let offset = self.data.len() as u32;

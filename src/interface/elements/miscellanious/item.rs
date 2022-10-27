@@ -2,11 +2,11 @@ use cgmath::{Array, Vector4, Zero};
 use derive_new::new;
 use procedural::*;
 
-use crate::graphics::{InterfaceRenderer, Renderer, Texture};
+use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
 use crate::inventory::Item;
-use crate::network::EquipPosition;
+
 
 #[derive(new)]
 pub struct ItemBox {

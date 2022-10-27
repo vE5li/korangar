@@ -1,7 +1,7 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 
-use cgmath::{Matrix3, Vector3};
+
+
+use cgmath::{Vector3};
 use derive_new::new;
 
 #[cfg(feature = "debug")]

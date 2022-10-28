@@ -23,8 +23,6 @@ pub struct InterfaceRenderer {
     rectangle_renderer: RectangleRenderer,
     sprite_renderer: SpriteRenderer,
     font_map: Texture,
-    #[cfg(feature = "debug")]
-    debug_icon_texture: Texture,
     checked_box_texture: Texture,
     unchecked_box_texture: Texture,
     expanded_arrow_texture: Texture,
@@ -64,8 +62,6 @@ impl InterfaceRenderer {
 
         let mut texture_future = now(device.clone()).boxed();
         let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
-        #[cfg(feature = "debug")]
-        let debug_icon_texture = texture_loader.get("debug_icon.png", game_file_loader, &mut texture_future).unwrap();
         let checked_box_texture = texture_loader
             .get("checked_box.png", game_file_loader, &mut texture_future)
             .unwrap();
@@ -89,8 +85,6 @@ impl InterfaceRenderer {
             rectangle_renderer,
             sprite_renderer,
             font_map,
-            #[cfg(feature = "debug")]
-            debug_icon_texture,
             checked_box_texture,
             unchecked_box_texture,
             expanded_arrow_texture,
@@ -247,26 +241,6 @@ impl InterfaceRenderer {
     /*pub fn render_text_new(&self, text: &str, position: Vector2<f32>, clip_size: Vector4<f32>, color: Color, font_size: f32) {
         self.text_renderer.render(&mut current_frame.builder, self.window_size, position, Vector2::from_value(font_size), clip_size, color);
     }*/
-
-    #[cfg(feature = "debug")]
-    pub fn render_debug_icon(
-        &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        color: Color,
-    ) {
-        self.render_sprite(
-            render_target,
-            self.debug_icon_texture.clone(),
-            position,
-            size,
-            clip_size,
-            color,
-            true,
-        );
-    }
 }
 
 impl Renderer for InterfaceRenderer {

@@ -7,6 +7,7 @@ use super::InterfaceSettings;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum MouseCursorState {
     Default,

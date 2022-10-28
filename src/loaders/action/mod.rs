@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
 use procedural::*;
-use vulkano::image::{ImageAccess, ImageViewAbstract};
+use vulkano::image::ImageAccess;
 
 use super::Sprite;
 #[cfg(feature = "debug")]

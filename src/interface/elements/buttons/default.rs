@@ -5,13 +5,16 @@ use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::{Element, *};
 
+pub type Selector = Box<dyn Fn() -> bool>;
+pub type ColorSelector = Box<dyn Fn(&Theme) -> Color>;
+
 #[derive(Default)]
 pub struct Button {
     text: Option<ElementText>,
     event: Option<ElementEvent>,
-    disabled_selector: Option<Box<dyn Fn() -> bool>>,
-    foreground_color: Option<Box<dyn Fn(&Theme) -> Color>>,
-    background_color: Option<Box<dyn Fn(&Theme) -> Color>>,
+    disabled_selector: Option<Selector>,
+    foreground_color: Option<ColorSelector>,
+    background_color: Option<ColorSelector>,
     width_constraint: Option<DimensionConstraint>,
     state: ElementState,
 }

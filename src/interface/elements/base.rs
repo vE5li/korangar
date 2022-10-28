@@ -86,17 +86,6 @@ impl<'a> ElementRenderer<'a> {
         );
     }
 
-    #[cfg(feature = "debug")]
-    pub fn render_debug_icon(&mut self, offset: Position, size: Size, color: Color) {
-        self.renderer.render_debug_icon(
-            self.render_target,
-            self.position + offset * *self.interface_settings.scaling,
-            size * *self.interface_settings.scaling,
-            self.clip_size,
-            color,
-        );
-    }
-
     pub fn render_sprite(&mut self, texture: Texture, offset: Position, size: Size, color: Color) {
         self.renderer.render_sprite(
             self.render_target,

@@ -23,6 +23,8 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
                 Self { #(#implemented_fields),* }
             }
 
+            // Temporary until serialization is always possible
+            #[allow(unreachable_code)]
             fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
                 [#(#to_bytes_implementations),*].concat()
@@ -73,6 +75,8 @@ pub fn derive_byte_convertable_enum(
                 }
             }
 
+            // Temporary until serialization is always possible
+            #[allow(unreachable_code)]
             fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
                 assert!(length_hint.is_none(), "length hint may not be given to enums");
                 match self {

@@ -29,11 +29,17 @@ use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::sampler::{Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
 
 pub struct DirectionalLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -48,13 +54,11 @@ impl DirectionalLightRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
-
-        let linear_sampler = Sampler::start(device)
-            .filter(Filter::Linear)
-            .address_mode(SamplerAddressMode::MirroredRepeat)
-            .build()
-            .unwrap();
+        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
+        let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
 
         Self {
             pipeline,
@@ -100,13 +104,13 @@ impl DirectionalLightRenderer {
         intensity: f32,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let matrices = Matrices {
             screen_to_world: camera.get_screen_to_world_matrix().into(),
             light: light_matrix.into(),
         };
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),

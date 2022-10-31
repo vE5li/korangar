@@ -34,6 +34,12 @@ use vulkano::shader::ShaderModule;
 use self::fragment_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
 
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
+
 pub struct PointLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
@@ -46,7 +52,10 @@ impl PointLightRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device, BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
 
         Self {
             pipeline,
@@ -86,14 +95,14 @@ impl PointLightRenderer {
         vertex_buffer: ScreenVertexBuffer,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let screen_to_world_matrix = camera.get_screen_to_world_matrix();
         let matrices = Matrices {
             screen_to_world: screen_to_world_matrix.into(),
         };
 
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
             WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),

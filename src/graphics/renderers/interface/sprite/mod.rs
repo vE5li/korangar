@@ -25,15 +25,20 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Device;
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
 use crate::graphics::*;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
 
 pub struct SpriteRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -59,19 +64,18 @@ impl SpriteRenderer {
             ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, vertices.into_iter()).unwrap();
 
-        let nearest_sampler = Sampler::start(device.clone())
-            .filter(Filter::Nearest)
-            .address_mode(SamplerAddressMode::MirroredRepeat)
-            .build()
-            .unwrap();
+        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+            mag_filter: Filter::Nearest,
+            min_filter: Filter::Nearest,
+            ..Default::default()
+        }).unwrap();
 
-        let linear_sampler = Sampler::start(device)
-            .filter(Filter::Linear)
-            .address_mode(SamplerAddressMode::MirroredRepeat)
-            .build()
-            .unwrap();
+        let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
 
         Self {
             pipeline,
@@ -101,6 +105,10 @@ impl SpriteRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .color_blend_state(ColorBlendState::new(1).blend_alpha())
+            .multisample_state(MultisampleState {
+                rasterization_samples: vulkano::image::SampleCount::Sample4,
+                ..Default::default()
+            })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -119,7 +127,7 @@ impl SpriteRenderer {
         smooth: bool,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let sampler = match smooth {
             true => self.linear_sampler.clone(),

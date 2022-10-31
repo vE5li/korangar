@@ -206,7 +206,7 @@ impl SpriteLoader {
 
                 *texture_future = combined_future;
 
-                ImageView::new(Arc::new(image)).unwrap()
+                ImageView::new_default(Arc::new(image)).unwrap()
             })
             .collect();
 

@@ -33,6 +33,9 @@ use vulkano::shader::ShaderModule;
 use self::vertex_shader::ty::Constants;
 use crate::graphics::*;
 
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
 pub struct RectangleRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
@@ -55,7 +58,10 @@ impl RectangleRenderer {
             ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, vertices.into_iter()).unwrap();
 
         Self {
             pipeline,

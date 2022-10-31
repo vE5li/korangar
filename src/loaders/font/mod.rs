@@ -4,20 +4,22 @@ use cgmath::{Array, Vector2};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryCommandBuffer};
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, BufferImageCopy, ClearColorImageInfo, CommandBufferUsage, CopyBufferToImageInfo, PrimaryCommandBuffer,
+};
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
-use vulkano::image::{AttachmentImage, ImageUsage};
-use vulkano::sync::{now, GpuFuture};
+use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
+use vulkano::sync::{now, FenceSignalFuture, GpuFuture};
 
 use super::GameFileLoader;
-use crate::graphics::{CommandBuilder, ImageBuffer};
+use crate::graphics::CommandBuilder;
 
 pub struct FontLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
-    font_atlas: ImageBuffer,
+    font_atlas: Arc<ImageView<StorageImage>>,
     cache: Box<Cache<'static>>,
     builder: Option<CommandBuilder>,
     font: Box<Font<'static>>,
@@ -29,6 +31,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
     let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
     let mut caret = point(0.0, v_metrics.ascent);
     let mut last_glyph_id = None;
+
     for c in text.chars() {
         if c.is_control() {
             match c {
@@ -40,10 +43,12 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
             }
             continue;
         }
+
         let base_glyph = font.glyph(c);
         if let Some(id) = last_glyph_id.take() {
             caret.x += font.pair_kerning(scale, id, base_glyph.id());
         }
+
         last_glyph_id = Some(base_glyph.id());
         let mut glyph = base_glyph.scaled(scale).positioned(caret);
         if let Some(bb) = glyph.pixel_bounding_box() {
@@ -56,6 +61,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
         caret.x += glyph.unpositioned().h_metrics().advance_width;
         result.push(glyph);
     }
+
     result
 }
 
@@ -66,23 +72,46 @@ impl FontLoader {
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
 
         let image_usage = ImageUsage {
-            transfer_destination: true,
+            transfer_dst: true,
             sampled: true,
-            ..ImageUsage::none()
+            ..ImageUsage::empty()
         };
 
-        let font_atlas_image =
-            Arc::new(AttachmentImage::with_usage(device.clone(), cache_size.into(), Format::R8G8B8A8_SRGB, image_usage).unwrap());
-        let font_atlas = ImageView::new(font_atlas_image.clone()).unwrap();
+        let image_dimensions = ImageDimensions::Dim2d {
+            width: cache_size.x,
+            height: cache_size.y,
+            array_layers: 1,
+        };
 
-        let font_path = "data\\raleway.medium.ttf";
+        // TODO: don't hardcode 2. This number is only used to determine the sharing
+        // mode of the image. 1 = exclusive, 2 = concurrent
+        let font_atlas_image = StorageImage::with_usage(
+            device.clone(),
+            image_dimensions,
+            Format::R8_UNORM, //R8G8B8A8_SRGB,
+            image_usage,
+            ImageCreateFlags::empty(),
+            0..2,
+        )
+        .unwrap();
+
+        let font_atlas = ImageView::new_default(font_atlas_image.clone()).unwrap();
+
+        let font_path = "data\\WenQuanYiMicroHei.ttf";
         let data = game_file_loader.get(font_path).unwrap();
         let font = Font::try_from_vec(data).unwrap_or_else(|| {
             panic!("error constructing a Font from data at {:?}", font_path);
         });
 
-        let mut builder = AutoCommandBufferBuilder::primary(device.clone(), queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap();
-        builder.clear_color_image(font_atlas_image, [0f32].into()).unwrap();
+        let mut builder =
+            AutoCommandBufferBuilder::primary(device.clone(), queue.queue_family_index(), CommandBufferUsage::OneTimeSubmit).unwrap();
+
+        let clear_color_image_info = ClearColorImageInfo {
+            clear_value: [0f32].into(),
+            ..ClearColorImageInfo::image(font_atlas_image)
+        };
+
+        builder.clear_color_image(clear_color_image_info).unwrap();
 
         Self {
             device,
@@ -96,38 +125,45 @@ impl FontLoader {
 
     pub fn get(&mut self, text: &str) -> Vec<(PositionedGlyph, Rect<f32>)> {
         let scale = 1.0; // get dynamically
-        let glyphs = layout_paragraph(&self.font, Scale::uniform(10.0 * scale), 500, text);
+        let glyphs = layout_paragraph(&self.font, Scale::uniform(25.0 * scale), 500, text);
 
         for glyph in &glyphs {
+            println!("{:?}", glyph);
             self.cache.queue_glyph(0, glyph.clone());
         }
 
         let buffer_usage = BufferUsage {
-            transfer_source: true,
-            ..BufferUsage::none()
+            transfer_src: true,
+            ..BufferUsage::empty()
         };
 
         self.cache
             .cache_queued(|rect, data| {
-                println!("{:?} ({} - {})", rect, rect.width(), rect.height());
-
                 let builder = self.builder.get_or_insert_with(|| {
-                    AutoCommandBufferBuilder::primary(self.device.clone(), self.queue.family(), CommandBufferUsage::OneTimeSubmit).unwrap()
+                    AutoCommandBufferBuilder::primary(
+                        self.device.clone(),
+                        self.queue.queue_family_index(),
+                        CommandBufferUsage::OneTimeSubmit,
+                    )
+                    .unwrap()
                 });
 
                 let pixels = data.iter().map(|&value| value as i8);
                 let buffer = CpuAccessibleBuffer::from_iter(self.device.clone(), buffer_usage, false, pixels).unwrap();
+                let image = self.font_atlas.image().clone();
+
+                let region = BufferImageCopy {
+                    image_subresource: image.subresource_layers(),
+                    image_extent: [rect.width(), rect.height(), 1],
+                    image_offset: [rect.min.x, rect.min.y, 0],
+                    ..Default::default()
+                };
 
                 builder
-                    .copy_buffer_to_image_dimensions(
-                        buffer,
-                        self.font_atlas.image().clone(),
-                        [rect.min.x, rect.min.y, 0],
-                        [rect.width(), rect.height(), 1],
-                        0,
-                        1,
-                        0,
-                    )
+                    .copy_buffer_to_image(CopyBufferToImageInfo {
+                        regions: [region].into(),
+                        ..CopyBufferToImageInfo::buffer_image(buffer, image)
+                    })
                     .unwrap();
             })
             .unwrap();
@@ -143,22 +179,20 @@ impl FontLoader {
             .collect()
     }
 
-    pub fn flush(&mut self) -> Box<dyn GpuFuture> {
-        let Some(builder) = self.builder.take() else {
-            return now(self.device.clone()).boxed();
-        };
-
-        builder
-            .build()
-            .unwrap()
-            .execute(self.queue.clone())
-            .unwrap()
-            .then_signal_semaphore_and_flush()
-            .unwrap()
-            .boxed()
+    pub fn flush(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
+        self.builder.take().map(|builder| {
+            builder
+                .build()
+                .unwrap()
+                .execute(self.queue.clone())
+                .unwrap()
+                .boxed()
+                .then_signal_fence_and_flush()
+                .unwrap()
+        })
     }
 
-    pub fn get_font_atlas(&self) -> ImageBuffer {
+    pub fn get_font_atlas(&self) -> Arc<ImageView<StorageImage>> {
         self.font_atlas.clone()
     }
 }

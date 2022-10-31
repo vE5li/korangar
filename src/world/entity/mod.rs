@@ -448,8 +448,16 @@ impl Common {
             ));
         }
 
+        let vertex_buffer_usage = BufferUsage {
+            vertex_buffer: true,
+            ..Default::default()
+        };
+
         let steps_vertices = NativeModelVertex::to_vertices(native_steps_vertices);
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage::all(), false, steps_vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, steps_vertices.into_iter()).unwrap();
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
     }
 
@@ -461,9 +469,6 @@ impl Common {
         let (texture, position, mirror) = self
             .actions
             .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
-
-        //let texture_height = (texture.image().dimensions().height() as f32 / 10.0) *
-        // 0.2;
 
         renderer.render_entity(
             render_target,

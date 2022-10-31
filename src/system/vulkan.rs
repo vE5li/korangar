@@ -1,19 +1,20 @@
 use cgmath::{Matrix4, Vector3};
+use vulkano::VulkanLibrary;
 use vulkano::device::DeviceExtensions;
 use vulkano::instance::InstanceExtensions;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
 
-pub fn get_instance_extensions() -> InstanceExtensions {
+pub fn get_instance_extensions(library: &VulkanLibrary) -> InstanceExtensions {
     InstanceExtensions {
         ext_debug_utils: true,
         //khr_get_physical_device_properties2: true,
-        ..vulkano_win::required_extensions()
+        ..vulkano_win::required_extensions(library)
     }
 }
 
-pub fn get_layers() -> Vec<&'static str> {
+/*pub fn get_layers() -> Vec<&'static str> {
     let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
     let desired_layers = Vec::new(); // vec!["VK_LAYER_KHRONOS_validation"];
 
@@ -43,24 +44,28 @@ pub fn get_layers() -> Vec<&'static str> {
         .into_iter()
         .filter(|&l| available_layers.iter().any(|li| li.name() == l))
         .collect()
-}
+}*/
 
 pub fn get_device_extensions() -> DeviceExtensions {
     DeviceExtensions {
         khr_swapchain: true,
         //amd_mixed_attachment_samples: true,
-        ..DeviceExtensions::none()
+        ..DeviceExtensions::empty()
     }
 }
 
 macro_rules! choose_physical_device {
     ($instance:expr, $surface:expr, $device_extensions:expr) => {{
-        vulkano::device::physical::PhysicalDevice::enumerate($instance)
-            .filter(|&p| p.supported_extensions().is_superset_of($device_extensions))
+        $instance.enumerate_physical_devices().unwrap()
+            .filter(|p| p.supported_extensions().contains($device_extensions))
             .filter_map(|p| {
-                p.queue_families()
-                    .find(|&q| q.supports_graphics() && $surface.is_supported(q).unwrap_or(false))
-                    .map(|q| (p, q))
+                p.queue_family_properties()
+                    .iter()
+                    .enumerate()
+                    .position(|(i, q)| {
+                        q.queue_flags.graphics && p.surface_support(i as u32, $surface).unwrap_or(false)
+                    })
+                    .map(|i| (p, i as u32))
             })
             .min_by_key(|(p, _)| match p.properties().device_type {
                 vulkano::device::physical::PhysicalDeviceType::DiscreteGpu => 0,
@@ -68,6 +73,7 @@ macro_rules! choose_physical_device {
                 vulkano::device::physical::PhysicalDeviceType::VirtualGpu => 2,
                 vulkano::device::physical::PhysicalDeviceType::Cpu => 3,
                 vulkano::device::physical::PhysicalDeviceType::Other => 4,
+                _ => 5,
             })
             .unwrap()
     }};

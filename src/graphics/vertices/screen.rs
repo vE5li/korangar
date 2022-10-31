@@ -1,6 +1,8 @@
+use bytemuck::{Zeroable, Pod};
 use cgmath::Vector2;
 
-#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+#[derive(Default, Debug, Clone, Copy, Zeroable, Pod)]
 pub struct ScreenVertex {
     pub position: [f32; 2],
 }

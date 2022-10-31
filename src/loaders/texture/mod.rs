@@ -75,7 +75,7 @@ impl TextureLoader {
         let combined_future = inner_future.join(future).boxed();
         *texture_future = combined_future;
 
-        let texture = ImageView::new(Arc::new(image)).unwrap();
+        let texture = ImageView::new_default(Arc::new(image)).unwrap();
         self.cache.insert(path.to_string(), texture.clone());
 
         #[cfg(feature = "debug")]

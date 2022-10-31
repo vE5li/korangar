@@ -21,16 +21,20 @@ use std::sync::Arc;
 
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Device;
+use vulkano::image::StorageImage;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::sampler::{Sampler, SamplerCreateInfo, Filter};
 use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::ty::Constants;
 use crate::graphics::*;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
 
 pub struct BufferRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -45,11 +49,11 @@ impl BufferRenderer {
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
-        let nearest_sampler = Sampler::start(device)
-            .filter(Filter::Nearest)
-            .address_mode(SamplerAddressMode::ClampToEdge)
-            .build()
-            .unwrap();
+        let nearest_sampler = Sampler::new(device, SamplerCreateInfo {
+            mag_filter: Filter::Nearest,
+            min_filter: Filter::Nearest,
+            ..Default::default()
+        }).unwrap();
 
         Self {
             pipeline,
@@ -84,13 +88,14 @@ impl BufferRenderer {
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        light_image: ImageBuffer,
         picker_image: ImageBuffer,
+        light_image: ImageBuffer,
+        font_atlas: Arc<ImageView<StorageImage>>,
         vertex_buffer: ScreenVertexBuffer,
         render_settings: &RenderSettings,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
@@ -99,7 +104,7 @@ impl BufferRenderer {
             WriteDescriptorSet::image_view(3, render_target.depth_image.clone()),
             WriteDescriptorSet::image_view_sampler(4, picker_image, self.nearest_sampler.clone()),
             WriteDescriptorSet::image_view_sampler(5, light_image, self.nearest_sampler.clone()),
-            //WriteDescriptorSet::image_view_sampler(6, light_image, self.nearest_sampler.clone()),
+            WriteDescriptorSet::image_view_sampler(6, font_atlas, self.nearest_sampler.clone()),
         ])
         .unwrap();
 
@@ -108,8 +113,8 @@ impl BufferRenderer {
             show_normal_buffer: render_settings.show_normal_buffer as u32,
             show_water_buffer: render_settings.show_water_buffer as u32,
             show_depth_buffer: render_settings.show_depth_buffer as u32,
-            show_shadow_buffer: render_settings.show_shadow_buffer as u32,
             show_picker_buffer: render_settings.show_picker_buffer as u32,
+            show_shadow_buffer: render_settings.show_shadow_buffer as u32,
             show_font_atlas: render_settings.show_font_atlas as u32,
         };
 

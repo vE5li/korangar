@@ -24,6 +24,7 @@ use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Device;
 use vulkano::pipeline::graphics::depth_stencil::{CompareOp, DepthState, DepthStencilState};
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint, StateMode};
@@ -32,6 +33,12 @@ use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
 
 pub struct WaterRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -45,7 +52,10 @@ impl WaterRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device, BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
 
         Self {
             pipeline,
@@ -83,6 +93,10 @@ impl WaterRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .depth_stencil_state(depth_stencil_state)
+            .multisample_state(MultisampleState {
+                rasterization_samples: vulkano::image::SampleCount::Sample4,
+                ..Default::default()
+            })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -96,14 +110,14 @@ impl WaterRenderer {
         day_timer: f32,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view: view_matrix.into(),
             projection: projection_matrix.into(),
         };
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 

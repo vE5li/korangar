@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
 use vulkano::device::{Device, Queue};
-use vulkano::format::Format;
+use vulkano::format::{Format, ClearColorValue, ClearValue};
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::render_pass::RenderPass;
 
@@ -63,7 +63,7 @@ impl ShadowRenderer {
         let image_usage = ImageUsage {
             sampled: true,
             depth_stencil_attachment: true,
-            ..ImageUsage::none()
+            ..ImageUsage::empty()
         };
 
         <Self as Renderer>::Target::new(
@@ -73,13 +73,13 @@ impl ShadowRenderer {
             [size; 2],
             SampleCount::Sample1,
             image_usage,
-            vulkano::format::ClearValue::Depth(1.0),
+            ClearValue::Depth(1.0),
         )
     }
 }
 
 impl Renderer for ShadowRenderer {
-    type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ShadowSubrenderer>;
+    type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ShadowSubrenderer, ClearValue>;
 }
 
 impl GeometryRendererTrait for ShadowRenderer {

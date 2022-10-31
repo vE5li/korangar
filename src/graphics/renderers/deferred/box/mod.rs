@@ -35,6 +35,12 @@ use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
 use crate::world::{BoundingBox, Model};
 
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
+
 pub struct BoxRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
@@ -115,9 +121,27 @@ impl BoxRenderer {
             0, 2, 2, 6, 6, 4, 4, 0, // bottom
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
-        let index_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, indices.into_iter()).unwrap();
-        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
+        let vertex_buffer_usage = BufferUsage {
+            vertex_buffer: true,
+            ..BufferUsage::empty()
+        };
+
+        let index_buffer_usage = BufferUsage {
+            index_buffer: true,
+            ..BufferUsage::empty()
+        };
+
+        let matrices_buffer_usage = BufferUsage {
+            uniform_buffer: true,
+            ..BufferUsage::empty()
+        };
+
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, vertices.into_iter()).unwrap();
+        let index_buffer = CpuAccessibleBuffer::from_iter(device.clone(), index_buffer_usage, false, indices.into_iter()).unwrap();
+        let matrices_buffer = CpuBufferPool::new(device, matrices_buffer_usage);
 
         Self {
             pipeline,
@@ -156,14 +180,14 @@ impl BoxRenderer {
 
     pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view_projection: (projection_matrix * view_matrix).into(),
         };
 
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 
         render_target

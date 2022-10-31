@@ -19,7 +19,7 @@ use cgmath::{Matrix4, SquareMatrix, Vector2, Vector3};
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
-use vulkano::image::SwapchainImage;
+use vulkano::image::{StorageImage, SwapchainImage};
 use vulkano::ordered_passes_renderpass;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{RenderPass, Subpass};
@@ -173,7 +173,16 @@ impl DeferredRenderer {
             ScreenVertex::new(Vector2::new(-1.0, 3.0)),
             ScreenVertex::new(Vector2::new(3.0, -1.0)),
         ];
-        let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(
+            device.clone(),
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            vertices.into_iter(),
+        )
+        .unwrap();
 
         let vertices = vec![
             ScreenVertex::new(Vector2::new(0.0, 0.0)),
@@ -183,8 +192,17 @@ impl DeferredRenderer {
             ScreenVertex::new(Vector2::new(0.0, 1.0)),
             ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
-        let billboard_vertex_buffer =
-            CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+
+        let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(
+            device.clone(),
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            vertices.into_iter(),
+        )
+        .unwrap();
 
         let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
 
@@ -462,15 +480,17 @@ impl DeferredRenderer {
     pub fn overlay_buffers(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        light_image: ImageBuffer,
         picker_image: ImageBuffer,
+        light_image: ImageBuffer,
+        font_atlas: Arc<ImageView<StorageImage>>,
         render_settings: &RenderSettings,
     ) {
         render_target.unbind_subrenderer();
         self.buffer_renderer.render(
             render_target,
-            light_image,
             picker_image,
+            light_image,
+            font_atlas,
             self.screen_vertex_buffer.clone(),
             render_settings,
         );

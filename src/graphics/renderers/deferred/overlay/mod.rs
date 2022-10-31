@@ -80,7 +80,7 @@ impl OverlayRenderer {
         vertex_buffer: ScreenVertexBuffer,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view(0, interface_buffer)]).unwrap();
 

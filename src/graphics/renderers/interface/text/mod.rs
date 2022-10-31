@@ -3,7 +3,7 @@
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "src/graphics/renderers/interface/rectangle/vertex_shader.glsl"
+        path: "src/graphics/renderers/interface/sprite/vertex_shader.glsl"
     }
 }
 
@@ -12,63 +12,63 @@ mod vertex_shader {
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "src/graphics/renderers/interface/rectangle/fragment_shader.glsl"
+        path: "src/graphics/renderers/interface/sprite/fragment_shader.glsl"
     }
 }
 
+use std::cell::RefCell;
 use std::iter;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
 use vulkano::buffer::BufferUsage;
+use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::Device;
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline};
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
+use vulkano::sampler::{Filter, Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
 use crate::graphics::*;
+use crate::loaders::FontLoader;
 
 unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
 
-pub struct RectangleRenderer {
+pub struct TextRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
-    vertex_buffer: ScreenVertexBuffer,
+    nearest_sampler: Arc<Sampler>,
+    font_loader: Rc<RefCell<FontLoader>>,
 }
 
-impl RectangleRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+impl TextRenderer {
+    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport, font_loader: Rc<RefCell<FontLoader>>) -> Self {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
-        let vertices = vec![
-            ScreenVertex::new(Vector2::new(0.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 1.0)),
-        ];
-
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, vertices.into_iter()).unwrap();
+        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+            mag_filter: Filter::Nearest,
+            min_filter: Filter::Nearest,
+            ..Default::default()
+        })
+        .unwrap();
 
         Self {
             pipeline,
             vertex_shader,
             fragment_shader,
-            vertex_buffer,
+            nearest_sampler,
+            font_loader,
         }
     }
 
@@ -89,7 +89,7 @@ impl RectangleRenderer {
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend(INTERFACE_ATTACHMENT_BLEND))
+            .color_blend_state(ColorBlendState::new(1).blend_alpha())
             .multisample_state(MultisampleState {
                 rasterization_samples: vulkano::image::SampleCount::Sample4,
                 ..Default::default()
@@ -102,42 +102,58 @@ impl RectangleRenderer {
     pub fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        text: &str,
         window_size: Vector2<usize>,
         screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
         clip_size: Vector4<f32>,
-        corner_radius: Vector4<f32>,
         color: Color,
+        font_size: f32,
     ) {
         let layout = self.pipeline.layout().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
+
+        let mut font_loader = self.font_loader.borrow_mut();
+        let texture = font_loader.get_font_atlas();
+        let character_layout = font_loader.get(text);
 
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
-        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
-        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
 
-        let pixel_size = 1.0 / window_size.y as f32;
-        let corner_radius = Vector4::new(
-            corner_radius.x * pixel_size,
-            corner_radius.y * pixel_size,
-            corner_radius.z * pixel_size,
-            corner_radius.w * pixel_size,
-        );
-
-        let constants = Constants {
-            screen_position: screen_position.into(),
-            screen_size: screen_size.into(),
-            clip_size: clip_size.into(),
-            corner_radius: corner_radius.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
-        };
+        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(
+            0,
+            texture,
+            self.nearest_sampler.clone(),
+        )])
+        .unwrap();
 
         render_target
             .state
             .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
-            .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())
-            .draw(6, 1, 0, 0)
-            .unwrap();
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
+
+        for character in character_layout {
+
+            let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
+            let screen_size = Vector2::new(character.0.position().x / half_screen.x, character.0.position().y / half_screen.y);
+            let texture_position = character.1.min;
+            let texture_size = character.1.max - character.1.min; // TODO: use absolute instead of
+                                                                  // size
+
+            let constants = Constants {
+                screen_position: screen_position.into(),
+                screen_size: screen_size.into(),
+                clip_size: clip_size.into(),
+                texture_position: [texture_position.x, texture_position.y],
+                texture_size: [texture_size.x, texture_size.y],
+                color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+            };
+
+            render_target
+                .state
+                .get_builder()
+                .push_constants(layout.clone(), 0, constants)
+                .draw(6, 1, 0, 0)
+                .unwrap();
+        }
     }
 }

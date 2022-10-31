@@ -26,17 +26,24 @@ use vulkano::device::Device;
 use vulkano::image::ImageViewAbstract;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::rasterization::{CullMode, PolygonMode, RasterizationState};
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint, StateMode};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::SpecializationConstants;
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
 
 pub struct GeometryRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -60,21 +67,26 @@ impl GeometryRenderer {
             #[cfg(feature = "debug")]
             false,
         );
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
 
-        let nearest_sampler = Sampler::start(device.clone())
-            .filter(Filter::Nearest)
-            .address_mode(SamplerAddressMode::ClampToEdge)
-            .build()
-            .unwrap();
+        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+            mag_filter: Filter::Nearest,
+            min_filter: Filter::Nearest,
+            address_mode: [SamplerAddressMode::ClampToEdge; 3],
+            ..Default::default()
+        }).unwrap();
 
-        let linear_sampler = Sampler::start(device)
-            .filter(Filter::Linear)
-            .address_mode(SamplerAddressMode::ClampToEdge)
-            .anisotropy(Some(4.0))
-            .min_lod(1.0)
-            .build()
-            .unwrap();
+        let linear_sampler = Sampler::new(device, SamplerCreateInfo {
+            mag_filter: Filter::Linear,
+            min_filter: Filter::Linear,
+            address_mode: [SamplerAddressMode::ClampToEdge; 3],
+            anisotropy: Some(4.0),
+            mip_lod_bias: 1.0,
+            ..Default::default()
+        }).unwrap();
 
         Self {
             pipeline,
@@ -139,6 +151,10 @@ impl GeometryRenderer {
                 polygon_mode,
                 ..Default::default()
             })
+            .multisample_state(MultisampleState {
+                rasterization_samples: vulkano::image::SampleCount::Sample4,
+                ..Default::default()
+            })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -146,7 +162,7 @@ impl GeometryRenderer {
 
     pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
@@ -154,7 +170,7 @@ impl GeometryRenderer {
             time,
         };
 
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 
         render_target
@@ -179,7 +195,7 @@ impl GeometryRenderer {
         const TEXTURE_COUNT: usize = 30;
 
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(1).unwrap().clone();
 
         let texture_count = textures.len();
         let mut textures: Vec<Arc<dyn ImageViewAbstract>> = textures

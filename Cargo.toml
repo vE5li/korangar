@@ -8,10 +8,11 @@ procedural = { path = "procedural" }
 rayon = "1.5.3"
 rand = "0.8.5"
 derive-new = "0.5"
-vulkano = "0.28"
-vulkano-shaders = "0.28"
-vulkano-win = "0.28"
-winit = "0.26"
+vulkano = "0.31"
+vulkano-shaders = "0.31"
+vulkano-win = "0.31"
+bytemuck = { version = "1.7", features = ["derive", "extern_crate_std", "min_const_generics"] }
+winit = "0.27"
 num = "*"
 cgmath = { version = "0.18", features = ["serde"] }
 serde = "1.0.137"

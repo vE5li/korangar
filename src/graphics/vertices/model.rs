@@ -1,6 +1,8 @@
+use bytemuck::{Pod, Zeroable};
 use cgmath::{Vector2, Vector3};
 
-#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+#[derive(Default, Debug, Clone, Copy, Zeroable, Pod)]
 pub struct ModelVertex {
     pub position: [f32; 3],
     pub normal: [f32; 3],

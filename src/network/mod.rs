@@ -20,6 +20,8 @@ use crate::interface::PacketEntry;
 use crate::interface::{CharacterSelectionWindow, ElementCell, PrototypeElement, TrackedState};
 use crate::loaders::{ByteConvertable, ByteStream};
 
+// 0x0b1d: ping
+
 /// Base trait that all packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size,
 /// followed by the packet data. If the packet does not have a fixed size,

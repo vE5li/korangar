@@ -608,11 +608,17 @@ impl MapLoader {
             byte_stream.assert_empty(&gat_file);
 
             let vertex_buffer =
-                CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, tile_vertices.into_iter()).unwrap();
+                CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, tile_vertices.into_iter()).unwrap();
             tile_vertex_buffer = Some(vertex_buffer);
 
             let vertex_buffer =
-                CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, tile_picker_vertices.into_iter()).unwrap();
+                CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, tile_picker_vertices.into_iter()).unwrap();
             tile_picker_vertex_buffer = Some(vertex_buffer);
         }
 
@@ -783,10 +789,16 @@ impl MapLoader {
 
         let ground_vertices = NativeModelVertex::to_vertices(native_ground_vertices);
         let ground_vertex_buffer =
-            CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, ground_vertices.into_iter()).unwrap();
+            CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, ground_vertices.into_iter()).unwrap();
 
         let water_vertex_buffer = match !water_vertices.is_empty() {
-            true => CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage::all(), false, water_vertices.into_iter())
+            true => CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, water_vertices.into_iter())
                 .unwrap()
                 .into(),
             false => None,

@@ -249,7 +249,10 @@ impl ModelLoader {
     ) -> Node {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
         let vertices = NativeModelVertex::to_vertices(Self::make_vertices(current_node, &main_matrix, reverse_order));
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, vertices.into_iter()).unwrap();
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = BoundingBox::new(

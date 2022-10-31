@@ -26,12 +26,19 @@ use vulkano::device::Device;
 use vulkano::image::ImageAccess;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
+use vulkano::pipeline::graphics::multisample::MultisampleState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
 
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::*;
@@ -96,14 +103,15 @@ impl EntityRenderer {
             ),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
-
-        let nearest_sampler = Sampler::start(device)
-            .filter(Filter::Nearest)
-            .address_mode(SamplerAddressMode::MirroredRepeat)
-            .build()
-            .unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, vertices.into_iter()).unwrap();
+        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
+        let nearest_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
 
         Self {
             pipeline,
@@ -133,6 +141,10 @@ impl EntityRenderer {
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
             .depth_stencil_state(DepthStencilState::simple_depth_test())
+            .multisample_state(MultisampleState {
+                rasterization_samples: vulkano::image::SampleCount::Sample4,
+                ..Default::default()
+            })
             .render_pass(subpass)
             .build(device)
             .unwrap()
@@ -140,7 +152,7 @@ impl EntityRenderer {
 
     pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
@@ -148,7 +160,7 @@ impl EntityRenderer {
             projection: projection_matrix.into(),
         };
 
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 
         render_target
@@ -178,7 +190,7 @@ impl EntityRenderer {
         );
 
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(1).unwrap().clone();
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(
             0,

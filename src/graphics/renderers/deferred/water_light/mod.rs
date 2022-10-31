@@ -32,6 +32,9 @@ use vulkano::shader::ShaderModule;
 use self::fragment_shader::ty::Constants;
 use crate::graphics::*;
 
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
 pub struct WaterLightRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
@@ -82,7 +85,7 @@ impl WaterLightRenderer {
         water_level: f32,
     ) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [
             WriteDescriptorSet::image_view(0, render_target.water_image.clone()),

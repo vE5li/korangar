@@ -30,12 +30,18 @@ use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerAddressMode};
+use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::renderers::PickerTarget;
 use crate::graphics::*;
+
+unsafe impl bytemuck::Zeroable for Constants {}
+unsafe impl bytemuck::Pod for Constants {}
+
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
 
 pub struct EntityRenderer {
     pipeline: Arc<GraphicsPipeline>,
@@ -97,14 +103,21 @@ impl EntityRenderer {
             ),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage::all(), false, vertices.into_iter()).unwrap();
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage::all());
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
+    vertex_buffer: true,
+    ..Default::default()
+}, false, vertices.into_iter()).unwrap();
+        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
 
-        let nearest_sampler = Sampler::start(device)
-            .filter(Filter::Nearest)
-            .address_mode(SamplerAddressMode::MirroredRepeat)
-            .build()
-            .unwrap();
+        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+            mag_filter: Filter::Nearest,
+            min_filter: Filter::Nearest,
+            address_mode: [SamplerAddressMode::MirroredRepeat; 3],
+            ..Default::default()
+        }).unwrap();
 
         Self {
             pipeline,
@@ -141,7 +154,7 @@ impl EntityRenderer {
 
     pub fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
@@ -149,7 +162,7 @@ impl EntityRenderer {
             projection: projection_matrix.into(),
         };
 
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 
         render_target
@@ -180,7 +193,7 @@ impl EntityRenderer {
         );
 
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(1).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(1).unwrap().clone();
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(
             0,

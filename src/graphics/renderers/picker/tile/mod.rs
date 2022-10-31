@@ -33,6 +33,9 @@ use vulkano::shader::ShaderModule;
 use self::vertex_shader::ty::Matrices;
 use crate::graphics::*;
 
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
+
 pub struct TileRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
@@ -45,7 +48,10 @@ impl TileRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-        let matrices_buffer = CpuBufferPool::new(device, BufferUsage::all());
+        let matrices_buffer = CpuBufferPool::new(device, BufferUsage {
+    uniform_buffer: true,
+    ..Default::default()
+});
 
         Self {
             pipeline,
@@ -80,13 +86,13 @@ impl TileRenderer {
 
     pub fn render(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.descriptor_set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
             view_projection: (projection_matrix * view_matrix).into(),
         };
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.next(matrices).unwrap());
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
 
         let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
 

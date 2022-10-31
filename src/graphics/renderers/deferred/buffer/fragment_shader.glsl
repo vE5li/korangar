@@ -11,15 +11,15 @@ layout(input_attachment_index = 3, set = 0, binding = 3) uniform subpassInputMS 
 
 layout(set = 0, binding = 4) uniform usampler2D picker_buffer;
 layout(set = 0, binding = 5) uniform sampler2D shadow_buffer;
-//layout(set = 0, binding = 6) uniform sampler2D font_atlas;
+layout(set = 0, binding = 6) uniform sampler2D font_atlas;
 
 layout(push_constant) uniform Constants {
     bool show_diffuse_buffer;
     bool show_normal_buffer;
     bool show_water_buffer;
     bool show_depth_buffer;
-    bool show_shadow_buffer;
     bool show_picker_buffer;
+    bool show_shadow_buffer;
     bool show_font_atlas;
 } constants;
 
@@ -51,13 +51,6 @@ void main() {
         output_color += linearize(depth, 1.0, 2000.0);
     }
 
-    if (constants.show_shadow_buffer) {
-        vec2 sample_position = (position * 0.5 + 0.5);
-        sample_position.y = 1.0 - sample_position.y;
-        float depth = texture(shadow_buffer, sample_position).x;
-        output_color += depth;
-    }
-
     if (constants.show_picker_buffer) {
         uint picker = texture(picker_buffer, position * 0.5 + 0.5).r;
         float red = (picker & 0xf) / 100.0;
@@ -66,10 +59,17 @@ void main() {
         output_color += vec3(red, green, blue);
     }
 
-    /*if (constants.show_font_atlas) {
+    if (constants.show_shadow_buffer) {
+        vec2 sample_position = (position * 0.5 + 0.5);
+        sample_position.y = 1.0 - sample_position.y;
+        float depth = texture(shadow_buffer, sample_position).x;
+        output_color += depth;
+    }
+
+    if (constants.show_font_atlas) {
         float color = texture(font_atlas, position * 0.5 + 0.5).r;
         output_color += color;
-    }*/
+    }
 
     fragment_color = vec4(output_color, 1.0);
 }

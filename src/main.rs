@@ -29,12 +29,10 @@ use std::rc::Rc;
 
 use chrono::prelude::*;
 use procedural::debug_condition;
-use vulkano::device::Device;
-#[cfg(feature = "debug")]
-use vulkano::instance::debug::{MessageSeverity, MessageType};
-use vulkano::instance::Instance;
+use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+use vulkano::instance::{Instance, InstanceCreateInfo};
 use vulkano::sync::{now, GpuFuture};
-use vulkano::Version;
+use vulkano::VulkanLibrary;
 use vulkano_win::VkSurfaceBuild;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -48,18 +46,27 @@ use crate::interface::*;
 use crate::inventory::Inventory;
 use crate::loaders::*;
 use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
-use crate::system::{get_device_extensions, get_instance_extensions, get_layers, GameTimer};
+use crate::system::{get_device_extensions, get_instance_extensions, GameTimer};
 use crate::world::*;
 
 fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    let instance = Instance::new(None, Version::V1_2, &get_instance_extensions(), get_layers()).expect("failed to create instance");
+    let library = VulkanLibrary::new().unwrap();
+    let create_info = InstanceCreateInfo {
+        enabled_extensions: get_instance_extensions(&library),
+        //enabled_layers: get_layers(),
+        enumerate_portability: true,
+        ..Default::default()
+    };
 
-    #[cfg(feature = "debug")]
-    let _debug_callback =
-        vulkano::instance::debug::DebugCallback::new(&instance, MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
+    let instance = Instance::new(library, create_info).expect("failed to create instance");
+
+    //#[cfg(feature = "debug")]
+    //let _debug_callback =
+    //    vulkano::instance::debug::DebugCallback::new(&instance,
+    // MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}instance{}", MAGENTA, NONE);
@@ -88,8 +95,7 @@ fn main() {
     let timer = Timer::new("choose physical device");
 
     let desired_device_extensions = get_device_extensions();
-    let (physical_device, queue_family) = choose_physical_device!(&instance, surface, &desired_device_extensions);
-    let required_device_extensions = physical_device.required_extensions().union(&desired_device_extensions);
+    let (physical_device, queue_family_index) = choose_physical_device!(&instance, &surface, &desired_device_extensions);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -97,12 +103,20 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
-    let (device, mut queues) = Device::new(
-        physical_device,
-        physical_device.supported_features(),
-        &required_device_extensions,
-        [(queue_family, 0.5)].iter().cloned(),
-    )
+    let (device, mut queues) = Device::new(physical_device.clone(), DeviceCreateInfo {
+        enabled_extensions: get_device_extensions(),
+        enabled_features: vulkano::device::Features {
+            sampler_anisotropy: true,
+            #[cfg(feature = "debug")]
+            fill_mode_non_solid: true,
+            ..Default::default()
+        },
+        queue_create_infos: vec![QueueCreateInfo {
+            queue_family_index,
+            ..Default::default()
+        }],
+        ..Default::default()
+    })
     .expect("failed to create device");
 
     #[cfg(feature = "debug")]
@@ -131,11 +145,15 @@ fn main() {
     game_file_loader.patch();
     game_file_loader.add_archive("lua_files.grf".to_string());
 
-    let _font_loader = Rc::new(RefCell::new(FontLoader::new(
+    let font_loader = Rc::new(RefCell::new(FontLoader::new(
         device.clone(),
         queue.clone(),
         &mut game_file_loader,
     )));
+
+    //println!("{:#?}", font_loader.borrow_mut().get("testsomemoreaaaカタカナ"));
+    //font_loader.borrow_mut().get("testsomemoreaaa123");
+    //font_loader.borrow_mut().flush().cleanup_finished();
 
     let mut model_loader = ModelLoader::new(device.clone());
     let mut texture_loader = TextureLoader::new(device.clone(), queue.clone());
@@ -192,6 +210,7 @@ fn main() {
         swapchain_holder.window_size_u32(),
         &mut game_file_loader,
         &mut texture_loader,
+        font_loader.clone(),
     );
     let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport, swapchain_holder.window_size_u32());
     let shadow_renderer = ShadowRenderer::new(device.clone(), queue);
@@ -852,6 +871,7 @@ fn main() {
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
                 let window_size = swapchain_holder.window_size_f32();
+                let window_size_u32 = swapchain_holder.window_size_u32();
                 let entities = &entities[..];
                 #[cfg(feature = "debug")]
                 let hovered_marker_identifier = match mouse_target {
@@ -1003,7 +1023,9 @@ fn main() {
                     });
 
                     if rerender_interface {
-                        interface_target.start_interface(clear_interface);
+                        let font_future = font_loader.borrow_mut().flush();
+
+                        interface_target.start(window_size_u32, clear_interface);
 
                         let state_provider = &StateProvider::new(&render_settings, networking_system.get_login_settings());
                         interface.render(
@@ -1015,7 +1037,16 @@ fn main() {
                             input_system.get_mouse_mode(),
                         );
 
-                        interface_target.finish();
+                        interface_renderer.render_text_new(
+                            &mut interface_target,
+                            "YA",
+                            cgmath::Vector2::new(10.0, 20.0),
+                            cgmath::Vector4::new(0.0, 0.0, 1000.0, 1000.0),
+                            Color::rgb(255, 10, 100),
+                            10.0,
+                        );
+
+                        interface_target.finish(font_future);
                     }
                 });
 
@@ -1029,8 +1060,9 @@ fn main() {
 
                     deferred_renderer.overlay_buffers(
                         screen_target,
-                        directional_shadow_image,
                         picker_target.image.clone(),
+                        directional_shadow_image,
+                        font_loader.borrow().get_font_atlas(),
                         &render_settings,
                     );
                 }

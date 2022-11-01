@@ -10,7 +10,7 @@ use cgmath::{Matrix4, Vector2, Vector3};
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, ClearAttachment, ClearColorImageInfo, ClearRect, CommandBufferUsage, CopyImageToBufferInfo,
-    PrimaryAutoCommandBuffer, PrimaryCommandBuffer, RenderPassBeginInfo, SubpassContents,
+    PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassContents,
 };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
@@ -22,6 +22,7 @@ use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::{
     acquire_next_image, AcquireError, ColorSpace, PresentInfo, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo,
+    SwapchainPresentInfo,
 };
 use vulkano::sync::{FenceSignalFuture, GpuFuture, SemaphoreSignalFuture};
 use winit::window::Window;
@@ -33,6 +34,7 @@ pub use self::picker::PickerRenderer;
 use self::picker::PickerSubrenderer;
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
+use super::MemoryAllocator;
 use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
 use crate::world::MarkerIdentifier;
 
@@ -187,7 +189,7 @@ pub trait MarkerRenderer {
 
 pub enum RenderTargetState {
     Ready,
-    Rendering(AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>),
+    Rendering(AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>),
     Semaphore(SemaphoreSignalFuture<Box<dyn GpuFuture>>),
     Fence(FenceSignalFuture<Box<dyn GpuFuture>>),
     OutOfDate,
@@ -196,7 +198,7 @@ pub enum RenderTargetState {
 unsafe impl Send for RenderTargetState {}
 
 impl RenderTargetState {
-    pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+    pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator> {
         let RenderTargetState::Rendering(builder) = self else {
             panic!("render target is not in the render state");
         };
@@ -204,7 +206,7 @@ impl RenderTargetState {
         builder
     }
 
-    pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer> {
+    pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator> {
         let RenderTargetState::Rendering(builder) = std::mem::replace(self, RenderTargetState::Ready) else {
             panic!("render target is not in the render state");
         };
@@ -246,7 +248,7 @@ impl RenderTargetState {
 }
 
 pub struct DeferredRenderTarget {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
     diffuse_image: ImageBuffer,
@@ -259,10 +261,10 @@ pub struct DeferredRenderTarget {
 
 impl DeferredRenderTarget {
     pub fn new(
-        device: Arc<Device>,
+        memory_allocator: Arc<MemoryAllocator>,
         queue: Arc<Queue>,
         render_pass: Arc<RenderPass>,
-        swapchain_image: Arc<SwapchainImage<Window>>,
+        swapchain_image: Arc<SwapchainImage>,
         dimensions: [u32; 2],
     ) -> Self {
         let color_image_usage = ImageUsage {
@@ -281,7 +283,7 @@ impl DeferredRenderTarget {
 
         let diffuse_image = ImageView::new_default(Arc::new(
             AttachmentImage::multisampled_with_usage(
-                device.clone(),
+                &*memory_allocator,
                 dimensions,
                 SampleCount::Sample4,
                 Format::R32G32B32A32_SFLOAT,
@@ -290,9 +292,10 @@ impl DeferredRenderTarget {
             .unwrap(),
         ))
         .unwrap();
+
         let normal_image = ImageView::new_default(Arc::new(
             AttachmentImage::multisampled_with_usage(
-                device.clone(),
+                &*memory_allocator,
                 dimensions,
                 SampleCount::Sample4,
                 Format::R16G16B16A16_SFLOAT,
@@ -301,9 +304,10 @@ impl DeferredRenderTarget {
             .unwrap(),
         ))
         .unwrap();
+
         let water_image = ImageView::new_default(Arc::new(
             AttachmentImage::multisampled_with_usage(
-                device.clone(),
+                &*memory_allocator,
                 dimensions,
                 SampleCount::Sample4,
                 Format::R8G8B8A8_SRGB,
@@ -312,9 +316,10 @@ impl DeferredRenderTarget {
             .unwrap(),
         ))
         .unwrap();
+
         let depth_image = ImageView::new_default(Arc::new(
             AttachmentImage::multisampled_with_usage(
-                device.clone(),
+                &*memory_allocator,
                 dimensions,
                 SampleCount::Sample4,
                 Format::D32_SFLOAT,
@@ -340,7 +345,7 @@ impl DeferredRenderTarget {
         let bound_subrenderer = None;
 
         Self {
-            device,
+            memory_allocator,
             queue,
             framebuffer,
             diffuse_image,
@@ -354,7 +359,7 @@ impl DeferredRenderTarget {
 
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.device.clone(),
+            &*self.memory_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
@@ -390,17 +395,15 @@ impl DeferredRenderTarget {
         self.state.get_builder().next_subpass(SubpassContents::Inline).unwrap();
     }
 
-    pub fn finish(&mut self, swapchain: Arc<Swapchain<Window>>, semaphore: Box<dyn GpuFuture>, image_number: usize) {
+    pub fn finish(&mut self, swapchain: Arc<Swapchain>, semaphore: Box<dyn GpuFuture>, image_number: usize) {
         let mut builder = self.state.take_builder();
 
         builder.end_render_pass().unwrap();
 
         let command_buffer = builder.build().unwrap();
 
-        let present_info = PresentInfo {
-            index: image_number,
-            ..PresentInfo::swapchain(swapchain)
-        };
+        // TODO: make this type ImageNumber instead
+        let present_info = SwapchainPresentInfo::swapchain_image_index(swapchain, image_number as u32);
 
         self.state = semaphore
             .then_execute(self.queue.clone(), command_buffer)
@@ -416,7 +419,7 @@ impl DeferredRenderTarget {
 }
 
 pub struct PickerRenderTarget {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
     pub image: ImageBuffer,
@@ -426,7 +429,7 @@ pub struct PickerRenderTarget {
 }
 
 impl PickerRenderTarget {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2]) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2]) -> Self {
         let image_usage = ImageUsage {
             sampled: true,
             transfer_src: true,
@@ -440,12 +443,12 @@ impl PickerRenderTarget {
         };
 
         let image = ImageView::new_default(Arc::new(
-            AttachmentImage::with_usage(device.clone(), dimensions, Format::R32_UINT, image_usage).unwrap(),
+            AttachmentImage::with_usage(&*memory_allocator, dimensions, Format::R32_UINT, image_usage).unwrap(),
         ))
         .unwrap();
 
         let depth_buffer = ImageView::new_default(Arc::new(
-            AttachmentImage::with_usage(device.clone(), dimensions, Format::D16_UNORM, depth_image_usage).unwrap(),
+            AttachmentImage::with_usage(&*memory_allocator, dimensions, Format::D16_UNORM, depth_image_usage).unwrap(),
         ))
         .unwrap();
 
@@ -458,7 +461,7 @@ impl PickerRenderTarget {
 
         let buffer = unsafe {
             CpuAccessibleBuffer::uninitialized_array(
-                device.clone(),
+                &*memory_allocator,
                 dimensions[0] as u64 * dimensions[1] as u64,
                 BufferUsage {
                     transfer_dst: true,
@@ -472,7 +475,7 @@ impl PickerRenderTarget {
         let bound_subrenderer = None;
 
         Self {
-            device,
+            memory_allocator,
             queue,
             framebuffer,
             image,
@@ -484,7 +487,7 @@ impl PickerRenderTarget {
 
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.device.clone(),
+            &*self.memory_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
@@ -535,7 +538,7 @@ impl PickerRenderTarget {
 }
 
 pub struct SingleRenderTarget<const F: Format, S: PartialEq, C> {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
     pub image: ImageBuffer,
@@ -546,7 +549,7 @@ pub struct SingleRenderTarget<const F: Format, S: PartialEq, C> {
 
 impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
     pub fn new(
-        device: Arc<Device>,
+        memory_allocator: Arc<MemoryAllocator>,
         queue: Arc<Queue>,
         render_pass: Arc<RenderPass>,
         dimensions: [u32; 2],
@@ -555,7 +558,7 @@ impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         clear_value: C,
     ) -> Self {
         let image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(device.clone(), dimensions, sample_count, F, image_usage).unwrap(),
+            AttachmentImage::multisampled_with_usage(&*memory_allocator, dimensions, sample_count, F, image_usage).unwrap(),
         ))
         .unwrap();
 
@@ -570,7 +573,7 @@ impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         let bound_subrenderer = None;
 
         Self {
-            device,
+            memory_allocator,
             queue,
             framebuffer,
             image,
@@ -590,7 +593,7 @@ impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
 impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.device.clone(),
+            &*self.memory_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
@@ -628,7 +631,7 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
         // TODO:
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.device.clone(),
+            &*self.memory_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
@@ -669,7 +672,6 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
     }
 
     pub fn finish(&mut self, font_future: Option<FenceSignalFuture<Box<dyn GpuFuture>>>) {
-
         if let Some(mut future) = font_future {
             future.wait(None).unwrap();
             future.cleanup_finished();
@@ -692,8 +694,8 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
 }
 
 pub struct SwapchainHolder {
-    swapchain: Arc<Swapchain<Window>>,
-    swapchain_images: Vec<Arc<SwapchainImage<Window>>>,
+    swapchain: Arc<Swapchain>,
+    swapchain_images: Vec<Arc<SwapchainImage>>,
     present_mode: PresentMode,
     window_size: [u32; 2],
     image_number: usize,
@@ -702,8 +704,8 @@ pub struct SwapchainHolder {
 }
 
 impl SwapchainHolder {
-    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface<Window>>) -> Self {
-        let window_size: [u32; 2] = surface.window().inner_size().into();
+    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface>) -> Self {
+        let window_size: [u32; 2] = surface.object().unwrap().downcast_ref::<Window>().unwrap().inner_size().into();
         let capabilities = physical_device
             .surface_capabilities(&surface, SurfaceInfo::default())
             .expect("failed to get surface capabilities");
@@ -751,7 +753,7 @@ impl SwapchainHolder {
             Err(e) => panic!("Failed to acquire next image: {:?}", e),
         };
 
-        self.image_number = image_number;
+        self.image_number = image_number as usize;
         self.recreate |= suboptimal;
         self.acquire_future = acquire_future.boxed().into();
         Ok(())
@@ -790,11 +792,11 @@ impl SwapchainHolder {
         self.viewport()
     }
 
-    pub fn get_swapchain(&self) -> Arc<Swapchain<Window>> {
+    pub fn get_swapchain(&self) -> Arc<Swapchain> {
         self.swapchain.clone()
     }
 
-    pub fn get_swapchain_images(&self) -> Vec<Arc<SwapchainImage<Window>>> {
+    pub fn get_swapchain_images(&self) -> Vec<Arc<SwapchainImage>> {
         self.swapchain_images.clone()
     }
 

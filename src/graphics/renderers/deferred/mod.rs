@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, SquareMatrix, Vector2, Vector3};
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::device::{Device, Queue};
+use vulkano::device::{Device, DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::image::{StorageImage, SwapchainImage};
 use vulkano::ordered_passes_renderpass;
@@ -55,7 +55,7 @@ pub enum DeferredSubrenderer {
 }
 
 pub struct DeferredRenderer {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     geometry_renderer: GeometryRenderer,
@@ -74,15 +74,15 @@ pub struct DeferredRenderer {
     box_renderer: BoxRenderer,
     #[cfg(feature = "debug")]
     tile_textures: [Texture; 7],
-    screen_vertex_buffer: ScreenVertexBuffer,
-    billboard_vertex_buffer: ScreenVertexBuffer,
     font_map: Texture,
     dimensions: [u32; 2],
+    screen_vertex_buffer: ScreenVertexBuffer,
+    billboard_vertex_buffer: ScreenVertexBuffer,
 }
 
 impl DeferredRenderer {
     pub fn new(
-        device: Arc<Device>,
+        memory_allocator: Arc<MemoryAllocator>,
         queue: Arc<Queue>,
         swapchain_format: Format,
         viewport: Viewport,
@@ -90,6 +90,7 @@ impl DeferredRenderer {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
     ) -> Self {
+        let device = memory_allocator.device().clone();
         let render_pass = ordered_passes_renderpass!(device.clone(),
             attachments: {
                 output: {
@@ -141,40 +142,38 @@ impl DeferredRenderer {
         let geometry_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
         let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
 
-        let mut texture_future = now(device.clone()).boxed();
-
-        let geometry_renderer = GeometryRenderer::new(device.clone(), geometry_subpass.clone(), viewport.clone());
-        let entity_renderer = EntityRenderer::new(device.clone(), geometry_subpass.clone(), viewport.clone());
-        let water_renderer = WaterRenderer::new(device.clone(), geometry_subpass, viewport.clone());
-        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let point_light_renderer = PointLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let water_light_renderer = WaterLightRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let overlay_renderer = OverlayRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
-        let rectangle_renderer = RectangleRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
+        let entity_renderer = EntityRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
+        let water_renderer = WaterRenderer::new(memory_allocator.clone(), geometry_subpass, viewport.clone());
+        let ambient_light_renderer = AmbientLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let directional_light_renderer =
+            DirectionalLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let point_light_renderer = PointLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let water_light_renderer = WaterLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let overlay_renderer = OverlayRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let rectangle_renderer = RectangleRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
         let sprite_renderer = SpriteRenderer::new(
-            device.clone(),
+            memory_allocator.clone(),
             lighting_subpass.clone(),
             viewport.clone(),
             #[cfg(feature = "debug")]
             game_file_loader,
             #[cfg(feature = "debug")]
             texture_loader,
-            #[cfg(feature = "debug")]
-            &mut texture_future,
         );
         #[cfg(feature = "debug")]
-        let buffer_renderer = BufferRenderer::new(device.clone(), lighting_subpass.clone(), viewport.clone());
+        let buffer_renderer = BufferRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let box_renderer = BoxRenderer::new(device.clone(), lighting_subpass, viewport);
+        let box_renderer = BoxRenderer::new(memory_allocator.clone(), lighting_subpass, viewport);
 
         let vertices = vec![
             ScreenVertex::new(Vector2::new(-1.0, -1.0)),
             ScreenVertex::new(Vector2::new(-1.0, 3.0)),
             ScreenVertex::new(Vector2::new(3.0, -1.0)),
         ];
+
         let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(
-            device.clone(),
+            &*memory_allocator,
             BufferUsage {
                 vertex_buffer: true,
                 ..Default::default()
@@ -194,7 +193,7 @@ impl DeferredRenderer {
         ];
 
         let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(
-            device.clone(),
+            &*memory_allocator,
             BufferUsage {
                 vertex_buffer: true,
                 ..Default::default()
@@ -204,24 +203,21 @@ impl DeferredRenderer {
         )
         .unwrap();
 
-        let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
+        let font_map = texture_loader.get("font.png", game_file_loader).unwrap();
 
         #[cfg(feature = "debug")]
         let tile_textures = [
-            texture_loader.get("0.png", game_file_loader, &mut texture_future).unwrap(),
-            texture_loader.get("1.png", game_file_loader, &mut texture_future).unwrap(),
-            texture_loader.get("2.png", game_file_loader, &mut texture_future).unwrap(),
-            texture_loader.get("3.png", game_file_loader, &mut texture_future).unwrap(),
-            texture_loader.get("4.png", game_file_loader, &mut texture_future).unwrap(),
-            texture_loader.get("5.png", game_file_loader, &mut texture_future).unwrap(),
-            texture_loader.get("6.png", game_file_loader, &mut texture_future).unwrap(),
+            texture_loader.get("0.png", game_file_loader).unwrap(),
+            texture_loader.get("1.png", game_file_loader).unwrap(),
+            texture_loader.get("2.png", game_file_loader).unwrap(),
+            texture_loader.get("3.png", game_file_loader).unwrap(),
+            texture_loader.get("4.png", game_file_loader).unwrap(),
+            texture_loader.get("5.png", game_file_loader).unwrap(),
+            texture_loader.get("6.png", game_file_loader).unwrap(),
         ];
 
-        texture_future.flush().unwrap();
-        texture_future.cleanup_finished();
-
         Self {
-            device,
+            memory_allocator,
             queue,
             render_pass,
             geometry_renderer,
@@ -240,53 +236,54 @@ impl DeferredRenderer {
             box_renderer,
             #[cfg(feature = "debug")]
             tile_textures,
-            screen_vertex_buffer,
-            billboard_vertex_buffer,
             font_map,
             dimensions,
+            screen_vertex_buffer,
+            billboard_vertex_buffer,
         }
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
+        let device = self.memory_allocator.device().clone();
         let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
         let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
 
         self.geometry_renderer.recreate_pipeline(
-            self.device.clone(),
+            device.clone(),
             geometry_subpass.clone(),
             viewport.clone(),
             #[cfg(feature = "debug")]
             wireframe,
         );
         self.entity_renderer
-            .recreate_pipeline(self.device.clone(), geometry_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), geometry_subpass.clone(), viewport.clone());
         self.water_renderer
-            .recreate_pipeline(self.device.clone(), geometry_subpass, viewport.clone());
+            .recreate_pipeline(device.clone(), geometry_subpass, viewport.clone());
         self.ambient_light_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.directional_light_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.point_light_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.water_light_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.overlay_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.rectangle_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.sprite_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
         self.buffer_renderer
-            .recreate_pipeline(self.device.clone(), lighting_subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        self.box_renderer.recreate_pipeline(self.device.clone(), lighting_subpass, viewport);
+        self.box_renderer.recreate_pipeline(device.clone(), lighting_subpass, viewport);
         self.dimensions = dimensions;
     }
 
-    pub fn create_render_target(&self, swapchain_image: Arc<SwapchainImage<Window>>) -> <Self as Renderer>::Target {
+    pub fn create_render_target(&self, swapchain_image: Arc<SwapchainImage>) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
-            self.device.clone(),
+            self.memory_allocator.clone(),
             self.queue.clone(),
             self.render_pass.clone(),
             swapchain_image,

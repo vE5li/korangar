@@ -22,8 +22,9 @@ use std::sync::Arc;
 use cgmath::Matrix4;
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::ImageViewAbstract;
+use vulkano::memory::allocator::MemoryUsage;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
@@ -46,16 +47,18 @@ unsafe impl bytemuck::Zeroable for Matrices {}
 unsafe impl bytemuck::Pod for Matrices {}
 
 pub struct GeometryRenderer {
+    memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
-    matrices_buffer: CpuBufferPool<Matrices>,
+    matrices_buffer: CpuBufferPool<Matrices, MemoryAllocator>,
     nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
 }
 
 impl GeometryRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(
@@ -67,17 +70,23 @@ impl GeometryRenderer {
             #[cfg(feature = "debug")]
             false,
         );
-        let matrices_buffer = CpuBufferPool::new(device.clone(), BufferUsage {
-    uniform_buffer: true,
-    ..Default::default()
-});
+
+        let matrices_buffer = CpuBufferPool::new(
+            memory_allocator.clone(),
+            BufferUsage {
+                uniform_buffer: true,
+                ..Default::default()
+            },
+            MemoryUsage::Upload,
+        );
 
         let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
             mag_filter: Filter::Nearest,
             min_filter: Filter::Nearest,
             address_mode: [SamplerAddressMode::ClampToEdge; 3],
             ..Default::default()
-        }).unwrap();
+        })
+        .unwrap();
 
         let linear_sampler = Sampler::new(device, SamplerCreateInfo {
             mag_filter: Filter::Linear,
@@ -86,9 +95,11 @@ impl GeometryRenderer {
             anisotropy: Some(4.0),
             mip_lod_bias: 1.0,
             ..Default::default()
-        }).unwrap();
+        })
+        .unwrap();
 
         Self {
+            memory_allocator,
             pipeline,
             vertex_shader,
             fragment_shader,
@@ -171,7 +182,11 @@ impl GeometryRenderer {
         };
 
         let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
-        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [WriteDescriptorSet::buffer(
+            0,
+            matrices_subbuffer,
+        )])
+        .unwrap();
 
         render_target
             .state
@@ -208,7 +223,7 @@ impl GeometryRenderer {
             textures.push(textures[0].clone());
         }
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
             WriteDescriptorSet::sampler(0, self.nearest_sampler.clone()),
             WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
             WriteDescriptorSet::image_view_array(2, 0, textures),

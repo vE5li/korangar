@@ -7,7 +7,7 @@ mod tile;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use vulkano::device::{Device, Queue};
+use vulkano::device::{Device, DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::RenderPass;
@@ -30,7 +30,7 @@ pub enum PickerSubrenderer {
 }
 
 pub struct PickerRenderer {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     geometry_renderer: GeometryRenderer,
@@ -42,7 +42,8 @@ pub struct PickerRenderer {
 }
 
 impl PickerRenderer {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
+        let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -67,14 +68,14 @@ impl PickerRenderer {
         .unwrap();
 
         let subpass = render_pass.clone().first_subpass();
-        let geometry_renderer = GeometryRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let entity_renderer = EntityRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let tile_renderer = TileRenderer::new(device.clone(), subpass.clone(), viewport.clone());
+        let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
+        let entity_renderer = EntityRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
+        let tile_renderer = TileRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let marker_renderer = MarkerRenderer::new(device.clone(), subpass, viewport);
+        let marker_renderer = MarkerRenderer::new(memory_allocator.clone(), subpass, viewport);
 
         Self {
-            device,
+            memory_allocator,
             queue,
             render_pass,
             geometry_renderer,
@@ -87,21 +88,22 @@ impl PickerRenderer {
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
+        let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();
         self.geometry_renderer
-            .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone(), false);
+            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone(), false);
         self.entity_renderer
-            .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
         self.tile_renderer
-            .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
+            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        self.marker_renderer.recreate_pipeline(self.device.clone(), subpass, viewport);
+        self.marker_renderer.recreate_pipeline(device.clone(), subpass, viewport);
         self.dimensions = dimensions;
     }
 
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
-            self.device.clone(),
+            self.memory_allocator.clone(),
             self.queue.clone(),
             self.render_pass.clone(),
             self.dimensions,

@@ -1,7 +1,7 @@
 use cgmath::{Matrix4, Vector3};
-use vulkano::VulkanLibrary;
 use vulkano::device::DeviceExtensions;
 use vulkano::instance::InstanceExtensions;
+use vulkano::VulkanLibrary;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -49,22 +49,22 @@ pub fn get_instance_extensions(library: &VulkanLibrary) -> InstanceExtensions {
 pub fn get_device_extensions() -> DeviceExtensions {
     DeviceExtensions {
         khr_swapchain: true,
-        //amd_mixed_attachment_samples: true,
+        //ext_filter_cubic: true,
         ..DeviceExtensions::empty()
     }
 }
 
 macro_rules! choose_physical_device {
     ($instance:expr, $surface:expr, $device_extensions:expr) => {{
-        $instance.enumerate_physical_devices().unwrap()
+        $instance
+            .enumerate_physical_devices()
+            .unwrap()
             .filter(|p| p.supported_extensions().contains($device_extensions))
             .filter_map(|p| {
                 p.queue_family_properties()
                     .iter()
                     .enumerate()
-                    .position(|(i, q)| {
-                        q.queue_flags.graphics && p.surface_support(i as u32, $surface).unwrap_or(false)
-                    })
+                    .position(|(i, q)| q.queue_flags.graphics && p.surface_support(i as u32, $surface).unwrap_or(false))
                     .map(|i| (p, i as u32))
             })
             .min_by_key(|(p, _)| match p.properties().device_type {

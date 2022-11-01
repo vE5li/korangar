@@ -4,8 +4,8 @@ mod geometry;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use vulkano::device::{Device, Queue};
-use vulkano::format::{Format, ClearColorValue, ClearValue};
+use vulkano::device::{Device, DeviceOwned, Queue};
+use vulkano::format::{ClearColorValue, ClearValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::render_pass::RenderPass;
 
@@ -20,7 +20,7 @@ pub enum ShadowSubrenderer {
 }
 
 pub struct ShadowRenderer {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     geometry_renderer: GeometryRenderer,
@@ -28,7 +28,8 @@ pub struct ShadowRenderer {
 }
 
 impl ShadowRenderer {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>) -> Self {
+        let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -47,11 +48,11 @@ impl ShadowRenderer {
         .unwrap();
 
         let subpass = render_pass.clone().first_subpass();
-        let geometry_renderer = GeometryRenderer::new(device.clone(), subpass.clone());
-        let entity_renderer = EntityRenderer::new(device.clone(), subpass);
+        let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), subpass.clone());
+        let entity_renderer = EntityRenderer::new(memory_allocator.clone(), subpass);
 
         Self {
-            device,
+            memory_allocator,
             queue,
             render_pass,
             geometry_renderer,
@@ -67,7 +68,7 @@ impl ShadowRenderer {
         };
 
         <Self as Renderer>::Target::new(
-            self.device.clone(),
+            self.memory_allocator.clone(),
             self.queue.clone(),
             self.render_pass.clone(),
             [size; 2],

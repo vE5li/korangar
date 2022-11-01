@@ -20,7 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -36,18 +36,21 @@ unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
 
 pub struct AmbientLightRenderer {
+    memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
 }
 
 impl AmbientLightRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
+            memory_allocator,
             pipeline,
             vertex_shader,
             fragment_shader,
@@ -81,7 +84,7 @@ impl AmbientLightRenderer {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
             WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
             WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
         ])

@@ -7,13 +7,13 @@ use cgmath::{Deg, Vector2, Vector3};
 use derive_new::new;
 use procedural::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::sync::{now, GpuFuture};
 
 use self::resource::ResourceType;
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{Color, ModelVertex, NativeModelVertex, PickerTarget, TileVertex, Transform, WaterVertex};
+use crate::graphics::{Color, MemoryAllocator, ModelVertex, NativeModelVertex, PickerTarget, TileVertex, Transform, WaterVertex};
 use crate::loaders::{ByteStream, GameFileLoader, ModelLoader, TextureLoader, Version};
 use crate::world::*;
 
@@ -157,7 +157,7 @@ struct MapData {
 
 #[derive(new)]
 pub struct MapLoader {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     #[new(default)]
     cache: HashMap<String, Arc<Map>>,
 }
@@ -172,8 +172,6 @@ impl MapLoader {
     ) -> Result<Arc<Map>, String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", resource_file));
-
-        let mut texture_future = now(self.device.clone()).boxed();
 
         let bytes = game_file_loader.get(&format!("data\\{}.rsw", resource_file))?;
         let mut byte_stream = ByteStream::new(&bytes);
@@ -284,13 +282,7 @@ impl MapLoader {
                         // offset the objects slightly to avoid depth buffer fighting
                         let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
 
-                        let model = model_loader.get(
-                            game_file_loader,
-                            texture_loader,
-                            &mut texture_future,
-                            &model_name,
-                            reverse_order,
-                        )?;
+                        let model = model_loader.get(game_file_loader, texture_loader, &model_name, reverse_order)?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, model, transform);
 
@@ -305,13 +297,7 @@ impl MapLoader {
                         let array: [f32; 3] = scale.into();
                         let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
 
-                        let model = model_loader.get(
-                            game_file_loader,
-                            texture_loader,
-                            &mut texture_future,
-                            &model_name,
-                            reverse_order,
-                        )?;
+                        let model = model_loader.get(game_file_loader, texture_loader, &model_name, reverse_order)?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(None, model_name, model, transform);
                         objects.push(object);
@@ -399,7 +385,7 @@ impl MapLoader {
 
         for _index in 0..texture_count {
             let texture_name = byte_stream.string(texture_name_length as usize);
-            let texture = texture_loader.get(&texture_name, game_file_loader, &mut texture_future)?;
+            let texture = texture_loader.get(&texture_name, game_file_loader)?;
             textures.push(texture);
         }
 
@@ -607,18 +593,28 @@ impl MapLoader {
             #[cfg(feature = "debug")]
             byte_stream.assert_empty(&gat_file);
 
-            let vertex_buffer =
-                CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, tile_vertices.into_iter()).unwrap();
+            let vertex_buffer = CpuAccessibleBuffer::from_iter(
+                &*self.memory_allocator,
+                BufferUsage {
+                    vertex_buffer: true,
+                    ..Default::default()
+                },
+                false,
+                tile_vertices.into_iter(),
+            )
+            .unwrap();
             tile_vertex_buffer = Some(vertex_buffer);
 
-            let vertex_buffer =
-                CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, tile_picker_vertices.into_iter()).unwrap();
+            let vertex_buffer = CpuAccessibleBuffer::from_iter(
+                &*self.memory_allocator,
+                BufferUsage {
+                    vertex_buffer: true,
+                    ..Default::default()
+                },
+                false,
+                tile_picker_vertices.into_iter(),
+            )
+            .unwrap();
             tile_picker_vertex_buffer = Some(vertex_buffer);
         }
 
@@ -788,19 +784,29 @@ impl MapLoader {
         }*/
 
         let ground_vertices = NativeModelVertex::to_vertices(native_ground_vertices);
-        let ground_vertex_buffer =
-            CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, ground_vertices.into_iter()).unwrap();
+        let ground_vertex_buffer = CpuAccessibleBuffer::from_iter(
+            &*self.memory_allocator,
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            ground_vertices.into_iter(),
+        )
+        .unwrap();
 
         let water_vertex_buffer = match !water_vertices.is_empty() {
-            true => CpuAccessibleBuffer::from_iter(self.device.clone(), BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, water_vertices.into_iter())
-                .unwrap()
-                .into(),
+            true => CpuAccessibleBuffer::from_iter(
+                &*self.memory_allocator,
+                BufferUsage {
+                    vertex_buffer: true,
+                    ..Default::default()
+                },
+                false,
+                water_vertices.into_iter(),
+            )
+            .unwrap()
+            .into(),
             false => None,
         };
 
@@ -830,9 +836,6 @@ impl MapLoader {
         ));
 
         self.cache.insert(resource_file, map.clone());
-
-        texture_future.flush().unwrap();
-        texture_future.cleanup_finished();
 
         #[cfg(feature = "debug")]
         timer.stop();

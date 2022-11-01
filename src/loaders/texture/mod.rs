@@ -5,32 +5,31 @@ use std::sync::Arc;
 use derive_new::new;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat, Rgba};
+use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract};
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
 use vulkano::image::{ImageDimensions, ImmutableImage, MipmapsCount};
-use vulkano::sync::{now, GpuFuture};
+use vulkano::sync::{FenceSignalFuture, GpuFuture};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::Texture;
+use crate::graphics::{MemoryAllocator, Texture};
 use crate::loaders::GameFileLoader;
 
 #[derive(new)]
 pub struct TextureLoader {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
+    #[new(default)]
+    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>>,
     #[new(value = "HashMap::new()")]
     cache: HashMap<String, Texture>,
 }
 
 impl TextureLoader {
-    fn load(
-        &mut self,
-        path: &str,
-        game_file_loader: &mut GameFileLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
-    ) -> Result<Texture, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Texture, String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}{}{}", MAGENTA, path, NONE));
 
@@ -62,18 +61,24 @@ impl TextureLoader {
             array_layers: 1,
         };
 
-        let (image, future) = ImmutableImage::from_iter(
+        let load_buffer = self.load_buffer.get_or_insert_with(|| {
+            AutoCommandBufferBuilder::primary(
+                &*self.memory_allocator,
+                self.queue.queue_family_index(),
+                CommandBufferUsage::OneTimeSubmit,
+            )
+            .unwrap()
+        });
+
+        let image = ImmutableImage::from_iter(
+            &*self.memory_allocator,
             image_data.iter().cloned(),
             dimensions,
             MipmapsCount::Log2,
             Format::R8G8B8A8_SRGB,
-            self.queue.clone(),
+            load_buffer,
         )
         .unwrap();
-
-        let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
-        let combined_future = inner_future.join(future).boxed();
-        *texture_future = combined_future;
 
         let texture = ImageView::new_default(Arc::new(image)).unwrap();
         self.cache.insert(path.to_string(), texture.clone());
@@ -84,15 +89,23 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(
-        &mut self,
-        path: &str,
-        game_file_loader: &mut GameFileLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
-    ) -> Result<Texture, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Texture, String> {
         match self.cache.get(path) {
             Some(texture) => Ok(texture.clone()),
-            None => self.load(path, game_file_loader, texture_future),
+            None => self.load(path, game_file_loader),
         }
+    }
+
+    pub fn submit_load_buffer(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
+        self.load_buffer.take().map(|buffer| {
+            buffer
+                .build()
+                .unwrap()
+                .execute(self.queue.clone())
+                .unwrap()
+                .boxed()
+                .then_signal_fence_and_flush()
+                .unwrap()
+        })
     }
 }

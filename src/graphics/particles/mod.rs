@@ -78,7 +78,6 @@ impl QuestIcon {
     pub fn new(
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         map: &Map,
         quest_effect: QuestEffectPacket,
     ) -> Self {
@@ -88,7 +87,6 @@ impl QuestIcon {
             .get(
                 &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1 /* 1 - 3 */),
                 game_file_loader,
-                texture_future,
             )
             .unwrap();
         let color = match quest_effect.color {
@@ -142,13 +140,12 @@ impl ParticleHolder {
         &mut self,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         map: &Map,
         quest_effect: QuestEffectPacket,
     ) {
         self.quest_icons.insert(
             quest_effect.entity_id,
-            QuestIcon::new(game_file_loader, texture_loader, texture_future, map, quest_effect),
+            QuestIcon::new(game_file_loader, texture_loader, map, quest_effect),
         );
     }
 

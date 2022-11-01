@@ -3,15 +3,17 @@ use std::sync::Arc;
 
 use derive_new::new;
 use procedural::*;
+use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
+use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract};
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
 use vulkano::image::{ImageDimensions, ImmutableImage, MipmapsCount};
-use vulkano::sync::{now, GpuFuture};
+use vulkano::sync::{now, FenceSignalFuture, GpuFuture};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::Texture;
+use crate::graphics::{MemoryAllocator, Texture};
 use crate::interface::{ElementCell, PrototypeElement};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 
@@ -132,19 +134,16 @@ struct SpriteData {
 
 #[derive(new)]
 pub struct SpriteLoader {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
+    #[new(default)]
+    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>>,
     #[new(default)]
     cache: HashMap<String, Arc<Sprite>>,
 }
 
 impl SpriteLoader {
-    fn load(
-        &mut self,
-        path: &str,
-        game_file_loader: &mut GameFileLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
-    ) -> Result<Arc<Sprite>, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}{}{}", MAGENTA, path, NONE));
 
@@ -185,10 +184,20 @@ impl SpriteLoader {
             }
         });
 
+        let load_buffer = self.load_buffer.get_or_insert_with(|| {
+            AutoCommandBufferBuilder::primary(
+                &*self.memory_allocator,
+                self.queue.queue_family_index(),
+                CommandBufferUsage::OneTimeSubmit,
+            )
+            .unwrap()
+        });
+
         let textures = rgba_images
             .chain(palette_images)
             .map(|image_data| {
-                let (image, future) = ImmutableImage::from_iter(
+                let image = ImmutableImage::from_iter(
+                    &*self.memory_allocator,
                     image_data.data.iter().cloned(),
                     ImageDimensions::Dim2d {
                         width: image_data.width as u32,
@@ -197,14 +206,9 @@ impl SpriteLoader {
                     },
                     MipmapsCount::One,
                     Format::R8G8B8A8_SRGB,
-                    self.queue.clone(),
+                    load_buffer,
                 )
                 .unwrap();
-
-                let inner_future = std::mem::replace(texture_future, now(self.device.clone()).boxed());
-                let combined_future = inner_future.join(future).boxed();
-
-                *texture_future = combined_future;
 
                 ImageView::new_default(Arc::new(image)).unwrap()
             })
@@ -224,15 +228,23 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(
-        &mut self,
-        path: &str,
-        game_file_loader: &mut GameFileLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
-    ) -> Result<Arc<Sprite>, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path, game_file_loader, texture_future),
+            None => self.load(path, game_file_loader),
         }
+    }
+
+    pub fn submit_load_buffer(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
+        self.load_buffer.take().map(|buffer| {
+            buffer
+                .build()
+                .unwrap()
+                .execute(self.queue.clone())
+                .unwrap()
+                .boxed()
+                .then_signal_fence_and_flush()
+                .unwrap()
+        })
     }
 }

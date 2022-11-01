@@ -22,7 +22,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector4};
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
@@ -39,8 +39,8 @@ use crate::graphics::*;
 unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
 
-
 pub struct SpriteRenderer {
+    memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
@@ -50,7 +50,8 @@ pub struct SpriteRenderer {
 }
 
 impl SpriteRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -64,20 +65,28 @@ impl SpriteRenderer {
             ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(
+            &*memory_allocator,
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            vertices.into_iter(),
+        )
+        .unwrap();
 
         let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
             mag_filter: Filter::Nearest,
             min_filter: Filter::Nearest,
             ..Default::default()
-        }).unwrap();
+        })
+        .unwrap();
 
         let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
 
         Self {
+            memory_allocator,
             pipeline,
             vertex_shader,
             fragment_shader,
@@ -134,7 +143,10 @@ impl SpriteRenderer {
             false => self.nearest_sampler.clone(),
         };
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(0, texture, sampler)]).unwrap();
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+            WriteDescriptorSet::image_view_sampler(0, texture, sampler),
+        ])
+        .unwrap();
 
         let constants = Constants {
             screen_position: screen_position.into(),

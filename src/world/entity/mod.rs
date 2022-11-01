@@ -83,7 +83,6 @@ impl Common {
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         script_loader: &ScriptLoader,
         map: &Map,
         entity_data: EntityData,
@@ -118,9 +117,7 @@ impl Common {
             EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
         };
 
-        let sprite = sprite_loader
-            .get(&format!("{}.spr", file_path), game_file_loader, texture_future)
-            .unwrap();
+        let sprite = sprite_loader.get(&format!("{}.spr", file_path), game_file_loader).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path), game_file_loader).unwrap();
         let details = ResourceState::Unavalible;
         let animation_state = AnimationState::new(client_tick);
@@ -287,7 +284,7 @@ impl Common {
         }
     }
 
-    #[cfg(feature = "debug")]
+    /*#[cfg(feature = "debug")]
     fn generate_step_texture_coordinates(
         steps: &Vec<(Vector2<usize>, u32)>,
         step: Vector2<usize>,
@@ -454,12 +451,18 @@ impl Common {
         };
 
         let steps_vertices = NativeModelVertex::to_vertices(native_steps_vertices);
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, steps_vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(
+            self.memory_allocator,
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            steps_vertices.into_iter(),
+        )
+        .unwrap();
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
-    }
+    }*/
 
     pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
     where
@@ -513,7 +516,6 @@ impl Player {
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         script_loader: &ScriptLoader,
         map: &Map,
         character_information: CharacterInformation,
@@ -528,7 +530,6 @@ impl Player {
             game_file_loader,
             sprite_loader,
             action_loader,
-            texture_future,
             script_loader,
             map,
             EntityData::from_character(character_information, player_position),
@@ -614,7 +615,6 @@ impl Npc {
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         script_loader: &ScriptLoader,
         map: &Map,
         entity_data: EntityData,
@@ -624,7 +624,6 @@ impl Npc {
             game_file_loader,
             sprite_loader,
             action_loader,
-            texture_future,
             script_loader,
             map,
             entity_data,
@@ -751,10 +750,10 @@ impl Entity {
         self.get_common_mut().move_from_to(map, from, to, starting_timestamp);
     }
 
-    #[cfg(feature = "debug")]
+    /*#[cfg(feature = "debug")]
     pub fn generate_steps_vertex_buffer(&mut self, device: Arc<Device>, map: &Map) {
         self.get_common_mut().generate_steps_vertex_buffer(device, map);
-    }
+    }*/
 
     pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
     where

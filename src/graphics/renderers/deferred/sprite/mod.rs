@@ -22,7 +22,7 @@ use std::sync::Arc;
 use cgmath::Vector2;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -42,6 +42,7 @@ unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
 
 pub struct SpriteRenderer {
+    memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
@@ -62,13 +63,13 @@ pub struct SpriteRenderer {
 
 impl SpriteRenderer {
     pub fn new(
-        device: Arc<Device>,
+        memory_allocator: Arc<MemoryAllocator>,
         subpass: Subpass,
         viewport: Viewport,
         #[cfg(feature = "debug")] game_file_loader: &mut GameFileLoader,
         #[cfg(feature = "debug")] texture_loader: &mut TextureLoader,
-        #[cfg(feature = "debug")] texture_future: &mut Box<dyn GpuFuture + 'static>,
     ) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -82,21 +83,27 @@ impl SpriteRenderer {
             ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device.clone(), BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(
+            &*memory_allocator,
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            vertices.into_iter(),
+        )
+        .unwrap();
 
         #[cfg(feature = "debug")]
-        let object_marker_texture = texture_loader.get("object.png", game_file_loader, texture_future).unwrap();
+        let object_marker_texture = texture_loader.get("object.png", game_file_loader).unwrap();
         #[cfg(feature = "debug")]
-        let light_source_marker_texture = texture_loader.get("light.png", game_file_loader, texture_future).unwrap();
+        let light_source_marker_texture = texture_loader.get("light.png", game_file_loader).unwrap();
         #[cfg(feature = "debug")]
-        let sound_source_marker_texture = texture_loader.get("sound.png", game_file_loader, texture_future).unwrap();
+        let sound_source_marker_texture = texture_loader.get("sound.png", game_file_loader).unwrap();
         #[cfg(feature = "debug")]
-        let effect_source_marker_texture = texture_loader.get("effect.png", game_file_loader, texture_future).unwrap();
+        let effect_source_marker_texture = texture_loader.get("effect.png", game_file_loader).unwrap();
         #[cfg(feature = "debug")]
-        let entity_marker_texture = texture_loader.get("entity.png", game_file_loader, texture_future).unwrap();
+        let entity_marker_texture = texture_loader.get("entity.png", game_file_loader).unwrap();
 
         let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
             mag_filter: Filter::Linear,
@@ -108,6 +115,7 @@ impl SpriteRenderer {
         let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
 
         Self {
+            memory_allocator,
             pipeline,
             vertex_shader,
             fragment_shader,
@@ -169,7 +177,10 @@ impl SpriteRenderer {
             false => self.nearest_sampler.clone(),
         };
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(0, texture, sampler)]).unwrap();
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+            WriteDescriptorSet::image_view_sampler(0, texture, sampler),
+        ])
+        .unwrap();
 
         let constants = Constants {
             screen_position: [screen_position.x, screen_position.y],

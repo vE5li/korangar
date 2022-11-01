@@ -26,6 +26,7 @@ mod world;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use chrono::prelude::*;
 use procedural::debug_condition;
@@ -83,7 +84,12 @@ fn main() {
         .build_vk_surface(&events_loop, instance.clone())
         .unwrap();
 
-    surface.window().set_cursor_visible(false);
+    surface
+        .object()
+        .unwrap()
+        .downcast_ref::<winit::window::Window>()
+        .unwrap()
+        .set_cursor_visible(false);
 
     #[cfg(feature = "debug")]
     print_debug!("created {}window{}", MAGENTA, NONE);
@@ -145,20 +151,18 @@ fn main() {
     game_file_loader.patch();
     game_file_loader.add_archive("lua_files.grf".to_string());
 
+    let memory_allocator = Arc::new(MemoryAllocator::new(device.clone()));
+
     let font_loader = Rc::new(RefCell::new(FontLoader::new(
-        device.clone(),
+        memory_allocator.clone(),
         queue.clone(),
         &mut game_file_loader,
     )));
 
-    //println!("{:#?}", font_loader.borrow_mut().get("testsomemoreaaaカタカナ"));
-    //font_loader.borrow_mut().get("testsomemoreaaa123");
-    //font_loader.borrow_mut().flush().cleanup_finished();
-
-    let mut model_loader = ModelLoader::new(device.clone());
-    let mut texture_loader = TextureLoader::new(device.clone(), queue.clone());
-    let mut map_loader = MapLoader::new(device.clone());
-    let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone());
+    let mut model_loader = ModelLoader::new(memory_allocator.clone());
+    let mut texture_loader = TextureLoader::new(memory_allocator.clone(), queue.clone());
+    let mut map_loader = MapLoader::new(memory_allocator.clone());
+    let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
     let mut action_loader = ActionLoader::default();
     let script_loader = ScriptLoader::new(&mut game_file_loader);
 
@@ -195,7 +199,7 @@ fn main() {
     let timer = Timer::new("create renderers");
 
     let mut deferred_renderer = DeferredRenderer::new(
-        device.clone(),
+        memory_allocator.clone(),
         queue.clone(),
         swapchain_holder.swapchain_format(),
         viewport.clone(),
@@ -204,7 +208,7 @@ fn main() {
         &mut texture_loader,
     );
     let mut interface_renderer = InterfaceRenderer::new(
-        device.clone(),
+        memory_allocator.clone(),
         queue.clone(),
         viewport.clone(),
         swapchain_holder.window_size_u32(),
@@ -212,8 +216,13 @@ fn main() {
         &mut texture_loader,
         font_loader.clone(),
     );
-    let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), viewport, swapchain_holder.window_size_u32());
-    let shadow_renderer = ShadowRenderer::new(device.clone(), queue);
+    let mut picker_renderer = PickerRenderer::new(
+        memory_allocator.clone(),
+        queue.clone(),
+        viewport,
+        swapchain_holder.window_size_u32(),
+    );
+    let shadow_renderer = ShadowRenderer::new(memory_allocator.clone(), queue);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -247,13 +256,10 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let mut texture_future = now(device.clone()).boxed();
-
     let mut interface = Interface::new(
         &mut game_file_loader,
         &mut sprite_loader,
         &mut action_loader,
-        &mut texture_future,
         swapchain_holder.window_size_f32(),
     );
     let mut focus_state = FocusState::default();
@@ -311,8 +317,6 @@ fn main() {
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
-    texture_future.then_signal_fence_and_flush().unwrap().wait(None).unwrap();
-
     events_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
@@ -323,7 +327,12 @@ fn main() {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
-                let window_size = surface.window().inner_size();
+                let window_size = surface
+                    .object()
+                    .unwrap()
+                    .downcast_ref::<winit::window::Window>()
+                    .unwrap()
+                    .inner_size();
                 interface.update_window_size(Size::new(window_size.width as f32, window_size.height as f32));
                 swapchain_holder.update_window_size(window_size.into());
             }
@@ -410,7 +419,6 @@ fn main() {
                                 &mut game_file_loader,
                                 &mut sprite_loader,
                                 &mut action_loader,
-                                &mut texture_future,
                                 &script_loader,
                                 &map,
                                 entity_appeared_data,
@@ -427,14 +435,14 @@ fn main() {
 
                             if let Some(entity) = entity {
                                 entity.move_from_to(&map, position_from, position_to, starting_timestamp);
-                                #[cfg(feature = "debug")]
-                                entity.generate_steps_vertex_buffer(device.clone(), &map);
+                                /*#[cfg(feature = "debug")]
+                                entity.generate_steps_vertex_buffer(device.clone(), &map);*/
                             }
                         }
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
                             entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
-                            #[cfg(feature = "debug")]
-                            entities[0].generate_steps_vertex_buffer(device.clone(), &map);
+                            /*#[cfg(feature = "debug")]
+                            entities[0].generate_steps_vertex_buffer(device.clone(), &map);*/
                         }
                         NetworkEvent::ChangeMap(map_name, player_position) => {
                             while entities.len() > 1 {
@@ -492,28 +500,17 @@ fn main() {
                         NetworkEvent::AddNextButton => interface.add_next_button(),
                         NetworkEvent::AddCloseButton => interface.add_close_button(),
                         NetworkEvent::AddChoiceButtons(choices) => interface.add_choice_buttons(choices),
-                        NetworkEvent::AddQuestEffect(quest_effect) => particle_holder.add_quest_icon(
-                            &mut game_file_loader,
-                            &mut texture_loader,
-                            &mut texture_future,
-                            &map,
-                            quest_effect,
-                        ),
+                        NetworkEvent::AddQuestEffect(quest_effect) => {
+                            particle_holder.add_quest_icon(&mut game_file_loader, &mut texture_loader, &map, quest_effect)
+                        }
                         NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
                         NetworkEvent::Inventory(item_data) => {
-                            player_inventory.fill(
-                                &mut game_file_loader,
-                                &mut texture_loader,
-                                &mut texture_future,
-                                &script_loader,
-                                item_data,
-                            );
+                            player_inventory.fill(&mut game_file_loader, &mut texture_loader, &script_loader, item_data);
                         }
                         NetworkEvent::AddIventoryItem(item_index, item_data, equip_position, equipped_position) => {
                             player_inventory.add_item(
                                 &mut game_file_loader,
                                 &mut texture_loader,
-                                &mut texture_future,
                                 &script_loader,
                                 item_index,
                                 item_data,
@@ -582,7 +579,6 @@ fn main() {
                                         &mut game_file_loader,
                                         &mut sprite_loader,
                                         &mut action_loader,
-                                        &mut texture_future,
                                         &script_loader,
                                         &map,
                                         character_information,
@@ -772,9 +768,8 @@ fn main() {
                     }
                 }
 
-                let texture_fence = texture_future
-                    .queue()
-                    .map(|_| texture_future.then_signal_fence_and_flush().unwrap());
+                let texture_fence = texture_loader.submit_load_buffer();
+                let sprite_fence = sprite_loader.submit_load_buffer();
 
                 particle_holder.update(delta_time as f32);
 
@@ -846,6 +841,11 @@ fn main() {
                 }
 
                 if let Some(mut fence) = texture_fence {
+                    fence.wait(None).unwrap();
+                    fence.cleanup_finished();
+                }
+
+                if let Some(mut fence) = sprite_fence {
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
@@ -1023,7 +1023,7 @@ fn main() {
                     });
 
                     if rerender_interface {
-                        let font_future = font_loader.borrow_mut().flush();
+                        let font_future = font_loader.borrow_mut().submit_load_buffer();
 
                         interface_target.start(window_size_u32, clear_interface);
 
@@ -1035,15 +1035,6 @@ fn main() {
                             hovered_element,
                             focused_element,
                             input_system.get_mouse_mode(),
-                        );
-
-                        interface_renderer.render_text_new(
-                            &mut interface_target,
-                            "YA",
-                            cgmath::Vector2::new(10.0, 20.0),
-                            cgmath::Vector4::new(0.0, 0.0, 1000.0, 1000.0),
-                            Color::rgb(255, 10, 100),
-                            10.0,
                         );
 
                         interface_target.finish(font_future);

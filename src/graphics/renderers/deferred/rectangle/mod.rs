@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use cgmath::Vector2;
 use vulkano::buffer::BufferUsage;
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -44,7 +44,8 @@ pub struct RectangleRenderer {
 }
 
 impl RectangleRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
@@ -58,10 +59,16 @@ impl RectangleRenderer {
             ScreenVertex::new(Vector2::new(1.0, 1.0)),
         ];
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(device, BufferUsage {
-    vertex_buffer: true,
-    ..Default::default()
-}, false, vertices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(
+            &*memory_allocator,
+            BufferUsage {
+                vertex_buffer: true,
+                ..Default::default()
+            },
+            false,
+            vertices.into_iter(),
+        )
+        .unwrap();
 
         Self {
             pipeline,

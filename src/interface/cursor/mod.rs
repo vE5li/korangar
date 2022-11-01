@@ -33,13 +33,8 @@ pub struct MouseCursor {
 }
 
 impl MouseCursor {
-    pub fn new(
-        game_file_loader: &mut GameFileLoader,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
-    ) -> Self {
-        let sprite = sprite_loader.get("cursors.spr", game_file_loader, texture_future).unwrap();
+    pub fn new(game_file_loader: &mut GameFileLoader, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader) -> Self {
+        let sprite = sprite_loader.get("cursors.spr", game_file_loader).unwrap();
         let actions = action_loader.get("cursors.act", game_file_loader).unwrap();
         let animation_state = AnimationState::new(0);
 

@@ -21,7 +21,8 @@ use std::sync::Arc;
 
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
+use vulkano::memory::allocator::MemoryUsage;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
@@ -37,23 +38,31 @@ unsafe impl bytemuck::Zeroable for Matrices {}
 unsafe impl bytemuck::Pod for Matrices {}
 
 pub struct TileRenderer {
+    memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
-    matrices_buffer: CpuBufferPool<Matrices>,
+    matrices_buffer: CpuBufferPool<Matrices, MemoryAllocator>,
 }
 
 impl TileRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-        let matrices_buffer = CpuBufferPool::new(device, BufferUsage {
-    uniform_buffer: true,
-    ..Default::default()
-});
+
+        let matrices_buffer = CpuBufferPool::new(
+            memory_allocator.clone(),
+            BufferUsage {
+                uniform_buffer: true,
+                ..Default::default()
+            },
+            MemoryUsage::Upload,
+        );
 
         Self {
+            memory_allocator,
             pipeline,
             vertex_shader,
             fragment_shader,
@@ -94,7 +103,11 @@ impl TileRenderer {
         };
         let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::buffer(0, matrices_subbuffer)]).unwrap();
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [WriteDescriptorSet::buffer(
+            0,
+            matrices_subbuffer,
+        )])
+        .unwrap();
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<TileVertex>();
 

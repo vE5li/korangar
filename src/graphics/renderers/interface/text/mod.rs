@@ -3,7 +3,7 @@
 mod vertex_shader {
     vulkano_shaders::shader! {
         ty: "vertex",
-        path: "src/graphics/renderers/interface/sprite/vertex_shader.glsl"
+        path: "src/graphics/renderers/interface/text/vertex_shader.glsl"
     }
 }
 
@@ -12,7 +12,7 @@ mod vertex_shader {
 mod fragment_shader {
     vulkano_shaders::shader! {
         ty: "fragment",
-        path: "src/graphics/renderers/interface/sprite/fragment_shader.glsl"
+        path: "src/graphics/renderers/interface/text/fragment_shader.glsl"
     }
 }
 
@@ -24,7 +24,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector4};
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
-use vulkano::device::Device;
+use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
@@ -43,6 +43,7 @@ unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
 
 pub struct TextRenderer {
+    memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
@@ -51,19 +52,21 @@ pub struct TextRenderer {
 }
 
 impl TextRenderer {
-    pub fn new(device: Arc<Device>, subpass: Subpass, viewport: Viewport, font_loader: Rc<RefCell<FontLoader>>) -> Self {
+    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport, font_loader: Rc<RefCell<FontLoader>>) -> Self {
+        let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
-        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
-            mag_filter: Filter::Nearest,
-            min_filter: Filter::Nearest,
+        let nearest_sampler = Sampler::new(device, SamplerCreateInfo {
+            mag_filter: Filter::Linear,
+            min_filter: Filter::Linear,
             ..Default::default()
         })
         .unwrap();
 
         Self {
+            memory_allocator,
             pipeline,
             vertex_shader,
             fragment_shader,
@@ -89,7 +92,7 @@ impl TextRenderer {
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend_alpha())
+            .color_blend_state(ColorBlendState::new(1).blend(INTERFACE_ATTACHMENT_BLEND))
             .multisample_state(MultisampleState {
                 rasterization_samples: vulkano::image::SampleCount::Sample4,
                 ..Default::default()
@@ -114,15 +117,13 @@ impl TextRenderer {
 
         let mut font_loader = self.font_loader.borrow_mut();
         let texture = font_loader.get_font_atlas();
-        let character_layout = font_loader.get(text);
+        let character_layout = font_loader.get(text, font_size);
 
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
 
-        let set = PersistentDescriptorSet::new(descriptor_layout, [WriteDescriptorSet::image_view_sampler(
-            0,
-            texture,
-            self.nearest_sampler.clone(),
-        )])
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+            WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone()),
+        ])
         .unwrap();
 
         render_target
@@ -132,12 +133,27 @@ impl TextRenderer {
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
 
         for character in character_layout {
+            let pixel_bounding_box = character.0.unpositioned().exact_bounding_box().unwrap();
 
-            let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
-            let screen_size = Vector2::new(character.0.position().x / half_screen.x, character.0.position().y / half_screen.y);
+            let screen_position = Vector2::new(
+                (screen_position.x + character.0.position().x) / half_screen.x,
+                (screen_position.y - (pixel_bounding_box.height() - character.0.position().y)) / half_screen.y,
+            );
+
+            let screen_size = Vector2::new(
+                pixel_bounding_box.width() / half_screen.x,
+                pixel_bounding_box.height() / half_screen.y,
+            );
+
             let texture_position = character.1.min;
-            let texture_size = character.1.max - character.1.min; // TODO: use absolute instead of
-                                                                  // size
+            let texture_size = character.1.max - character.1.min; // TODO: use absolute instead
+
+            /*println!("glyph: {:#?}", character.0);
+            println!("rect: {:#?}", character.1);
+            println!("s-pos: {:?}", screen_position);
+            println!("s-size: {:?}", screen_size);
+            println!("t-pos: {:?}", texture_position);
+            println!("t-size: {:?}", texture_size);*/
 
             let constants = Constants {
                 screen_position: screen_position.into(),

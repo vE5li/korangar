@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
-use vulkano::device::{Device, Queue};
+use vulkano::device::{Device, DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -17,17 +17,16 @@ use vulkano::sync::{now, GpuFuture};
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
-use crate::graphics::{Color, Renderer, SingleRenderTarget, Texture};
+use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, Texture};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
 pub struct InterfaceRenderer {
-    device: Arc<Device>,
+    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     rectangle_renderer: RectangleRenderer,
     sprite_renderer: SpriteRenderer,
     text_renderer: TextRenderer,
-    font_map: Texture,
     checked_box_texture: Texture,
     unchecked_box_texture: Texture,
     expanded_arrow_texture: Texture,
@@ -37,7 +36,7 @@ pub struct InterfaceRenderer {
 
 impl InterfaceRenderer {
     pub fn new(
-        device: Arc<Device>,
+        memory_allocator: Arc<MemoryAllocator>,
         queue: Arc<Queue>,
         viewport: Viewport,
         dimensions: [u32; 2],
@@ -45,6 +44,7 @@ impl InterfaceRenderer {
         texture_loader: &mut TextureLoader,
         font_loader: Rc<RefCell<FontLoader>>,
     ) -> Self {
+        let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
             device.clone(),
             attachments: {
@@ -63,36 +63,22 @@ impl InterfaceRenderer {
         .unwrap();
 
         let subpass = render_pass.clone().first_subpass();
-        let rectangle_renderer = RectangleRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let sprite_renderer = SpriteRenderer::new(device.clone(), subpass.clone(), viewport.clone());
-        let font_renderer = TextRenderer::new(device.clone(), subpass, viewport, font_loader);
+        let rectangle_renderer = RectangleRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
+        let sprite_renderer = SpriteRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
+        let font_renderer = TextRenderer::new(memory_allocator.clone(), subpass, viewport, font_loader);
 
-        let mut texture_future = now(device.clone()).boxed();
-        let font_map = texture_loader.get("font.png", game_file_loader, &mut texture_future).unwrap();
-        let checked_box_texture = texture_loader
-            .get("checked_box.png", game_file_loader, &mut texture_future)
-            .unwrap();
-        let unchecked_box_texture = texture_loader
-            .get("unchecked_box.png", game_file_loader, &mut texture_future)
-            .unwrap();
-        let expanded_arrow_texture = texture_loader
-            .get("expanded_arrow.png", game_file_loader, &mut texture_future)
-            .unwrap();
-        let collapsed_arrow_texture = texture_loader
-            .get("collapsed_arrow.png", game_file_loader, &mut texture_future)
-            .unwrap();
-
-        texture_future.flush().unwrap();
-        texture_future.cleanup_finished();
+        let checked_box_texture = texture_loader.get("checked_box.png", game_file_loader).unwrap();
+        let unchecked_box_texture = texture_loader.get("unchecked_box.png", game_file_loader).unwrap();
+        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", game_file_loader).unwrap();
+        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", game_file_loader).unwrap();
 
         Self {
-            device,
+            memory_allocator,
             queue,
             render_pass,
             rectangle_renderer,
             sprite_renderer,
             text_renderer: font_renderer,
-            font_map,
             checked_box_texture,
             unchecked_box_texture,
             expanded_arrow_texture,
@@ -102,11 +88,14 @@ impl InterfaceRenderer {
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
+        let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();
 
         self.rectangle_renderer
-            .recreate_pipeline(self.device.clone(), subpass.clone(), viewport.clone());
-        self.sprite_renderer.recreate_pipeline(self.device.clone(), subpass, viewport);
+            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
+        self.sprite_renderer
+            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
+        self.text_renderer.recreate_pipeline(device.clone(), subpass, viewport);
         self.dimensions = dimensions;
     }
 
@@ -120,7 +109,7 @@ impl InterfaceRenderer {
         };
 
         <Self as Renderer>::Target::new(
-            self.device.clone(),
+            self.memory_allocator.clone(),
             self.queue.clone(),
             self.render_pass.clone(),
             self.dimensions,
@@ -224,47 +213,14 @@ impl InterfaceRenderer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         text: &str,
-        mut position: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        color: Color,
-        font_size: f32,
-    ) {
-        for character in text.as_bytes() {
-            let index = (*character as usize).saturating_sub(31);
-            self.render_sprite_indexed(
-                render_target,
-                self.font_map.clone(),
-                position,
-                Vector2::new(font_size, font_size),
-                clip_size,
-                color,
-                10,
-                index,
-                true,
-            );
-            position.x += font_size / 2.0;
-        }
-    }
-
-    pub fn render_text_new(
-        &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        text: &str,
         position: Vector2<f32>,
         clip_size: Vector4<f32>,
         color: Color,
         font_size: f32,
     ) {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-        self.text_renderer.render(
-            render_target,
-            text,
-            window_size,
-            position,
-            clip_size,
-            color,
-            font_size,
-        );
+        self.text_renderer
+            .render(render_target, text, window_size, position, clip_size, color, font_size);
     }
 }
 

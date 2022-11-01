@@ -1,5 +1,6 @@
 mod cameras;
 mod color;
+mod memory;
 mod particles;
 mod renderers;
 mod smoothed;
@@ -17,13 +18,14 @@ use vulkano::image::ImmutableImage;
 
 pub use self::cameras::*;
 pub use self::color::*;
+pub use self::memory::MemoryAllocator;
 pub use self::particles::*;
 pub use self::renderers::*;
 pub use self::smoothed::SmoothedValue;
 pub use self::transform::Transform;
 pub use self::vertices::*;
 
-pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer>;
+pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>;
 
 pub type ModelVertexBuffer = Arc<CpuAccessibleBuffer<[ModelVertex]>>;
 

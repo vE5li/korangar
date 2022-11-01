@@ -4,7 +4,7 @@ layout(location = 0) in vec2 texture_coordinates;
 
 layout(location = 0) out vec4 fragment_color;
 
-layout (set = 0, binding = 0) uniform readonly sampler2D sprite_texture;
+layout (set = 0, binding = 0) uniform sampler2D sprite_texture;
 
 layout(push_constant) uniform Constants {
     vec2 screen_position;
@@ -21,5 +21,5 @@ void main() {
         discard;
     }
 
-    fragment_color = texture(sprite_texture, texture_coordinates) * constants.color;
+    fragment_color = vec4(constants.color.rgb, texture(sprite_texture, texture_coordinates).r * constants.color.a);
 }

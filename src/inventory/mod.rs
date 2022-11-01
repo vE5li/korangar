@@ -1,6 +1,6 @@
 use vulkano::sync::GpuFuture;
 
-use crate::graphics::Texture;
+use crate::graphics::{MemoryAllocator, Texture};
 use crate::interface::TrackedState;
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
 use crate::network::{EquipPosition, ItemOptions};
@@ -46,7 +46,6 @@ impl Inventory {
         &mut self,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         script_loader: &ScriptLoader,
         item_data: Vec<(usize, usize, EquipPosition, EquipPosition)>,
     ) {
@@ -55,7 +54,7 @@ impl Inventory {
             .map(|item_data| {
                 let resource_name = script_loader.get_item_resource_from_id(item_data.1);
                 let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
-                let texture = texture_loader.get(&full_path, game_file_loader, texture_future).unwrap();
+                let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
                 Item {
                     index: item_data.0 as u16,
                     item_id: item_data.1,
@@ -73,7 +72,6 @@ impl Inventory {
         &mut self,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         script_loader: &ScriptLoader,
         item_index: usize,
         item_data: usize,
@@ -91,7 +89,7 @@ impl Inventory {
 
             let resource_name = script_loader.get_item_resource_from_id(item_data);
             let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
-            let texture = texture_loader.get(&full_path, game_file_loader, texture_future).unwrap();
+            let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
             let item = Item {
                 index: item_index as u16,
                 item_id: item_data,

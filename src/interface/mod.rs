@@ -53,14 +53,13 @@ impl Interface {
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
-        texture_future: &mut Box<dyn GpuFuture + 'static>,
         avalible_space: Size,
     ) -> Self {
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
         let theme = Theme::new(&interface_settings.theme_file);
         let dialog_handle = None;
-        let mouse_cursor = MouseCursor::new(game_file_loader, sprite_loader, action_loader, texture_future);
+        let mouse_cursor = MouseCursor::new(game_file_loader, sprite_loader, action_loader);
         let mouse_cursor_hidden = false;
 
         Self {

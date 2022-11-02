@@ -132,28 +132,19 @@ impl TextRenderer {
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
 
-        for character in character_layout {
-            let pixel_bounding_box = character.0.unpositioned().exact_bounding_box().unwrap();
-
+        character_layout.iter().for_each(|(texture_coordinates, position)| {
             let screen_position = Vector2::new(
-                (screen_position.x + character.0.position().x) / half_screen.x,
-                (screen_position.y - (pixel_bounding_box.height() - character.0.position().y)) / half_screen.y,
+                (screen_position.x + position.min.x as f32) / half_screen.x,
+                (screen_position.y + position.min.y as f32) / half_screen.y,
             );
 
             let screen_size = Vector2::new(
-                pixel_bounding_box.width() / half_screen.x,
-                pixel_bounding_box.height() / half_screen.y,
+                position.width() as f32 / half_screen.x,
+                position.height() as f32 / half_screen.y,
             );
 
-            let texture_position = character.1.min;
-            let texture_size = character.1.max - character.1.min; // TODO: use absolute instead
-
-            /*println!("glyph: {:#?}", character.0);
-            println!("rect: {:#?}", character.1);
-            println!("s-pos: {:?}", screen_position);
-            println!("s-size: {:?}", screen_size);
-            println!("t-pos: {:?}", texture_position);
-            println!("t-size: {:?}", texture_size);*/
+            let texture_position = texture_coordinates.min;
+            let texture_size = texture_coordinates.max - texture_coordinates.min; // TODO: use absolute instead
 
             let constants = Constants {
                 screen_position: screen_position.into(),
@@ -170,6 +161,6 @@ impl TextRenderer {
                 .push_constants(layout.clone(), 0, constants)
                 .draw(6, 1, 0, 0)
                 .unwrap();
-        }
+        });
     }
 }

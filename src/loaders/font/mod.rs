@@ -129,7 +129,7 @@ impl FontLoader {
         }
     }
 
-    pub fn get(&mut self, text: &str, font_size: f32) -> Vec<(PositionedGlyph, Rect<f32>)> {
+    pub fn get(&mut self, text: &str, font_size: f32) -> Vec<(Rect<f32>, Rect<i32>)> {
         let glyphs = layout_paragraph(&self.font, Scale::uniform(font_size), 500, text);
 
         for glyph in &glyphs {
@@ -174,12 +174,7 @@ impl FontLoader {
 
         glyphs
             .into_iter()
-            .filter_map(|glyph| {
-                self.cache
-                    .rect_for(0, &glyph)
-                    .unwrap()
-                    .map(|(floating, _integer)| (glyph, floating))
-            })
+            .filter_map(|glyph| self.cache.rect_for(0, &glyph).unwrap())
             .collect()
     }
 

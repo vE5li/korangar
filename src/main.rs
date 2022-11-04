@@ -1037,6 +1037,7 @@ fn main() {
                             input_system.get_mouse_mode(),
                         );
 
+                        let font_future = font_loader.borrow_mut().submit_load_buffer();
                         interface_target.finish(font_future);
                     }
                 });

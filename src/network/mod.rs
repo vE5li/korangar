@@ -2173,7 +2173,7 @@ impl NetworkingSystem {
     }
 
     fn try_get_data_from_map_server(&mut self) -> Option<Vec<u8>> {
-        let mut buffer = [0; 4096];
+        let mut buffer = [0; 8096];
         let map_stream = self.map_stream.as_mut()?;
         map_stream.set_read_timeout(Duration::from_micros(1).into()).unwrap();
         let response_lenght = map_stream.read(&mut buffer).ok()?;

@@ -207,6 +207,7 @@ fn main() {
         &mut game_file_loader,
         &mut texture_loader,
     );
+
     let mut interface_renderer = InterfaceRenderer::new(
         memory_allocator.clone(),
         queue.clone(),
@@ -216,13 +217,15 @@ fn main() {
         &mut texture_loader,
         font_loader.clone(),
     );
+
     let mut picker_renderer = PickerRenderer::new(
         memory_allocator.clone(),
         queue.clone(),
         viewport,
         swapchain_holder.window_size_u32(),
     );
-    let shadow_renderer = ShadowRenderer::new(memory_allocator.clone(), queue);
+
+    let shadow_renderer = ShadowRenderer::new(memory_allocator, queue);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -601,10 +604,12 @@ fn main() {
                         UserEvent::OpenCharacterCreationWindow(character_slot) => {
                             interface.open_window(&mut focus_state, &CharacterCreationWindow::new(character_slot))
                         }
-                        UserEvent::CreateCharacter(character_slot, name) => match networking_system.create_character(character_slot, name) {
-                            Ok(..) => interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS),
-                            Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
-                        },
+                        UserEvent::CreateCharacter(character_slot, name) => {
+                            match networking_system.create_character(character_slot, name) {
+                                Ok(..) => interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS),
+                                Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
+                            }
+                        }
                         UserEvent::DeleteCharacter(character_id) => {
                             interface.handle_result(&mut focus_state, networking_system.delete_character(character_id))
                         }
@@ -1021,8 +1026,6 @@ fn main() {
                     });
 
                     if rerender_interface {
-                        let font_future = font_loader.borrow_mut().submit_load_buffer();
-
                         interface_target.start(window_size_u32, clear_interface);
 
                         let state_provider = &StateProvider::new(&render_settings, networking_system.get_login_settings());

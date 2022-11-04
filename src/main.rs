@@ -395,22 +395,20 @@ fn main() {
                 );
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-                    let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id).unwrap();
+                    if let Some(entity) = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
+                        if entity.are_details_unavalible() {
+                            networking_system.request_entity_details(entity_id);
+                            entity.set_details_requested();
+                        }
 
-                    if entity.are_details_unavalible() {
-                        networking_system.request_entity_details(entity_id);
-                        entity.set_details_requested();
-                    }
-
-                    match entity.get_entity_type() {
-                        EntityType::Npc => interface.set_mouse_cursor_state(MouseCursorState::Dialog, client_tick),
-                        EntityType::Warp => interface.set_mouse_cursor_state(MouseCursorState::Warp, client_tick),
-                        EntityType::Monster => interface.set_mouse_cursor_state(MouseCursorState::Attack, client_tick),
-                        _ => {} // TODO: fill other entity types
+                        match entity.get_entity_type() {
+                            EntityType::Npc => interface.set_mouse_cursor_state(MouseCursorState::Dialog, client_tick),
+                            EntityType::Warp => interface.set_mouse_cursor_state(MouseCursorState::Warp, client_tick),
+                            EntityType::Monster => interface.set_mouse_cursor_state(MouseCursorState::Attack, client_tick),
+                            _ => {} // TODO: fill other entity types
+                        }
                     }
                 }
-
-                let mut texture_future = now(device.clone()).boxed();
 
                 for event in network_events {
                     match event {

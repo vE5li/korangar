@@ -2206,7 +2206,7 @@ impl NetworkingSystem {
         }
     }
 
-    pub fn crate_character(&mut self, slot: usize, name: String) -> Result<(), String> {
+    pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), String> {
         let hair_color = 0;
         let hair_style = 0;
         let start_job = 0;

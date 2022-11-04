@@ -601,7 +601,7 @@ fn main() {
                         UserEvent::OpenCharacterCreationWindow(character_slot) => {
                             interface.open_window(&mut focus_state, &CharacterCreationWindow::new(character_slot))
                         }
-                        UserEvent::CreateCharacter(character_slot, name) => match networking_system.crate_character(character_slot, name) {
+                        UserEvent::CreateCharacter(character_slot, name) => match networking_system.create_character(character_slot, name) {
                             Ok(..) => interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS),
                             Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                         },

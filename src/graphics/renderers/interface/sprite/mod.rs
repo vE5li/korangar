@@ -113,7 +113,7 @@ impl SpriteRenderer {
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
             .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend_alpha())
+            .color_blend_state(ColorBlendState::new(1).blend(INTERFACE_ATTACHMENT_BLEND))
             .multisample_state(MultisampleState {
                 rasterization_samples: vulkano::image::SampleCount::Sample4,
                 ..Default::default()

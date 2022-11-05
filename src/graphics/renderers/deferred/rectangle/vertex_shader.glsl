@@ -1,7 +1,5 @@
 #version 450
 
-//layout(location = 0) in vec2 position;
-
 layout(push_constant) uniform Constants {
     vec2 screen_position;
     vec2 screen_size;

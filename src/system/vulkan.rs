@@ -14,9 +14,9 @@ pub fn get_instance_extensions(library: &VulkanLibrary) -> InstanceExtensions {
     }
 }
 
-/*pub fn get_layers() -> Vec<&'static str> {
-    let available_layers: Vec<_> = vulkano::instance::layers_list().unwrap().collect();
-    let desired_layers = Vec::new(); // vec!["VK_LAYER_KHRONOS_validation"];
+pub fn get_layers(library: &VulkanLibrary) -> Vec<String> {
+    let available_layers: Vec<_> = library.layer_properties().unwrap().collect();
+    let desired_layers = vec![/*"VK_LAYER_KHRONOS_validation".to_owned()*/];
 
     #[cfg(feature = "debug")]
     let timer = Timer::new("available layers");
@@ -42,14 +42,13 @@ pub fn get_instance_extensions(library: &VulkanLibrary) -> InstanceExtensions {
 
     desired_layers
         .into_iter()
-        .filter(|&l| available_layers.iter().any(|li| li.name() == l))
+        .filter(|layer| available_layers.iter().any(|li| li.name() == layer))
         .collect()
-}*/
+}
 
 pub fn get_device_extensions() -> DeviceExtensions {
     DeviceExtensions {
         khr_swapchain: true,
-        //ext_filter_cubic: true,
         ..DeviceExtensions::empty()
     }
 }

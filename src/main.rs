@@ -31,6 +31,7 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use procedural::debug_condition;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+use vulkano::instance::debug::{DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessenger, DebugUtilsMessengerCreateInfo};
 use vulkano::instance::{Instance, InstanceCreateInfo};
 use vulkano::sync::{now, GpuFuture};
 use vulkano::VulkanLibrary;
@@ -47,7 +48,7 @@ use crate::interface::*;
 use crate::inventory::Inventory;
 use crate::loaders::*;
 use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
-use crate::system::{get_device_extensions, get_instance_extensions, GameTimer};
+use crate::system::{get_device_extensions, get_instance_extensions, get_layers, GameTimer};
 use crate::world::*;
 
 fn main() {
@@ -57,17 +58,33 @@ fn main() {
     let library = VulkanLibrary::new().unwrap();
     let create_info = InstanceCreateInfo {
         enabled_extensions: get_instance_extensions(&library),
-        //enabled_layers: get_layers(),
+        enabled_layers: get_layers(&library),
         enumerate_portability: true,
         ..Default::default()
     };
 
     let instance = Instance::new(library, create_info).expect("failed to create instance");
 
-    //#[cfg(feature = "debug")]
-    //let _debug_callback =
-    //    vulkano::instance::debug::DebugCallback::new(&instance,
-    // MessageSeverity::all(), MessageType::all(), vulkan_message_callback).ok();
+    #[cfg(feature = "debug")]
+    let _debug_callback = unsafe {
+        DebugUtilsMessenger::new(instance.clone(), DebugUtilsMessengerCreateInfo {
+            message_severity: DebugUtilsMessageSeverity {
+                error: true,
+                warning: true,
+                information: true,
+                verbose: true,
+                ..Default::default()
+            },
+            message_type: DebugUtilsMessageType {
+                general: true,
+                validation: true,
+                performance: true,
+                ..Default::default()
+            },
+            ..DebugUtilsMessengerCreateInfo::user_callback(Arc::new(vulkan_message_callback))
+        })
+        .ok()
+    };
 
     #[cfg(feature = "debug")]
     print_debug!("created {}instance{}", MAGENTA, NONE);

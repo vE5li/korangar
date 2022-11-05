@@ -37,6 +37,18 @@ pub fn print_indented(message: String, newline: bool) {
 }
 
 pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
+    let severity = if message.severity.error {
+        "error"
+    } else if message.severity.warning {
+        "warning"
+    } else if message.severity.information {
+        "information"
+    } else if message.severity.verbose {
+        "verbose"
+    } else {
+        panic!("no-impl");
+    };
+
     let message_type = if message.ty.general {
         "general"
     } else if message.ty.validation {
@@ -44,16 +56,19 @@ pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
     } else if message.ty.performance {
         "performance"
     } else {
-        "vulkano message type not implemented"
+        panic!("no-impl");
     };
 
     print_debug!(
-        "{}{:?}{} [{}{}{}] : {}",
+        "{}{}{} [{}{}{}] [{}{}{}]: {}",
         MAGENTA,
-        message.layer_prefix,
+        message.layer_prefix.unwrap_or("unknown"),
         NONE,
         YELLOW,
         message_type,
+        NONE,
+        RED,
+        severity,
         NONE,
         message.description
     );

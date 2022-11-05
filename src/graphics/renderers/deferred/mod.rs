@@ -298,8 +298,7 @@ impl DeferredRenderer {
 
     pub fn water_light(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
         render_target.unbind_subrenderer();
-        self.water_light_renderer
-            .render(render_target, camera, water_level);
+        self.water_light_renderer.render(render_target, camera, water_level);
     }
 
     pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: ImageBuffer) {

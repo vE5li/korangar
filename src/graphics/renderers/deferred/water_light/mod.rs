@@ -79,12 +79,7 @@ impl WaterLightRenderer {
             .unwrap()
     }
 
-    pub fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        camera: &dyn Camera,
-        water_level: f32,
-    ) {
+    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 

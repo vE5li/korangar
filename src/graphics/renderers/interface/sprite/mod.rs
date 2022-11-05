@@ -183,6 +183,7 @@ impl SpriteRenderer {
         let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
 
+        // TODO: don't invoke build. inline code
         self.build(
             render_target,
             texture,
@@ -191,40 +192,6 @@ impl SpriteRenderer {
             clip_size,
             Vector2::new(0.0, 0.0),
             Vector2::new(1.0, 1.0),
-            color,
-            smooth,
-        );
-    }
-
-    pub fn render_indexed(
-        &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        texture: Texture,
-        window_size: Vector2<usize>,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        color: Color,
-        column_count: usize,
-        cell_index: usize,
-        smooth: bool,
-    ) {
-        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
-        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
-        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
-
-        let unit = 1.0 / column_count as f32;
-        let offset_x = unit * (cell_index % column_count) as f32;
-        let offset_y = unit * (cell_index / column_count) as f32;
-
-        self.build(
-            render_target,
-            texture,
-            screen_position,
-            screen_size,
-            clip_size,
-            Vector2::new(offset_x, offset_y),
-            Vector2::new(unit, unit),
             color,
             smooth,
         );

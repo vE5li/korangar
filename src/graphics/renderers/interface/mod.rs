@@ -134,33 +134,6 @@ impl InterfaceRenderer {
             .render(render_target, texture, window_size, position, size, clip_size, color, smooth);
     }
 
-    pub fn render_sprite_indexed(
-        &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        texture: Texture,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        color: Color,
-        column_count: usize,
-        cell_index: usize,
-        smooth: bool,
-    ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-        self.sprite_renderer.render_indexed(
-            render_target,
-            texture,
-            window_size,
-            position,
-            size,
-            clip_size,
-            color,
-            column_count,
-            cell_index,
-            smooth,
-        );
-    }
-
     pub fn render_rectangle(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,

@@ -40,7 +40,6 @@ pub struct RectangleRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
-    vertex_buffer: ScreenVertexBuffer,
 }
 
 impl RectangleRenderer {
@@ -50,31 +49,10 @@ impl RectangleRenderer {
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
-        let vertices = vec![
-            ScreenVertex::new(Vector2::new(0.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 1.0)),
-        ];
-
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(
-            &*memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            vertices.into_iter(),
-        )
-        .unwrap();
-
         Self {
             pipeline,
             vertex_shader,
             fragment_shader,
-            vertex_buffer,
         }
     }
 
@@ -90,7 +68,6 @@ impl RectangleRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
@@ -126,7 +103,6 @@ impl RectangleRenderer {
             .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
             .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .draw(6, 1, 0, 0)
             .unwrap();
     }

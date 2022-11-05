@@ -44,7 +44,6 @@ pub struct SpriteRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
-    vertex_buffer: ScreenVertexBuffer,
     nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
 }
@@ -55,26 +54,6 @@ impl SpriteRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-
-        let vertices = vec![
-            ScreenVertex::new(Vector2::new(0.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 1.0)),
-        ];
-
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(
-            &*memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            vertices.into_iter(),
-        )
-        .unwrap();
 
         let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
             mag_filter: Filter::Nearest,
@@ -90,7 +69,6 @@ impl SpriteRenderer {
             pipeline,
             vertex_shader,
             fragment_shader,
-            vertex_buffer,
             nearest_sampler,
             linear_sampler,
         }
@@ -108,7 +86,6 @@ impl SpriteRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
@@ -163,7 +140,6 @@ impl SpriteRenderer {
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .draw(6, 1, 0, 0)
             .unwrap();
     }

@@ -85,7 +85,6 @@ impl PointLightRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
@@ -96,12 +95,7 @@ impl PointLightRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        camera: &dyn Camera,
-        vertex_buffer: ScreenVertexBuffer,
-    ) {
+    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -123,8 +117,7 @@ impl PointLightRenderer {
             .state
             .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set)
-            .bind_vertex_buffers(0, vertex_buffer);
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
     pub fn render(

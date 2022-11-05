@@ -79,7 +79,6 @@ impl BufferRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
@@ -95,7 +94,6 @@ impl BufferRenderer {
         picker_image: ImageBuffer,
         light_image: ImageBuffer,
         font_atlas: Arc<ImageView<StorageImage>>,
-        vertex_buffer: ScreenVertexBuffer,
         render_settings: &RenderSettings,
     ) {
         let layout = self.pipeline.layout().clone();
@@ -128,8 +126,7 @@ impl BufferRenderer {
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, vertex_buffer)
-            .draw(3, 1, 0, 0)
+            .draw(6, 1, 0, 0)
             .unwrap();
     }
 }

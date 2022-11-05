@@ -31,8 +31,6 @@ pub type ModelVertexBuffer = Arc<CpuAccessibleBuffer<[ModelVertex]>>;
 
 pub type WaterVertexBuffer = Arc<CpuAccessibleBuffer<[WaterVertex]>>;
 
-pub type ScreenVertexBuffer = Arc<CpuAccessibleBuffer<[ScreenVertex]>>;
-
 pub type TileVertexBuffer = Arc<CpuAccessibleBuffer<[TileVertex]>>;
 
 pub type Texture = Arc<ImageView<Arc<ImmutableImage>>>;

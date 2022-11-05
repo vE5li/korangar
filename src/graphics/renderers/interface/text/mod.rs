@@ -87,7 +87,6 @@ impl TextRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))

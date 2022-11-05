@@ -69,7 +69,6 @@ impl AmbientLightRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ScreenVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
@@ -80,7 +79,7 @@ impl AmbientLightRenderer {
             .unwrap()
     }
 
-    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, vertex_buffer: ScreenVertexBuffer, color: Color) {
+    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, color: Color) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -100,8 +99,7 @@ impl AmbientLightRenderer {
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, vertex_buffer)
-            .draw(3, 1, 0, 0)
+            .draw(6, 1, 0, 0)
             .unwrap();
     }
 }

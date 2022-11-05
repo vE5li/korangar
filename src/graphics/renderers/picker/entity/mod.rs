@@ -49,7 +49,6 @@ pub struct EntityRenderer {
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
-    vertex_buffer: ModelVertexBuffer,
     matrices_buffer: CpuBufferPool<Matrices, MemoryAllocator>,
     nearest_sampler: Arc<Sampler>,
 }
@@ -60,62 +59,6 @@ impl EntityRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-
-        let vertices = vec![
-            ModelVertex::new(
-                Vector3::new(-1.0, -2.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 0.0),
-                0,
-                0.0,
-            ),
-            ModelVertex::new(
-                Vector3::new(-1.0, 0.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 1.0),
-                0,
-                0.0,
-            ),
-            ModelVertex::new(
-                Vector3::new(1.0, -2.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 0.0),
-                0,
-                0.0,
-            ),
-            ModelVertex::new(
-                Vector3::new(1.0, -2.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 0.0),
-                0,
-                0.0,
-            ),
-            ModelVertex::new(
-                Vector3::new(-1.0, 0.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 1.0),
-                0,
-                0.0,
-            ),
-            ModelVertex::new(
-                Vector3::new(1.0, 0.0, 0.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 1.0),
-                0,
-                0.0,
-            ),
-        ];
-
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(
-            &*memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            vertices.into_iter(),
-        )
-        .unwrap();
 
         let matrices_buffer = CpuBufferPool::new(
             memory_allocator.clone(),
@@ -139,7 +82,6 @@ impl EntityRenderer {
             pipeline,
             vertex_shader,
             fragment_shader,
-            vertex_buffer,
             matrices_buffer,
             nearest_sampler,
         }
@@ -157,7 +99,6 @@ impl EntityRenderer {
         fragment_shader: &ShaderModule,
     ) -> Arc<GraphicsPipeline> {
         GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
             .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
             .input_assembly_state(InputAssemblyState::new())
             .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
@@ -189,8 +130,7 @@ impl EntityRenderer {
             .state
             .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set)
-            .bind_vertex_buffers(0, self.vertex_buffer.clone());
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
     pub fn render(

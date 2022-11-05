@@ -76,8 +76,6 @@ pub struct DeferredRenderer {
     tile_textures: [Texture; 7],
     font_map: Texture,
     dimensions: [u32; 2],
-    screen_vertex_buffer: ScreenVertexBuffer,
-    billboard_vertex_buffer: ScreenVertexBuffer,
 }
 
 impl DeferredRenderer {
@@ -166,43 +164,6 @@ impl DeferredRenderer {
         #[cfg(feature = "debug")]
         let box_renderer = BoxRenderer::new(memory_allocator.clone(), lighting_subpass, viewport);
 
-        let vertices = vec![
-            ScreenVertex::new(Vector2::new(-1.0, -1.0)),
-            ScreenVertex::new(Vector2::new(-1.0, 3.0)),
-            ScreenVertex::new(Vector2::new(3.0, -1.0)),
-        ];
-
-        let screen_vertex_buffer = CpuAccessibleBuffer::from_iter(
-            &*memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            vertices.into_iter(),
-        )
-        .unwrap();
-
-        let vertices = vec![
-            ScreenVertex::new(Vector2::new(0.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(1.0, 0.0)),
-            ScreenVertex::new(Vector2::new(0.0, 1.0)),
-            ScreenVertex::new(Vector2::new(1.0, 1.0)),
-        ];
-
-        let billboard_vertex_buffer = CpuAccessibleBuffer::from_iter(
-            &*memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            vertices.into_iter(),
-        )
-        .unwrap();
-
         let font_map = texture_loader.get("font.png", game_file_loader).unwrap();
 
         #[cfg(feature = "debug")]
@@ -238,8 +199,6 @@ impl DeferredRenderer {
             tile_textures,
             font_map,
             dimensions,
-            screen_vertex_buffer,
-            billboard_vertex_buffer,
         }
     }
 
@@ -304,8 +263,7 @@ impl DeferredRenderer {
 
     pub fn ambient_light(&self, render_target: &mut <Self as Renderer>::Target, color: Color) {
         render_target.unbind_subrenderer();
-        self.ambient_light_renderer
-            .render(render_target, self.screen_vertex_buffer.clone(), color);
+        self.ambient_light_renderer.render(render_target, color);
     }
 
     pub fn directional_light(
@@ -319,16 +277,8 @@ impl DeferredRenderer {
         intensity: f32,
     ) {
         render_target.unbind_subrenderer();
-        self.directional_light_renderer.render(
-            render_target,
-            camera,
-            light_image,
-            light_matrix,
-            self.screen_vertex_buffer.clone(),
-            direction,
-            color,
-            intensity,
-        );
+        self.directional_light_renderer
+            .render(render_target, camera, light_image, light_matrix, direction, color, intensity);
     }
 
     pub fn point_light(
@@ -340,8 +290,7 @@ impl DeferredRenderer {
         range: f32,
     ) {
         if render_target.bind_subrenderer(DeferredSubrenderer::PointLight) {
-            self.point_light_renderer
-                .bind_pipeline(render_target, camera, self.billboard_vertex_buffer.clone());
+            self.point_light_renderer.bind_pipeline(render_target, camera);
         }
 
         self.point_light_renderer.render(render_target, camera, position, color, range);
@@ -350,13 +299,12 @@ impl DeferredRenderer {
     pub fn water_light(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
         render_target.unbind_subrenderer();
         self.water_light_renderer
-            .render(render_target, camera, self.screen_vertex_buffer.clone(), water_level);
+            .render(render_target, camera, water_level);
     }
 
     pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: ImageBuffer) {
         render_target.unbind_subrenderer();
-        self.overlay_renderer
-            .render(render_target, interface_image, self.screen_vertex_buffer.clone());
+        self.overlay_renderer.render(render_target, interface_image);
     }
 
     pub fn render_sprite(
@@ -483,14 +431,8 @@ impl DeferredRenderer {
         render_settings: &RenderSettings,
     ) {
         render_target.unbind_subrenderer();
-        self.buffer_renderer.render(
-            render_target,
-            picker_image,
-            light_image,
-            font_atlas,
-            self.screen_vertex_buffer.clone(),
-            render_settings,
-        );
+        self.buffer_renderer
+            .render(render_target, picker_image, light_image, font_atlas, render_settings);
     }
 }
 

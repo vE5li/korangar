@@ -22,5 +22,5 @@ jobs:
           args: --all --check
 
 concurrency:
-  group: ${{ github.ref }}
+  group: ${{ github.ref }}-formatting
   cancel-in-progress: true

@@ -25,3 +25,7 @@ jobs:
         with:
           command: build
           args: --features debug
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true

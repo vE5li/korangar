@@ -20,3 +20,7 @@ jobs:
         with:
           command: fmt
           args: --all --check
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true

@@ -6,7 +6,7 @@ use std::rc::{Rc, Weak};
 
 use cgmath::Vector2;
 use winit::dpi::PhysicalPosition;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta};
+use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
 pub use self::event::UserEvent;
 pub use self::key::Key;
@@ -15,7 +15,7 @@ use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
 use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
-const KEY_COUNT: usize = 128;
+const KEY_COUNT: usize = 160; // TODO: get from size_of VirtualKeyCode
 
 #[derive(Default)]
 pub struct FocusState {
@@ -154,10 +154,9 @@ impl InputSystem {
         }
     }
 
-    pub fn update_keyboard(&mut self, code: usize, state: ElementState) {
+    pub fn update_keyboard(&mut self, virtual_code: VirtualKeyCode, state: ElementState) {
         let pressed = matches!(state, ElementState::Pressed);
-        self.keys[code].set_down(pressed);
-        //println!("code: {}", code);
+        self.keys[virtual_code as usize].set_down(pressed);
     }
 
     pub fn buffer_character(&mut self, character: char) {
@@ -176,6 +175,10 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
+    fn get_key(&self, key_code: VirtualKeyCode) -> &Key {
+        &self.keys[key_code as usize]
+    }
+
     pub fn user_events(
         &mut self,
         interface: &mut Interface,
@@ -189,7 +192,7 @@ impl InputSystem {
         let mut mouse_target = None;
         let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
 
-        let shift_down = self.keys[42].down();
+        let shift_down = self.get_key(VirtualKeyCode::LShift).down();
 
         #[cfg(feature = "debug")]
         let lock_actions = render_settings.use_debug_camera;
@@ -348,16 +351,16 @@ impl InputSystem {
             }
         }
 
-        let characters = self.input_buffer.drain(..);
+        let characters = self.input_buffer.drain(..).collect::<Vec<_>>();
 
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
             // this will currently not affect the following statements, which is a bit
             // strange
-            if self.keys[1].pressed() {
+            if self.get_key(VirtualKeyCode::Escape).pressed() {
                 focus_state.remove_focus();
             }
 
-            if self.keys[15].pressed() {
+            if self.get_key(VirtualKeyCode::Tab).pressed() {
                 let new_focused_element = focused_element
                     .borrow()
                     .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
@@ -365,7 +368,7 @@ impl InputSystem {
                 focus_state.update_focused_element(new_focused_element, *focused_window);
             }
 
-            if self.keys[28].pressed() {
+            if self.get_key(VirtualKeyCode::Return).pressed() {
                 let action = interface.left_click_element(focused_element, *focused_window);
 
                 if let Some(action) = action {
@@ -419,50 +422,50 @@ impl InputSystem {
                 }
             }
         } else {
-            if self.keys[15].pressed() {
+            if self.get_key(VirtualKeyCode::Tab).pressed() {
                 interface.first_focused_element(focus_state);
             }
 
-            if self.keys[1].pressed() {
+            if self.get_key(VirtualKeyCode::Escape).pressed() {
                 events.push(UserEvent::OpenMenuWindow);
             }
 
-            if self.keys[23].pressed() {
+            if self.get_key(VirtualKeyCode::I).pressed() {
                 events.push(UserEvent::OpenInventoryWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[50].pressed() {
+            if self.get_key(VirtualKeyCode::M).pressed() {
                 events.push(UserEvent::OpenMapsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[19].pressed() {
+            if self.get_key(VirtualKeyCode::R).pressed() {
                 events.push(UserEvent::OpenRenderSettingsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[20].pressed() {
+            if self.get_key(VirtualKeyCode::T).pressed() {
                 events.push(UserEvent::OpenTimeWindow);
             }
 
             #[cfg(feature = "debug_network")]
-            if self.keys[49].pressed() {
+            if self.get_key(VirtualKeyCode::P).pressed() {
                 events.push(UserEvent::OpenPacketWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[42].pressed() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::LShift).pressed() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraAccelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[42].released() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::LShift).released() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraDecelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[33].pressed() {
+            if self.get_key(VirtualKeyCode::F).pressed() {
                 events.push(UserEvent::ToggleUseDebugCamera);
                 events.push(UserEvent::CameraDecelerate);
             }
@@ -477,27 +480,27 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[17].down() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::W).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveForward);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[31].down() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::S).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveBackward);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[30].down() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::A).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveLeft);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[32].down() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::D).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveRight);
             }
 
             #[cfg(feature = "debug")]
-            if self.keys[57].down() && render_settings.use_debug_camera {
+            if self.get_key(VirtualKeyCode::Space).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveUp);
             }
         }

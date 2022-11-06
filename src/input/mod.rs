@@ -2,6 +2,7 @@ mod event;
 mod key;
 mod mode;
 
+use std::mem::variant_count;
 use std::rc::{Rc, Weak};
 
 use cgmath::Vector2;
@@ -15,7 +16,7 @@ use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
 use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
-const KEY_COUNT: usize = 160; // TODO: get from size_of VirtualKeyCode
+const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
 
 #[derive(Default)]
 pub struct FocusState {

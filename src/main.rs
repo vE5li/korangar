@@ -10,6 +10,7 @@
 #![feature(iter_intersperse)]
 #![feature(auto_traits)]
 #![feature(let_chains)]
+#![feature(variant_count)]
 
 #[cfg(feature = "debug")]
 #[macro_use]

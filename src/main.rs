@@ -388,7 +388,7 @@ fn main() {
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
-            } => input_system.update_keyboard(input.scancode as usize, input.state),
+            } => input_system.update_keyboard(input.virtual_keycode.unwrap(), input.state),
             Event::WindowEvent {
                 event: WindowEvent::ReceivedCharacter(character),
                 ..

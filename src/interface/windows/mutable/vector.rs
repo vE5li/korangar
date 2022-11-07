@@ -27,12 +27,7 @@ where
     T: Array,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         const LABELS: [char; 4] = ['x', 'y', 'z', 'w'];
 
         let mut elements = Vec::new();
@@ -51,7 +46,7 @@ where
             )) as _);
         }
 
-        Box::new(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -60,6 +55,6 @@ where
             elements,
             constraint!(200 > 250 < 300, ?),
             true,
-        ))
+        )
     }
 }

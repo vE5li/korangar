@@ -258,7 +258,6 @@ impl Default for InputTheme {
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ChatTheme {
     pub background_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
     pub font_size: MutableRange<f32, RERENDER>,
 }
 
@@ -266,7 +265,6 @@ impl Default for ChatTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::rgba(0, 0, 0, 170)),
-            border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
             font_size: MutableRange::new(14.0, 6.0, 50.0),
         }
     }

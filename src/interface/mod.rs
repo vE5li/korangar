@@ -36,7 +36,7 @@ struct DialogHandle {
 }
 
 pub struct Interface {
-    windows: Vec<(Box<dyn Window>, bool, bool)>,
+    windows: Vec<(Window, bool, bool)>,
     window_cache: WindowCache,
     interface_settings: InterfaceSettings,
     avalible_space: Size,
@@ -393,7 +393,7 @@ impl Interface {
         }
     }
 
-    fn open_new_window(&mut self, focus_state: &mut FocusState, window: Box<dyn Window + 'static>) {
+    fn open_new_window(&mut self, focus_state: &mut FocusState, window: Window) {
         self.windows.push((window, true, true));
         focus_state.remove_focus();
     }
@@ -479,17 +479,7 @@ impl Interface {
 
         // drop window in another thread to avoid frame drops when deallocation a large
         // amount of elements
-
-        #[allow(dead_code)]
-        struct WindowSender {
-            window: Box<dyn Window>,
-        }
-
-        unsafe impl Send for WindowSender {}
-        unsafe impl Sync for WindowSender {}
-
-        let window_sender = WindowSender { window };
-        std::thread::spawn(move || drop(window_sender));
+        std::thread::spawn(move || drop(window));
 
         // TODO: only if tab mode
         self.restore_focus(focus_state);

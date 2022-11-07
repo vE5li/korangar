@@ -24,11 +24,11 @@ pub fn derive_prototype_window_struct(
                 #window_class_ref_option
             }
 
-            fn to_window(&self, window_cache: &crate::interface::WindowCache, interface_settings: &crate::interface::InterfaceSettings, avalible_space: crate::interface::Size) -> std::boxed::Box<dyn crate::interface::Window + 'static> {
+            fn to_window(&self, window_cache: &crate::interface::WindowCache, interface_settings: &crate::interface::InterfaceSettings, avalible_space: crate::interface::Size) -> crate::interface::Window {
                 let scroll_view = crate::interface::ScrollView::new(vec![#(#initializers),*], constraint!(100%, ?));
                 let elements: Vec<crate::interface::ElementCell> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
                 let size_constraint = constraint!(200 > 300 < 400, 100 > ? < 80%);
-                std::boxed::Box::new(crate::interface::FramedWindow::new(window_cache, interface_settings, avalible_space, #window_title.to_string(), #window_class_option, elements, size_constraint, true))
+                crate::interface::Window::new(window_cache, interface_settings, avalible_space, #window_title.to_string(), #window_class_option, elements, size_constraint, true)
             }
         }
     }.into()

@@ -5,7 +5,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 const MINIMUM_NAME_LENGTH: usize = 4;
 const MAXIMUM_NAME_LENGTH: usize = 24;
@@ -24,12 +24,7 @@ impl PrototypeWindow for CharacterCreationWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let name = Rc::new(RefCell::new(String::new()));
 
         let selector = {
@@ -61,7 +56,7 @@ impl PrototypeWindow for CharacterCreationWindow {
                 .wrap(),
         ];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -70,6 +65,6 @@ impl PrototypeWindow for CharacterCreationWindow {
             elements,
             constraint!(200 > 250 < 300, ? < 80%),
             true,
-        ))
+        )
     }
 }

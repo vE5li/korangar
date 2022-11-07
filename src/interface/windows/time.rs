@@ -1,7 +1,7 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(Default)]
 pub struct TimeWindow {}
@@ -15,12 +15,7 @@ impl PrototypeWindow for TimeWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             Button::default().with_static_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
             Button::default().with_static_text("set noon").with_event(UserEvent::SetNoon).wrap(),
@@ -31,7 +26,7 @@ impl PrototypeWindow for TimeWindow {
                 .wrap(),
         ];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -40,6 +35,6 @@ impl PrototypeWindow for TimeWindow {
             elements,
             constraint!(200 > 250 < 300, ? < 80%),
             true,
-        ))
+        )
     }
 }

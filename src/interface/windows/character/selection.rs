@@ -1,7 +1,7 @@
 use derive_new::new;
 use procedural::*;
 
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 use crate::network::CharacterInformation;
 
 #[derive(new)]
@@ -20,12 +20,7 @@ impl PrototypeWindow for CharacterSelectionWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements: Vec<ElementCell> = (0..self.slot_count)
             .into_iter()
             .map(|slot| {
@@ -37,7 +32,7 @@ impl PrototypeWindow for CharacterSelectionWindow {
             })
             .collect();
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -46,6 +41,6 @@ impl PrototypeWindow for CharacterSelectionWindow {
             elements,
             constraint!(600, ?),
             false,
-        ))
+        )
     }
 }

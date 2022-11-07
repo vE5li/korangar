@@ -1,6 +1,6 @@
 use procedural::*;
 
-use crate::interface::{FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
+use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 
 #[derive(Default)]
 pub struct AudioSettingsWindow {}
@@ -14,15 +14,10 @@ impl PrototypeWindow for AudioSettingsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements = vec![];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -31,6 +26,6 @@ impl PrototypeWindow for AudioSettingsWindow {
             elements,
             constraint!(200 > 250 < 300, ?),
             true,
-        ))
+        )
     }
 }

@@ -2,7 +2,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::Color;
-use crate::interface::{ChangeEvent, ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(new)]
 pub struct ColorWindow {
@@ -12,12 +12,7 @@ pub struct ColorWindow {
 }
 
 impl PrototypeWindow for ColorWindow {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let rgb_elements: Vec<ElementCell> = vec![
             cell!(Headline::new("red".to_string(), Headline::DEFAULT_SIZE)),
             cell!(Slider::new(
@@ -51,7 +46,7 @@ impl PrototypeWindow for ColorWindow {
 
         let elements: Vec<ElementCell> = vec![cell!(Expandable::new("rgb".to_string(), rgb_elements, true))];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -60,6 +55,6 @@ impl PrototypeWindow for ColorWindow {
             elements,
             constraint!(200 > 250 < 300, ?),
             true,
-        ))
+        )
     }
 }

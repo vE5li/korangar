@@ -16,12 +16,7 @@ impl PrototypeWindow for CharacterOverviewWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements = vec![
             /*Text::default()
                 .with_dynamic_text(|| format!("base level: {}", player.get_base_level()))
@@ -43,7 +38,7 @@ impl PrototypeWindow for CharacterOverviewWindow {
                 .wrap(),
         ];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -52,6 +47,6 @@ impl PrototypeWindow for CharacterOverviewWindow {
             elements,
             constraint!(200 > 300 < 400, ?),
             false,
-        ))
+        )
     }
 }

@@ -17,15 +17,10 @@ impl PrototypeWindow for InventoryWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements = vec![InventoryContainer::new(self.items.new_remote()).wrap()];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -34,6 +29,6 @@ impl PrototypeWindow for InventoryWindow {
             elements,
             constraint!(300 > 400 < 500, ?),
             true,
-        ))
+        )
     }
 }

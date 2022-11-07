@@ -16,12 +16,7 @@ impl PrototypeWindow for MapsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let map_warps = [
             ("geffen", Vector2::new(119, 59)),
             ("alberta", Vector2::new(28, 234)),
@@ -58,7 +53,7 @@ impl PrototypeWindow for MapsWindow {
             })
             .collect();
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -67,6 +62,6 @@ impl PrototypeWindow for MapsWindow {
             elements,
             constraint!(200 > 250 < 300, ? < 80%),
             true,
-        ))
+        )
     }
 }

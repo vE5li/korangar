@@ -15,12 +15,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             StateButton::default()
                 .with_static_text("framerate limit")
@@ -30,7 +25,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
             interface_settings.to_element("interface settings".to_string()),
         ];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -39,6 +34,6 @@ impl PrototypeWindow for GraphicsSettingsWindow {
             elements,
             constraint!(200 > 250 < 300, ?),
             true,
-        ))
+        )
     }
 }

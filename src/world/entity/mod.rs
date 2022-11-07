@@ -792,12 +792,7 @@ impl Entity {
 }
 
 impl PrototypeWindow for Entity {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         match self {
             Entity::Player(player) => player.to_window(window_cache, interface_settings, avalible_space),
             Entity::Npc(npc) => npc.to_window(window_cache, interface_settings, avalible_space),

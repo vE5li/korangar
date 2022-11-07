@@ -3,19 +3,18 @@ use procedural::dimension;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::{
-    CloseButton, DragButton, Element, ElementCell, PartialSize, Position, Size, SizeConstraint, StateProvider, Window, WindowCache, *,
-};
+use crate::interface::*;
 
-pub struct FramedWindow {
+pub struct Window {
     window_class: Option<String>,
     position: Vector2<f32>,
     size_constraint: SizeConstraint,
     size: Vector2<f32>,
     elements: Vec<ElementCell>,
+    closeable: bool,
 }
 
-impl FramedWindow {
+impl Window {
     pub fn new(
         window_cache: &WindowCache,
         interface_settings: &InterfaceSettings,
@@ -71,20 +70,23 @@ impl FramedWindow {
             size_constraint,
             size,
             elements,
+            closeable,
         }
     }
-}
 
-impl Window for FramedWindow {
-    fn get_window_class(&self) -> Option<&str> {
+    pub fn get_window_class(&self) -> Option<&str> {
         self.window_class.as_deref()
     }
 
-    fn has_transparency(&self, theme: &Theme) -> bool {
+    pub fn has_transparency(&self, theme: &Theme) -> bool {
         theme.window.background_color.alpha != 255
     }
 
-    fn resolve(
+    pub fn is_closeable(&self) -> bool {
+        self.closeable
+    }
+
+    pub fn resolve(
         &mut self,
         interface_settings: &InterfaceSettings,
         theme: &Theme,
@@ -124,7 +126,7 @@ impl Window for FramedWindow {
         (self.window_class.as_deref(), self.position, self.size)
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    pub fn update(&mut self) -> Option<ChangeEvent> {
         self.elements
             .iter_mut()
             .map(|element| element.borrow_mut().update())
@@ -133,16 +135,16 @@ impl Window for FramedWindow {
             })
     }
 
-    fn first_focused_element(&self) -> Option<ElementCell> {
+    pub fn first_focused_element(&self) -> Option<ElementCell> {
         let element_cell = self.elements[0].clone();
         self.elements[0].borrow().focus_next(element_cell, None, Focus::downwards())
     }
 
-    fn restore_focus(&self) -> Option<ElementCell> {
+    pub fn restore_focus(&self) -> Option<ElementCell> {
         self.elements[0].borrow().restore_focus(self.elements[0].clone())
     }
 
-    fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
+    pub fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
         let absolute_position = mouse_position - self.position;
 
         if absolute_position.x >= 0.0
@@ -164,11 +166,11 @@ impl Window for FramedWindow {
         HoverInformation::Missed
     }
 
-    fn get_area(&self) -> (Position, Size) {
+    pub fn get_area(&self) -> (Position, Size) {
         (self.position, self.size)
     }
 
-    fn hovers_area(&self, position: Position, size: Size) -> bool {
+    pub fn hovers_area(&self, position: Position, size: Size) -> bool {
         let self_combined = self.position + self.size;
         let area_combined = position + size;
 
@@ -178,7 +180,7 @@ impl Window for FramedWindow {
             && self.position.y < area_combined.y
     }
 
-    fn offset(&mut self, avalible_space: Size, offset: Position) -> Option<(&str, Position)> {
+    pub fn offset(&mut self, avalible_space: Size, offset: Position) -> Option<(&str, Position)> {
         self.position += offset;
         self.validate_position(avalible_space);
         self.window_class
@@ -186,11 +188,11 @@ impl Window for FramedWindow {
             .map(|window_class| (window_class.as_str(), self.position))
     }
 
-    fn validate_position(&mut self, avalible_space: Size) {
+    pub fn validate_position(&mut self, avalible_space: Size) {
         self.position = self.size_constraint.validated_position(self.position, self.size, avalible_space);
     }
 
-    fn resize(
+    pub fn resize(
         &mut self,
         interface_settings: &InterfaceSettings,
         _theme: &Theme,
@@ -202,13 +204,13 @@ impl Window for FramedWindow {
         (self.window_class.as_deref(), self.size)
     }
 
-    fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {
+    pub fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {
         self.size = self
             .size_constraint
             .validated_size(self.size, avalible_space, *interface_settings.scaling);
     }
 
-    fn render(
+    pub fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
@@ -251,3 +253,7 @@ impl Window for FramedWindow {
         });
     }
 }
+
+// Needed so that we can deallocate FramedWindow in another thread.
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}

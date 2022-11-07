@@ -5,7 +5,7 @@ use num::traits::NumOps;
 use num::{NumCast, Zero};
 use procedural::*;
 
-use crate::interface::{ChangeEvent, ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(new)]
 pub struct NumberWindow<T> {
@@ -17,12 +17,7 @@ pub struct NumberWindow<T> {
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow for NumberWindow<T> {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             cell!(Headline::new("value".to_string(), Headline::DEFAULT_SIZE)),
             cell!(Slider::new(
@@ -33,7 +28,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
             )),
         ];
 
-        Box::new(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -42,6 +37,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
             elements,
             constraint!(200 > 250 < 300, ?),
             true,
-        ))
+        )
     }
 }

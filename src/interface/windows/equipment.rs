@@ -17,15 +17,10 @@ impl PrototypeWindow for EquipmentWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements = vec![EquipmentContainer::new(self.items.new_remote()).wrap()];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -34,6 +29,6 @@ impl PrototypeWindow for EquipmentWindow {
             elements,
             constraint!(150 > 200 < 300, ?),
             true,
-        ))
+        )
     }
 }

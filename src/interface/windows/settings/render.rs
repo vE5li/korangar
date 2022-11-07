@@ -1,7 +1,7 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, Expandable, FramedWindow, InterfaceSettings, PrototypeWindow, Size, StateButton, Window, WindowCache};
+use crate::interface::{ElementCell, Expandable, InterfaceSettings, PrototypeWindow, Size, StateButton, Window, WindowCache};
 
 macro_rules! render_state_button {
     ($display:expr, $event:expr, $selector:ident) => {{
@@ -109,12 +109,7 @@ impl PrototypeWindow for RenderSettingsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             general_expandable(),
             map_expandable(),
@@ -125,7 +120,7 @@ impl PrototypeWindow for RenderSettingsWindow {
             buffers_expandable(),
         ];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -134,6 +129,6 @@ impl PrototypeWindow for RenderSettingsWindow {
             elements,
             constraint!(200 > 250 < 300, ?),
             true,
-        ))
+        )
     }
 }

@@ -2,7 +2,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::Color;
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 
 #[derive(new)]
 pub struct ErrorWindow {
@@ -10,12 +10,7 @@ pub struct ErrorWindow {
 }
 
 impl PrototypeWindow for ErrorWindow {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![cell!(Text::new(
             self.message.clone(),
             Color::rgb(220, 100, 100),
@@ -23,7 +18,7 @@ impl PrototypeWindow for ErrorWindow {
             constraint!(100%, 14)
         ))];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -32,6 +27,6 @@ impl PrototypeWindow for ErrorWindow {
             elements,
             constraint!(300 > 400 < 500, ?),
             true,
-        ))
+        )
     }
 }

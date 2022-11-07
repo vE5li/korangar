@@ -6,7 +6,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, FramedWindow, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache, *};
+use crate::interface::*;
 use crate::network::LoginSettings;
 
 #[derive(new)]
@@ -23,12 +23,7 @@ impl PrototypeWindow for LoginWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-    ) -> Box<dyn Window + 'static> {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let username = Rc::new(RefCell::new(self.login_settings.username.clone()));
         let password = Rc::new(RefCell::new(self.login_settings.password.clone()));
 
@@ -101,7 +96,7 @@ impl PrototypeWindow for LoginWindow {
                 .wrap(),
         ];
 
-        Box::from(FramedWindow::new(
+        Window::new(
             window_cache,
             interface_settings,
             avalible_space,
@@ -110,6 +105,6 @@ impl PrototypeWindow for LoginWindow {
             elements,
             constraint!(200 > 250 < 300, ? < 80%),
             false,
-        ))
+        )
     }
 }

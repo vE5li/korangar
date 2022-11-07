@@ -40,4 +40,4 @@ pub use self::prototype::PrototypeWindow;
 pub use self::settings::*;
 #[cfg(feature = "debug")]
 pub use self::time::TimeWindow;
-pub use self::window::Window;
+pub use self::window::{Window, WindowBuilder};

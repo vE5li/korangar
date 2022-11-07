@@ -5,6 +5,7 @@ use std::rc::Rc;
 use derive_new::new;
 use procedural::*;
 
+use super::window::WindowBuilder;
 use crate::input::UserEvent;
 use crate::interface::*;
 use crate::network::ChatMessage;
@@ -71,15 +72,11 @@ impl PrototypeWindow for PrototypeChatWindow {
             )),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Chat".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 500 < 800, 100 > 100 < 600),
-            false,
-        )
+        WindowBuilder::default()
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 500 < 800, 100 > 100 < 600))
+            .with_background_color(Box::new(|theme| *theme.chat.background_color))
+            .with_elements(elements)
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

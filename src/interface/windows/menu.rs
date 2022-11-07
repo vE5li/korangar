@@ -71,15 +71,12 @@ impl PrototypeWindow for MenuWindow {
             Button::default().with_static_text("exit").with_event(UserEvent::Exit).wrap(),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Menu".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 250 < 300, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Menu".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

@@ -38,15 +38,11 @@ impl PrototypeWindow for CharacterOverviewWindow {
                 .wrap(),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Character Overview".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 300 < 400, ?),
-            false,
-        )
+        WindowBuilder::default()
+            .with_title("Character Overview".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 300 < 400, ?))
+            .with_elements(elements)
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

@@ -1,4 +1,5 @@
 use derive_new::new;
+use procedural::constraint;
 use serde::{Deserialize, Serialize};
 
 use crate::interface::{Dimension, PartialSize, Position, Size};
@@ -97,5 +98,11 @@ impl SizeConstraint {
         let x = f32::clamp(position.x, -half_size.x, avalible.x - half_size.x);
         let y = f32::clamp(position.y, 0.0, avalible.y - 30.0);
         Position::new(x, y)
+    }
+}
+
+impl Default for SizeConstraint {
+    fn default() -> Self {
+        constraint!(200 > 300 < 400, 100 > ? < 80%)
     }
 }

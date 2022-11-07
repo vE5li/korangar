@@ -32,15 +32,11 @@ impl PrototypeWindow for CharacterSelectionWindow {
             })
             .collect();
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Character Selection".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(600, ?),
-            false,
-        )
+        WindowBuilder::default()
+            .with_title("Character Selection".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(600, ?))
+            .with_elements(elements)
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

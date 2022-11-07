@@ -26,15 +26,12 @@ impl PrototypeWindow for TimeWindow {
                 .wrap(),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Time".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 250 < 300, ? < 80%),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Time".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

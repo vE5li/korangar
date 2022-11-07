@@ -5,6 +5,7 @@ use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::{Element, *};
 
+// TODO: move this
 pub type Selector = Box<dyn Fn() -> bool>;
 pub type ColorSelector = Box<dyn Fn(&Theme) -> Color>;
 

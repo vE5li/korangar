@@ -20,15 +20,12 @@ impl PrototypeWindow for EquipmentWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements = vec![EquipmentContainer::new(self.items.new_remote()).wrap()];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Equipment".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(150 > 200 < 300, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Equipment".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(150 > 200 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

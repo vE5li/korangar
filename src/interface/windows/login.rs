@@ -96,15 +96,11 @@ impl PrototypeWindow for LoginWindow {
                 .wrap(),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Log In".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 250 < 300, ? < 80%),
-            false,
-        )
+        WindowBuilder::default()
+            .with_title("Log In".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 250 < 300, ? < 80%))
+            .with_elements(elements)
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

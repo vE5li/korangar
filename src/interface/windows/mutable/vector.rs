@@ -46,15 +46,11 @@ where
             )) as _);
         }
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            self.name.clone(),
-            None,
-            elements,
-            constraint!(200 > 250 < 300, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title(self.name.clone())
+            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

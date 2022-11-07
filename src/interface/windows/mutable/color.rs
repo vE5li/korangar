@@ -46,15 +46,11 @@ impl PrototypeWindow for ColorWindow {
 
         let elements: Vec<ElementCell> = vec![cell!(Expandable::new("rgb".to_string(), rgb_elements, true))];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            self.name.to_string(),
-            None,
-            elements,
-            constraint!(200 > 250 < 300, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title(self.name.to_string())
+            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

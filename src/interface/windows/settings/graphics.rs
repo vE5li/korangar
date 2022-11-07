@@ -25,15 +25,12 @@ impl PrototypeWindow for GraphicsSettingsWindow {
             interface_settings.to_element("interface settings".to_string()),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Graphics Settings".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 250 < 300, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Graphics Settings".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

@@ -79,15 +79,12 @@ impl PrototypeWindow for PacketWindow {
             cell!(ScrollView::new(elements, constraint!(100%, ?))),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Network".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(300 > 400 < 500, ? < 80%),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Network".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(300 > 400 < 500, ? < 80%))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

@@ -18,15 +18,11 @@ impl PrototypeWindow for ErrorWindow {
             constraint!(100%, 14)
         ))];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Error".to_string(),
-            None,
-            elements,
-            constraint!(300 > 400 < 500, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Error".to_string())
+            .with_size(constraint!(300 > 400 < 500, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

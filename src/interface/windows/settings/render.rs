@@ -1,7 +1,7 @@
 use procedural::*;
 
 use crate::input::UserEvent;
-use crate::interface::{ElementCell, Expandable, InterfaceSettings, PrototypeWindow, Size, StateButton, Window, WindowCache};
+use crate::interface::*;
 
 macro_rules! render_state_button {
     ($display:expr, $event:expr, $selector:ident) => {{
@@ -120,15 +120,12 @@ impl PrototypeWindow for RenderSettingsWindow {
             buffers_expandable(),
         ];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Render Settings".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 250 < 300, ?),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Render Settings".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

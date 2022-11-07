@@ -30,15 +30,11 @@ impl PrototypeWindow for DialogWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
         let elements = vec![DialogContainer::new(self.elements.new_remote(), self.npc_id).wrap()];
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Dialog".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(300 > 400 < 500, ?),
-            false,
-        )
+        WindowBuilder::default()
+            .with_title("Dialog".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(300 > 400 < 500, ?))
+            .with_elements(elements)
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

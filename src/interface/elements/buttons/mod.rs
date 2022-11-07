@@ -4,7 +4,7 @@ mod drag;
 mod state;
 
 pub use self::close::CloseButton;
-pub use self::default::Button;
+pub use self::default::{Button, ColorSelector};
 pub use self::drag::DragButton;
 pub use self::state::StateButton;
 use crate::input::UserEvent;

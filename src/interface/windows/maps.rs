@@ -53,15 +53,12 @@ impl PrototypeWindow for MapsWindow {
             })
             .collect();
 
-        Window::new(
-            window_cache,
-            interface_settings,
-            avalible_space,
-            "Maps".to_string(),
-            Self::WINDOW_CLASS.to_string().into(),
-            elements,
-            constraint!(200 > 250 < 300, ? < 80%),
-            true,
-        )
+        WindowBuilder::default()
+            .with_title("Maps".to_string())
+            .with_class(Self::WINDOW_CLASS.to_string())
+            .with_size(constraint!(200 > 250 < 300, ? < 80%))
+            .with_elements(elements)
+            .closeable()
+            .build(window_cache, interface_settings, avalible_space)
     }
 }

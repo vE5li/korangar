@@ -5,27 +5,64 @@ use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
 
-pub struct Window {
+#[derive(Default)]
+pub struct WindowBuilder {
+    window_title: Option<String>,
     window_class: Option<String>,
-    position: Vector2<f32>,
     size_constraint: SizeConstraint,
-    size: Vector2<f32>,
     elements: Vec<ElementCell>,
     closeable: bool,
+    background_color: Option<ColorSelector>,
 }
 
-impl Window {
-    pub fn new(
-        window_cache: &WindowCache,
-        interface_settings: &InterfaceSettings,
-        avalible_space: Size,
-        window_title: String,
-        window_class: Option<String>,
-        mut elements: Vec<ElementCell>,
-        size_constraint: SizeConstraint,
-        closeable: bool,
-    ) -> Self {
+impl WindowBuilder {
+    pub fn with_title(mut self, window_title: String) -> Self {
+        assert!(self.window_title.is_none()); // TODO: do this check everywhere?
+        self.window_title = Some(window_title);
+        self
+    }
+
+    pub fn with_class(mut self, window_class: String) -> Self {
+        assert!(self.window_class.is_none());
+        self.window_class = Some(window_class);
+        self
+    }
+
+    /// To simplify PrototypeWindow proc macro. Migth be removed later
+    pub fn with_class_option(self, window_class: Option<String>) -> Self {
+        Self { window_class, ..self }
+    }
+
+    pub fn with_size(self, size_constraint: SizeConstraint) -> Self {
+        Self { size_constraint, ..self }
+    }
+
+    pub fn with_elements(self, elements: Vec<ElementCell>) -> Self {
+        Self { elements, ..self }
+    }
+
+    pub fn with_background_color(mut self, background_color: ColorSelector) -> Self {
+        self.background_color = Some(background_color);
+        self
+    }
+
+    pub fn closeable(mut self) -> Self {
+        self.closeable = true;
+        self
+    }
+
+    pub fn build(self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+        let WindowBuilder {
+            window_title,
+            window_class,
+            size_constraint,
+            mut elements,
+            closeable,
+            background_color,
+        } = self;
+
         if closeable {
+            assert!(window_title.is_some(), "closeable window must also have a title");
             let close_button = cell!(CloseButton::default());
             elements.insert(0, close_button);
         }
@@ -35,8 +72,10 @@ impl Window {
             false => dimension!(!),
         };
 
-        let drag_button = cell!(DragButton::new(window_title, width_constraint));
-        elements.insert(0, drag_button);
+        if let Some(title) = window_title {
+            let drag_button = cell!(DragButton::new(title, width_constraint));
+            elements.insert(0, drag_button);
+        }
 
         let elements = vec![Container::new(elements).wrap()];
 
@@ -64,16 +103,29 @@ impl Window {
             .map(|position| size_constraint.validated_position(position, size, avalible_space))
             .unwrap_or((avalible_space - size) / 2.0);
 
-        Self {
+        Window {
             window_class,
             position,
             size_constraint,
             size,
             elements,
             closeable,
+            background_color,
         }
     }
+}
 
+pub struct Window {
+    window_class: Option<String>,
+    position: Vector2<f32>,
+    size_constraint: SizeConstraint,
+    size: Vector2<f32>,
+    elements: Vec<ElementCell>,
+    closeable: bool,
+    background_color: Option<ColorSelector>,
+}
+
+impl Window {
     pub fn get_window_class(&self) -> Option<&str> {
         self.window_class.as_deref()
     }
@@ -228,13 +280,19 @@ impl Window {
             self.position.y + self.size.y,
         );
 
+        let background_color = self
+            .background_color
+            .as_ref()
+            .map(|closure| closure(theme))
+            .unwrap_or(*theme.window.background_color);
+
         renderer.render_rectangle(
             render_target,
             self.position,
             self.size,
             clip_size,
             *theme.window.border_radius,
-            *theme.window.background_color,
+            background_color,
         );
         self.elements.iter().for_each(|element| {
             element.borrow().render(

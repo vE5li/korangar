@@ -389,7 +389,11 @@ fn main() {
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
-            } => input_system.update_keyboard(input.virtual_keycode.unwrap(), input.state),
+            } => {
+                if let Some(keycode) = input.virtual_keycode {
+                    input_system.update_keyboard(keycode, input.state)
+                }
+            }
             Event::WindowEvent {
                 event: WindowEvent::ReceivedCharacter(character),
                 ..

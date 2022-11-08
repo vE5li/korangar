@@ -32,6 +32,7 @@ use std::sync::Arc;
 use chrono::prelude::*;
 use procedural::debug_condition;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+#[cfg(feature = "debug")]
 use vulkano::instance::debug::{DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessenger, DebugUtilsMessengerCreateInfo};
 use vulkano::instance::{Instance, InstanceCreateInfo};
 use vulkano::sync::{now, GpuFuture};
@@ -285,6 +286,8 @@ fn main() {
     );
     let mut focus_state = FocusState::default();
     let mut input_system = InputSystem::new();
+    let mut graphics_settings = GraphicsSettings::new();
+    #[cfg(feature = "debug")]
     let mut render_settings = RenderSettings::new();
 
     #[cfg(feature = "debug")]
@@ -414,6 +417,7 @@ fn main() {
                     &mut interface,
                     &mut focus_state,
                     &mut picker_targets[swapchain_holder.get_image_number()],
+                    #[cfg(feature = "debug")]
                     &render_settings,
                     swapchain_holder.window_size(),
                     client_tick,
@@ -565,8 +569,8 @@ fn main() {
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::ToggleFrameLimit => {
-                            render_settings.toggle_frame_limit();
-                            swapchain_holder.set_frame_limit(render_settings.frame_limit);
+                            graphics_settings.toggle_frame_limit();
+                            swapchain_holder.set_frame_limit(graphics_settings.frame_limit);
 
                             // for some reason the interface buffer becomes messed up when
                             // recreating the swapchain, so we need to render it again
@@ -1050,7 +1054,13 @@ fn main() {
                     if rerender_interface {
                         interface_target.start(window_size_u32, clear_interface);
 
-                        let state_provider = &StateProvider::new(&render_settings, networking_system.get_login_settings());
+                        let state_provider = &StateProvider::new(
+                            &graphics_settings,
+                            #[cfg(feature = "debug")]
+                            &render_settings,
+                            networking_system.get_login_settings(),
+                        );
+
                         interface.render(
                             &mut interface_target,
                             &interface_renderer,
@@ -1101,11 +1111,12 @@ fn main() {
                     entities[0].render_status(screen_target, &deferred_renderer, current_camera, window_size);
                 }
 
+                #[cfg(feature = "debug")]
                 if render_settings.show_frames_per_second {
                     interface.render_frames_per_second(screen_target, &deferred_renderer, game_timer.last_frames_per_second());
                 }
 
-                if render_settings.show_interface {
+                if graphics_settings.show_interface {
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
 
                     let grabbed_item = match input_system.get_mouse_mode() {

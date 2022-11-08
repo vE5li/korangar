@@ -346,6 +346,7 @@ impl Interface {
         renderer.render_text(render_target, text, mouse_position + offset, Color::monochrome(255), 12.0); // move variables into theme
     }
 
+    #[cfg(feature = "debug")]
     pub fn render_frames_per_second(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

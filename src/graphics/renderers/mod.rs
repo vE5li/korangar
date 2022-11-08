@@ -1,6 +1,7 @@
 mod deferred;
 mod interface;
 mod picker;
+#[cfg(feature = "debug")]
 mod settings;
 mod shadow;
 
@@ -31,10 +32,12 @@ use self::deferred::DeferredSubrenderer;
 pub use self::interface::InterfaceRenderer;
 pub use self::picker::PickerRenderer;
 use self::picker::PickerSubrenderer;
+#[cfg(feature = "debug")]
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
 use super::MemoryAllocator;
 use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
+#[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {

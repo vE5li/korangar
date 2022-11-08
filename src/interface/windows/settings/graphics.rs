@@ -19,7 +19,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
         let elements: Vec<ElementCell> = vec![
             StateButton::default()
                 .with_static_text("framerate limit")
-                .with_selector(|state_provider| state_provider.render_settings.frame_limit)
+                .with_selector(|state_provider| state_provider.graphics_settings.frame_limit)
                 .with_event(UserEvent::ToggleFrameLimit)
                 .wrap(),
             interface_settings.to_element("interface settings".to_string()),

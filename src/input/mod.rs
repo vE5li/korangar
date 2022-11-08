@@ -12,7 +12,9 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
-use crate::graphics::{PickerRenderTarget, PickerTarget, RenderSettings};
+#[cfg(feature = "debug")]
+use crate::graphics::RenderSettings;
+use crate::graphics::{PickerRenderTarget, PickerTarget};
 use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
@@ -185,7 +187,7 @@ impl InputSystem {
         interface: &mut Interface,
         focus_state: &mut FocusState,
         picker_target: &mut PickerRenderTarget,
-        render_settings: &RenderSettings,
+        #[cfg(feature = "debug")] render_settings: &RenderSettings,
         window_size: Vector2<usize>,
         client_tick: u32,
     ) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {

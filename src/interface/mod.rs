@@ -367,14 +367,14 @@ impl Interface {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         mouse_position: Position,
-        grabbed_item: Option<Texture>,
+        grabbed_texture: Option<Texture>,
     ) {
         if !self.mouse_cursor_hidden {
             self.mouse_cursor.render(
                 render_target,
                 renderer,
                 mouse_position,
-                grabbed_item,
+                grabbed_texture,
                 *self.theme.cursor.color,
                 &self.interface_settings,
             );

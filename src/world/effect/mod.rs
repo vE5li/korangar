@@ -3,8 +3,7 @@ use derive_new::new;
 use procedural::*;
 
 #[cfg(feature = "debug")]
-use crate::graphics::MarkerRenderer;
-use crate::graphics::{Camera, Renderer};
+use crate::graphics::{Camera, MarkerRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

@@ -15,10 +15,14 @@ mod water_light;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, SquareMatrix, Vector2, Vector3};
+#[cfg(feature = "debug")]
+use cgmath::SquareMatrix;
+use cgmath::{Matrix4, Vector2, Vector3};
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
-use vulkano::image::{StorageImage, SwapchainImage};
+#[cfg(feature = "debug")]
+use vulkano::image::StorageImage;
+use vulkano::image::SwapchainImage;
 use vulkano::ordered_passes_renderpass;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{RenderPass, Subpass};

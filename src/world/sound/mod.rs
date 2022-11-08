@@ -4,6 +4,7 @@ use procedural::*;
 
 #[cfg(feature = "debug")]
 use crate::graphics::{Camera, MarkerRenderer, Renderer};
+#[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]

@@ -32,7 +32,9 @@ use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
 use crate::graphics::*;
+#[cfg(feature = "debug")]
 use crate::loaders::{GameFileLoader, TextureLoader};
+#[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 unsafe impl bytemuck::Zeroable for Constants {}

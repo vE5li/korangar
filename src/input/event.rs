@@ -1,6 +1,7 @@
 use cgmath::Vector2;
 
 use crate::interface::ItemMove;
+#[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 #[derive(Clone, Debug)]

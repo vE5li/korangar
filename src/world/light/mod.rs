@@ -3,6 +3,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::*;
+#[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]

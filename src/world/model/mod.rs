@@ -7,9 +7,9 @@ use derive_new::new;
 use procedural::*;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};
+use crate::graphics::{Camera, GeometryRenderer, Renderer, Transform};
 #[cfg(feature = "debug")]
-use crate::graphics::Color;
-use crate::graphics::{Camera, DeferredRenderer, GeometryRenderer, Renderer, Transform};
+use crate::graphics::{Color, DeferredRenderer};
 #[cfg(feature = "debug")]
 use crate::loaders::ModelData;
 

@@ -16,7 +16,7 @@ use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
 use vulkano::format::{ClearColorValue, ClearValue, Format};
 use vulkano::image::view::ImageView;
-use vulkano::image::{AttachmentImage, ImageUsage, ImageViewAbstract, SampleCount, SwapchainImage};
+use vulkano::image::{AttachmentImage, ImageUsage, SampleCount, SwapchainImage};
 use vulkano::pipeline::graphics::color_blend::{AttachmentBlend, BlendFactor, BlendOp};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};

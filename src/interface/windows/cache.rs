@@ -1,15 +1,19 @@
-mod state;
-
 use std::collections::HashMap;
 
 use cgmath::Vector2;
+use derive_new::new;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
-use self::state::WindowState;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::interface::{Position, Size};
+
+#[derive(Serialize, Deserialize, new)]
+pub struct WindowState {
+    pub position: Position,
+    pub size: Size,
+}
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct WindowCache {

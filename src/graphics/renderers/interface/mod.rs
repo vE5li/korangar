@@ -12,7 +12,6 @@ use vulkano::format::{ClearColorValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::RenderPass;
-use vulkano::sync::GpuFuture;
 
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;

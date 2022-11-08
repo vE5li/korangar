@@ -22,7 +22,6 @@ use vulkano::image::{StorageImage, SwapchainImage};
 use vulkano::ordered_passes_renderpass;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{RenderPass, Subpass};
-use vulkano::sync::GpuFuture;
 
 use self::ambient::AmbientLightRenderer;
 #[cfg(feature = "debug")]

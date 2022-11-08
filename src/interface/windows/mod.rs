@@ -1,43 +1,228 @@
+mod account;
+mod builder;
 mod cache;
 mod character;
-mod chat;
-mod dialog;
-mod equipment;
-mod error;
-mod inventory;
-mod login;
 #[cfg(feature = "debug")]
-mod maps;
-mod menu;
+mod debug;
+mod generic;
 mod mutable;
-#[cfg(feature = "debug_network")]
-mod packet;
-#[cfg(feature = "debug")]
-mod profiler;
 mod prototype;
 mod settings;
-#[cfg(feature = "debug")]
-mod time;
-mod window;
 
+use cgmath::{Vector2, Vector4};
+
+pub use self::account::*;
+pub use self::builder::WindowBuilder;
 pub use self::cache::*;
 pub use self::character::*;
-pub use self::chat::*;
-pub use self::dialog::DialogWindow;
-pub use self::equipment::EquipmentWindow;
-pub use self::error::ErrorWindow;
-pub use self::inventory::InventoryWindow;
-pub use self::login::LoginWindow;
 #[cfg(feature = "debug")]
-pub use self::maps::MapsWindow;
-pub use self::menu::MenuWindow;
+pub use self::debug::*;
+pub use self::generic::*;
 pub use self::mutable::*;
-#[cfg(feature = "debug_network")]
-pub use self::packet::PacketWindow;
-#[cfg(feature = "debug")]
-pub use self::profiler::ProfilerWindow;
 pub use self::prototype::PrototypeWindow;
 pub use self::settings::*;
-#[cfg(feature = "debug")]
-pub use self::time::TimeWindow;
-pub use self::window::{Window, WindowBuilder};
+use crate::graphics::{InterfaceRenderer, Renderer};
+use crate::input::MouseInputMode;
+use crate::interface::*;
+
+pub struct Window {
+    window_class: Option<String>,
+    position: Vector2<f32>,
+    size_constraint: SizeConstraint,
+    size: Vector2<f32>,
+    elements: Vec<ElementCell>,
+    closable: bool,
+    background_color: Option<ColorSelector>,
+}
+
+impl Window {
+    pub fn get_window_class(&self) -> Option<&str> {
+        self.window_class.as_deref()
+    }
+
+    pub fn has_transparency(&self, theme: &Theme) -> bool {
+        theme.window.background_color.alpha != 255
+    }
+
+    pub fn is_closable(&self) -> bool {
+        self.closable
+    }
+
+    pub fn resolve(
+        &mut self,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        avalible_space: Size,
+    ) -> (Option<&str>, Vector2<f32>, Size) {
+        let height = match self.size_constraint.height.is_flexible() {
+            true => None,
+            false => Some(self.size.y),
+        };
+
+        let mut placement_resolver = PlacementResolver::new(
+            PartialSize::new(self.size.x, height),
+            Vector2::new(0.0, 0.0),
+            *theme.window.border_size,
+            *theme.window.gaps,
+            *interface_settings.scaling,
+        );
+
+        self.elements
+            .iter()
+            .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
+
+        if self.size_constraint.height.is_flexible() {
+            let final_height = theme.window.border_size.y + placement_resolver.final_height();
+            let final_height = self.size_constraint.validated_height(
+                final_height,
+                avalible_space.y.into(),
+                avalible_space.y.into(),
+                *interface_settings.scaling,
+            );
+            self.size.y = final_height;
+            self.validate_size(interface_settings, avalible_space);
+        }
+
+        self.validate_position(avalible_space);
+
+        (self.window_class.as_deref(), self.position, self.size)
+    }
+
+    pub fn update(&mut self) -> Option<ChangeEvent> {
+        self.elements
+            .iter_mut()
+            .map(|element| element.borrow_mut().update())
+            .fold(None, |current, other| {
+                current.zip_with(other, ChangeEvent::combine).or(current).or(other)
+            })
+    }
+
+    pub fn first_focused_element(&self) -> Option<ElementCell> {
+        let element_cell = self.elements[0].clone();
+        self.elements[0].borrow().focus_next(element_cell, None, Focus::downwards())
+    }
+
+    pub fn restore_focus(&self) -> Option<ElementCell> {
+        self.elements[0].borrow().restore_focus(self.elements[0].clone())
+    }
+
+    pub fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
+        let absolute_position = mouse_position - self.position;
+
+        if absolute_position.x >= 0.0
+            && absolute_position.y >= 0.0
+            && absolute_position.x <= self.size.x
+            && absolute_position.y <= self.size.y
+        {
+            for element in &self.elements {
+                match element.borrow().hovered_element(absolute_position, mouse_mode) {
+                    HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
+                    HoverInformation::Missed => {}
+                    hover_information => return hover_information,
+                }
+            }
+
+            return HoverInformation::Hovered;
+        }
+
+        HoverInformation::Missed
+    }
+
+    pub fn get_area(&self) -> (Position, Size) {
+        (self.position, self.size)
+    }
+
+    pub fn hovers_area(&self, position: Position, size: Size) -> bool {
+        let self_combined = self.position + self.size;
+        let area_combined = position + size;
+
+        self_combined.x > position.x
+            && self.position.x < area_combined.x
+            && self_combined.y > position.y
+            && self.position.y < area_combined.y
+    }
+
+    pub fn offset(&mut self, avalible_space: Size, offset: Position) -> Option<(&str, Position)> {
+        self.position += offset;
+        self.validate_position(avalible_space);
+        self.window_class
+            .as_ref()
+            .map(|window_class| (window_class.as_str(), self.position))
+    }
+
+    fn validate_position(&mut self, avalible_space: Size) {
+        self.position = self.size_constraint.validated_position(self.position, self.size, avalible_space);
+    }
+
+    pub fn resize(
+        &mut self,
+        interface_settings: &InterfaceSettings,
+        _theme: &Theme,
+        avalible_space: Size,
+        growth: Size,
+    ) -> (Option<&str>, Size) {
+        self.size += growth;
+        self.validate_size(interface_settings, avalible_space);
+        (self.window_class.as_deref(), self.size)
+    }
+
+    fn validate_size(&mut self, interface_settings: &InterfaceSettings, avalible_space: Size) {
+        self.size = self
+            .size_constraint
+            .validated_size(self.size, avalible_space, *interface_settings.scaling);
+    }
+
+    pub fn render(
+        &self,
+        render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        renderer: &InterfaceRenderer,
+        state_provider: &StateProvider,
+        interface_settings: &InterfaceSettings,
+        theme: &Theme,
+        hovered_element: Option<&dyn Element>,
+        focused_element: Option<&dyn Element>,
+        mouse_mode: &MouseInputMode,
+    ) {
+        let clip_size = Vector4::new(
+            self.position.x,
+            self.position.y,
+            self.position.x + self.size.x,
+            self.position.y + self.size.y,
+        );
+
+        let background_color = self
+            .background_color
+            .as_ref()
+            .map(|closure| closure(theme))
+            .unwrap_or(*theme.window.background_color);
+
+        renderer.render_rectangle(
+            render_target,
+            self.position,
+            self.size,
+            clip_size,
+            *theme.window.border_radius,
+            background_color,
+        );
+
+        self.elements.iter().for_each(|element| {
+            element.borrow().render(
+                render_target,
+                renderer,
+                state_provider,
+                interface_settings,
+                theme,
+                self.position,
+                clip_size,
+                hovered_element,
+                focused_element,
+                mouse_mode,
+                false,
+            )
+        });
+    }
+}
+
+// Needed so that we can deallocate FramedWindow in another thread.
+unsafe impl Send for Window {}
+unsafe impl Sync for Window {}

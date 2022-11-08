@@ -5,23 +5,22 @@ use std::rc::Rc;
 use derive_new::new;
 use procedural::*;
 
-use super::window::WindowBuilder;
 use crate::input::UserEvent;
 use crate::interface::*;
 use crate::network::ChatMessage;
 
 #[derive(new)]
-pub struct PrototypeChatWindow {
+pub struct ChatWindow {
     messages: Rc<RefCell<Vec<ChatMessage>>>,
 }
 
-impl PrototypeChatWindow {
+impl ChatWindow {
     pub const WINDOW_CLASS: &'static str = "chat";
 }
 
-impl PrototypeWindow for PrototypeChatWindow {
+impl PrototypeWindow for ChatWindow {
     fn window_class(&self) -> Option<&str> {
-        PrototypeChatWindow::WINDOW_CLASS.into()
+        ChatWindow::WINDOW_CLASS.into()
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {

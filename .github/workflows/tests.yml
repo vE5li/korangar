@@ -19,7 +19,3 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-
-concurrency:
-  group: ${{ github.ref }}-tests
-  cancel-in-progress: true

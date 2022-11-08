@@ -69,14 +69,14 @@ impl MouseCursor {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         mouse_position: Vector2<f32>,
-        grabbed_item: Option<Texture>,
+        grabbed_texture: Option<Texture>,
         color: Color,
         interface_settings: &InterfaceSettings,
     ) {
-        if let Some(item) = grabbed_item {
+        if let Some(texture) = grabbed_texture {
             renderer.render_sprite(
                 render_target,
-                item,
+                texture,
                 mouse_position - Vector2::from_value(15.0 * *interface_settings.scaling),
                 Vector2::from_value(30.0 * *interface_settings.scaling),
                 Color::monochrome(255),

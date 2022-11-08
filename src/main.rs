@@ -45,7 +45,7 @@ use winit::window::WindowBuilder;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::*;
-use crate::input::{FocusState, InputSystem, MouseInputMode, UserEvent};
+use crate::input::{FocusState, InputSystem, UserEvent};
 use crate::interface::*;
 use crate::inventory::Inventory;
 use crate::loaders::*;
@@ -1120,16 +1120,11 @@ fn main() {
                 if graphics_settings.show_interface {
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
 
-                    let grabbed_item = match input_system.get_mouse_mode() {
-                        MouseInputMode::MoveItem(_, item) => Some(item.texture.clone()),
-                        _ => None,
-                    };
-
                     interface.render_mouse_cursor(
                         screen_target,
                         &deferred_renderer,
                         input_system.get_mouse_position(),
-                        grabbed_item,
+                        input_system.get_mouse_mode().grabbed_texture(),
                     );
                 }
 

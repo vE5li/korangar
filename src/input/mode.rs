@@ -1,3 +1,4 @@
+use crate::graphics::Texture;
 use crate::interface::{ElementCell, ItemSource};
 use crate::inventory::Item;
 
@@ -17,5 +18,12 @@ pub enum MouseInputMode {
 impl MouseInputMode {
     pub fn is_none(&self) -> bool {
         matches!(self, MouseInputMode::None)
+    }
+
+    pub fn grabbed_texture(&self) -> Option<Texture> {
+        match self {
+            MouseInputMode::MoveItem(_, item) => Some(item.texture.clone()),
+            _ => None,
+        }
     }
 }

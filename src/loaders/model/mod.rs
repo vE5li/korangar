@@ -5,8 +5,6 @@ use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use procedural::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::device::Device;
-use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;

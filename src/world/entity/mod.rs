@@ -3,17 +3,12 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2, Vector3, VectorSpace};
 use derive_new::new;
 use procedural::*;
-#[cfg(feature = "debug")]
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-#[cfg(feature = "debug")]
-use vulkano::device::Device;
-use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
-use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 #[cfg(feature = "debug")]
-use crate::graphics::{ModelVertexBuffer, NativeModelVertex};
+use crate::graphics::ModelVertexBuffer;
+use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{CharacterInformation, EntityData, StatusType};

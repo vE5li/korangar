@@ -16,15 +16,13 @@ mod water_light;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, SquareMatrix, Vector2, Vector3};
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::device::{Device, DeviceOwned, Queue};
+use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::image::{StorageImage, SwapchainImage};
 use vulkano::ordered_passes_renderpass;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{RenderPass, Subpass};
-use vulkano::sync::{now, GpuFuture};
-use winit::window::Window;
+use vulkano::sync::GpuFuture;
 
 use self::ambient::AmbientLightRenderer;
 #[cfg(feature = "debug")]
@@ -89,7 +87,7 @@ impl DeferredRenderer {
         texture_loader: &mut TextureLoader,
     ) -> Self {
         let device = memory_allocator.device().clone();
-        let render_pass = ordered_passes_renderpass!(device.clone(),
+        let render_pass = ordered_passes_renderpass!(device,
             attachments: {
                 output: {
                     load: Clear,
@@ -236,7 +234,7 @@ impl DeferredRenderer {
         self.buffer_renderer
             .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        self.box_renderer.recreate_pipeline(device.clone(), lighting_subpass, viewport);
+        self.box_renderer.recreate_pipeline(device, lighting_subpass, viewport);
         self.dimensions = dimensions;
     }
 

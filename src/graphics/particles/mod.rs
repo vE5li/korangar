@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use cgmath::{Array, Vector2, Vector3};
 use derive_new::new;
 use rand::{thread_rng, Rng};
-use vulkano::sync::GpuFuture;
 
 use crate::graphics::*;
 use crate::loaders::{GameFileLoader, TextureLoader};

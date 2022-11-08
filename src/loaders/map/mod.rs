@@ -7,8 +7,6 @@ use cgmath::{Deg, Vector2, Vector3};
 use derive_new::new;
 use procedural::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
-use vulkano::device::{Device, DeviceOwned};
-use vulkano::sync::{now, GpuFuture};
 
 use self::resource::ResourceType;
 #[cfg(feature = "debug")]

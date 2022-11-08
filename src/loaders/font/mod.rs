@@ -7,11 +7,11 @@ use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, BufferImageCopy, ClearColorImageInfo, CommandBufferUsage, CopyBufferToImageInfo, PrimaryCommandBufferAbstract,
 };
-use vulkano::device::{Device, Queue};
+use vulkano::device::Queue;
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
 use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
-use vulkano::sync::{now, FenceSignalFuture, GpuFuture};
+use vulkano::sync::{FenceSignalFuture, GpuFuture};
 
 use super::GameFileLoader;
 use crate::graphics::{CommandBuilder, MemoryAllocator};

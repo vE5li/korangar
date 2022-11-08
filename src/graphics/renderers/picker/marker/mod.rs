@@ -20,10 +20,8 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::Vector2;
-use vulkano::buffer::BufferUsage;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline};
 use vulkano::render_pass::Subpass;
@@ -47,7 +45,7 @@ impl MarkerRenderer {
         let device = memory_allocator.device().clone();
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
+        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
             pipeline,

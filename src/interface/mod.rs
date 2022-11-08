@@ -14,7 +14,6 @@ use std::rc::Rc;
 
 use cgmath::Vector2;
 use derive_new::new;
-use vulkano::sync::GpuFuture;
 
 pub use self::cursor::*;
 pub use self::elements::*;

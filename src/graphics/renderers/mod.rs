@@ -9,20 +9,19 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Vector2, Vector3};
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, ClearAttachment, ClearColorImageInfo, ClearRect, CommandBufferUsage, CopyImageToBufferInfo,
-    PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassContents,
+    AutoCommandBufferBuilder, ClearAttachment, ClearRect, CommandBufferUsage, CopyImageToBufferInfo, PrimaryAutoCommandBuffer,
+    PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassContents,
 };
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
 use vulkano::format::{ClearColorValue, ClearValue, Format};
-use vulkano::image::view::{ImageView, ImageViewCreateInfo};
-use vulkano::image::{AttachmentImage, ImageAccess, ImageUsage, ImageViewAbstract, SampleCount, SwapchainImage};
+use vulkano::image::view::ImageView;
+use vulkano::image::{AttachmentImage, ImageUsage, ImageViewAbstract, SampleCount, SwapchainImage};
 use vulkano::pipeline::graphics::color_blend::{AttachmentBlend, BlendFactor, BlendOp};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::{
-    acquire_next_image, AcquireError, ColorSpace, PresentInfo, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo,
-    SwapchainPresentInfo,
+    acquire_next_image, AcquireError, ColorSpace, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
 };
 use vulkano::sync::{FenceSignalFuture, GpuFuture, SemaphoreSignalFuture};
 use winit::window::Window;
@@ -704,7 +703,7 @@ pub struct SwapchainHolder {
 }
 
 impl SwapchainHolder {
-    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, queue: Arc<Queue>, surface: Arc<Surface>) -> Self {
+    pub fn new(physical_device: &PhysicalDevice, device: Arc<Device>, _queue: Arc<Queue>, surface: Arc<Surface>) -> Self {
         let window_size: [u32; 2] = surface.object().unwrap().downcast_ref::<Window>().unwrap().inner_size().into();
         let capabilities = physical_device
             .surface_capabilities(&surface, SurfaceInfo::default())

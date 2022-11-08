@@ -3,13 +3,12 @@ use std::sync::Arc;
 
 use derive_new::new;
 use procedural::*;
-use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
 use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract};
-use vulkano::device::{Device, Queue};
+use vulkano::device::Queue;
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
 use vulkano::image::{ImageDimensions, ImmutableImage, MipmapsCount};
-use vulkano::sync::{now, FenceSignalFuture, GpuFuture};
+use vulkano::sync::{FenceSignalFuture, GpuFuture};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;

@@ -27,7 +27,6 @@ use vulkano::image::ImageAccess;
 use vulkano::memory::allocator::MemoryUsage;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
 use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
@@ -69,7 +68,7 @@ impl EntityRenderer {
             MemoryUsage::Upload,
         );
 
-        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+        let nearest_sampler = Sampler::new(device, SamplerCreateInfo {
             mag_filter: Filter::Nearest,
             min_filter: Filter::Nearest,
             address_mode: [SamplerAddressMode::MirroredRepeat; 3],

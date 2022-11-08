@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
-use vulkano::sync::GpuFuture;
 
 use super::InterfaceSettings;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};

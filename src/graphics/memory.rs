@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use vulkano::command_buffer::allocator::{
-    CommandBufferAllocator, StandardCommandBufferAlloc, StandardCommandBufferAllocator, StandardCommandBufferBuilderAlloc,
-};
+use vulkano::command_buffer::allocator::{CommandBufferAllocator, StandardCommandBufferAllocator};
 use vulkano::descriptor_set::allocator::{DescriptorSetAllocator, StandardDescriptorSetAlloc, StandardDescriptorSetAllocator};
 use vulkano::descriptor_set::layout::DescriptorSetLayout;
 use vulkano::device::{Device, DeviceOwned};

@@ -4,8 +4,8 @@ mod geometry;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use vulkano::device::{Device, DeviceOwned, Queue};
-use vulkano::format::{ClearColorValue, ClearValue, Format};
+use vulkano::device::{DeviceOwned, Queue};
+use vulkano::format::{ClearValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::render_pass::RenderPass;
 
@@ -31,7 +31,7 @@ impl ShadowRenderer {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
-            device.clone(),
+            device,
             attachments: {
                 depth: {
                     load: Clear,

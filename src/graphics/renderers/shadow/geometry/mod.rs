@@ -64,7 +64,7 @@ impl GeometryRenderer {
             MemoryUsage::Upload,
         );
 
-        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+        let nearest_sampler = Sampler::new(device, SamplerCreateInfo {
             mag_filter: Filter::Nearest,
             min_filter: Filter::Nearest,
             address_mode: [SamplerAddressMode::ClampToEdge; 3],

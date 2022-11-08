@@ -7,7 +7,7 @@ mod tile;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use vulkano::device::{Device, DeviceOwned, Queue};
+use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::RenderPass;
@@ -45,7 +45,7 @@ impl PickerRenderer {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
-            device.clone(),
+            device,
             attachments: {
                 color: {
                     load: Clear,
@@ -97,7 +97,7 @@ impl PickerRenderer {
         self.tile_renderer
             .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        self.marker_renderer.recreate_pipeline(device.clone(), subpass, viewport);
+        self.marker_renderer.recreate_pipeline(device, subpass, viewport);
         self.dimensions = dimensions;
     }
 

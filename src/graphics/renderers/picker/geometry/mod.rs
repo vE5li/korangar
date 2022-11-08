@@ -67,7 +67,7 @@ impl GeometryRenderer {
             MemoryUsage::Upload,
         );
 
-        let linear_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
+        let linear_sampler = Sampler::new(device, SamplerCreateInfo {
             mag_filter: Filter::Linear,
             min_filter: Filter::Linear,
             address_mode: [SamplerAddressMode::ClampToEdge; 3],

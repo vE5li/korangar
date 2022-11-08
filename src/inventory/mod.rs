@@ -1,6 +1,4 @@
-use vulkano::sync::GpuFuture;
-
-use crate::graphics::{MemoryAllocator, Texture};
+use crate::graphics::Texture;
 use crate::interface::TrackedState;
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
 use crate::network::{EquipPosition, ItemOptions};

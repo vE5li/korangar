@@ -7,12 +7,12 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
-use vulkano::device::{Device, DeviceOwned, Queue};
+use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::RenderPass;
-use vulkano::sync::{now, GpuFuture};
+use vulkano::sync::GpuFuture;
 
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
@@ -46,7 +46,7 @@ impl InterfaceRenderer {
     ) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
-            device.clone(),
+            device,
             attachments: {
                 interface: {
                     load: DontCare,
@@ -95,7 +95,7 @@ impl InterfaceRenderer {
             .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
         self.sprite_renderer
             .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
-        self.text_renderer.recreate_pipeline(device.clone(), subpass, viewport);
+        self.text_renderer.recreate_pipeline(device, subpass, viewport);
         self.dimensions = dimensions;
     }
 

@@ -437,6 +437,10 @@ impl InputSystem {
                 events.push(UserEvent::OpenInventoryWindow);
             }
 
+            if self.get_key(VirtualKeyCode::H).pressed() && shift_down {
+                events.push(UserEvent::ToggleShowInterface);
+            }
+
             #[cfg(feature = "debug")]
             if self.get_key(VirtualKeyCode::M).pressed() {
                 events.push(UserEvent::OpenMapsWindow);

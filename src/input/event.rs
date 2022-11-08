@@ -14,6 +14,7 @@ pub enum UserEvent {
     CameraZoom(f32),
     CameraRotate(f32),
     ToggleFrameLimit,
+    ToggleShowInterface,
     OpenMenuWindow,
     OpenInventoryWindow,
     OpenEquipmentWindow,

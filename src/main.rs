@@ -576,6 +576,7 @@ fn main() {
                             // recreating the swapchain, so we need to render it again
                             interface.schedule_rerender();
                         }
+                        UserEvent::ToggleShowInterface => graphics_settings.toggle_show_interface(),
                         UserEvent::OpenMenuWindow => interface.open_window(&mut focus_state, &MenuWindow::default()),
                         UserEvent::OpenInventoryWindow => {
                             interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_item_state()))

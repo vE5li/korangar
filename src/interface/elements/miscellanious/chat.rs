@@ -6,6 +6,7 @@ use crate::interface::{Element, *};
 use crate::network::ChatMessage;
 
 pub struct Chat {
+    // TODO: make this TrackedState
     messages: Rc<RefCell<Vec<ChatMessage>>>,
     cached_message_count: usize,
     state: ElementState,

@@ -22,7 +22,7 @@ impl PrototypeWindow for ErrorWindow {
             .with_title("Error".to_string())
             .with_size(constraint!(300 > 400 < 500, ?))
             .with_elements(elements)
-            .closeable()
+            .closable()
             .build(window_cache, interface_settings, avalible_space)
     }
 }

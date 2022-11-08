@@ -11,7 +11,7 @@ pub struct WindowBuilder {
     window_class: Option<String>,
     size_constraint: SizeConstraint,
     elements: Vec<ElementCell>,
-    closeable: bool,
+    closable: bool,
     background_color: Option<ColorSelector>,
 }
 
@@ -46,8 +46,8 @@ impl WindowBuilder {
         self
     }
 
-    pub fn closeable(mut self) -> Self {
-        self.closeable = true;
+    pub fn closable(mut self) -> Self {
+        self.closable = true;
         self
     }
 
@@ -57,17 +57,17 @@ impl WindowBuilder {
             window_class,
             size_constraint,
             mut elements,
-            closeable,
+            closable,
             background_color,
         } = self;
 
-        if closeable {
-            assert!(window_title.is_some(), "closeable window must also have a title");
+        if closable {
+            assert!(window_title.is_some(), "closable window must also have a title");
             let close_button = cell!(CloseButton::default());
             elements.insert(0, close_button);
         }
 
-        let width_constraint = match closeable {
+        let width_constraint = match closable {
             true => dimension!(70%),
             false => dimension!(!),
         };
@@ -109,7 +109,7 @@ impl WindowBuilder {
             size_constraint,
             size,
             elements,
-            closeable,
+            closable,
             background_color,
         }
     }
@@ -121,7 +121,7 @@ pub struct Window {
     size_constraint: SizeConstraint,
     size: Vector2<f32>,
     elements: Vec<ElementCell>,
-    closeable: bool,
+    closable: bool,
     background_color: Option<ColorSelector>,
 }
 
@@ -134,8 +134,8 @@ impl Window {
         theme.window.background_color.alpha != 255
     }
 
-    pub fn is_closeable(&self) -> bool {
-        self.closeable
+    pub fn is_closable(&self) -> bool {
+        self.closable
     }
 
     pub fn resolve(

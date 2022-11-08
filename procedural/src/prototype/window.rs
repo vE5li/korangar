@@ -32,7 +32,7 @@ pub fn derive_prototype_window_struct(
                     .with_title(#window_title.to_string())
                     .with_class_option(#window_class_option)
                     .with_elements(elements)
-                    .closeable()
+                    .closable()
                     .build(window_cache, interface_settings, avalible_space)
             }
         }

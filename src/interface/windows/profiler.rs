@@ -19,7 +19,7 @@ impl PrototypeWindow for ProfilerWindow {
             .with_title("Profiler".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
             .with_size(constraint!(200 > 250 < 300, ?))
-            .closeable()
+            .closable()
             .build(window_cache, interface_settings, avalible_space)
     }
 }

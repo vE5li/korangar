@@ -32,7 +32,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
             .with_title(self.name.clone())
             .with_size(constraint!(200 > 250 < 300, ?))
             .with_elements(elements)
-            .closeable()
+            .closable()
             .build(window_cache, interface_settings, avalible_space)
     }
 }

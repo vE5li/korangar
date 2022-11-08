@@ -76,7 +76,7 @@ impl PrototypeWindow for MenuWindow {
             .with_class(Self::WINDOW_CLASS.to_string())
             .with_size(constraint!(200 > 250 < 300, ?))
             .with_elements(elements)
-            .closeable()
+            .closable()
             .build(window_cache, interface_settings, avalible_space)
     }
 }

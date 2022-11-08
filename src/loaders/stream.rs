@@ -9,7 +9,7 @@ use crate::interface::PacketEntry;
 #[cfg(feature = "debug_network")]
 use crate::interface::TrackedState;
 use crate::loaders::Version;
-#[cfg(feature = "debug")]
+#[cfg(feature = "debug_network")]
 use crate::network::Packet;
 
 #[derive(new)]

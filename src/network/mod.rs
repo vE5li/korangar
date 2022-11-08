@@ -12,8 +12,8 @@ use derive_new::new;
 use procedural::*;
 
 pub use self::login::LoginSettings;
-#[cfg(feature = "debug")]
-use crate::debug::*;
+#[cfg(feature = "debug_network")]
+use crate::debug::Timer;
 use crate::graphics::{Color, ColorBGR, ColorRGB};
 #[cfg(feature = "debug_network")]
 use crate::interface::PacketEntry;

@@ -39,6 +39,8 @@ pub fn derive_packet_struct(
                 [#first, #second]
             }
 
+            // Temporary until serialization is always possible
+            #[allow(unreachable_code)]
             fn to_bytes(&self) -> Vec<u8> {
                 #to_bytes
             }

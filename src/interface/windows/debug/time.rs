@@ -15,7 +15,7 @@ impl PrototypeWindow for TimeWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             Button::default().with_static_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
             Button::default().with_static_text("set noon").with_event(UserEvent::SetNoon).wrap(),
@@ -32,6 +32,6 @@ impl PrototypeWindow for TimeWindow {
             .with_size(constraint!(200 > 250 < 300, ?))
             .with_elements(elements)
             .closable()
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

@@ -178,7 +178,7 @@ struct LoginServerLoginSuccessPacket {
 }
 
 /// Sent by the character server as a response to [CharacterServerLoginPacket]
-/// succeeding. Provides basic information about the number of avalible
+/// succeeding. Provides basic information about the number of available
 /// character slots.
 #[allow(dead_code)]
 #[derive(Clone, Debug, Packet, PrototypeElement)]
@@ -200,7 +200,7 @@ struct CharacterServerLoginSuccessPacket {
 struct Packet6b00 {
     pub unused: u16,
     pub maximum_slot_count: u8,
-    pub avalible_slot_count: u8,
+    pub available_slot_count: u8,
     pub vip_slot_count: u8,
     pub unknown: [u8; 20],
 }
@@ -311,7 +311,7 @@ struct LoginFailedPacket {
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x40, 0x08)]
-struct MapServerUnavaliblePacket {
+struct MapServerUnavailablePacket {
     pub packet_length: u16,
     #[length_hint(self.packet_length - 4)]
     pub unknown: String,
@@ -687,7 +687,7 @@ struct RequestEntityDetailsSuccessPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xe7, 0x09)]
 struct NewMailStatusPacket {
-    pub new_avalible: u8,
+    pub new_available: u8,
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
@@ -2331,8 +2331,8 @@ impl NetworkingSystem {
             }
         }
 
-        if let Ok(_map_server_unavalible_packet) = MapServerUnavaliblePacket::try_from_bytes(&mut byte_stream) {
-            return Err("Map server currently unavalible".to_string());
+        if let Ok(_map_server_unavailable_packet) = MapServerUnavailablePacket::try_from_bytes(&mut byte_stream) {
+            return Err("Map server currently unavailable".to_string());
         }
 
         let character_selection_success_packet = CharacterSelectionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();

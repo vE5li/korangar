@@ -46,7 +46,7 @@ impl WindowBuilder {
         self
     }
 
-    pub fn build(self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    pub fn build(self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let WindowBuilder {
             window_title,
             window_class,
@@ -87,16 +87,16 @@ impl WindowBuilder {
             .unzip();
 
         let size = cached_size
-            .map(|size| size_constraint.validated_size(size, avalible_space, *interface_settings.scaling))
+            .map(|size| size_constraint.validated_size(size, available_space, *interface_settings.scaling))
             .unwrap_or_else(|| {
                 size_constraint
-                    .resolve(avalible_space, avalible_space, *interface_settings.scaling)
+                    .resolve(available_space, available_space, *interface_settings.scaling)
                     .finalize_or(0.0)
             });
 
         let position = cached_position
-            .map(|position| size_constraint.validated_position(position, size, avalible_space))
-            .unwrap_or((avalible_space - size) / 2.0);
+            .map(|position| size_constraint.validated_position(position, size, available_space))
+            .unwrap_or((available_space - size) / 2.0);
 
         Window {
             window_class,

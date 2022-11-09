@@ -10,7 +10,7 @@ pub struct ErrorWindow {
 }
 
 impl PrototypeWindow for ErrorWindow {
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![cell!(Text::new(
             self.message.clone(),
             Color::rgb(220, 100, 100),
@@ -23,6 +23,6 @@ impl PrototypeWindow for ErrorWindow {
             .with_size(constraint!(300 > 400 < 500, ?))
             .with_elements(elements)
             .closable()
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

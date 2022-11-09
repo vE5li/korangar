@@ -6,7 +6,7 @@ const ELEMENT_THRESHHOLD: f32 = 1.0000;
 const REMAINDER_THRESHHOLD: f32 = 0.0001;
 
 pub struct PlacementResolver {
-    avalible_space: PartialSize,
+    available_space: PartialSize,
     base_position: Position,
     horizontal_accumulator: f32,
     vertical_offset: f32,
@@ -17,9 +17,9 @@ pub struct PlacementResolver {
 }
 
 impl PlacementResolver {
-    pub fn new(mut avalible_space: PartialSize, base_position: Position, border: Size, gaps: Size, scaling: f32) -> Self {
-        avalible_space.x -= border.x * scaling * 2.0;
-        avalible_space.y = avalible_space.y.map(|height| height - border.y * scaling * 2.0);
+    pub fn new(mut available_space: PartialSize, base_position: Position, border: Size, gaps: Size, scaling: f32) -> Self {
+        available_space.x -= border.x * scaling * 2.0;
+        available_space.y = available_space.y.map(|height| height - border.y * scaling * 2.0);
 
         let base_position = base_position * scaling + border * scaling;
         let horizontal_accumulator = 0.0;
@@ -27,7 +27,7 @@ impl PlacementResolver {
         let total_height = 0.0;
 
         Self {
-            avalible_space,
+            available_space,
             base_position,
             horizontal_accumulator,
             total_height,
@@ -38,9 +38,9 @@ impl PlacementResolver {
         }
     }
 
-    pub fn derive(&self, mut avalible_space: PartialSize, offset: Position, border: Size) -> Self {
-        avalible_space.x -= offset.x + border.x * self.scaling * 2.0;
-        avalible_space.y = avalible_space.y.map(|height| height - border.y * self.scaling * 2.0);
+    pub fn derive(&self, mut available_space: PartialSize, offset: Position, border: Size) -> Self {
+        available_space.x -= offset.x + border.x * self.scaling * 2.0;
+        available_space.y = available_space.y.map(|height| height - border.y * self.scaling * 2.0);
 
         let base_position = offset + border * self.scaling;
         let horizontal_accumulator = 0.0;
@@ -50,7 +50,7 @@ impl PlacementResolver {
         let scaling = self.scaling;
 
         Self {
-            avalible_space,
+            available_space,
             base_position,
             horizontal_accumulator,
             total_height,
@@ -65,14 +65,14 @@ impl PlacementResolver {
         self.gaps = gaps;
     }
 
-    pub fn get_avalible(&self) -> PartialSize {
-        self.avalible_space
+    pub fn get_available(&self) -> PartialSize {
+        self.available_space
     }
 
     pub fn get_remaining(&self) -> PartialSize {
-        let remaining_width = self.avalible_space.x - self.horizontal_accumulator;
+        let remaining_width = self.available_space.x - self.horizontal_accumulator;
         let remaining_height = self
-            .avalible_space
+            .available_space
             .y
             .map(|height| height - self.total_height - self.vertical_offset);
 
@@ -98,7 +98,7 @@ impl PlacementResolver {
         };
 
         let mut remaining = self.get_remaining();
-        let mut size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
+        let mut size = size_constraint.resolve_partial(self.available_space, remaining, self.scaling);
         let mut gaps_subtract = 0.0;
 
         if remaining.x < size.x - REMAINDER_THRESHHOLD {
@@ -106,10 +106,10 @@ impl PlacementResolver {
             remaining = self.get_remaining();
 
             if size_constraint.width.is_remaining() || size_constraint.height.is_remaining() {
-                size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
+                size = size_constraint.resolve_partial(self.available_space, remaining, self.scaling);
             }
 
-            size.x = f32::min(size.x, self.avalible_space.x);
+            size.x = f32::min(size.x, self.available_space.x);
         }
 
         if self.horizontal_accumulator > ELEMENT_THRESHHOLD {
@@ -143,19 +143,19 @@ impl PlacementResolver {
 
     pub fn allocate_right(&mut self, size_constraint: &SizeConstraint) -> (PartialSize, Position) {
         let mut remaining = self.get_remaining();
-        let mut size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
+        let mut size = size_constraint.resolve_partial(self.available_space, remaining, self.scaling);
 
         if remaining.x < size.x - REMAINDER_THRESHHOLD + self.gaps.x * self.scaling {
             self.newline();
             remaining = self.get_remaining();
 
             if size_constraint.width.is_remaining() || size_constraint.height.is_remaining() {
-                size = size_constraint.resolve_partial(self.avalible_space, remaining, self.scaling);
+                size = size_constraint.resolve_partial(self.available_space, remaining, self.scaling);
             }
         }
 
         let position = Vector2::new(
-            self.base_position.x + (self.avalible_space.x - size.x - self.gaps.x * self.scaling),
+            self.base_position.x + (self.available_space.x - size.x - self.gaps.x * self.scaling),
             self.base_position.y,
         );
 

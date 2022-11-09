@@ -25,7 +25,7 @@ impl PrototypeWindow for ChatWindow {
         ChatWindow::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let input_text = Rc::new(RefCell::new(String::new()));
 
         let button_selector = {
@@ -78,6 +78,6 @@ impl PrototypeWindow for ChatWindow {
             .with_size(constraint!(200 > 500 < 800, 100 > 100 < 600))
             .with_background_color(Box::new(|theme| *theme.chat.background_color))
             .with_elements(elements)
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

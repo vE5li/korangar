@@ -429,7 +429,7 @@ fn main() {
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
                     if let Some(entity) = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
-                        if entity.are_details_unavalible() {
+                        if entity.are_details_unavailable() {
                             networking_system.request_entity_details(entity_id);
                             entity.set_details_requested();
                         }

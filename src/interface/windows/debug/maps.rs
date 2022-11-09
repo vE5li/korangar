@@ -16,7 +16,7 @@ impl PrototypeWindow for MapsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let map_warps = [
             ("geffen", Vector2::new(119, 59)),
             ("alberta", Vector2::new(28, 234)),
@@ -59,6 +59,6 @@ impl PrototypeWindow for MapsWindow {
             .with_size(constraint!(200 > 250 < 300, ? < 80%))
             .with_elements(elements)
             .closable()
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

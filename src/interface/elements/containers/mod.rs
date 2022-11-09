@@ -69,8 +69,8 @@ impl ContainerState {
             let final_height = inner_placement_resolver.final_height();
             let final_height = size_constraint.validated_height(
                 final_height,
-                placement_resolver.get_avalible().y,
-                placement_resolver.get_avalible().y,
+                placement_resolver.get_available().y,
+                placement_resolver.get_available().y,
                 *interface_settings.scaling,
             );
             size.y = Some(final_height);

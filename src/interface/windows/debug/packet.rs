@@ -31,7 +31,7 @@ impl PrototypeWindow for PacketWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             PacketView::new(
                 self.packets.clone(),
@@ -85,6 +85,6 @@ impl PrototypeWindow for PacketWindow {
             .with_size(constraint!(300 > 400 < 500, ? < 80%))
             .with_elements(elements)
             .closable()
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

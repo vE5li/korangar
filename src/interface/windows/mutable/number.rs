@@ -17,7 +17,7 @@ pub struct NumberWindow<T> {
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow for NumberWindow<T> {
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements: Vec<ElementCell> = vec![
             cell!(Headline::new("value".to_string(), Headline::DEFAULT_SIZE)),
             cell!(Slider::new(
@@ -33,6 +33,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
             .with_size(constraint!(200 > 250 < 300, ?))
             .with_elements(elements)
             .closable()
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

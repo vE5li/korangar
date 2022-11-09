@@ -54,7 +54,7 @@ impl Element for Chat {
             height += self.font_loader.borrow_mut().get_text_height(
                 message.stamped_text(self.stamp),
                 *theme.chat.font_size * *interface_settings.scaling,
-                placement_resolver.get_avalible().x,
+                placement_resolver.get_available().x,
             );
         }
 

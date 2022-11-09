@@ -24,7 +24,7 @@ pub fn derive_prototype_window_struct(
                 #window_class_ref_option
             }
 
-            fn to_window(&self, window_cache: &crate::interface::WindowCache, interface_settings: &crate::interface::InterfaceSettings, avalible_space: crate::interface::Size) -> crate::interface::Window {
+            fn to_window(&self, window_cache: &crate::interface::WindowCache, interface_settings: &crate::interface::InterfaceSettings, available_space: crate::interface::Size) -> crate::interface::Window {
                 let scroll_view = crate::interface::ScrollView::new(vec![#(#initializers),*], constraint!(100%, ?));
                 let elements: Vec<crate::interface::ElementCell> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
 
@@ -33,7 +33,7 @@ pub fn derive_prototype_window_struct(
                     .with_class_option(#window_class_option)
                     .with_elements(elements)
                     .closable()
-                    .build(window_cache, interface_settings, avalible_space)
+                    .build(window_cache, interface_settings, available_space)
             }
         }
     }.into()

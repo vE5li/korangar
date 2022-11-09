@@ -39,7 +39,7 @@ pub struct Interface {
     windows: Vec<(Window, bool, bool)>,
     window_cache: WindowCache,
     interface_settings: InterfaceSettings,
-    avalible_space: Size,
+    available_space: Size,
     theme: Theme,
     dialog_handle: Option<DialogHandle>,
     mouse_cursor: MouseCursor,
@@ -53,7 +53,7 @@ impl Interface {
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
-        avalible_space: Size,
+        available_space: Size,
     ) -> Self {
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
@@ -66,7 +66,7 @@ impl Interface {
             windows: Vec::new(),
             window_cache,
             interface_settings,
-            avalible_space,
+            available_space,
             theme,
             dialog_handle,
             mouse_cursor,
@@ -128,7 +128,7 @@ impl Interface {
         for (window_index, (window, reresolve, rerender)) in self.windows.iter_mut().enumerate() {
             if self.reresolve || *reresolve {
                 let (_position, previous_size) = window.get_area();
-                let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.avalible_space);
+                let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.available_space);
 
                 // should only ever be the last window
                 if let Some(focused_index) = focus_state.focused_window() && focused_index == window_index {
@@ -167,7 +167,7 @@ impl Interface {
     }
 
     pub fn update_window_size(&mut self, screen_size: Size) {
-        self.avalible_space = screen_size;
+        self.available_space = screen_size;
         self.reresolve = true;
     }
 
@@ -252,7 +252,7 @@ impl Interface {
     }
 
     pub fn move_window(&mut self, window_index: usize, offset: Position) {
-        if let Some((window_class, position)) = self.windows[window_index].0.offset(self.avalible_space, offset) {
+        if let Some((window_class, position)) = self.windows[window_index].0.offset(self.available_space, offset) {
             self.window_cache.update_position(window_class, position);
         }
 
@@ -263,7 +263,7 @@ impl Interface {
         let (window, reresolve, _rerender) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
-        let (window_class, new_size) = window.resize(&self.interface_settings, &self.theme, self.avalible_space, growth);
+        let (window_class, new_size) = window.resize(&self.interface_settings, &self.theme, self.available_space, growth);
 
         if previous_size != new_size {
             if let Some(window_class) = window_class {
@@ -401,7 +401,7 @@ impl Interface {
 
     pub fn open_window(&mut self, focus_state: &mut FocusState, prototype_window: &dyn PrototypeWindow) {
         if !self.window_exists(prototype_window.window_class()) {
-            let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
+            let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.available_space);
             self.open_new_window(focus_state, window);
         }
     }
@@ -468,7 +468,7 @@ impl Interface {
         if !self.window_exists(self.theme.window_class()) {
             let window = self
                 .theme
-                .to_window(&self.window_cache, &self.interface_settings, self.avalible_space);
+                .to_window(&self.window_cache, &self.interface_settings, self.available_space);
 
             self.open_new_window(focus_state, window);
         }

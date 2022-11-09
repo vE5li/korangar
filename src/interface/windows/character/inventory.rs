@@ -17,7 +17,7 @@ impl PrototypeWindow for InventoryWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements = vec![InventoryContainer::new(self.items.new_remote()).wrap()];
 
         WindowBuilder::default()
@@ -26,6 +26,6 @@ impl PrototypeWindow for InventoryWindow {
             .with_size(constraint!(300 > 400 < 500, ? < 80%))
             .with_elements(elements)
             .closable()
-            .build(window_cache, interface_settings, avalible_space)
+            .build(window_cache, interface_settings, available_space)
     }
 }

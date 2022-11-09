@@ -17,16 +17,16 @@ use crate::world::Map;
 use crate::world::MarkerIdentifier;
 
 pub enum ResourceState<T> {
-    Avalible(T),
-    Unavalible,
+    Available(T),
+    Unavailable,
     Requested,
 }
 
 impl<T> ResourceState<T> {
     pub fn as_option(&self) -> Option<&T> {
         match self {
-            ResourceState::Avalible(value) => Some(value),
-            _requested_or_unavalible => None,
+            ResourceState::Available(value) => Some(value),
+            _requested_or_unavailable => None,
         }
     }
 }
@@ -114,7 +114,7 @@ impl Common {
 
         let sprite = sprite_loader.get(&format!("{}.spr", file_path), game_file_loader).unwrap();
         let actions = action_loader.get(&format!("{}.act", file_path), game_file_loader).unwrap();
-        let details = ResourceState::Unavalible;
+        let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(client_tick);
 
         Self {
@@ -700,10 +700,10 @@ impl Entity {
         self.get_common().entity_type
     }
 
-    pub fn are_details_unavalible(&self) -> bool {
+    pub fn are_details_unavailable(&self) -> bool {
         match &self.get_common().details {
-            ResourceState::Unavalible => true,
-            _requested_or_avalible => false,
+            ResourceState::Unavailable => true,
+            _requested_or_available => false,
         }
     }
 
@@ -712,7 +712,7 @@ impl Entity {
     }
 
     pub fn set_details(&mut self, details: String) {
-        self.get_common_mut().details = ResourceState::Avalible(details);
+        self.get_common_mut().details = ResourceState::Available(details);
     }
 
     pub fn get_details(&self) -> Option<&String> {
@@ -787,10 +787,10 @@ impl Entity {
 }
 
 impl PrototypeWindow for Entity {
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, avalible_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         match self {
-            Entity::Player(player) => player.to_window(window_cache, interface_settings, avalible_space),
-            Entity::Npc(npc) => npc.to_window(window_cache, interface_settings, avalible_space),
+            Entity::Player(player) => player.to_window(window_cache, interface_settings, available_space),
+            Entity::Npc(npc) => npc.to_window(window_cache, interface_settings, available_space),
         }
     }
 }

@@ -61,7 +61,7 @@ impl Element for Expandable {
         let closed_size = self
             .closed_size_constraint
             .resolve_partial(
-                placement_resolver.get_avalible(),
+                placement_resolver.get_available(),
                 placement_resolver.get_remaining(),
                 *interface_settings.scaling,
             )
@@ -93,8 +93,8 @@ impl Element for Expandable {
                     + theme.expandable.border_size.y * *interface_settings.scaling * 2.0;
                 let final_height = self.open_size_constraint.validated_height(
                     final_height,
-                    placement_resolver.get_avalible().y,
-                    placement_resolver.get_avalible().y,
+                    placement_resolver.get_available().y,
+                    placement_resolver.get_available().y,
                     *interface_settings.scaling,
                 );
                 size.y = Some(final_height);

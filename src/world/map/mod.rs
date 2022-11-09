@@ -10,6 +10,7 @@ use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
 use crate::loaders::Version;
+use crate::network::ClientTick;
 use crate::world::*;
 
 // MOVE
@@ -177,7 +178,7 @@ impl Map {
         render_target: &mut T::Target,
         renderer: &T,
         camera: &dyn Camera,
-        client_tick: u32,
+        client_tick: ClientTick,
         time: f32,
         #[cfg(feature = "debug")] frustum_culling: bool,
     ) where

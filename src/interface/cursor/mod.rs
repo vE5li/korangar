@@ -5,6 +5,7 @@ use cgmath::{Array, Vector2};
 use super::InterfaceSettings;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
+use crate::network::ClientTick;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -35,7 +36,7 @@ impl MouseCursor {
     pub fn new(game_file_loader: &mut GameFileLoader, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader) -> Self {
         let sprite = sprite_loader.get("cursors.spr", game_file_loader).unwrap();
         let actions = action_loader.get("cursors.act", game_file_loader).unwrap();
-        let animation_state = AnimationState::new(0);
+        let animation_state = AnimationState::new(ClientTick(0));
 
         Self {
             sprite,
@@ -44,17 +45,17 @@ impl MouseCursor {
         }
     }
 
-    pub fn update(&mut self, client_tick: u32) {
+    pub fn update(&mut self, client_tick: ClientTick) {
         self.animation_state.update(client_tick);
     }
 
     // TODO: this is just a workaround until i find a better solution to make the
     // cursor always look correct.
-    pub fn set_start_time(&mut self, client_tick: u32) {
+    pub fn set_start_time(&mut self, client_tick: ClientTick) {
         self.animation_state.start_time = client_tick;
     }
 
-    pub fn set_state(&mut self, state: MouseCursorState, client_tick: u32) {
+    pub fn set_state(&mut self, state: MouseCursorState, client_tick: ClientTick) {
         let new_state = state as usize;
 
         if self.animation_state.action != new_state {

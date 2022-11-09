@@ -12,6 +12,7 @@ use vulkano::render_pass::RenderPass;
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+use crate::network::EntityId;
 
 #[derive(PartialEq, Eq)]
 pub enum ShadowSubrenderer {
@@ -116,7 +117,7 @@ impl EntityRendererTrait for ShadowRenderer {
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
         mirror: bool,
-        _entity_id: usize,
+        _entity_id: EntityId,
     ) where
         Self: Renderer,
     {

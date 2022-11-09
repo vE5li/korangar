@@ -12,6 +12,7 @@ use crate::graphics::{Camera, GeometryRenderer, Renderer, Transform};
 use crate::graphics::{Color, DeferredRenderer};
 #[cfg(feature = "debug")]
 use crate::loaders::ModelData;
+use crate::network::ClientTick;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
@@ -28,7 +29,7 @@ impl Model {
         renderer: &T,
         camera: &dyn Camera,
         root_transform: &Transform,
-        client_tick: u32,
+        client_tick: ClientTick,
         time: f32,
     ) where
         T: Renderer + GeometryRenderer,

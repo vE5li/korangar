@@ -16,6 +16,7 @@ pub use self::mode::MouseInputMode;
 use crate::graphics::RenderSettings;
 use crate::graphics::{PickerRenderTarget, PickerTarget};
 use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
+use crate::network::ClientTick;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
@@ -189,7 +190,7 @@ impl InputSystem {
         picker_target: &mut PickerRenderTarget,
         #[cfg(feature = "debug")] render_settings: &RenderSettings,
         window_size: Vector2<usize>,
-        client_tick: u32,
+        client_tick: ClientTick,
     ) -> (Vec<UserEvent>, Option<ElementCell>, Option<ElementCell>, Option<PickerTarget>) {
         let mut events = Vec::new();
         let mut mouse_target = None;

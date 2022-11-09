@@ -1,7 +1,7 @@
 use crate::graphics::Texture;
 use crate::interface::TrackedState;
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
-use crate::network::{EquipPosition, ItemOptions};
+use crate::network::{EquipPosition, ItemId, ItemIndex, ItemOptions};
 
 enum ItemDetails {
     Regular {
@@ -23,8 +23,8 @@ enum ItemDetails {
 
 #[derive(Clone, Debug)]
 pub struct Item {
-    pub index: u16,
-    pub item_id: usize,
+    pub index: ItemIndex,
+    pub item_id: ItemId,
     pub equip_position: EquipPosition,
     pub equipped_position: EquipPosition,
     //pub item_type: u8,
@@ -45,7 +45,7 @@ impl Inventory {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         script_loader: &ScriptLoader,
-        item_data: Vec<(usize, usize, EquipPosition, EquipPosition)>,
+        item_data: Vec<(ItemIndex, ItemId, EquipPosition, EquipPosition)>,
     ) {
         let items = item_data
             .into_iter()
@@ -54,7 +54,7 @@ impl Inventory {
                 let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
                 let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
                 Item {
-                    index: item_data.0 as u16,
+                    index: item_data.0,
                     item_id: item_data.1,
                     equip_position: item_data.2,
                     equipped_position: item_data.3,
@@ -71,26 +71,26 @@ impl Inventory {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         script_loader: &ScriptLoader,
-        item_index: usize,
-        item_data: usize,
+        item_index: ItemIndex,
+        item_id: ItemId,
         equip_position: EquipPosition,
         equipped_position: EquipPosition,
     ) {
         self.items.with_mut(|items, changed| {
-            // set changed ahead of time since we might exit early
+            // Set changed ahead of time since we might exit early.
             changed();
 
-            if let Some(_stack) = items.iter_mut().find(|item| item.item_id == item_data) {
+            if let Some(_stack) = items.iter_mut().find(|item| item.item_id == item_id) {
                 //stack.amount += item_data.amount;
                 return;
             }
 
-            let resource_name = script_loader.get_item_resource_from_id(item_data);
+            let resource_name = script_loader.get_item_resource_from_id(item_id);
             let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
             let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
             let item = Item {
-                index: item_index as u16,
-                item_id: item_data,
+                index: item_index,
+                item_id,
                 equip_position,
                 equipped_position,
                 texture,
@@ -100,7 +100,7 @@ impl Inventory {
         });
     }
 
-    pub fn update_equipped_position(&mut self, index: u16, equipped_position: EquipPosition) {
+    pub fn update_equipped_position(&mut self, index: ItemIndex, equipped_position: EquipPosition) {
         self.items.with_mut(|items, changed| {
             items.iter_mut().find(|item| item.index == index).unwrap().equipped_position = equipped_position;
             changed();

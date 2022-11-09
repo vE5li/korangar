@@ -2,6 +2,8 @@ use std::time::Instant;
 
 use derive_new::new;
 
+use crate::network::ClientTick;
+
 #[derive(new)]
 pub struct GameTimer {
     #[new(value = "Instant::now()")]
@@ -14,16 +16,16 @@ pub struct GameTimer {
     frame_counter: usize,
     #[new(default)]
     frames_per_second: usize,
-    #[new(default)]
-    client_tick: u32,
+    #[new(value = "ClientTick(0)")]
+    client_tick: ClientTick,
 }
 
 impl GameTimer {
-    pub fn set_client_tick(&mut self, client_tick: u32) {
+    pub fn set_client_tick(&mut self, client_tick: ClientTick) {
         self.client_tick = client_tick;
     }
 
-    pub fn get_client_tick(&self) -> u32 {
+    pub fn get_client_tick(&self) -> ClientTick {
         self.client_tick
     }
 
@@ -41,7 +43,7 @@ impl GameTimer {
             self.frame_counter = 0;
         }
 
-        self.client_tick += (delta_time * 1075.0) as u32;
+        self.client_tick.0 += (delta_time * 1075.0) as u32;
 
         delta_time
     }

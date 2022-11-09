@@ -1,6 +1,7 @@
 use cgmath::Vector2;
 
 use crate::interface::ItemMove;
+use crate::network::{CharacterId, EntityId};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -25,17 +26,17 @@ pub enum UserEvent {
     SelectCharacter(usize),
     OpenCharacterCreationWindow(usize),
     CreateCharacter(usize, String),
-    DeleteCharacter(usize),
+    DeleteCharacter(CharacterId),
     RequestSwitchCharacterSlot(usize),
     CancelSwitchCharacterSlot,
     SwitchCharacterSlot(usize),
     RequestPlayerMove(Vector2<usize>),
-    RequestPlayerInteract(u32),
+    RequestPlayerInteract(EntityId),
     RequestWarpToMap(String, Vector2<usize>),
     SendMessage(String),
-    NextDialog(u32),
-    CloseDialog(u32),
-    ChooseDialogOption(u32, i8),
+    NextDialog(EntityId),
+    CloseDialog(EntityId),
+    ChooseDialogOption(EntityId, i8),
     MoveItem(ItemMove),
     #[cfg(feature = "debug")]
     ToggleFrustumCulling,

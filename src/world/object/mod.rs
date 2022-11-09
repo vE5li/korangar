@@ -5,6 +5,7 @@ use derive_new::new;
 use procedural::*;
 
 use crate::graphics::*;
+use crate::network::ClientTick;
 use crate::world::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
@@ -20,7 +21,7 @@ impl Object {
         self.transform.position += offset;
     }
 
-    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: u32, time: f32)
+    pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: ClientTick, time: f32)
     where
         T: Renderer + GeometryRenderer,
     {

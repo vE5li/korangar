@@ -51,7 +51,7 @@ impl CharacterPreview {
                     .wrap(),
                 Button::default()
                     .with_static_text("delete")
-                    .with_event(UserEvent::DeleteCharacter(character_information.character_id as usize))
+                    .with_event(UserEvent::DeleteCharacter(character_information.character_id))
                     .with_background_color(|theme| *theme.close_button.background_color)
                     .with_foreground_color(|theme| *theme.close_button.foreground_color)
                     .with_width(dimension!(50%))

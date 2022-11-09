@@ -3,6 +3,7 @@ use std::ops::Mul;
 use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
+use derive_new::new;
 use procedural::*;
 use vulkano::image::ImageAccess;
 
@@ -12,45 +13,41 @@ use crate::debug::*;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
 use crate::interface::InterfaceSettings;
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
+use crate::network::ClientTick;
 
 //pub enum Animations {
 //}
 
+#[derive(new)]
 pub struct AnimationState {
+    #[new(default)]
     pub action: usize,
-    pub start_time: u32,
+    pub start_time: ClientTick,
+    #[new(default)]
     pub time: u32,
+    #[new(default)]
     pub duration: Option<u32>,
+    #[new(default)]
     pub factor: Option<f32>,
 }
 
 impl AnimationState {
-    pub fn new(client_tick: u32) -> Self {
-        Self {
-            action: 0,
-            start_time: client_tick,
-            time: 0,
-            duration: None,
-            factor: None,
-        }
-    }
-
-    pub fn idle(&mut self, client_tick: u32) {
+    pub fn idle(&mut self, client_tick: ClientTick) {
         self.action = 0;
         self.start_time = client_tick;
         self.duration = None;
         self.factor = None;
     }
 
-    pub fn walk(&mut self, movement_speed: usize, client_tick: u32) {
+    pub fn walk(&mut self, movement_speed: usize, client_tick: ClientTick) {
         self.action = 1;
         self.start_time = client_tick;
         self.duration = None;
         self.factor = Some(movement_speed as f32 * 100.0 / 150.0);
     }
 
-    pub fn update(&mut self, client_tick: u32) {
-        let mut time = client_tick - self.start_time;
+    pub fn update(&mut self, client_tick: ClientTick) {
+        let mut time = client_tick.0 - self.start_time.0;
 
         // TODO: make everything have a duration so that we can update the start_time
         // from time to time so that animations won't start to drop frames as

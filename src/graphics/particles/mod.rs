@@ -6,7 +6,7 @@ use rand::{thread_rng, Rng};
 
 use crate::graphics::*;
 use crate::loaders::{GameFileLoader, TextureLoader};
-use crate::network::{QuestColor, QuestEffectPacket};
+use crate::network::{EntityId, QuestColor, QuestEffectPacket};
 use crate::world::*;
 
 pub trait Particle {
@@ -127,7 +127,7 @@ impl QuestIcon {
 #[derive(Default)]
 pub struct ParticleHolder {
     particles: Vec<Box<dyn Particle + Send + Sync>>,
-    quest_icons: HashMap<u32, QuestIcon>,
+    quest_icons: HashMap<EntityId, QuestIcon>,
 }
 
 impl ParticleHolder {
@@ -148,7 +148,7 @@ impl ParticleHolder {
         );
     }
 
-    pub fn remove_quest_icon(&mut self, entity_id: u32) {
+    pub fn remove_quest_icon(&mut self, entity_id: EntityId) {
         self.quest_icons.remove(&entity_id);
     }
 

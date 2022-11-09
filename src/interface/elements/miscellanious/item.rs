@@ -48,7 +48,6 @@ impl Element for ItemBox {
 
     fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
         if let Some(item) = &self.item {
-            println!("item with id: {}", item.item_id);
             return Some(ClickAction::MoveItem(self.source, item.clone()));
         }
 

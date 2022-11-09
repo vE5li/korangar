@@ -18,12 +18,12 @@ pub enum DialogElement {
 
 pub struct DialogContainer {
     dialog_elements: Remote<Vec<DialogElement>>,
-    npc_id: u32,
+    npc_id: EntityId,
     state: ContainerState,
 }
 
 impl DialogContainer {
-    fn to_element(dialog_element: &DialogElement, npc_id: u32) -> ElementCell {
+    fn to_element(dialog_element: &DialogElement, npc_id: EntityId) -> ElementCell {
         match dialog_element {
             DialogElement::Text(text) => cell!(Text::new(text.clone(), Color::monochrome(255), 14.0, constraint!(100%, 14))),
             DialogElement::NextButton => Button::default()
@@ -41,7 +41,7 @@ impl DialogContainer {
         }
     }
 
-    pub fn new(dialog_elements: Remote<Vec<DialogElement>>, npc_id: u32) -> Self {
+    pub fn new(dialog_elements: Remote<Vec<DialogElement>>, npc_id: EntityId) -> Self {
         let elements = dialog_elements
             .borrow()
             .iter()

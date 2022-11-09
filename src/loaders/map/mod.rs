@@ -124,6 +124,8 @@ pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
     }
 }
 
+// TODO: remove once this data is actually used
+#[allow(dead_code)]
 #[derive(ByteConvertable)]
 struct MapData {
     #[version]

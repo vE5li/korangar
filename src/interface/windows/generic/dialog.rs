@@ -4,13 +4,13 @@ use crate::interface::*;
 
 pub struct DialogWindow {
     elements: TrackedState<Vec<DialogElement>>,
-    npc_id: u32,
+    npc_id: EntityId,
 }
 
 impl DialogWindow {
     pub const WINDOW_CLASS: &'static str = "dialog";
 
-    pub fn new(text: String, npc_id: u32) -> (Self, TrackedState<Vec<DialogElement>>) {
+    pub fn new(text: String, npc_id: EntityId) -> (Self, TrackedState<Vec<DialogElement>>) {
         let elements = TrackedState::new(vec![DialogElement::Text(text)]);
 
         let dialog_window = Self {

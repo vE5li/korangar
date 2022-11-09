@@ -20,6 +20,7 @@ use self::tile::TileRenderer;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -153,7 +154,7 @@ impl EntityRendererTrait for PickerRenderer {
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
         mirror: bool,
-        entity_id: usize,
+        entity_id: EntityId,
     ) where
         Self: Renderer,
     {

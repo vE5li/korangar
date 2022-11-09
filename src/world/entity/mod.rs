@@ -11,7 +11,7 @@ use crate::graphics::ModelVertexBuffer;
 use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
-use crate::network::{CharacterInformation, EntityData, StatusType};
+use crate::network::{CharacterInformation, ClientTick, EntityData, EntityId, StatusType};
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -53,7 +53,7 @@ pub enum EntityType {
 
 #[derive(PrototypeElement)]
 pub struct Common {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub job_id: usize,
     pub health_points: usize,
     pub maximum_health_points: usize,
@@ -81,7 +81,7 @@ impl Common {
         script_loader: &ScriptLoader,
         map: &Map,
         entity_data: EntityData,
-        client_tick: u32,
+        client_tick: ClientTick,
     ) -> Self {
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
@@ -135,23 +135,23 @@ impl Common {
         }
     }
 
-    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: u32) {
+    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
         self.grid_position = position;
         self.position = map.get_world_position(position);
         self.active_movement = None;
         self.animation_state.idle(client_tick);
     }
 
-    pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: u32) {
+    pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: ClientTick) {
         if let Some(active_movement) = self.active_movement.take() {
             let last_step = active_movement.steps.last().unwrap();
 
-            if client_tick > last_step.1 {
+            if client_tick.0 > last_step.1 {
                 let position = Vector2::new(last_step.0.x, last_step.0.y);
                 self.set_position(map, position, client_tick);
             } else {
                 let mut last_step_index = 0;
-                while active_movement.steps[last_step_index + 1].1 < client_tick {
+                while active_movement.steps[last_step_index + 1].1 < client_tick.0 {
                     last_step_index += 1;
                 }
 
@@ -175,7 +175,7 @@ impl Common {
                 let last_step_position = map.get_world_position(last_step.0);
                 let next_step_position = map.get_world_position(next_step.0);
 
-                let clamped_tick = u32::max(last_step.1, client_tick);
+                let clamped_tick = u32::max(last_step.1, client_tick.0);
                 let total = next_step.1 - last_step.1;
                 let offset = clamped_tick - last_step.1;
 
@@ -190,7 +190,7 @@ impl Common {
         self.animation_state.update(client_tick);
     }
 
-    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
+    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: ClientTick) {
         use pathfinding::prelude::bfs;
 
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -269,12 +269,12 @@ impl Common {
                 .into_iter()
                 .enumerate()
                 .map(|(index, pos)| {
-                    let arrival_timestamp = starting_timestamp + index as u32 * self.movement_speed as u32;
+                    let arrival_timestamp = starting_timestamp.0 + index as u32 * self.movement_speed as u32;
                     (pos.convert_to_vector(), arrival_timestamp)
                 })
                 .collect();
 
-            self.active_movement = Movement::new(steps, starting_timestamp).into();
+            self.active_movement = Movement::new(steps, starting_timestamp.0).into();
             self.animation_state.walk(self.movement_speed, starting_timestamp);
         }
     }
@@ -478,7 +478,7 @@ impl Common {
             Vector2::new(1, 1),
             Vector2::new(0, 0),
             mirror,
-            self.entity_id as usize,
+            self.entity_id,
         );
     }
 
@@ -515,7 +515,7 @@ impl Player {
         map: &Map,
         character_information: CharacterInformation,
         player_position: Vector2<usize>,
-        client_tick: u32,
+        client_tick: ClientTick,
     ) -> Self {
         let spell_points = character_information.spell_points as usize;
         let activity_points = 0;
@@ -613,7 +613,7 @@ impl Npc {
         script_loader: &ScriptLoader,
         map: &Map,
         entity_data: EntityData,
-        client_tick: u32,
+        client_tick: ClientTick,
     ) -> Self {
         let common = Common::new(
             game_file_loader,
@@ -688,7 +688,7 @@ impl Entity {
         }
     }
 
-    pub fn get_entity_id(&self) -> u32 {
+    pub fn get_entity_id(&self) -> EntityId {
         self.get_common().entity_id
     }
 
@@ -727,7 +727,7 @@ impl Entity {
         self.get_common().position
     }
 
-    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: u32) {
+    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
         self.get_common_mut().set_position(map, position, client_tick);
     }
 
@@ -737,11 +737,11 @@ impl Entity {
         common.maximum_health_points = maximum_health_points;
     }
 
-    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: u32) {
+    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: ClientTick) {
         self.get_common_mut().update(map, delta_time, client_tick);
     }
 
-    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: u32) {
+    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: ClientTick) {
         self.get_common_mut().move_from_to(map, from, to, starting_timestamp);
     }
 

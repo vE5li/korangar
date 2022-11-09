@@ -37,6 +37,7 @@ pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
 use super::MemoryAllocator;
 use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
+use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -96,7 +97,7 @@ pub trait EntityRenderer {
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
         mirror: bool,
-        entity_id: usize,
+        entity_id: EntityId,
     ) where
         Self: Renderer;
 }
@@ -104,7 +105,7 @@ pub trait EntityRenderer {
 #[derive(Debug)]
 pub enum PickerTarget {
     Tile(u16, u16),
-    Entity(u32),
+    Entity(EntityId),
     #[cfg(feature = "debug")]
     Marker(MarkerIdentifier),
 }
@@ -147,7 +148,7 @@ impl From<u32> for PickerTarget {
             false => data,
         };
 
-        Self::Entity(entity_id)
+        Self::Entity(EntityId(entity_id))
     }
 }
 
@@ -159,7 +160,7 @@ impl From<PickerTarget> for u32 {
                 encoded |= 1 << 31;
                 encoded
             }
-            PickerTarget::Entity(entity_id) => match entity_id >> 24 == 0 {
+            PickerTarget::Entity(EntityId(entity_id)) => match entity_id >> 24 == 0 {
                 true => entity_id | (5 << 24),
                 false => entity_id,
             },

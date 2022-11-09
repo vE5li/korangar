@@ -27,6 +27,7 @@ pub use self::windows::*;
 use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer, Texture};
 use crate::input::{FocusState, MouseInputMode};
 use crate::loaders::{ActionLoader, GameFileLoader, SpriteLoader};
+use crate::network::{ClientTick, EntityId};
 
 #[derive(new)]
 struct DialogHandle {
@@ -102,11 +103,11 @@ impl Interface {
 
     // TODO: this is just a workaround until i find a better solution to make the
     // cursor always look correct.
-    pub fn set_start_time(&mut self, client_tick: u32) {
+    pub fn set_start_time(&mut self, client_tick: ClientTick) {
         self.mouse_cursor.set_start_time(client_tick);
     }
 
-    pub fn update(&mut self, focus_state: &mut FocusState, client_tick: u32) -> (bool, bool) {
+    pub fn update(&mut self, focus_state: &mut FocusState, client_tick: ClientTick) -> (bool, bool) {
         self.mouse_cursor.update(client_tick);
 
         for (window, _reresolve, rerender) in &mut self.windows {
@@ -405,7 +406,7 @@ impl Interface {
         }
     }
 
-    pub fn open_dialog_window(&mut self, focus_state: &mut FocusState, text: String, npc_id: u32) {
+    pub fn open_dialog_window(&mut self, focus_state: &mut FocusState, text: String, npc_id: EntityId) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
             dialog_handle.elements.with_mut(|elements, changed| {
                 if dialog_handle.clear {
@@ -501,7 +502,7 @@ impl Interface {
         self.dialog_handle = None;
     }
 
-    pub fn set_mouse_cursor_state(&mut self, state: MouseCursorState, client_tick: u32) {
+    pub fn set_mouse_cursor_state(&mut self, state: MouseCursorState, client_tick: ClientTick) {
         self.mouse_cursor.set_state(state, client_tick)
     }
 

@@ -20,7 +20,36 @@ use crate::interface::PacketEntry;
 use crate::interface::{CharacterSelectionWindow, ElementCell, PrototypeElement, TrackedState};
 use crate::loaders::{ByteConvertable, ByteStream};
 
-// 0x0b1d: ping
+#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement)]
+pub struct ClientTick(pub u32);
+
+// TODO: move to login
+#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct AccountId(pub u32);
+
+// TODO: move to character
+#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct CharacterId(pub u32);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct EntityId(pub u32);
+
+/// Item index is always actual index + 2.
+#[derive(Clone, Copy, Debug, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct ItemIndex(u16);
+
+impl ByteConvertable for ItemIndex {
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+        Self(u16::from_bytes(byte_stream, length_hint) - 2)
+    }
+
+    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+        u16::to_bytes(&(self.0 + 2), length_hint)
+    }
+}
+
+#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct ItemId(pub u32);
 
 /// Base trait that all packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size,
@@ -42,35 +71,35 @@ pub enum NetworkEvent {
     AddEntity(EntityData),
     /// Remove an entity from the list of entities that the client is aware of
     /// by its id
-    RemoveEntity(u32),
+    RemoveEntity(EntityId),
     /// The player is pathing to a new position
-    PlayerMove(Vector2<usize>, Vector2<usize>, u32),
+    PlayerMove(Vector2<usize>, Vector2<usize>, ClientTick),
     /// An Entity nearby is pathing to a new position
-    EntityMove(u32, Vector2<usize>, Vector2<usize>, u32),
+    EntityMove(EntityId, Vector2<usize>, Vector2<usize>, ClientTick),
     /// Player was moved to a new position on a different map or the current map
     ChangeMap(String, Vector2<usize>),
     /// Update the client side [tick
     /// counter](crate::system::GameTimer::client_tick) to keep server and
     /// client synchronized
-    UpdateClientTick(u32),
+    UpdateClientTick(ClientTick),
     /// New chat message for the client
     ChatMessage(ChatMessage),
     /// Update entity details. Mostly received when the client sends
     /// [RequestDetailsPacket] after the player hovered an entity.
-    UpdateEntityDetails(u32, String),
-    UpdateEntityHealth(u32, usize, usize),
-    DamageEffect(u32, usize),
+    UpdateEntityDetails(EntityId, String),
+    UpdateEntityHealth(EntityId, usize, usize),
+    DamageEffect(EntityId, usize),
     UpdateStatus(StatusType),
-    OpenDialog(String, u32),
+    OpenDialog(String, EntityId),
     AddNextButton,
     AddCloseButton,
     AddChoiceButtons(Vec<String>),
     AddQuestEffect(QuestEffectPacket),
-    RemoveQuestEffect(u32),
-    Inventory(Vec<(usize, usize, EquipPosition, EquipPosition)>),
-    AddIventoryItem(usize, usize, EquipPosition, EquipPosition),
+    RemoveQuestEffect(EntityId),
+    Inventory(Vec<(ItemIndex, ItemId, EquipPosition, EquipPosition)>),
+    AddIventoryItem(ItemIndex, ItemId, EquipPosition, EquipPosition),
     UpdateEquippedPosition {
-        index: u16,
+        index: ItemIndex,
         equipped_position: EquipPosition,
     },
 }
@@ -116,7 +145,7 @@ struct LoginServerLoginPacket {
 struct LoginServerLoginSuccessPacket {
     pub packet_length: u16,
     pub login_id1: u32,
-    pub account_id: u32,
+    pub account_id: AccountId,
     pub login_id2: u32,
     /// Deprecated and always 0 on rAthena
     pub ip_address: u32,
@@ -239,7 +268,7 @@ impl ByteConvertable for WorldPosition2 {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xeb, 0x02)]
 struct MapServerLoginSuccessPacket {
-    pub client_tick: u32,
+    pub client_tick: ClientTick,
     pub position: WorldPosition,
     /// Always [5, 5] on rAthena
     pub ignored: [u8; 2],
@@ -308,7 +337,7 @@ struct CharacterSelectionFailedPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc5, 0x0a)]
 struct CharacterSelectionSuccessPacket {
-    pub character_id: u32,
+    pub character_id: CharacterId,
     /// Ignored by Korangar, since the players current map will be taken from
     /// the [ChangeMapPacket].
     #[length_hint(16)]
@@ -369,7 +398,7 @@ struct CharacterServerInformation {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x65, 0x00)]
 struct CharacterServerLoginPacket {
-    pub account_id: u32,
+    pub account_id: AccountId,
     pub login_id1: u32,
     pub login_id2: u32,
     #[new(default)]
@@ -383,10 +412,10 @@ struct CharacterServerLoginPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x36, 0x04)]
 struct MapServerLoginPacket {
-    pub account_id: u32,
-    pub character_id: u32,
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
     pub login_id1: u32,
-    pub client_tick: u32,
+    pub client_tick: ClientTick,
     pub sex: Sex,
     #[new(default)]
     pub unknown: [u8; 4],
@@ -395,7 +424,7 @@ struct MapServerLoginPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x83, 0x02)]
 struct Packet8302 {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
 }
 
 /// Sent by the client to the character server when the player tries to create
@@ -418,7 +447,7 @@ struct CreateCharacterPacket {
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub struct CharacterInformation {
-    pub character_id: u32,
+    pub character_id: CharacterId,
     pub experience: i64,
     pub money: i32,
     pub job_experience: i64,
@@ -518,15 +547,15 @@ struct RequestWarpToMapPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x86, 0x00)]
 struct EntityMovePacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub from_to: WorldPosition2,
-    pub timestamp: u32,
+    pub timestamp: ClientTick,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x88, 0x00)]
 struct EntityStopMovePacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub x: u16,
     pub y: u16,
 }
@@ -538,7 +567,7 @@ struct EntityStopMovePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x87, 0x00)]
 struct PlayerMovePacket {
-    pub timestamp: u32,
+    pub timestamp: ClientTick,
     pub from_to: WorldPosition2,
 }
 
@@ -549,7 +578,7 @@ struct PlayerMovePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xfb, 0x01)]
 struct DeleteCharacterPacket {
-    character_id: u32,
+    character_id: CharacterId,
     /// This field can be used for email or date of birth, depending on the
     /// configuration of the character server.
     #[length_hint(40)]
@@ -604,7 +633,7 @@ struct ServerMessagePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x68, 0x03)]
 struct RequestDetailsPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
 }
 
 /// Sent by the map server to the client as a response to
@@ -612,7 +641,7 @@ struct RequestDetailsPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x30, 0x0a)]
 struct RequestPlayerDetailsSuccessPacket {
-    pub entity_id: u32,
+    pub character_id: CharacterId,
     #[length_hint(24)]
     pub name: String,
     #[length_hint(24)]
@@ -629,7 +658,7 @@ struct RequestPlayerDetailsSuccessPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xdf, 0x0a)]
 struct RequestEntityDetailsSuccessPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub group_id: u32,
     #[length_hint(24)]
     pub name: String,
@@ -684,8 +713,8 @@ struct CriticalWeightUpdatePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xd7, 0x01)]
 struct SpriteChangePacket {
-    pub entity_id: u32,
-    pub sprite_type: u8, // is it actually sprite_ ?
+    pub entity_id: EntityId,
+    pub sprite_type: u8, // TODO: Is it actually the sprite type?
     pub value: u32,
     pub value2: u32,
 }
@@ -715,9 +744,8 @@ pub struct ItemOptions {
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct RegularItemInformation {
-    /// Actually index + 2
-    pub index: u16,
-    pub item_id: u32,
+    pub index: ItemIndex,
+    pub item_id: ItemId,
     pub item_type: u8,
     pub amount: u16,
     pub wear_state: u32,
@@ -737,9 +765,8 @@ struct RegularItemListPacket {
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct EquippableItemInformation {
-    /// Actually index + 2
-    pub index: u16,
-    pub item_id: u32,
+    pub index: ItemIndex,
+    pub item_id: ItemId,
     pub item_type: u8,
     pub equip_position: EquipPosition,
     pub equipped_position: EquipPosition,
@@ -765,8 +792,7 @@ struct EquippableItemListPacket {
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct EquippableSwitchItemInformation {
-    /// is in actually index + 2
-    pub index: u16,
+    pub index: ItemIndex,
     pub position: u32,
 }
 
@@ -774,7 +800,7 @@ struct EquippableSwitchItemInformation {
 #[header(0x9b, 0x0a)]
 struct EquippableSwitchItemListPacket {
     pub packet_length: u16,
-    #[repeating((self.packet_length - 4) / 6)]
+    #[repeating((self.packet_length - 4) / 6)] // TODO: (remaining / 6)
     pub item_information: Vec<EquippableSwitchItemInformation>,
 }
 
@@ -808,7 +834,7 @@ struct BroadcastMessagePacket {
 #[header(0xc1, 0x02)]
 struct EntityMessagePacket {
     pub packet_length: u16,
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub color: ColorBGR,
     #[length_hint(self.packet_length - 12)]
     pub message: String,
@@ -817,7 +843,7 @@ struct EntityMessagePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc0, 0x00)]
 struct DisplayEmotionPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub emotion: u8,
 }
 
@@ -1078,7 +1104,7 @@ enum Action {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x37, 0x04)]
 struct RequestActionPacket {
-    pub value: u32,
+    pub npc_id: EntityId,
     pub action: Action,
 }
 
@@ -1092,7 +1118,7 @@ struct GlobalMessagePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x39, 0x01)]
 struct RequestPlayerAttackFailedPacket {
-    pub target_entity_id: u32,
+    pub target_entity_id: EntityId,
     pub target_x: u16,
     pub target_y: u16,
     pub x: u16,
@@ -1103,7 +1129,7 @@ struct RequestPlayerAttackFailedPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x77, 0x09)]
 struct UpdateEntityHealthPointsPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub health_points: u32,
     pub maximum_health_points: u32,
 }
@@ -1115,9 +1141,9 @@ enum DamageType {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc8, 0x08)]
 struct DamagePacket {
-    pub source_entity_id: u32,
-    pub destination_entity_id: u32,
-    pub client_tick: u32,
+    pub source_entity_id: EntityId,
+    pub destination_entity_id: EntityId,
+    pub client_tick: ClientTick,
     pub source_movement_speed: u32,
     pub destination_movement_speed: u32,
     pub damage_amount: u32,
@@ -1132,14 +1158,14 @@ struct DamagePacket {
 #[header(0x7f, 0x00)]
 #[ping]
 struct ServerTickPacket {
-    pub client_tick: u32,
+    pub client_tick: ClientTick,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x60, 0x03)]
 #[ping]
 struct RequestServerTickPacket {
-    pub client_tick: u32,
+    pub client_tick: ClientTick,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, ByteConvertable, PrototypeElement)]
@@ -1178,7 +1204,7 @@ enum DissapearanceReason {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x80, 0x00)]
 struct EntityDisappearedPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub reason: DissapearanceReason,
 }
 
@@ -1187,7 +1213,7 @@ struct EntityDisappearedPacket {
 struct MovingEntityAppearedPacket {
     pub packet_length: u16,
     pub object_type: u8,
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
     pub movement_speed: u16,
     pub body_state: u16,
@@ -1229,7 +1255,7 @@ struct MovingEntityAppearedPacket {
 struct EntityAppearedPacket {
     pub packet_length: u16,
     pub object_type: u8,
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub group_id: u32, // may be reversed - or completely wrong
     pub movement_speed: u16,
     pub body_state: u16,
@@ -1267,7 +1293,7 @@ struct EntityAppearedPacket {
 }
 
 pub struct EntityData {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub movement_speed: u16,
     pub job: u16,
     pub position: Vector2<usize>,
@@ -1280,7 +1306,7 @@ pub struct EntityData {
 impl EntityData {
     pub fn from_character(character_information: CharacterInformation, position: Vector2<usize>) -> Self {
         Self {
-            entity_id: character_information.character_id,
+            entity_id: EntityId(character_information.character_id.0), // TODO: should not mix like that
             movement_speed: character_information.movement_speed as u16,
             job: character_information.job as u16,
             position,
@@ -1402,7 +1428,7 @@ enum MarkerType {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x44, 0x01)]
 struct MarkMinimapPositionPacket {
-    pub npc_id: u32,
+    pub npc_id: EntityId,
     pub marker_type: MarkerType,
     pub position: Vector2<u32>,
     pub id: u8,
@@ -1412,20 +1438,20 @@ struct MarkMinimapPositionPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb5, 0x00)]
 struct NextButtonPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb6, 0x00)]
 struct CloseButtonPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xb7, 0x00)]
 struct DialogMenuPacket {
     pub packet_length: u16,
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     #[length_hint(self.packet_length - 8)]
     pub message: String,
 }
@@ -1433,7 +1459,7 @@ struct DialogMenuPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xf3, 0x01)]
 struct DisplaySpecialEffectPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub effect_id: u32,
 }
 
@@ -1442,8 +1468,8 @@ struct DisplaySpecialEffectPacket {
 struct DisplaySkillEffectPacket {
     pub skill_id: u16,
     pub heal: u32,
-    pub destination_entity_id: u32,
-    pub source_entity_id: u32,
+    pub destination_entity_id: EntityId,
+    pub source_entity_id: EntityId,
     pub result: u8,
 }
 
@@ -1451,7 +1477,7 @@ struct DisplaySkillEffectPacket {
 #[header(0x83, 0x09)]
 struct StatusChangePacket {
     pub index: u16,
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub state: u8,
     pub duration_in_milliseconds: u32,
     pub remaining_in_milliseconds: u32,
@@ -1565,7 +1591,7 @@ enum VisualEffect {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x9b, 0x01)]
 struct VisualEffectPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub effect: VisualEffect,
 }
 
@@ -1587,7 +1613,7 @@ enum ExperienceSource {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xcc, 0x0a)]
 struct DisplayGainedExperiencePacket {
-    pub account_id: u32,
+    pub account_id: AccountId,
     pub amount: u64,
     pub experience_type: ExperienceType,
     pub experience_source: ExperienceSource,
@@ -1615,7 +1641,7 @@ struct DisplayImagePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x29, 0x02)]
 struct StateChangePacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub body_state: u16,
     pub health_state: u16,
     pub effect_state: u32,
@@ -1625,9 +1651,9 @@ struct StateChangePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x41, 0x0b)]
 struct ItemPickupPacket {
-    pub index: u16,
+    pub index: ItemIndex,
     pub count: u16,
-    pub name_id: u32,
+    pub item_id: ItemId,
     pub is_identified: u8,
     pub is_broken: u8,
     pub cards: [u32; 4],
@@ -1695,7 +1721,7 @@ pub enum QuestColor {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x46, 0x04)]
 pub struct QuestEffectPacket {
-    pub entity_id: u32,
+    pub entity_id: EntityId,
     pub position: Vector2<u16>,
     pub effect: QuestEffect,
     pub color: QuestColor,
@@ -1705,7 +1731,7 @@ pub struct QuestEffectPacket {
 #[header(0xb4, 0x00)]
 struct NpcDialogPacket {
     pub packet_length: u16,
-    pub npc_id: u32,
+    pub npc_id: EntityId,
     #[length_hint(self.packet_length - 8)]
     pub text: String,
 }
@@ -1714,17 +1740,19 @@ struct NpcDialogPacket {
 #[header(0x7d, 0x00)]
 struct MapLoadedPacket {}
 
-#[derive(Clone, Debug, Default, Packet, PrototypeElement)]
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x87, 0x01)]
 #[ping]
 struct CharacterServerKeepalivePacket {
-    pub account_id: u32,
+    /// rAthena never reads this value, so just set it to 0.
+    #[new(value = "AccountId(0)")]
+    pub account_id: AccountId,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x90, 0x00)]
 struct StartDialogPacket {
-    pub npc_id: u32,
+    pub npc_id: EntityId,
     #[new(value = "1")]
     pub dialog_type: u8,
 }
@@ -1732,19 +1760,19 @@ struct StartDialogPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xb9, 0x00)]
 struct NextDialogPacket {
-    pub npc_id: u32,
+    pub npc_id: EntityId,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x46, 0x01)]
 struct CloseDialogPacket {
-    pub npc_id: u32,
+    pub npc_id: EntityId,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xb8, 0x00)]
 struct ChooseDialogOptionPacket {
-    pub npc_id: u32,
+    pub npc_id: EntityId,
     pub option: i8,
 }
 
@@ -1835,8 +1863,7 @@ impl EquipPosition {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0x98, 0x09)]
 struct RequestEquipItemPacket {
-    /// Actually inventory index + 2
-    pub inventory_index: u16,
+    pub inventory_index: ItemIndex,
     pub equip_position: EquipPosition,
 }
 
@@ -1850,8 +1877,7 @@ enum RequestEquipItemStatus {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x99, 0x09)]
 struct RequestEquipItemStatusPacket {
-    /// Actually inventory index + 2
-    pub inventory_index: u16,
+    pub inventory_index: ItemIndex,
     pub equipped_position: EquipPosition,
     pub view_id: u16,
     pub result: RequestEquipItemStatus,
@@ -1860,7 +1886,7 @@ struct RequestEquipItemStatusPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement, new)]
 #[header(0xab, 0x00)]
 struct RequestUnequipItemPacket {
-    pub inventory_index: u16,
+    pub inventory_index: ItemIndex,
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
@@ -1872,8 +1898,7 @@ enum RequestUnequipItemStatus {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x9a, 0x09)]
 struct RequestUnequipItemStatusPacket {
-    /// Actually inventory index + 2
-    pub inventory_index: u16,
+    pub inventory_index: ItemIndex,
     pub equipped_position: EquipPosition,
     pub result: RequestUnequipItemStatus,
 }
@@ -1900,7 +1925,7 @@ impl NetworkTimer {
 
 #[derive(new)]
 struct LoginData {
-    pub account_id: u32,
+    pub account_id: AccountId,
     pub login_id1: u32,
     pub sex: Sex,
 }
@@ -2041,10 +2066,10 @@ impl NetworkingSystem {
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
 
-        let account_id = u32::from_bytes(&mut byte_stream, None);
-        assert!(account_id == login_server_login_success_packet.account_id);
+        let mut byte_stream = ByteStream::new(&response);
+        let account_id = AccountId::from_bytes(&mut byte_stream, None);
+        assert_eq!(account_id, login_server_login_success_packet.account_id);
 
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -2192,13 +2217,13 @@ impl NetworkingSystem {
         }
     }
 
-    pub fn keep_alive(&mut self, delta_time: f64, client_tick: u32) {
+    pub fn keep_alive(&mut self, delta_time: f64, client_tick: ClientTick) {
         if self.login_keep_alive_timer.update(delta_time) {
             self.send_packet_to_login_server(LoginServerKeepalivePacket::default());
         }
 
         if self.character_keep_alive_timer.update(delta_time) && self.character_stream.is_some() {
-            self.send_packet_to_character_server(CharacterServerKeepalivePacket::default());
+            self.send_packet_to_character_server(CharacterServerKeepalivePacket::new());
         }
 
         if self.map_keep_alive_timer.update(delta_time) && self.map_stream.is_some() {
@@ -2239,10 +2264,10 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn delete_character(&mut self, character_id: usize) -> Result<(), String> {
+    pub fn delete_character(&mut self, character_id: CharacterId) -> Result<(), String> {
         let email = "a@a.com".to_string();
 
-        self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id as u32, email));
+        self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id, email));
 
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -2260,7 +2285,7 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
-        self.characters.retain(|character| character.character_id as usize != character_id);
+        self.characters.retain(|character| character.character_id != character_id);
         Ok(())
     }
 
@@ -2268,7 +2293,7 @@ impl NetworkingSystem {
         &mut self,
         slot: usize,
         chat_messages: &Rc<RefCell<Vec<ChatMessage>>>,
-    ) -> Result<(String, Vector2<usize>, CharacterInformation, u32), String> {
+    ) -> Result<(String, Vector2<usize>, CharacterInformation, ClientTick), String> {
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
         let response = self.get_data_from_character_server();
@@ -2305,7 +2330,7 @@ impl NetworkingSystem {
             login_data.account_id,
             character_selection_success_packet.character_id,
             login_data.login_id1,
-            100,
+            ClientTick(100), // TODO: what is the logic here?
             login_data.sex,
         ));
 
@@ -2409,11 +2434,11 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(MapLoadedPacket::default());
     }
 
-    pub fn request_entity_details(&mut self, entity_id: u32) {
+    pub fn request_entity_details(&mut self, entity_id: EntityId) {
         self.send_packet_to_map_server(RequestDetailsPacket::new(entity_id));
     }
 
-    pub fn request_player_attack(&mut self, entity_id: u32) {
+    pub fn request_player_attack(&mut self, entity_id: EntityId) {
         self.send_packet_to_map_server(RequestActionPacket::new(entity_id, Action::Attack));
     }
 
@@ -2426,28 +2451,28 @@ impl NetworkingSystem {
         ));
     }
 
-    pub fn start_dialog(&mut self, npc_id: u32) {
+    pub fn start_dialog(&mut self, npc_id: EntityId) {
         self.send_packet_to_map_server(StartDialogPacket::new(npc_id));
     }
 
-    pub fn next_dialog(&mut self, npc_id: u32) {
+    pub fn next_dialog(&mut self, npc_id: EntityId) {
         self.send_packet_to_map_server(NextDialogPacket::new(npc_id));
     }
 
-    pub fn close_dialog(&mut self, npc_id: u32) {
+    pub fn close_dialog(&mut self, npc_id: EntityId) {
         self.send_packet_to_map_server(CloseDialogPacket::new(npc_id));
     }
 
-    pub fn choose_dialog_option(&mut self, npc_id: u32, option: i8) {
+    pub fn choose_dialog_option(&mut self, npc_id: EntityId, option: i8) {
         self.send_packet_to_map_server(ChooseDialogOptionPacket::new(npc_id, option));
     }
 
-    pub fn request_item_equip(&mut self, inventory_index: u16, equip_position: EquipPosition) {
-        self.send_packet_to_map_server(RequestEquipItemPacket::new(inventory_index + 2, equip_position));
+    pub fn request_item_equip(&mut self, item_index: ItemIndex, equip_position: EquipPosition) {
+        self.send_packet_to_map_server(RequestEquipItemPacket::new(item_index, equip_position));
     }
 
-    pub fn request_item_unequip(&mut self, inventory_index: u16) {
-        self.send_packet_to_map_server(RequestUnequipItemPacket::new(inventory_index + 2));
+    pub fn request_item_unequip(&mut self, item_index: ItemIndex) {
+        self.send_packet_to_map_server(RequestUnequipItemPacket::new(item_index));
     }
 
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
@@ -2511,8 +2536,8 @@ impl NetworkingSystem {
                         if let Ok(packet) = RegularItemListPacket::try_from_bytes(&mut byte_stream) {
                             for item_information in packet.item_information {
                                 item_data.push((
-                                    item_information.index as usize - 2,
-                                    item_information.item_id as usize,
+                                    item_information.index,
+                                    item_information.item_id,
                                     EquipPosition::None,
                                     EquipPosition::None,
                                 )); // TODO: Don't add that data here, only equippable itemes need this data
@@ -2520,8 +2545,8 @@ impl NetworkingSystem {
                         } else if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
                             for item_information in packet.item_information {
                                 item_data.push((
-                                    item_information.index as usize - 2,
-                                    item_information.item_id as usize,
+                                    item_information.index,
+                                    item_information.item_id,
                                     item_information.equip_position,
                                     item_information.equipped_position,
                                 ));
@@ -2575,8 +2600,8 @@ impl NetworkingSystem {
                     events.push(event);
                 } else if let Ok(packet) = ItemPickupPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddIventoryItem(
-                        packet.index as usize - 2,
-                        packet.name_id as usize,
+                        packet.index,
+                        packet.item_id,
                         packet.equip_position,
                         EquipPosition::None,
                     ));
@@ -2584,7 +2609,7 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
                 } else if let Ok(packet) = RequestPlayerDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
-                    events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
+                    events.push(NetworkEvent::UpdateEntityDetails(EntityId(packet.character_id.0), packet.name));
                 } else if let Ok(packet) = RequestEntityDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
                 } else if let Ok(packet) = UpdateEntityHealthPointsPacket::try_from_bytes(&mut byte_stream) {
@@ -2604,14 +2629,14 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = RequestEquipItemStatusPacket::try_from_bytes(&mut byte_stream) {
                     if let RequestEquipItemStatus::Success = packet.result {
                         events.push(NetworkEvent::UpdateEquippedPosition {
-                            index: packet.inventory_index - 2,
+                            index: packet.inventory_index,
                             equipped_position: packet.equipped_position,
                         });
                     }
                 } else if let Ok(packet) = RequestUnequipItemStatusPacket::try_from_bytes(&mut byte_stream) {
                     if let RequestUnequipItemStatus::Success = packet.result {
                         events.push(NetworkEvent::UpdateEquippedPosition {
-                            index: packet.inventory_index - 2,
+                            index: packet.inventory_index,
                             equipped_position: EquipPosition::None,
                         });
                     }

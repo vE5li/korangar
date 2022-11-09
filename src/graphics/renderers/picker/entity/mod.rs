@@ -36,6 +36,7 @@ use vulkano::shader::ShaderModule;
 use self::vertex_shader::ty::{Constants, Matrices};
 use crate::graphics::renderers::PickerTarget;
 use crate::graphics::*;
+use crate::network::EntityId;
 
 unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
@@ -142,7 +143,7 @@ impl EntityRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
-        entity_id: usize,
+        entity_id: EntityId,
         mirror: bool,
     ) {
         let image_dimensions = Vector2::<u32>::from(texture.image().dimensions().width_height());
@@ -162,7 +163,7 @@ impl EntityRenderer {
         let world_matrix = camera.billboard_matrix(position, origin, size);
         let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
         let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
-        let picker_target = PickerTarget::Entity(entity_id as u32);
+        let picker_target = PickerTarget::Entity(entity_id);
 
         let constants = Constants {
             world: world_matrix.into(),

@@ -4,6 +4,7 @@ use procedural::*;
 
 use crate::graphics::{Camera, GeometryRenderer, ModelVertexBuffer, Renderer, Texture, Transform};
 use crate::loaders::RotationKeyframeData;
+use crate::network::ClientTick;
 use crate::system::multiply_matrix4_and_vector3;
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]
@@ -110,9 +111,9 @@ pub struct Node {
 }
 
 impl Node {
-    fn animaton_matrix(&self, client_tick: u32) -> Matrix4<f32> {
+    fn animaton_matrix(&self, client_tick: ClientTick) -> Matrix4<f32> {
         let last_step = self.rotation_keyframes.last().unwrap();
-        let animation_tick = client_tick % last_step.frame;
+        let animation_tick = client_tick.0 % last_step.frame;
 
         let mut last_keyframe_index = 0;
         while self.rotation_keyframes[last_keyframe_index + 1].frame < animation_tick {
@@ -131,7 +132,7 @@ impl Node {
         current_rotation.into()
     }
 
-    pub fn world_matrix(&self, transform: &Transform, client_tick: u32) -> Matrix4<f32> {
+    pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
             false => self.animaton_matrix(client_tick),
@@ -160,7 +161,7 @@ impl Node {
         renderer: &T,
         camera: &dyn Camera,
         transform: &Transform,
-        client_tick: u32,
+        client_tick: ClientTick,
         time: f32,
     ) where
         T: Renderer + GeometryRenderer,

@@ -43,6 +43,7 @@ use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
 use crate::loaders::{GameFileLoader, TextureLoader};
+use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::{BoundingBox, MarkerIdentifier};
 
@@ -473,7 +474,7 @@ impl EntityRendererTrait for DeferredRenderer {
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
         mirror: bool,
-        _entity_id: usize,
+        _entity_id: EntityId,
     ) where
         Self: Renderer,
     {

@@ -8,6 +8,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use cgmath::Vector2;
+use chrono::Local;
 use derive_new::new;
 use procedural::*;
 
@@ -104,10 +105,27 @@ pub enum NetworkEvent {
     },
 }
 
-#[derive(new)]
 pub struct ChatMessage {
     pub text: String,
     pub color: Color,
+    offset: usize,
+}
+
+impl ChatMessage {
+    // TODO: Maybe this shouldn't modify the text directly but rather save the
+    // timestamp.
+    pub fn new(mut text: String, color: Color) -> Self {
+        let prefix = Local::now().format("^66BB44%H:%M:%S^000000: ").to_string();
+        let offset = prefix.len();
+
+        text.insert_str(0, &prefix);
+        Self { text, color, offset }
+    }
+
+    pub fn stamped_text(&self, stamp: bool) -> &str {
+        let start = self.offset * !stamp as usize;
+        &self.text[start..]
+    }
 }
 
 #[derive(Copy, Clone, Debug, ByteConvertable, PrototypeElement)]

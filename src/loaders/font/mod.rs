@@ -14,7 +14,7 @@ use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage,
 use vulkano::sync::{FenceSignalFuture, GpuFuture};
 
 use super::GameFileLoader;
-use crate::graphics::{CommandBuilder, MemoryAllocator};
+use crate::graphics::{Color, CommandBuilder, MemoryAllocator};
 
 pub struct FontLoader {
     memory_allocator: Arc<MemoryAllocator>,
@@ -25,16 +25,23 @@ pub struct FontLoader {
     font: Box<Font<'static>>,
 }
 
-fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) -> Vec<PositionedGlyph<'static>> {
+struct GlyphData {
+    glyph: PositionedGlyph<'static>,
+    color: Color,
+}
+
+fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, default_color: Color) -> (Vec<GlyphData>, f32) {
     let mut result = Vec::new();
     let v_metrics = font.v_metrics(scale);
     let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
     let mut caret = point(0.0, v_metrics.ascent);
     let mut last_glyph_id = None;
+    let mut color = default_color;
+    let mut chars = text.chars();
 
-    for c in text.chars() {
-        if c.is_control() {
-            match c {
+    while let Some(character) = chars.next() {
+        if character.is_control() {
+            match character {
                 '\r' => {
                     caret = point(0.0, caret.y + advance_height);
                 }
@@ -44,7 +51,20 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
             continue;
         }
 
-        let base_glyph = font.glyph(c);
+        // Color code following.
+        if character == '^' {
+            let color_code: String = (0..6).map(|_| chars.next().unwrap()).collect();
+
+            color = match color_code.as_str() {
+                "000000" => default_color,
+                code => Color::rgb_hex(code),
+            };
+
+            // Advance to the next character so that '^' doesn't get rendered.
+            continue;
+        }
+
+        let base_glyph = font.glyph(character);
         if let Some(id) = last_glyph_id.take() {
             caret.x += font.pair_kerning(scale, id, base_glyph.id());
         }
@@ -53,7 +73,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
         let mut glyph = base_glyph.scaled(scale).positioned(caret);
 
         if let Some(bb) = glyph.pixel_bounding_box() {
-            if bb.max.x > width as i32 {
+            if bb.max.x as f32 > width {
                 caret = point(0.0, caret.y + advance_height);
                 glyph.set_position(caret);
                 last_glyph_id = None;
@@ -61,10 +81,10 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: u32, text: &str) 
         }
 
         caret.x += glyph.unpositioned().h_metrics().advance_width;
-        result.push(glyph);
+        result.push(GlyphData { glyph, color });
     }
 
-    result
+    (result, caret.y)
 }
 
 impl FontLoader {
@@ -129,11 +149,29 @@ impl FontLoader {
         }
     }
 
-    pub fn get(&mut self, text: &str, font_size: f32) -> Vec<(Rect<f32>, Rect<i32>)> {
-        let glyphs = layout_paragraph(&self.font, Scale::uniform(font_size), 500, text);
+    pub fn get_text_height(&mut self, text: &str, font_size: f32, available_width: f32) -> f32 {
+        let (_, height) = layout_paragraph(
+            &self.font,
+            Scale::uniform(font_size),
+            available_width,
+            text,
+            Color::monochrome(0),
+        );
+
+        height
+    }
+
+    pub fn get(
+        &mut self,
+        text: &str,
+        default_color: Color,
+        font_size: f32,
+        available_width: f32,
+    ) -> (Vec<(Rect<f32>, Rect<i32>, Color)>, f32) {
+        let (glyphs, heigth) = layout_paragraph(&self.font, Scale::uniform(font_size), available_width, text, default_color);
 
         for glyph in &glyphs {
-            self.cache.queue_glyph(0, glyph.clone());
+            self.cache.queue_glyph(0, glyph.glyph.clone());
         }
 
         let buffer_usage = BufferUsage {
@@ -172,10 +210,18 @@ impl FontLoader {
             })
             .unwrap();
 
-        glyphs
-            .into_iter()
-            .filter_map(|glyph| self.cache.rect_for(0, &glyph).unwrap())
-            .collect()
+        (
+            glyphs
+                .into_iter()
+                .filter_map(|glyph| {
+                    self.cache
+                        .rect_for(0, &glyph.glyph)
+                        .unwrap()
+                        .map(|tuple| (tuple.0, tuple.1, glyph.color))
+                })
+                .collect(),
+            heigth,
+        )
     }
 
     pub fn submit_load_buffer(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {

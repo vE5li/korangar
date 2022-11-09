@@ -3,22 +3,28 @@ use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
+use crate::loaders::FontLoader;
 use crate::network::ChatMessage;
 
 pub struct Chat {
-    // TODO: make this TrackedState
+    // TODO: make this Remote
     messages: Rc<RefCell<Vec<ChatMessage>>>,
+    font_loader: Rc<RefCell<FontLoader>>,
+    // TODO: make this Remote
+    stamp: bool,
     cached_message_count: usize,
     state: ElementState,
 }
 
 impl Chat {
-    pub fn new(messages: Rc<RefCell<Vec<ChatMessage>>>) -> Self {
+    pub fn new(messages: Rc<RefCell<Vec<ChatMessage>>>, font_loader: Rc<RefCell<FontLoader>>) -> Self {
         let cached_message_count = messages.borrow().len();
         let state = ElementState::default();
 
         Self {
             messages,
+            font_loader,
+            stamp: true,
             cached_message_count,
             state,
         }
@@ -38,10 +44,21 @@ impl Element for Chat {
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
         let mut size_constraint = constraint!(100%, 0);
-        size_constraint.height = Dimension::Absolute(self.messages.borrow().len() as f32 * *theme.chat.font_size);
+        // Not sure why but 0.0 cuts off the lower part of the text, so add some
+        // padding.
+        let mut height = 5.0 * *interface_settings.scaling;
 
+        for message in self.messages.borrow().iter() {
+            height += self.font_loader.borrow_mut().get_text_height(
+                message.stamped_text(self.stamp),
+                *theme.chat.font_size * *interface_settings.scaling,
+                placement_resolver.get_avalible().x,
+            );
+        }
+
+        size_constraint.height = Dimension::Absolute(height);
         self.state.resolve(placement_resolver, &size_constraint);
     }
 
@@ -74,20 +91,19 @@ impl Element for Chat {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        for (message_index, message) in self.messages.borrow().iter().enumerate() {
+        let mut offset = 0.0;
+
+        for message in self.messages.borrow().iter() {
+            let text = message.stamped_text(self.stamp);
+
             renderer.render_text(
-                &message.text,
-                Vector2::new(0.0, message_index as f32 * *theme.chat.font_size) + Vector2::from_value(0.2),
+                text,
+                Vector2::new(0.0, offset) + Vector2::from_value(0.2),
                 Color::monochrome(0),
                 *theme.chat.font_size,
             );
 
-            renderer.render_text(
-                &message.text,
-                Vector2::new(0.0, message_index as f32 * *theme.chat.font_size),
-                message.color,
-                *theme.chat.font_size,
-            );
+            offset += renderer.render_text(text, Vector2::new(0.0, offset), message.color, *theme.chat.font_size);
         }
     }
 }

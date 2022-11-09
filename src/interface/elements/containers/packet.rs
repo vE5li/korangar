@@ -16,8 +16,8 @@ enum Direction {
 impl Display for Direction {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            Direction::Incoming => write!(f, "[in]"),
-            Direction::Outgoing => write!(f, "[out]"),
+            Direction::Incoming => write!(f, "[^66FF44in^000000]"),
+            Direction::Outgoing => write!(f, "[^FF7744out^000000]"),
         }
     }
 }

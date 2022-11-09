@@ -189,10 +189,10 @@ impl InterfaceRenderer {
         clip_size: Vector4<f32>,
         color: Color,
         font_size: f32,
-    ) {
+    ) -> f32 {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
         self.text_renderer
-            .render(render_target, text, window_size, position, clip_size, color, font_size);
+            .render(render_target, text, window_size, position, clip_size, color, font_size)
     }
 }
 

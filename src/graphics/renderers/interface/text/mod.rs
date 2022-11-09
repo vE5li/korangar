@@ -108,13 +108,13 @@ impl TextRenderer {
         clip_size: Vector4<f32>,
         color: Color,
         font_size: f32,
-    ) {
+    ) -> f32 {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
         let mut font_loader = self.font_loader.borrow_mut();
         let texture = font_loader.get_font_atlas();
-        let character_layout = font_loader.get(text, font_size);
+        let (character_layout, heigth) = font_loader.get(text, color, font_size, clip_size.z - screen_position.x);
 
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
 
@@ -129,7 +129,7 @@ impl TextRenderer {
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
 
-        character_layout.iter().for_each(|(texture_coordinates, position)| {
+        character_layout.iter().for_each(|(texture_coordinates, position, color)| {
             let screen_position = Vector2::new(
                 (screen_position.x + position.min.x as f32) / half_screen.x,
                 (screen_position.y + position.min.y as f32) / half_screen.y,
@@ -159,5 +159,7 @@ impl TextRenderer {
                 .draw(6, 1, 0, 0)
                 .unwrap();
         });
+
+        heigth
     }
 }

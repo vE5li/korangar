@@ -40,8 +40,15 @@ impl Window {
         self.window_class.as_deref()
     }
 
+    fn get_background_color(&self, theme: &Theme) -> Color {
+        self.background_color
+            .as_ref()
+            .map(|closure| closure(theme))
+            .unwrap_or(*theme.window.background_color)
+    }
+
     pub fn has_transparency(&self, theme: &Theme) -> bool {
-        theme.window.background_color.alpha != 255
+        self.get_background_color(theme).alpha != 255
     }
 
     pub fn is_closable(&self) -> bool {
@@ -190,19 +197,13 @@ impl Window {
             self.position.y + self.size.y,
         );
 
-        let background_color = self
-            .background_color
-            .as_ref()
-            .map(|closure| closure(theme))
-            .unwrap_or(*theme.window.background_color);
-
         renderer.render_rectangle(
             render_target,
             self.position,
             self.size,
             clip_size,
             *theme.window.border_radius,
-            background_color,
+            self.get_background_color(theme),
         );
 
         self.elements.iter().for_each(|element| {

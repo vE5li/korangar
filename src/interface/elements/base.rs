@@ -53,7 +53,7 @@ impl<'a> ElementRenderer<'a> {
         );
     }
 
-    pub fn render_text(&mut self, text: &str, offset: Position, foreground_color: Color, font_size: f32) {
+    pub fn render_text(&mut self, text: &str, offset: Position, foreground_color: Color, font_size: f32) -> f32 {
         self.renderer.render_text(
             self.render_target,
             text,
@@ -61,7 +61,7 @@ impl<'a> ElementRenderer<'a> {
             self.clip_size,
             foreground_color,
             font_size * *self.interface_settings.scaling,
-        );
+        )
     }
 
     pub fn render_checkbox(&mut self, offset: Position, size: Size, color: Color, checked: bool) {

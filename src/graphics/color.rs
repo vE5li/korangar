@@ -32,6 +32,13 @@ impl Color {
         }
     }
 
+    pub fn rgb_hex(hex: &str) -> Self {
+        assert_eq!(hex.len(), 6);
+
+        let channel = |range| u8::from_str_radix(&hex[range], 16).unwrap();
+        Color::rgb(channel(0..2), channel(2..4), channel(4..6))
+    }
+
     pub const fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
         Self { red, green, blue, alpha }
     }

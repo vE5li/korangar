@@ -7,11 +7,13 @@ use procedural::*;
 
 use crate::input::UserEvent;
 use crate::interface::*;
+use crate::loaders::FontLoader;
 use crate::network::ChatMessage;
 
 #[derive(new)]
 pub struct ChatWindow {
     messages: Rc<RefCell<Vec<ChatMessage>>>,
+    font_loader: Rc<RefCell<FontLoader>>,
 }
 
 impl ChatWindow {
@@ -66,7 +68,7 @@ impl PrototypeWindow for ChatWindow {
                 .with_width(dimension!(25%))
                 .wrap(),
             cell!(ScrollView::new(
-                vec![cell!(Chat::new(self.messages.clone()))],
+                vec![cell!(Chat::new(self.messages.clone(), self.font_loader.clone()))],
                 constraint!(100%, ?)
             )),
         ];

@@ -601,7 +601,7 @@ fn main() {
                                     // that will be problematic
                                     interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
                                     interface.open_window(&mut focus_state, &CharacterOverviewWindow::new());
-                                    interface.open_window(&mut focus_state, &ChatWindow::new(chat_messages.clone()));
+                                    interface.open_window(&mut focus_state, &ChatWindow::new(chat_messages.clone(), font_loader.clone()));
 
                                     map = map_loader
                                         .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)

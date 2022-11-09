@@ -195,14 +195,12 @@ fn main() {
 
     let mut map = map_loader
         .get(
-            "pay_dun00".to_string(),
+            "geffen".to_string(),
             &mut game_file_loader,
             &mut model_loader,
             &mut texture_loader,
         )
         .expect("failed to load initial map");
-
-    // interesting: ma_zif07, ama_dun01
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -308,8 +306,12 @@ fn main() {
 
     #[cfg(feature = "debug")]
     let mut debug_camera = DebugCamera::new();
+    let mut start_camera = StartCamera::new();
     let mut player_camera = PlayerCamera::new();
     let mut directional_shadow_camera = ShadowCamera::new();
+
+    start_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
+    directional_shadow_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -815,6 +817,7 @@ fn main() {
                     directional_shadow_camera.set_focus_point(player_position);
                 }
 
+                start_camera.update(delta_time);
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
 
@@ -882,6 +885,10 @@ fn main() {
                     fence.cleanup_finished();
                 }
 
+                if entities.is_empty() {
+                    start_camera.generate_view_projection(swapchain_holder.window_size());
+                }
+
                 player_camera.generate_view_projection(swapchain_holder.window_size());
                 directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
                 #[cfg(feature = "debug")]
@@ -889,14 +896,12 @@ fn main() {
                     debug_camera.generate_view_projection(swapchain_holder.window_size());
                 }
 
-                #[cfg(feature = "debug")]
-                let current_camera: &(dyn Camera + Send + Sync) = match render_settings.use_debug_camera {
-                    true => &debug_camera,
+                let current_camera: &(dyn Camera + Send + Sync) = match entities.is_empty() {
+                    #[cfg(feature = "debug")]
+                    _ if render_settings.use_debug_camera => &debug_camera,
+                    true => &start_camera,
                     false => &player_camera,
                 };
-
-                #[cfg(not(feature = "debug"))]
-                let current_camera: &(dyn Camera + Send + Sync) = &player_camera;
 
                 let image_number = swapchain_holder.get_image_number();
                 let client_tick = game_timer.get_client_tick();

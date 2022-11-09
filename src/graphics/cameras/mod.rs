@@ -2,6 +2,7 @@
 mod debug;
 mod player;
 mod shadow;
+mod start;
 
 use cgmath::{InnerSpace, Matrix4, Vector2, Vector3, Vector4};
 
@@ -9,6 +10,7 @@ use cgmath::{InnerSpace, Matrix4, Vector2, Vector3, Vector4};
 pub use self::debug::DebugCamera;
 pub use self::player::PlayerCamera;
 pub use self::shadow::ShadowCamera;
+pub use self::start::StartCamera;
 use crate::graphics::{SmoothedValue, Transform};
 
 fn direction(vector: Vector2<f32>) -> usize {

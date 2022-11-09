@@ -1,18 +1,20 @@
 use proc_macro::TokenStream as InterfaceTokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{Attribute, DataEnum, DataStruct, Fields, Generics, Ident};
+use syn::{Attribute, DataEnum, DataStruct, Generics, Ident};
 
 use super::helper::byte_convertable_helper;
 use crate::utils::*;
 
 pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
-    let Fields::Named(named_fields) = data_struct.fields else {
-        panic!("only named fields may be derived");
-    };
-
-    let (from_bytes_implementations, implemented_fields, to_bytes_implementations) = byte_convertable_helper(named_fields);
+    let (from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) = byte_convertable_helper(data_struct);
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    let instanciate = match delimiter {
+        proc_macro2::Delimiter::Brace => quote!(Self { #(#implemented_fields),* }),
+        proc_macro2::Delimiter::Parenthesis => quote!(Self ( #(#implemented_fields),* )),
+        _ => panic!(),
+    };
 
     quote! {
         impl #impl_generics crate::loaders::ByteConvertable for #name #type_generics #where_clause {
@@ -20,7 +22,7 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
             fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Self {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
                 #(#from_bytes_implementations)*
-                Self { #(#implemented_fields),* }
+                #instanciate
             }
 
             // Temporary until serialization is always possible

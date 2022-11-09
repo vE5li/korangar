@@ -1,6 +1,6 @@
-use proc_macro2::{Group, TokenStream, TokenTree};
-use quote::quote;
-use syn::FieldsNamed;
+use proc_macro2::{Delimiter, Group, TokenStream, TokenTree};
+use quote::{format_ident, quote};
+use syn::{DataStruct, Field};
 
 use crate::utils::*;
 
@@ -31,13 +31,24 @@ fn remove_self_from_stream(token_stream: TokenStream) -> TokenStream {
     new_stream
 }
 
-pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>) {
+pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, Delimiter) {
     let mut from_bytes_implementations = vec![];
     let mut implemented_fields = vec![];
     let mut to_bytes_implementations = vec![];
 
-    for mut field in named_fields.named {
-        let field_name = field.ident.unwrap();
+    let (fields, delimiter): (Vec<Field>, _) = match data_struct.fields {
+        syn::Fields::Named(named_fields) => (named_fields.named.into_iter().collect(), Delimiter::Brace),
+        syn::Fields::Unnamed(unnamed_fields) => (unnamed_fields.unnamed.into_iter().collect(), Delimiter::Parenthesis),
+        syn::Fields::Unit => panic!("unit types are not supported"),
+    };
+
+    let mut counter: usize = 0;
+    for mut field in fields {
+        let counter_ident = format_ident!("_{}", counter);
+        let counter_index = syn::Index::from(counter);
+        let field_variable = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_ident));
+        let field_identifier = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_index));
+        counter += 1;
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
 
@@ -83,29 +94,34 @@ pub fn byte_convertable_helper(named_fields: FieldsNamed) -> (Vec<TokenStream>, 
         let from_implementation = match version_function {
             Some(function) => {
                 quote! {
-                    let #field_name = match byte_stream.get_version().#function {
+                    let #field_variable = match byte_stream.get_version().#function {
                         true => Some(#from_implementation),
                         false => None,
                     };
                 }
             }
-            None => quote!(let #field_name = #from_implementation;),
+            None => quote!(let #field_variable = #from_implementation;),
         };
 
         // base to byte implementation
         let to_implementation = match is_repeating || version_restricted {
             true => quote!(panic!("implement for to_bytes aswell")),
-            false => quote!(crate::loaders::ByteConvertable::to_bytes(&self.#field_name, #length_hint).as_slice()),
+            false => quote!(crate::loaders::ByteConvertable::to_bytes(&self.#field_identifier, #length_hint).as_slice()),
         };
 
-        implemented_fields.push(quote!(#field_name));
+        implemented_fields.push(quote!(#field_variable));
         from_bytes_implementations.push(from_implementation);
         to_bytes_implementations.push(to_implementation);
 
         if is_version {
-            from_bytes_implementations.push(quote!(byte_stream.set_version(#field_name);));
+            from_bytes_implementations.push(quote!(byte_stream.set_version(#field_variable);));
         }
     }
 
-    (from_bytes_implementations, implemented_fields, to_bytes_implementations)
+    (
+        from_bytes_implementations,
+        implemented_fields,
+        to_bytes_implementations,
+        delimiter,
+    )
 }

@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
-use quote::quote;
-use syn::{Attribute, DataStruct, Fields, LitStr};
+use quote::{quote, format_ident};
+use syn::{Attribute, DataStruct, LitStr, Field};
 
 use crate::utils::get_unique_attribute;
 
@@ -9,8 +9,10 @@ pub fn prototype_element_helper(
     mut attributes: Vec<Attribute>,
     name: String,
 ) -> (Vec<TokenStream>, TokenStream, Option<TokenStream>) {
-    let Fields::Named(named_fields) = data_struct.fields else {
-        panic!("only named fields may be derived");
+    let fields: Vec<Field> = match data_struct.fields {
+        syn::Fields::Named(named_fields) => named_fields.named.into_iter().collect(),
+        syn::Fields::Unnamed(unnamed_fields) => unnamed_fields.unnamed.into_iter().collect(),
+        syn::Fields::Unit => panic!("unit types are not supported"),
     };
 
     let window_title = get_unique_attribute(&mut attributes, "window_title")
@@ -24,19 +26,24 @@ pub fn prototype_element_helper(
 
     let mut initializers = vec![];
 
-    for mut field in named_fields.named {
+    let mut counter: usize = 0;
+    for mut field in fields {
         if get_unique_attribute(&mut field.attrs, "hidden_element").is_some() {
             continue;
         }
 
-        let field_name = field.ident.unwrap();
+        let counter_ident = format_ident!("_{}", counter);
+        let counter_index = syn::Index::from(counter);
+        let field_variable = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_ident));
+        let field_identifier = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_index));
+        counter += 1;
 
         let display_name = get_unique_attribute(&mut field.attrs, "name")
             .map(|attribute| attribute.parse_args().expect(""))
             .map(|name: LitStr| name.value())
-            .unwrap_or_else(|| str::replace(&field_name.to_string(), "_", " "));
+            .unwrap_or_else(|| str::replace(&field_variable.to_string(), "_", " "));
 
-        initializers.push(quote!(crate::interface::PrototypeElement::to_element(&self.#field_name, #display_name.to_string())));
+        initializers.push(quote!(crate::interface::PrototypeElement::to_element(&self.#field_identifier, #display_name.to_string())));
     }
 
     (initializers, window_title, window_class)

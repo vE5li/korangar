@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
-use quote::{quote, format_ident};
-use syn::{Attribute, DataStruct, LitStr, Field};
+use quote::{format_ident, quote};
+use syn::{Attribute, DataStruct, Field, LitStr};
 
 use crate::utils::get_unique_attribute;
 

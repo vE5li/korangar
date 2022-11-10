@@ -1,6 +1,5 @@
 #![allow(incomplete_features)]
 #![allow(clippy::too_many_arguments)]
-#![feature(unzip_option)]
 #![feature(option_zip)]
 #![feature(adt_const_params)]
 #![feature(arc_unwrap_or_clone)]
@@ -26,10 +25,13 @@ mod network;
 mod world;
 
 use std::cell::RefCell;
+use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use chrono::prelude::*;
+use image::io::Reader as ImageReader;
+use image::{EncodableLayout, ImageFormat};
 use procedural::debug_condition;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
@@ -40,7 +42,7 @@ use vulkano::VulkanLibrary;
 use vulkano_win::VkSurfaceBuild;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
+use winit::window::{Icon, WindowBuilder};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -97,9 +99,21 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("create window");
 
+    // TODO: move this somewhere else
+    let file_data = include_bytes!("../icon.png");
+
+    let reader = ImageReader::with_format(Cursor::new(file_data), ImageFormat::Png);
+    let image_buffer = reader.decode().unwrap().to_rgba8();
+    let image_data = image_buffer.as_bytes().to_vec();
+
+    assert_eq!(image_buffer.width(), image_buffer.height(), "icon must be square");
+    let icon = Icon::from_rgba(image_data, image_buffer.width(), image_buffer.height()).unwrap();
+    //
+
     let events_loop = EventLoop::new();
     let surface = WindowBuilder::new()
-        .with_title("korangar".to_string())
+        .with_title("Korangar".to_string())
+        .with_window_icon(Some(icon))
         .build_vk_surface(&events_loop, instance.clone())
         .unwrap();
 
@@ -653,7 +667,7 @@ fn main() {
                             if !entities.is_empty() {
                                 networking_system.request_player_move(destination)
                             }
-                        },
+                        }
                         UserEvent::RequestPlayerInteract(entity_id) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 

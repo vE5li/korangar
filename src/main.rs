@@ -649,7 +649,11 @@ fn main() {
                         UserEvent::SwitchCharacterSlot(destination_slot) => {
                             interface.handle_result(&mut focus_state, networking_system.switch_character_slot(destination_slot))
                         }
-                        UserEvent::RequestPlayerMove(destination) => networking_system.request_player_move(destination),
+                        UserEvent::RequestPlayerMove(destination) => {
+                            if !entities.is_empty() {
+                                networking_system.request_player_move(destination)
+                            }
+                        },
                         UserEvent::RequestPlayerInteract(entity_id) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 

@@ -77,7 +77,7 @@ pub struct NodeData {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PrototypeElement)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelString {
     pub inner: String,
 }
@@ -95,6 +95,12 @@ impl ByteConvertable for ModelString {
         };
 
         Self { inner }
+    }
+}
+
+impl crate::interface::PrototypeElement for ModelString {
+    fn to_element(&self, display: String) -> crate::interface::ElementCell {
+        self.inner.to_element(display)
     }
 }
 

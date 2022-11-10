@@ -67,7 +67,7 @@ impl Element for Expandable {
             )
             .finalize();
 
-        let (mut size, position) = match self.expanded && !self.state.elements.is_empty()  {
+        let (mut size, position) = match self.expanded && !self.state.elements.is_empty() {
             true => placement_resolver.allocate(&self.open_size_constraint),
             false => placement_resolver.allocate(&self.closed_size_constraint),
         };
@@ -108,7 +108,7 @@ impl Element for Expandable {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        if !self.expanded || self.state.elements.is_empty()  {
+        if !self.expanded || self.state.elements.is_empty() {
             return None;
         }
 
@@ -123,7 +123,7 @@ impl Element for Expandable {
             && absolute_position.x <= self.state.state.cached_size.x
             && absolute_position.y <= self.state.state.cached_size.y
         {
-            if self.expanded && !self.state.elements.is_empty()  {
+            if self.expanded && !self.state.elements.is_empty() {
                 for element in &self.state.elements {
                     match element.borrow().hovered_element(absolute_position, mouse_mode) {
                         HoverInformation::Hovered => return HoverInformation::Element(element.clone()),
@@ -192,7 +192,7 @@ impl Element for Expandable {
             *theme.expandable.font_size,
         );
 
-        if self.expanded && !self.state.elements.is_empty()  {
+        if self.expanded && !self.state.elements.is_empty() {
             self.state.render(
                 &mut renderer,
                 state_provider,

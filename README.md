@@ -12,11 +12,11 @@ Korangar is a Ragnarok Online client written in Rust using Vulkan. It features r
 ##### Screenshot of the current state
 ![geffen](.github/geffen.png)
 
-#### Running
+### Running
 If you want to try it out for yourself, check out the [Installation page](https://github.com/vE5li/korangar/wiki/Installation) inside the wiki.
 
-#### Updates
+### Updates
 I created a [Discord server](https://discord.gg/2CqRZsvKja) where I regularly post updates about the progress of development and answer any questions you might have.
 
-#### Contributing
+### Contributing
 If you want to contribute to this project, please read [this page](https://github.com/vE5li/korangar/wiki/Contributing).

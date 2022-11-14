@@ -419,7 +419,7 @@ fn main() {
                 event: WindowEvent::ReceivedCharacter(character),
                 ..
             } => input_system.buffer_character(character),
-            Event::RedrawEventsCleared => {
+            Event::MainEventsCleared => {
                 input_system.update_delta();
 
                 let delta_time = game_timer.update();

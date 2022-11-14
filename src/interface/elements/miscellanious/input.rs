@@ -70,7 +70,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
 
     fn input_character(&mut self, character: char) -> Option<ClickAction> {
         match character {
-            '\u{8}' => self.remove_character(),
+            '\u{8}' | '\u{7f}' => self.remove_character(),
             '\r' => (self.action)(),
             character => self.add_character(character),
         }

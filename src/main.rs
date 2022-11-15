@@ -29,7 +29,6 @@ use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use chrono::prelude::*;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
 use procedural::debug_condition;
@@ -347,13 +346,6 @@ fn main() {
     let mut entities = Vec::<Entity>::new();
     let mut player_inventory = Inventory::default();
 
-    // move
-    const TIME_FACTOR: f32 = 1000.0;
-    let local: DateTime<Local> = Local::now();
-    let mut day_timer = (local.hour() as f32 / TIME_FACTOR * 60.0 * 60.0) + (local.minute() as f32 / TIME_FACTOR * 60.0);
-    let mut animation_timer = 0.0;
-    //
-
     let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220));
     let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
 
@@ -423,10 +415,9 @@ fn main() {
                 input_system.update_delta();
 
                 let delta_time = game_timer.update();
+                let day_timer = game_timer.get_day_timer();
+                let animation_timer = game_timer.get_animation_timer();
                 let client_tick = game_timer.get_client_tick();
-
-                day_timer += delta_time as f32 / TIME_FACTOR;
-                animation_timer += delta_time as f32;
 
                 networking_system.keep_alive(delta_time, client_tick);
 
@@ -725,13 +716,13 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenTimeWindow => interface.open_window(&mut focus_state, &TimeWindow::default()),
                         #[cfg(feature = "debug")]
-                        UserEvent::SetDawn => day_timer = 0.0,
+                        UserEvent::SetDawn => game_timer.set_day_timer(0.0),
                         #[cfg(feature = "debug")]
-                        UserEvent::SetNoon => day_timer = std::f32::consts::FRAC_PI_2,
+                        UserEvent::SetNoon => game_timer.set_day_timer(std::f32::consts::FRAC_PI_2),
                         #[cfg(feature = "debug")]
-                        UserEvent::SetDusk => day_timer = std::f32::consts::PI,
+                        UserEvent::SetDusk => game_timer.set_day_timer(std::f32::consts::PI),
                         #[cfg(feature = "debug")]
-                        UserEvent::SetMidnight => day_timer = -std::f32::consts::FRAC_PI_2,
+                        UserEvent::SetMidnight => game_timer.set_day_timer(-std::f32::consts::FRAC_PI_2),
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(&mut focus_state),
                         #[cfg(feature = "debug")]

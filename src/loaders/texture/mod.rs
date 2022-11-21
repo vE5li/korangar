@@ -47,9 +47,10 @@ impl TextureLoader {
             .to_rgba8();
 
         if image_format == ImageFormat::Bmp {
+            // These numbers are taken from https://github.com/Duckwhale/RagnarokFileFormats
             image_buffer
                 .pixels_mut()
-                .filter(|pixel| pixel.0[0] == 255 && pixel.0[1] == 0 && pixel.0[2] == 255)
+                .filter(|pixel| pixel.0[0] > 0xf0 && pixel.0[1] < 0x10 && pixel.0[2] > 0x0f)
                 .for_each(|pixel| *pixel = Rgba([0; 4]));
         }
 

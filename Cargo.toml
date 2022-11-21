@@ -8,10 +8,9 @@ procedural = { path = "procedural" }
 rayon = "1.5.3"
 rand = "0.8.5"
 derive-new = "0.5"
-# Temporarily use GitHub as source until https://github.com/vulkano-rs/vulkano/pull/2075 is in a new release
-vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "1d14f01" }
-vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "1d14f01" }
-vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "1d14f01" }
+vulkano = "0.32.1"
+vulkano-shaders = "0.32.0"
+vulkano-win = "0.32.0"
 bytemuck = { version = "1.7", features = ["derive", "extern_crate_std", "min_const_generics"] }
 winit = "0.27"
 num = "*"

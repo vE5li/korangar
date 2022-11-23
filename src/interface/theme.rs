@@ -178,8 +178,8 @@ impl Default for CloseButtonTheme {
             background_color: Mutable::new(Color::rgb(200, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(200, 140, 100)),
             foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
-            border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(6.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            border_radius: MutableRange::new(Vector4::from_value(1.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
+            text_offset: MutableRange::new(Vector2::new(9.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
             font_size: MutableRange::new(12.0, 6.0, 30.0),
             size_constraint: constraint!(25, 12),
         }

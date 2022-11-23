@@ -46,6 +46,7 @@ impl CharacterPreview {
                 Button::default()
                     .with_static_text("switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
+                    .with_background_color(|_| Color::rgb(161, 141, 141))
                     .with_width(dimension!(50%))
                     .wrap(),
                 Button::default()

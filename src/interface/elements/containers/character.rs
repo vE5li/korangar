@@ -25,12 +25,12 @@ impl CharacterPreview {
                 false => "switch",
             };
 
-            return vec![cell!(Text::new(
-                text.to_string(),
-                Color::rgb(200, 140, 180),
-                14.0,
-                constraint!(100%, 14)
-            ))];
+            return vec![
+                Text::default()
+                    .with_dynamic_text(text.to_owned())
+                    .with_foreground_color(|_| Color::rgb(200, 140, 180))
+                    .wrap(),
+            ];
         }
 
         let characters = characters.borrow();
@@ -38,12 +38,11 @@ impl CharacterPreview {
 
         if let Some(character_information) = character_information {
             return vec![
-                cell!(Text::new(
-                    character_information.name.clone(),
-                    Color::rgb(220, 210, 210),
-                    18.0,
-                    constraint!(100%, 18)
-                )), // alignment!(center, top)
+                Text::default()
+                    .with_dynamic_text(character_information.name.clone())
+                    .with_foreground_color(|_| Color::rgb(220, 210, 210))
+                    .with_font_size(|_| 18.0)
+                    .wrap(),
                 Button::default()
                     .with_static_text("switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
@@ -59,12 +58,12 @@ impl CharacterPreview {
             ];
         }
 
-        vec![cell!(Text::new(
-            "new character".to_string(),
-            Color::rgb(200, 140, 180),
-            14.0,
-            constraint!(100%, 14)
-        ))]
+        vec![
+            Text::default()
+                .with_static_text("new character")
+                .with_foreground_color(|_| Color::rgb(200, 140, 180))
+                .wrap(),
+        ]
     }
 
     pub fn new(characters: Remote<Vec<CharacterInformation>>, move_request: Remote<Option<usize>>, slot: usize) -> Self {

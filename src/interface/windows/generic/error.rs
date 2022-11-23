@@ -11,12 +11,12 @@ pub struct ErrorWindow {
 
 impl PrototypeWindow for ErrorWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements: Vec<ElementCell> = vec![cell!(Text::new(
-            self.message.clone(),
-            Color::rgb(220, 100, 100),
-            14.0,
-            constraint!(100%, 14)
-        ))];
+        let elements: Vec<ElementCell> = vec![
+            Text::default()
+                .with_dynamic_text(self.message.clone())
+                .with_foreground_color(|_| Color::rgb(220, 100, 100))
+                .wrap(),
+        ];
 
         WindowBuilder::default()
             .with_title("Error".to_string())

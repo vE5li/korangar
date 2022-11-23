@@ -38,12 +38,11 @@ impl EquipmentContainer {
                 .map(|index| {
                     let slot = SLOT_POSITIONS[index];
 
-                    let text = cell!(Text::new(
-                        slot.display_name().to_string(),
-                        Color::monochrome(200),
-                        14.0,
-                        constraint!(!, 14)
-                    ));
+                    let text = Text::default()
+                        .with_dynamic_text(slot.display_name().to_string())
+                        .with_foreground_color(|_| Color::monochrome(200))
+                        .with_width(dimension!(!))
+                        .wrap();
 
                     let item = items.iter().find(|item| item.equipped_position == slot).cloned();
 

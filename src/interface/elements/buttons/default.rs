@@ -8,6 +8,7 @@ use crate::interface::{Element, *};
 // TODO: move this
 pub type Selector = Box<dyn Fn() -> bool>;
 pub type ColorSelector = Box<dyn Fn(&Theme) -> Color>;
+pub type FontSizeSelector = Box<dyn Fn(&Theme) -> f32>;
 
 #[derive(Default)]
 pub struct Button {

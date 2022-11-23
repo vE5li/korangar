@@ -4,13 +4,13 @@ mod drag;
 mod state;
 
 pub use self::close::CloseButton;
-pub use self::default::{Button, ColorSelector};
+pub use self::default::{Button, ColorSelector, FontSizeSelector};
 pub use self::drag::DragButton;
 pub use self::state::StateButton;
 use crate::input::UserEvent;
 use crate::interface::ClickAction;
 
-enum ElementText {
+pub enum ElementText {
     Static(&'static str),
     Dynamic(String),
 }

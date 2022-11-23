@@ -25,7 +25,10 @@ pub struct DialogContainer {
 impl DialogContainer {
     fn to_element(dialog_element: &DialogElement, npc_id: EntityId) -> ElementCell {
         match dialog_element {
-            DialogElement::Text(text) => cell!(Text::new(text.clone(), Color::monochrome(255), 14.0, constraint!(100%, 14))),
+            DialogElement::Text(text) => Text::default()
+                .with_dynamic_text(text.clone())
+                .with_foreground_color(|_| Color::monochrome(255))
+                .wrap(),
             DialogElement::NextButton => Button::default()
                 .with_static_text("next")
                 .with_event(UserEvent::NextDialog(npc_id))

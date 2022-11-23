@@ -94,6 +94,7 @@ where
     T: Default,
 {
     pub fn take(&mut self) -> Option<T> {
+        self.update();
         self.0.borrow_mut().0.take()
     }
 }

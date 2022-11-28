@@ -1,4 +1,4 @@
-#[cfg(any(target_os = "windows", feature = "plain"))]
+#[cfg(feature = "plain")]
 mod colors {
     pub const GREEN: &str = "";
     pub const RED: &str = "";
@@ -8,7 +8,7 @@ mod colors {
     pub const NONE: &str = "";
 }
 
-#[cfg(not(any(target_os = "windows", feature = "plain")))]
+#[cfg(not(feature = "plain"))]
 mod colors {
     pub const GREEN: &str = "\x1B[32m";
     pub const RED: &str = "\x1B[31m";

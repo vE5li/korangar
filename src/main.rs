@@ -497,8 +497,9 @@ fn main() {
                             // cursor always look correct.
                             interface.set_start_time(game_timer.get_client_tick());
                         }
-                        NetworkEvent::UpdateClientTick(client_tick) => {
-                            game_timer.set_client_tick(client_tick);
+                        NetworkEvent::UpdateClientTick(_) => {
+                            // Ignored for now since server tick doesn't affect
+                            // client tick
                         }
                         NetworkEvent::ChatMessage(message) => {
                             chat_messages.borrow_mut().push(message);

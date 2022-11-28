@@ -79,9 +79,7 @@ pub enum NetworkEvent {
     EntityMove(EntityId, Vector2<usize>, Vector2<usize>, ClientTick),
     /// Player was moved to a new position on a different map or the current map
     ChangeMap(String, Vector2<usize>),
-    /// Update the client side [tick
-    /// counter](crate::system::GameTimer::client_tick) to keep server and
-    /// client synchronized
+    /// Tick message from server
     UpdateClientTick(ClientTick),
     /// New chat message for the client
     ChatMessage(ChatMessage),

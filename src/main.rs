@@ -498,8 +498,8 @@ fn main() {
                             interface.set_start_time(game_timer.get_client_tick());
                         }
                         NetworkEvent::UpdateClientTick(_) => {
-                            // Ignored for now since server tick doesn't affect
-                            // client tick
+                            // Ignored for now since client tick shouldn't be
+                            // updated based on server tick
                         }
                         NetworkEvent::ChatMessage(message) => {
                             chat_messages.borrow_mut().push(message);

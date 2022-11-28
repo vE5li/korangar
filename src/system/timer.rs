@@ -71,7 +71,7 @@ impl GameTimer {
             self.frame_counter = 0;
         }
 
-        self.client_tick.0 += (delta_time * 1075.0) as u32;
+        self.client_tick.0 += (delta_time * 1000.0) as u32;
 
         delta_time
     }
@@ -90,7 +90,7 @@ mod test {
     fn update_increments_client_tick() {
         let mut game_timer = GameTimer::new();
         let elapsed = game_timer.update();
-        assert_eq!(game_timer.client_tick.0, (elapsed * 1075.0) as u32);
+        assert_eq!(game_timer.client_tick.0, (elapsed * 1000.0) as u32);
     }
 
     #[test]

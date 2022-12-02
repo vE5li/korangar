@@ -2476,7 +2476,7 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
                     let chat_message = ChatMessage::new(packet.message, packet.color.into());
                     events.push(NetworkEvent::ChatMessage(chat_message));
-                } else if let Ok(_packet) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) {
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::EntityMove(
@@ -2485,7 +2485,7 @@ impl NetworkingSystem {
                         destination,
                         packet.timestamp,
                     ));
-                } else if let Ok(_packet) = EntityStopMovePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = EntityStopMovePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = PlayerMovePacket::try_from_bytes(&mut byte_stream) {
                     let (origin, destination) = packet.from_to.to_vectors();
                     events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
@@ -2508,13 +2508,13 @@ impl NetworkingSystem {
                     events.push(NetworkEvent::UpdateStatus(packet.status_type));
                 } else if let Ok(packet) = UpdateStatusPacket3::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateStatus(packet.status_type));
-                } else if let Ok(_packet) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = AchievementListPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = InventoyStartPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = UpdateAttackRangePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = NewMailStatusPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = AchievementListPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = SpriteChangePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = InventoyStartPacket::try_from_bytes(&mut byte_stream) {
                     let mut item_data = Vec::new();
 
                     while InventoyEndPacket::try_from_bytes(&mut byte_stream).is_err() {
@@ -2542,19 +2542,19 @@ impl NetworkingSystem {
                     }
 
                     events.push(NetworkEvent::Inventory(item_data));
-                } else if let Ok(_packet) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = MapTypePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = InitialStatusPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = UpdatePartyInvitationStatePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = UpdateShowEquipPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = UpdateConfigurationPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = NavigateToMonsterPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = MarkMinimapPositionPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = NextButtonPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = MapTypePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = InitialStatusPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = UpdatePartyInvitationStatePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = UpdateShowEquipPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = UpdateConfigurationPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = NavigateToMonsterPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = MarkMinimapPositionPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = NextButtonPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddNextButton);
-                } else if let Ok(_packet) = CloseButtonPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = CloseButtonPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddCloseButton);
                 } else if let Ok(packet) = DialogMenuPacket::try_from_bytes(&mut byte_stream) {
                     let choices = packet
@@ -2565,18 +2565,18 @@ impl NetworkingSystem {
                         .collect();
 
                     events.push(NetworkEvent::AddChoiceButtons(choices));
-                } else if let Ok(_packet) = DisplaySpecialEffectPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = DisplaySkillEffectPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = StatusChangePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = QuestNotificationPacket1::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = HuntingQuestNotificationPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = HuntingQuestUpdateObjectivePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = QuestRemovedPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = QuestListPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = VisualEffectPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = DisplayGainedExperiencePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = DisplayImagePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_packet) = StateChangePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplaySpecialEffectPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplaySkillEffectPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = StatusChangePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = QuestNotificationPacket1::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = HuntingQuestNotificationPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = HuntingQuestUpdateObjectivePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = QuestRemovedPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = QuestListPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = VisualEffectPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplayGainedExperiencePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplayImagePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = StateChangePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = QuestEffectPacket::try_from_bytes(&mut byte_stream) {
                     let event = match packet.effect {
                         QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
@@ -2590,7 +2590,7 @@ impl NetworkingSystem {
                         packet.equip_position,
                         EquipPosition::None,
                     ));
-                } else if let Ok(_packet) = RemoveItemFromInventoryPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = RemoveItemFromInventoryPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = ServerTickPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
                 } else if let Ok(packet) = RequestPlayerDetailsSuccessPacket::try_from_bytes(&mut byte_stream) {
@@ -2603,7 +2603,7 @@ impl NetworkingSystem {
                         packet.health_points as usize,
                         packet.maximum_health_points as usize,
                     ));
-                } else if let Ok(_packet) = RequestPlayerAttackFailedPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = RequestPlayerAttackFailedPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = DamagePacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::DamageEffect(
                         packet.destination_entity_id,

@@ -1,10 +1,8 @@
 mod login;
 
-use std::cell::RefCell;
 use std::fmt::Debug;
 use std::io::prelude::*;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
-use std::rc::Rc;
 use std::time::Duration;
 
 use cgmath::Vector2;
@@ -356,8 +354,6 @@ struct CharacterSelectionFailedPacket {
 #[header(0xc5, 0x0a)]
 struct CharacterSelectionSuccessPacket {
     pub character_id: CharacterId,
-    /// Ignored by Korangar, since the players current map will be taken from
-    /// the [ChangeMapPacket].
     #[length_hint(16)]
     pub map_name: String,
     pub map_server_ip: Ipv4Addr,
@@ -2307,11 +2303,7 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn select_character(
-        &mut self,
-        slot: usize,
-        chat_messages: &Rc<RefCell<Vec<ChatMessage>>>,
-    ) -> Result<(String, Vector2<usize>, CharacterInformation, ClientTick), String> {
+    pub fn select_character(&mut self, slot: usize) -> Result<(CharacterInformation, String), String> {
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
         let response = self.get_data_from_character_server();
@@ -2355,26 +2347,6 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
-        let response = self.get_data_from_map_server();
-        let mut byte_stream = ByteStream::new(&response);
-
-        let _packet8302 = Packet8302::try_from_bytes(&mut byte_stream).unwrap();
-
-        #[cfg(feature = "debug_network")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
-
-        let response = self.get_data_from_map_server();
-        let mut byte_stream = ByteStream::new(&response);
-
-        let _packet_180b = Packet180b::try_from_bytes(&mut byte_stream).unwrap();
-        let map_server_login_success_packet = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
-
-        let mut chat_messages = chat_messages.borrow_mut();
-        while let Ok(server_message_packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
-            chat_messages.push(ChatMessage::new(server_message_packet.message, Color::rgb(230, 230, 200)));
-        }
-
-        let change_map_packet = ChangeMapPacket::try_from_bytes(&mut byte_stream).unwrap();
         let character_information = self
             .characters
             .borrow()
@@ -2385,14 +2357,9 @@ impl NetworkingSystem {
 
         self.player_name = character_information.name.clone();
 
-        #[cfg(feature = "debug_network")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
-
         Ok((
-            change_map_packet.map_name.replace(".gat", ""),
-            Vector2::new(change_map_packet.x as usize, change_map_packet.y as usize),
             character_information,
-            map_server_login_success_packet.client_tick,
+            character_selection_success_packet.map_name.replace(".gat", "").to_string(),
         ))
     }
 
@@ -2658,6 +2625,10 @@ impl NetworkingSystem {
                             equipped_position: EquipPosition::None,
                         });
                     }
+                } else if let Ok(_) = Packet8302::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = Packet180b::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::UpdateClientTick(packet.client_tick))
                 } else {
                     #[cfg(feature = "debug_network")]
                     {

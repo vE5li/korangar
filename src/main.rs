@@ -29,6 +29,7 @@ use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use cgmath::Vector2;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
 use procedural::debug_condition;
@@ -600,14 +601,8 @@ fn main() {
                         UserEvent::ReloadTheme => interface.reload_theme(),
                         UserEvent::SaveTheme => interface.save_theme(),
                         UserEvent::SelectCharacter(character_slot) => {
-                            match networking_system.select_character(character_slot, &chat_messages) {
-                                Ok((map_name, player_position, character_information, client_tick)) => {
-                                    // TODO: this will do one unnecessary restore_focus. check if
-                                    // that will be problematic
-                                    interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
-                                    interface.open_window(&mut focus_state, &CharacterOverviewWindow::new());
-                                    interface.open_window(&mut focus_state, &ChatWindow::new(chat_messages.clone(), font_loader.clone()));
-
+                            match networking_system.select_character(character_slot) {
+                                Ok((character_information, map_name)) => {
                                     map = map_loader
                                         .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
                                         .unwrap();
@@ -619,13 +614,19 @@ fn main() {
                                         &script_loader,
                                         &map,
                                         character_information,
-                                        player_position,
+                                        Vector2::new(0, 0),
                                         client_tick,
                                     );
                                     let player = Entity::Player(player);
 
                                     player_camera.set_focus_point(player.get_position());
                                     entities.push(player);
+
+                                    // TODO: this will do one unnecessary restore_focus. check if
+                                    // that will be problematic
+                                    interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
+                                    interface.open_window(&mut focus_state, &CharacterOverviewWindow::new());
+                                    interface.open_window(&mut focus_state, &ChatWindow::new(chat_messages.clone(), font_loader.clone()));
 
                                     particle_holder.clear();
                                     networking_system.map_loaded();

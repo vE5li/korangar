@@ -29,7 +29,7 @@ use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::Vector2;
+use cgmath::{Vector2, Zero};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
 use procedural::debug_condition;
@@ -614,7 +614,7 @@ fn main() {
                                         &script_loader,
                                         &map,
                                         character_information,
-                                        Vector2::new(0, 0),
+                                        Vector2::zero(),
                                         client_tick,
                                     );
                                     let player = Entity::Player(player);

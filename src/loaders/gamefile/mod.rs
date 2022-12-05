@@ -236,7 +236,7 @@ impl GameFileLoader {
         let settings = Settings::default();
 
         #[cfg(feature = "debug")]
-        let total = lua_files.len();
+        let mut total = lua_files.len();
         #[cfg(feature = "debug")]
         let mut failed_count = 0;
 
@@ -248,7 +248,7 @@ impl GameFileLoader {
                 Ok(bytes) => lua_archive.add_file(file_name, bytes),
                 // If the operation fails the file with this error, the Lua file is not actually a
                 // pre-compiled binary but rather a source file, so we can safely ignore it.
-                Err(LunifyError::IncorrectSignature) => {}
+                Err(LunifyError::IncorrectSignature) => total -= 1,
                 Err(error) => {
                     #[cfg(feature = "debug")]
                     {
@@ -267,7 +267,7 @@ impl GameFileLoader {
 
         #[cfg(feature = "debug")]
         print_debug!(
-            "converted a total of {}{total}{} of which {}{failed_count}{} failed.",
+            "converted a total of {}{total}{} files of which {}{failed_count}{} failed.",
             YELLOW,
             NONE,
             RED,

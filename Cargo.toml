@@ -25,7 +25,7 @@ chrono = "0.4"
 lazy_static = { version = "1.4.0", optional = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
-lunify = "0.1.1"
+lunify = "1.0.0"
 
 [features]
 local = []

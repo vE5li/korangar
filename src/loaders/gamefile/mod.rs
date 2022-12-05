@@ -224,7 +224,7 @@ impl GameFileLoader {
     }
 
     pub fn patch(&mut self) {
-        use lunify::{unify, Format};
+        use lunify::{unify, Format, LunifyError, Settings};
 
         if Path::new("lua_files.grf").exists() {
             return;
@@ -233,17 +233,46 @@ impl GameFileLoader {
         let lua_files: Vec<String> = self.lua_files.drain(..).collect();
         let mut lua_archive = GameArchive::default();
         let bytecode_format = Format::default();
+        let settings = Settings::default();
+
+        #[cfg(feature = "debug")]
+        let total = lua_files.len();
+        #[cfg(feature = "debug")]
+        let mut failed_count = 0;
 
         for file_name in lua_files {
             let bytes = self.get(&file_name).unwrap();
 
-            // Try to unify all bytecode to Lua 5.1 and possibly 64 bit, If the operation
-            // fails the file might not actually be bytecode but rather source
-            // code so don't add it.
-            if let Ok(bytes) = unify(&bytes, bytecode_format) {
-                lua_archive.add_file(file_name, bytes);
+            // Try to unify all bytecode to Lua 5.1 and possibly 64 bit.
+            match unify(&bytes, &bytecode_format, &settings) {
+                Ok(bytes) => lua_archive.add_file(file_name, bytes),
+                // If the operation fails the file with this error, the Lua file is not actually a
+                // pre-compiled binary but rather a source file, so we can safely ignore it.
+                Err(LunifyError::IncorrectSignature) => {}
+                Err(error) => {
+                    #[cfg(feature = "debug")]
+                    {
+                        print_debug!(
+                            "[{}warning{}] error upcasting {}{file_name}{}: {error:?}",
+                            YELLOW,
+                            NONE,
+                            MAGENTA,
+                            NONE
+                        );
+                        failed_count += 1;
+                    }
+                }
             }
         }
+
+        #[cfg(feature = "debug")]
+        print_debug!(
+            "converted a total of {}{total}{} of which {}{failed_count}{} failed.",
+            YELLOW,
+            NONE,
+            RED,
+            NONE
+        );
 
         lua_archive.save("lua_files.grf");
     }

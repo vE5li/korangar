@@ -1,5 +1,5 @@
-pub mod resource;
 pub mod map_data;
+pub mod resource;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -9,9 +9,8 @@ use derive_new::new;
 use procedural::*;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 
-use self::resource::ResourceType;
 use self::map_data::*;
-
+use self::resource::ResourceType;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Color, MemoryAllocator, ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, Transform, WaterVertex};
@@ -89,6 +88,11 @@ impl MapLoader {
 
         let mut map_data = parse_map_data(&resource_file, model_loader, game_file_loader, texture_loader)?;
 
+        //replace with attribute
+        let water_settings = &mut map_data.water_settings;
+        water_settings.water_level = Some(-water_settings.water_level.unwrap());
+        let water_level = water_settings.water_level.unwrap();
+
         let ground_data = parse_ground_data(map_data.ground_file, game_file_loader)?;
 
         let mut gat_data = parse_gat_data(map_data.gat_file.unwrap(), game_file_loader)?;
@@ -104,94 +108,95 @@ impl MapLoader {
         let mut tile_picker_vertices = Vec::new();
 
         //gat_data.tiles.iter_mut().for_each(|tile| {
-        let count = 0;
+        let mut count = 0;
         for y in 0..gat_data.map_height {
             for x in 0..gat_data.map_width {
                 let mut tile = &mut gat_data.tiles[count];
+                //replace with attribute
                 tile.upper_left_height = -tile.upper_left_height;
                 tile.upper_right_height = -tile.upper_right_height;
                 tile.lower_left_height = -tile.lower_left_height;
                 tile.lower_right_height = -tile.lower_right_height;
+                count += 1;
 
-            if tile.tile_type.is_none() {
-                continue;
-            }
+                if tile.tile_type.is_none() {
+                    continue;
+                }
 
-            let offset = Vector2::new(x as f32 * 5.0, y as f32 * 5.0);
+                let offset = Vector2::new(x as f32 * 5.0, y as f32 * 5.0);
 
-            let first_position = Vector3::new(offset.x, tile.upper_left_height + 1.0, offset.y);
-            let second_position = Vector3::new(offset.x + 5.0, tile.upper_right_height + 1.0, offset.y);
-            let third_position = Vector3::new(offset.x + 5.0, tile.lower_right_height + 1.0, offset.y + 5.0);
-            let fourth_position = Vector3::new(offset.x, tile.lower_left_height + 1.0, offset.y + 5.0);
+                let first_position = Vector3::new(offset.x, tile.upper_left_height + 1.0, offset.y);
+                let second_position = Vector3::new(offset.x + 5.0, tile.upper_right_height + 1.0, offset.y);
+                let third_position = Vector3::new(offset.x + 5.0, tile.lower_right_height + 1.0, offset.y + 5.0);
+                let fourth_position = Vector3::new(offset.x, tile.lower_left_height + 1.0, offset.y + 5.0);
 
-            let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
-            let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
+                let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
+                let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
-            let first_texture_coordinates = Vector2::new(0.0, 0.0);
-            let second_texture_coordinates = Vector2::new(0.0, 1.0);
-            let third_texture_coordinates = Vector2::new(1.0, 1.0);
-            let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
+                let first_texture_coordinates = Vector2::new(0.0, 0.0);
+                let second_texture_coordinates = Vector2::new(0.0, 1.0);
+                let third_texture_coordinates = Vector2::new(1.0, 1.0);
+                let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
 
-            let tile_type_index = tile.tile_type.0 as i32;
+                let tile_type_index = tile.tile_type.0 as i32;
 
-            tile_vertices.push(ModelVertex::new(
-                first_position,
-                first_normal,
-                first_texture_coordinates,
-                tile_type_index,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                second_position,
-                first_normal,
-                second_texture_coordinates,
-                tile_type_index,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                third_position,
-                first_normal,
-                third_texture_coordinates,
-                tile_type_index,
-                0.0,
-            ));
+                tile_vertices.push(ModelVertex::new(
+                    first_position,
+                    first_normal,
+                    first_texture_coordinates,
+                    tile_type_index,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    second_position,
+                    first_normal,
+                    second_texture_coordinates,
+                    tile_type_index,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    third_position,
+                    first_normal,
+                    third_texture_coordinates,
+                    tile_type_index,
+                    0.0,
+                ));
 
-            tile_vertices.push(ModelVertex::new(
-                first_position,
-                second_normal,
-                first_texture_coordinates,
-                tile_type_index,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                third_position,
-                second_normal,
-                third_texture_coordinates,
-                tile_type_index,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                fourth_position,
-                second_normal,
-                fourth_texture_coordinates,
-                tile_type_index,
-                0.0,
-            ));
+                tile_vertices.push(ModelVertex::new(
+                    first_position,
+                    second_normal,
+                    first_texture_coordinates,
+                    tile_type_index,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    third_position,
+                    second_normal,
+                    third_texture_coordinates,
+                    tile_type_index,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    fourth_position,
+                    second_normal,
+                    fourth_texture_coordinates,
+                    tile_type_index,
+                    0.0,
+                ));
 
-            let first_position = Vector3::new(offset.x, tile.upper_left_height, offset.y);
-            let second_position = Vector3::new(offset.x + 5.0, tile.upper_right_height, offset.y);
-            let third_position = Vector3::new(offset.x + 5.0, tile.lower_right_height, offset.y + 5.0);
-            let fourth_position = Vector3::new(offset.x, tile.lower_left_height, offset.y + 5.0);
+                let first_position = Vector3::new(offset.x, tile.upper_left_height, offset.y);
+                let second_position = Vector3::new(offset.x + 5.0, tile.upper_right_height, offset.y);
+                let third_position = Vector3::new(offset.x + 5.0, tile.lower_right_height, offset.y + 5.0);
+                let fourth_position = Vector3::new(offset.x, tile.lower_left_height, offset.y + 5.0);
 
-            let color = PickerTarget::Tile(x as u16, y as u16).into();
-            tile_picker_vertices.push(TileVertex::new(first_position, color));
-            tile_picker_vertices.push(TileVertex::new(second_position, color));
-            tile_picker_vertices.push(TileVertex::new(third_position, color));
+                let color = PickerTarget::Tile(x as u16, y as u16).into();
+                tile_picker_vertices.push(TileVertex::new(first_position, color));
+                tile_picker_vertices.push(TileVertex::new(second_position, color));
+                tile_picker_vertices.push(TileVertex::new(third_position, color));
 
-            tile_picker_vertices.push(TileVertex::new(first_position, color));
-            tile_picker_vertices.push(TileVertex::new(third_position, color));
-            tile_picker_vertices.push(TileVertex::new(fourth_position, color));
-
+                tile_picker_vertices.push(TileVertex::new(first_position, color));
+                tile_picker_vertices.push(TileVertex::new(third_position, color));
+                tile_picker_vertices.push(TileVertex::new(fourth_position, color));
             }
         }
 
@@ -332,9 +337,6 @@ impl MapLoader {
                         ));
                     }
                 }
-
-                // negative because
-                let water_level = -map_data.water_settings.water_level.unwrap();
 
                 if -current_tile.get_lowest_point() < water_level {
                     let first_position = Vector3::new(x as f32 * TILE_SIZE, water_level, y as f32 * TILE_SIZE);

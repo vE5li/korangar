@@ -69,35 +69,65 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
 }
 //
 
-#[derive(Debug, PrototypeElement, new)]
+// #[derive(Debug, PrototypeElement, new)]
+// pub struct WaterSettings {
+//     #[new(value = "0.0")]
+//     pub water_level: f32,
+//     #[new(value = "0")]
+//     pub water_type: usize,
+//     #[new(value = "0.0")]
+//     pub wave_height: f32,
+//     #[new(value = "0.0")]
+//     pub wave_speed: f32,
+//     #[new(value = "0.0")]
+//     pub wave_pitch: f32,
+//     #[new(value = "0")]
+//     pub water_animation_speed: usize,
+// }
+
+#[derive(ByteConvertable, PrototypeElement)]
 pub struct WaterSettings {
-    #[new(value = "0.0")]
-    pub water_level: f32,
-    #[new(value = "0")]
-    pub water_type: usize,
-    #[new(value = "0.0")]
-    pub wave_height: f32,
-    #[new(value = "0.0")]
-    pub wave_speed: f32,
-    #[new(value = "0.0")]
-    pub wave_pitch: f32,
-    #[new(value = "0")]
-    pub water_animation_speed: usize,
+    #[version_equals_or_above(1, 4)]
+    pub water_level: Option<f32>,
+    #[version_equals_or_above(1, 8)]
+    pub water_type: Option<i32>,
+    #[version_equals_or_above(1, 8)]
+    pub wave_height: Option<f32>,
+    #[version_equals_or_above(1, 8)]
+    pub wave_speed: Option<f32>,
+    //#[version_equals_or_above(1, 8)]
+    pub wave_pitch: f32, //Option<f32>,
+    #[version_equals_or_above(1, 9)]
+    pub water_animation_speed: Option<i32>,
 }
 
-#[derive(Debug, PrototypeElement, new)]
+#[derive(ByteConvertable, PrototypeElement)]
 pub struct LightSettings {
-    #[new(value = "0")]
-    pub light_longitude: isize,
-    #[new(value = "0")]
-    pub light_latitude: isize,
-    #[new(value = "Color::monochrome(255)")]
-    pub diffuse_color: Color,
-    #[new(value = "Color::monochrome(255)")]
-    pub ambient_color: Color,
-    #[new(value = "1.0")]
+    #[version_equals_or_above(1, 5)]
+    pub light_longitude: Option<i32>,
+    #[version_equals_or_above(1, 5)]
+    pub light_latitude: Option<i32>,
+    #[version_equals_or_above(1, 5)]
+    pub diffuse_color: Option<Color>,
+    #[version_equals_or_above(1, 5)]
+    pub ambient_color: Option<Color>,
+    //#[version_equals_or_above(1, 7)]
     pub light_intensity: f32,
 }
+
+// #[derive(Debug, PrototypeElement, new)]
+// pub struct LightSettings {
+//     #[new(value = "0")]
+//     pub light_longitude: isize,
+//     #[new(value = "0")]
+//     pub light_latitude: isize,
+//     #[new(value = "Color::monochrome(255)")]
+//     pub diffuse_color: Color,
+//     #[new(value = "Color::monochrome(255)")]
+//     pub ambient_color: Color,
+//     #[new(value = "1.0")]
+//     pub light_intensity: f32,
+// }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MarkerIdentifier {
@@ -263,7 +293,7 @@ impl Map {
     }
 
     pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
-        let ambient_color = get_ambient_light_color(self.light_settings.ambient_color, day_timer);
+        let ambient_color = get_ambient_light_color(self.light_settings.ambient_color.unwrap(), day_timer);
         renderer.ambient_light(render_target, ambient_color);
     }
 
@@ -278,7 +308,7 @@ impl Map {
     ) {
         let light_direction = get_light_direction(day_timer);
         let (directional_color, intensity) = get_directional_light_color_intensity(
-            self.light_settings.diffuse_color,
+            self.light_settings.diffuse_color.unwrap(),
             self.light_settings.light_intensity,
             day_timer,
         );
@@ -311,7 +341,7 @@ impl Map {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        renderer.water_light(render_target, camera, self.water_settings.water_level);
+        renderer.water_light(render_target, camera, self.water_settings.water_level.unwrap());
     }
 
     #[cfg(feature = "debug")]

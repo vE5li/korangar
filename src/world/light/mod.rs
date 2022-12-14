@@ -6,7 +6,7 @@ use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-#[derive(PrototypeElement, PrototypeWindow, new)]
+#[derive(ByteConvertable, PrototypeElement, PrototypeWindow, new)]
 #[window_title("Light Source")]
 pub struct LightSource {
     pub name: String,

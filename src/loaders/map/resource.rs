@@ -1,4 +1,5 @@
 use cgmath::{Deg, Vector3};
+
 use crate::graphics::{Color, Transform};
 use crate::loaders::{ByteConvertable, ByteStream};
 use crate::world::{EffectSource, LightSource, Object, SoundSource};
@@ -23,21 +24,21 @@ impl ResourceType {
     }
 }
 
+#[allow(dead_code)]
 pub struct MapResources {
     resources_amount: usize,
     pub objects: Vec<Object>,
-    pub light_source: Vec<LightSource>,
-    pub sound_source: Vec<SoundSource>,
-    pub effect_source: Vec<EffectSource>,
+    pub light_sources: Vec<LightSource>,
+    pub sound_sources: Vec<SoundSource>,
+    pub effect_sources: Vec<EffectSource>,
 }
 
-
 impl ByteConvertable for MapResources {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
+    fn to_bytes(&self, _: Option<usize>) -> Vec<u8> {
         [1 as u8].to_vec()
     }
 
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
         let resources_amount = byte_stream.integer32() as usize;
 
         let mut objects = Vec::new();
@@ -62,12 +63,10 @@ impl ByteConvertable for MapResources {
                         let position = byte_stream.vector3_flipped();
                         let rotation = byte_stream.vector3();
                         let scale = byte_stream.vector3();
-
                         // offset the objects slightly to avoid depth buffer fighting
                         let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
 
                         //let model = model_loader.get(game_file_loader, texture_loader, &model_name,
-                        // reverse_order)?; // resolve with a map
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, None, transform);
 
@@ -144,9 +143,9 @@ impl ByteConvertable for MapResources {
         Self {
             resources_amount,
             objects,
-            light_source: light_sources,
-            sound_source: sound_sources,
-            effect_source: effect_sources,
+            light_sources,
+            sound_sources,
+            effect_sources,
         }
     }
 }

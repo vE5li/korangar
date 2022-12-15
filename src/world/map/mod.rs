@@ -67,23 +67,6 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
         false => Vector3::new(s, -c, -0.5),
     }
 }
-//
-
-// #[derive(Debug, PrototypeElement, new)]
-// pub struct WaterSettings {
-//     #[new(value = "0.0")]
-//     pub water_level: f32,
-//     #[new(value = "0")]
-//     pub water_type: usize,
-//     #[new(value = "0.0")]
-//     pub wave_height: f32,
-//     #[new(value = "0.0")]
-//     pub wave_speed: f32,
-//     #[new(value = "0.0")]
-//     pub wave_pitch: f32,
-//     #[new(value = "0")]
-//     pub water_animation_speed: usize,
-// }
 
 #[derive(ByteConvertable, PrototypeElement)]
 pub struct WaterSettings {
@@ -95,7 +78,7 @@ pub struct WaterSettings {
     pub wave_height: Option<f32>,
     #[version_equals_or_above(1, 8)]
     pub wave_speed: Option<f32>,
-    //#[version_equals_or_above(1, 8)]
+    //#[version_equals_or_above(1, 8)] //todo: fix deserealization error if all fields are Option
     pub wave_pitch: f32, //Option<f32>,
     #[version_equals_or_above(1, 9)]
     pub water_animation_speed: Option<i32>,
@@ -111,23 +94,9 @@ pub struct LightSettings {
     pub diffuse_color: Option<Color>,
     #[version_equals_or_above(1, 5)]
     pub ambient_color: Option<Color>,
-    //#[version_equals_or_above(1, 7)]
+    //#[version_equals_or_above(1, 7)] //todo: same (all have version rules)
     pub light_intensity: f32,
 }
-
-// #[derive(Debug, PrototypeElement, new)]
-// pub struct LightSettings {
-//     #[new(value = "0")]
-//     pub light_longitude: isize,
-//     #[new(value = "0")]
-//     pub light_latitude: isize,
-//     #[new(value = "Color::monochrome(255)")]
-//     pub diffuse_color: Color,
-//     #[new(value = "Color::monochrome(255)")]
-//     pub ambient_color: Color,
-//     #[new(value = "1.0")]
-//     pub light_intensity: f32,
-// }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MarkerIdentifier {

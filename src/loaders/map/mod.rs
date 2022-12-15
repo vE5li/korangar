@@ -49,7 +49,7 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut map_data = parse_map_data(&resource_file, model_loader, game_file_loader, texture_loader)?;//todo: extract model loader
+        let mut map_data = parse_map_data(&resource_file, model_loader, game_file_loader, texture_loader)?; //todo: extract model loader
         let ground_data = parse_ground_data(map_data.ground_file.as_str(), game_file_loader)?;
         let mut gat_data = parse_gat_data(map_data.gat_file.unwrap().as_str(), game_file_loader)?;
 

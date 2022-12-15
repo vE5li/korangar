@@ -3,12 +3,20 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use vulkano::buffer::{BufferContents, BufferUsage, CpuAccessibleBuffer};
 
-use super::map_data::{GroundTile, Heights};
+use super::map_data::{GroundTile};
 use crate::graphics::{MemoryAllocator, ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
 use crate::loaders::map::map_data::{GatData, GroundData, SurfaceType};
 use crate::loaders::{GameFileLoader, TextureLoader};
 
-pub const TILE_SIZE: f32 = 10.0;
+const TILE_SIZE: f32 = 10.0;
+
+#[derive(Copy, Clone, Debug)]
+pub enum Heights {
+    UpperLeft,
+    UpperRight,
+    LowerLeft,
+    LowerRight,
+}
 
 pub fn get_vertex_buffer<T>(memory_allocator: &Arc<MemoryAllocator>, data: Vec<T>) -> Arc<CpuAccessibleBuffer<[T]>>
 where

@@ -68,30 +68,6 @@ impl ByteConvertable for u64 {
     }
 }
 
-impl ByteConvertable for usize {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none(), "usize may not have a length hint");
-        byte_stream.next() as usize
-    }
-
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        assert!(length_hint.is_none(), "isize may not have a length hint");
-        vec![*self as u8]
-    }
-}
-
-impl ByteConvertable for isize {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none(), "isize may not have a length hint");
-        byte_stream.next() as isize
-    }
-
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        assert!(length_hint.is_none(), "isize may not have a length hint");
-        vec![*self as u8]
-    }
-}
-
 impl ByteConvertable for i8 {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none(), "i8 may not have a length hint");
@@ -237,7 +213,6 @@ impl ByteConvertable for Color {
     fn to_bytes(&self, _length_hint: Option<usize>) -> Vec<u8> {
         [self.red, self.green, self.blue].to_vec()
     }
-
 }
 
 impl<T: ByteConvertable> ByteConvertable for Vec<T> {

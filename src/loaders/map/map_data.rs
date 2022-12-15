@@ -5,26 +5,21 @@ use crate::graphics::Color;
 use crate::loaders::{ByteConvertable, ByteStream, Version};
 use crate::world::{LightSettings, Tile, WaterSettings};
 
-#[allow(dead_code)]
 #[derive(ByteConvertable)]
 pub struct MapData {
     #[version]
     pub version: Version,
-    /// Ignored
     #[length_hint(40)]
-    pub ini_file: String,
+    pub _ini_file: String,
     #[length_hint(40)]
     pub ground_file: String,
     #[version_equals_or_above(1, 4)]
     #[length_hint(40)]
     pub gat_file: Option<String>,
-    /// Ignored
     #[length_hint(40)]
-    pub source_file: String,
-
+    pub _source_file: String,
     pub water_settings: WaterSettings,
     pub light_settings: LightSettings,
-
     #[version_equals_or_above(1, 6)]
     pub ground_top: Option<i32>,
     #[version_equals_or_above(1, 6)]
@@ -33,11 +28,9 @@ pub struct MapData {
     pub ground_left: Option<i32>,
     #[version_equals_or_above(1, 6)]
     pub ground_right: Option<i32>,
-
     pub resources: MapResources,
 }
 
-#[allow(dead_code)]
 #[derive(ByteConvertable)]
 pub struct GatData {
     #[version]
@@ -48,7 +41,6 @@ pub struct GatData {
     pub tiles: Vec<Tile>,
 }
 
-#[allow(dead_code)]
 #[derive(ByteConvertable)]
 pub struct GroundData {
     #[version]
@@ -66,7 +58,7 @@ pub struct GroundData {
     pub light_map_height: i32,
     pub light_map_cells_per_grid: i32,
     #[length_hint(self.light_map_count * self.light_map_width * self.light_map_height * 4)]
-    pub _skip: Vec<u8>,
+    pub _skip: Vec<u8>, //todo: handle different skip size by version
     // // match ground_version.equals_or_above(1, 7) {
     // //     true => byte_stream.skip(light_map_count * light_map_dimensions * 4),
     // //     false => byte_stream.skip(light_map_count * 16),
@@ -109,7 +101,6 @@ pub enum SurfaceType {
     Top,
 }
 
-//#[derive(ByteConvertable)]
 pub struct Surface {
     pub u: [f32; 4],
     pub v: [f32; 4],
@@ -119,11 +110,7 @@ pub struct Surface {
 }
 
 impl ByteConvertable for Surface {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-        [1 as u8].to_vec()
-    }
-
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
         let u = [
             byte_stream.float32(),
             byte_stream.float32(),
@@ -150,12 +137,4 @@ impl ByteConvertable for Surface {
             color,
         }
     }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum Heights {
-    UpperLeft,
-    UpperRight,
-    LowerLeft,
-    LowerRight,
 }

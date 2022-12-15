@@ -52,7 +52,7 @@ impl ByteConvertable for MapResources {
 
             match resource_type {
                 ResourceType::Object => {
-                    if true {
+                    if true { //todo: handle resource_version
                         //resource_version.equals_or_above(1, 6) {
                         let name = byte_stream.string(40);
                         let _animation_type = byte_stream.integer32();
@@ -65,11 +65,8 @@ impl ByteConvertable for MapResources {
                         let scale = byte_stream.vector3();
                         // offset the objects slightly to avoid depth buffer fighting
                         let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
-
-                        //let model = model_loader.get(game_file_loader, texture_loader, &model_name,
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(Some(name), model_name, None, transform);
-
                         objects.push(object);
                     } else {
                         let model_name = byte_stream.string(80);
@@ -77,9 +74,6 @@ impl ByteConvertable for MapResources {
                         let position = byte_stream.vector3_flipped();
                         let rotation = byte_stream.vector3();
                         let scale = byte_stream.vector3();
-
-                        //let model = model_loader.get(game_file_loader, texture_loader, &model_name,
-                        // reverse_order)?;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
                         let object = Object::new(None, model_name, None, transform);
                         objects.push(object);
@@ -106,7 +100,7 @@ impl ByteConvertable for MapResources {
                     let height = byte_stream.integer32();
                     let range = byte_stream.float32();
 
-                    // let cycle = match resource_version.equals_or_above(2, 0) {
+                    // let cycle = match resource_version.equals_or_above(2, 0) { //todo: handle resource_version
                     //     true => byte_stream.float32(),
                     //     false => 4.0,
                     // };

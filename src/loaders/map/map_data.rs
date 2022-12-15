@@ -7,7 +7,7 @@ use crate::world::{LightSettings, Tile, WaterSettings};
 
 #[derive(ByteConvertable)]
 pub struct MapData {
-    #[version]
+    #[version] //todo: handle major.minor version
     pub version: Version,
     #[length_hint(40)]
     pub _ini_file: String,

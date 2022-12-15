@@ -9,17 +9,6 @@ const CLIFF: u8 = 0b00001000;
 
 #[allow(dead_code)]
 #[derive(ByteConvertable)]
-pub struct Tile {
-    pub upper_left_height: f32,
-    pub upper_right_height: f32,
-    pub lower_left_height: f32,
-    pub lower_right_height: f32,
-    pub tile_type: TileType,
-    _skip: [u8; 3],
-}
-
-#[allow(dead_code)]
-#[derive(ByteConvertable)]
 pub struct TileType(pub u8);
 
 impl TileType {
@@ -45,14 +34,16 @@ impl TileType {
     }
 }
 
-// #[derive(Clone, new)]
-// pub struct Tile {
-//     pub upper_left_height: f32,
-//     pub upper_right_height: f32,
-//     pub lower_left_height: f32,
-//     pub lower_right_height: f32,
-//     pub tile_type: TileType,
-// }
+#[allow(dead_code)]
+#[derive(ByteConvertable)]
+pub struct Tile {
+    pub upper_left_height: f32,
+    pub upper_right_height: f32,
+    pub lower_left_height: f32,
+    pub lower_right_height: f32,
+    pub tile_type: TileType,
+    _skip: [u8; 3],
+}
 
 impl Tile {
     pub fn is_walkable(&self) -> bool {

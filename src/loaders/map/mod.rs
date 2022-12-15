@@ -16,7 +16,7 @@ use crate::graphics::{MemoryAllocator, NativeModelVertex};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, ModelLoader, TextureLoader};
 use crate::world::*;
 
-pub const MAP_OFFSET: f32 = 5.0;
+const MAP_OFFSET: f32 = 5.0;
 
 #[derive(new)]
 pub struct MapLoader {

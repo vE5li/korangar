@@ -9,7 +9,7 @@ pub use self::tile::{Tile, TileType};
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
-use crate::loaders::Version;
+use crate::loaders::{LightSettings, Version, WaterSettings};
 use crate::network::ClientTick;
 use crate::world::*;
 
@@ -66,36 +66,6 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
         true => Vector3::new(s, c, -0.5),
         false => Vector3::new(s, -c, -0.5),
     }
-}
-
-#[derive(ByteConvertable, PrototypeElement)]
-pub struct WaterSettings {
-    #[version_equals_or_above(1, 4)]
-    pub water_level: Option<f32>,
-    #[version_equals_or_above(1, 8)]
-    pub water_type: Option<i32>,
-    #[version_equals_or_above(1, 8)]
-    pub wave_height: Option<f32>,
-    #[version_equals_or_above(1, 8)]
-    pub wave_speed: Option<f32>,
-    //#[version_equals_or_above(1, 8)] //todo: fix deserealization error if all fields are Option
-    pub wave_pitch: f32, //Option<f32>,
-    #[version_equals_or_above(1, 9)]
-    pub water_animation_speed: Option<i32>,
-}
-
-#[derive(ByteConvertable, PrototypeElement)]
-pub struct LightSettings {
-    #[version_equals_or_above(1, 5)]
-    pub light_longitude: Option<i32>,
-    #[version_equals_or_above(1, 5)]
-    pub light_latitude: Option<i32>,
-    #[version_equals_or_above(1, 5)]
-    pub diffuse_color: Option<Color>,
-    #[version_equals_or_above(1, 5)]
-    pub ambient_color: Option<Color>,
-    //#[version_equals_or_above(1, 7)] //todo: same (all have version rules)
-    pub light_intensity: f32,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -277,7 +247,7 @@ impl Map {
     ) {
         let light_direction = get_light_direction(day_timer);
         let (directional_color, intensity) = get_directional_light_color_intensity(
-            self.light_settings.diffuse_color.unwrap(),
+            self.light_settings.diffuse_color,
             self.light_settings.light_intensity,
             day_timer,
         );

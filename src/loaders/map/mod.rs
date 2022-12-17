@@ -142,10 +142,7 @@ fn parse_map_data(
     Ok(map_data)
 }
 
-fn parse_ground_data(
-    ground_file: &str,
-    game_file_loader: &mut GameFileLoader
-) -> Result<GroundData, String> {
+fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GroundData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}", &ground_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
     let magic = byte_stream.string(4);

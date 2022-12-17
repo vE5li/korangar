@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use vulkano::buffer::{BufferContents, BufferUsage, CpuAccessibleBuffer};
 
-use super::map_data::{GroundTile};
+use super::map_data::GroundTile;
 use crate::graphics::{MemoryAllocator, ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
 use crate::loaders::map::map_data::{GatData, GroundData, SurfaceType};
 use crate::loaders::{GameFileLoader, TextureLoader};
@@ -192,7 +192,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
     for y in 0..gat_data.map_height {
         for x in 0..gat_data.map_width {
             let mut tile = &mut gat_data.tiles[count];
-            //todo: replace with attribute
+
             tile.upper_left_height = -tile.upper_left_height;
             tile.upper_right_height = -tile.upper_right_height;
             tile.lower_left_height = -tile.lower_left_height;

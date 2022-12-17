@@ -14,6 +14,7 @@ pub use self::action::*;
 pub use self::convertable::ByteConvertable;
 pub use self::font::FontLoader;
 pub use self::gamefile::GameFileLoader;
+pub use self::map::resource::{LightSettings, WaterSettings};
 //pub use self::model::ModelLoader;
 pub use self::map::MapLoader;
 //pub use self::sprite::SpriteLoader;

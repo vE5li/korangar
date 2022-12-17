@@ -49,12 +49,12 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut map_data = parse_map_data(&resource_file, model_loader, game_file_loader, texture_loader)?; //todo: extract model loader
+        let mut map_data = parse_map_data(&resource_file, model_loader, game_file_loader, texture_loader)?;
         let ground_data = parse_ground_data(map_data.ground_file.as_str(), game_file_loader)?;
         let mut gat_data = parse_gat_data(map_data.gat_file.unwrap().as_str(), game_file_loader)?;
 
         let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
-        let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, -map_data.water_settings.water_level.unwrap());
+        let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, -map_data.water_settings.water_level);
 
         let ground_vertices = NativeModelVertex::to_vertices(ground_vertices);
         let ground_vertex_buffer = get_vertex_buffer(&self.memory_allocator, ground_vertices);

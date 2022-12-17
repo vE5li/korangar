@@ -1,4 +1,6 @@
 use cgmath::{Deg, Vector3};
+use derive_new::new;
+use procedural::PrototypeElement;
 
 use crate::graphics::{Color, Transform};
 use crate::loaders::{ByteConvertable, ByteStream};
@@ -34,10 +36,6 @@ pub struct MapResources {
 }
 
 impl ByteConvertable for MapResources {
-    fn to_bytes(&self, _: Option<usize>) -> Vec<u8> {
-        [1 as u8].to_vec()
-    }
-
     fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
         let resources_amount = byte_stream.integer32() as usize;
 
@@ -52,8 +50,7 @@ impl ByteConvertable for MapResources {
 
             match resource_type {
                 ResourceType::Object => {
-                    if true { //todo: handle resource_version
-                        //resource_version.equals_or_above(1, 6) {
+                    if byte_stream.get_version().equals_or_above(1, 6) {
                         let name = byte_stream.string(40);
                         let _animation_type = byte_stream.integer32();
                         let _animation_speed = byte_stream.float32();
@@ -100,12 +97,10 @@ impl ByteConvertable for MapResources {
                     let height = byte_stream.integer32();
                     let range = byte_stream.float32();
 
-                    // let cycle = match resource_version.equals_or_above(2, 0) { //todo: handle resource_version
-                    //     true => byte_stream.float32(),
-                    //     false => 4.0,
-                    // };
-
-                    let cycle = byte_stream.float32();
+                    let cycle = match byte_stream.get_version().equals_or_above(2, 0) {
+                        true => byte_stream.float32(),
+                        false => 4.0,
+                    };
 
                     sound_sources.push(SoundSource::new(
                         name,
@@ -141,5 +136,87 @@ impl ByteConvertable for MapResources {
             sound_sources,
             effect_sources,
         }
+    }
+}
+
+#[derive(Debug, PrototypeElement, new)]
+pub struct WaterSettings {
+    #[new(value = "0.0")]
+    pub water_level: f32,
+    #[new(value = "0")]
+    pub water_type: usize,
+    #[new(value = "0.0")]
+    pub wave_height: f32,
+    #[new(value = "0.0")]
+    pub wave_speed: f32,
+    #[new(value = "0.0")]
+    pub wave_pitch: f32,
+    #[new(value = "0")]
+    pub water_animation_speed: usize,
+}
+
+impl ByteConvertable for WaterSettings {
+    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Self {
+        let mut water_settings = WaterSettings::new();
+
+        if byte_stream.get_version().equals_or_above(1, 3) {
+            let water_level = byte_stream.float32();
+            water_settings.water_level = -water_level;
+        }
+
+        if byte_stream.get_version().equals_or_above(1, 8) {
+            let water_type = byte_stream.integer32();
+            let wave_height = byte_stream.float32();
+            let wave_speed = byte_stream.float32();
+            let wave_pitch = byte_stream.float32();
+
+            water_settings.water_type = water_type as usize;
+            water_settings.wave_height = wave_height;
+            water_settings.wave_speed = wave_speed;
+            water_settings.wave_pitch = wave_pitch;
+        }
+
+        if byte_stream.get_version().equals_or_above(1, 9) {
+            let water_animation_speed = byte_stream.integer32();
+            water_settings.water_animation_speed = water_animation_speed as usize;
+        }
+        water_settings
+    }
+}
+
+#[derive(Debug, PrototypeElement, new)]
+pub struct LightSettings {
+    #[new(value = "0")]
+    pub light_longitude: isize,
+    #[new(value = "0")]
+    pub light_latitude: isize,
+    #[new(value = "Color::monochrome(255)")]
+    pub diffuse_color: Color,
+    #[new(value = "Color::monochrome(255)")]
+    pub ambient_color: Color,
+    #[new(value = "1.0")]
+    pub light_intensity: f32,
+}
+
+impl ByteConvertable for LightSettings {
+    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Self {
+        let mut light_settings = LightSettings::new();
+
+        if byte_stream.get_version().equals_or_above(1, 5) {
+            let light_longitude = byte_stream.integer32();
+            let light_latitude = byte_stream.integer32();
+            let diffuse_color = byte_stream.color();
+            let ambient_color = byte_stream.color();
+
+            light_settings.light_longitude = light_longitude as isize;
+            light_settings.light_latitude = light_latitude as isize;
+            light_settings.diffuse_color = diffuse_color;
+            light_settings.ambient_color = ambient_color;
+
+            if byte_stream.get_version().equals_or_above(1, 7) {
+                light_settings.light_intensity = byte_stream.float32();
+            }
+        }
+        light_settings
     }
 }

@@ -1,6 +1,8 @@
 use derive_new::new;
 use procedural::ByteConvertable;
 
+use crate::loaders::{ByteStream, ByteConvertable};
+
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;
 const WATER: u8 = 0b00000010;
@@ -8,8 +10,13 @@ const SNIPABLE: u8 = 0b00000100;
 const CLIFF: u8 = 0b00001000;
 
 #[allow(dead_code)]
-#[derive(ByteConvertable)]
 pub struct TileType(pub u8);
+
+impl ByteConvertable for TileType {
+    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
+        Self::new(byte_stream.next())
+    }
+}
 
 impl TileType {
     pub fn new(type_index: u8) -> Self {

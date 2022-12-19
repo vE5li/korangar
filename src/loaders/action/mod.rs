@@ -215,7 +215,7 @@ struct Event {
 
 #[derive(Debug, ByteConvertable, PrototypeElement)]
 struct ActionsData {
-    #[version_minor_first]
+    #[version]
     pub version: Version,
     pub action_count: u16,
     pub reserved: [u8; 10],

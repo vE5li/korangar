@@ -118,7 +118,7 @@ struct Palette {
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct SpriteData {
-    #[version_minor_first]
+    #[version]
     pub version: Version,
     pub palette_image_count: u16,
     #[version_equals_or_above(2, 0)]

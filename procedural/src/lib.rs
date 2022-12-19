@@ -65,6 +65,7 @@ pub fn derive_toggle(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
         numeric_type,
         numeric_value,
         version,
+        version_minor_first,
         version_smaller,
         version_equals_or_above
     )

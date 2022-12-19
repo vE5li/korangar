@@ -51,6 +51,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         counter += 1;
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
+        let is_version_minor_first = get_unique_attribute(&mut field.attrs, "version_minor_first").is_some();
 
         let length_hint = get_unique_attribute(&mut field.attrs, "length_hint")
             .map(|attribute| attribute.tokens)
@@ -100,7 +101,13 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                     };
                 }
             }
-            None => quote!(let #field_variable = #from_implementation;),
+            None => match is_version_minor_first {
+                true => quote!(
+                    let #field_variable : crate::loaders::Version = crate :: loaders :: ByteConvertable ::from_bytes(byte_stream, None) ;
+                    let #field_variable = #field_variable.get_minor_first();
+                ),
+                false => quote!(let #field_variable = #from_implementation;),
+            },
         };
 
         // base to byte implementation
@@ -110,14 +117,15 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         };
 
         implemented_fields.push(quote!(#field_variable));
-        from_bytes_implementations.push(from_implementation);
         to_bytes_implementations.push(to_implementation);
+        from_bytes_implementations.push(from_implementation);
 
-        if is_version {
-            from_bytes_implementations.push(quote!(byte_stream.set_version(#field_variable);));
+        if is_version || is_version_minor_first {
+            from_bytes_implementations.push(quote!(
+                byte_stream.set_version(#field_variable);
+            ));
         }
     }
-
     (
         from_bytes_implementations,
         implemented_fields,

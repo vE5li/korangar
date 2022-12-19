@@ -3,13 +3,13 @@ use procedural::*;
 pub use super::resource::MapResources;
 use crate::graphics::Color;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
-use crate::loaders::{ByteConvertable, ByteStream, Version};
+use crate::loaders::{ByteConvertable, ByteStream, MajorFirst, Version};
 use crate::world::Tile;
 
 #[derive(ByteConvertable)]
 pub struct MapData {
     #[version]
-    pub version: Version,
+    pub version: Version<MajorFirst>,
     #[length_hint(40)]
     pub _ini_file: String,
     #[length_hint(40)]
@@ -35,7 +35,7 @@ pub struct MapData {
 #[derive(ByteConvertable)]
 pub struct GatData {
     #[version]
-    pub version: Version,
+    pub version: Version<MajorFirst>,
     pub map_width: i32,
     pub map_height: i32,
     #[repeating(self.map_width * self.map_height)]
@@ -45,7 +45,7 @@ pub struct GatData {
 #[derive(ByteConvertable)]
 pub struct GroundData {
     #[version]
-    pub version: Version,
+    pub version: Version<MajorFirst>,
     pub width: i32,
     pub height: i32,
     pub zoom: f32,

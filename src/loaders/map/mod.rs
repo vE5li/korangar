@@ -66,8 +66,8 @@ impl MapLoader {
         apply_map_offset(&ground_data, &mut map_data.resources);
 
         let map = Arc::new(Map::new(
-            map_data.version,
-            ground_data.version,
+            map_data.version.into(),
+            ground_data.version.into(),
             gat_data.map_width as usize,
             gat_data.map_height as usize,
             map_data.water_settings,

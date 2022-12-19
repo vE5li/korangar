@@ -12,7 +12,7 @@ use super::Sprite;
 use crate::debug::*;
 use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
 use crate::interface::InterfaceSettings;
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
+use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
 use crate::network::ClientTick;
 
 //pub enum Animations {
@@ -216,7 +216,7 @@ struct Event {
 #[derive(Debug, ByteConvertable, PrototypeElement)]
 struct ActionsData {
     #[version]
-    pub version: Version,
+    pub version: Version<MinorFirst>,
     pub action_count: u16,
     pub reserved: [u8; 10],
     #[repeating(self.action_count)]

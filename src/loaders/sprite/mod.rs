@@ -14,7 +14,7 @@ use vulkano::sync::{FenceSignalFuture, GpuFuture};
 use crate::debug::*;
 use crate::graphics::{MemoryAllocator, Texture};
 use crate::interface::{ElementCell, PrototypeElement};
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
+use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
 
 #[derive(Clone, PrototypeElement)]
 pub struct Sprite {
@@ -119,7 +119,7 @@ struct Palette {
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct SpriteData {
     #[version]
-    pub version: Version,
+    pub version: Version<MinorFirst>,
     pub palette_image_count: u16,
     #[version_equals_or_above(2, 0)]
     pub rgba_image_count: Option<u16>,

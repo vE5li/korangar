@@ -9,7 +9,7 @@ use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{MemoryAllocator, NativeModelVertex, Texture};
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, TextureLoader, Version};
+use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MajorFirst, TextureLoader, Version};
 use crate::system::multiply_matrix4_and_vector3;
 use crate::world::{BoundingBox, Model, Node};
 
@@ -106,8 +106,8 @@ impl crate::interface::PrototypeElement for ModelString {
 
 #[derive(Debug, ByteConvertable, PrototypeElement)]
 pub struct ModelData {
-    //#[version]
-    //pub version: Version,
+    #[version]
+    pub version: Version<MajorFirst>,
     pub animation_length: u32,
     pub shade_type: u32,
     #[version_equals_or_above(1, 4)]
@@ -336,11 +336,6 @@ impl ModelLoader {
         if &magic != "GRSM" {
             return Err(format!("failed to read magic number from {}", model_file));
         }
-
-        // make this prettier
-        let major = byte_stream.next();
-        let minor = byte_stream.next();
-        byte_stream.set_version(Version::new(major, minor));
 
         let model_data = ModelData::from_bytes(&mut byte_stream, None);
 

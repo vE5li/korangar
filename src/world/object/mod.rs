@@ -16,7 +16,6 @@ pub struct Object {
     pub transform: Transform,
 }
 
-
 impl Object {
     pub fn set_model(&mut self, model: Arc<Model>) {
         self.model = Some(model);

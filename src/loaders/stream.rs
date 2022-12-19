@@ -1,6 +1,8 @@
 use cgmath::Vector3;
 use derive_new::new;
 
+use super::version::InternalVersion;
+use super::Version;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::Color;
@@ -8,7 +10,6 @@ use crate::graphics::Color;
 use crate::interface::PacketEntry;
 #[cfg(feature = "debug_network")]
 use crate::interface::TrackedState;
-use crate::loaders::Version;
 #[cfg(feature = "debug_network")]
 use crate::network::Packet;
 
@@ -18,7 +19,7 @@ pub struct ByteStream<'b> {
     #[new(default)]
     offset: usize,
     #[new(default)]
-    version: Option<Version>,
+    version: Option<InternalVersion>,
     #[cfg(feature = "debug_network")]
     #[new(default)]
     packet_history: Vec<PacketEntry>,
@@ -41,11 +42,11 @@ impl<'b> ByteStream<'b> {
         self.offset >= self.data.len()
     }
 
-    pub fn set_version(&mut self, version: Version) {
-        self.version = version.into();
+    pub fn set_version<T>(&mut self, version: Version<T>) {
+        self.version = Some(version.into());
     }
 
-    pub fn get_version(&mut self) -> Version {
+    pub fn get_version(&mut self) -> InternalVersion {
         self.version.unwrap()
     }
 
@@ -63,11 +64,11 @@ impl<'b> ByteStream<'b> {
         signature_matches
     }
 
-    pub fn version(&mut self) -> Version {
+    pub fn version(&mut self) -> InternalVersion {
         let major = self.next();
         let minor = self.next();
 
-        Version::new(major, minor)
+        InternalVersion::new(major, minor)
     }
 
     pub fn byte(&mut self) -> u8 {

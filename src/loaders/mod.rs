@@ -24,4 +24,4 @@ pub use self::script::ScriptLoader;
 pub use self::sprite::*;
 pub use self::stream::ByteStream;
 pub use self::texture::TextureLoader;
-pub use self::version::Version;
+pub use self::version::{InternalVersion, MajorFirst, MinorFirst, Version};

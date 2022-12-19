@@ -1,7 +1,7 @@
 use derive_new::new;
 use procedural::ByteConvertable;
 
-use crate::loaders::{ByteStream, ByteConvertable};
+use crate::loaders::{ByteConvertable, ByteStream};
 
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;

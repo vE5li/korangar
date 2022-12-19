@@ -9,7 +9,7 @@ pub use self::tile::{Tile, TileType};
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
-use crate::loaders::{LightSettings, Version, WaterSettings};
+use crate::loaders::{InternalVersion, LightSettings, WaterSettings};
 use crate::network::ClientTick;
 use crate::world::*;
 
@@ -86,8 +86,8 @@ impl MarkerIdentifier {
 #[window_title("Map Viewer")]
 #[window_class("map_viewer")]
 pub struct Map {
-    resource_version: Version,
-    ground_version: Version,
+    resource_version: InternalVersion,
+    ground_version: InternalVersion,
     width: usize,
     height: usize,
     water_settings: WaterSettings,

@@ -486,6 +486,10 @@ impl Interface {
         self.restore_focus(focus_state);
     }
 
+    pub fn get_window(&self, window_index: usize) -> &Window {
+        return &self.windows[window_index].0
+    }
+
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState, window_class: &str) {
         let index = self
             .windows

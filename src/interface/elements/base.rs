@@ -11,10 +11,8 @@ use crate::inventory::Item;
 pub type ElementCell = Rc<RefCell<dyn Element>>;
 pub type WeakElementCell = Weak<RefCell<dyn Element>>;
 
-macro_rules! cell {
-    ($element:expr) => {
-        std::rc::Rc::new(std::cell::RefCell::new($element))
-    };
+pub macro cell($element:expr) {
+    std::rc::Rc::new(std::cell::RefCell::new($element))
 }
 
 pub struct ElementRenderer<'a> {

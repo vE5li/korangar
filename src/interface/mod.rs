@@ -396,7 +396,7 @@ impl Interface {
 
     fn open_new_window(&mut self, focus_state: &mut FocusState, window: Window) {
         self.windows.push((window, true, true));
-        focus_state.remove_focus();
+        focus_state.set_focused_window(self.windows.len()-1);
     }
 
     pub fn open_window(&mut self, focus_state: &mut FocusState, prototype_window: &dyn PrototypeWindow) {

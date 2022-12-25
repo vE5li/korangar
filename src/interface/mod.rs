@@ -396,7 +396,7 @@ impl Interface {
 
     fn open_new_window(&mut self, focus_state: &mut FocusState, window: Window) {
         self.windows.push((window, true, true));
-        focus_state.set_focused_window(self.windows.len()-1);
+        focus_state.set_focused_window(self.windows.len() - 1);
     }
 
     pub fn open_window(&mut self, focus_state: &mut FocusState, prototype_window: &dyn PrototypeWindow) {
@@ -487,7 +487,7 @@ impl Interface {
     }
 
     pub fn get_window(&self, window_index: usize) -> &Window {
-        return &self.windows[window_index].0
+        return &self.windows[window_index].0;
     }
 
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState, window_class: &str) {

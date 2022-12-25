@@ -25,10 +25,8 @@ const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
 pub struct FocusState {
     focused_element: Option<WeakElementCell>,
     focused_window: Option<usize>,
-
     previous_hovered_element: Option<WeakElementCell>,
     previous_hovered_window: Option<usize>,
-
     previous_focused_element: Option<WeakElementCell>,
     previous_focused_window: Option<usize>,
 }
@@ -375,7 +373,6 @@ impl InputSystem {
                 events.push(UserEvent::CameraZoom(self.scroll_delta));
             }
         }
-
 
         let characters = self.input_buffer.drain(..).collect::<Vec<_>>();
 

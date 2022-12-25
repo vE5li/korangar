@@ -1,7 +1,6 @@
 # Rust
 target/
 procedural/target
-Cargo.lock
 
 # Korangar
 client/

@@ -232,6 +232,7 @@ pub struct InputTheme {
     pub focused_text_color: Mutable<Color, RERENDER>,
     pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
     pub font_size: MutableRange<f32, RERENDER>,
+    pub text_offset: MutableRange<f32, RERENDER>,
     pub cursor_offset: MutableRange<f32, RERENDER>,
     pub cursor_width: MutableRange<f32, RERENDER>,
     pub height_constraint: DimensionConstraint,
@@ -248,7 +249,8 @@ impl Default for InputTheme {
             focused_text_color: Mutable::new(Color::monochrome(200)),
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
             font_size: MutableRange::new(14.0, 6.0, 50.0),
-            cursor_offset: MutableRange::new(4.0, 2.0, 10.0),
+            text_offset: MutableRange::new(4.0, 2.0, 10.0),
+            cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
             cursor_width: MutableRange::new(3.0, 2.0, 30.0),
             height_constraint: dimension!(15),
         }

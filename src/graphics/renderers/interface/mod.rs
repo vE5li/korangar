@@ -21,6 +21,7 @@ use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
 pub struct InterfaceRenderer {
     memory_allocator: Arc<MemoryAllocator>,
+    font_loader: Rc<RefCell<FontLoader>>,
     queue: Arc<Queue>,
     render_pass: Arc<RenderPass>,
     rectangle_renderer: RectangleRenderer,
@@ -64,7 +65,7 @@ impl InterfaceRenderer {
         let subpass = render_pass.clone().first_subpass();
         let rectangle_renderer = RectangleRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
         let sprite_renderer = SpriteRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
-        let font_renderer = TextRenderer::new(memory_allocator.clone(), subpass, viewport, font_loader);
+        let font_renderer = TextRenderer::new(memory_allocator.clone(), subpass, viewport, font_loader.clone());
 
         let checked_box_texture = texture_loader.get("checked_box.png", game_file_loader).unwrap();
         let unchecked_box_texture = texture_loader.get("unchecked_box.png", game_file_loader).unwrap();
@@ -73,6 +74,7 @@ impl InterfaceRenderer {
 
         Self {
             memory_allocator,
+            font_loader,
             queue,
             render_pass,
             rectangle_renderer,
@@ -84,6 +86,10 @@ impl InterfaceRenderer {
             collapsed_arrow_texture,
             dimensions,
         }
+    }
+
+    pub fn get_text_dimensions(&self, text: &str, font_size: f32, available_width: f32) -> Vector2<f32> {
+        self.font_loader.borrow().get_text_dimensions(text, font_size, available_width)
     }
 
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {

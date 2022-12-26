@@ -25,6 +25,10 @@ pub struct ElementRenderer<'a> {
 }
 
 impl<'a> ElementRenderer<'a> {
+    pub fn get_text_dimensions(&self, text: &str, font_size: f32, available_width: f32) -> Vector2<f32> {
+        self.renderer.get_text_dimensions(text, font_size, available_width) * *self.interface_settings.scaling
+    }
+
     pub fn set_scroll(&mut self, scroll: f32) {
         self.position.y -= scroll;
     }

@@ -608,6 +608,6 @@ impl InputSystem {
     }
 
     fn close_window_hotkey_pressed(&self) -> bool {
-        self.get_key(VirtualKeyCode::LControl).down() && self.get_key(VirtualKeyCode::Q).released()
+        self.get_key(VirtualKeyCode::LControl).down() && self.get_key(VirtualKeyCode::Q).pressed()
     }
 }

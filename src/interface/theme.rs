@@ -131,7 +131,7 @@ impl Default for LabelTheme {
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
             text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(150 > 0 < 70%, 14),
+            size_constraint: constraint!(120 > 50% < 300, 0),
         }
     }
 }

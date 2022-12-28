@@ -21,8 +21,16 @@ impl Element for StaticLabel {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
         let mut size_constraint = theme.label.size_constraint;
-        let width = self.label.len() as f32 * 8.0 + theme.label.text_offset.x * *interface_settings.scaling * 2.0;
-        size_constraint.width = Dimension::Absolute(width);
+
+        let size = placement_resolver.get_text_dimensions(
+            &self.label,
+            *theme.label.font_size,
+            *theme.label.text_offset,
+            *interface_settings.scaling,
+            placement_resolver.get_available().x / 2.0, // TODO: make better
+        );
+
+        size_constraint.height = Dimension::Absolute(f32::max(size.y / *interface_settings.scaling, 14.0)); // TODO: make better
 
         self.state.resolve(placement_resolver, &size_constraint);
     }

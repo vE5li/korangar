@@ -53,10 +53,10 @@ impl Element for Chat {
         for message in self.messages.borrow().iter() {
             height += self
                 .font_loader
-                .borrow_mut()
+                .borrow()
                 .get_text_dimensions(
                     message.stamped_text(self.stamp),
-                    *theme.chat.font_size * *interface_settings.scaling,
+                    *theme.chat.font_size,
                     placement_resolver.get_available().x,
                 )
                 .y;

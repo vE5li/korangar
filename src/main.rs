@@ -832,7 +832,8 @@ fn main() {
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
 
-                let (clear_interface, rerender_interface) = interface.update(&mut focus_state, game_timer.get_client_tick());
+                let (clear_interface, rerender_interface) =
+                    interface.update(font_loader.clone(), &mut focus_state, game_timer.get_client_tick());
 
                 if swapchain_holder.is_swapchain_invalid() {
                     let viewport = swapchain_holder.recreate_swapchain();

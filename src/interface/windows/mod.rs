@@ -24,6 +24,7 @@ pub use self::settings::*;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
+use crate::loaders::FontLoader;
 
 pub struct Window {
     window_class: Option<String>,
@@ -57,6 +58,7 @@ impl Window {
 
     pub fn resolve(
         &mut self,
+        font_loader: Rc<RefCell<FontLoader>>,
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         available_space: Size,
@@ -67,6 +69,7 @@ impl Window {
         };
 
         let mut placement_resolver = PlacementResolver::new(
+            font_loader,
             PartialSize::new(self.size.x, height),
             Vector2::new(0.0, 0.0),
             *theme.window.border_size,

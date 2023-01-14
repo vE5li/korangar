@@ -58,14 +58,12 @@ pub struct GroundData {
     pub light_map_width: i32,
     pub light_map_height: i32,
     pub light_map_cells_per_grid: i32,
-
     #[version_equals_or_above(1, 7)]
     #[length_hint(self.light_map_count * self.light_map_width * self.light_map_height * 4)]
     pub _skip: Option<Vec<u8>>,
     #[version_smaller(1, 7)]
     #[length_hint(self.light_map_count * 16)]
     pub _skip2: Option<Vec<u8>>,
-
     pub surface_count: i32,
     #[repeating(self.surface_count)]
     pub surfaces: Vec<Surface>,

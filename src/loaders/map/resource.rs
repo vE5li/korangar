@@ -1,8 +1,8 @@
 use cgmath::{Deg, Vector3};
 use derive_new::new;
-use procedural::{PrototypeElement, ByteConvertable};
+use procedural::{PrototypeElement};
 
-use crate::graphics::{Transform, Color, ColorRGB};
+use crate::graphics::{Transform, Color};
 use crate::loaders::{ByteConvertable, ByteStream};
 use crate::world::{EffectSource, LightSource, SoundSource};
 

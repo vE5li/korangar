@@ -85,13 +85,15 @@ pub struct GroundTile {
 
 impl GroundTile {
     pub fn get_lowest_point(&self) -> f32 {
-        f32::max(
+        [
             self.lower_right_height,
-            f32::max(
-                self.lower_left_height,
-                f32::max(self.upper_left_height, self.upper_right_height),
-            ),
-        )
+            self.lower_left_height,
+            self.upper_left_height,
+            self.lower_right_height,
+        ]
+        .into_iter()
+        .reduce(f32::max)
+        .unwrap()
     }
 }
 

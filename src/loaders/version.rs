@@ -1,9 +1,6 @@
 use std::fmt::{Display, Formatter, Result};
 use std::marker::PhantomData;
-
 use derive_new::new;
-use procedural::ByteConvertable;
-
 use super::ByteConvertable;
 
 #[derive(Copy, Clone, Debug)]
@@ -64,7 +61,7 @@ impl<T> From<Version<T>> for InternalVersion {
         let Version {
             major,
             minor,
-            phantom_data: PhantomData,
+            ..
         } = version;
         Self { major, minor }
     }

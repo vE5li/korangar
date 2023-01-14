@@ -1,6 +1,5 @@
 use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 
-use crate::graphics::Color;
 use crate::loaders::ByteStream;
 
 pub trait ByteConvertable {
@@ -201,17 +200,6 @@ impl ByteConvertable for String {
             }
             None => self.bytes().chain(iter::once(0)).collect(),
         }
-    }
-}
-
-impl ByteConvertable for Color {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none(), "Color may not have a length hint");
-        byte_stream.color()
-    }
-
-    fn to_bytes(&self, _length_hint: Option<usize>) -> Vec<u8> {
-        [self.red, self.green, self.blue].to_vec()
     }
 }
 

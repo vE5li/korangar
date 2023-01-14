@@ -1,17 +1,16 @@
 use cgmath::Vector3;
-use derive_new::new;
 use procedural::*;
 
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-#[derive(ByteConvertable, PrototypeElement, PrototypeWindow, new)]
+#[derive(ByteConvertable, PrototypeElement, PrototypeWindow)]
 #[window_title("Light Source")]
 pub struct LightSource {
     pub name: String,
     pub position: Vector3<f32>,
-    pub color: Color,
+    pub color: ColorRGB,
     pub range: f32,
 }
 
@@ -26,7 +25,7 @@ impl LightSource {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        renderer.point_light(render_target, camera, self.position, self.color, self.range);
+        renderer.point_light(render_target, camera, self.position, self.color.to_owned().into(), self.range);
     }
 
     #[cfg(feature = "debug")]

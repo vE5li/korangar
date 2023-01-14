@@ -1,7 +1,7 @@
 use procedural::*;
 
 pub use super::resource::MapResources;
-use crate::graphics::Color;
+use crate::graphics::ColorBGR;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
 use crate::loaders::{ByteConvertable, ByteStream, MajorFirst, Version};
 use crate::world::Tile;
@@ -136,40 +136,11 @@ pub enum SurfaceType {
     Top,
 }
 
+#[derive(ByteConvertable)]
 pub struct Surface {
     pub u: [f32; 4],
     pub v: [f32; 4],
     pub texture_index: i16,
     pub light_map_index: i16,
-    pub color: Color,
-}
-
-impl ByteConvertable for Surface {
-    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
-        let u = [
-            byte_stream.float32(),
-            byte_stream.float32(),
-            byte_stream.float32(),
-            byte_stream.float32(),
-        ];
-        let v = [
-            byte_stream.float32(),
-            byte_stream.float32(),
-            byte_stream.float32(),
-            byte_stream.float32(),
-        ];
-
-        let texture_index = byte_stream.integer16();
-        let light_map_index = byte_stream.integer16();
-        let color_bgra = byte_stream.slice(4);
-        let color = Color::rgb(color_bgra[2], color_bgra[1], color_bgra[0]);
-
-        Self {
-            u,
-            v,
-            texture_index,
-            light_map_index,
-            color,
-        }
-    }
+    pub color: ColorBGR,
 }

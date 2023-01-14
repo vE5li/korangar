@@ -26,7 +26,7 @@ pub use self::theme::Theme;
 pub use self::windows::*;
 use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer, Texture};
 use crate::input::{FocusState, MouseInputMode};
-use crate::loaders::{ActionLoader, GameFileLoader, SpriteLoader};
+use crate::loaders::{ActionLoader, FontLoader, GameFileLoader, SpriteLoader};
 use crate::network::{ClientTick, EntityId};
 
 #[derive(new)]
@@ -107,7 +107,7 @@ impl Interface {
         self.mouse_cursor.set_start_time(client_tick);
     }
 
-    pub fn update(&mut self, focus_state: &mut FocusState, client_tick: ClientTick) -> (bool, bool) {
+    pub fn update(&mut self, font_loader: Rc<RefCell<FontLoader>>, focus_state: &mut FocusState, client_tick: ClientTick) -> (bool, bool) {
         self.mouse_cursor.update(client_tick);
 
         for (window, _reresolve, rerender) in &mut self.windows {
@@ -128,7 +128,8 @@ impl Interface {
         for (window_index, (window, reresolve, rerender)) in self.windows.iter_mut().enumerate() {
             if self.reresolve || *reresolve {
                 let (_position, previous_size) = window.get_area();
-                let (window_class, new_position, new_size) = window.resolve(&self.interface_settings, &self.theme, self.available_space);
+                let (window_class, new_position, new_size) =
+                    window.resolve(font_loader.clone(), &self.interface_settings, &self.theme, self.available_space);
 
                 // should only ever be the last window
                 if let Some(focused_index) = focus_state.focused_window() && focused_index == window_index {
@@ -396,7 +397,7 @@ impl Interface {
 
     fn open_new_window(&mut self, focus_state: &mut FocusState, window: Window) {
         self.windows.push((window, true, true));
-        focus_state.remove_focus();
+        focus_state.set_focused_window(self.windows.len() - 1);
     }
 
     pub fn open_window(&mut self, focus_state: &mut FocusState, prototype_window: &dyn PrototypeWindow) {
@@ -484,6 +485,10 @@ impl Interface {
 
         // TODO: only if tab mode
         self.restore_focus(focus_state);
+    }
+
+    pub fn get_window(&self, window_index: usize) -> &Window {
+        return &self.windows[window_index].0;
     }
 
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState, window_class: &str) {

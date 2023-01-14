@@ -10,6 +10,7 @@
 #![feature(auto_traits)]
 #![feature(let_chains)]
 #![feature(variant_count)]
+#![feature(decl_macro)]
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -52,7 +53,7 @@ use crate::interface::*;
 use crate::inventory::Inventory;
 use crate::loaders::*;
 use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
-use crate::system::{get_device_extensions, get_instance_extensions, get_layers, GameTimer};
+use crate::system::{choose_physical_device, get_device_extensions, get_instance_extensions, get_layers, GameTimer};
 use crate::world::*;
 
 fn main() {
@@ -134,7 +135,7 @@ fn main() {
     let timer = Timer::new("choose physical device");
 
     let desired_device_extensions = get_device_extensions();
-    let (physical_device, queue_family_index) = choose_physical_device!(&instance, &surface, &desired_device_extensions);
+    let (physical_device, queue_family_index) = choose_physical_device(&instance, &surface, &desired_device_extensions);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -831,7 +832,8 @@ fn main() {
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
 
-                let (clear_interface, rerender_interface) = interface.update(&mut focus_state, game_timer.get_client_tick());
+                let (clear_interface, rerender_interface) =
+                    interface.update(font_loader.clone(), &mut focus_state, game_timer.get_client_tick());
 
                 if swapchain_holder.is_swapchain_invalid() {
                     let viewport = swapchain_holder.recreate_swapchain();

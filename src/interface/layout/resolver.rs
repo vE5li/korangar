@@ -1,11 +1,16 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use cgmath::Vector2;
 
 use crate::interface::{PartialSize, Position, Size, SizeConstraint};
+use crate::loaders::FontLoader;
 
 const ELEMENT_THRESHHOLD: f32 = 1.0000;
 const REMAINDER_THRESHHOLD: f32 = 0.0001;
 
 pub struct PlacementResolver {
+    font_loader: Rc<RefCell<FontLoader>>,
     available_space: PartialSize,
     base_position: Position,
     horizontal_accumulator: f32,
@@ -17,7 +22,14 @@ pub struct PlacementResolver {
 }
 
 impl PlacementResolver {
-    pub fn new(mut available_space: PartialSize, base_position: Position, border: Size, gaps: Size, scaling: f32) -> Self {
+    pub fn new(
+        font_loader: Rc<RefCell<FontLoader>>,
+        mut available_space: PartialSize,
+        base_position: Position,
+        border: Size,
+        gaps: Size,
+        scaling: f32,
+    ) -> Self {
         available_space.x -= border.x * scaling * 2.0;
         available_space.y = available_space.y.map(|height| height - border.y * scaling * 2.0);
 
@@ -27,6 +39,7 @@ impl PlacementResolver {
         let total_height = 0.0;
 
         Self {
+            font_loader,
             available_space,
             base_position,
             horizontal_accumulator,
@@ -42,6 +55,7 @@ impl PlacementResolver {
         available_space.x -= offset.x + border.x * self.scaling * 2.0;
         available_space.y = available_space.y.map(|height| height - border.y * self.scaling * 2.0);
 
+        let font_loader = self.font_loader.clone();
         let base_position = offset + border * self.scaling;
         let horizontal_accumulator = 0.0;
         let vertical_offset = 0.0;
@@ -50,6 +64,7 @@ impl PlacementResolver {
         let scaling = self.scaling;
 
         Self {
+            font_loader,
             available_space,
             base_position,
             horizontal_accumulator,
@@ -59,6 +74,19 @@ impl PlacementResolver {
             gaps,
             scaling,
         }
+    }
+
+    pub fn get_text_dimensions(
+        &self,
+        text: &str,
+        font_size: f32,
+        text_offset: Vector2<f32>,
+        scaling: f32,
+        available_width: f32,
+    ) -> Vector2<f32> {
+        self.font_loader
+            .borrow()
+            .get_text_dimensions(text, font_size * scaling, available_width - text_offset.x * scaling)
     }
 
     pub fn set_gaps(&mut self, gaps: Size) {

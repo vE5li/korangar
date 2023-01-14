@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use cgmath::{Array, Vector2, Vector4};
 use derive_new::new;
-use num::Zero;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -97,6 +96,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         let display: &String = &RefCell::borrow(&self.display);
         let is_hovererd = self.is_element_self(hovered_element);
         let is_focused = self.is_element_self(focused_element);
+        let text_offset = *theme.input.text_offset * *interface_settings.scaling;
 
         let text = if display.is_empty() && !is_focused {
             self.ghost_text.to_string()
@@ -123,17 +123,15 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         };
 
         renderer.render_background(*theme.input.border_radius, background_color);
-
-        renderer.render_text(&text, Vector2::zero(), text_color, *theme.input.font_size);
+        renderer.render_text(&text, Vector2::new(text_offset, 0.0), text_color, *theme.input.font_size);
 
         if is_focused {
-            let cursor_offset = *theme.input.cursor_offset * *interface_settings.scaling;
+            let cursor_offset = text_offset
+                + *theme.input.cursor_offset * *interface_settings.scaling
+                + renderer.get_text_dimensions(&text, *theme.input.font_size, f32::MAX).x;
 
             renderer.render_rectangle(
-                Vector2::new(
-                    cursor_offset + text.len() as f32 * *theme.input.font_size * *interface_settings.scaling * 0.5,
-                    0.0,
-                ),
+                Vector2::new(cursor_offset, 0.0),
                 Vector2::new(*theme.input.cursor_width, self.state.cached_size.y),
                 Vector4::from_value(0.0),
                 *theme.input.text_color,

@@ -51,11 +51,15 @@ impl Element for Chat {
         let mut height = 5.0 * *interface_settings.scaling;
 
         for message in self.messages.borrow().iter() {
-            height += self.font_loader.borrow_mut().get_text_height(
-                message.stamped_text(self.stamp),
-                *theme.chat.font_size * *interface_settings.scaling,
-                placement_resolver.get_available().x,
-            );
+            height += self
+                .font_loader
+                .borrow()
+                .get_text_dimensions(
+                    message.stamped_text(self.stamp),
+                    *theme.chat.font_size,
+                    placement_resolver.get_available().x,
+                )
+                .y;
         }
 
         size_constraint.height = Dimension::Absolute(height);

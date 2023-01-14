@@ -23,36 +23,46 @@ const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
 
 #[derive(Default)]
 pub struct FocusState {
-    focused_element: Option<(WeakElementCell, usize)>,
-    previous_hovered_element: Option<(WeakElementCell, usize)>,
-    previous_focused_element: Option<(WeakElementCell, usize)>,
+    focused_element: Option<WeakElementCell>,
+    focused_window: Option<usize>,
+    previous_hovered_element: Option<WeakElementCell>,
+    previous_hovered_window: Option<usize>,
+    previous_focused_element: Option<WeakElementCell>,
+    previous_focused_window: Option<usize>,
 }
 
 impl FocusState {
     pub fn remove_focus(&mut self) {
         self.focused_element = None;
+        self.focused_window = None;
     }
 
     pub fn set_focused_element(&mut self, element: Option<ElementCell>, window_index: usize) {
-        self.focused_element = element.as_ref().map(Rc::downgrade).zip(Some(window_index));
+        self.focused_element = element.as_ref().map(Rc::downgrade);
+        self.focused_window = Some(window_index);
+    }
+
+    pub fn set_focused_window(&mut self, window_index: usize) {
+        self.focused_window = Some(window_index);
     }
 
     pub fn update_focused_element(&mut self, element: Option<ElementCell>, window_index: usize) {
         if let Some(element) = element {
-            self.focused_element = Some((Rc::downgrade(&element), window_index));
+            self.focused_element = Some(Rc::downgrade(&element));
+            self.focused_window = Some(window_index);
         }
     }
 
     pub fn get_focused_element(&self) -> Option<(ElementCell, usize)> {
-        let (element, index) = self.focused_element.clone().unzip();
-        element.as_ref().and_then(Weak::upgrade).zip(index)
+        let element = self.focused_element.clone();
+        element.as_ref().and_then(Weak::upgrade).zip(self.focused_window)
     }
 
     pub fn did_hovered_element_change(&self, hovered_element: &Option<ElementCell>) -> bool {
         self.previous_hovered_element
             .as_ref()
             .zip(hovered_element.as_ref())
-            .map(|(previous, current)| !Weak::ptr_eq(&previous.0, &Rc::downgrade(current)))
+            .map(|(previous, current)| !Weak::ptr_eq(&previous, &Rc::downgrade(current)))
             .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some())
     }
 
@@ -60,27 +70,30 @@ impl FocusState {
         self.previous_focused_element
             .as_ref()
             .zip(self.focused_element.as_ref())
-            .map(|(previous, current)| !Weak::ptr_eq(&previous.0, &current.0))
+            .map(|(previous, current)| !Weak::ptr_eq(&previous, &current))
             .unwrap_or(self.previous_focused_element.is_some() || self.focused_element.is_some())
     }
 
     pub fn previous_hovered_window(&self) -> Option<usize> {
-        self.previous_hovered_element.as_ref().map(|(_, index)| index).cloned()
+        self.previous_hovered_window.clone()
     }
 
     pub fn focused_window(&self) -> Option<usize> {
-        self.focused_element.as_ref().map(|(_, index)| index).cloned()
+        self.focused_window.clone()
     }
 
     pub fn previous_focused_window(&self) -> Option<usize> {
-        self.previous_focused_element.as_ref().map(|(_, index)| index).cloned()
+        self.previous_focused_window.clone()
     }
 
     pub fn update(&mut self, hovered_element: &Option<ElementCell>, window_index: Option<usize>) -> Option<ElementCell> {
-        self.previous_hovered_element = hovered_element.as_ref().map(Rc::downgrade).zip(window_index);
-        self.previous_focused_element = self.focused_element.clone();
+        self.previous_hovered_element = hovered_element.as_ref().map(Rc::downgrade);
+        self.previous_hovered_window = window_index;
 
-        self.focused_element.clone().and_then(|(weak_element, _)| weak_element.upgrade())
+        self.previous_focused_element = self.focused_element.clone();
+        self.previous_focused_window = self.focused_window.clone();
+
+        self.focused_element.clone().and_then(|weak_element| weak_element.upgrade())
     }
 }
 
@@ -209,6 +222,8 @@ impl InputSystem {
 
         if shift_down {
             if let Some(window_index) = &mut window_index {
+                focus_state.set_focused_window(*window_index);
+
                 if self.left_mouse_button.pressed() {
                     *window_index = interface.move_window_to_top(*window_index);
                     self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
@@ -219,6 +234,10 @@ impl InputSystem {
                     self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
             }
+        }
+
+        if window_index.is_some() && self.left_mouse_button.pressed() {
+            focus_state.set_focused_window(window_index.unwrap())
         }
 
         let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;
@@ -384,6 +403,13 @@ impl InputSystem {
                         _ => {}
                     }
                 }
+            }
+        }
+
+        if self.close_window_hotkey_pressed() && focus_state.focused_window().is_some() {
+            let window_index = focus_state.focused_window.unwrap();
+            if interface.get_window(window_index).is_closable() {
+                interface.close_window(focus_state, window_index);
             }
         }
 
@@ -579,5 +605,9 @@ impl InputSystem {
 
     pub fn get_mouse_mode(&self) -> &MouseInputMode {
         &self.mouse_input_mode
+    }
+
+    fn close_window_hotkey_pressed(&self) -> bool {
+        self.get_key(VirtualKeyCode::LControl).down() && self.get_key(VirtualKeyCode::Q).pressed()
     }
 }

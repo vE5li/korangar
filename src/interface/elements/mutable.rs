@@ -1,3 +1,4 @@
+use super::cell;
 use crate::graphics::Color;
 use crate::interface::{ChangeEvent, Container, DimensionConstraint, ElementCell, MutableColorValue, SizeConstraint, StaticLabel};
 

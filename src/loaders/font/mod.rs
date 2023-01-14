@@ -30,7 +30,7 @@ struct GlyphData {
     color: Color,
 }
 
-fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, default_color: Color) -> (Vec<GlyphData>, f32) {
+fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, default_color: Color) -> (Vec<GlyphData>, Vector2<f32>) {
     let mut result = Vec::new();
     let v_metrics = font.v_metrics(scale);
     let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
@@ -84,7 +84,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
         result.push(GlyphData { glyph, color });
     }
 
-    (result, caret.y)
+    (result, Vector2::new(caret.x, caret.y))
 }
 
 impl FontLoader {
@@ -149,8 +149,8 @@ impl FontLoader {
         }
     }
 
-    pub fn get_text_height(&mut self, text: &str, font_size: f32, available_width: f32) -> f32 {
-        let (_, height) = layout_paragraph(
+    pub fn get_text_dimensions(&self, text: &str, font_size: f32, available_width: f32) -> Vector2<f32> {
+        let (_, size) = layout_paragraph(
             &self.font,
             Scale::uniform(font_size),
             available_width,
@@ -158,7 +158,7 @@ impl FontLoader {
             Color::monochrome(0),
         );
 
-        height
+        size
     }
 
     pub fn get(
@@ -168,7 +168,7 @@ impl FontLoader {
         font_size: f32,
         available_width: f32,
     ) -> (Vec<(Rect<f32>, Rect<i32>, Color)>, f32) {
-        let (glyphs, heigth) = layout_paragraph(&self.font, Scale::uniform(font_size), available_width, text, default_color);
+        let (glyphs, size) = layout_paragraph(&self.font, Scale::uniform(font_size), available_width, text, default_color);
 
         for glyph in &glyphs {
             self.cache.queue_glyph(0, glyph.glyph.clone());
@@ -220,7 +220,7 @@ impl FontLoader {
                         .map(|tuple| (tuple.0, tuple.1, glyph.color))
                 })
                 .collect(),
-            heigth,
+            size.y,
         )
     }
 

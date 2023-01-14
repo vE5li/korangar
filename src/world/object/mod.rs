@@ -12,15 +12,11 @@ use crate::world::*;
 pub struct Object {
     pub name: Option<String>,
     pub model_name: String,
-    pub model: Option<Arc<Model>>,
+    pub model: Arc<Model>,
     pub transform: Transform,
 }
 
 impl Object {
-    pub fn set_model(&mut self, model: Arc<Model>) {
-        self.model = Some(model);
-    }
-
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.transform.position += offset;
     }
@@ -29,15 +25,12 @@ impl Object {
     where
         T: Renderer + GeometryRenderer,
     {
-        if let Some(model) = &self.model {
-            model.render_geometry(render_target, renderer, camera, &self.transform, client_tick, time);
-        } else {
-            println!("model not loaded");
-        }
+        self.model
+            .render_geometry(render_target, renderer, camera, &self.transform, client_tick, time);
     }
 
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
-        self.model.as_ref().unwrap().get_bounding_box_matrix(&self.transform)
+        self.model.get_bounding_box_matrix(&self.transform)
     }
 
     #[cfg(feature = "debug")]
@@ -47,11 +40,7 @@ impl Object {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        if let Some(model) = &self.model {
-            model.render_bounding_box(render_target, renderer, camera, &self.transform);
-        } else {
-            println!("model not loaded");
-        }
+        self.model.render_bounding_box(render_target, renderer, camera, &self.transform);
     }
 
     #[cfg(feature = "debug")]

@@ -65,6 +65,16 @@ impl MapLoader {
         let textures = load_textures(&ground_data, texture_loader, game_file_loader);
         apply_map_offset(&ground_data, &mut map_data.resources);
 
+        let mut objects: Vec<Object> = Vec::new();
+
+        // Loading object models
+        map_data.resources.objects.iter_mut().for_each(|object_data| {
+            let array: [f32; 3] = object_data.transform.scale.into();
+            let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
+            let model = model_loader.get(game_file_loader, texture_loader, object_data.model_name.as_str(), reverse_order);
+            objects.push(Object::new(object_data.name.to_owned(), object_data.model_name.to_owned(), model.unwrap(), object_data.transform.clone()));
+        });
+
         let map = Arc::new(Map::new(
             map_data.version.into(),
             ground_data.version.into(),
@@ -76,7 +86,7 @@ impl MapLoader {
             ground_vertex_buffer,
             water_vertex_buffer,
             textures,
-            map_data.resources.objects,
+            objects,
             map_data.resources.light_sources,
             map_data.resources.sound_sources,
             map_data.resources.effect_sources,
@@ -128,14 +138,6 @@ fn parse_map_data(
     }
 
     let mut map_data = MapData::from_bytes(&mut byte_stream, None);
-
-    // Loading object models
-    map_data.resources.objects.iter_mut().for_each(|object| {
-        let array: [f32; 3] = object.transform.scale.into();
-        let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
-        let model = model_loader.get(game_file_loader, texture_loader, object.model_name.as_str(), reverse_order);
-        object.set_model(model.unwrap());
-    });
 
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(&resource_file);

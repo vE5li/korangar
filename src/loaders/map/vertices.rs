@@ -176,12 +176,11 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
 }
 
 pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoader, game_file_loader: &mut GameFileLoader) -> Vec<Texture> {
-    let mut textures = Vec::new();
-    ground_data.textures.iter().for_each(|texture_name| {
-        let texture = texture_loader.get(&texture_name, game_file_loader).unwrap();
-        textures.push(texture);
-    });
-    textures
+    ground_data
+        .textures
+        .iter()
+        .map(|texture_name| texture_loader.get(texture_name, game_file_loader).unwrap())
+        .collect()
 }
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {

@@ -1,10 +1,10 @@
 use cgmath::{Deg, Vector3};
 use derive_new::new;
-use procedural::PrototypeElement;
+use procedural::{PrototypeElement, ByteConvertable};
 
-use crate::graphics::{Color, Transform};
+use crate::graphics::{Transform, Color, ColorRGB};
 use crate::loaders::{ByteConvertable, ByteStream};
-use crate::world::{EffectSource, LightSource, Object, SoundSource};
+use crate::world::{EffectSource, LightSource, SoundSource};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ResourceType {
@@ -26,10 +26,22 @@ impl ResourceType {
     }
 }
 
+#[derive(new)]
+pub struct ObjectData {
+    pub name: Option<String>,
+    pub model_name: String,
+    pub transform: Transform,
+}
+impl ObjectData {
+    pub fn offset(&mut self, offset: Vector3<f32>) {
+        self.transform.position += offset;
+    }
+}
+
 #[allow(dead_code)]
 pub struct MapResources {
     resources_amount: usize,
-    pub objects: Vec<Object>,
+    pub objects: Vec<ObjectData>,
     pub light_sources: Vec<LightSource>,
     pub sound_sources: Vec<SoundSource>,
     pub effect_sources: Vec<EffectSource>,
@@ -63,7 +75,7 @@ impl ByteConvertable for MapResources {
                         // offset the objects slightly to avoid depth buffer fighting
                         let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
                         let transform = Transform::from(position, rotation.map(Deg), scale);
-                        let object = Object::new(Some(name), model_name, None, transform);
+                        let object = ObjectData::new(Some(name), model_name, transform);
                         objects.push(object);
                     } else {
                         let model_name = byte_stream.string(80);
@@ -72,21 +84,12 @@ impl ByteConvertable for MapResources {
                         let rotation = byte_stream.vector3();
                         let scale = byte_stream.vector3();
                         let transform = Transform::from(position, rotation.map(Deg), scale);
-                        let object = Object::new(None, model_name, None, transform);
+                        let object = ObjectData::new(None, model_name, transform);
                         objects.push(object);
                     }
                 }
                 ResourceType::LightSource => {
-                    let name = byte_stream.string(80);
-                    let position = byte_stream.vector3_flipped();
-                    let red = byte_stream.float32();
-                    let green = byte_stream.float32();
-                    let blue = byte_stream.float32();
-
-                    let color = Color::rgb_f32(red, green, blue);
-                    let range = byte_stream.float32();
-
-                    light_sources.push(LightSource::new(name, position, color, range));
+                    light_sources.push(LightSource::from_bytes(byte_stream, None));
                 }
                 ResourceType::SoundSource => {
                     let name = byte_stream.string(80);

@@ -105,7 +105,10 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
 
         // base to byte implementation
         let to_implementation = match is_repeating || version_restricted {
-            true => quote!(panic!("implement for to_bytes aswell")),
+            true => quote!({
+                panic!("implement for to_bytes aswell");
+                [0u8].as_slice()
+            }),
             false => quote!(crate::loaders::ByteConvertable::to_bytes(&self.#field_identifier, #length_hint).as_slice()),
         };
 

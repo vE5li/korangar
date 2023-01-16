@@ -16,11 +16,6 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
         _ => panic!(),
     };
 
-    let return_vector = match to_bytes_implementations.is_empty() {
-        true => quote!(Vec::new()),
-        false => quote!([#(#to_bytes_implementations),*].concat()),
-    };
-
     quote! {
         impl #impl_generics crate::loaders::ByteConvertable for #name #type_generics #where_clause {
 
@@ -34,7 +29,7 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
             #[allow(unreachable_code)]
             fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
-                #return_vector
+                [#(#to_bytes_implementations),*].concat()
             }
         }
     }

@@ -92,30 +92,44 @@ impl Color {
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-pub struct ColorBGR {
+pub struct ColorBGRA {
     pub blue: u8,
     pub green: u8,
     pub red: u8,
-    pub unused: u8,
+    pub alpha: u8,
 }
 
-impl From<ColorBGR> for Color {
-    fn from(color: ColorBGR) -> Self {
-        Self::rgb(color.red, color.green, color.blue)
+impl From<ColorBGRA> for Color {
+    fn from(color: ColorBGRA) -> Self {
+        Self::rgba(color.red, color.green, color.blue, color.alpha)
     }
 }
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 pub struct ColorRGB {
-    pub red: u8,
-    pub green: u8,
-    pub blue: u8,
-    pub unused: u8,
+    pub red: f32,
+    pub green: f32,
+    pub blue: f32,
 }
 
 impl From<ColorRGB> for Color {
     fn from(color: ColorRGB) -> Self {
-        Self::rgb(color.red, color.green, color.blue)
+        Self::rgb_f32(color.red, color.green, color.blue)
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+pub struct ColorRGBA {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub alpha: u8,
+}
+
+impl From<ColorRGBA> for Color {
+    fn from(color: ColorRGBA) -> Self {
+        Self::rgba(color.red, color.green, color.blue, color.alpha)
     }
 }

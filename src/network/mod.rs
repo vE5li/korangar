@@ -832,7 +832,7 @@ struct MapTypePacket {
 #[header(0xc3, 0x01)]
 struct BroadcastMessagePacket {
     pub packet_length: u16,
-    pub font_color: ColorRGB,
+    pub font_color: ColorRGBA,
     pub font_type: u16,
     pub font_size: u16,
     pub font_alignment: u16,
@@ -849,7 +849,7 @@ struct BroadcastMessagePacket {
 struct EntityMessagePacket {
     pub packet_length: u16,
     pub entity_id: EntityId,
-    pub color: ColorBGR,
+    pub color: ColorBGRA,
     #[length_hint(self.packet_length - 12)]
     pub message: String,
 }

@@ -1,7 +1,7 @@
 use procedural::*;
 
 pub use super::resource::MapResources;
-use crate::graphics::ColorBGR;
+use crate::graphics::ColorBGRA;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
 use crate::loaders::{ByteConvertable, ByteStream, MajorFirst, Version};
 use crate::world::Tile;
@@ -142,5 +142,5 @@ pub struct Surface {
     pub v: [f32; 4],
     pub texture_index: i16,
     pub light_map_index: i16,
-    pub color: ColorBGR,
+    pub color: ColorBGRA,
 }

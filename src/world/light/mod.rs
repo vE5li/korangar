@@ -10,7 +10,7 @@ use crate::world::MarkerIdentifier;
 pub struct LightSource {
     pub name: String,
     pub position: Vector3<f32>,
-    pub color: ColorRGB,
+    pub color: ColorRGBA,
     pub range: f32,
 }
 

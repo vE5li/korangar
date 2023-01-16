@@ -13,7 +13,7 @@ use procedural::*;
 pub use self::login::LoginSettings;
 #[cfg(feature = "debug_network")]
 use crate::debug::Timer;
-use crate::graphics::{Color, ColorBGR, ColorRGB};
+use crate::graphics::{Color, ColorBGRA, ColorRGBA};
 #[cfg(feature = "debug_network")]
 use crate::interface::PacketEntry;
 use crate::interface::{CharacterSelectionWindow, ElementCell, PrototypeElement, TrackedState};
@@ -1446,7 +1446,7 @@ struct MarkMinimapPositionPacket {
     pub marker_type: MarkerType,
     pub position: Vector2<u32>,
     pub id: u8,
-    pub color: ColorRGB,
+    pub color: ColorRGBA,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]

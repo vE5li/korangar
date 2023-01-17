@@ -54,7 +54,8 @@ impl MapLoader {
         let mut gat_data = parse_gat_data(map_data.gat_file.unwrap().as_str(), game_file_loader)?;
 
         let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
-        let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, -map_data.water_settings.water_level);
+        let water_level = -map_data.water_settings.water_level.unwrap();
+        let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
 
         let ground_vertices = NativeModelVertex::to_vertices(ground_vertices);
         let ground_vertex_buffer = get_vertex_buffer(&self.memory_allocator, ground_vertices);
@@ -72,7 +73,12 @@ impl MapLoader {
             let array: [f32; 3] = object_data.transform.scale.into();
             let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
             let model = model_loader.get(game_file_loader, texture_loader, object_data.model_name.as_str(), reverse_order);
-            objects.push(Object::new(object_data.name.to_owned(), object_data.model_name.to_owned(), model.unwrap(), object_data.transform.clone()));
+            objects.push(Object::new(
+                object_data.name.to_owned(),
+                object_data.model_name.to_owned(),
+                model.unwrap(),
+                object_data.transform.clone(),
+            ));
         });
 
         let map = Arc::new(Map::new(

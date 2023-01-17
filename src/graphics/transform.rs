@@ -11,6 +11,15 @@ pub struct Transform {
     pub scale: Vector3<f32>,
 }
 
+impl crate::loaders::ByteConvertable for Transform {
+    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, _length_hint: Option<usize>) -> Self {
+        let position = byte_stream.vector3_flipped();
+        let rotation = byte_stream.vector3();
+        let scale = byte_stream.vector3();
+        Transform::from(position, rotation.map(Deg), scale)
+    }
+}
+
 impl Transform {
     pub fn from(position: Vector3<f32>, rotation: Vector3<Deg<f32>>, scale: Vector3<f32>) -> Self {
         let rotation = rotation.map(|degrees| degrees.into());

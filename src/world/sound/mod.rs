@@ -7,17 +7,20 @@ use crate::graphics::{Camera, MarkerRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-#[derive(PrototypeElement, PrototypeWindow, new)]
+#[derive(PrototypeElement, PrototypeWindow, ByteConvertable)]
 #[window_title("Sound Source")]
 pub struct SoundSource {
+    #[length_hint(80)]
     pub name: String,
+    #[length_hint(80)]
     pub sound_file: String,
     pub position: Vector3<f32>,
     pub volume: f32,
-    pub width: usize,
-    pub height: usize,
+    pub width: u32,
+    pub height: u32,
     pub range: f32,
-    pub cycle: f32,
+    #[version_equals_or_above(2, 0)]
+    pub cycle: Option<f32>,
 }
 
 impl SoundSource {

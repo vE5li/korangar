@@ -1,6 +1,6 @@
 use cgmath::{Deg, Vector3};
 use derive_new::new;
-use procedural::{PrototypeElement};
+use procedural::{PrototypeElement, ByteConvertable};
 
 use crate::graphics::{Transform, Color};
 use crate::loaders::{ByteConvertable, ByteStream};
@@ -26,12 +26,24 @@ impl ResourceType {
     }
 }
 
-#[derive(new)]
+#[derive(ByteConvertable)]
 pub struct ObjectData {
+    #[length_hint(40)]
+    #[version_equals_or_above(1, 6)]
     pub name: Option<String>,
+    #[version_equals_or_above(1, 6)]
+    pub _animation_type: Option<i32>,
+    #[version_equals_or_above(1, 6)]
+    pub _animation_speed: Option<f32>,
+    #[version_equals_or_above(1, 6)]
+    pub _block_type: Option<i32>,
+    #[length_hint(80)]
     pub model_name: String,
+    #[length_hint(80)]
+    pub _node_name: String,
     pub transform: Transform,
 }
+
 impl ObjectData {
     pub fn offset(&mut self, offset: Vector3<f32>) {
         self.transform.position += offset;
@@ -62,72 +74,29 @@ impl ByteConvertable for MapResources {
 
             match resource_type {
                 ResourceType::Object => {
-                    if byte_stream.get_version().equals_or_above(1, 6) {
-                        let name = byte_stream.string(40);
-                        let _animation_type = byte_stream.integer32();
-                        let _animation_speed = byte_stream.float32();
-                        let _block_type = byte_stream.integer32();
-                        let model_name = byte_stream.string(80);
-                        let _node_name = byte_stream.string(80);
-                        let position = byte_stream.vector3_flipped();
-                        let rotation = byte_stream.vector3();
-                        let scale = byte_stream.vector3();
-                        // offset the objects slightly to avoid depth buffer fighting
-                        let position = position + Vector3::new(0.0, 0.0005, 0.0) * index as f32;
-                        let transform = Transform::from(position, rotation.map(Deg), scale);
-                        let object = ObjectData::new(Some(name), model_name, transform);
-                        objects.push(object);
-                    } else {
-                        let model_name = byte_stream.string(80);
-                        let _node_name = byte_stream.string(80);
-                        let position = byte_stream.vector3_flipped();
-                        let rotation = byte_stream.vector3();
-                        let scale = byte_stream.vector3();
-                        let transform = Transform::from(position, rotation.map(Deg), scale);
-                        let object = ObjectData::new(None, model_name, transform);
-                        objects.push(object);
-                    }
+                    let mut object = ObjectData::from_bytes(byte_stream, None);
+                    // offset the objects slightly to avoid depth buffer fighting
+                    object.transform.position += Vector3::new(0.0, 0.0005, 0.0) * index as f32;
+                    objects.push(object);
                 }
                 ResourceType::LightSource => {
-                    light_sources.push(LightSource::from_bytes(byte_stream, None));
+                    let mut light_source = LightSource::from_bytes(byte_stream, None);
+                    light_source.position.y = -light_source.position.y;
+                    light_sources.push(light_source);
                 }
                 ResourceType::SoundSource => {
-                    let name = byte_stream.string(80);
-                    let sound_file = byte_stream.string(80);
-                    let position = byte_stream.vector3_flipped();
-                    let volume = byte_stream.float32();
-                    let width = byte_stream.integer32();
-                    let height = byte_stream.integer32();
-                    let range = byte_stream.float32();
+                    let mut sound_source = SoundSource::from_bytes(byte_stream, None);
+                    sound_source.position.y = -sound_source.position.y;
+                    if sound_source.cycle == None {
+                        sound_source.cycle = Some(4.0);
+                    }
+                    sound_sources.push(sound_source);
 
-                    let cycle = match byte_stream.get_version().equals_or_above(2, 0) {
-                        true => byte_stream.float32(),
-                        false => 4.0,
-                    };
-
-                    sound_sources.push(SoundSource::new(
-                        name,
-                        sound_file,
-                        position,
-                        volume,
-                        width as usize,
-                        height as usize,
-                        range,
-                        cycle,
-                    ));
                 }
                 ResourceType::EffectSource => {
-                    let name = byte_stream.string(80);
-                    let position = byte_stream.vector3_flipped();
-                    let effect_type = byte_stream.integer32();
-                    let emit_speed = byte_stream.float32();
-
-                    let _param0 = byte_stream.float32();
-                    let _param1 = byte_stream.float32();
-                    let _param2 = byte_stream.float32();
-                    let _param3 = byte_stream.float32();
-
-                    effect_sources.push(EffectSource::new(name, position, effect_type as usize, emit_speed));
+                    let mut effect_source = EffectSource::from_bytes(byte_stream, None);
+                    effect_source.position.y = -effect_source.position.y;
+                    effect_sources.push(effect_source);
                 }
             }
         }

@@ -232,7 +232,7 @@ impl Map {
     }
 
     pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
-        let ambient_color = get_ambient_light_color(self.light_settings.ambient_color.to_owned().into(), day_timer);
+        let ambient_color = get_ambient_light_color(self.light_settings.ambient_color.to_owned().unwrap().into(), day_timer);
         renderer.ambient_light(render_target, ambient_color);
     }
 
@@ -247,8 +247,8 @@ impl Map {
     ) {
         let light_direction = get_light_direction(day_timer);
         let (directional_color, intensity) = get_directional_light_color_intensity(
-            self.light_settings.diffuse_color.to_owned().into(),
-            self.light_settings.light_intensity,
+            self.light_settings.diffuse_color.to_owned().unwrap().into(),
+            self.light_settings.light_intensity.unwrap(),
             day_timer,
         );
 
@@ -280,7 +280,7 @@ impl Map {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        renderer.water_light(render_target, camera, self.water_settings.water_level);
+        renderer.water_light(render_target, camera, self.water_settings.water_level.unwrap());
     }
 
     #[cfg(feature = "debug")]

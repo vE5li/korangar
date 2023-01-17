@@ -1,6 +1,8 @@
 use std::fmt::{Display, Formatter, Result};
 use std::marker::PhantomData;
+
 use derive_new::new;
+
 use super::ByteConvertable;
 
 #[derive(Copy, Clone, Debug)]
@@ -58,11 +60,7 @@ pub struct InternalVersion {
 
 impl<T> From<Version<T>> for InternalVersion {
     fn from(version: Version<T>) -> Self {
-        let Version {
-            major,
-            minor,
-            ..
-        } = version;
+        let Version { major, minor, .. } = version;
         Self { major, minor }
     }
 }

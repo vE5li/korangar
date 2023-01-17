@@ -1,5 +1,4 @@
 use cgmath::Vector3;
-use derive_new::new;
 use procedural::*;
 
 #[cfg(feature = "debug")]
@@ -7,13 +6,18 @@ use crate::graphics::{Camera, MarkerRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-#[derive(PrototypeElement, PrototypeWindow, new)]
+#[derive(PrototypeElement, PrototypeWindow, ByteConvertable)]
 #[window_title("Effect Source")]
 pub struct EffectSource {
+    #[length_hint(80)]
     pub name: String,
     pub position: Vector3<f32>,
-    pub effect_type: usize, // TODO: fix this
+    pub effect_type: u32, // TODO: fix this
     pub emit_speed: f32,
+    pub _param0: f32,
+    pub _param1: f32,
+    pub _param2: f32,
+    pub _param3: f32,
 }
 
 impl EffectSource {

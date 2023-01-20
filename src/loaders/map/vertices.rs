@@ -22,7 +22,7 @@ pub fn get_vertex_buffer<T>(memory_allocator: &Arc<MemoryAllocator>, data: Vec<T
 where
     [T]: BufferContents,
 {
-    let vertex_buffer = CpuAccessibleBuffer::from_iter(
+    CpuAccessibleBuffer::from_iter(
         &*memory_allocator.clone(),
         BufferUsage {
             vertex_buffer: true,
@@ -31,8 +31,7 @@ where
         false,
         data,
     )
-    .unwrap();
-    vertex_buffer
+    .unwrap()
 }
 
 pub fn optional_vertex_buffer<T>(memory_allocator: &Arc<MemoryAllocator>, data: Vec<T>) -> Option<Arc<CpuAccessibleBuffer<[T]>>>
@@ -114,21 +113,21 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         first_position,
                         first_normal,
                         first_texture_coordinates,
-                        ground_surface.texture_index as i32,
+                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         second_position,
                         first_normal,
                         second_texture_coordinates,
-                        ground_surface.texture_index as i32,
+                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         third_position,
                         first_normal,
                         third_texture_coordinates,
-                        ground_surface.texture_index as i32,
+                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
                         0.0,
                     ));
 
@@ -136,21 +135,21 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         first_position,
                         second_normal,
                         first_texture_coordinates,
-                        ground_surface.texture_index as i32,
+                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         third_position,
                         second_normal,
                         third_texture_coordinates,
-                        ground_surface.texture_index as i32,
+                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
                         fourth_position,
                         second_normal,
                         fourth_texture_coordinates,
-                        ground_surface.texture_index as i32,
+                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
                         0.0,
                     ));
                 }

@@ -2468,13 +2468,17 @@ impl NetworkingSystem {
 
             while !byte_stream.is_empty() {
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
-                    let chat_message = ChatMessage::new(packet.message, packet.font_color.into());
+                    // NOTE: Drop the alpha channel because it might be 0.
+                    let color = Color::rgb(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
+                    let chat_message = ChatMessage::new(packet.message, color);
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {
                     let chat_message = ChatMessage::new(packet.message, Color::monochrome(255));
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(packet) = EntityMessagePacket::try_from_bytes(&mut byte_stream) {
-                    let chat_message = ChatMessage::new(packet.message, packet.color.into());
+                    // NOTE: Drop the alpha channel because it might be 0.
+                    let color = Color::rgb(packet.color.red, packet.color.green, packet.color.blue);
+                    let chat_message = ChatMessage::new(packet.message, color);
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(_) = DisplayEmotionPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = EntityMovePacket::try_from_bytes(&mut byte_stream) {

@@ -238,13 +238,13 @@ pub struct ActionLoader {
 impl ActionLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load actions from {}{}{}", MAGENTA, path, NONE));
+        let timer = Timer::new_dynamic(format!("load actions from {MAGENTA}{path}{NONE}"));
 
-        let bytes = game_file_loader.get(&format!("data\\sprite\\{}", path))?;
+        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         if byte_stream.string(2).as_str() != "AC" {
-            return Err(format!("failed to read magic number from {}", path));
+            return Err(format!("failed to read magic number from {path}"));
         }
 
         let actions_data = ActionsData::from_bytes(&mut byte_stream, None);

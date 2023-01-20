@@ -5,7 +5,6 @@ use super::version::InternalVersion;
 use super::Version;
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::Color;
 #[cfg(feature = "debug_network")]
 use crate::interface::PacketEntry;
 #[cfg(feature = "debug_network")]
@@ -64,26 +63,6 @@ impl<'b> ByteStream<'b> {
         signature_matches
     }
 
-    pub fn version(&mut self) -> InternalVersion {
-        let major = self.next();
-        let minor = self.next();
-
-        InternalVersion::new(major, minor)
-    }
-
-    pub fn byte(&mut self) -> u8 {
-        self.next()
-    }
-
-    pub fn integer16(&mut self) -> i16 {
-        let mut value = 0;
-
-        value |= self.next() as i16;
-        value |= (self.next() as i16) << 8;
-
-        value
-    }
-
     pub fn integer32(&mut self) -> i32 {
         let mut value = 0;
 
@@ -137,14 +116,6 @@ impl<'b> ByteStream<'b> {
         Vector3::new(x, -y, z)
     }
 
-    pub fn color(&mut self) -> Color {
-        let red = self.float32();
-        let green = self.float32();
-        let blue = self.float32();
-
-        Color::rgb((red * 255.0) as u8, (green * 255.0) as u8, (blue * 255.0) as u8)
-    }
-
     pub fn slice(&mut self, count: usize) -> Vec<u8> {
         let mut value = Vec::new();
 
@@ -152,6 +123,15 @@ impl<'b> ByteStream<'b> {
             let byte = self.next();
             value.push(byte);
         }
+
+        value
+    }
+
+    pub fn integer16(&mut self) -> i16 {
+        let mut value = 0;
+
+        value |= self.next() as i16;
+        value |= (self.next() as i16) << 8;
 
         value
     }

@@ -34,7 +34,6 @@ impl EquipmentContainer {
             let items = items.borrow();
 
             (0..SLOT_POSITIONS.len())
-                .into_iter()
                 .map(|index| {
                     let slot = SLOT_POSITIONS[index];
 

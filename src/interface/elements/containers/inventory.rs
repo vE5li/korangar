@@ -21,7 +21,6 @@ impl InventoryContainer {
             let items = items.borrow();
 
             (0..40)
-                .into_iter()
                 .map(|index| items.get(index).cloned())
                 .map(|item| ItemBox::new(item, ItemSource::Inventory, Box::new(|_| false)))
                 .map(ItemBox::wrap)

@@ -49,7 +49,7 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut map_data = parse_map_data(&resource_file, model_loader, game_file_loader, texture_loader)?;
+        let mut map_data = parse_map_data(&resource_file, game_file_loader)?;
         let ground_data = parse_ground_data(map_data.ground_file.as_str(), game_file_loader)?;
         let mut gat_data = parse_gat_data(map_data.gat_file.unwrap().as_str(), game_file_loader)?;
 
@@ -77,7 +77,7 @@ impl MapLoader {
                 object_data.name.to_owned(),
                 object_data.model_name.to_owned(),
                 model.unwrap(),
-                object_data.transform.clone(),
+                object_data.transform,
             ));
         });
 
@@ -115,6 +115,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
         0.0,
         ground_data.height as f32 * MAP_OFFSET,
     );
+
     resources.objects.iter_mut().for_each(|object| object.offset(offset));
     resources
         .sound_sources
@@ -130,12 +131,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
         .for_each(|effect_source| effect_source.offset(offset));
 }
 
-fn parse_map_data(
-    resource_file: &str,
-    model_loader: &mut ModelLoader,
-    game_file_loader: &mut GameFileLoader,
-    texture_loader: &mut TextureLoader,
-) -> Result<MapData, String> {
+fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) -> Result<MapData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}.rsw", &resource_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
 
@@ -143,10 +139,10 @@ fn parse_map_data(
         return Err(format!("failed to read magic number from {}.rsw", &resource_file));
     }
 
-    let mut map_data = MapData::from_bytes(&mut byte_stream, None);
+    let map_data = MapData::from_bytes(&mut byte_stream, None);
 
     #[cfg(feature = "debug")]
-    byte_stream.assert_empty(&resource_file);
+    byte_stream.assert_empty(resource_file);
     Ok(map_data)
 }
 
@@ -160,7 +156,7 @@ fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -
     let ground_data = GroundData::from_bytes(&mut byte_stream, None);
 
     #[cfg(feature = "debug")]
-    byte_stream.assert_empty(&ground_file);
+    byte_stream.assert_empty(ground_file);
     Ok(ground_data)
 }
 
@@ -174,6 +170,6 @@ fn parse_gat_data(gat_file: &str, game_file_loader: &mut GameFileLoader) -> Resu
 
     let gat_data = GatData::from_bytes(&mut byte_stream, None);
     #[cfg(feature = "debug")]
-    byte_stream.assert_empty(&gat_file);
+    byte_stream.assert_empty(gat_file);
     Ok(gat_data)
 }

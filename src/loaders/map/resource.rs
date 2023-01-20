@@ -20,7 +20,7 @@ impl ResourceType {
             2 => ResourceType::LightSource,
             3 => ResourceType::SoundSource,
             4 => ResourceType::EffectSource,
-            _ => panic!("invalid object type {}", index),
+            _ => panic!("invalid object type {index}"),
         }
     }
 }
@@ -86,9 +86,11 @@ impl ByteConvertable for MapResources {
                 ResourceType::SoundSource => {
                     let mut sound_source = SoundSource::from_bytes(byte_stream, None);
                     sound_source.position.y = -sound_source.position.y;
-                    if sound_source.cycle == None {
+
+                    if sound_source.cycle.is_none() {
                         sound_source.cycle = Some(4.0);
                     }
+
                     sound_sources.push(sound_source);
                 }
                 ResourceType::EffectSource => {

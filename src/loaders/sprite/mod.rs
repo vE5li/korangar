@@ -144,13 +144,13 @@ pub struct SpriteLoader {
 impl SpriteLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load sprite from {}{}{}", MAGENTA, path, NONE));
+        let timer = Timer::new_dynamic(format!("load sprite from {MAGENTA}{path}{NONE}"));
 
-        let bytes = game_file_loader.get(&format!("data\\sprite\\{}", path))?;
+        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         if byte_stream.string(2).as_str() != "SP" {
-            return Err(format!("failed to read magic number from {}", path));
+            return Err(format!("failed to read magic number from {path}"));
         }
 
         let sprite_data = SpriteData::from_bytes(&mut byte_stream, None);

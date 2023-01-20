@@ -22,7 +22,7 @@ pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + D
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> MutableNumberValue<T> {
     pub fn new(name: String, inner_pointer: *const T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
         let cached_inner = unsafe { *inner_pointer };
-        let cached_values = format!("{:.1}", cached_inner);
+        let cached_values = format!("{cached_inner:.1}");
         let state = ElementState::default();
 
         Self {

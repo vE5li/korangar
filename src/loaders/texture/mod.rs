@@ -30,20 +30,20 @@ pub struct TextureLoader {
 impl TextureLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Texture, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load texture from {}{}{}", MAGENTA, path, NONE));
+        let timer = Timer::new_dynamic(format!("load texture from {MAGENTA}{path}{NONE}"));
 
         let image_format = match &path[path.len() - 4..] {
             ".png" => ImageFormat::Png,
             ".bmp" | ".BMP" => ImageFormat::Bmp,
             ".tga" | ".TGA" => ImageFormat::Tga,
-            extension => return Err(format!("unsupported file format {}", extension)),
+            extension => return Err(format!("unsupported file format {extension}")),
         };
 
-        let file_data = game_file_loader.get(&format!("data\\texture\\{}", path))?;
+        let file_data = game_file_loader.get(&format!("data\\texture\\{path}"))?;
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
         let mut image_buffer = reader
             .decode()
-            .map_err(|error| format!("failed to decode image file ({})", error))?
+            .map_err(|error| format!("failed to decode image file ({error})"))?
             .to_rgba8();
 
         if image_format == ImageFormat::Bmp {

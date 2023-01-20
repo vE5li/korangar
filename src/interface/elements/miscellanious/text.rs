@@ -9,7 +9,6 @@ pub struct Text {
     text: Option<ElementText>,
     foreground_color: Option<ColorSelector>,
     width_constraint: Option<DimensionConstraint>,
-    cached_text: String,
     font_size: Option<FontSizeSelector>,
     state: ElementState,
 }

@@ -195,7 +195,7 @@ impl ByteConvertable for String {
         match length_hint {
             Some(length) => {
                 assert!(self.len() <= length, "string is to long for the byte stream");
-                let padding = (0..length - self.len()).into_iter().map(|_| 0);
+                let padding = (0..length - self.len()).map(|_| 0);
                 self.bytes().chain(padding).collect()
             }
             None => self.bytes().chain(iter::once(0)).collect(),

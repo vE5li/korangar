@@ -122,7 +122,7 @@ impl FontLoader {
         let font_path = "data\\WenQuanYiMicroHei.ttf";
         let data = game_file_loader.get(font_path).unwrap();
         let font = Font::try_from_vec(data).unwrap_or_else(|| {
-            panic!("error constructing a Font from data at {:?}", font_path);
+            panic!("error constructing a Font from data at {font_path:?}");
         });
 
         let mut builder = AutoCommandBufferBuilder::primary(

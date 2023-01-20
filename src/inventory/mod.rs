@@ -51,7 +51,7 @@ impl Inventory {
             .into_iter()
             .map(|item_data| {
                 let resource_name = script_loader.get_item_resource_from_id(item_data.1);
-                let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
+                let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
                 let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
                 Item {
                     index: item_data.0,
@@ -86,7 +86,7 @@ impl Inventory {
             }
 
             let resource_name = script_loader.get_item_resource_from_id(item_id);
-            let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{}.bmp", resource_name);
+            let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
             let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
             let item = Item {
                 index: item_index,

@@ -67,9 +67,9 @@ pub struct GameArchive {
 impl GameArchive {
     pub fn load(path: &str, lua_files: &mut Vec<String>) -> Self {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load game data from {}{}{}", MAGENTA, path, NONE));
+        let timer = Timer::new_dynamic(format!("load game data from {MAGENTA}{path}{NONE}"));
 
-        let bytes = fs::read(path).unwrap_or_else(|_| panic!("failed to load archive from {}", path));
+        let bytes = fs::read(path).unwrap_or_else(|_| panic!("failed to load archive from {path}"));
         let mut byte_stream = ByteStream::new(&bytes);
 
         assert!(
@@ -202,11 +202,10 @@ impl GameFileLoader {
             .archives
             .iter_mut() // convert this to a multithreaded iter ?
             .find_map(|archive| archive.get(&path.to_lowercase()))
-            .ok_or(format!("failed to find file {}", path));
+            .ok_or(format!("failed to find file {path}"));
 
+        // TODO: should this be removed in the future or left in for resilience?
         if result.is_err() {
-            // TEMP
-
             #[cfg(feature = "debug")]
             print_debug!("failed to find file {}; tying to replace it with placeholder", path);
 

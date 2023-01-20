@@ -1009,7 +1009,7 @@ impl ByteConvertable for StatusType {
             250 => Self::SpUspl(u8::from_bytes(&mut byte_stream, None)),
             251 => Self::SpUcon(u8::from_bytes(&mut byte_stream, None)),
             252 => Self::SpUcrt(u8::from_bytes(&mut byte_stream, None)),
-            invalid => panic!("invalid status code {}", invalid),
+            invalid => panic!("invalid status code {invalid}"),
         }
     }
 }
@@ -2359,7 +2359,7 @@ impl NetworkingSystem {
 
         Ok((
             character_information,
-            character_selection_success_packet.map_name.replace(".gat", "").to_string(),
+            character_selection_success_packet.map_name.replace(".gat", ""),
         ))
     }
 
@@ -2491,7 +2491,7 @@ impl NetworkingSystem {
                     events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
                 } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::ChangeMap(
-                        packet.map_name.replace(".gat", "").to_string(),
+                        packet.map_name.replace(".gat", ""),
                         Vector2::new(packet.x as usize, packet.y as usize),
                     ));
                 } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) {

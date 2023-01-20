@@ -1,4 +1,3 @@
-use derive_new::new;
 use procedural::ByteConvertable;
 
 use crate::loaders::{ByteConvertable, ByteStream};
@@ -28,7 +27,7 @@ impl TileType {
             4 => Self(WATER | SNIPABLE),
             5 => Self(CLIFF | SNIPABLE),
             6 => Self(CLIFF),
-            invalid => panic!("invalid tile type {}", invalid),
+            invalid => panic!("invalid tile type {invalid}"),
         }
     }
 

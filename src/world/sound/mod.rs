@@ -1,5 +1,4 @@
 use cgmath::Vector3;
-use derive_new::new;
 use procedural::*;
 
 #[cfg(feature = "debug")]

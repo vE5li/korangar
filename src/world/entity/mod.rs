@@ -112,8 +112,8 @@ impl Common {
             EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
         };
 
-        let sprite = sprite_loader.get(&format!("{}.spr", file_path), game_file_loader).unwrap();
-        let actions = action_loader.get(&format!("{}.act", file_path), game_file_loader).unwrap();
+        let sprite = sprite_loader.get(&format!("{file_path}.spr"), game_file_loader).unwrap();
+        let actions = action_loader.get(&format!("{file_path}.act"), game_file_loader).unwrap();
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(client_tick);
 

@@ -1,5 +1,5 @@
 #[cfg(feature = "plain")]
-mod colors {
+mod color_codes {
     pub const GREEN: &str = "";
     pub const RED: &str = "";
     pub const CYAN: &str = "";
@@ -9,7 +9,7 @@ mod colors {
 }
 
 #[cfg(not(feature = "plain"))]
-mod colors {
+mod color_codes {
     pub const GREEN: &str = "\x1B[32m";
     pub const RED: &str = "\x1B[31m";
     pub const CYAN: &str = "\x1B[36m";
@@ -18,4 +18,4 @@ mod colors {
     pub const NONE: &str = "\x1B[0m";
 }
 
-pub use self::colors::*;
+pub use self::color_codes::*;

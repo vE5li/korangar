@@ -15,7 +15,7 @@ pub fn print_indented(message: String, newline: bool) {
 
     if stack_size() > 0 {
         if get_message_count() == 0 {
-            println!(" {} started", ARROW);
+            println!(" {ARROW} started");
         }
 
         increment_message_count();
@@ -26,10 +26,10 @@ pub fn print_indented(message: String, newline: bool) {
     }
 
     if offset != 0 {
-        print!("{} ", NEWLINE);
+        print!("{NEWLINE} ");
     }
 
-    print!("{}", message);
+    print!("{message}");
 
     if newline {
         println!();

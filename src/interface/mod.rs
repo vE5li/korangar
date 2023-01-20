@@ -488,7 +488,7 @@ impl Interface {
     }
 
     pub fn get_window(&self, window_index: usize) -> &Window {
-        return &self.windows[window_index].0;
+        &self.windows[window_index].0
     }
 
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState, window_class: &str) {

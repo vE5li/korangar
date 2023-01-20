@@ -36,7 +36,7 @@ where
 
 impl ElementDisplay for f32 {
     fn display(&self) -> String {
-        format!("{:.1}", self)
+        format!("{self:.1}")
     }
 }
 

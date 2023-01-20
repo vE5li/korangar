@@ -62,7 +62,7 @@ impl FocusState {
         self.previous_hovered_element
             .as_ref()
             .zip(hovered_element.as_ref())
-            .map(|(previous, current)| !Weak::ptr_eq(&previous, &Rc::downgrade(current)))
+            .map(|(previous, current)| !Weak::ptr_eq(previous, &Rc::downgrade(current)))
             .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some())
     }
 
@@ -70,20 +70,20 @@ impl FocusState {
         self.previous_focused_element
             .as_ref()
             .zip(self.focused_element.as_ref())
-            .map(|(previous, current)| !Weak::ptr_eq(&previous, &current))
+            .map(|(previous, current)| !Weak::ptr_eq(previous, current))
             .unwrap_or(self.previous_focused_element.is_some() || self.focused_element.is_some())
     }
 
     pub fn previous_hovered_window(&self) -> Option<usize> {
-        self.previous_hovered_window.clone()
+        self.previous_hovered_window
     }
 
     pub fn focused_window(&self) -> Option<usize> {
-        self.focused_window.clone()
+        self.focused_window
     }
 
     pub fn previous_focused_window(&self) -> Option<usize> {
-        self.previous_focused_window.clone()
+        self.previous_focused_window
     }
 
     pub fn update(&mut self, hovered_element: &Option<ElementCell>, window_index: Option<usize>) -> Option<ElementCell> {
@@ -91,7 +91,7 @@ impl FocusState {
         self.previous_hovered_window = window_index;
 
         self.previous_focused_element = self.focused_element.clone();
-        self.previous_focused_window = self.focused_window.clone();
+        self.previous_focused_window = self.focused_window;
 
         self.focused_element.clone().and_then(|weak_element| weak_element.upgrade())
     }
@@ -236,8 +236,8 @@ impl InputSystem {
             }
         }
 
-        if window_index.is_some() && self.left_mouse_button.pressed() {
-            focus_state.set_focused_window(window_index.unwrap())
+        if let Some(index) = window_index && self.left_mouse_button.pressed() {
+            focus_state.set_focused_window(index)
         }
 
         let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;

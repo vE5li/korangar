@@ -748,12 +748,12 @@ impl SwapchainHolder {
 
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
         let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
-            Ok(r) => r,
+            Ok(image) => image,
             Err(AcquireError::OutOfDate) => {
                 self.recreate = true;
                 return Err(());
             }
-            Err(e) => panic!("Failed to acquire next image: {:?}", e),
+            Err(error) => panic!("Failed to acquire next image: {error:?}"),
         };
 
         self.image_number = image_number as usize;
@@ -784,9 +784,9 @@ impl SwapchainHolder {
         let swapchain_result = self.swapchain.recreate(swapchain_create_info);
 
         let (swapchain, swapchain_images) = match swapchain_result {
-            Ok(r) => r,
+            Ok(swapchain) => swapchain,
             //Err(SwapchainCreationError::UnsupportedDimensions) => return,
-            Err(e) => panic!("Failed to recreate swapchain: {:?}", e),
+            Err(error) => panic!("Failed to recreate swapchain: {error:?}"),
         };
 
         self.swapchain = swapchain;

@@ -326,15 +326,15 @@ impl ModelLoader {
         reverse_order: bool,
     ) -> Result<Arc<Model>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load rsm model from {}{}{}", MAGENTA, model_file, NONE));
+        let timer = Timer::new_dynamic(format!("load rsm model from {MAGENTA}{model_file}{NONE}"));
 
-        let bytes = game_file_loader.get(&format!("data\\model\\{}", model_file))?;
+        let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
         let magic = byte_stream.string(4);
 
         if &magic != "GRSM" {
-            return Err(format!("failed to read magic number from {}", model_file));
+            return Err(format!("failed to read magic number from {model_file}"));
         }
 
         let model_data = ModelData::from_bytes(&mut byte_stream, None);

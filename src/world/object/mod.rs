@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector3};
+use cgmath::Matrix4;
 use derive_new::new;
 use procedural::*;
 
@@ -17,10 +17,6 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn offset(&mut self, offset: Vector3<f32>) {
-        self.transform.position += offset;
-    }
-
     pub fn render_geometry<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, client_tick: ClientTick, time: f32)
     where
         T: Renderer + GeometryRenderer,

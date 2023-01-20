@@ -331,9 +331,7 @@ impl ModelLoader {
         let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        let magic = byte_stream.string(4);
-
-        if &magic != "GRSM" {
+        if <[u8; 4]>::from_bytes(&mut byte_stream, None) != [b'G', b'R', b'S', b'M'] {
             return Err(format!("failed to read magic number from {model_file}"));
         }
 

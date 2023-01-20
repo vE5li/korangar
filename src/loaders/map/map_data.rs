@@ -97,24 +97,24 @@ impl GroundTile {
 
 impl ByteConvertable for GroundTile {
     fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
-        let upper_left_height = byte_stream.float32();
-        let upper_right_height = byte_stream.float32();
-        let lower_left_height = byte_stream.float32();
-        let lower_right_height = byte_stream.float32();
+        let upper_left_height = f32::from_bytes(byte_stream, None);
+        let upper_right_height = f32::from_bytes(byte_stream, None);
+        let lower_left_height = f32::from_bytes(byte_stream, None);
+        let lower_right_height = f32::from_bytes(byte_stream, None);
 
         let top_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => byte_stream.integer32(),
-            false => byte_stream.integer16() as i32,
+            true => i32::from_bytes(byte_stream, None),
+            false => i16::from_bytes(byte_stream, None) as i32,
         };
 
         let front_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => byte_stream.integer32(),
-            false => byte_stream.integer16() as i32,
+            true => i32::from_bytes(byte_stream, None),
+            false => i16::from_bytes(byte_stream, None) as i32,
         };
 
         let right_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => byte_stream.integer32(),
-            false => byte_stream.integer16() as i32,
+            true => i32::from_bytes(byte_stream, None),
+            false => i16::from_bytes(byte_stream, None) as i32,
         };
 
         Self {

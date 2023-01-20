@@ -149,7 +149,7 @@ impl SpriteLoader {
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if byte_stream.string(2).as_str() != "SP" {
+        if <[u8; 2]>::from_bytes(&mut byte_stream, None) != [b'S', b'P'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 

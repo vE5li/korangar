@@ -2529,7 +2529,7 @@ impl NetworkingSystem {
                                     item_information.item_id,
                                     EquipPosition::None,
                                     EquipPosition::None,
-                                )); // TODO: Don't add that data here, only equippable itemes need this data
+                                )); // TODO: Don't add that data here, only equippable items need this data.
                             }
                         } else if let Ok(packet) = EquippableItemListPacket::try_from_bytes(&mut byte_stream) {
                             for item_information in packet.item_information {

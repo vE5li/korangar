@@ -1,4 +1,3 @@
-use cgmath::Vector3;
 use derive_new::new;
 
 use super::version::InternalVersion;
@@ -63,59 +62,6 @@ impl<'b> ByteStream<'b> {
         signature_matches
     }
 
-    pub fn integer32(&mut self) -> i32 {
-        let mut value = 0;
-
-        value |= self.next() as i32;
-        value |= (self.next() as i32) << 8;
-        value |= (self.next() as i32) << 16;
-        value |= (self.next() as i32) << 24;
-
-        value
-    }
-
-    pub fn string(&mut self, count: usize) -> String {
-        let mut value = String::new();
-
-        for index in 0..count {
-            let byte = self.next();
-
-            if byte == 0 {
-                self.skip(count - index - 1);
-                break;
-            }
-
-            value.push(byte as char);
-        }
-
-        value
-    }
-
-    pub fn float32(&mut self) -> f32 {
-        let first = self.next();
-        let second = self.next();
-        let third = self.next();
-        let fourth = self.next();
-
-        f32::from_le_bytes([first, second, third, fourth])
-    }
-
-    pub fn vector3(&mut self) -> Vector3<f32> {
-        let x = self.float32();
-        let y = self.float32();
-        let z = self.float32();
-
-        Vector3::new(x, y, z)
-    }
-
-    pub fn vector3_flipped(&mut self) -> Vector3<f32> {
-        let x = self.float32();
-        let y = self.float32();
-        let z = self.float32();
-
-        Vector3::new(x, -y, z)
-    }
-
     pub fn slice(&mut self, count: usize) -> Vec<u8> {
         let mut value = Vec::new();
 
@@ -123,15 +69,6 @@ impl<'b> ByteStream<'b> {
             let byte = self.next();
             value.push(byte);
         }
-
-        value
-    }
-
-    pub fn integer16(&mut self) -> i16 {
-        let mut value = 0;
-
-        value |= self.next() as i16;
-        value |= (self.next() as i16) << 8;
 
         value
     }

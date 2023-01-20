@@ -60,7 +60,7 @@ pub struct MapResources {
 
 impl ByteConvertable for MapResources {
     fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
-        let resources_amount = byte_stream.integer32() as usize;
+        let resources_amount = i32::from_bytes(byte_stream, None) as usize;
 
         let mut objects = Vec::new();
         let mut light_sources = Vec::new();
@@ -68,7 +68,7 @@ impl ByteConvertable for MapResources {
         let mut effect_sources = Vec::new();
 
         for index in 0..resources_amount {
-            let type_index = byte_stream.integer32();
+            let type_index = i32::from_bytes(byte_stream, None);
             let resource_type = ResourceType::from(type_index);
 
             match resource_type {

@@ -135,7 +135,7 @@ fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) ->
     let bytes = game_file_loader.get(&format!("data\\{}.rsw", &resource_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
 
-    if byte_stream.string(4) != "GRSW" {
+    if <[u8; 4]>::from_bytes(&mut byte_stream, None) != [b'G', b'R', b'S', b'W'] {
         return Err(format!("failed to read magic number from {}.rsw", &resource_file));
     }
 
@@ -143,33 +143,38 @@ fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) ->
 
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(resource_file);
+
     Ok(map_data)
 }
 
 fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GroundData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}", &ground_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
-    let magic = byte_stream.string(4);
-    if &magic != "GRGN" {
+
+    if <[u8; 4]>::from_bytes(&mut byte_stream, None) != [b'G', b'R', b'G', b'N'] {
         return Err(format!("failed to read magic number from {}", &ground_file));
     }
+
     let ground_data = GroundData::from_bytes(&mut byte_stream, None);
 
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(ground_file);
+
     Ok(ground_data)
 }
 
 fn parse_gat_data(gat_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GatData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}", &gat_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
-    let magic = byte_stream.string(4);
-    if &magic != "GRAT" {
+
+    if <[u8; 4]>::from_bytes(&mut byte_stream, None) != [b'G', b'R', b'A', b'T'] {
         return Err(format!("failed to read magic number from {}", &gat_file));
     }
 
     let gat_data = GatData::from_bytes(&mut byte_stream, None);
+
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(gat_file);
+
     Ok(gat_data)
 }

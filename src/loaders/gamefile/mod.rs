@@ -73,7 +73,7 @@ impl GameArchive {
         let mut byte_stream = ByteStream::new(&bytes);
 
         assert!(
-            byte_stream.string(16).as_str() == "Master of Magic",
+            String::from_bytes(&mut byte_stream, Some(16)).as_str() == "Master of Magic",
             "failed to read magic number"
         ); // TODO: change failed to invalid
 

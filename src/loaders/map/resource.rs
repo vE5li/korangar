@@ -25,7 +25,7 @@ impl ResourceType {
     }
 }
 
-#[derive(ByteConvertable)]
+#[derive(Clone, ByteConvertable, PrototypeElement)]
 pub struct ObjectData {
     #[length_hint(40)]
     #[version_equals_or_above(1, 6)]
@@ -50,6 +50,7 @@ impl ObjectData {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, PrototypeElement)]
 pub struct MapResources {
     resources_amount: usize,
     pub objects: Vec<ObjectData>,

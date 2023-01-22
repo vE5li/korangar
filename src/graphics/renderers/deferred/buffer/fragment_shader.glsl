@@ -42,8 +42,8 @@ void main() {
     }
 
     if (constants.show_water_buffer) {
-        float water = subpassLoad(water_in, 0).r;
-        output_color += vec3(0, 0, water);
+        vec4 water = subpassLoad(water_in, 0);
+        output_color += vec3(0, 0, water.r);
     }
 
     if (constants.show_depth_buffer) {

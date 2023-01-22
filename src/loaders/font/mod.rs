@@ -110,7 +110,7 @@ impl FontLoader {
         let font_atlas_image = StorageImage::with_usage(
             &*memory_allocator,
             image_dimensions,
-            Format::R8_UNORM, //R8G8B8A8_SRGB,
+            Format::R8_UNORM,
             image_usage,
             ImageCreateFlags::empty(),
             0..2,

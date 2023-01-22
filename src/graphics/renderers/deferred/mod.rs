@@ -114,7 +114,7 @@ impl DeferredRenderer {
                 water: {
                     load: Clear,
                     store: Store,
-                    format: Format::R8G8B8A8_SRGB,
+                    format: Format::R8G8B8A8_UNORM,
                     samples: 4,
                 },
                 depth: {

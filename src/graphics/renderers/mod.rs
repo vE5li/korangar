@@ -313,7 +313,7 @@ impl DeferredRenderTarget {
                 &*memory_allocator,
                 dimensions,
                 SampleCount::Sample4,
-                Format::R8G8B8A8_SRGB,
+                Format::R8G8B8A8_UNORM,
                 color_image_usage,
             )
             .unwrap(),

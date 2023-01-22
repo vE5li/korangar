@@ -51,7 +51,7 @@ impl InterfaceRenderer {
                 interface: {
                     load: DontCare,
                     store: Store,
-                    format: Format::R8G8B8A8_SRGB,
+                    format: Format::R8G8B8A8_UNORM,
                     samples: 4,
                 }
             },
@@ -203,5 +203,5 @@ impl InterfaceRenderer {
 }
 
 impl Renderer for InterfaceRenderer {
-    type Target = SingleRenderTarget<{ Format::R8G8B8A8_SRGB }, (), ClearColorValue>;
+    type Target = SingleRenderTarget<{ Format::R8G8B8A8_UNORM }, (), ClearColorValue>;
 }

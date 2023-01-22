@@ -6,7 +6,9 @@ use crate::loaders::map::resource::{LightSettings, WaterSettings};
 use crate::loaders::{ByteConvertable, ByteStream, MajorFirst, Version};
 use crate::world::Tile;
 
-#[derive(ByteConvertable)]
+#[derive(Clone, ByteConvertable, PrototypeElement, PrototypeWindow)]
+#[window_title("Map Viewer")]
+#[window_class("map_viewer")]
 pub struct MapData {
     #[version]
     pub version: Version<MajorFirst>,

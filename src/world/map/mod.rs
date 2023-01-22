@@ -3,13 +3,12 @@ mod tile;
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
-use procedural::*;
 
 pub use self::tile::{Tile, TileType};
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
-use crate::loaders::{InternalVersion, LightSettings, WaterSettings};
+use crate::loaders::{InternalVersion, LightSettings, MapData, WaterSettings};
 use crate::network::ClientTick;
 use crate::world::*;
 
@@ -82,9 +81,7 @@ impl MarkerIdentifier {
     pub const SIZE: f32 = 1.5;
 }
 
-#[derive(PrototypeElement, PrototypeWindow, new)]
-#[window_title("Map Viewer")]
-#[window_class("map_viewer")]
+#[derive(new)]
 pub struct Map {
     resource_version: InternalVersion,
     ground_version: InternalVersion,
@@ -92,22 +89,18 @@ pub struct Map {
     height: usize,
     water_settings: WaterSettings,
     light_settings: LightSettings,
-    #[hidden_element]
     tiles: Vec<Tile>,
-    #[hidden_element]
     ground_vertex_buffer: ModelVertexBuffer,
-    #[hidden_element]
     water_vertex_buffer: Option<WaterVertexBuffer>,
-    #[hidden_element]
     ground_textures: Vec<Texture>,
     objects: Vec<Object>,
     light_sources: Vec<LightSource>,
     sound_sources: Vec<SoundSource>,
     effect_sources: Vec<EffectSource>,
-    #[hidden_element]
     tile_picker_vertex_buffer: TileVertexBuffer,
-    #[hidden_element]
-    tile_vertex_buffer: ModelVertexBuffer, // make debug only
+    tile_vertex_buffer: ModelVertexBuffer,
+    #[cfg(feature = "debug")]
+    map_data: MapData,
 }
 
 impl Map {
@@ -285,7 +278,7 @@ impl Map {
 
     #[cfg(feature = "debug")]
     pub fn to_prototype_window(&self) -> &dyn PrototypeWindow {
-        self
+        &self.map_data
     }
 
     #[cfg(feature = "debug")]

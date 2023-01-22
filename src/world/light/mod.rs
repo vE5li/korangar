@@ -5,7 +5,7 @@ use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-#[derive(ByteConvertable, PrototypeElement, PrototypeWindow)]
+#[derive(Clone, ByteConvertable, PrototypeElement, PrototypeWindow)]
 #[window_title("Light Source")]
 pub struct LightSource {
     #[length_hint(80)]

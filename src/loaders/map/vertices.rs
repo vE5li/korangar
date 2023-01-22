@@ -3,9 +3,8 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use vulkano::buffer::{BufferContents, BufferUsage, CpuAccessibleBuffer};
 
-use super::map_data::GroundTile;
+use super::data::{GatData, GroundData, GroundTile, SurfaceType};
 use crate::graphics::{MemoryAllocator, ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
-use crate::loaders::map::map_data::{GatData, GroundData, SurfaceType};
 use crate::loaders::{GameFileLoader, TextureLoader};
 
 const TILE_SIZE: f32 = 10.0;

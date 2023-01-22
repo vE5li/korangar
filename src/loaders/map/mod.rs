@@ -1,6 +1,6 @@
-pub mod map_data;
-pub mod resource;
-pub mod vertices;
+mod data;
+mod resource;
+mod vertices;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -8,7 +8,10 @@ use std::sync::Arc;
 use cgmath::Vector3;
 use derive_new::new;
 
-use self::map_data::*;
+#[cfg(feature = "debug")]
+pub use self::data::MapData;
+use self::data::*;
+pub use self::resource::{LightSettings, WaterSettings};
 use self::vertices::{generate_tile_vertices, get_vertex_buffer, ground_water_vertices, load_textures, optional_vertex_buffer};
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -50,6 +53,10 @@ impl MapLoader {
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
         let mut map_data = parse_map_data(&resource_file, game_file_loader)?;
+
+        #[cfg(feature = "debug")]
+        let map_data_clone = map_data.clone();
+
         let ground_data = parse_ground_data(map_data.ground_file.as_str(), game_file_loader)?;
         let mut gat_data = parse_gat_data(map_data.gat_file.unwrap().as_str(), game_file_loader)?;
 
@@ -66,20 +73,24 @@ impl MapLoader {
         let textures = load_textures(&ground_data, texture_loader, game_file_loader);
         apply_map_offset(&ground_data, &mut map_data.resources);
 
-        let mut objects: Vec<Object> = Vec::new();
-
         // Loading object models
-        map_data.resources.objects.iter_mut().for_each(|object_data| {
-            let array: [f32; 3] = object_data.transform.scale.into();
-            let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
-            let model = model_loader.get(game_file_loader, texture_loader, object_data.model_name.as_str(), reverse_order);
-            objects.push(Object::new(
-                object_data.name.to_owned(),
-                object_data.model_name.to_owned(),
-                model.unwrap(),
-                object_data.transform,
-            ));
-        });
+        let objects: Vec<Object> = map_data
+            .resources
+            .objects
+            .iter()
+            .map(|object_data| {
+                let array: [f32; 3] = object_data.transform.scale.into();
+                let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
+                let model = model_loader.get(game_file_loader, texture_loader, object_data.model_name.as_str(), reverse_order);
+
+                Object::new(
+                    object_data.name.to_owned(),
+                    object_data.model_name.to_owned(),
+                    model.unwrap(),
+                    object_data.transform,
+                )
+            })
+            .collect();
 
         let map = Arc::new(Map::new(
             map_data.version.into(),
@@ -98,6 +109,8 @@ impl MapLoader {
             map_data.resources.effect_sources,
             tile_picker_vertex_buffer.unwrap(),
             tile_vertex_buffer.unwrap(),
+            #[cfg(feature = "debug")]
+            map_data_clone,
         ));
 
         self.cache.insert(resource_file, map.clone());

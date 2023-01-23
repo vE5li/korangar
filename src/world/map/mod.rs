@@ -8,7 +8,9 @@ pub use self::tile::{Tile, TileType};
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
-use crate::loaders::{InternalVersion, LightSettings, MapData, WaterSettings};
+#[cfg(feature = "debug")]
+use crate::loaders::MapData;
+use crate::loaders::{InternalVersion, LightSettings, WaterSettings};
 use crate::network::ClientTick;
 use crate::world::*;
 

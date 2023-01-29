@@ -88,7 +88,7 @@ struct PaletteImageData {
 struct RgbaImageData {
     pub width: u16,
     pub height: u16,
-    #[length_hint(self.width * self.height)]
+    #[length_hint(self.width * self.height * 4)]
     pub data: Vec<u8>,
 }
 
@@ -121,7 +121,7 @@ struct SpriteData {
     #[version]
     pub version: Version<MinorFirst>,
     pub palette_image_count: u16,
-    #[version_equals_or_above(2, 0)]
+    #[version_equals_or_above(1, 2)]
     pub rgba_image_count: Option<u16>,
     #[repeating(self.palette_image_count)]
     pub palette_image_data: Vec<PaletteImageData>,
@@ -156,8 +156,6 @@ impl SpriteLoader {
         let sprite_data = SpriteData::from_bytes(&mut byte_stream, None);
         #[cfg(feature = "debug")]
         let cloned_sprite_data = sprite_data.clone();
-
-        assert!(byte_stream.is_empty());
 
         let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
         // the default palette is

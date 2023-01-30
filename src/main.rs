@@ -726,6 +726,8 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&mut focus_state, &MapsWindow::default()),
                         #[cfg(feature = "debug")]
+                        UserEvent::OpenCommandsWindow => interface.open_window(&mut focus_state, &CommandsWindow::default()),
+                        #[cfg(feature = "debug")]
                         UserEvent::OpenTimeWindow => interface.open_window(&mut focus_state, &TimeWindow::default()),
                         #[cfg(feature = "debug")]
                         UserEvent::SetDawn => game_timer.set_day_timer(0.0),

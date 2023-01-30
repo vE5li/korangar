@@ -51,6 +51,8 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     OpenMapsWindow,
     #[cfg(feature = "debug")]
+    OpenCommandsWindow,
+    #[cfg(feature = "debug")]
     OpenTimeWindow,
     #[cfg(feature = "debug")]
     SetDawn,

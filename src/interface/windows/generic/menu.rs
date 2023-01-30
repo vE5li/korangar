@@ -45,6 +45,12 @@ impl PrototypeWindow for MenuWindow {
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
+                .with_text("commands")
+                .with_event(UserEvent::OpenCommandsWindow)
+                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .wrap(),
+            #[cfg(feature = "debug")]
+            Button::default()
                 .with_text("time")
                 .with_event(UserEvent::OpenTimeWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)

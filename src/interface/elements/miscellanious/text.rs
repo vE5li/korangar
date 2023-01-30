@@ -2,25 +2,20 @@ use num::Zero;
 use procedural::dimension;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::interface::{Element, ElementText, *};
+use crate::interface::*;
 
 #[derive(Default)]
-pub struct Text {
-    text: Option<ElementText>,
+pub struct Text<T: AsRef<str> + 'static> {
+    text: Option<T>,
     foreground_color: Option<ColorSelector>,
     width_constraint: Option<DimensionConstraint>,
     font_size: Option<FontSizeSelector>,
     state: ElementState,
 }
 
-impl Text {
-    pub fn with_static_text(mut self, text: &'static str) -> Self {
-        self.text = Some(ElementText::Static(text));
-        self
-    }
-
-    pub fn with_dynamic_text(mut self, text: String) -> Self {
-        self.text = Some(ElementText::Dynamic(text));
+impl<T: AsRef<str> + 'static> Text<T> {
+    pub fn with_text(mut self, text: T) -> Self {
+        self.text = Some(text);
         self
     }
 
@@ -47,7 +42,7 @@ impl Text {
     }
 }
 
-impl Element for Text {
+impl<T: AsRef<str> + 'static> Element for Text<T> {
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -101,6 +96,6 @@ impl Element for Text {
             .unwrap_or(*theme.button.foreground_color);
 
         let text = self.text.as_ref().unwrap();
-        renderer.render_text(text.get_str(), Vector2::zero(), foreground_color, self.get_font_size(theme));
+        renderer.render_text(text.as_ref(), Vector2::zero(), foreground_color, self.get_font_size(theme));
     }
 }

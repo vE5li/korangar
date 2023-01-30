@@ -16,12 +16,12 @@ impl PrototypeWindow for TimeWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements: Vec<ElementCell> = vec![
-            Button::default().with_static_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
-            Button::default().with_static_text("set noon").with_event(UserEvent::SetNoon).wrap(),
-            Button::default().with_static_text("set dusk").with_event(UserEvent::SetDusk).wrap(),
+        let elements = vec![
+            Button::default().with_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
+            Button::default().with_text("set noon").with_event(UserEvent::SetNoon).wrap(),
+            Button::default().with_text("set dusk").with_event(UserEvent::SetDusk).wrap(),
             Button::default()
-                .with_static_text("set midnight")
+                .with_text("set midnight")
                 .with_event(UserEvent::SetMidnight)
                 .wrap(),
         ];

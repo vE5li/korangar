@@ -1,19 +1,16 @@
 use procedural::dimension;
 
-use super::{ElementEvent, ElementText};
 use crate::graphics::{InterfaceRenderer, Renderer};
-use crate::input::{MouseInputMode, UserEvent};
-use crate::interface::{Element, *};
+use crate::input::MouseInputMode;
+use crate::interface::*;
 
-// TODO: move this
-pub type Selector = Box<dyn Fn() -> bool>;
-pub type ColorSelector = Box<dyn Fn(&Theme) -> Color>;
-pub type FontSizeSelector = Box<dyn Fn(&Theme) -> f32>;
-
-#[derive(Default)]
-pub struct Button {
-    text: Option<ElementText>,
-    event: Option<ElementEvent>,
+pub struct Button<T, E>
+where
+    T: AsRef<str> + 'static,
+    E: ElementEvent + 'static,
+{
+    text: Option<T>,
+    event: Option<E>,
     disabled_selector: Option<Selector>,
     foreground_color: Option<ColorSelector>,
     background_color: Option<ColorSelector>,
@@ -21,29 +18,38 @@ pub struct Button {
     state: ElementState,
 }
 
-impl Button {
-    pub fn with_static_text(mut self, text: &'static str) -> Self {
-        self.text = Some(ElementText::Static(text));
+// HACK: Workaround for Rust incorrect trait bounds when deriving Option<T>
+// where T: !Default.
+impl<T, E> Default for Button<T, E>
+where
+    T: AsRef<str> + 'static,
+    E: ElementEvent + 'static,
+{
+    fn default() -> Self {
+        Self {
+            text: Default::default(),
+            event: Default::default(),
+            disabled_selector: Default::default(),
+            foreground_color: Default::default(),
+            background_color: Default::default(),
+            width_constraint: Default::default(),
+            state: Default::default(),
+        }
+    }
+}
+
+impl<T, E> Button<T, E>
+where
+    T: AsRef<str> + 'static,
+    E: ElementEvent + 'static,
+{
+    pub fn with_text(mut self, text: T) -> Self {
+        self.text = Some(text);
         self
     }
 
-    pub fn with_dynamic_text(mut self, text: String) -> Self {
-        self.text = Some(ElementText::Dynamic(text));
-        self
-    }
-
-    pub fn with_event(mut self, event: UserEvent) -> Self {
-        self.event = Some(ElementEvent::Event(event));
-        self
-    }
-
-    pub fn with_action_closure(mut self, event_closure: impl Fn() -> Option<ClickAction> + 'static) -> Self {
-        self.event = Some(ElementEvent::ActionClosure(Box::new(event_closure)));
-        self
-    }
-
-    pub fn with_closure(mut self, closure: impl FnMut() + 'static) -> Self {
-        self.event = Some(ElementEvent::Closure(Box::new(closure)));
+    pub fn with_event(mut self, event: E) -> Self {
+        self.event = Some(event);
         self
     }
 
@@ -72,7 +78,7 @@ impl Button {
     }
 }
 
-impl Element for Button {
+impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -107,7 +113,7 @@ impl Element for Button {
             return None;
         }
 
-        self.event.as_mut().and_then(ElementEvent::execute)
+        self.event.as_mut().and_then(ElementEvent::trigger)
     }
 
     fn render(
@@ -149,7 +155,7 @@ impl Element for Button {
             };
 
             renderer.render_text(
-                text.get_str(),
+                text.as_ref(),
                 *theme.button.text_offset,
                 foreground_color,
                 *theme.button.font_size,

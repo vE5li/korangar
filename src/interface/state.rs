@@ -2,7 +2,7 @@ use std::cell::{Ref, RefCell};
 use std::ops::Not;
 use std::rc::Rc;
 
-use super::StateProvider;
+use super::{ClickAction, StateProvider};
 
 #[derive(Default)]
 pub struct TrackedState<T>(Rc<RefCell<(T, usize)>>);
@@ -109,9 +109,12 @@ where
         inner.1 = inner.1.wrapping_add(1);
     }
 
-    pub fn toggle_action(&self) -> impl FnMut() {
+    pub fn toggle_action(&self) -> Box<impl FnMut() -> Option<ClickAction>> {
         let mut cloned = self.clone();
-        move || cloned.toggle()
+        Box::new(move || {
+            cloned.toggle();
+            None
+        })
     }
 }
 

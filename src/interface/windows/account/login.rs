@@ -73,21 +73,21 @@ impl PrototypeWindow for LoginWindow {
             InputField::<24>::new(username, "username", username_action, dimension!(100%)).wrap(),
             InputField::<24, true>::new(password, "password", password_action, dimension!(100%)).wrap(),
             StateButton::default()
-                .with_static_text("remember username")
+                .with_text("remember username")
                 .with_selector(|state_provider| state_provider.login_settings.remember_username)
                 .with_event(UserEvent::ToggleRemeberUsername)
                 .with_transparent_background()
                 .wrap(),
             StateButton::default()
-                .with_static_text("remember password")
+                .with_text("remember password")
                 .with_selector(|state_provider| state_provider.login_settings.remember_password)
                 .with_event(UserEvent::ToggleRemeberPassword)
                 .with_transparent_background()
                 .wrap(),
             Button::default()
-                .with_static_text("log in")
+                .with_text("log in")
                 .with_disabled_selector(selector)
-                .with_action_closure(action)
+                .with_event(Box::new(action))
                 .wrap(),
         ];
 

@@ -25,9 +25,33 @@ pub use self::state::{Remote, TrackedState};
 pub use self::theme::Theme;
 pub use self::windows::*;
 use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer, Texture};
-use crate::input::{FocusState, MouseInputMode};
+use crate::input::{FocusState, MouseInputMode, UserEvent};
 use crate::loaders::{ActionLoader, FontLoader, GameFileLoader, SpriteLoader};
 use crate::network::{ClientTick, EntityId};
+
+// TODO: move this
+pub type Selector = Box<dyn Fn() -> bool>;
+pub type ColorSelector = Box<dyn Fn(&Theme) -> Color>;
+pub type FontSizeSelector = Box<dyn Fn(&Theme) -> f32>;
+
+pub trait ElementEvent {
+    fn trigger(&mut self) -> Option<ClickAction>;
+}
+
+impl<F> ElementEvent for Box<F>
+where
+    F: FnMut() -> Option<ClickAction> + 'static,
+{
+    fn trigger(&mut self) -> Option<ClickAction> {
+        self()
+    }
+}
+
+impl ElementEvent for UserEvent {
+    fn trigger(&mut self) -> Option<ClickAction> {
+        Some(ClickAction::Event(self.clone()))
+    }
+}
 
 #[derive(new)]
 struct DialogHandle {

@@ -54,26 +54,27 @@ impl PrototypeWindow for PacketWindow {
             move || {
                 packets.clear();
                 cleared.update();
+                None
             }
         };
 
         let elements = vec![
             Button::default()
-                .with_static_text("clear")
+                .with_text("clear")
                 .with_disabled_selector(clear_selector)
-                .with_closure(clear_action)
+                .with_event(Box::new(clear_action))
                 .with_width(dimension!(33.33%))
                 .wrap(),
             StateButton::default()
-                .with_static_text("show pings")
+                .with_text("show pings")
                 .with_selector(self.show_pings.selector())
-                .with_closure(self.show_pings.toggle_action())
+                .with_event(self.show_pings.toggle_action())
                 .with_width(dimension!(33.33%))
                 .wrap(),
             StateButton::default()
-                .with_static_text("update")
+                .with_text("update")
                 .with_selector(self.update.selector())
-                .with_closure(self.update.toggle_action())
+                .with_event(self.update.toggle_action())
                 .with_width(dimension!(!))
                 .wrap(),
             ScrollView::new(elements, constraint!(100%, ?)).wrap(),

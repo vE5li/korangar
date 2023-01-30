@@ -5,7 +5,7 @@ use crate::interface::*;
 
 macro render_state_button($display:expr, $event:expr, $selector:ident) {
     StateButton::default()
-        .with_static_text($display)
+        .with_text($display)
         .with_selector(|state_provider| state_provider.render_settings.$selector)
         .with_event($event)
         .wrap()

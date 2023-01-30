@@ -35,7 +35,7 @@ impl EquipmentContainer {
                     let slot = SLOT_POSITIONS[index];
 
                     let text = Text::default()
-                        .with_dynamic_text(slot.display_name().to_string())
+                        .with_text(slot.display_name().to_string())
                         .with_foreground_color(|_| Color::monochrome(200))
                         .with_width(dimension!(!))
                         .wrap();

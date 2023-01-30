@@ -23,19 +23,16 @@ impl DialogContainer {
     fn to_element(dialog_element: &DialogElement, npc_id: EntityId) -> ElementCell {
         match dialog_element {
             DialogElement::Text(text) => Text::default()
-                .with_dynamic_text(text.clone())
+                .with_text(text.clone())
                 .with_foreground_color(|_| Color::monochrome(255))
                 .wrap(),
-            DialogElement::NextButton => Button::default()
-                .with_static_text("next")
-                .with_event(UserEvent::NextDialog(npc_id))
-                .wrap(),
+            DialogElement::NextButton => Button::default().with_text("next").with_event(UserEvent::NextDialog(npc_id)).wrap(),
             DialogElement::CloseButton => Button::default()
-                .with_static_text("close")
+                .with_text("close")
                 .with_event(UserEvent::CloseDialog(npc_id))
                 .wrap(),
             DialogElement::ChoiceButton(text, index) => Button::default()
-                .with_dynamic_text(text.clone())
+                .with_text(text.clone())
                 .with_event(UserEvent::ChooseDialogOption(npc_id, *index))
                 .wrap(),
         }

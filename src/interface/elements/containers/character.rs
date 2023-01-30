@@ -27,7 +27,7 @@ impl CharacterPreview {
 
             return vec![
                 Text::default()
-                    .with_dynamic_text(text.to_owned())
+                    .with_text(text.to_owned())
                     .with_foreground_color(|_| Color::rgb(200, 140, 180))
                     .wrap(),
             ];
@@ -39,18 +39,18 @@ impl CharacterPreview {
         if let Some(character_information) = character_information {
             return vec![
                 Text::default()
-                    .with_dynamic_text(character_information.name.clone())
+                    .with_text(character_information.name.clone())
                     .with_foreground_color(|_| Color::rgb(220, 210, 210))
                     .with_font_size(|_| 18.0)
                     .wrap(),
                 Button::default()
-                    .with_static_text("switch")
+                    .with_text("switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
                     .with_background_color(|_| Color::rgb(161, 141, 141))
                     .with_width(dimension!(50%))
                     .wrap(),
                 Button::default()
-                    .with_static_text("delete")
+                    .with_text("delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
                     .with_background_color(|theme| *theme.close_button.background_color)
                     .with_foreground_color(|theme| *theme.close_button.foreground_color)
@@ -61,7 +61,7 @@ impl CharacterPreview {
 
         vec![
             Text::default()
-                .with_static_text("new character")
+                .with_text("new character")
                 .with_foreground_color(|_| Color::rgb(200, 140, 180))
                 .wrap(),
         ]

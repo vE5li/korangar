@@ -47,7 +47,7 @@ impl PrototypeWindow for MapsWindow {
             .into_iter()
             .map(|(name, position)| {
                 Button::default()
-                    .with_dynamic_text(name.to_owned())
+                    .with_text(name.to_owned())
                     .with_event(UserEvent::RequestWarpToMap(format!("{name}.gat"), position))
                     .wrap()
             })

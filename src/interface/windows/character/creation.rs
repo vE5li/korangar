@@ -44,9 +44,9 @@ impl PrototypeWindow for CharacterCreationWindow {
         let elements = vec![
             InputField::<MAXIMUM_NAME_LENGTH>::new(name, "character name", input_action, dimension!(100%)).wrap(),
             Button::default()
-                .with_static_text("done")
+                .with_text("done")
                 .with_disabled_selector(selector)
-                .with_action_closure(action)
+                .with_event(Box::new(action))
                 .with_width(dimension!(50%))
                 .wrap(),
         ];

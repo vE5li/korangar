@@ -18,57 +18,57 @@ impl PrototypeWindow for MenuWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements = vec![
             Button::default()
-                .with_static_text("graphics settings")
+                .with_text("graphics settings")
                 .with_event(UserEvent::OpenGraphicsSettingsWindow)
                 .wrap(),
             Button::default()
-                .with_static_text("audio settings")
+                .with_text("audio settings")
                 .with_event(UserEvent::OpenAudioSettingsWindow)
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
-                .with_static_text("render settings")
+                .with_text("render settings")
                 .with_event(UserEvent::OpenRenderSettingsWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
-                .with_static_text("map viewer")
+                .with_text("map viewer")
                 .with_event(UserEvent::OpenMapDataWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
-                .with_static_text("maps")
+                .with_text("maps")
                 .with_event(UserEvent::OpenMapsWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
-                .with_static_text("time")
+                .with_text("time")
                 .with_event(UserEvent::OpenTimeWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
-                .with_static_text("theme viewer")
+                .with_text("theme viewer")
                 .with_event(UserEvent::OpenThemeViewerWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
-                .with_static_text("profiler")
+                .with_text("profiler")
                 .with_event(UserEvent::OpenProfilerWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
             #[cfg(feature = "debug_network")]
             Button::default()
-                .with_static_text("packets")
+                .with_text("packets")
                 .with_event(UserEvent::OpenPacketWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
-            Button::default().with_static_text("log out").with_event(UserEvent::LogOut).wrap(),
-            Button::default().with_static_text("exit").with_event(UserEvent::Exit).wrap(),
+            Button::default().with_text("log out").with_event(UserEvent::LogOut).wrap(),
+            Button::default().with_text("exit").with_event(UserEvent::Exit).wrap(),
         ];
 
         WindowBuilder::default()

@@ -19,23 +19,20 @@ impl PrototypeWindow for CharacterOverviewWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements = vec![
             /*Text::default()
-                .with_dynamic_text(|| format!("base level: {}", player.get_base_level()))
+                .with_text(|| format!("base level: {}", player.get_base_level()))
                 .wrap(),
             Text::default()
-                .with_dynamic_text(|| format!("job level: {}", player.get_job_level()))
+                .with_text(|| format!("job level: {}", player.get_job_level()))
                 .wrap(),*/
             Button::default()
-                .with_static_text("inventory")
+                .with_text("inventory")
                 .with_event(UserEvent::OpenInventoryWindow)
                 .wrap(),
             Button::default()
-                .with_static_text("equipment")
+                .with_text("equipment")
                 .with_event(UserEvent::OpenEquipmentWindow)
                 .wrap(),
-            Button::default()
-                .with_static_text("menu")
-                .with_event(UserEvent::OpenMenuWindow)
-                .wrap(),
+            Button::default().with_text("menu").with_event(UserEvent::OpenMenuWindow).wrap(),
         ];
 
         WindowBuilder::default()

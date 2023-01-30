@@ -593,8 +593,8 @@ fn main() {
                             graphics_settings.toggle_frame_limit();
                             swapchain_holder.set_frame_limit(graphics_settings.frame_limit);
 
-                            // for some reason the interface buffer becomes messed up when
-                            // recreating the swapchain, so we need to render it again
+                            // NOTE: For some reason the interface buffer becomes messed up when
+                            // recreating the swapchain, so we need to render it again.
                             interface.schedule_rerender();
                         }
                         UserEvent::ToggleShowInterface => graphics_settings.toggle_show_interface(),
@@ -770,8 +770,8 @@ fn main() {
                             render_settings.toggle_show_wireframe();
                             swapchain_holder.invalidate_swapchain();
 
-                            // for some reason the interface buffer becomes messed up when
-                            // recreating the swapchain, so we need to render it again
+                            // NOTE: For some reason the interface buffer becomes messed up when
+                            // recreating the swapchain, so we need to render it again.
                             interface.schedule_rerender();
                         }
                         #[cfg(feature = "debug")]

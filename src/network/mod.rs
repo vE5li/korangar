@@ -1018,7 +1018,7 @@ impl ByteConvertable for StatusType {
 // TODO: make StatusType derivable
 impl PrototypeElement for StatusType {
     fn to_element(&self, display: String) -> ElementCell {
-        "<todo>".to_element(display)
+        format!("{self:?}").to_element(display)
     }
 }
 

@@ -16,12 +16,6 @@ pub struct ItemBox {
     state: ElementState,
 }
 
-impl ItemBox {
-    pub fn wrap(self) -> ElementCell {
-        Rc::new(RefCell::new(self))
-    }
-}
-
 impl Element for ItemBox {
     fn get_state(&self) -> &ElementState {
         &self.state

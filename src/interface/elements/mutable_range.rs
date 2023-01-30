@@ -20,15 +20,9 @@ impl<T> IsVector for Vector4<T> {}
 
 impl PrototypeMutableRangeElement<f32> for f32 {
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
-            cell!(MutableNumberValue::new(
-                display,
-                self as *const f32,
-                minimum,
-                maximum,
-                change_event
-            )),
+        let elements = vec![
+            StaticLabel::new(display.clone()).wrap(),
+            MutableNumberValue::new(display, self as *const f32, minimum, maximum, change_event).wrap(),
         ];
 
         Container::new(elements).wrap()
@@ -41,15 +35,9 @@ where
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
-            cell!(MutableVectorValue::new(
-                display,
-                self as *const Self,
-                minimum,
-                maximum,
-                change_event
-            )),
+        let elements = vec![
+            StaticLabel::new(display.clone()).wrap(),
+            MutableVectorValue::new(display, self as *const Self, minimum, maximum, change_event).wrap(),
         ];
 
         Container::new(elements).wrap()

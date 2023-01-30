@@ -18,14 +18,15 @@ pub struct NumberWindow<T> {
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow for NumberWindow<T> {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements: Vec<ElementCell> = vec![
-            cell!(Headline::new("value".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(
+        let elements = vec![
+            Headline::new("value".to_string(), Headline::DEFAULT_SIZE).wrap(),
+            Slider::new(
                 unsafe { &(*self.inner_pointer) as *const T },
                 self.minimum_value,
                 self.maximum_value,
-                self.change_event
-            )),
+                self.change_event,
+            )
+            .wrap(),
         ];
 
         WindowBuilder::default()

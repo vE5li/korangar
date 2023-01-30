@@ -13,38 +13,18 @@ pub struct ColorWindow {
 
 impl PrototypeWindow for ColorWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let rgb_elements: Vec<ElementCell> = vec![
-            cell!(Headline::new("red".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(
-                unsafe { &(*self.color_pointer).red as *const u8 },
-                0,
-                255,
-                self.change_event
-            )),
-            cell!(Headline::new("green".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(
-                unsafe { &(*self.color_pointer).green as *const u8 },
-                0,
-                255,
-                self.change_event
-            )),
-            cell!(Headline::new("blue".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(
-                unsafe { &(*self.color_pointer).blue as *const u8 },
-                0,
-                255,
-                self.change_event
-            )),
-            cell!(Headline::new("alpha".to_string(), Headline::DEFAULT_SIZE)),
-            cell!(Slider::new(
-                unsafe { &(*self.color_pointer).alpha as *const u8 },
-                0,
-                255,
-                self.change_event
-            )),
+        let rgb_elements = vec![
+            Headline::new("red".to_string(), Headline::DEFAULT_SIZE).wrap(),
+            Slider::new(unsafe { &(*self.color_pointer).red as *const u8 }, 0, 255, self.change_event).wrap(),
+            Headline::new("green".to_string(), Headline::DEFAULT_SIZE).wrap(),
+            Slider::new(unsafe { &(*self.color_pointer).green as *const u8 }, 0, 255, self.change_event).wrap(),
+            Headline::new("blue".to_string(), Headline::DEFAULT_SIZE).wrap(),
+            Slider::new(unsafe { &(*self.color_pointer).blue as *const u8 }, 0, 255, self.change_event).wrap(),
+            Headline::new("alpha".to_string(), Headline::DEFAULT_SIZE).wrap(),
+            Slider::new(unsafe { &(*self.color_pointer).alpha as *const u8 }, 0, 255, self.change_event).wrap(),
         ];
 
-        let elements: Vec<ElementCell> = vec![cell!(Expandable::new("rgb".to_string(), rgb_elements, true))];
+        let elements = vec![Expandable::new("rgb".to_string(), rgb_elements, true).wrap()];
 
         WindowBuilder::default()
             .with_title(self.name.to_string())

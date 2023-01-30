@@ -11,8 +11,17 @@ use crate::inventory::Item;
 pub type ElementCell = Rc<RefCell<dyn Element>>;
 pub type WeakElementCell = Weak<RefCell<dyn Element>>;
 
-pub macro cell($element:expr) {
-    std::rc::Rc::new(std::cell::RefCell::new($element))
+pub trait ElementWrap {
+    fn wrap(self) -> ElementCell;
+}
+
+impl<T> ElementWrap for T
+where
+    T: Element + Sized + 'static,
+{
+    fn wrap(self) -> ElementCell {
+        Rc::new(RefCell::new(self))
+    }
 }
 
 pub struct ElementRenderer<'a> {

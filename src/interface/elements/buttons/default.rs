@@ -67,10 +67,6 @@ impl Button {
         self
     }
 
-    pub fn wrap(self) -> ElementCell {
-        Rc::new(RefCell::new(self))
-    }
-
     fn is_disabled(&self) -> bool {
         self.disabled_selector.as_ref().map(|selector| !selector()).unwrap_or(false)
     }

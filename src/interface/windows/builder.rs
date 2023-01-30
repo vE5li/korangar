@@ -58,7 +58,7 @@ impl WindowBuilder {
 
         if closable {
             assert!(window_title.is_some(), "closable window must also have a title");
-            let close_button = cell!(CloseButton::default());
+            let close_button = CloseButton::default().wrap();
             elements.insert(0, close_button);
         }
 
@@ -68,7 +68,7 @@ impl WindowBuilder {
         };
 
         if let Some(title) = window_title {
-            let drag_button = cell!(DragButton::new(title, width_constraint));
+            let drag_button = DragButton::new(title, width_constraint).wrap();
             elements.insert(0, drag_button);
         }
 

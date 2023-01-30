@@ -69,14 +69,9 @@ impl PrototypeWindow for LoginWindow {
             })
         };
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<24>::new(username, "username", username_action, dimension!(100%))),
-            cell!(InputField::<24, true>::new(
-                password,
-                "password",
-                password_action,
-                dimension!(100%)
-            )),
+        let elements = vec![
+            InputField::<24>::new(username, "username", username_action, dimension!(100%)).wrap(),
+            InputField::<24, true>::new(password, "password", password_action, dimension!(100%)).wrap(),
             StateButton::default()
                 .with_static_text("remember username")
                 .with_selector(|state_provider| state_provider.login_settings.remember_username)

@@ -1,6 +1,5 @@
-use super::cell;
 use crate::graphics::Color;
-use crate::interface::{ChangeEvent, Container, DimensionConstraint, ElementCell, MutableColorValue, SizeConstraint, StaticLabel};
+use crate::interface::*;
 
 pub trait PrototypeMutableElement {
     fn to_mutable_element(&self, display: String, change_event: Option<ChangeEvent>) -> ElementCell;
@@ -8,9 +7,9 @@ pub trait PrototypeMutableElement {
 
 impl PrototypeMutableElement for Color {
     fn to_mutable_element(&self, display: String, change_event: Option<ChangeEvent>) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![
-            cell!(StaticLabel::new(display.clone())),
-            cell!(MutableColorValue::new(display, self as *const Color, change_event)),
+        let elements = vec![
+            StaticLabel::new(display.clone()).wrap(),
+            MutableColorValue::new(display, self as *const Color, change_event).wrap(),
         ];
 
         Container::new(elements).wrap()
@@ -19,7 +18,7 @@ impl PrototypeMutableElement for Color {
 
 impl PrototypeMutableElement for DimensionConstraint {
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
+        let elements = vec![StaticLabel::new(display).wrap()];
 
         Container::new(elements).wrap()
     }
@@ -27,7 +26,7 @@ impl PrototypeMutableElement for DimensionConstraint {
 
 impl PrototypeMutableElement for SizeConstraint {
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
+        let elements = vec![StaticLabel::new(display).wrap()];
 
         Container::new(elements).wrap()
     }

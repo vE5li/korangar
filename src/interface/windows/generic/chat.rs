@@ -54,23 +54,19 @@ impl PrototypeWindow for ChatWindow {
             })
         };
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<30>::new(
-                input_text,
-                "write message or command",
-                input_action,
-                dimension!(75%)
-            )) as _,
+        let elements = vec![
+            InputField::<30>::new(input_text, "write message or command", input_action, dimension!(75%)).wrap(),
             Button::default()
                 .with_static_text("send")
                 .with_disabled_selector(button_selector)
                 .with_action_closure(button_action)
                 .with_width(dimension!(25%))
                 .wrap(),
-            cell!(ScrollView::new(
-                vec![cell!(Chat::new(self.messages.clone(), self.font_loader.clone()))],
-                constraint!(100%, ?)
-            )),
+            ScrollView::new(
+                vec![Chat::new(self.messages.clone(), self.font_loader.clone()).wrap()],
+                constraint!(100%, ?),
+            )
+            .wrap(),
         ];
 
         WindowBuilder::default()

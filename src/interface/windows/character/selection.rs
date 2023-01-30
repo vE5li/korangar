@@ -21,14 +21,8 @@ impl PrototypeWindow for CharacterSelectionWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements: Vec<ElementCell> = (0..self.slot_count)
-            .map(|slot| {
-                cell!(CharacterPreview::new(
-                    self.characters.new_remote(),
-                    self.move_request.new_remote(),
-                    slot
-                )) as ElementCell
-            })
+        let elements = (0..self.slot_count)
+            .map(|slot| CharacterPreview::new(self.characters.new_remote(), self.move_request.new_remote(), slot).wrap())
             .collect();
 
         WindowBuilder::default()

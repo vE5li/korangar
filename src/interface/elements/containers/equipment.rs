@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use cgmath::Array;
 use procedural::*;
 
@@ -60,10 +57,6 @@ impl EquipmentContainer {
         let state = ContainerState::new(elements);
 
         Self { items, weak_self, state }
-    }
-
-    pub fn wrap(self) -> ElementCell {
-        Rc::new(RefCell::new(self))
     }
 }
 

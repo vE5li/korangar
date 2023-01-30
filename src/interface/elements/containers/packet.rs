@@ -88,10 +88,6 @@ impl PacketView {
             state: ContainerState::new(elements),
         }
     }
-
-    pub fn wrap(self) -> ElementCell {
-        Rc::new(RefCell::new(self))
-    }
 }
 
 impl Element for PacketView {

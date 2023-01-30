@@ -32,7 +32,7 @@ impl PrototypeWindow for PacketWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements: Vec<ElementCell> = vec![
+        let elements = vec![
             PacketView::new(
                 self.packets.clone(),
                 self.cleared.new_remote(),
@@ -76,7 +76,7 @@ impl PrototypeWindow for PacketWindow {
                 .with_closure(self.update.toggle_action())
                 .with_width(dimension!(!))
                 .wrap(),
-            cell!(ScrollView::new(elements, constraint!(100%, ?))),
+            ScrollView::new(elements, constraint!(100%, ?)).wrap(),
         ];
 
         WindowBuilder::default()

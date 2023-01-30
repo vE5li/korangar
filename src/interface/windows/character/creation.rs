@@ -41,13 +41,8 @@ impl PrototypeWindow for CharacterCreationWindow {
 
         let input_action = Box::new(move || Some(ClickAction::FocusNext(FocusMode::FocusNext)));
 
-        let elements: Vec<ElementCell> = vec![
-            cell!(InputField::<MAXIMUM_NAME_LENGTH>::new(
-                name,
-                "character name",
-                input_action,
-                dimension!(100%)
-            )),
+        let elements = vec![
+            InputField::<MAXIMUM_NAME_LENGTH>::new(name, "character name", input_action, dimension!(100%)).wrap(),
             Button::default()
                 .with_static_text("done")
                 .with_disabled_selector(selector)

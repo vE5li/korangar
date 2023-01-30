@@ -37,13 +37,8 @@ where
             let label = LABELS[index].to_string();
             let pointer = &inner_value[index] as *const T::Element;
 
-            elements.push(cell!(Headline::new(label, Headline::DEFAULT_SIZE)) as _);
-            elements.push(cell!(Slider::new(
-                pointer,
-                self.minimum_value[index],
-                self.maximum_value[index],
-                self.change_event
-            )) as _);
+            elements.push(Headline::new(label, Headline::DEFAULT_SIZE).wrap());
+            elements.push(Slider::new(pointer, self.minimum_value[index], self.maximum_value[index], self.change_event).wrap());
         }
 
         WindowBuilder::default()

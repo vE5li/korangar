@@ -39,10 +39,6 @@ impl Text {
         self
     }
 
-    pub fn wrap(self) -> Rc<RefCell<dyn Element>> {
-        Rc::new(RefCell::new(self))
-    }
-
     fn get_font_size(&self, theme: &Theme) -> f32 {
         self.font_size
             .as_ref()

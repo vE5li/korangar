@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use cgmath::Array;
 use procedural::*;
 
@@ -58,10 +55,6 @@ impl DialogContainer {
             npc_id,
             state,
         }
-    }
-
-    pub fn wrap(self) -> ElementCell {
-        Rc::new(RefCell::new(self))
     }
 }
 

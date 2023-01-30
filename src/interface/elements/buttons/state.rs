@@ -55,11 +55,6 @@ impl StateButton {
         self.width_constraint = Some(width_constraint);
         self
     }
-
-    pub fn wrap(self) -> ElementCell {
-        assert!(self.selector.is_some(), "state buttons need a selector");
-        Rc::new(RefCell::new(self))
-    }
 }
 
 impl Element for StateButton {

@@ -27,10 +27,6 @@ impl Container {
         self.size_constraint = Some(size_constraint);
         self
     }*/
-
-    pub fn wrap(self) -> ElementCell {
-        Rc::new(RefCell::new(self))
-    }
 }
 
 impl Element for Container {

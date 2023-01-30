@@ -12,7 +12,7 @@ macro render_state_button($display:expr, $event:expr, $selector:ident) {
 }
 
 fn general_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![
+    let buttons = vec![
         render_state_button!("debug camera", UserEvent::ToggleUseDebugCamera, use_debug_camera),
         render_state_button!("show fps", UserEvent::ToggleShowFramesPerSecond, show_frames_per_second),
         render_state_button!("show wireframe", UserEvent::ToggleShowWireframe, show_wireframe),
@@ -20,22 +20,22 @@ fn general_expandable() -> ElementCell {
         render_state_button!("show bounding boxes", UserEvent::ToggleShowBoundingBoxes, show_bounding_boxes),
     ];
 
-    cell!(Expandable::new("general".to_string(), buttons, true))
+    Expandable::new("general".to_string(), buttons, true).wrap()
 }
 
 fn map_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![
+    let buttons = vec![
         render_state_button!("show map", UserEvent::ToggleShowMap, show_map),
         render_state_button!("show objects", UserEvent::ToggleShowObjects, show_objects),
         render_state_button!("show entities", UserEvent::ToggleShowEntities, show_entities),
         render_state_button!("show water", UserEvent::ToggleShowWater, show_water),
     ];
 
-    cell!(Expandable::new("map".to_string(), buttons, true))
+    Expandable::new("map".to_string(), buttons, true).wrap()
 }
 
 fn lighting_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![
+    let buttons = vec![
         render_state_button!("ambient light", UserEvent::ToggleShowAmbientLight, show_ambient_light),
         render_state_button!(
             "directional light",
@@ -46,21 +46,21 @@ fn lighting_expandable() -> ElementCell {
         render_state_button!("particle lights", UserEvent::ToggleShowParticleLights, show_particle_lights),
     ];
 
-    cell!(Expandable::new("lighting".to_string(), buttons, true))
+    Expandable::new("lighting".to_string(), buttons, true).wrap()
 }
 
 fn shadows_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![render_state_button!(
+    let buttons = vec![render_state_button!(
         "directional shadows",
         UserEvent::ToggleShowDirectionalShadows,
         show_directional_shadows
     )];
 
-    cell!(Expandable::new("shadows".to_string(), buttons, true))
+    Expandable::new("shadows".to_string(), buttons, true).wrap()
 }
 
 fn markers_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![
+    let buttons = vec![
         render_state_button!("object markers", UserEvent::ToggleShowObjectMarkers, show_object_markers),
         render_state_button!("light markers", UserEvent::ToggleShowLightMarkers, show_light_markers),
         render_state_button!("sound markers", UserEvent::ToggleShowSoundMarkers, show_sound_markers),
@@ -69,20 +69,20 @@ fn markers_expandable() -> ElementCell {
         render_state_button!("entity markers", UserEvent::ToggleShowEntityMarkers, show_entity_markers),
     ];
 
-    cell!(Expandable::new("markers".to_string(), buttons, true))
+    Expandable::new("markers".to_string(), buttons, true).wrap()
 }
 
 fn grid_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![
+    let buttons = vec![
         render_state_button!("map tiles", UserEvent::ToggleShowMapTiles, show_map_tiles),
         render_state_button!("pathing", UserEvent::ToggleShowPathing, show_pathing),
     ];
 
-    cell!(Expandable::new("grid".to_string(), buttons, true))
+    Expandable::new("grid".to_string(), buttons, true).wrap()
 }
 
 fn buffers_expandable() -> ElementCell {
-    let buttons: Vec<ElementCell> = vec![
+    let buttons = vec![
         render_state_button!("diffuse buffer", UserEvent::ToggleShowDiffuseBuffer, show_diffuse_buffer),
         render_state_button!("normal buffer", UserEvent::ToggleShowNormalBuffer, show_normal_buffer),
         render_state_button!("water buffer", UserEvent::ToggleShowWaterBuffer, show_water_buffer),
@@ -92,7 +92,7 @@ fn buffers_expandable() -> ElementCell {
         render_state_button!("font atlas", UserEvent::ToggleShowFontAtlas, show_font_atlas),
     ];
 
-    cell!(Expandable::new("buffers".to_string(), buttons, true))
+    Expandable::new("buffers".to_string(), buttons, true).wrap()
 }
 
 #[derive(Default)]
@@ -108,7 +108,7 @@ impl PrototypeWindow for RenderSettingsWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements: Vec<ElementCell> = vec![
+        let elements = vec![
             general_expandable(),
             map_expandable(),
             lighting_expandable(),

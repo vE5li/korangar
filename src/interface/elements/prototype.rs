@@ -127,7 +127,7 @@ where
     T: ElementDisplay + NoPrototype,
 {
     fn to_element(&self, display: String) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(StringValue::new(self.display()))];
+        let elements = vec![StaticLabel::new(display).wrap(), StringValue::new(self.display()).wrap()];
 
         Container::new(elements).wrap()
     }
@@ -135,7 +135,7 @@ where
 
 impl PrototypeElement for DimensionConstraint {
     fn to_element(&self, display: String) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
+        let elements = vec![StaticLabel::new(display).wrap()];
 
         Container::new(elements).wrap()
     }
@@ -143,7 +143,7 @@ impl PrototypeElement for DimensionConstraint {
 
 impl PrototypeElement for SizeConstraint {
     fn to_element(&self, display: String) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display))];
+        let elements = vec![StaticLabel::new(display).wrap()];
 
         Container::new(elements).wrap()
     }
@@ -161,7 +161,7 @@ impl<T: PrototypeElement> PrototypeElement for Option<T> {
             return value.to_element(display);
         }
 
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(StringValue::new("none".to_string()))];
+        let elements = vec![StaticLabel::new(display).wrap(), StringValue::new("none".to_string()).wrap()];
 
         Container::new(elements).wrap()
     }
@@ -175,7 +175,7 @@ impl<T: PrototypeElement, const SIZE: usize> PrototypeElement for [T; SIZE] {
             .map(|(index, item)| item.to_element(index.to_string()))
             .collect();
 
-        cell!(Expandable::new(display, elements, false))
+        Expandable::new(display, elements, false).wrap()
     }
 }
 
@@ -187,13 +187,13 @@ impl<T: PrototypeElement> PrototypeElement for Vec<T> {
             .map(|(index, item)| item.to_element(index.to_string()))
             .collect();
 
-        cell!(Expandable::new(display, elements, false))
+        Expandable::new(display, elements, false).wrap()
     }
 }
 
 impl PrototypeElement for Color {
     fn to_element(&self, display: String) -> ElementCell {
-        let elements: Vec<ElementCell> = vec![cell!(StaticLabel::new(display)), cell!(ColorValue::new(*self))];
+        let elements = vec![StaticLabel::new(display).wrap(), ColorValue::new(*self).wrap()];
 
         Container::new(elements).wrap()
     }

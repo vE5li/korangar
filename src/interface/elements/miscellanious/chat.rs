@@ -56,7 +56,7 @@ impl Element for Chat {
                 .borrow()
                 .get_text_dimensions(
                     message.stamped_text(self.stamp),
-                    *theme.chat.font_size,
+                    *theme.chat.font_size * *interface_settings.scaling,
                     placement_resolver.get_available().x,
                 )
                 .y;

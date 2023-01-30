@@ -101,6 +101,7 @@ pub enum NetworkEvent {
         index: ItemIndex,
         equipped_position: EquipPosition,
     },
+    ChangeJob(AccountId, u32),
 }
 
 pub struct ChatMessage {
@@ -727,7 +728,7 @@ struct CriticalWeightUpdatePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xd7, 0x01)]
 struct SpriteChangePacket {
-    pub entity_id: EntityId,
+    pub account_id: AccountId,
     pub sprite_type: u8, // TODO: Is it actually the sprite type?
     pub value: u32,
     pub value2: u32,
@@ -2517,7 +2518,10 @@ impl NetworkingSystem {
                 } else if let Ok(_) = AchievementUpdatePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = AchievementListPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = CriticalWeightUpdatePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_) = SpriteChangePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = SpriteChangePacket::try_from_bytes(&mut byte_stream) {
+                    if packet.sprite_type == 0 {
+                        events.push(NetworkEvent::ChangeJob(packet.account_id, packet.value));
+                    }
                 } else if let Ok(_) = InventoyStartPacket::try_from_bytes(&mut byte_stream) {
                     let mut item_data = Vec::new();
 

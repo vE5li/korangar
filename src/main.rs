@@ -559,6 +559,16 @@ fn main() {
                         NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                             player_inventory.update_equipped_position(index, equipped_position);
                         }
+                        NetworkEvent::ChangeJob(account_id, job_id) => {
+                            let entity = entities.iter_mut().find(|entity| entity.with_account_id(account_id)).unwrap();
+
+                            let Entity::Player(player) = entity else {
+                                panic!();
+                            };
+
+                            player.set_job(job_id as usize);
+                            player.reload_sprite(&mut game_file_loader, &mut sprite_loader, &mut action_loader, &script_loader);
+                        }
                     }
                 }
 

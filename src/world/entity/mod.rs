@@ -11,7 +11,7 @@ use crate::graphics::ModelVertexBuffer;
 use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
-use crate::network::{CharacterInformation, ClientTick, EntityData, EntityId, StatusType};
+use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, StatusType};
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -133,6 +133,34 @@ impl Common {
             details,
             animation_state,
         }
+    }
+
+    pub fn reload_sprite(
+        &mut self,
+        game_file_loader: &mut GameFileLoader,
+        sprite_loader: &mut SpriteLoader,
+        action_loader: &mut ActionLoader,
+        script_loader: &ScriptLoader,
+    ) {
+        let entity_type = match self.job_id {
+            45 => EntityType::Warp,
+            111 => EntityType::Hidden, // TODO: check that this is correct
+            // 111 | 139 => None,
+            0..=44 | 4000..=5999 => EntityType::Player,
+            46..=999 => EntityType::Npc,
+            1000..=3999 => EntityType::Monster,
+            _ => EntityType::Npc,
+        };
+
+        let file_path = match entity_type {
+            EntityType::Player => format!("¸ó½ºÅÍ\\b_{}", script_loader.get_job_name_from_id(self.job_id)),
+            EntityType::Npc => format!("npc\\{}", script_loader.get_job_name_from_id(self.job_id)),
+            EntityType::Monster => format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(self.job_id)),
+            EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(self.job_id)), // TODO: change
+        };
+
+        self.sprite = sprite_loader.get(&format!("{file_path}.spr"), game_file_loader).unwrap();
+        self.actions = action_loader.get(&format!("{file_path}.act"), game_file_loader).unwrap();
     }
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
@@ -540,12 +568,27 @@ impl Player {
         }
     }
 
+    pub fn reload_sprite(
+        &mut self,
+        game_file_loader: &mut GameFileLoader,
+        sprite_loader: &mut SpriteLoader,
+        action_loader: &mut ActionLoader,
+        script_loader: &ScriptLoader,
+    ) {
+        self.common
+            .reload_sprite(game_file_loader, sprite_loader, action_loader, script_loader);
+    }
+
     pub fn get_common(&self) -> &Common {
         &self.common
     }
 
     pub fn get_common_mut(&mut self) -> &mut Common {
         &mut self.common
+    }
+
+    pub fn set_job(&mut self, job_id: usize) {
+        self.common.job_id = job_id;
     }
 
     pub fn update_status(&mut self, status_type: StatusType) {
@@ -690,6 +733,14 @@ impl Entity {
 
     pub fn get_entity_id(&self) -> EntityId {
         self.get_common().entity_id
+    }
+
+    pub fn with_account_id(&self, account_id: AccountId) -> bool {
+        // FIX: match on correct account id
+        if let Self::Player(player) = self {
+            return true;
+        }
+        false
     }
 
     pub fn get_job(&self) -> usize {

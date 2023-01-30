@@ -93,8 +93,6 @@ impl MapLoader {
             .collect();
 
         let map = Arc::new(Map::new(
-            map_data.version.into(),
-            ground_data.version.into(),
             gat_data.map_width as usize,
             gat_data.map_height as usize,
             map_data.water_settings,

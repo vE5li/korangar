@@ -10,7 +10,7 @@ use crate::graphics::*;
 use crate::interface::PrototypeWindow;
 #[cfg(feature = "debug")]
 use crate::loaders::MapData;
-use crate::loaders::{InternalVersion, LightSettings, WaterSettings};
+use crate::loaders::{LightSettings, WaterSettings};
 use crate::network::ClientTick;
 use crate::world::*;
 
@@ -85,8 +85,6 @@ impl MarkerIdentifier {
 
 #[derive(new)]
 pub struct Map {
-    resource_version: InternalVersion,
-    ground_version: InternalVersion,
     width: usize,
     height: usize,
     water_settings: WaterSettings,

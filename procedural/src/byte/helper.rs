@@ -35,6 +35,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
     let mut from_bytes_implementations = vec![];
     let mut implemented_fields = vec![];
     let mut to_bytes_implementations = vec![];
+    let mut packet_length = None;
 
     let (fields, delimiter): (Vec<Field>, _) = match data_struct.fields {
         syn::Fields::Named(named_fields) => (named_fields.named.into_iter().collect(), Delimiter::Brace),
@@ -42,15 +43,16 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         syn::Fields::Unit => panic!("unit types are not supported"),
     };
 
-    let mut counter: usize = 0;
-    for mut field in fields {
+    for (counter, mut field) in fields.into_iter().enumerate() {
         let counter_ident = format_ident!("_{}", counter);
         let counter_index = syn::Index::from(counter);
         let field_variable = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_ident));
         let field_identifier = field.ident.as_ref().map(|ident| quote!(#ident)).unwrap_or(quote!(#counter_index));
-        counter += 1;
+        let field_type = field.ty;
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
+
+        let is_packet_length = get_unique_attribute(&mut field.attrs, "packet_length").is_some();
 
         let length_hint = get_unique_attribute(&mut field.attrs, "length_hint")
             .map(|attribute| attribute.tokens)
@@ -61,6 +63,8 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
 
         let repeating: Option<TokenStream> =
             get_unique_attribute(&mut field.attrs, "repeating").map(|attribute| remove_self_from_stream(attribute.tokens));
+
+        let repeating_remaining = get_unique_attribute(&mut field.attrs, "repeating_remaining").is_some();
 
         let version_smaller = get_unique_attribute(&mut field.attrs, "version_smaller")
             .map(|attribute| attribute.parse_args().expect("failed to parse version"))
@@ -80,12 +84,23 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         let version_restricted = version_function.is_some();
         let is_repeating = repeating.is_some();
 
+        if is_packet_length {
+            assert!(counter == 0, "packet_length must always be the first field");
+            packet_length = Some(field_identifier.clone());
+        }
+
         // base from bytes implementation
         let from_implementation = quote!(crate::loaders::ByteConvertable::from_bytes(byte_stream, #from_length_hint));
 
         // wrap base implementation in a loop if the element can appear multiple times
         let from_implementation = match repeating {
             Some(repeat_count) => quote!((0..(#repeat_count)).map(|_| #from_implementation).collect()),
+            None if repeating_remaining => {
+                let packet_length = packet_length
+                    .as_ref()
+                    .expect("repeating_remaining is used but no packet_length attribute is set");
+                quote!((0..((#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes() as u16))).map(|_| #from_implementation).collect())
+            }
             None => from_implementation,
         };
 

@@ -57,11 +57,24 @@ pub fn derive_toggle(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
     }
 }
 
+#[proc_macro_derive(FixedByteSize)]
+pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, data, .. } = parse(token_stream).expect("failed to parse token stream");
+
+    match data {
+        Data::Struct(data_struct) => derive_fixed_byte_size_struct(data_struct, generics, ident),
+        Data::Enum(..) => panic!("enum types may not be derived"),
+        Data::Union(..) => panic!("union types may not be derived"),
+    }
+}
+
 #[proc_macro_derive(
     ByteConvertable,
     attributes(
+        packet_length,
         length_hint,
         repeating,
+        repeating_remaining,
         numeric_type,
         numeric_value,
         version,
@@ -87,7 +100,7 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
 
 /// Derive the Packet trait. A packet header must be specified and all fields
 /// must implement ByteConvertable.
-#[proc_macro_derive(Packet, attributes(header, ping, length_hint, repeating))]
+#[proc_macro_derive(Packet, attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining))]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     let DeriveInput {
         ident,

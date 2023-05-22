@@ -1,5 +1,6 @@
 mod action;
 mod convertable;
+mod fixed;
 mod font;
 mod gamefile;
 mod map;
@@ -12,6 +13,7 @@ mod version;
 
 pub use self::action::*;
 pub use self::convertable::ByteConvertable;
+pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
 pub use self::font::FontLoader;
 pub use self::gamefile::GameFileLoader;
 #[cfg(feature = "debug")]

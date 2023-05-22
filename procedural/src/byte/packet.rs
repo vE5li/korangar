@@ -54,6 +54,7 @@ pub fn derive_packet_struct(
 
                 let result = match byte_stream.match_signature(Self::header()) {
                     true => {
+                        let base_offset = byte_stream.get_offset();
                         #(#from_bytes_implementations)*
                         Ok( #instanciate )
                     },

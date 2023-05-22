@@ -82,6 +82,10 @@ impl<'b> ByteStream<'b> {
         self.offset += count;
     }
 
+    pub fn get_offset(&self) -> usize {
+        self.offset
+    }
+
     #[cfg(feature = "debug_network")]
     pub fn incoming_packet(&mut self, packet: &(impl Packet + 'static), name: &'static str, is_ping: bool) {
         self.packet_history.push(PacketEntry::new_incoming(packet, name, is_ping));

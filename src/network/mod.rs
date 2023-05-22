@@ -17,24 +17,24 @@ use crate::graphics::{Color, ColorBGRA, ColorRGBA};
 #[cfg(feature = "debug_network")]
 use crate::interface::PacketEntry;
 use crate::interface::{CharacterSelectionWindow, ElementCell, PrototypeElement, TrackedState};
-use crate::loaders::{ByteConvertable, ByteStream};
+use crate::loaders::{ByteConvertable, ByteStream, FixedByteSize};
 
-#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct ClientTick(pub u32);
 
 // TODO: move to login
-#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct AccountId(pub u32);
 
 // TODO: move to character
-#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct CharacterId(pub u32);
 
-#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct EntityId(pub u32);
 
 /// Item index is always actual index + 2.
-#[derive(Clone, Copy, Debug, PrototypeElement, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PrototypeElement, FixedByteSize, PartialEq, Eq, Hash)]
 pub struct ItemIndex(u16);
 
 impl ByteConvertable for ItemIndex {
@@ -47,7 +47,7 @@ impl ByteConvertable for ItemIndex {
     }
 }
 
-#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct ItemId(pub u32);
 
 /// Base trait that all packets implement.
@@ -160,6 +160,7 @@ struct LoginServerLoginPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc4, 0x0a)]
 struct LoginServerLoginSuccessPacket {
+    #[packet_length]
     pub packet_length: u16,
     pub login_id1: u32,
     pub account_id: AccountId,
@@ -172,7 +173,7 @@ struct LoginServerLoginSuccessPacket {
     pub unknown: u16,
     pub sex: Sex,
     pub auth_token: [u8; 17],
-    #[repeating((self.packet_length - 64) / 160)]
+    #[repeating_remaining]
     pub character_server_information: Vec<CharacterServerInformation>,
 }
 
@@ -396,7 +397,7 @@ impl ByteConvertable for Ipv4Addr {
     }
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
 struct CharacterServerInformation {
     pub server_ip: Ipv4Addr,
     pub server_port: u16,
@@ -510,6 +511,13 @@ pub struct CharacterInformation {
     pub sex: Sex,
 }
 
+// TODO: derive
+impl const FixedByteSize for CharacterInformation {
+    fn size_in_bytes() -> usize {
+        175
+    }
+}
+
 /// Sent by the character server as a response to [CreateCharacterPacket]
 /// succeeding. Provides all character information of the newly created
 /// character.
@@ -530,8 +538,9 @@ struct RequestCharacterListPacket {}
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x72, 0x0b)]
 struct RequestCharacterListSuccessPacket {
+    #[packet_length]
     pub packet_length: u16,
-    #[repeating((self.packet_length - 4) / 175)]
+    #[repeating_remaining]
     pub character_information: Vec<CharacterInformation>,
 }
 
@@ -709,6 +718,7 @@ struct AchievementUpdatePacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x23, 0x0a)]
 struct AchievementListPacket {
+    #[packet_length]
     pub packet_length: u16,
     pub acheivement_count: u32,
     pub total_score: u32,
@@ -750,14 +760,14 @@ struct InventoyEndPacket {
     pub flag: u8, // maybe char ?
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct ItemOptions {
     pub index: u16,
     pub value: u16,
     pub parameter: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
 struct RegularItemInformation {
     pub index: ItemIndex,
     pub item_id: ItemId,
@@ -772,9 +782,10 @@ struct RegularItemInformation {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x09, 0x0b)]
 struct RegularItemListPacket {
+    #[packet_length]
     pub packet_length: u16,
     pub inventory_type: u8,
-    #[repeating((self.packet_length - 5) / 34)]
+    #[repeating_remaining]
     pub item_information: Vec<RegularItemInformation>,
 }
 
@@ -796,16 +807,23 @@ struct EquippableItemInformation {
     pub fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
 }
 
+impl const FixedByteSize for EquippableItemInformation {
+    fn size_in_bytes() -> usize {
+        68 // This is actually wrong but for some reason its correct
+    }
+}
+
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x39, 0x0b)]
 struct EquippableItemListPacket {
+    #[packet_length]
     pub packet_length: u16,
     pub inventory_type: u8,
-    #[repeating((self.packet_length - 5) / 68)]
+    #[repeating_remaining]
     pub item_information: Vec<EquippableItemInformation>,
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
 struct EquippableSwitchItemInformation {
     pub index: ItemIndex,
     pub position: u32,
@@ -814,8 +832,9 @@ struct EquippableSwitchItemInformation {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x9b, 0x0a)]
 struct EquippableSwitchItemListPacket {
+    #[packet_length]
     pub packet_length: u16,
-    #[repeating((self.packet_length - 4) / 6)] // TODO: (remaining / 6)
+    #[repeating_remaining]
     pub item_information: Vec<EquippableSwitchItemInformation>,
 }
 
@@ -1377,11 +1396,19 @@ struct SkillInformation {
     pub upgraded: u8,
 }
 
+// TODO: derive
+impl const FixedByteSize for SkillInformation {
+    fn size_in_bytes() -> usize {
+        37
+    }
+}
+
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x0f, 0x01)]
 struct UpdateSkillTreePacket {
+    #[packet_length]
     pub packet_length: u16,
-    #[repeating((self.packet_length - 4) / 37)]
+    #[repeating_remaining]
     pub skill_information: Vec<SkillInformation>,
 }
 
@@ -1524,7 +1551,7 @@ struct QuestNotificationPacket1 {
     pub objective_details: [ObjectiveDetails1; 3],
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
 struct HuntingObjective {
     pub quest_id: u32,
     pub mob_id: u32,
@@ -1535,17 +1562,19 @@ struct HuntingObjective {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xfe, 0x08)]
 struct HuntingQuestNotificationPacket {
+    #[packet_length]
     pub packet_length: u16,
-    #[repeating((self.packet_length - 4) / 12)]
+    #[repeating_remaining]
     pub objective_details: Vec<HuntingObjective>,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xfa, 0x09)]
 struct HuntingQuestUpdateObjectivePacket {
+    #[packet_length]
     pub packet_length: u16,
     pub objective_count: u16,
-    #[repeating((self.packet_length - 4) / 12)]
+    #[repeating_remaining]
     pub objective_details: Vec<HuntingObjective>,
 }
 
@@ -1570,6 +1599,7 @@ struct QuestDetails {
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct Quest {
+    #[packet_length]
     pub quest_id: u32,
     pub active: u8,
     pub remaining_time: u32, // TODO: double check these
@@ -1582,6 +1612,7 @@ struct Quest {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xf8, 0x09)]
 struct QuestListPacket {
+    #[packet_length]
     pub packet_length: u16,
     pub quest_count: u32,
     #[repeating(self.quest_count)]
@@ -1842,6 +1873,13 @@ pub enum EquipPosition {
     LeftRightAccessory,
     #[numeric_value(3145728)]
     ShadowLeftRightAccessory,
+}
+
+// TODO: derive
+impl const FixedByteSize for EquipPosition {
+    fn size_in_bytes() -> usize {
+        4
+    }
 }
 
 impl EquipPosition {

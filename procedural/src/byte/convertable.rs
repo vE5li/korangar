@@ -21,6 +21,7 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
 
             fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Self {
                 assert!(length_hint.is_none(), "structs may not have a length hint");
+                let base_offset = byte_stream.get_offset();
                 #(#from_bytes_implementations)*
                 #instanciate
             }

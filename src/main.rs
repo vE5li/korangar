@@ -9,6 +9,7 @@
 #![feature(auto_traits)]
 #![feature(let_chains)]
 #![feature(variant_count)]
+#![feature(const_trait_impl)]
 #![feature(decl_macro)]
 
 #[cfg(feature = "debug")]

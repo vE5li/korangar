@@ -14,6 +14,7 @@ use std::rc::Rc;
 
 use cgmath::Vector2;
 use derive_new::new;
+use option_ext::OptionExt;
 
 pub use self::cursor::*;
 pub use self::elements::*;

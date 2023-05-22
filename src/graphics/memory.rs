@@ -13,6 +13,7 @@ pub struct MemoryAllocator {
     descriptor_set_allocator: StandardDescriptorSetAllocator,
     command_buffer_allocator: StandardCommandBufferAllocator,
 }
+
 impl MemoryAllocator {
     pub fn new(device: Arc<Device>) -> Self {
         let memory_allocator = StandardMemoryAllocator::new_default(device.clone());

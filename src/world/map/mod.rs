@@ -3,6 +3,7 @@ mod tile;
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
+use option_ext::OptionExt;
 
 pub use self::tile::{Tile, TileType};
 use crate::graphics::*;

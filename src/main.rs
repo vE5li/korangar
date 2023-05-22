@@ -3,7 +3,6 @@
 #![feature(option_zip)]
 #![feature(adt_const_params)]
 #![feature(arc_unwrap_or_clone)]
-#![feature(option_result_contains)]
 #![feature(proc_macro_hygiene)]
 #![feature(negative_impls)]
 #![feature(iter_intersperse)]

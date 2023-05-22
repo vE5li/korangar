@@ -8,6 +8,7 @@ mod shadow;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
+use option_ext::OptionExt;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, ClearAttachment, ClearRect, CommandBufferUsage, CopyImageToBufferInfo, PrimaryAutoCommandBuffer,

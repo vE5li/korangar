@@ -5,10 +5,12 @@ mod picker;
 mod settings;
 mod shadow;
 
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
 use option_ext::OptionExt;
+use procedural::profile;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, ClearAttachment, ClearRect, CommandBufferUsage, CopyImageToBufferInfo, PrimaryAutoCommandBuffer,
@@ -37,6 +39,8 @@ use self::picker::PickerSubrenderer;
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
 use super::MemoryAllocator;
+#[cfg(feature = "debug")]
+use crate::debug::*;
 use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
@@ -399,24 +403,55 @@ impl DeferredRenderTarget {
         self.state.get_builder().next_subpass(SubpassContents::Inline).unwrap();
     }
 
+    #[profile("finish swapchain image")]
     pub fn finish(&mut self, swapchain: Arc<Swapchain>, semaphore: Box<dyn GpuFuture>, image_number: usize) {
         let mut builder = self.state.take_builder();
 
+        #[cfg(feature = "debug")]
+        let end_render_pass_measurement = start_measurement("end render pass");
+
         builder.end_render_pass().unwrap();
 
+        #[cfg(feature = "debug")]
+        end_render_pass_measurement.stop();
+
         let command_buffer = builder.build().unwrap();
+
+        #[cfg(feature = "debug")]
+        let swapchain_measurement = start_measurement("get next swapchain image");
 
         // TODO: make this type ImageNumber instead
         let present_info = SwapchainPresentInfo::swapchain_image_index(swapchain, image_number as u32);
 
-        self.state = semaphore
-            .then_execute(self.queue.clone(), command_buffer)
-            .unwrap()
-            .then_swapchain_present(self.queue.clone(), present_info)
-            .boxed()
+        #[cfg(feature = "debug")]
+        swapchain_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let execute_measurement = start_measurement("queue command buffer");
+
+        let future = semaphore.then_execute(self.queue.clone(), command_buffer).unwrap();
+
+        #[cfg(feature = "debug")]
+        execute_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let present_measurement = start_measurement("present swapchain");
+
+        let future = future.then_swapchain_present(self.queue.clone(), present_info).boxed();
+
+        #[cfg(feature = "debug")]
+        present_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let flush_measurement = start_measurement("flush");
+
+        self.state = future
             .then_signal_fence_and_flush()
             .map(RenderTargetState::Fence)
             .unwrap_or(RenderTargetState::OutOfDate);
+
+        #[cfg(feature = "debug")]
+        flush_measurement.stop();
 
         self.bound_subrenderer = None;
     }
@@ -541,7 +576,11 @@ impl PickerRenderTarget {
     }
 }
 
-pub struct SingleRenderTarget<const F: Format, S: PartialEq, C> {
+pub trait IntoFormat {
+    fn into_format() -> Format;
+}
+
+pub struct SingleRenderTarget<F: IntoFormat, S: PartialEq, C> {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
@@ -549,9 +588,10 @@ pub struct SingleRenderTarget<const F: Format, S: PartialEq, C> {
     pub state: RenderTargetState,
     clear_value: C,
     bound_subrenderer: Option<S>,
+    _phantom_data: PhantomData<F>,
 }
 
-impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
+impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
     pub fn new(
         memory_allocator: Arc<MemoryAllocator>,
         queue: Arc<Queue>,
@@ -562,7 +602,7 @@ impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         clear_value: C,
     ) -> Self {
         let image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(&*memory_allocator, dimensions, sample_count, F, image_usage).unwrap(),
+            AttachmentImage::multisampled_with_usage(&*memory_allocator, dimensions, sample_count, F::into_format(), image_usage).unwrap(),
         ))
         .unwrap();
 
@@ -584,6 +624,7 @@ impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
             state,
             clear_value,
             bound_subrenderer,
+            _phantom_data: Default::default(),
         }
     }
 
@@ -594,7 +635,7 @@ impl<const F: Format, S: PartialEq, C> SingleRenderTarget<F, S, C> {
     }
 }
 
-impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
+impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
             &*self.memory_allocator,
@@ -630,7 +671,7 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
     }
 }
 
-impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
+impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
     pub fn start(&mut self, dimensions: [u32; 2], clear_interface: bool) {
         // TODO:
 
@@ -675,8 +716,12 @@ impl<const F: Format, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
         self.state = RenderTargetState::Rendering(builder);
     }
 
+    #[profile("finish interface buffer")]
     pub fn finish(&mut self, font_future: Option<FenceSignalFuture<Box<dyn GpuFuture>>>) {
         if let Some(mut future) = font_future {
+            #[cfg(feature = "debug")]
+            profile_block!("wait for font future");
+
             future.wait(None).unwrap();
             future.cleanup_finished();
         }

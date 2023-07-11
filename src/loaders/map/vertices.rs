@@ -63,8 +63,8 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                     let neighbor_x = x + neighbor_tile_index.x;
                     let neighbor_y = y + neighbor_tile_index.y;
                     let Some(neighbor_tile) = ground_tiles.get(neighbor_x + neighbor_y * width) else {
-                            continue;
-                        };
+                        continue;
+                    };
 
                     let (surface_offset, surface_height) = surface_alignment[0];
                     let height = get_tile_height_at(current_tile, surface_height);

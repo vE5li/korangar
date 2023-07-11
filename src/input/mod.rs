@@ -6,12 +6,15 @@ use std::mem::variant_count;
 use std::rc::{Rc, Weak};
 
 use cgmath::Vector2;
+use procedural::profile;
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
 pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
+#[cfg(feature = "debug")]
+use crate::debug::*;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
 use crate::graphics::{PickerRenderTarget, PickerTarget};
@@ -196,6 +199,7 @@ impl InputSystem {
         &self.keys[key_code as usize]
     }
 
+    #[profile("update user input")]
     pub fn user_events(
         &mut self,
         interface: &mut Interface,

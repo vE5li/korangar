@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use cgmath::{Array, Vector2, Vector3};
 use derive_new::new;
+use procedural::profile;
 use rand::{thread_rng, Rng};
 
 use crate::graphics::*;
@@ -157,6 +158,7 @@ impl ParticleHolder {
         self.quest_icons.clear();
     }
 
+    #[profile("update particles")]
     pub fn update(&mut self, delta_time: f32) {
         self.particles.retain_mut(|particle| particle.update(delta_time));
     }

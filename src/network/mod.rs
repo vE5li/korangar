@@ -11,8 +11,8 @@ use derive_new::new;
 use procedural::*;
 
 pub use self::login::LoginSettings;
-#[cfg(feature = "debug_network")]
-use crate::debug::Timer;
+#[cfg(feature = "debug")]
+use crate::debug::*;
 use crate::graphics::{Color, ColorBGRA, ColorRGBA};
 #[cfg(feature = "debug_network")]
 use crate::interface::PacketEntry;
@@ -2243,17 +2243,9 @@ impl NetworkingSystem {
         buffer[..response_lenght].to_vec()
     }
 
-    fn get_data_from_map_server(&mut self) -> Vec<u8> {
-        let mut buffer = [0; 4096];
-        let map_stream = self.map_stream.as_mut().expect("no map server connection");
-        let response_lenght = map_stream.read(&mut buffer).expect("failed to get response from map server");
-        buffer[..response_lenght].to_vec()
-    }
-
     fn try_get_data_from_map_server(&mut self) -> Option<Vec<u8>> {
         let mut buffer = [0; 8096];
         let map_stream = self.map_stream.as_mut()?;
-        map_stream.set_read_timeout(Duration::from_micros(1).into()).unwrap();
         let response_lenght = map_stream.read(&mut buffer).ok()?;
 
         match response_lenght {
@@ -2285,6 +2277,20 @@ impl NetworkingSystem {
     }
 
     pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), String> {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("create character");
+
+        #[cfg(feature = "debug")]
+        print_debug!(
+            "character with name {}{}{} in slot {}{}{}",
+            MAGENTA,
+            name,
+            NONE,
+            MAGENTA,
+            slot,
+            NONE
+        );
+
         let hair_color = 0;
         let hair_style = 0;
         let start_job = 0;
@@ -2314,11 +2320,29 @@ impl NetworkingSystem {
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
         self.characters.push(create_character_success_packet.character_information);
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
         Ok(())
     }
 
     pub fn delete_character(&mut self, character_id: CharacterId) -> Result<(), String> {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("delete character");
+
         let email = "a@a.com".to_string();
+
+        #[cfg(feature = "debug")]
+        print_debug!(
+            "character with id {}{}{} and email {}{}{}",
+            MAGENTA,
+            character_id.0,
+            NONE,
+            MAGENTA,
+            email,
+            NONE
+        );
 
         self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id, email));
 
@@ -2339,10 +2363,20 @@ impl NetworkingSystem {
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
         self.characters.retain(|character| character.character_id != character_id);
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
         Ok(())
     }
 
     pub fn select_character(&mut self, slot: usize) -> Result<(CharacterInformation, String), String> {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("select character");
+
+        #[cfg(feature = "debug")]
+        print_debug!("character in slot {}{}{}", MAGENTA, slot, NONE,);
+
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
         let response = self.get_data_from_character_server();
@@ -2370,9 +2404,11 @@ impl NetworkingSystem {
 
         let server_ip = IpAddr::V4(character_selection_success_packet.map_server_ip);
         let socket_address = SocketAddr::new(server_ip, character_selection_success_packet.map_server_port);
-        self.map_stream = TcpStream::connect_timeout(&socket_address, Duration::from_secs(1))
-            .map_err(|_| "Failed to connect to map server. Please try again")?
-            .into();
+        let map_stream = TcpStream::connect_timeout(&socket_address, Duration::from_secs(1))
+            .map_err(|_| "Failed to connect to map server. Please try again")?;
+
+        map_stream.set_nonblocking(true).unwrap();
+        self.map_stream = Some(map_stream);
 
         let login_data = self.login_data.as_ref().unwrap();
         self.send_packet_to_map_server(MapServerLoginPacket::new(
@@ -2396,6 +2432,9 @@ impl NetworkingSystem {
 
         self.player_name = character_information.name.clone();
 
+        #[cfg(feature = "debug")]
+        timer.stop();
+
         Ok((
             character_information,
             character_selection_success_packet.map_name.replace(".gat", ""),
@@ -2411,7 +2450,21 @@ impl NetworkingSystem {
     }
 
     pub fn switch_character_slot(&mut self, destination_slot: usize) -> Result<(), String> {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("switch character slot");
+
         let origin_slot = self.move_request.take().unwrap();
+
+        #[cfg(feature = "debug")]
+        print_debug!(
+            "from slot {}{}{} to slot {}{}{}",
+            MAGENTA,
+            origin_slot,
+            NONE,
+            MAGENTA,
+            destination_slot,
+            NONE
+        );
 
         self.send_packet_to_character_server(SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16));
 
@@ -2443,6 +2496,10 @@ impl NetworkingSystem {
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
         self.move_request.take();
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
         Ok(())
     }
 
@@ -2499,6 +2556,7 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(RequestUnequipItemPacket::new(item_index));
     }
 
+    #[profile]
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
 
@@ -2687,7 +2745,10 @@ impl NetworkingSystem {
             }
 
             #[cfg(feature = "debug_network")]
-            byte_stream.transfer_packet_history(&mut self.packet_history);
+            {
+                let _ = crate::debug::start_measurement("transfer packet history");
+                byte_stream.transfer_packet_history(&mut self.packet_history);
+            }
         }
 
         events

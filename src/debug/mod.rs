@@ -1,5 +1,6 @@
 #[macro_use]
 mod logging;
+#[macro_use]
 mod profiling;
 
 pub use self::logging::*;

@@ -55,14 +55,19 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         let is_packet_length = get_unique_attribute(&mut field.attrs, "packet_length").is_some();
 
         let length_hint = get_unique_attribute(&mut field.attrs, "length_hint")
-            .map(|attribute| attribute.tokens)
-            .map(|length_hint: TokenStream| quote!(((#length_hint) as usize).into()))
+            .map(|attribute| match attribute.meta {
+                syn::Meta::List(list) => list.tokens,
+                syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
+            })
+            .map(|length_hint| quote!(((#length_hint) as usize).into()))
             .unwrap_or(quote!(None));
 
         let from_length_hint = remove_self_from_stream(length_hint.clone());
 
-        let repeating: Option<TokenStream> =
-            get_unique_attribute(&mut field.attrs, "repeating").map(|attribute| remove_self_from_stream(attribute.tokens));
+        let repeating: Option<TokenStream> = get_unique_attribute(&mut field.attrs, "repeating").map(|attribute| match attribute.meta {
+            syn::Meta::List(list) => remove_self_from_stream(list.tokens),
+            syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
+        });
 
         let repeating_remaining = get_unique_attribute(&mut field.attrs, "repeating_remaining").is_some();
 

@@ -19,6 +19,28 @@ impl ChangeEvent {
     }
 }
 
-pub const RERENDER: Option<ChangeEvent> = Some(ChangeEvent::Rerender);
-pub const RERESOLVE: Option<ChangeEvent> = Some(ChangeEvent::Reresolve);
-pub const NO_EVENT: Option<ChangeEvent> = None;
+pub trait IntoChangeEvent {
+    fn into_change_event() -> Option<ChangeEvent>;
+}
+
+pub struct Rerender {}
+pub struct Reresolve {}
+pub struct Nothing {}
+
+impl IntoChangeEvent for Rerender {
+    fn into_change_event() -> Option<ChangeEvent> {
+        Some(ChangeEvent::Rerender)
+    }
+}
+
+impl IntoChangeEvent for Reresolve {
+    fn into_change_event() -> Option<ChangeEvent> {
+        Some(ChangeEvent::Reresolve)
+    }
+}
+
+impl IntoChangeEvent for Nothing {
+    fn into_change_event() -> Option<ChangeEvent> {
+        None
+    }
+}

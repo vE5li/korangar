@@ -18,6 +18,7 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
+use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 #[cfg(feature = "debug")]
@@ -303,6 +304,7 @@ impl DeferredRenderer {
         self.water_light_renderer.render(render_target, camera, water_level);
     }
 
+    #[profile]
     pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: ImageBuffer) {
         render_target.unbind_subrenderer();
         self.overlay_renderer.render(render_target, interface_image);

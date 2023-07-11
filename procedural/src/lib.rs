@@ -1,5 +1,5 @@
 #![feature(extend_one)]
-#![feature(drain_filter)]
+#![feature(extract_if)]
 
 mod byte;
 mod constraint;
@@ -10,7 +10,7 @@ mod utils;
 use proc_macro::TokenStream as InterfaceTokenStream;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse, Data, DeriveInput};
+use syn::{parse, Data, DeriveInput, ItemFn, LitStr, Stmt};
 
 use self::byte::*;
 use self::constraint::*;
@@ -44,6 +44,26 @@ pub fn debug_condition(condition: InterfaceTokenStream, conditional: InterfaceTo
         }
     }
     .into()
+}
+
+#[proc_macro_attribute]
+pub fn profile(name: InterfaceTokenStream, function: InterfaceTokenStream) -> InterfaceTokenStream {
+    let mut function: ItemFn = parse(function).expect("failed to parse token stream");
+    let name: LitStr = parse(name).unwrap_or_else(|_| {
+        let function_name = &function.sig.ident;
+        LitStr::new(function_name.to_string().replace("_", " ").as_str(), function_name.span())
+    });
+
+    let code = quote! {
+        #[cfg(feature = "debug")]
+        let _measurement = crate::debug::start_measurement(#name);
+    }
+    .into();
+
+    let statement: Stmt = parse(code).expect("failed to parse token stream");
+    function.block.stmts.insert(0, statement);
+
+    quote! { #function }.into()
 }
 
 #[proc_macro_derive(toggle, attributes(toggle))]

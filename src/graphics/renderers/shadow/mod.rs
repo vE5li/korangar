@@ -80,8 +80,16 @@ impl ShadowRenderer {
     }
 }
 
+pub struct ShadowFormat {}
+
+impl IntoFormat for ShadowFormat {
+    fn into_format() -> Format {
+        Format::D32_SFLOAT
+    }
+}
+
 impl Renderer for ShadowRenderer {
-    type Target = SingleRenderTarget<{ Format::D32_SFLOAT }, ShadowSubrenderer, ClearValue>;
+    type Target = SingleRenderTarget<ShadowFormat, ShadowSubrenderer, ClearValue>;
 }
 
 impl GeometryRendererTrait for ShadowRenderer {

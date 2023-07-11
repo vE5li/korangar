@@ -10,19 +10,19 @@ use crate::interface::*;
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ButtonTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub hovered_background_color: Mutable<Color, RERENDER>,
-    pub disabled_background_color: Mutable<Color, RERENDER>,
-    pub foreground_color: Mutable<Color, RERENDER>,
-    pub hovered_foreground_color: Mutable<Color, RERENDER>,
-    pub disabled_foreground_color: Mutable<Color, RERENDER>,
-    pub debug_foreground_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub icon_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub icon_size: MutableRange<Vector2<f32>, RERENDER>,
-    pub icon_text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub hovered_background_color: Mutable<Color, Rerender>,
+    pub disabled_background_color: Mutable<Color, Rerender>,
+    pub foreground_color: Mutable<Color, Rerender>,
+    pub hovered_foreground_color: Mutable<Color, Rerender>,
+    pub disabled_foreground_color: Mutable<Color, Rerender>,
+    pub debug_foreground_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub icon_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub icon_size: MutableRange<Vector2<f32>, Rerender>,
+    pub icon_text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub font_size: MutableRange<f32, Rerender>,
     pub height_constraint: DimensionConstraint,
 }
 
@@ -49,15 +49,15 @@ impl Default for ButtonTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct WindowTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub title_background_color: Mutable<Color, RERENDER>,
-    pub foreground_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub title_border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub border_size: MutableRange<Vector2<f32>, RERESOLVE>,
-    pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub gaps: MutableRange<Vector2<f32>, RERESOLVE>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub title_background_color: Mutable<Color, Rerender>,
+    pub foreground_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub title_border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub border_size: MutableRange<Vector2<f32>, Reresolve>,
+    pub text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub gaps: MutableRange<Vector2<f32>, Reresolve>,
+    pub font_size: MutableRange<f32, Rerender>,
     pub title_height: DimensionConstraint,
 }
 
@@ -80,18 +80,18 @@ impl Default for WindowTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ExpandableTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub second_background_color: Mutable<Color, RERENDER>,
-    pub foreground_color: Mutable<Color, RERENDER>,
-    pub hovered_foreground_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub border_size: MutableRange<Vector2<f32>, RERESOLVE>,
-    pub element_offset: MutableRange<Vector2<f32>, RERESOLVE>,
-    pub icon_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub icon_size: MutableRange<Vector2<f32>, RERENDER>,
-    pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub gaps: MutableRange<Vector2<f32>, RERESOLVE>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub second_background_color: Mutable<Color, Rerender>,
+    pub foreground_color: Mutable<Color, Rerender>,
+    pub hovered_foreground_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub border_size: MutableRange<Vector2<f32>, Reresolve>,
+    pub element_offset: MutableRange<Vector2<f32>, Reresolve>,
+    pub icon_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub icon_size: MutableRange<Vector2<f32>, Rerender>,
+    pub text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub gaps: MutableRange<Vector2<f32>, Reresolve>,
+    pub font_size: MutableRange<f32, Rerender>,
 }
 
 impl Default for ExpandableTheme {
@@ -115,11 +115,11 @@ impl Default for ExpandableTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct LabelTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub foreground_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub foreground_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub font_size: MutableRange<f32, Rerender>,
     pub size_constraint: SizeConstraint,
 }
 
@@ -138,12 +138,12 @@ impl Default for LabelTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ValueTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub hovered_background_color: Mutable<Color, RERENDER>,
-    pub foreground_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub hovered_background_color: Mutable<Color, Rerender>,
+    pub foreground_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub font_size: MutableRange<f32, Rerender>,
     pub size_constraint: SizeConstraint,
 }
 
@@ -163,12 +163,12 @@ impl Default for ValueTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct CloseButtonTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub hovered_background_color: Mutable<Color, RERENDER>,
-    pub foreground_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub text_offset: MutableRange<Vector2<f32>, RERENDER>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub hovered_background_color: Mutable<Color, Rerender>,
+    pub foreground_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub font_size: MutableRange<f32, Rerender>,
     pub size_constraint: SizeConstraint,
 }
 
@@ -188,9 +188,9 @@ impl Default for CloseButtonTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct OverlayTheme {
-    pub foreground_color: Mutable<Color, NO_EVENT>,
-    pub text_offset: MutableRange<Vector2<f32>, NO_EVENT>,
-    pub font_size: MutableRange<f32, NO_EVENT>,
+    pub foreground_color: Mutable<Color, Nothing>,
+    pub text_offset: MutableRange<Vector2<f32>, Nothing>,
+    pub font_size: MutableRange<f32, Nothing>,
 }
 
 impl Default for OverlayTheme {
@@ -205,9 +205,9 @@ impl Default for OverlayTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct SliderTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub rail_color: Mutable<Color, RERENDER>,
-    pub knob_color: Mutable<Color, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub rail_color: Mutable<Color, Rerender>,
+    pub knob_color: Mutable<Color, Rerender>,
     pub size_constraint: SizeConstraint,
 }
 
@@ -224,17 +224,17 @@ impl Default for SliderTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct InputTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub hovered_background_color: Mutable<Color, RERENDER>,
-    pub focused_background_color: Mutable<Color, RERENDER>,
-    pub text_color: Mutable<Color, RERENDER>,
-    pub ghost_text_color: Mutable<Color, RERENDER>,
-    pub focused_text_color: Mutable<Color, RERENDER>,
-    pub border_radius: MutableRange<Vector4<f32>, RERENDER>,
-    pub font_size: MutableRange<f32, RERENDER>,
-    pub text_offset: MutableRange<f32, RERENDER>,
-    pub cursor_offset: MutableRange<f32, RERENDER>,
-    pub cursor_width: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub hovered_background_color: Mutable<Color, Rerender>,
+    pub focused_background_color: Mutable<Color, Rerender>,
+    pub text_color: Mutable<Color, Rerender>,
+    pub ghost_text_color: Mutable<Color, Rerender>,
+    pub focused_text_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub font_size: MutableRange<f32, Rerender>,
+    pub text_offset: MutableRange<f32, Rerender>,
+    pub cursor_offset: MutableRange<f32, Rerender>,
+    pub cursor_width: MutableRange<f32, Rerender>,
     pub height_constraint: DimensionConstraint,
 }
 
@@ -259,8 +259,8 @@ impl Default for InputTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ChatTheme {
-    pub background_color: Mutable<Color, RERENDER>,
-    pub font_size: MutableRange<f32, RERENDER>,
+    pub background_color: Mutable<Color, Rerender>,
+    pub font_size: MutableRange<f32, Rerender>,
 }
 
 impl Default for ChatTheme {
@@ -274,7 +274,7 @@ impl Default for ChatTheme {
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct CursorTheme {
-    pub color: Mutable<Color, NO_EVENT>,
+    pub color: Mutable<Color, Nothing>,
 }
 
 impl Default for CursorTheme {
@@ -289,6 +289,12 @@ impl Default for CursorTheme {
 #[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
 pub struct Theme {
+    //#[skip_element]
+    //button_0: EventButton<"reload theme", ReloadeTheme>,
+    //#[skip_element]
+    //button_1: EventButton<"save theme", SaveTheme>,
+    // or:
+    //control_panel: ThemeControlPanel,
     #[event_button("reload theme", ReloadTheme)]
     #[event_button("save theme", SaveTheme)]
     pub button: ButtonTheme,
@@ -323,7 +329,6 @@ impl Theme {
 
     pub fn reload(&mut self, theme_file: &str) -> bool {
         let Some(theme) = Self::load(theme_file) else {
-
             #[cfg(feature = "debug")]
             print_debug!("failed to load theme from file {}{}{}", MAGENTA, theme_file, NONE);
 

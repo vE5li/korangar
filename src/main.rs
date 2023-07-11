@@ -11,6 +11,7 @@
 #![feature(variant_count)]
 #![feature(const_trait_impl)]
 #![feature(decl_macro)]
+#![feature(lazy_cell)]
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -57,6 +58,10 @@ use crate::system::{choose_physical_device, get_device_extensions, get_instance_
 use crate::world::*;
 
 fn main() {
+    // We start a frame so that functions trying to start a measurement don't panic.
+    #[cfg(feature = "debug")]
+    let _measurement = profiler_start_frame();
+
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
 
@@ -354,11 +359,14 @@ fn main() {
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
     events_loop.run(move |event, _, control_flow| {
+        #[cfg(feature = "debug")]
+        let _measurement = profiler_start_frame();
+
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
                 ..
-            } => *control_flow = ControlFlow::Exit,
+            } => control_flow.set_exit(),
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 ..
@@ -414,6 +422,12 @@ fn main() {
                 ..
             } => input_system.buffer_character(character),
             Event::MainEventsCleared => {
+                #[cfg(feature = "debug")]
+                let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
+
+                #[cfg(feature = "debug")]
+                let timer_measuremen = start_measurement("update timers");
+
                 input_system.update_delta();
 
                 let delta_time = game_timer.update();
@@ -421,9 +435,12 @@ fn main() {
                 let animation_timer = game_timer.get_animation_timer();
                 let client_tick = game_timer.get_client_tick();
 
-                networking_system.keep_alive(delta_time, client_tick);
+                #[cfg(feature = "debug")]
+                timer_measuremen.stop();
 
+                networking_system.keep_alive(delta_time, client_tick);
                 let network_events = networking_system.network_events();
+
                 let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
                     &mut interface,
                     &mut focus_state,
@@ -433,6 +450,9 @@ fn main() {
                     swapchain_holder.window_size(),
                     client_tick,
                 );
+
+                #[cfg(feature = "debug")]
+                let picker_measuremen = start_measurement("update picker target");
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
                     if let Some(entity) = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
@@ -449,6 +469,12 @@ fn main() {
                         }
                     }
                 }
+
+                #[cfg(feature = "debug")]
+                picker_measuremen.stop();
+
+                #[cfg(feature = "debug")]
+                let network_event_measuremen = start_measurement("process network events");
 
                 for event in network_events {
                     match event {
@@ -571,6 +597,12 @@ fn main() {
                         }
                     }
                 }
+
+                #[cfg(feature = "debug")]
+                network_event_measuremen.stop();
+
+                #[cfg(feature = "debug")]
+                let user_event_measuremen = start_measurement("process user events");
 
                 for event in user_events {
                     match event {
@@ -740,7 +772,7 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(&mut focus_state),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::default()),
+                        UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::new()),
                         #[cfg(feature = "debug_network")]
                         UserEvent::OpenPacketWindow => {
                             interface.open_window(&mut focus_state, &PacketWindow::new(networking_system.packets()))
@@ -825,14 +857,23 @@ fn main() {
                     }
                 }
 
+                #[cfg(feature = "debug")]
+                user_event_measuremen.stop();
+
                 let texture_fence = texture_loader.submit_load_buffer();
                 let sprite_fence = sprite_loader.submit_load_buffer();
 
                 particle_holder.update(delta_time as f32);
 
+                #[cfg(feature = "debug")]
+                let update_entities_measuremen = start_measurement("update entities");
+
                 entities
                     .iter_mut()
                     .for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
+
+                #[cfg(feature = "debug")]
+                update_entities_measuremen.stop();
 
                 if !entities.is_empty() {
                     let player_position = entities[0].get_position();
@@ -840,14 +881,23 @@ fn main() {
                     directional_shadow_camera.set_focus_point(player_position);
                 }
 
+                #[cfg(feature = "debug")]
+                let update_cameras_measuremen = start_measurement("update cameras");
+
                 start_camera.update(delta_time);
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
+
+                #[cfg(feature = "debug")]
+                update_cameras_measuremen.stop();
 
                 let (clear_interface, rerender_interface) =
                     interface.update(font_loader.clone(), &mut focus_state, game_timer.get_client_tick());
 
                 if swapchain_holder.is_swapchain_invalid() {
+                    #[cfg(feature = "debug")]
+                    profile_block!("recreate swapchain");
+
                     let viewport = swapchain_holder.recreate_swapchain();
 
                     deferred_renderer.recreate_pipeline(
@@ -880,34 +930,31 @@ fn main() {
                 }
 
                 if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for frame in current slot");
+
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
 
-                #[cfg(feature = "debug")]
-                let wait_for_previous = rerender_interface || render_settings.show_buffers();
-
-                #[cfg(not(feature = "debug"))]
-                let wait_for_previous = rerender_interface;
-
-                if wait_for_previous {
-                    for screen_target in &mut screen_targets {
-                        if let Some(mut fence) = screen_target.state.try_take_fence() {
-                            fence.wait(None).unwrap();
-                            fence.cleanup_finished();
-                        }
-                    }
-                }
-
                 if let Some(mut fence) = texture_fence {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for textures");
+
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
 
                 if let Some(mut fence) = sprite_fence {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for sprites");
+
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
+
+                #[cfg(feature = "debug")]
+                let matrices_measuremen = start_measurement("generate view and projection matrices");
 
                 if entities.is_empty() {
                     start_camera.generate_view_projection(swapchain_holder.window_size());
@@ -920,12 +967,18 @@ fn main() {
                     debug_camera.generate_view_projection(swapchain_holder.window_size());
                 }
 
+                #[cfg(feature = "debug")]
+                matrices_measuremen.stop();
+
                 let current_camera: &(dyn Camera + Send + Sync) = match entities.is_empty() {
                     #[cfg(feature = "debug")]
                     _ if render_settings.use_debug_camera => &debug_camera,
                     true => &start_camera,
                     false => &player_camera,
                 };
+
+                #[cfg(feature = "debug")]
+                let prepare_frame_measuremen = start_measurement("prepare frame");
 
                 let image_number = swapchain_holder.get_image_number();
                 let client_tick = game_timer.get_client_tick();
@@ -940,7 +993,13 @@ fn main() {
                     _ => None,
                 };
 
+                #[cfg(feature = "debug")]
+                prepare_frame_measuremen.stop();
+
                 thread_pool.in_place_scope(|scope| {
+                    #[cfg(feature = "debug")]
+                    profile_block!("spawn render threads");
+
                     scope.spawn(|_| {
                         let picker_target = &mut picker_targets[image_number];
 
@@ -1084,6 +1143,9 @@ fn main() {
                     });
 
                     if rerender_interface {
+                        #[cfg(feature = "debug")]
+                        profile_block!("rerender user interface");
+
                         interface_target.start(window_size_u32, clear_interface);
 
                         let state_provider = &StateProvider::new(
@@ -1125,6 +1187,9 @@ fn main() {
                 }
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                    #[cfg(feature = "debug")]
+                    profile_block!("render hovered entity status");
+
                     let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
                     if let Some(entity) = entity {
@@ -1140,6 +1205,9 @@ fn main() {
                 }
 
                 if !entities.is_empty() {
+                    #[cfg(feature = "debug")]
+                    profile_block!("render player status");
+
                     entities[0].render_status(screen_target, &deferred_renderer, current_camera, window_size);
                 }
 
@@ -1159,6 +1227,9 @@ fn main() {
                     );
                 }
 
+                #[cfg(feature = "debug")]
+                let finalize_frame_measuremen = start_measurement("finalize frame");
+
                 let interface_future = interface_target
                     .state
                     .try_take_semaphore()
@@ -1172,6 +1243,9 @@ fn main() {
                     .boxed();
 
                 screen_target.finish(swapchain_holder.get_swapchain(), combined_future, image_number);
+
+                #[cfg(feature = "debug")]
+                finalize_frame_measuremen.stop();
             }
             _ignored => (),
         }

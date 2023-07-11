@@ -16,6 +16,7 @@ use vulkano::render_pass::RenderPass;
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
+use super::IntoFormat;
 use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, Texture};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
@@ -202,6 +203,14 @@ impl InterfaceRenderer {
     }
 }
 
+pub struct InterfaceFormat {}
+
+impl IntoFormat for InterfaceFormat {
+    fn into_format() -> Format {
+        Format::R8G8B8A8_UNORM
+    }
+}
+
 impl Renderer for InterfaceRenderer {
-    type Target = SingleRenderTarget<{ Format::R8G8B8A8_UNORM }, (), ClearColorValue>;
+    type Target = SingleRenderTarget<InterfaceFormat, (), ClearColorValue>;
 }

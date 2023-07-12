@@ -1,28 +1,26 @@
-use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Weak;
 
-use cgmath::Array;
 use procedural::*;
 
 use crate::debug::*;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::{MouseInputMode, UserEvent};
+use crate::input::MouseInputMode;
 use crate::interface::*;
-use crate::network::CharacterInformation;
 
 pub struct FrameViewer {
     state: ElementState,
     frame_counter: usize,
     always_update: Remote<bool>,
+    visible_thread: Remote<ProfilerThread>,
 }
 
 impl FrameViewer {
-    pub fn new(always_update: Remote<bool>) -> Self {
+    pub fn new(always_update: Remote<bool>, visible_thread: Remote<ProfilerThread>) -> Self {
         Self {
             state: ElementState::default(),
             frame_counter: 0,
             always_update,
+            visible_thread,
         }
     }
 }
@@ -40,7 +38,7 @@ impl Element for FrameViewer {
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
         let size_constraint = &constraint!(100%, 300);
         self.state.resolve(placement_resolver, size_constraint);
     }
@@ -67,27 +65,27 @@ impl Element for FrameViewer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        state_provider: &StateProvider,
+        _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        _theme: &Theme,
         parent_position: Position,
         clip_size: ClipSize,
-        hovered_element: Option<&dyn Element>,
-        focused_element: Option<&dyn Element>,
-        mouse_mode: &MouseInputMode,
-        second_theme: bool,
+        _hovered_element: Option<&dyn Element>,
+        _focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
+        _second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
 
-        let (entries, statistics_map, longest_frame) = get_statistics_data();
+        let (entries, statistics_map, longest_frame) = get_statistics_data(*self.visible_thread.borrow());
 
-        let mut colors = BTreeMap::new();
         let bar_width = (self.state.cached_size.x - 50.0) / entries.len() as f32;
         let gap_width = 50.0 / entries.len() as f32;
         let height_unit = self.state.cached_size.y / longest_frame.as_secs_f32();
         let mut x_position = 0.0;
+        let mut colors = BTreeMap::new();
 
         for entry in entries {
             let mut y_position = self.state.cached_size.y;

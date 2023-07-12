@@ -163,6 +163,7 @@ impl ParticleHolder {
         self.particles.retain_mut(|particle| particle.update(delta_time));
     }
 
+    #[profile("render particles")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

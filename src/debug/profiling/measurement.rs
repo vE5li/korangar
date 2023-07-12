@@ -18,7 +18,7 @@ impl ActiveMeasurement {
 
 impl Drop for ActiveMeasurement {
     fn drop(&mut self) {
-        PROFILER.lock().unwrap().stop_measurement(self.name);
+        unsafe { PROFILER.assume_init_ref().lock().unwrap().stop_measurement(self.name) };
     }
 }
 

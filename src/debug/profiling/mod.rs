@@ -2,7 +2,8 @@ mod measurement;
 mod ring_buffer;
 mod statistics;
 
-use std::sync::{LazyLock, Mutex};
+use std::mem::MaybeUninit;
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Instant;
 
 use self::measurement::{ActiveMeasurement, Measurement};
@@ -10,13 +11,27 @@ use self::ring_buffer::RingBuffer;
 pub use self::statistics::{get_statistics_data, FrameData, MeasurementStatistics};
 use crate::debug::*;
 
-static PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
+#[thread_local]
+static mut PROFILER: MaybeUninit<Arc<Mutex<Profiler>>> = MaybeUninit::uninit();
+
+static mut MAIN_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
+static mut PICKER_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
+static mut SHADOW_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
+static mut DEFERRED_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProfilerThread {
+    Main,
+    Picker,
+    Shadow,
+    Deferred,
+}
 
 pub const ROOT_MEASUREMENT_NAME: &str = "main loop";
 pub const MAIN_EVENT_MEASUREMENT_NAME: &str = "window main event";
 
 #[derive(Default)]
-struct Profiler {
+pub struct Profiler {
     root_measurement: Option<Measurement>,
     /// Self referencing pointers
     active_measurements: Vec<*const Measurement>,
@@ -113,18 +128,38 @@ impl Profiler {
     }
 }
 
-// FIXME: Do this properly
-unsafe impl Send for Profiler {}
-unsafe impl Sync for Profiler {}
-
 #[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
-pub fn profiler_start_frame() -> ActiveMeasurement {
-    PROFILER.lock().unwrap().start_frame()
+pub fn profiler_start_main_thread() -> ActiveMeasurement {
+    let profiler = unsafe { Arc::clone(&MAIN_THREAD_PROFILER) };
+    let measurement = profiler.lock().unwrap().start_frame();
+    unsafe { PROFILER.write(profiler) };
+    measurement
+}
+
+pub fn profiler_start_picker_thread() -> ActiveMeasurement {
+    let profiler = unsafe { Arc::clone(&PICKER_THREAD_PROFILER) };
+    let measurement = profiler.lock().unwrap().start_frame();
+    unsafe { PROFILER.write(profiler) };
+    measurement
+}
+
+pub fn profiler_start_shadow_thread() -> ActiveMeasurement {
+    let profiler = unsafe { Arc::clone(&SHADOW_THREAD_PROFILER) };
+    let measurement = profiler.lock().unwrap().start_frame();
+    unsafe { PROFILER.write(profiler) };
+    measurement
+}
+
+pub fn profiler_start_deferred_thread() -> ActiveMeasurement {
+    let profiler = unsafe { Arc::clone(&DEFERRED_THREAD_PROFILER) };
+    let measurement = profiler.lock().unwrap().start_frame();
+    unsafe { PROFILER.write(profiler) };
+    measurement
 }
 
 #[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
 pub fn start_measurement(name: &'static str) -> ActiveMeasurement {
-    PROFILER.lock().unwrap().start_measurement(name)
+    unsafe { PROFILER.assume_init_ref().lock().unwrap().start_measurement(name) }
 }
 
 macro_rules! profile_block {

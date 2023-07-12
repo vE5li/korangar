@@ -3,7 +3,10 @@ use std::ops::Div;
 use std::time::Duration;
 
 use super::measurement::Measurement;
-use super::{MAIN_EVENT_MEASUREMENT_NAME, PROFILER};
+use super::{
+    ProfilerThread, DEFERRED_THREAD_PROFILER, MAIN_EVENT_MEASUREMENT_NAME, MAIN_THREAD_PROFILER, PICKER_THREAD_PROFILER,
+    SHADOW_THREAD_PROFILER,
+};
 
 #[derive(Default, Debug)]
 struct MeasurementTiming {
@@ -64,8 +67,14 @@ pub struct FrameData {
     pub total_time: Duration,
 }
 
-pub fn get_statistics_data() -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
-    let profiler = PROFILER.lock().unwrap();
+pub fn get_statistics_data(thread: ProfilerThread) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
+    let profiler = match thread {
+        ProfilerThread::Main => unsafe { MAIN_THREAD_PROFILER.lock().unwrap() },
+        ProfilerThread::Picker => unsafe { PICKER_THREAD_PROFILER.lock().unwrap() },
+        ProfilerThread::Shadow => unsafe { SHADOW_THREAD_PROFILER.lock().unwrap() },
+        ProfilerThread::Deferred => unsafe { DEFERRED_THREAD_PROFILER.lock().unwrap() },
+    };
+
     let mut longest_frame_time = Duration::default();
 
     let frame_data = profiler

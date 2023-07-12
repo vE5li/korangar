@@ -11,6 +11,7 @@
 #![feature(variant_count)]
 #![feature(const_trait_impl)]
 #![feature(decl_macro)]
+#![feature(thread_local)]
 #![feature(lazy_cell)]
 
 #[cfg(feature = "debug")]
@@ -60,7 +61,7 @@ use crate::world::*;
 fn main() {
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
-    let _measurement = profiler_start_frame();
+    let _measurement = profiler_start_main_thread();
 
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
@@ -360,7 +361,7 @@ fn main() {
 
     events_loop.run(move |event, _, control_flow| {
         #[cfg(feature = "debug")]
-        let _measurement = profiler_start_frame();
+        let _measurement = profiler_start_main_thread();
 
         match event {
             Event::WindowEvent {
@@ -997,10 +998,12 @@ fn main() {
                 prepare_frame_measuremen.stop();
 
                 thread_pool.in_place_scope(|scope| {
-                    #[cfg(feature = "debug")]
-                    profile_block!("spawn render threads");
-
                     scope.spawn(|_| {
+                        #[cfg(feature = "debug")]
+                        let _measurement = profiler_start_picker_thread();
+                        #[cfg(feature = "debug")]
+                        let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
+
                         let picker_target = &mut picker_targets[image_number];
 
                         picker_target.start();
@@ -1009,10 +1012,7 @@ fn main() {
                         map.render_tiles(picker_target, &picker_renderer, current_camera);
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities
-                            .iter()
-                            .skip(1)
-                            .for_each(|entity| entity.render(picker_target, &picker_renderer, current_camera));
+                        map.render_entities(entities, picker_target, &picker_renderer, current_camera, false);
 
                         #[cfg(feature = "debug")]
                         map.render_markers(
@@ -1028,6 +1028,11 @@ fn main() {
                     });
 
                     scope.spawn(|_| {
+                        #[cfg(feature = "debug")]
+                        let _measurement = profiler_start_shadow_thread();
+                        #[cfg(feature = "debug")]
+                        let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
+
                         let directional_shadow_target = &mut directional_shadow_targets[image_number];
 
                         directional_shadow_target.start();
@@ -1052,14 +1057,23 @@ fn main() {
                         );
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities
-                            .iter()
-                            .for_each(|entity| entity.render(directional_shadow_target, &shadow_renderer, &directional_shadow_camera));
+                        map.render_entities(
+                            entities,
+                            directional_shadow_target,
+                            &shadow_renderer,
+                            &directional_shadow_camera,
+                            true,
+                        );
 
                         directional_shadow_target.finish();
                     });
 
                     scope.spawn(|_| {
+                        #[cfg(feature = "debug")]
+                        let _measurement = profiler_start_deferred_thread();
+                        #[cfg(feature = "debug")]
+                        let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
+
                         screen_target.start();
 
                         #[debug_condition(render_settings.show_map)]
@@ -1082,9 +1096,7 @@ fn main() {
                         );
 
                         #[debug_condition(render_settings.show_entities)]
-                        entities
-                            .iter()
-                            .for_each(|entity| entity.render(screen_target, &deferred_renderer, current_camera));
+                        map.render_entities(entities, screen_target, &deferred_renderer, current_camera, true);
 
                         #[debug_condition(render_settings.show_water)]
                         map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
@@ -1144,7 +1156,7 @@ fn main() {
 
                     if rerender_interface {
                         #[cfg(feature = "debug")]
-                        profile_block!("rerender user interface");
+                        profile_block!("render user interface");
 
                         interface_target.start(window_size_u32, clear_interface);
 

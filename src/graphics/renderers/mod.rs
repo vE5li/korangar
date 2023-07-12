@@ -365,6 +365,7 @@ impl DeferredRenderTarget {
         }
     }
 
+    #[profile("start frame")]
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
             &*self.memory_allocator,
@@ -524,6 +525,7 @@ impl PickerRenderTarget {
         }
     }
 
+    #[profile("start frame")]
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
             &*self.memory_allocator,
@@ -552,6 +554,7 @@ impl PickerRenderTarget {
         self.bound_subrenderer = None;
     }
 
+    #[profile("finish buffer")]
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
 
@@ -636,6 +639,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
 }
 
 impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
+    #[profile("start frame")]
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
             &*self.memory_allocator,
@@ -653,6 +657,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
         self.state = RenderTargetState::Rendering(builder);
     }
 
+    #[profile("finalize buffer")]
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
 
@@ -672,6 +677,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
 }
 
 impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
+    #[profile("start frame")]
     pub fn start(&mut self, dimensions: [u32; 2], clear_interface: bool) {
         // TODO:
 
@@ -716,7 +722,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
         self.state = RenderTargetState::Rendering(builder);
     }
 
-    #[profile("finish interface buffer")]
+    #[profile("finish buffer")]
     pub fn finish(&mut self, font_future: Option<FenceSignalFuture<Box<dyn GpuFuture>>>) {
         if let Some(mut future) = font_future {
             #[cfg(feature = "debug")]

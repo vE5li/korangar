@@ -12,12 +12,12 @@ pub use self::statistics::{get_statistics_data, FrameData, MeasurementStatistics
 use crate::debug::*;
 
 #[thread_local]
-static mut PROFILER: MaybeUninit<Arc<Mutex<Profiler>>> = MaybeUninit::uninit();
+static mut PROFILER: MaybeUninit<&'static Mutex<Profiler>> = MaybeUninit::uninit();
 
-static mut MAIN_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
-static mut PICKER_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
-static mut SHADOW_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
-static mut DEFERRED_THREAD_PROFILER: LazyLock<Arc<Mutex<Profiler>>> = LazyLock::new(|| Arc::new(Mutex::new(Profiler::default())));
+static mut MAIN_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
+static mut PICKER_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
+static mut SHADOW_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
+static mut DEFERRED_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfilerThread {
@@ -130,28 +130,28 @@ impl Profiler {
 
 #[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
 pub fn profiler_start_main_thread() -> ActiveMeasurement {
-    let profiler = unsafe { Arc::clone(&MAIN_THREAD_PROFILER) };
+    let profiler = unsafe { &MAIN_THREAD_PROFILER };
     let measurement = profiler.lock().unwrap().start_frame();
     unsafe { PROFILER.write(profiler) };
     measurement
 }
 
 pub fn profiler_start_picker_thread() -> ActiveMeasurement {
-    let profiler = unsafe { Arc::clone(&PICKER_THREAD_PROFILER) };
+    let profiler = unsafe { &PICKER_THREAD_PROFILER };
     let measurement = profiler.lock().unwrap().start_frame();
     unsafe { PROFILER.write(profiler) };
     measurement
 }
 
 pub fn profiler_start_shadow_thread() -> ActiveMeasurement {
-    let profiler = unsafe { Arc::clone(&SHADOW_THREAD_PROFILER) };
+    let profiler = unsafe { &SHADOW_THREAD_PROFILER };
     let measurement = profiler.lock().unwrap().start_frame();
     unsafe { PROFILER.write(profiler) };
     measurement
 }
 
 pub fn profiler_start_deferred_thread() -> ActiveMeasurement {
-    let profiler = unsafe { Arc::clone(&DEFERRED_THREAD_PROFILER) };
+    let profiler = unsafe { &DEFERRED_THREAD_PROFILER };
     let measurement = profiler.lock().unwrap().start_frame();
     unsafe { PROFILER.write(profiler) };
     measurement

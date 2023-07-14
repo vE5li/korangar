@@ -360,9 +360,6 @@ fn main() {
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
     events_loop.run(move |event, _, control_flow| {
-        #[cfg(feature = "debug")]
-        let _measurement = profiler_start_main_thread();
-
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -424,7 +421,7 @@ fn main() {
             } => input_system.buffer_character(character),
             Event::MainEventsCleared => {
                 #[cfg(feature = "debug")]
-                let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
+                let _measurement = profiler_start_main_thread();
 
                 #[cfg(feature = "debug")]
                 let timer_measuremen = start_measurement("update timers");
@@ -1001,8 +998,6 @@ fn main() {
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
                         let _measurement = profiler_start_picker_thread();
-                        #[cfg(feature = "debug")]
-                        let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
 
                         let picker_target = &mut picker_targets[image_number];
 
@@ -1030,8 +1025,6 @@ fn main() {
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
                         let _measurement = profiler_start_shadow_thread();
-                        #[cfg(feature = "debug")]
-                        let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
 
                         let directional_shadow_target = &mut directional_shadow_targets[image_number];
 
@@ -1071,8 +1064,6 @@ fn main() {
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
                         let _measurement = profiler_start_deferred_thread();
-                        #[cfg(feature = "debug")]
-                        let _measurement = start_measurement(MAIN_EVENT_MEASUREMENT_NAME);
 
                         screen_target.start();
 

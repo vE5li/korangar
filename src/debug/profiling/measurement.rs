@@ -2,6 +2,7 @@ use std::time::{Duration, Instant};
 
 use super::PROFILER;
 
+#[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
 pub struct ActiveMeasurement {
     name: &'static str,
 }

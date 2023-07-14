@@ -120,7 +120,7 @@ impl Element for FrameViewer {
         }
 
         let mut y_position = 0.0;
-        for (name, color) in std::iter::once((&MAIN_EVENT_MEASUREMENT_NAME, &Color::monochrome(150))).chain(colors.iter()) {
+        for (name, color) in std::iter::once((&ROOT_MEASUREMENT_NAME, &Color::monochrome(150))).chain(colors.iter()) {
             let statistics = statistics_map.get(name).unwrap();
             let text = format!("{} {:?} (SD {:.1})", name, statistics.mean, statistics.standard_deviation);
 

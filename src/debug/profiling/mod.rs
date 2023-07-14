@@ -3,7 +3,7 @@ mod ring_buffer;
 mod statistics;
 
 use std::mem::MaybeUninit;
-use std::sync::{Arc, LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex};
 use std::time::Instant;
 
 use self::measurement::{ActiveMeasurement, Measurement};
@@ -28,7 +28,6 @@ pub enum ProfilerThread {
 }
 
 pub const ROOT_MEASUREMENT_NAME: &str = "main loop";
-pub const MAIN_EVENT_MEASUREMENT_NAME: &str = "window main event";
 
 #[derive(Default)]
 pub struct Profiler {
@@ -75,8 +74,7 @@ impl Profiler {
         self.active_measurements = vec![self.root_measurement.as_ref().unwrap() as *const _];
 
         // Save the completed frame so we can inspect it in the profiler later on.
-        // TODO: only discard measurements if some boolean is toggled
-        if let Some(previous_measurement) = previous_measurement && previous_measurement.indices.iter().any(|entry| entry.name == MAIN_EVENT_MEASUREMENT_NAME) {
+        if let Some(previous_measurement) = previous_measurement {
             self.saved_frames.push(previous_measurement);
         }
 
@@ -128,7 +126,6 @@ impl Profiler {
     }
 }
 
-#[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
 pub fn profiler_start_main_thread() -> ActiveMeasurement {
     let profiler = unsafe { &MAIN_THREAD_PROFILER };
     let measurement = profiler.lock().unwrap().start_frame();
@@ -157,7 +154,6 @@ pub fn profiler_start_deferred_thread() -> ActiveMeasurement {
     measurement
 }
 
-#[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
 pub fn start_measurement(name: &'static str) -> ActiveMeasurement {
     unsafe { PROFILER.assume_init_ref().lock().unwrap().start_measurement(name) }
 }

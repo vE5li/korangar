@@ -3,10 +3,7 @@ use std::ops::Div;
 use std::time::Duration;
 
 use super::measurement::Measurement;
-use super::{
-    ProfilerThread, DEFERRED_THREAD_PROFILER, MAIN_EVENT_MEASUREMENT_NAME, MAIN_THREAD_PROFILER, PICKER_THREAD_PROFILER,
-    SHADOW_THREAD_PROFILER,
-};
+use super::{ProfilerThread, DEFERRED_THREAD_PROFILER, MAIN_THREAD_PROFILER, PICKER_THREAD_PROFILER, SHADOW_THREAD_PROFILER};
 
 #[derive(Default, Debug)]
 struct MeasurementTiming {
@@ -28,7 +25,7 @@ impl MeasurementTiming {
     }
 }
 
-fn process_timing(measurement: &Measurement, timings: &mut HashMap<&'static str, MeasurementTiming>) {
+fn process_timing<const RECURSE: bool>(measurement: &Measurement, timings: &mut HashMap<&'static str, MeasurementTiming>) {
     let total_time = measurement.total_time_taken();
     let timing = timings.entry(measurement.name).or_insert(MeasurementTiming {
         shortest_time: Duration::MAX,
@@ -41,10 +38,12 @@ fn process_timing(measurement: &Measurement, timings: &mut HashMap<&'static str,
     timing.total_time += total_time;
     timing.times_called += 1;
 
-    measurement
-        .indices
-        .iter()
-        .for_each(|measurement| process_timing(measurement, timings));
+    if RECURSE {
+        measurement
+            .indices
+            .iter()
+            .for_each(|measurement| process_timing::<RECURSE>(measurement, timings));
+    }
 }
 
 fn calculate_standard_deviation(mean: Duration, times: &[Duration]) -> f64 {
@@ -87,10 +86,6 @@ pub fn get_statistics_data(thread: ProfilerThread) -> (Vec<FrameData>, HashMap<&
             let frame_times = measurement
                 .indices
                 .iter()
-                .find(|entry| entry.name == MAIN_EVENT_MEASUREMENT_NAME)
-                .unwrap()
-                .indices
-                .iter()
                 .map(|entry| (entry.name, entry.total_time_taken()))
                 .collect();
 
@@ -100,10 +95,13 @@ pub fn get_statistics_data(thread: ProfilerThread) -> (Vec<FrameData>, HashMap<&
 
     let mut timing_map = HashMap::new();
 
-    profiler
-        .saved_frames
-        .iter()
-        .for_each(|measurement| process_timing(measurement, &mut timing_map));
+    profiler.saved_frames.iter().for_each(|measurement| {
+        process_timing::<false>(measurement, &mut timing_map);
+        measurement
+            .indices
+            .iter()
+            .for_each(|measurement| process_timing::<false>(measurement, &mut timing_map))
+    });
 
     let statistics_map = timing_map
         .iter()

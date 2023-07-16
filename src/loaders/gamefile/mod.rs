@@ -150,10 +150,16 @@ impl GameArchive {
         let mut byte_stream = ByteStream::new(&self.data);
         byte_stream.skip(file_information.offset as usize + 46);
 
+        // TODO: Figure out what the GRF_FLAG_MIXCRYPT flag actually means and load the
+        // file correctly
+        if file_information.flags > 1 {
+            return None;
+        }
+
         let compressed = byte_stream.slice(file_information.compressed_size_aligned as usize);
         let (uncompressed, _checksum) = decompress(&compressed, Format::Zlib).unwrap();
 
-        uncompressed.into()
+        Some(uncompressed)
     }
 
     pub fn get(&mut self, path: &str) -> Option<Vec<u8>> {
@@ -242,7 +248,24 @@ impl GameFileLoader {
         let mut failed_count = 0;
 
         for file_name in lua_files {
-            let bytes = self.get(&file_name).unwrap();
+            let bytes = match self.get(&file_name) {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    #[cfg(feature = "debug")]
+                    {
+                        print_debug!(
+                            "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {error:?}",
+                            YELLOW,
+                            NONE,
+                            MAGENTA,
+                            NONE
+                        );
+                        failed_count += 1;
+                    }
+
+                    continue;
+                }
+            };
 
             // Try to unify all bytecode to Lua 5.1 and possibly 64 bit.
             match unify(&bytes, &bytecode_format, &settings) {

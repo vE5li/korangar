@@ -9,7 +9,7 @@ pub struct InventoryWindow {
 }
 
 impl InventoryWindow {
-    pub const WINDOW_CLASS: &'static str = "invetory";
+    pub const WINDOW_CLASS: &'static str = "inventory";
 }
 
 impl PrototypeWindow for InventoryWindow {

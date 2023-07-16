@@ -193,7 +193,7 @@ fn main() {
     game_file_loader.patch();
 
     // Load patched files to overwrite the original ones.
-    game_file_loader.add_archive("lua_files.grf".to_string());
+    game_file_loader.add_archive(LUA_GRF_FILE_NAME.to_string());
 
     let memory_allocator = Arc::new(MemoryAllocator::new(device.clone()));
 

@@ -10,6 +10,8 @@ use yazi::*;
 use crate::debug::*;
 use crate::loaders::{ByteConvertable, ByteStream};
 
+pub const LUA_GRF_FILE_NAME: &str = "lua_files.grf";
+
 #[derive(Clone, ByteConvertable, new)]
 pub struct FileHeader {
     #[new(default)]
@@ -225,7 +227,7 @@ impl GameFileLoader {
     pub fn patch(&mut self) {
         use lunify::{unify, Format, LunifyError, Settings};
 
-        if Path::new("lua_files.grf").exists() {
+        if Path::new(LUA_GRF_FILE_NAME).exists() {
             return;
         }
 
@@ -274,6 +276,6 @@ impl GameFileLoader {
             NONE
         );
 
-        lua_archive.save("lua_files.grf");
+        lua_archive.save(LUA_GRF_FILE_NAME);
     }
 }

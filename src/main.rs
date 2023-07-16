@@ -143,6 +143,8 @@ fn main() {
     let desired_device_extensions = get_device_extensions();
     let (physical_device, queue_family_index) = choose_physical_device(&instance, &surface, &desired_device_extensions);
 
+    let present_mode_info = PresentModeInfo::from_device(&physical_device, &surface);
+
     #[cfg(feature = "debug")]
     timer.stop();
 
@@ -621,7 +623,7 @@ fn main() {
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::ToggleFrameLimit => {
                             graphics_settings.toggle_frame_limit();
-                            swapchain_holder.set_frame_limit(graphics_settings.frame_limit);
+                            swapchain_holder.set_frame_limit(present_mode_info, graphics_settings.frame_limit);
 
                             // NOTE: For some reason the interface buffer becomes messed up when
                             // recreating the swapchain, so we need to render it again.
@@ -636,7 +638,7 @@ fn main() {
                             interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_item_state()))
                         }
                         UserEvent::OpenGraphicsSettingsWindow => {
-                            interface.open_window(&mut focus_state, &GraphicsSettingsWindow::default())
+                            interface.open_window(&mut focus_state, &GraphicsSettingsWindow::new(present_mode_info))
                         }
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&mut focus_state, &AudioSettingsWindow::default()),
                         UserEvent::ReloadTheme => interface.reload_theme(),

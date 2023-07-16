@@ -1,10 +1,13 @@
 use procedural::*;
 
+use crate::graphics::PresentModeInfo;
 use crate::input::UserEvent;
 use crate::interface::*;
 
-#[derive(Default)]
-pub struct GraphicsSettingsWindow {}
+#[derive(new)]
+pub struct GraphicsSettingsWindow {
+    present_mode_info: PresentModeInfo,
+}
 
 impl GraphicsSettingsWindow {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
@@ -16,14 +19,20 @@ impl PrototypeWindow for GraphicsSettingsWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements = vec![
-            StateButton::default()
-                .with_text("framerate limit")
-                .with_selector(|state_provider| state_provider.graphics_settings.frame_limit)
-                .with_event(UserEvent::ToggleFrameLimit)
-                .wrap(),
-            interface_settings.to_element("interface settings".to_string()),
-        ];
+        let mut elements = vec![interface_settings.to_element("interface settings".to_string())];
+
+        // TODO: Instead of not showing this option, disable the checkbox and add a
+        // tooltip
+        if self.present_mode_info.supports_immediate || self.present_mode_info.supports_mailbox {
+            elements.insert(
+                0,
+                StateButton::default()
+                    .with_text("framerate limit")
+                    .with_selector(|state_provider| state_provider.graphics_settings.frame_limit)
+                    .with_event(UserEvent::ToggleFrameLimit)
+                    .wrap(),
+            );
+        }
 
         WindowBuilder::default()
             .with_title("Graphics Settings".to_string())

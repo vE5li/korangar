@@ -14,8 +14,6 @@ pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::MouseInputMode;
 #[cfg(feature = "debug")]
-use crate::debug::*;
-#[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
 use crate::graphics::{PickerRenderTarget, PickerTarget};
 use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};

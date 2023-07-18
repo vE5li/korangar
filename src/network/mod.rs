@@ -102,6 +102,7 @@ pub enum NetworkEvent {
         equipped_position: EquipPosition,
     },
     ChangeJob(AccountId, u32),
+    SetPlayerPosition(Vector2<usize>),
 }
 
 pub struct ChatMessage {
@@ -2732,7 +2733,8 @@ impl NetworkingSystem {
                 } else if let Ok(_) = Packet8302::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = Packet180b::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream) {
-                    events.push(NetworkEvent::UpdateClientTick(packet.client_tick))
+                    events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
+                    events.push(NetworkEvent::SetPlayerPosition(packet.position.to_vector()));
                 } else {
                     #[cfg(feature = "debug_network")]
                     {

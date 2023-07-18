@@ -525,6 +525,9 @@ fn main() {
                             // cursor always look correct.
                             interface.set_start_time(game_timer.get_client_tick());
                         }
+                        NetworkEvent::SetPlayerPosition(player_position) => {
+                            entities[0].set_position(&map, player_position, game_timer.get_client_tick());
+                        }
                         NetworkEvent::UpdateClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
                         }

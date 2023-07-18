@@ -7,14 +7,14 @@ use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
 
-pub struct FrameViewer {
+pub struct FrameView {
     state: ElementState,
     frame_counter: usize,
     always_update: Remote<bool>,
     visible_thread: Remote<ProfilerThread>,
 }
 
-impl FrameViewer {
+impl FrameView {
     pub fn new(always_update: Remote<bool>, visible_thread: Remote<ProfilerThread>) -> Self {
         Self {
             state: ElementState::default(),
@@ -25,7 +25,7 @@ impl FrameViewer {
     }
 }
 
-impl Element for FrameViewer {
+impl Element for FrameView {
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -59,6 +59,11 @@ impl Element for FrameViewer {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
         }
+    }
+
+    fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
+        let measurement = get_frame_by_index(*self.visible_thread.borrow(), 0);
+        Some(ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement))))
     }
 
     fn render(

@@ -23,7 +23,7 @@ impl Drop for ActiveMeasurement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Measurement {
     pub name: &'static str,
     pub start_time: Instant,

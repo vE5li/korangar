@@ -541,12 +541,14 @@ impl PickerRenderTarget {
         self.state = RenderTargetState::Rendering(builder);
     }
 
+    #[profile]
     pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
     }
 
+    #[profile]
     pub fn unbind_subrenderer(&mut self) {
         self.bound_subrenderer = None;
     }
@@ -628,6 +630,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         }
     }
 
+    #[profile]
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);

@@ -3,7 +3,7 @@ use std::ops::Div;
 use std::time::Duration;
 
 use super::measurement::Measurement;
-use super::{ProfilerThread, DEFERRED_THREAD_PROFILER, MAIN_THREAD_PROFILER, PICKER_THREAD_PROFILER, SHADOW_THREAD_PROFILER};
+use super::ProfilerThread;
 
 #[derive(Default, Debug)]
 struct MeasurementTiming {
@@ -67,13 +67,7 @@ pub struct FrameData {
 }
 
 pub fn get_statistics_data(thread: ProfilerThread) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
-    let profiler = match thread {
-        ProfilerThread::Main => unsafe { MAIN_THREAD_PROFILER.lock().unwrap() },
-        ProfilerThread::Picker => unsafe { PICKER_THREAD_PROFILER.lock().unwrap() },
-        ProfilerThread::Shadow => unsafe { SHADOW_THREAD_PROFILER.lock().unwrap() },
-        ProfilerThread::Deferred => unsafe { DEFERRED_THREAD_PROFILER.lock().unwrap() },
-    };
-
+    let profiler = thread.lock_profiler();
     let mut longest_frame_time = Duration::default();
 
     let frame_data = profiler
@@ -113,4 +107,15 @@ pub fn get_statistics_data(thread: ProfilerThread) -> (Vec<FrameData>, HashMap<&
         .collect();
 
     (frame_data, statistics_map, longest_frame_time)
+}
+
+pub fn get_frame_by_index(thread: ProfilerThread, index: usize) -> Measurement {
+    let profiler = thread.lock_profiler();
+
+    let measurement = profiler.saved_frames.iter().nth(index).unwrap();
+
+    /*let mut timing_map = HashMap::new();
+    process_timing::<true>(measurement, &mut timing_map);*/
+
+    measurement.clone()
 }

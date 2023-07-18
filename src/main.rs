@@ -13,6 +13,7 @@
 #![feature(decl_macro)]
 #![feature(thread_local)]
 #![feature(lazy_cell)]
+#![feature(div_duration)]
 
 #[cfg(feature = "debug")]
 #[macro_use]

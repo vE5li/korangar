@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
 use cgmath::{Vector2, Vector4, Zero};
@@ -141,6 +141,7 @@ pub struct ElementState {
     pub cached_size: Size,
     pub cached_position: Position,
     pub parent_element: Option<Weak<RefCell<dyn Element>>>,
+    pub mouse_position: Cell<Position>,
 }
 
 impl Default for ElementState {
@@ -149,6 +150,7 @@ impl Default for ElementState {
             cached_size: Size::zero(),
             cached_position: Position::zero(),
             parent_element: None,
+            mouse_position: Cell::new(Position::zero()),
         }
     }
 }
@@ -172,6 +174,7 @@ impl ElementState {
             && absolute_position.x <= self.cached_size.x
             && absolute_position.y <= self.cached_size.y
         {
+            self.mouse_position.replace(absolute_position);
             return HoverInformation::Hovered;
         }
 

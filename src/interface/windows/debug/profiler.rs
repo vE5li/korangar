@@ -103,7 +103,7 @@ impl PrototypeWindow for ProfilerWindow {
                 .with_event(Box::new(show_deferred_thread))
                 .with_width(dimension!(!))
                 .wrap(),
-            ElementWrap::wrap(FrameViewer::new(
+            ElementWrap::wrap(FrameView::new(
                 self.always_update.new_remote(),
                 self.visible_thread.new_remote(),
             )),

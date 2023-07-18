@@ -19,6 +19,7 @@ mod fragment_shader {
 use std::sync::Arc;
 
 use cgmath::Matrix4;
+use procedural::profile;
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -34,6 +35,8 @@ use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
+#[cfg(feature = "debug")]
+use crate::debug::*;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -98,9 +101,19 @@ impl GeometryRenderer {
             .unwrap()
     }
 
+    #[profile]
     pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("get descriptor layout");
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("update matrices buffer");
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let matrices = Matrices {
@@ -109,11 +122,24 @@ impl GeometryRenderer {
         };
 
         let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("create persistent descriptor set");
+
         let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [WriteDescriptorSet::buffer(
             0,
             matrices_subbuffer,
         )])
         .unwrap();
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("create viewport");
 
         let dimensions = render_target
             .image
@@ -128,14 +154,37 @@ impl GeometryRenderer {
             depth_range: 0.0..1.0,
         };
 
-        render_target
-            .state
-            .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .set_viewport(0, [viewport])
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
+        let builder = render_target.state.get_builder();
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("bind pipeline");
+
+        builder.bind_pipeline_graphics(self.pipeline.clone());
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("set viewport");
+
+        builder.set_viewport(0, [viewport]);
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("bind descriptor set");
+
+        builder.bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
     }
 
+    #[profile("geometry renderer")]
     pub fn render(
         &self,
         render_target: &mut <ShadowRenderer as Renderer>::Target,
@@ -150,8 +199,17 @@ impl GeometryRenderer {
 
         const TEXTURE_COUNT: usize = 30;
 
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("get descriptor layout");
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(1).unwrap().clone();
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("create samplers");
 
         let texture_count = textures.len();
         let mut samplers: Vec<(Arc<dyn ImageViewAbstract>, Arc<Sampler>)> = textures
@@ -164,23 +222,63 @@ impl GeometryRenderer {
             samplers.push((textures[0].clone() as _, self.nearest_sampler.clone()));
         }
 
+        #[cfg(feature = "debug")]
+        measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("create persistent descriptor set");
+
         let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
             WriteDescriptorSet::image_view_sampler_array(0, 0, samplers),
         ])
         .unwrap();
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
 
         let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
         let constants = Constants {
             world: world_matrix.into(),
         };
 
-        render_target
-            .state
-            .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
-            .push_constants(layout, 0, constants)
-            .bind_vertex_buffers(0, vertex_buffer)
-            .draw(vertex_count as u32, 1, 0, 0)
-            .unwrap();
+        #[cfg(feature = "debug")]
+        let measurement = start_measurement("append commands");
+
+        let builder = render_target.state.get_builder();
+
+        #[cfg(feature = "debug")]
+        let inner_measurement = start_measurement("append commands");
+
+        builder.bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set);
+
+        #[cfg(feature = "debug")]
+        inner_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let inner_measurement = start_measurement("push constants");
+
+        builder.push_constants(layout, 0, constants);
+
+        #[cfg(feature = "debug")]
+        inner_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let inner_measurement = start_measurement("bind vertex buffer");
+
+        builder.bind_vertex_buffers(0, vertex_buffer);
+
+        #[cfg(feature = "debug")]
+        inner_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let inner_measurement = start_measurement("draw call");
+
+        builder.draw(vertex_count as u32, 1, 0, 0).unwrap();
+
+        #[cfg(feature = "debug")]
+        inner_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        measurement.stop();
     }
 }

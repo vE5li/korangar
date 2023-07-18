@@ -7,6 +7,8 @@ use option_ext::OptionExt;
 use procedural::profile;
 
 pub use self::tile::{Tile, TileType};
+#[cfg(feature = "debug")]
+use crate::debug::*;
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::interface::PrototypeWindow;
@@ -161,6 +163,9 @@ impl Map {
                 continue;
             }
 
+            #[cfg(feature = "debug")]
+            let culling_measurement = start_measurement("frustum culling");
+
             let bounding_box_matrix = object.get_bounding_box_matrix();
             let oriented_bounding_box = standard_box.transform(bounding_box_matrix);
             let bounding_box = BoundingBox::new(oriented_bounding_box.corners);
@@ -169,6 +174,9 @@ impl Map {
                 max: Point3::from_vec(bounding_box.biggest),
             };
             let culled = matches!(frustum.contains(&collision_bounding_box), Relation::Out);
+
+            #[cfg(feature = "debug")]
+            culling_measurement.stop();
 
             if !culled {
                 object.render_geometry(render_target, renderer, camera, client_tick, time);

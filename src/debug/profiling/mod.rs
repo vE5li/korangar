@@ -3,12 +3,13 @@ mod ring_buffer;
 mod statistics;
 
 use std::mem::MaybeUninit;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::Instant;
 
-use self::measurement::{ActiveMeasurement, Measurement};
+use self::measurement::ActiveMeasurement;
+pub use self::measurement::Measurement;
 use self::ring_buffer::RingBuffer;
-pub use self::statistics::{get_statistics_data, FrameData, MeasurementStatistics};
+pub use self::statistics::{get_frame_by_index, get_statistics_data, FrameData, MeasurementStatistics};
 use crate::debug::*;
 
 #[thread_local]
@@ -25,6 +26,17 @@ pub enum ProfilerThread {
     Picker,
     Shadow,
     Deferred,
+}
+
+impl ProfilerThread {
+    fn lock_profiler(&self) -> MutexGuard<'_, Profiler> {
+        match self {
+            ProfilerThread::Main => unsafe { MAIN_THREAD_PROFILER.lock().unwrap() },
+            ProfilerThread::Picker => unsafe { PICKER_THREAD_PROFILER.lock().unwrap() },
+            ProfilerThread::Shadow => unsafe { SHADOW_THREAD_PROFILER.lock().unwrap() },
+            ProfilerThread::Deferred => unsafe { DEFERRED_THREAD_PROFILER.lock().unwrap() },
+        }
+    }
 }
 
 pub const ROOT_MEASUREMENT_NAME: &str = "main loop";

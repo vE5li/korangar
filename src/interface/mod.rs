@@ -516,12 +516,19 @@ impl Interface {
             dialog_handle.elements.with_mut(move |elements, changed| {
                 elements.retain(|element| *element != DialogElement::NextButton);
 
+                let has_cancel = choices
+                    .iter()
+                    .any(|choice| choice.to_lowercase() == "cancel");
+
                 choices
                     .into_iter()
                     .enumerate()
                     .for_each(|(index, choice)| elements.push(DialogElement::ChoiceButton(choice, index as i8 + 1)));
 
-                elements.push(DialogElement::ChoiceButton("cancel".to_string(), -1));
+                if !has_cancel {
+                    elements.push(DialogElement::ChoiceButton("cancel".to_string(), -1));
+                }
+                
                 changed();
             });
         }

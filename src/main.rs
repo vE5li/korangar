@@ -900,7 +900,7 @@ fn main() {
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
-                    profile_block!("recreate swapchain");
+                    profile_block!("recreate buffers");
 
                     let viewport = swapchain_holder.recreate_swapchain();
 

@@ -25,12 +25,12 @@ where
 }
 
 pub struct ElementRenderer<'a> {
-    render_target: &'a mut <InterfaceRenderer as Renderer>::Target,
-    renderer: &'a InterfaceRenderer,
-    interface_settings: &'a InterfaceSettings,
-    position: Position,
-    size: Size,
-    clip_size: ClipSize,
+    pub render_target: &'a mut <InterfaceRenderer as Renderer>::Target,
+    pub renderer: &'a InterfaceRenderer,
+    pub interface_settings: &'a InterfaceSettings,
+    pub position: Position,
+    pub size: Size,
+    pub clip_size: ClipSize,
 }
 
 impl<'a> ElementRenderer<'a> {

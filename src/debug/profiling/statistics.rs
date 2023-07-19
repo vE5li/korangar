@@ -109,13 +109,17 @@ pub fn get_statistics_data(thread: ProfilerThread) -> (Vec<FrameData>, HashMap<&
     (frame_data, statistics_map, longest_frame_time)
 }
 
+pub fn get_number_of_saved_frames(thread: ProfilerThread) -> usize {
+    let profiler = thread.lock_profiler();
+    profiler.saved_frames.iter().count()
+}
+
 pub fn get_frame_by_index(thread: ProfilerThread, index: usize) -> Measurement {
     let profiler = thread.lock_profiler();
 
+    // TODO: maybe don't use the iterator to receive the frame? That would help
+    // performance
     let measurement = profiler.saved_frames.iter().nth(index).unwrap();
-
-    /*let mut timing_map = HashMap::new();
-    process_timing::<true>(measurement, &mut timing_map);*/
 
     measurement.clone()
 }

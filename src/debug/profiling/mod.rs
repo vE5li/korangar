@@ -3,13 +3,14 @@ mod ring_buffer;
 mod statistics;
 
 use std::mem::MaybeUninit;
+use std::sync::atomic::AtomicBool;
 use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::time::Instant;
 
 use self::measurement::ActiveMeasurement;
 pub use self::measurement::Measurement;
 use self::ring_buffer::RingBuffer;
-pub use self::statistics::{get_frame_by_index, get_statistics_data, FrameData, MeasurementStatistics};
+pub use self::statistics::{get_frame_by_index, get_number_of_saved_frames, get_statistics_data, FrameData, MeasurementStatistics};
 use crate::debug::*;
 
 #[thread_local]
@@ -19,6 +20,16 @@ static mut MAIN_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mu
 static mut PICKER_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
 static mut SHADOW_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
 static mut DEFERRED_THREAD_PROFILER: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
+
+static mut PROFILER_HALTED: AtomicBool = AtomicBool::new(false);
+
+pub fn set_profiler_halted(running: bool) {
+    unsafe { PROFILER_HALTED.store(running, std::sync::atomic::Ordering::Relaxed) };
+}
+
+pub fn is_profiler_halted() -> bool {
+    unsafe { PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProfilerThread {
@@ -39,6 +50,7 @@ impl ProfilerThread {
     }
 }
 
+pub const SAVED_FRAME_COUNT: usize = 128;
 pub const ROOT_MEASUREMENT_NAME: &str = "main loop";
 
 #[derive(Default)]
@@ -46,7 +58,7 @@ pub struct Profiler {
     root_measurement: Option<Measurement>,
     /// Self referencing pointers
     active_measurements: Vec<*const Measurement>,
-    saved_frames: RingBuffer<Measurement, 128>,
+    saved_frames: RingBuffer<Measurement, SAVED_FRAME_COUNT>,
 }
 
 impl Profiler {
@@ -86,7 +98,8 @@ impl Profiler {
         self.active_measurements = vec![self.root_measurement.as_ref().unwrap() as *const _];
 
         // Save the completed frame so we can inspect it in the profiler later on.
-        if let Some(previous_measurement) = previous_measurement {
+        let profiler_halted = unsafe { PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) };
+        if let Some(previous_measurement) = previous_measurement && !profiler_halted {
             self.saved_frames.push(previous_measurement);
         }
 

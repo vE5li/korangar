@@ -205,6 +205,7 @@ impl DeferredRenderer {
         }
     }
 
+    #[profile("recreate deferred pipeline")]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
         let device = self.memory_allocator.device().clone();
         let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
@@ -243,6 +244,7 @@ impl DeferredRenderer {
         self.dimensions = dimensions;
     }
 
+    #[profile("create deferred render target")]
     pub fn create_render_target(&self, swapchain_image: Arc<SwapchainImage>) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),

@@ -19,6 +19,7 @@ mod fragment_shader {
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
+use procedural::profile;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -97,6 +98,7 @@ impl EntityRenderer {
             .unwrap()
     }
 
+    #[profile]
     pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
@@ -135,6 +137,7 @@ impl EntityRenderer {
             .set_viewport(0, [viewport]);
     }
 
+    #[profile("entity renderer")]
     pub fn render(
         &self,
         render_target: &mut <ShadowRenderer as Renderer>::Target,

@@ -24,6 +24,12 @@ impl PrototypeWindow for ProfilerWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+        let toggle_halting = || {
+            let is_profiler_halted = is_profiler_halted();
+            set_profiler_halted(!is_profiler_halted);
+            None
+        };
+
         let main_selector = {
             let visible_thread = self.visible_thread.clone();
             move |_: &StateProvider| *visible_thread.borrow() == ProfilerThread::Main
@@ -73,6 +79,12 @@ impl PrototypeWindow for ProfilerWindow {
         };
 
         let elements = vec![
+            StateButton::default()
+                .with_text("halt")
+                .with_selector(|_: &StateProvider| is_profiler_halted())
+                .with_event(Box::new(toggle_halting))
+                .with_width(dimension!(20%))
+                .wrap(),
             StateButton::default()
                 .with_text("always update")
                 .with_selector(self.always_update.selector())

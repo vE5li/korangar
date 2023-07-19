@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
+use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
@@ -93,6 +94,7 @@ impl InterfaceRenderer {
         self.font_loader.borrow().get_text_dimensions(text, font_size, available_width)
     }
 
+    #[profile("recreate interface pipeline")]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
         let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();
@@ -105,6 +107,7 @@ impl InterfaceRenderer {
         self.dimensions = dimensions;
     }
 
+    #[profile("create interface render target")]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
         let image_usage = ImageUsage {
             sampled: true,

@@ -285,6 +285,41 @@ impl Default for CursorTheme {
     }
 }
 
+#[derive(Serialize, Deserialize, PrototypeElement)]
+pub struct ProfilerTheme {
+    pub background_color: Mutable<Color, Rerender>,
+    pub border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub line_color: Mutable<Color, Rerender>,
+    pub line_width: MutableRange<f32, Rerender>,
+    pub bar_height: MutableRange<f32, Rerender>,
+    pub bar_gap: MutableRange<Vector2<f32>, Rerender>,
+    pub bar_border_radius: MutableRange<Vector4<f32>, Rerender>,
+    pub bar_text_color: Mutable<Color, Rerender>,
+    pub bar_text_size: MutableRange<f32, Rerender>,
+    pub bar_text_offset: MutableRange<Vector2<f32>, Rerender>,
+    pub distance_text_size: MutableRange<f32, Rerender>,
+    pub distance_text_offset: MutableRange<f32, Rerender>,
+}
+
+impl Default for ProfilerTheme {
+    fn default() -> Self {
+        Self {
+            background_color: Mutable::new(Color::monochrome(55)),
+            border_radius: MutableRange::new(Vector4::from_value(2.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
+            line_color: Mutable::new(Color::rgb(80, 90, 80)),
+            line_width: MutableRange::new(2.0, 0.5, 4.0),
+            bar_height: MutableRange::new(15.0, 5.0, 30.0),
+            bar_gap: MutableRange::new(Vector2::new(1.0, 5.0), Vector2::from_value(0.0), Vector2::new(10.0, 20.0)),
+            bar_border_radius: MutableRange::new(Vector4::from_value(0.0), Vector4::from_value(0.0), Vector4::from_value(15.0)),
+            bar_text_color: Mutable::new(Color::monochrome(0)),
+            bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
+            bar_text_offset: MutableRange::new(Vector2::new(7.0, 0.0), Vector2::new(0.0, -10.0), Vector2::new(40.0, 10.0)),
+            distance_text_size: MutableRange::new(12.0, 6.0, 50.0),
+            distance_text_offset: MutableRange::new(20.0, 0.0, 200.0),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
 #[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
@@ -308,6 +343,7 @@ pub struct Theme {
     pub input: InputTheme,
     pub chat: ChatTheme,
     pub cursor: CursorTheme,
+    pub profiler: ProfilerTheme,
 }
 
 impl Theme {

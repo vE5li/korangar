@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use cgmath::Vector2;
+use procedural::profile;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
 use vulkano::format::Format;
@@ -89,6 +90,7 @@ impl SwapchainHolder {
         }
     }
 
+    #[profile]
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
         let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
             Ok(image) => image,
@@ -117,6 +119,7 @@ impl SwapchainHolder {
         self.recreate
     }
 
+    #[profile]
     pub fn recreate_swapchain(&mut self) -> Viewport {
         let swapchain_create_info = SwapchainCreateInfo {
             image_extent: self.window_size,

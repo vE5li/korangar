@@ -68,6 +68,12 @@ impl Color {
         self.alpha as f32 / 255.0
     }
 
+    pub fn multiply_alpha_f32(mut self, alpha: f32) -> Self {
+        let new_alpha = alpha * self.alpha_f32();
+        self.alpha = (new_alpha * 255.0) as u8;
+        self
+    }
+
     pub fn invert(&self) -> Self {
         Self::rgba(255 - self.red, 255 - self.green, 255 - self.green, self.alpha)
     }

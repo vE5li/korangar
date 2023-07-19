@@ -7,6 +7,7 @@ mod tile;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
+use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -88,6 +89,7 @@ impl PickerRenderer {
         }
     }
 
+    #[profile("recreate picker pipeline")]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
         let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();
@@ -102,6 +104,7 @@ impl PickerRenderer {
         self.dimensions = dimensions;
     }
 
+    #[profile("create picker render target")]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),

@@ -90,7 +90,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
 impl FontLoader {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader) -> Self {
         let scale = 1.0; // get dynamically
-        let cache_size = Vector2::from_value((256.0 * scale) as u32);
+        let cache_size = Vector2::from_value((512.0 * scale) as u32);
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
 
         let image_usage = ImageUsage {

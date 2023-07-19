@@ -130,10 +130,22 @@ impl ChatMessage {
 
 #[derive(Copy, Clone, Debug, ByteConvertable, PrototypeElement)]
 pub enum Sex {
-    Male,
     Female,
+    Male,
     Both,
     Server,
+}
+
+impl PartialEq for Sex {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Sex::Male, Sex::Male) => true,
+            (Sex::Female, Sex::Female) => true,
+            (Sex::Both, Sex::Both) => true,
+            (Sex::Server, Sex::Server) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Sent by the client to the login server.
@@ -1336,6 +1348,7 @@ pub struct EntityData {
     pub health_points: i32,
     pub maximum_health_points: i32,
     pub head_direction: usize,
+    pub sex: Sex,
 }
 
 impl EntityData {
@@ -1349,6 +1362,7 @@ impl EntityData {
             health_points: character_information.health_points as i32,
             maximum_health_points: character_information.maximum_health_points as i32,
             head_direction: 0, // TODO: get correct rotation
+            sex: character_information.sex,
         }
     }
 }
@@ -1364,6 +1378,7 @@ impl From<EntityAppearedPacket> for EntityData {
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
             head_direction: packet.head_direction as usize,
+            sex: packet.sex,
         }
     }
 }
@@ -1381,6 +1396,7 @@ impl From<MovingEntityAppearedPacket> for EntityData {
             health_points: packet.health_points,
             maximum_health_points: packet.maximum_health_points,
             head_direction: packet.head_direction as usize,
+            sex: packet.sex,
         }
     }
 }

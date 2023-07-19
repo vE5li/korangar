@@ -16,6 +16,11 @@ use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
+use crate::network::Sex;
+
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+
 pub enum ResourceState<T> {
     Available(T),
     Unavailable,
@@ -59,6 +64,7 @@ pub struct Common {
     pub maximum_health_points: usize,
     pub movement_speed: usize,
     pub head_direction: usize,
+    pub sex: Sex,
 
     #[hidden_element]
     pub entity_type: EntityType,
@@ -71,6 +77,93 @@ pub struct Common {
     details: ResourceState<String>,
     #[hidden_element]
     animation_state: AnimationState,
+}
+
+fn get_sprite_path_for_player_job(player_job: &str) -> &str {
+    lazy_static! {
+        static ref JOB_SPRITE_NAME_TABLE: HashMap<&'static str, &'static str> = {
+            let mut table = HashMap::new();
+            table.insert("NOVICE", "ÃÊº¸ÀÚ");
+            table.insert("SWORDMAN", "°Ë»Ç");
+            table.insert("MAGICIAN", "À§Àúµå");
+            table.insert("ARCHER", "±Ã¼Ö");
+            table.insert("ACOLYTE", "¼ºÁ÷ÀÚ");
+            table.insert("MERCHANT", "»ÓÀÎ");
+            table.insert("THIEF", "ΜΜΜÏ");
+            table.insert("KNIGHT", "±â»ç");
+            table.insert("PRIEST", "¼ºÅõ»ç");
+            table.insert("WIZARD", "¸¶¹Ý»Ç");
+            table.insert("BLACKSMITH", "Á¦Ã¶°ø");
+            table.insert("HUNTER", "ÇåÅÍ");
+            table.insert("ASSASSIN", "¾î¼¼½Å");
+            table.insert("CRUSADER", "Å©·ç¼¼ÀÌ´õ");
+            table.insert("MONK", "¸ùÅ©");
+            table.insert("SAGE", "¼¼ÀÌÁö");
+            table.insert("ROGUE", "·Î±×");
+            table.insert("ALCHEMIST", "¿¬±Ý¼ú»ç");
+            table.insert("BARD", "¹Ùµå");
+            table.insert("DANCER", "¹«Èñ");
+            table.insert("NOVICE_H", "ÃÊº¸ÀÚ");
+            table.insert("SWORDMAN_H", "°Ë»Ç");
+            table.insert("MAGICIAN_H", "À§Àúµå");
+            table.insert("ARCHER_H", "±Ã¼Ö");
+            table.insert("ACOLYTE_H", "¼ºÁ÷ÀÚ");
+            table.insert("MERCHANT_H", "»ÓÀÎ");
+            table.insert("THIEF_H", "ΜΜΜÏ");
+            table.insert("KNIGHT_H", "·Îµå³ªÀÌÆ®");
+            table.insert("PRIEST_H", "ÇÏÀÌÇÁ¸®");
+            table.insert("WIZARD_H", "ÇÏÀÌÀ§Àúµå");
+            table.insert("BLACKSMITH_H", "È­ÀÌÆ®½º¹Ì½º");
+            table.insert("HUNTER_H", "½º³ªÀÌÆÛ");
+            table.insert("ASSASSIN_H", "¾î½Ø½ÅÅ©·Î½º");
+            table.insert("CRUSADER_H", "ÆÈ¶óµò");
+            table.insert("MONK_H", "Ã¨ÇÇ¿Â");
+            table.insert("SAGE_H", "ÇÁ·ÎÆä¼­");
+            table.insert("ROGUE_H", "½ºÅäÄ¿");
+            table.insert("ALCHEMIST_H", "Å©¸®¿¡ÀÌÅÍ");
+            table.insert("BARD_H", "Å¬¶ó¿î");
+            table.insert("DANCER_H", "Áý½Ã");
+            table.insert("RUNE_KNIGHT", "·é³ªÀÌÆ®");
+            table.insert("WARLOCK", "¿ö·Ï");
+            table.insert("RANGER", "·¹ÀÎÁ®");
+            table.insert("ARCH_BISHOP", "¾ÆÅ©ºñ¼ó");
+            table.insert("MECHANIC", "¹ÌÄÉ´Ð");
+            table.insert("GUILLOTINE_CROSS", "±æ·ÎÆ¾Å©·Î½º");
+            table.insert("ROYAL_GUARD", "°¡ΜÅ");
+            table.insert("SORCERER", "¼Ò¼­·¯");
+            table.insert("MINSTREL", "¹Î½ºÆ®·²");
+            table.insert("WANDERER", "¿ø´õ·¯");
+            table.insert("SURA", "½´¶ó");
+            table.insert("GENETIC", "Á¦³×¸¯");
+            table.insert("SHADOW_CHASER", "½¦µµ¿ìÃ¼ÀÌ¼­");
+            table.insert("RUNE_KNIGHT_H", "·é³ªÀÌÆ®");
+            table.insert("WARLOCK_H", "¿ö·Ï");
+            table.insert("RANGER_H", "·¹ÀÎÁ®");
+            table.insert("ARCH_BISHOP_H", "¾ÆÅ©ºñ¼ó");
+            table.insert("MECHANIC_H", "¹ÌÄÉ´Ð");
+            table.insert("GUILLOTINE_CROSS_H", "±æ·ÎÆ¾Å©·Î½º");
+            table.insert("ROYAL_GUARD_H", "°¡ΜÅ");
+            table.insert("SORCERER_H", "¼Ò¼­·¯");
+            table.insert("MINSTREL_H", "¹Î½ºÆ®·²");
+            table.insert("WANDERER_H", "¿ø´õ·¯");
+            table.insert("SURA_H", "½´¶ó");
+            table.insert("GENETIC_H", "Á¦³×¸¯");
+            table.insert("SHADOW_CHASER_H", "½¦µµ¿ìÃ¼ÀÌ¼­");
+            table.insert("SUPERNOVICE", "½´ÆÛ³ëºñ½º");
+            table.insert("GUNSLINGER", "°Ç³Ê");
+            table.insert("NINJA", "´ÑÀÚ");
+            table.insert("TAEKWON", "ÅÂ±Ç¼Ò³â");
+            table.insert("STAR", "±Ç¼º");
+            table.insert("LINKER", "¼Ò¿ï¸µÄ¿");
+            table.insert("SUPERNOVICE2", "½´ÆÛ³ëºñ½º");
+            table.insert("KAGEROU", "KAGEROU");
+            table.insert("OBORO", "OBORO");
+
+            table
+        };
+    }
+
+    JOB_SPRITE_NAME_TABLE.get(player_job).copied().unwrap_or("ÃÊº¸ÀÚ")
 }
 
 impl Common {
@@ -92,6 +185,7 @@ impl Common {
         let movement_speed = entity_data.movement_speed as usize;
         let health_points = entity_data.health_points as usize;
         let maximum_health_points = entity_data.maximum_health_points as usize;
+        let sex = entity_data.sex;
 
         let active_movement = None;
 
@@ -104,9 +198,19 @@ impl Common {
             1000..=3999 => EntityType::Monster,
             _ => EntityType::Npc,
         };
+        
+        let sex_sprite_path = match sex == Sex::Female {
+            true => "¿©",
+            false => "³²",
+        };
 
         let file_path = match entity_type {
-            EntityType::Player => format!("¸ó½ºÅÍ\\b_{}", script_loader.get_job_name_from_id(job_id)),
+            EntityType::Player => format!(
+                "ÀÎ°£Á·\\¸öÅë\\{}\\{}_{}",
+                sex_sprite_path,
+                get_sprite_path_for_player_job(&script_loader.get_job_name_from_id(job_id)),
+                sex_sprite_path
+            ),
             EntityType::Npc => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)),
             EntityType::Monster => format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(job_id)),
             EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
@@ -123,6 +227,7 @@ impl Common {
             entity_id,
             job_id,
             head_direction,
+            sex,
             active_movement,
             entity_type,
             movement_speed,
@@ -152,8 +257,19 @@ impl Common {
             _ => EntityType::Npc,
         };
 
+
+        let sex_sprite_path = match self.sex == Sex::Female {
+            true => "¿©",
+            false => "³²",
+        };
+
         let file_path = match entity_type {
-            EntityType::Player => format!("¸ó½ºÅÍ\\b_{}", script_loader.get_job_name_from_id(self.job_id)),
+            EntityType::Player => format!(
+                "ÀÎ°£Á·\\¸öÅë\\{}\\{}_{}",
+                sex_sprite_path,
+                get_sprite_path_for_player_job(&script_loader.get_job_name_from_id(self.job_id)),
+                sex_sprite_path
+            ),
             EntityType::Npc => format!("npc\\{}", script_loader.get_job_name_from_id(self.job_id)),
             EntityType::Monster => format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(self.job_id)),
             EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(self.job_id)), // TODO: change
@@ -591,6 +707,10 @@ impl Player {
         self.common.job_id = job_id;
     }
 
+    pub fn set_sex(&mut self, sex: Sex) {
+        self.common.sex = sex;
+    }
+
     pub fn update_status(&mut self, status_type: StatusType) {
         match status_type {
             StatusType::MaximumHealthPoints(value) => self.common.maximum_health_points = value as usize,
@@ -745,6 +865,10 @@ impl Entity {
 
     pub fn get_job(&self) -> usize {
         self.get_common().job_id
+    }
+
+    pub fn get_sex(&self) -> Sex {
+        self.get_common().sex
     }
 
     pub fn get_entity_type(&self) -> EntityType {

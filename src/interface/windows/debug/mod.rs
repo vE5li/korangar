@@ -7,7 +7,7 @@ mod profiler;
 mod time;
 
 pub use self::commands::CommandsWindow;
-#[cfg(feature = "debug_network")]
+#[cfg(feature = "debug")]
 pub use self::inspector::FrameInspectorWindow;
 pub use self::maps::MapsWindow;
 #[cfg(feature = "debug_network")]

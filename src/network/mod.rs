@@ -2004,7 +2004,7 @@ impl NetworkingSystem {
     pub fn new() -> Self {
         let login_server_ip = match cfg!(feature = "local") {
             true => "127.0.0.1:6900",
-            false => "167.235.227.244:6900",
+            false => "49.12.109.207:6900",
         };
 
         let login_settings = LoginSettings::new();
@@ -2404,7 +2404,20 @@ impl NetworkingSystem {
         let character_selection_success_packet = CharacterSelectionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
         let server_ip = IpAddr::V4(character_selection_success_packet.map_server_ip);
-        let socket_address = SocketAddr::new(server_ip, character_selection_success_packet.map_server_port);
+        let server_port = character_selection_success_packet.map_server_port;
+
+        #[cfg(feature = "debug_network")]
+        print_debug!(
+            "connecting to map server at {}{}{} on port {}{}{}",
+            MAGENTA,
+            server_ip,
+            NONE,
+            MAGENTA,
+            character_selection_success_packet.map_server_port,
+            NONE
+        );
+
+        let socket_address = SocketAddr::new(server_ip, server_port);
         let map_stream = TcpStream::connect_timeout(&socket_address, Duration::from_secs(1))
             .map_err(|_| "Failed to connect to map server. Please try again")?;
 

@@ -377,18 +377,22 @@ impl DeferredRenderer {
         maximum: f32,
         current: f32,
     ) {
-        const BAR_SIZE: f32 = 70.0;
-        let offset = Vector2::new(BAR_SIZE / 2.0, 0.0);
+        const BAR_BG_WIDTH: f32 = 76.0;
+        const BAR_BG_HEIGHT: f32 = 12.0;
+        const BAR_WIDTH: f32 = 70.0;
+        const BAR_HEIGHT: f32 = 6.0;
+        let bg_offset = Vector2::new(BAR_BG_WIDTH / 2.0, 0.0);
+        let bar_offset = Vector2::new(BAR_WIDTH / 2.0, (BAR_HEIGHT - BAR_BG_HEIGHT) / 2.0);
         self.render_rectangle(
             render_target,
-            position - offset,
-            Vector2::new(BAR_SIZE, 5.0),
+            position - bg_offset,
+            Vector2::new(BAR_BG_WIDTH, BAR_BG_HEIGHT),
             Color::monochrome(40),
         );
         self.render_rectangle(
             render_target,
-            position - offset,
-            Vector2::new((BAR_SIZE / maximum) * current, 5.0),
+            position - bar_offset,
+            Vector2::new((BAR_WIDTH / maximum) * current, BAR_HEIGHT),
             color,
         );
     }

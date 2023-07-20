@@ -738,14 +738,14 @@ impl Player {
         );
         renderer.render_bar(
             render_target,
-            final_position + Vector2::new(0.0, 5.0),
+            final_position + Vector2::new(0.0, 9.0),
             Color::rgb(67, 129, 163),
             self.maximum_spell_points as f32,
             self.spell_points as f32,
         );
         renderer.render_bar(
             render_target,
-            final_position + Vector2::new(0.0, 10.0),
+            final_position + Vector2::new(0.0, 18.0),
             Color::rgb(163, 96, 67),
             self.maximum_activity_points as f32,
             self.activity_points as f32,

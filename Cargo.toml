@@ -22,7 +22,7 @@ yazi = "0.1.4"
 image = "0.24.2"
 pathfinding = "2.2.2"
 chrono = "0.4"
-lazy_static = { version = "1.4.0" }
+lazy_static = { version = "1.4.0", optional = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
 option-ext = "0.2.0"
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
@@ -31,7 +31,7 @@ random_color = { version = "0.6.1", optional = true }
 
 [features]
 local = []
-debug = ["random_color"]
+debug = ["lazy_static", "random_color"]
 debug_network = ["debug"]
 unicode = ["debug"]
 plain = ["debug"]

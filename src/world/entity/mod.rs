@@ -675,9 +675,11 @@ impl Player {
         self.common.job_id = job_id;
     }
 
+    /* Unused for now
     pub fn set_sex(&mut self, sex: Sex) {
         self.common.sex = sex;
     }
+    */
 
     pub fn update_status(&mut self, status_type: StatusType) {
         match status_type {
@@ -831,11 +833,11 @@ impl Entity {
         false
     }
 
-    /* Unused for now
     pub fn get_job(&self) -> usize {
         self.get_common().job_id
     }
 
+    /* Unused for now
     pub fn get_sex(&self) -> Sex {
         self.get_common().sex
     }*/

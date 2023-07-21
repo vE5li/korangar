@@ -128,24 +128,12 @@ impl ChatMessage {
     }
 }
 
-#[derive(Copy, Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Copy, Clone, Debug, ByteConvertable, PrototypeElement, PartialEq)]
 pub enum Sex {
     Female,
     Male,
     Both,
     Server,
-}
-
-impl PartialEq for Sex {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Sex::Male, Sex::Male) => true,
-            (Sex::Female, Sex::Female) => true,
-            (Sex::Both, Sex::Both) => true,
-            (Sex::Server, Sex::Server) => true,
-            _ => false,
-        }
-    }
 }
 
 /// Sent by the client to the login server.

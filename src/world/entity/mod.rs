@@ -700,12 +700,6 @@ impl Player {
         self.common.job_id = job_id;
     }
 
-    /* Unused for now
-    pub fn set_sex(&mut self, sex: Sex) {
-        self.common.sex = sex;
-    }
-    */
-
     pub fn update_status(&mut self, status_type: StatusType) {
         match status_type {
             StatusType::MaximumHealthPoints(value) => self.common.maximum_health_points = value as usize,
@@ -861,11 +855,6 @@ impl Entity {
     pub fn get_job(&self) -> usize {
         self.get_common().job_id
     }
-
-    /* Unused for now
-    pub fn get_sex(&self) -> Sex {
-        self.get_common().sex
-    }*/
 
     pub fn get_entity_type(&self) -> EntityType {
         self.get_common().entity_type

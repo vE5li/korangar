@@ -11,12 +11,10 @@ use crate::graphics::ModelVertexBuffer;
 use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
-use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, StatusType};
+use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, Sex, StatusType};
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-
-use crate::network::Sex;
 
 pub enum ResourceState<T> {
     Available(T),
@@ -78,89 +76,97 @@ pub struct Common {
 
 fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     match job_id {
-        0 => "ÃÊº¸ÀÚ",  // NOVICE
-        1 => "°Ë»Ç",    // SWORDMAN
-        2 => "À§Àúµå",  // MAGICIAN
-        3 => "±Ã¼Ö",    // ARCHER
-        4 => "¼ºÁ÷ÀÚ",  // ACOLYTE
-        5 => "»ÓÀÎ",    // MERCHANT
-        6 => "ΜΜΜÏ",    // THIEF
-        7 => "±â»ç",    // KNIGHT
-        8 => "¼ºÅõ»ç",  // PRIEST
-        9 => "¸¶¹Ý»Ç",  // WIZARD
-        10 => "Á¦Ã¶°ø", // BLACKSMITH
-        11 => "ÇåÅÍ",    // HUNTER
-        12 => "¾î¼¼½Å",  // ASSASSIN
-        13 => "¿£´ë¿î",  // CHICKEN
-        14 => "Å©·ç¼¼ÀÌ´õ", // CRUSADER
-        15 => "¸ùÅ©",   // MONK
-        16 => "¼¼ÀÌÁö", // SAGE
-        17 => "·Î±×",   // ROGUE
-        18 => "¿¬±Ý¼ú»ç", // ALCHEMIST
-        19 => "¹Ùµå",   // BARD
-        20 => "¹«Èñ",   // DANCER
-        23 => "½´ÆÛ³ëºñ½º",   // SUPERNOVICE
-        24 => "°Ç³Ê",   // GUNSLINGER
-        25 => "´ÑÀÚ",   // NINJA
-        4001 => "ÃÊº¸ÀÚ",  // NOVICE_H
-        4002 => "°Ë»Ç",    // SWORDMAN_H
-        4003 => "À§Àúµå",  // MAGICIAN_H
-        4004 => "±Ã¼Ö",    // ARCHER_H
-        4005 => "¼ºÁ÷ÀÚ",  // ACOLYTE_H
-        4006 => "»ÓÀÎ",    // MERCHANT_H
-        4007 => "ΜΜΜÏ",    // THIEF_H
+        0 => "ÃÊº¸ÀÚ",          // NOVICE
+        1 => "°Ë»Ç",            // SWORDMAN
+        2 => "À§Àúµå",          // MAGICIAN
+        3 => "±Ã¼Ö",            // ARCHER
+        4 => "¼ºÁ÷ÀÚ",          // ACOLYTE
+        5 => "»ÓÀÎ",            // MERCHANT
+        6 => "ΜΜΜÏ",            // THIEF
+        7 => "±â»ç",            // KNIGHT
+        8 => "¼ºÅõ»ç",          // PRIEST
+        9 => "¸¶¹Ý»Ç",          // WIZARD
+        10 => "Á¦Ã¶°ø",         // BLACKSMITH
+        11 => "ÇåÅÍ",           // HUNTER
+        12 => "¾î¼¼½Å",         // ASSASSIN
+        13 => "¿£´ë¿î",         // CHICKEN
+        14 => "Å©·ç¼¼ÀÌ´õ",     // CRUSADER
+        15 => "¸ùÅ©",           // MONK
+        16 => "¼¼ÀÌÁö",         // SAGE
+        17 => "·Î±×",           // ROGUE
+        18 => "¿¬±Ý¼ú»ç",       // ALCHEMIST
+        19 => "¹Ùµå",           // BARD
+        20 => "¹«Èñ",           // DANCER
+        23 => "½´ÆÛ³ëºñ½º",     // SUPERNOVICE
+        24 => "°Ç³Ê",           // GUNSLINGER
+        25 => "´ÑÀÚ",           // NINJA
+        4001 => "ÃÊº¸ÀÚ",       // NOVICE_H
+        4002 => "°Ë»Ç",         // SWORDMAN_H
+        4003 => "À§Àúµå",       // MAGICIAN_H
+        4004 => "±Ã¼Ö",         // ARCHER_H
+        4005 => "¼ºÁ÷ÀÚ",       // ACOLYTE_H
+        4006 => "»ÓÀÎ",         // MERCHANT_H
+        4007 => "ΜΜΜÏ",         // THIEF_H
         4008 => "·Îµå³ªÀÌÆ®",   // KNIGHT_H
-        4009 => "ÇÏÀÌÇÁ¸®",   // PRIEST_H
-        4010 => "ÇÏÀÌÀ§Àúµå", // WIZARD_H
+        4009 => "ÇÏÀÌÇÁ¸®",     // PRIEST_H
+        4010 => "ÇÏÀÌÀ§Àúµå",   // WIZARD_H
         4011 => "È­ÀÌÆ®½º¹Ì½º", // BLACKSMITH_H
-        4012 => "½º³ªÀÌÆÛ",   // HUNTER_H
+        4012 => "½º³ªÀÌÆÛ",     // HUNTER_H
         4013 => "¾î½Ø½ÅÅ©·Î½º", // ASSASSIN_H
-        4014 => "¿£´ë¿î",  // CHICKEN_H
-        4015 => "Å©·ç¼¼ÀÌ´õ", // CRUSADER_H
-        4016 => "¸ùÅ©",   // MONK_H
-        4017 => "¼¼ÀÌÁö", // SAGE_H
-        4018 => "·Î±×",   // ROGUE_H
-        4019 => "¿¬±Ý¼ú»ç", // ALCHEMIST_H
-        4020 => "¹Ùµå",   // BARD_H
-        4021 => "¹«Èñ",   // DANCER_H
-        4054 => "·é³ªÀÌÆ®",   // RUNE_KNIGHT
-        4055 => "¿ö·Ï",   // WARLOCK
-        4056 => "·¹ÀÎÁ®",   // RANGER
-        4057 => "¾ÆÅ©ºñ¼ó",   // ARCH_BISHOP
-        4058 => "¹ÌÄÉ´Ð",   // MECHANIC
-        4059 => "±æ·ÎÆ¾Å©·Î½º",   // GUILLOTINE_CROSS
-        4066 => "°¡ΜÅ",   // ROYAL_GUARD
-        4067 => "¼Ò¼­·¯",   // SORCERER
-        4068 => "¹Î½ºÆ®·²",   // MINSTREL
-        4069 => "¿ø´õ·¯",   // WANDERER
-        4070 => "½´¶ó",   // SURA
-        4071 => "Á¦³×¸¯",   // GENETIC
-        4072 => "½¦µµ¿ìÃ¼ÀÌ¼­",   // SHADOW_CHASER
-        4060 => "·é³ªÀÌÆ®",   // RUNE_KNIGHT_H
-        4061 => "¿ö·Ï",   // WARLOCK_H
-        4062 => "·¹ÀÎÁ®",   // RANGER_H
-        4063 => "¾ÆÅ©ºñ¼ó",   // ARCH_BISHOP_H
-        4064 => "¹ÌÄÉ´Ð",   // MECHANIC_H
-        4065 => "±æ·ÎÆ¾Å©·Î½º",   // GUILLOTINE_CROSS_H
-        4073 => "°¡ΜÅ",   // ROYAL_GUARD_H
-        4074 => "¼Ò¼­·¯",   // SORCERER_H
-        4075 => "¹Î½ºÆ®·²",   // MINSTREL_H
-        4076 => "¿ø´õ·¯",   // WANDERER_H
-        4077 => "½´¶ó",   // SURA_H
-        4078 => "Á¦³×¸¯",   // GENETIC_H
-        4079 => "½¦µµ¿ìÃ¼ÀÌ¼­",   // SHADOW_CHASER_H
-        4046 => "ÅÂ±Ç¼Ò³â",   // TAEKWON
-        4047 => "±Ç¼º",   // STAR
-        4049 => "¼Ò¿ï¸µÄ¿",   // LINKER
+        4014 => "¿£´ë¿î",       // CHICKEN_H
+        4015 => "Å©·ç¼¼ÀÌ´õ",   // CRUSADER_H
+        4016 => "¸ùÅ©",         // MONK_H
+        4017 => "¼¼ÀÌÁö",       // SAGE_H
+        4018 => "·Î±×",         // ROGUE_H
+        4019 => "¿¬±Ý¼ú»ç",     // ALCHEMIST_H
+        4020 => "¹Ùµå",         // BARD_H
+        4021 => "¹«Èñ",         // DANCER_H
+        4054 => "·é³ªÀÌÆ®",     // RUNE_KNIGHT
+        4055 => "¿ö·Ï",         // WARLOCK
+        4056 => "·¹ÀÎÁ®",       // RANGER
+        4057 => "¾ÆÅ©ºñ¼ó",     // ARCH_BISHOP
+        4058 => "¹ÌÄÉ´Ð",       // MECHANIC
+        4059 => "±æ·ÎÆ¾Å©·Î½º", // GUILLOTINE_CROSS
+        4066 => "°¡ΜÅ",         // ROYAL_GUARD
+        4067 => "¼Ò¼­·¯",       // SORCERER
+        4068 => "¹Î½ºÆ®·²",     // MINSTREL
+        4069 => "¿ø´õ·¯",       // WANDERER
+        4070 => "½´¶ó",         // SURA
+        4071 => "Á¦³×¸¯",       // GENETIC
+        4072 => "½¦µµ¿ìÃ¼ÀÌ¼­", // SHADOW_CHASER
+        4060 => "·é³ªÀÌÆ®",     // RUNE_KNIGHT_H
+        4061 => "¿ö·Ï",         // WARLOCK_H
+        4062 => "·¹ÀÎÁ®",       // RANGER_H
+        4063 => "¾ÆÅ©ºñ¼ó",     // ARCH_BISHOP_H
+        4064 => "¹ÌÄÉ´Ð",       // MECHANIC_H
+        4065 => "±æ·ÎÆ¾Å©·Î½º", // GUILLOTINE_CROSS_H
+        4073 => "°¡ΜÅ",         // ROYAL_GUARD_H
+        4074 => "¼Ò¼­·¯",       // SORCERER_H
+        4075 => "¹Î½ºÆ®·²",     // MINSTREL_H
+        4076 => "¿ø´õ·¯",       // WANDERER_H
+        4077 => "½´¶ó",         // SURA_H
+        4078 => "Á¦³×¸¯",       // GENETIC_H
+        4079 => "½¦µµ¿ìÃ¼ÀÌ¼­", // SHADOW_CHASER_H
+        4046 => "ÅÂ±Ç¼Ò³â",     // TAEKWON
+        4047 => "±Ç¼º",         // STAR
+        4049 => "¼Ò¿ï¸µÄ¿",     // LINKER
         4190 => "½´ÆÛ³ëºñ½º",   // SUPERNOVICE2
-        4211 => "KAGEROU",   // KAGEROU
-        4212 => "OBORO",   // OBORO
+        4211 => "KAGEROU",      // KAGEROU
+        4212 => "OBORO",        // OBORO
 
-        _ => "ÃÊº¸ÀÚ",  // NOVICE
+        _ => "ÃÊº¸ÀÚ", // NOVICE
     }
 }
 
-fn get_sprite_and_actions(game_file_loader: &mut GameFileLoader, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, script_loader: &ScriptLoader, entity_type: EntityType, job_id: usize, sex: Sex) -> (Arc<Sprite>, Arc<Actions>) {
+fn get_sprite_and_actions(
+    game_file_loader: &mut GameFileLoader,
+    sprite_loader: &mut SpriteLoader,
+    action_loader: &mut ActionLoader,
+    script_loader: &ScriptLoader,
+    entity_type: EntityType,
+    job_id: usize,
+    sex: Sex,
+) -> (Arc<Sprite>, Arc<Actions>) {
     let sex_sprite_path = match sex == Sex::Female {
         true => "¿©",
         false => "³²",
@@ -178,7 +184,10 @@ fn get_sprite_and_actions(game_file_loader: &mut GameFileLoader, sprite_loader: 
         EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
     };
 
-    (sprite_loader.get(&format!("{file_path}.spr"), game_file_loader).unwrap(), action_loader.get(&format!("{file_path}.act"), game_file_loader).unwrap())
+    (
+        sprite_loader.get(&format!("{file_path}.spr"), game_file_loader).unwrap(),
+        action_loader.get(&format!("{file_path}.act"), game_file_loader).unwrap(),
+    )
 }
 
 impl Common {
@@ -213,8 +222,16 @@ impl Common {
             1000..=3999 => EntityType::Monster,
             _ => EntityType::Npc,
         };
-        
-        let (sprite, actions) = get_sprite_and_actions(game_file_loader, sprite_loader, action_loader, script_loader, entity_type, job_id, sex);
+
+        let (sprite, actions) = get_sprite_and_actions(
+            game_file_loader,
+            sprite_loader,
+            action_loader,
+            script_loader,
+            entity_type,
+            job_id,
+            sex,
+        );
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(client_tick);
 
@@ -244,7 +261,15 @@ impl Common {
         action_loader: &mut ActionLoader,
         script_loader: &ScriptLoader,
     ) {
-        (self.sprite, self.actions) = get_sprite_and_actions(game_file_loader, sprite_loader, action_loader, script_loader, self.entity_type, self.job_id, self.sex);
+        (self.sprite, self.actions) = get_sprite_and_actions(
+            game_file_loader,
+            sprite_loader,
+            action_loader,
+            script_loader,
+            self.entity_type,
+            self.job_id,
+            self.sex,
+        );
     }
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {

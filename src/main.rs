@@ -60,6 +60,8 @@ use crate::system::{choose_physical_device, get_device_extensions, get_instance_
 use crate::world::*;
 
 fn main() {
+    const DEFAULT_MAP: &str = "geffen";
+
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
     let _measurement = profiler_start_main_thread();
@@ -219,7 +221,7 @@ fn main() {
 
     let mut map = map_loader
         .get(
-            "geffen".to_string(),
+            DEFAULT_MAP.to_string(),
             &mut game_file_loader,
             &mut model_loader,
             &mut texture_loader,
@@ -599,6 +601,27 @@ fn main() {
                             player.set_job(job_id as usize);
                             player.reload_sprite(&mut game_file_loader, &mut sprite_loader, &mut action_loader, &script_loader);
                         }
+                        NetworkEvent::Disconnect => {
+                            networking_system.disconnect_from_map_server();
+                            entities.clear();
+
+                            map = map_loader
+                                .get(
+                                    DEFAULT_MAP.to_string(),
+                                    &mut game_file_loader,
+                                    &mut model_loader,
+                                    &mut texture_loader,
+                                )
+                                .expect("failed to load initial map");
+
+                            interface.close_all_windows(&mut focus_state);
+
+                            let character_selection_window = networking_system.character_selection_window();
+                            interface.open_window(&mut focus_state, &character_selection_window);
+
+                            start_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
+                            directional_shadow_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
+                        }
                     }
                 }
 
@@ -611,10 +634,12 @@ fn main() {
                 for event in user_events {
                     match event {
                         UserEvent::LogIn(username, password) => match networking_system.log_in(username, password) {
-                            Ok(character_selection_window) => {
+                            Ok(()) => {
                                 // TODO: this will do one unnecessary restore_focus. check if
                                 // that will be problematic
                                 interface.close_window_with_class(&mut focus_state, LoginWindow::WINDOW_CLASS);
+
+                                let character_selection_window = networking_system.character_selection_window();
                                 interface.open_window(&mut focus_state, &character_selection_window);
                             }
                             Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),

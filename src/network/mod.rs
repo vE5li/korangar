@@ -103,6 +103,7 @@ pub enum NetworkEvent {
     },
     ChangeJob(AccountId, u32),
     SetPlayerPosition(Vector2<usize>),
+    Disconnect,
 }
 
 pub struct ChatMessage {
@@ -115,7 +116,7 @@ impl ChatMessage {
     // TODO: Maybe this shouldn't modify the text directly but rather save the
     // timestamp.
     pub fn new(mut text: String, color: Color) -> Self {
-        let prefix = Local::now().format("^66BB44%H:%M:%S^000000: ").to_string();
+        let prefix = Local::now().format("^66BB44%H:%M:%S: ^000000").to_string();
         let offset = prefix.len();
 
         text.insert_str(0, &prefix);
@@ -1961,6 +1962,49 @@ struct RequestUnequipItemStatusPacket {
     pub result: RequestUnequipItemStatus,
 }
 
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[numeric_type(u8)]
+enum RestartType {
+    Respawn,
+    Disconnect,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0xb2, 0x00)]
+struct RestartPacket {
+    pub restart_type: RestartType,
+}
+
+// TODO: check that this can be only 1 and 0, if not ByteConvertable should be
+// implemented manually
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq)]
+#[numeric_type(u8)]
+enum RestartResponseStatus {
+    Nothing,
+    Ok,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0xb3, 0x00)]
+struct RestartResponsePacket {
+    pub result: RestartResponseStatus,
+}
+
+// TODO: check that this can be only 1 and 0, if not ByteConvertable should be
+// implemented manually
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq)]
+#[numeric_type(u16)]
+enum DisconnectResponseStatus {
+    Ok,
+    Wait10Seconds,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x8b, 0x01)]
+struct DisconnectResponsePacket {
+    pub result: DisconnectResponseStatus,
+}
+
 #[derive(new)]
 struct NetworkTimer {
     period: Duration,
@@ -1996,6 +2040,7 @@ pub struct NetworkingSystem {
     login_data: Option<LoginData>,
     characters: TrackedState<Vec<CharacterInformation>>,
     move_request: TrackedState<Option<usize>>,
+    slot_count: usize,
     login_keep_alive_timer: NetworkTimer,
     character_keep_alive_timer: NetworkTimer,
     map_keep_alive_timer: NetworkTimer,
@@ -2019,6 +2064,7 @@ impl NetworkingSystem {
         let login_data = None;
         let characters = TrackedState::default();
         let move_request = TrackedState::default();
+        let slot_count = 0;
         let login_keep_alive_timer = NetworkTimer::new(Duration::from_secs(58));
         let character_keep_alive_timer = NetworkTimer::new(Duration::from_secs(10));
         let map_keep_alive_timer = NetworkTimer::new(Duration::from_secs(4));
@@ -2033,6 +2079,7 @@ impl NetworkingSystem {
             login_stream,
             character_stream,
             move_request,
+            slot_count,
             login_data,
             map_stream,
             characters,
@@ -2057,7 +2104,7 @@ impl NetworkingSystem {
         self.login_settings.remember_password = !self.login_settings.remember_password;
     }
 
-    pub fn log_in(&mut self, username: String, password: String) -> Result<CharacterSelectionWindow, String> {
+    pub fn log_in(&mut self, username: String, password: String) -> Result<(), String> {
         #[cfg(feature = "debug_network")]
         let timer = Timer::new("log in");
 
@@ -2168,19 +2215,23 @@ impl NetworkingSystem {
         #[cfg(feature = "debug_network")]
         byte_stream.transfer_packet_history(&mut self.packet_history);
 
+        self.slot_count = character_server_login_success_packet.normal_slot_count as usize;
+
         #[cfg(feature = "debug_network")]
         timer.stop();
 
-        Ok(CharacterSelectionWindow::new(
-            self.characters.clone(),
-            self.move_request.clone(),
-            character_server_login_success_packet.normal_slot_count as usize,
-        ))
+        Ok(())
+    }
+
+    pub fn character_selection_window(&self) -> CharacterSelectionWindow {
+        CharacterSelectionWindow::new(self.characters.clone(), self.move_request.clone(), self.slot_count)
     }
 
     pub fn log_out(&mut self) -> Result<(), String> {
         #[cfg(feature = "debug_network")]
         let timer = Timer::new("log out");
+
+        self.send_packet_to_map_server(RestartPacket::new(RestartType::Disconnect));
 
         #[cfg(feature = "debug_network")]
         timer.stop();
@@ -2232,31 +2283,31 @@ impl NetworkingSystem {
 
     fn get_data_from_login_server(&mut self) -> Vec<u8> {
         let mut buffer = [0; 4096];
-        let response_lenght = self
+        let response_length = self
             .login_stream
             .read(&mut buffer)
             .expect("failed to get response from login server");
-        buffer[..response_lenght].to_vec()
+        buffer[..response_length].to_vec()
     }
 
     fn get_data_from_character_server(&mut self) -> Vec<u8> {
         let mut buffer = [0; 4096];
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
-        let response_lenght = character_stream
+        let response_length = character_stream
             .read(&mut buffer)
             .expect("failed to get response from character server");
-        buffer[..response_lenght].to_vec()
+        buffer[..response_length].to_vec()
     }
 
     fn try_get_data_from_map_server(&mut self) -> Option<Vec<u8>> {
         let mut buffer = [0; 8096];
         let map_stream = self.map_stream.as_mut()?;
-        let response_lenght = map_stream.read(&mut buffer).ok()?;
+        let response_length = map_stream.read(&mut buffer).ok()?;
 
-        match response_lenght {
+        match response_length {
             // TODO: make sure this will always work
             1400 => {
-                let mut first_buffer = buffer[..response_lenght].to_vec();
+                let mut first_buffer = buffer[..response_length].to_vec();
                 let mut second_buffer = self.try_get_data_from_map_server().unwrap();
                 first_buffer.append(&mut second_buffer);
 
@@ -2457,6 +2508,11 @@ impl NetworkingSystem {
             character_information,
             character_selection_success_packet.map_name.replace(".gat", ""),
         ))
+    }
+
+    pub fn disconnect_from_map_server(&mut self) {
+        // Dropping the TcpStream will also close the connection.
+        self.map_stream = None;
     }
 
     pub fn request_switch_character_slot(&mut self, origin_slot: usize) {
@@ -2752,6 +2808,24 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = MapServerLoginSuccessPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
                     events.push(NetworkEvent::SetPlayerPosition(packet.position.to_vector()));
+                } else if let Ok(packet) = RestartResponsePacket::try_from_bytes(&mut byte_stream) {
+                    match packet.result {
+                        RestartResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
+                        RestartResponseStatus::Nothing => {
+                            let color = Color::rgb(255, 100, 100);
+                            let chat_message = ChatMessage::new("Failed to log out.".to_string(), color);
+                            events.push(NetworkEvent::ChatMessage(chat_message));
+                        }
+                    }
+                } else if let Ok(packet) = DisconnectResponsePacket::try_from_bytes(&mut byte_stream) {
+                    match packet.result {
+                        DisconnectResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
+                        DisconnectResponseStatus::Wait10Seconds => {
+                            let color = Color::rgb(255, 100, 100);
+                            let chat_message = ChatMessage::new("Please wait 10 seconds before trying to log out.".to_string(), color);
+                            events.push(NetworkEvent::ChatMessage(chat_message));
+                        }
+                    }
                 } else {
                     #[cfg(feature = "debug_network")]
                     {

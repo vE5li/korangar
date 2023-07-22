@@ -581,6 +581,13 @@ impl Interface {
     }
 
     #[profile]
+    pub fn close_all_windows(&mut self, focus_state: &mut FocusState) {
+        for index in (0..self.windows.len()).rev() {
+            self.close_window(focus_state, index);
+        }
+    }
+
+    #[profile]
     pub fn set_mouse_cursor_state(&mut self, state: MouseCursorState, client_tick: ClientTick) {
         self.mouse_cursor.set_state(state, client_tick)
     }

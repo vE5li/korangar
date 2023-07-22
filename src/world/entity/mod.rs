@@ -74,6 +74,8 @@ pub struct Common {
     animation_state: AnimationState,
 }
 
+#[profile]
+#[allow(clippy::invisible_characters)]
 fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     match job_id {
         0 => "ÃÊº¸ÀÚ",          // NOVICE
@@ -153,8 +155,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4190 => "½´ÆÛ³ëºñ½º",   // SUPERNOVICE2
         4211 => "KAGEROU",      // KAGEROU
         4212 => "OBORO",        // OBORO
-
-        _ => "ÃÊº¸ÀÚ", // NOVICE
+        _ => "ÃÊº¸ÀÚ",          // NOVICE
     }
 }
 

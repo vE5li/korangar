@@ -97,6 +97,11 @@ impl PrototypeWindow for CommandsWindow {
                 .with_width(dimension!(25%))
                 .with_event(UserEvent::SendMessage("@jlvl 9999".to_string()))
                 .wrap(),
+            Text::default().with_text("stats").wrap(),
+            Button::default()
+                .with_text("set all stats to max")
+                .with_event(UserEvent::SendMessage("@allstats".to_string()))
+                .wrap(),
             Text::default().with_text("skills").wrap(),
             Button::default()
                 .with_text("unlock all skills")
@@ -106,6 +111,10 @@ impl PrototypeWindow for CommandsWindow {
             Button::default()
                 .with_text("mount")
                 .with_event(UserEvent::SendMessage("@mount".to_string()))
+                .wrap(),
+            Button::default()
+                .with_text("heal")
+                .with_event(UserEvent::SendMessage("@heal".to_string()))
                 .wrap(),
             Button::default()
                 .with_text("resurrect")

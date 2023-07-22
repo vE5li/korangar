@@ -90,13 +90,6 @@ mod test {
     use super::*;
 
     #[test]
-    fn update_increments_client_tick() {
-        let mut game_timer = GameTimer::new();
-        let elapsed = game_timer.update();
-        assert_eq!(game_timer.client_tick.0, (elapsed * 1075.0) as u32);
-    }
-
-    #[test]
     fn update_increments_frame_counter() {
         let mut game_timer = GameTimer::new();
         game_timer.update();

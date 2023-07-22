@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use chrono::prelude::*;
+use procedural::profile;
 
 use crate::network::ClientTick;
 
@@ -12,7 +13,8 @@ pub struct GameTimer {
     frames_per_second: usize,
     animation_timer: f32,
     day_timer: f32,
-    client_tick: ClientTick,
+    last_client_tick: Instant,
+    base_client_tick: u32,
 }
 
 const TIME_FACTOR: f32 = 1000.0;
@@ -30,16 +32,19 @@ impl GameTimer {
             frames_per_second: Default::default(),
             animation_timer: Default::default(),
             day_timer,
-            client_tick: ClientTick(0),
+            last_client_tick: Instant::now(),
+            base_client_tick: 0,
         }
     }
 
     pub fn set_client_tick(&mut self, client_tick: ClientTick) {
-        self.client_tick = client_tick;
+        self.last_client_tick = Instant::now();
+        self.base_client_tick = client_tick.0;
     }
 
+    #[profile]
     pub fn get_client_tick(&self) -> ClientTick {
-        self.client_tick
+        ClientTick(self.last_client_tick.elapsed().as_millis() as u32 + self.base_client_tick)
     }
 
     #[cfg(feature = "debug")]
@@ -70,8 +75,6 @@ impl GameTimer {
             self.accumulate_second -= 1.0;
             self.frame_counter = 0;
         }
-
-        self.client_tick.0 += (delta_time * 1075.0) as u32;
 
         delta_time
     }

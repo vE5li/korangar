@@ -489,7 +489,7 @@ fn main() {
                                 &script_loader,
                                 &map,
                                 entity_appeared_data,
-                                game_timer.get_client_tick(),
+                                client_tick,
                             );
                             let npc = Entity::Npc(npc);
                             entities.push(npc);
@@ -520,16 +520,16 @@ fn main() {
                                 .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
                                 .unwrap();
 
-                            entities[0].set_position(&map, player_position, game_timer.get_client_tick());
+                            entities[0].set_position(&map, player_position, client_tick);
 
                             particle_holder.clear();
                             networking_system.map_loaded();
                             // TODO: this is just a workaround until i find a better solution to make the
                             // cursor always look correct.
-                            interface.set_start_time(game_timer.get_client_tick());
+                            interface.set_start_time(client_tick);
                         }
                         NetworkEvent::SetPlayerPosition(player_position) => {
-                            entities[0].set_position(&map, player_position, game_timer.get_client_tick());
+                            entities[0].set_position(&map, player_position, client_tick);
                         }
                         NetworkEvent::UpdateClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
@@ -899,7 +899,7 @@ fn main() {
 
                 entities
                     .iter_mut()
-                    .for_each(|entity| entity.update(&map, delta_time as f32, game_timer.get_client_tick()));
+                    .for_each(|entity| entity.update(&map, delta_time as f32, client_tick));
 
                 #[cfg(feature = "debug")]
                 update_entities_measuremen.stop();
@@ -920,8 +920,7 @@ fn main() {
                 #[cfg(feature = "debug")]
                 update_cameras_measuremen.stop();
 
-                let (clear_interface, rerender_interface) =
-                    interface.update(font_loader.clone(), &mut focus_state, game_timer.get_client_tick());
+                let (clear_interface, rerender_interface) = interface.update(font_loader.clone(), &mut focus_state, client_tick);
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
@@ -1010,7 +1009,6 @@ fn main() {
                 let prepare_frame_measuremen = start_measurement("prepare frame");
 
                 let image_number = swapchain_holder.get_image_number();
-                let client_tick = game_timer.get_client_tick();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
                 let window_size = swapchain_holder.window_size_f32();

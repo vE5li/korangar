@@ -9,7 +9,7 @@ use crate::graphics::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::graphics::ModelVertexBuffer;
 use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
-use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
+use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Theme, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, StatusType};
 use crate::world::Map;
@@ -608,6 +608,7 @@ impl Player {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
+        theme: &Theme,
         window_size: Vector2<f32>,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
@@ -619,24 +620,47 @@ impl Player {
         let screen_position = screen_position / 2.0;
         let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y + 5.0);
 
+        let bar_width = *theme.status_bar.player_bar_width;
+        let gap = *theme.status_bar.gap;
+        let total_height =
+            *theme.status_bar.health_height + *theme.status_bar.spell_point_height + *theme.status_bar.activity_point_height + gap * 2.0;
+
+        let mut offset = 0.0;
+
+        renderer.render_rectangle(
+            render_target,
+            final_position - *theme.status_bar.border_size - Vector2::new(bar_width / 2.0, 0.0),
+            Vector2::new(bar_width, total_height) + *theme.status_bar.border_size * 2.0,
+            *theme.status_bar.background_color,
+        );
+
         renderer.render_bar(
             render_target,
             final_position,
-            Color::rgb(67, 163, 83),
+            Vector2::new(bar_width, *theme.status_bar.health_height),
+            *theme.status_bar.player_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
+
+        offset += gap + *theme.status_bar.health_height;
+
         renderer.render_bar(
             render_target,
-            final_position + Vector2::new(0.0, 9.0),
-            Color::rgb(67, 129, 163),
+            final_position + Vector2::new(0.0, offset),
+            Vector2::new(bar_width, *theme.status_bar.spell_point_height),
+            *theme.status_bar.spell_point_color,
             self.maximum_spell_points as f32,
             self.spell_points as f32,
         );
+
+        offset += gap + *theme.status_bar.spell_point_height;
+
         renderer.render_bar(
             render_target,
-            final_position + Vector2::new(0.0, 18.0),
-            Color::rgb(163, 96, 67),
+            final_position + Vector2::new(0.0, offset),
+            Vector2::new(bar_width, *theme.status_bar.activity_point_height),
+            *theme.status_bar.activity_point_color,
             self.maximum_activity_points as f32,
             self.activity_points as f32,
         );
@@ -684,6 +708,7 @@ impl Npc {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
+        theme: &Theme,
         window_size: Vector2<f32>,
     ) {
         if self.common.entity_type != EntityType::Monster {
@@ -699,10 +724,20 @@ impl Npc {
         let screen_position = screen_position / 2.0;
         let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y + 5.0);
 
+        let bar_width = *theme.status_bar.enemy_bar_width;
+
+        renderer.render_rectangle(
+            render_target,
+            final_position - Vector2::new(theme.status_bar.border_size.x + bar_width / 2.0, theme.status_bar.border_size.y),
+            Vector2::new(bar_width, *theme.status_bar.enemy_health_height) + *theme.status_bar.border_size * 2.0,
+            *theme.status_bar.background_color,
+        );
+
         renderer.render_bar(
             render_target,
             final_position,
-            Color::rgb(67, 163, 83),
+            Vector2::new(bar_width, *theme.status_bar.enemy_health_height),
+            *theme.status_bar.enemy_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
@@ -828,11 +863,12 @@ impl Entity {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
+        theme: &Theme,
         window_size: Vector2<f32>,
     ) {
         match self {
-            Self::Player(player) => player.render_status(render_target, renderer, camera, window_size),
-            Self::Npc(npc) => npc.render_status(render_target, renderer, camera, window_size),
+            Self::Player(player) => player.render_status(render_target, renderer, camera, theme, window_size),
+            Self::Npc(npc) => npc.render_status(render_target, renderer, camera, theme, window_size),
         }
     }
 }

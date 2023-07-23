@@ -116,6 +116,10 @@ impl Interface {
         self.theme.save(&self.interface_settings.theme_file);
     }
 
+    pub fn get_theme(&self) -> &Theme {
+        &self.theme
+    }
+
     pub fn schedule_rerender(&mut self) {
         self.rerender = true;
     }

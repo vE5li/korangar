@@ -521,7 +521,6 @@ impl Interface {
                     .enumerate()
                     .for_each(|(index, choice)| elements.push(DialogElement::ChoiceButton(choice, index as i8 + 1)));
 
-                elements.push(DialogElement::ChoiceButton("cancel".to_string(), -1));
                 changed();
             });
         }

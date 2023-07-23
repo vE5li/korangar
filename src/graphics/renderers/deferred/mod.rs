@@ -43,6 +43,7 @@ use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+use crate::interface::Theme;
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
@@ -373,28 +374,15 @@ impl DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         position: Vector2<f32>,
+        size: Vector2<f32>,
         color: Color,
         maximum: f32,
         current: f32,
     ) {
-        const BAR_BG_WIDTH: f32 = 76.0;
-        const BAR_BG_HEIGHT: f32 = 12.0;
-        const BAR_WIDTH: f32 = 70.0;
-        const BAR_HEIGHT: f32 = 6.0;
-        let bg_offset = Vector2::new(BAR_BG_WIDTH / 2.0, 0.0);
-        let bar_offset = Vector2::new(BAR_WIDTH / 2.0, (BAR_HEIGHT - BAR_BG_HEIGHT) / 2.0);
-        self.render_rectangle(
-            render_target,
-            position - bg_offset,
-            Vector2::new(BAR_BG_WIDTH, BAR_BG_HEIGHT),
-            Color::monochrome(40),
-        );
-        self.render_rectangle(
-            render_target,
-            position - bar_offset,
-            Vector2::new((BAR_WIDTH / maximum) * current, BAR_HEIGHT),
-            color,
-        );
+        let bar_offset = Vector2::new(size.x / 2.0, 0.0);
+        let bar_size = Vector2::new((size.x / maximum) * current, size.y);
+
+        self.render_rectangle(render_target, position - bar_offset, bar_size, color);
     }
 
     #[cfg(feature = "debug")]

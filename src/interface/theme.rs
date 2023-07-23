@@ -320,6 +320,43 @@ impl Default for ProfilerTheme {
     }
 }
 
+#[derive(Serialize, Deserialize, PrototypeElement)]
+pub struct StatusBarTheme {
+    pub background_color: Mutable<Color, Nothing>,
+    pub player_health_color: Mutable<Color, Nothing>,
+    pub enemy_health_color: Mutable<Color, Nothing>,
+    pub spell_point_color: Mutable<Color, Nothing>,
+    pub activity_point_color: Mutable<Color, Nothing>,
+    pub player_bar_width: MutableRange<f32, Rerender>,
+    pub enemy_bar_width: MutableRange<f32, Rerender>,
+    pub health_height: MutableRange<f32, Rerender>,
+    pub enemy_health_height: MutableRange<f32, Rerender>,
+    pub spell_point_height: MutableRange<f32, Rerender>,
+    pub activity_point_height: MutableRange<f32, Rerender>,
+    pub border_size: MutableRange<Vector2<f32>, Rerender>,
+    pub gap: MutableRange<f32, Rerender>,
+}
+
+impl Default for StatusBarTheme {
+    fn default() -> Self {
+        Self {
+            background_color: Mutable::new(Color::monochrome(40)),
+            player_health_color: Mutable::new(Color::rgb(67, 163, 83)),
+            enemy_health_color: Mutable::new(Color::rgb(206, 49, 116)),
+            spell_point_color: Mutable::new(Color::rgb(0, 129, 163)),
+            activity_point_color: Mutable::new(Color::rgb(218, 145, 81)),
+            player_bar_width: MutableRange::new(85.0, 20.0, 300.0),
+            enemy_bar_width: MutableRange::new(60.0, 20.0, 300.0),
+            health_height: MutableRange::new(8.0, 2.0, 30.0),
+            enemy_health_height: MutableRange::new(6.0, 2.0, 30.0),
+            spell_point_height: MutableRange::new(4.0, 2.0, 30.0),
+            activity_point_height: MutableRange::new(4.0, 2.0, 30.0),
+            border_size: MutableRange::new(Vector2::from_value(3.0), Vector2::from_value(0.0), Vector2::from_value(20.0)),
+            gap: MutableRange::new(1.0, 0.0, 10.0),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
 #[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
@@ -344,6 +381,7 @@ pub struct Theme {
     pub chat: ChatTheme,
     pub cursor: CursorTheme,
     pub profiler: ProfilerTheme,
+    pub status_bar: StatusBarTheme,
 }
 
 impl Theme {

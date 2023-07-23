@@ -1225,14 +1225,18 @@ fn main() {
                     let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
                     if let Some(entity) = entity {
-                        entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
+                        entity.render_status(
+                            screen_target,
+                            &deferred_renderer,
+                            current_camera,
+                            interface.get_theme(),
+                            window_size,
+                        );
 
                         if let Some(name) = &entity.get_details() {
                             let name = name.split('#').next().unwrap();
                             interface.render_hover_text(screen_target, &deferred_renderer, name, input_system.get_mouse_position());
                         }
-
-                        entity.render_status(screen_target, &deferred_renderer, current_camera, window_size);
                     }
                 }
 
@@ -1240,7 +1244,13 @@ fn main() {
                     #[cfg(feature = "debug")]
                     profile_block!("render player status");
 
-                    entities[0].render_status(screen_target, &deferred_renderer, current_camera, window_size);
+                    entities[0].render_status(
+                        screen_target,
+                        &deferred_renderer,
+                        current_camera,
+                        interface.get_theme(),
+                        window_size,
+                    );
                 }
 
                 #[cfg(feature = "debug")]

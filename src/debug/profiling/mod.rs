@@ -124,32 +124,40 @@ impl Profiler {
 
     /// Stop a running measurement.
     fn stop_measurement(&mut self, name: &'static str) {
-        if let Some(top_measurement) = self.active_measurements.last().copied() {
-            let measurement = unsafe { &mut *(top_measurement as *mut Measurement) };
-    
-            // Assert that the names match to emit a warning when something went wrong.
-            if name as *const _ != measurement.name as *const _ {
-                print_debug!(
-                    "[{}warning{}] active measurement mismatch; exepcted {}{}{} but got {}{}{}",
-                    YELLOW,
-                    NONE,
-                    MAGENTA,
-                    measurement.name,
-                    NONE,
-                    MAGENTA,
-                    name,
-                    NONE
-                );
-            }
+        let Some(top_measurement) = self.active_measurements.last().copied() else {
+            print_debug!(
+                "[{}warning{}] tried to stop measurement {}{}{} but no measurement is active",
+                YELLOW,
+                NONE,
+                MAGENTA,
+                name,
+                NONE,
+            );
+            return;
+        };
 
-            // Set the end time of the measurement.
-            measurement.set_end_time();
+        let measurement = unsafe { &mut *(top_measurement as *mut Measurement) };
 
-            // Remove the measurement from the list of active measurements.
-            self.active_measurements.pop();
-        } else {
-            print_debug!("No active measurement found!");
+        // Assert that the names match to emit a warning when something went wrong.
+        if name as *const _ != measurement.name as *const _ {
+            print_debug!(
+                "[{}warning{}] active measurement mismatch; exepcted {}{}{} but got {}{}{}",
+                YELLOW,
+                NONE,
+                MAGENTA,
+                measurement.name,
+                NONE,
+                MAGENTA,
+                name,
+                NONE
+            );
         }
+
+        // Set the end time of the measurement.
+        measurement.set_end_time();
+
+        // Remove the measurement from the list of active measurements.
+        self.active_measurements.pop();
     }
 }
 

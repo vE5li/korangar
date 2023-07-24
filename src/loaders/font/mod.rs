@@ -53,15 +53,27 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
 
         // Color code following.
         if character == '^' {
-            let color_code: String = (0..6).map(|_| chars.next().unwrap()).collect();
+            let mut cloned_chars = chars.clone();
 
-            color = match color_code.as_str() {
-                "000000" => default_color,
-                code => Color::rgb_hex(code),
-            };
+            // If the next 6 characters are Hex digits (0-9 A-F)
+            if (0..6)
+                .map(|_| cloned_chars.next())
+                .all(|option| option.is_some_and(|character| character.is_ascii_hexdigit()))
+            {
+                // Advance the actual iterator
+                let color_bytes: [u8; 6] = chars.next_chunk().unwrap().map(|character| character as u8);
 
-            // Advance to the next character so that '^' doesn't get rendered.
-            continue;
+                // We made sure that all characters are ascii hexdigits, so this is completetly
+                // safe.
+                let color_code = unsafe { std::str::from_utf8_unchecked(&color_bytes) };
+
+                color = match color_code {
+                    "000000" => default_color,
+                    code => Color::rgb_hex(code),
+                };
+
+                continue;
+            }
         }
 
         let base_glyph = font.glyph(character);

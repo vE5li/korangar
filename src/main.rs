@@ -14,6 +14,7 @@
 #![feature(thread_local)]
 #![feature(lazy_cell)]
 #![feature(div_duration)]
+#![feature(iter_next_chunk)]
 
 #[cfg(feature = "debug")]
 #[macro_use]

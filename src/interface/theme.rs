@@ -351,7 +351,7 @@ impl Default for StatusBarTheme {
             enemy_health_height: MutableRange::new(6.0, 2.0, 30.0),
             spell_point_height: MutableRange::new(4.0, 2.0, 30.0),
             activity_point_height: MutableRange::new(4.0, 2.0, 30.0),
-            border_size: MutableRange::new(Vector2::from_value(3.0), Vector2::from_value(0.0), Vector2::from_value(20.0)),
+            border_size: MutableRange::new(Vector2::new(2.0, 1.0), Vector2::from_value(0.0), Vector2::from_value(20.0)),
             gap: MutableRange::new(1.0, 0.0, 10.0),
         }
     }

@@ -117,6 +117,10 @@ impl PrototypeWindow for CommandsWindow {
                 .with_event(UserEvent::SendMessage("@heal".to_string()))
                 .wrap(),
             Button::default()
+                .with_text("fill AP")
+                .with_event(UserEvent::SendMessage("@healap".to_string()))
+                .wrap(),
+            Button::default()
                 .with_text("resurrect")
                 .with_event(UserEvent::SendMessage("@alive".to_string()))
                 .wrap(),

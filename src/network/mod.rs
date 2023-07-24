@@ -852,7 +852,7 @@ struct MapTypePacket {
 /// information on how the message should be displayed.
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0xc3, 0x01)]
-struct BroadcastMessagePacket {
+struct Broadcast2MessagePacket {
     pub packet_length: u16,
     pub font_color: ColorRGBA,
     pub font_type: u16,
@@ -860,6 +860,16 @@ struct BroadcastMessagePacket {
     pub font_alignment: u16,
     pub font_y: u16,
     #[length_hint(self.packet_length - 16)]
+    pub message: String,
+}
+
+/// Sent by the map server to the client when when someone uses the @broadcast
+/// command. Provides the message to be displayed in the chat window.
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x9a, 0x00)]
+struct BroadcastMessagePacket {
+    pub packet_length: u16,
+    #[length_hint(self.packet_length - 2)]
     pub message: String,
 }
 
@@ -2639,6 +2649,10 @@ impl NetworkingSystem {
 
             while !byte_stream.is_empty() {
                 if let Ok(packet) = BroadcastMessagePacket::try_from_bytes(&mut byte_stream) {
+                    let color = Color::rgb(220, 200, 30);
+                    let chat_message = ChatMessage::new(packet.message, color);
+                    events.push(NetworkEvent::ChatMessage(chat_message));
+                } else if let Ok(packet) = Broadcast2MessagePacket::try_from_bytes(&mut byte_stream) {
                     // NOTE: Drop the alpha channel because it might be 0.
                     let color = Color::rgb(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
                     let chat_message = ChatMessage::new(packet.message, color);

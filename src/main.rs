@@ -660,12 +660,20 @@ fn main() {
                             interface.schedule_rerender();
                         }
                         UserEvent::ToggleShowInterface => graphics_settings.toggle_show_interface(),
-                        UserEvent::OpenMenuWindow => interface.open_window(&mut focus_state, &MenuWindow::default()),
+                        UserEvent::OpenMenuWindow => {
+                            if !entities.is_empty() {
+                                interface.open_window(&mut focus_state, &MenuWindow::default())
+                            }
+                        }
                         UserEvent::OpenInventoryWindow => {
-                            interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_item_state()))
+                            if !entities.is_empty() {
+                                interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_item_state()))
+                            }
                         }
                         UserEvent::OpenEquipmentWindow => {
-                            interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_item_state()))
+                            if !entities.is_empty() {
+                                interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_item_state()))
+                            }
                         }
                         UserEvent::OpenGraphicsSettingsWindow => {
                             interface.open_window(&mut focus_state, &GraphicsSettingsWindow::new(present_mode_info))

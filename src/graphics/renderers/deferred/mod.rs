@@ -44,7 +44,9 @@ use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
-use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+use crate::graphics::{
+    EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait, *,
+};
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
@@ -263,29 +265,6 @@ impl DeferredRenderer {
             swapchain_image,
             self.dimensions,
         )
-    }
-
-    pub fn render_walk_indicator(
-        &self,
-        render_target: &mut <Self as Renderer>::Target,
-        camera: &dyn Camera,
-        color: Color,
-        upper_left: Vector3<f32>,
-        upper_right: Vector3<f32>,
-        lower_left: Vector3<f32>,
-        lower_right: Vector3<f32>,
-    ) {
-        render_target.unbind_subrenderer();
-        self.indicator_renderer.render_ground_indicator(
-            render_target,
-            camera,
-            self.walk_indicator.clone(),
-            color,
-            upper_left,
-            upper_right,
-            lower_left,
-            lower_right,
-        );
     }
 
     pub fn render_water(
@@ -547,5 +526,32 @@ impl MarkerRenderer for DeferredRenderer {
             self.sprite_renderer
                 .render_marker(render_target, marker_identifier, screen_position, screen_size, hovered);
         }
+    }
+}
+
+impl IndicatorRendererTrait for DeferredRenderer {
+    fn render_walk_indicator(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        color: Color,
+        upper_left: Vector3<f32>,
+        upper_right: Vector3<f32>,
+        lower_left: Vector3<f32>,
+        lower_right: Vector3<f32>,
+    ) where
+        Self: Renderer,
+    {
+        render_target.unbind_subrenderer();
+        self.indicator_renderer.render_ground_indicator(
+            render_target,
+            camera,
+            self.walk_indicator.clone(),
+            color,
+            upper_left,
+            upper_right,
+            lower_left,
+            lower_right,
+        );
     }
 }

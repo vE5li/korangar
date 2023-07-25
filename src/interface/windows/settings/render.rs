@@ -29,6 +29,7 @@ fn map_expandable() -> ElementCell {
         render_state_button!("show objects", UserEvent::ToggleShowObjects, show_objects),
         render_state_button!("show entities", UserEvent::ToggleShowEntities, show_entities),
         render_state_button!("show water", UserEvent::ToggleShowWater, show_water),
+        render_state_button!("show indicators", UserEvent::ToggleShowIndicators, show_indicators),
     ];
 
     Expandable::new("map".to_string(), buttons, true).wrap()

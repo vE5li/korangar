@@ -245,26 +245,31 @@ impl Map {
     }
 
     #[profile]
-    pub fn render_walk_indicator(
+    pub fn render_walk_indicator<T>(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        renderer: &DeferredRenderer,
+        render_target: &mut <T>::Target,
+        renderer: &T,
         camera: &dyn Camera,
         color: Color,
         position: Vector2<usize>,
-        tile: &Tile,
-    ) {
+    ) where
+        T: Renderer + IndicatorRenderer,
+    {
         const OFFSET: f32 = 1.0;
 
-        let base_x = position.x as f32 * 5.0;
-        let base_y = position.y as f32 * 5.0;
+        let tile = self.get_tile(position);
 
-        let upper_left = Vector3::new(base_x, tile.upper_left_height + OFFSET, base_y);
-        let upper_right = Vector3::new(base_x + 5.0, tile.upper_right_height + OFFSET, base_y);
-        let lower_left = Vector3::new(base_x, tile.lower_left_height + OFFSET, base_y + 5.0);
-        let lower_right = Vector3::new(base_x + 5.0, tile.lower_right_height + OFFSET, base_y + 5.0);
+        if tile.is_walkable() {
+            let base_x = position.x as f32 * 5.0;
+            let base_y = position.y as f32 * 5.0;
 
-        renderer.render_walk_indicator(render_target, camera, color, upper_left, upper_right, lower_left, lower_right);
+            let upper_left = Vector3::new(base_x, tile.upper_left_height + OFFSET, base_y);
+            let upper_right = Vector3::new(base_x + 5.0, tile.upper_right_height + OFFSET, base_y);
+            let lower_left = Vector3::new(base_x, tile.lower_left_height + OFFSET, base_y + 5.0);
+            let lower_right = Vector3::new(base_x + 5.0, tile.lower_right_height + OFFSET, base_y + 5.0);
+
+            renderer.render_walk_indicator(render_target, camera, color, upper_left, upper_right, lower_left, lower_right);
+        }
     }
 
     #[profile]

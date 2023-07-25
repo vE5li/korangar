@@ -99,6 +99,8 @@ pub enum UserEvent {
     #[cfg(feature = "debug")]
     ToggleShowWater,
     #[cfg(feature = "debug")]
+    ToggleShowIndicators,
+    #[cfg(feature = "debug")]
     ToggleShowAmbientLight,
     #[cfg(feature = "debug")]
     ToggleShowDirectionalLight,

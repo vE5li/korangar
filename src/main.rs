@@ -271,7 +271,7 @@ fn main() {
         swapchain_holder.window_size_u32(),
     );
 
-    let shadow_renderer = ShadowRenderer::new(memory_allocator, queue);
+    let shadow_renderer = ShadowRenderer::new(memory_allocator, queue, &mut game_file_loader, &mut texture_loader);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -853,6 +853,8 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowWater => render_settings.toggle_show_water(),
                         #[cfg(feature = "debug")]
+                        UserEvent::ToggleShowIndicators => render_settings.toggle_show_indicators(),
+                        #[cfg(feature = "debug")]
                         UserEvent::ToggleShowAmbientLight => render_settings.toggle_show_ambient_light(),
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowDirectionalLight => render_settings.toggle_show_directional_light(),
@@ -1097,6 +1099,17 @@ fn main() {
                             true,
                         );
 
+                        if let Some(PickerTarget::Tile { x, y }) = mouse_target && !entities.is_empty() {
+                            #[debug_condition(render_settings.show_indicators)]
+                            map.render_walk_indicator(
+                                directional_shadow_target,
+                                &shadow_renderer,
+                                &directional_shadow_camera,
+                                walk_indicator_color,
+                                Vector2::new(x as usize, y as usize),
+                            );
+                        }
+
                         directional_shadow_target.finish();
                     });
 
@@ -1132,19 +1145,14 @@ fn main() {
                         map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
 
                         if let Some(PickerTarget::Tile { x, y }) = mouse_target && !entities.is_empty() {
-                            let position = Vector2::new(x as usize, y as usize);
-                            let tile = map.get_tile(position);
-
-                            if tile.is_walkable() {
-                                map.render_walk_indicator(
-                                    screen_target,
-                                    &deferred_renderer,
-                                    current_camera,
-                                    walk_indicator_color,
-                                    position,
-                                    tile,
-                                );
-                            }
+                            #[debug_condition(render_settings.show_indicators)]
+                            map.render_walk_indicator(
+                                screen_target,
+                                &deferred_renderer,
+                                current_camera,
+                                walk_indicator_color,
+                                Vector2::new(x as usize, y as usize),
+                            );
                         }
 
                         screen_target.lighting_pass();

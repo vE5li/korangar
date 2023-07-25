@@ -35,13 +35,14 @@ use self::picker::PickerSubrenderer;
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
 pub use self::swapchain::{PresentModeInfo, SwapchainHolder};
-use super::MemoryAllocator;
+use super::{Color, MemoryAllocator};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
+use crate::world::Tile;
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     color_op: BlendOp::Add,
@@ -100,6 +101,20 @@ pub trait EntityRenderer {
         cell_position: Vector2<usize>,
         mirror: bool,
         entity_id: EntityId,
+    ) where
+        Self: Renderer;
+}
+
+pub trait IndicatorRenderer {
+    fn render_walk_indicator(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        color: Color,
+        upper_left: Vector3<f32>,
+        upper_right: Vector3<f32>,
+        lower_left: Vector3<f32>,
+        lower_right: Vector3<f32>,
     ) where
         Self: Renderer;
 }
@@ -631,6 +646,11 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
             bound_subrenderer,
             _phantom_data: Default::default(),
         }
+    }
+
+    #[profile]
+    pub fn unbind_subrenderer(&mut self) {
+        self.bound_subrenderer = None;
     }
 
     #[profile]

@@ -33,6 +33,7 @@ use std::cell::RefCell;
 use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Instant;
 
 use cgmath::{Vector2, Zero};
 use image::io::Reader as ImageReader;
@@ -324,6 +325,8 @@ fn main() {
     let timer = Timer::new("initialize timer");
 
     let mut game_timer = GameTimer::new();
+
+    let mut move_start_time = Instant::now();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -737,8 +740,9 @@ fn main() {
                             interface.handle_result(&mut focus_state, networking_system.switch_character_slot(destination_slot))
                         }
                         UserEvent::RequestPlayerMove(destination) => {
-                            if !entities.is_empty() {
-                                networking_system.request_player_move(destination)
+                            if !entities.is_empty() && (move_start_time.elapsed().as_millis() > 300) {
+                                networking_system.request_player_move(destination);
+                                move_start_time = Instant::now();
                             }
                         }
                         UserEvent::RequestPlayerInteract(entity_id) => {

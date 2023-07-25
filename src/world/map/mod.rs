@@ -121,6 +121,7 @@ impl Map {
         Vector3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
 
+    // TODO: Make this private once path finding is properly implemented
     pub fn get_tile(&self, position: Vector2<usize>) -> &Tile {
         &self.tiles[position.x + position.y * self.width]
     }
@@ -241,6 +242,29 @@ impl Map {
     #[profile]
     pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {
         renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
+    }
+
+    #[profile]
+    pub fn render_walk_indicator(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        color: Color,
+        position: Vector2<usize>,
+        tile: &Tile,
+    ) {
+        const OFFSET: f32 = 1.0;
+
+        let base_x = position.x as f32 * 5.0;
+        let base_y = position.y as f32 * 5.0;
+
+        let upper_left = Vector3::new(base_x, tile.upper_left_height + OFFSET, base_y);
+        let upper_right = Vector3::new(base_x + 5.0, tile.upper_right_height + OFFSET, base_y);
+        let lower_left = Vector3::new(base_x, tile.lower_left_height + OFFSET, base_y + 5.0);
+        let lower_right = Vector3::new(base_x + 5.0, tile.lower_right_height + OFFSET, base_y + 5.0);
+
+        renderer.render_walk_indicator(render_target, camera, color, upper_left, upper_right, lower_left, lower_right);
     }
 
     #[profile]

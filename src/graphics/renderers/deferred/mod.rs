@@ -6,6 +6,7 @@ mod buffer;
 mod directional;
 mod entity;
 mod geometry;
+mod indicator;
 mod overlay;
 mod point;
 mod rectangle;
@@ -36,6 +37,7 @@ use self::buffer::BufferRenderer;
 use self::directional::DirectionalLightRenderer;
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
+use self::indicator::IndicatorRenderer;
 use self::overlay::OverlayRenderer;
 use self::point::PointLightRenderer;
 use self::rectangle::RectangleRenderer;
@@ -43,7 +45,6 @@ use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
-use crate::interface::Theme;
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
@@ -65,6 +66,7 @@ pub struct DeferredRenderer {
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     water_renderer: WaterRenderer,
+    indicator_renderer: IndicatorRenderer,
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     point_light_renderer: PointLightRenderer,
@@ -79,6 +81,7 @@ pub struct DeferredRenderer {
     #[cfg(feature = "debug")]
     tile_textures: [Texture; 7],
     font_map: Texture,
+    walk_indicator: Texture,
     dimensions: [u32; 2],
 }
 
@@ -146,7 +149,8 @@ impl DeferredRenderer {
 
         let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
         let entity_renderer = EntityRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
-        let water_renderer = WaterRenderer::new(memory_allocator.clone(), geometry_subpass, viewport.clone());
+        let water_renderer = WaterRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
+        let indicator_renderer = IndicatorRenderer::new(memory_allocator.clone(), geometry_subpass, viewport.clone());
         let ambient_light_renderer = AmbientLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
         let directional_light_renderer =
             DirectionalLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
@@ -169,6 +173,7 @@ impl DeferredRenderer {
         let box_renderer = BoxRenderer::new(memory_allocator.clone(), lighting_subpass, viewport);
 
         let font_map = texture_loader.get("font.png", game_file_loader).unwrap();
+        let walk_indicator = texture_loader.get("grid.tga", game_file_loader).unwrap();
 
         #[cfg(feature = "debug")]
         let tile_textures = [
@@ -188,6 +193,7 @@ impl DeferredRenderer {
             geometry_renderer,
             entity_renderer,
             water_renderer,
+            indicator_renderer,
             ambient_light_renderer,
             directional_light_renderer,
             point_light_renderer,
@@ -202,6 +208,7 @@ impl DeferredRenderer {
             #[cfg(feature = "debug")]
             tile_textures,
             font_map,
+            walk_indicator,
             dimensions,
         }
     }
@@ -222,6 +229,8 @@ impl DeferredRenderer {
         self.entity_renderer
             .recreate_pipeline(device.clone(), geometry_subpass.clone(), viewport.clone());
         self.water_renderer
+            .recreate_pipeline(device.clone(), geometry_subpass.clone(), viewport.clone());
+        self.indicator_renderer
             .recreate_pipeline(device.clone(), geometry_subpass, viewport.clone());
         self.ambient_light_renderer
             .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
@@ -254,6 +263,29 @@ impl DeferredRenderer {
             swapchain_image,
             self.dimensions,
         )
+    }
+
+    pub fn render_walk_indicator(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        color: Color,
+        upper_left: Vector3<f32>,
+        upper_right: Vector3<f32>,
+        lower_left: Vector3<f32>,
+        lower_right: Vector3<f32>,
+    ) {
+        render_target.unbind_subrenderer();
+        self.indicator_renderer.render_ground_indicator(
+            render_target,
+            camera,
+            self.walk_indicator.clone(),
+            color,
+            upper_left,
+            upper_right,
+            lower_left,
+            lower_right,
+        );
     }
 
     pub fn render_water(
@@ -392,6 +424,8 @@ impl DeferredRenderer {
         camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
     ) {
+        // FIX: This is broken on account of the TileTypes not storing their original
+        // index. Should choose an index based on flags instead.
         self.render_geometry(
             render_target,
             camera,

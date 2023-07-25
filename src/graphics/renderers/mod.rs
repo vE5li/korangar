@@ -106,7 +106,10 @@ pub trait EntityRenderer {
 
 #[derive(Debug)]
 pub enum PickerTarget {
-    Tile(u16, u16),
+    Tile {
+        x: u16,
+        y: u16,
+    },
     Entity(EntityId),
     #[cfg(feature = "debug")]
     Marker(MarkerIdentifier),
@@ -117,7 +120,7 @@ impl From<u32> for PickerTarget {
         if data >> 31 == 1 {
             let x = ((data >> 16) as u16) ^ (1 << 15);
             let y = data as u16;
-            return Self::Tile(x, y);
+            return Self::Tile { x, y };
         }
 
         #[cfg(feature = "debug")]
@@ -157,7 +160,7 @@ impl From<u32> for PickerTarget {
 impl From<PickerTarget> for u32 {
     fn from(picker_target: PickerTarget) -> Self {
         match picker_target {
-            PickerTarget::Tile(x, y) => {
+            PickerTarget::Tile { x, y } => {
                 let mut encoded = ((x as u32) << 16) | y as u32;
                 encoded |= 1 << 31;
                 encoded

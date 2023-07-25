@@ -266,7 +266,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             let third_position = Vector3::new(offset.x + 5.0, tile.lower_right_height, offset.y + 5.0);
             let fourth_position = Vector3::new(offset.x, tile.lower_left_height, offset.y + 5.0);
 
-            let color = PickerTarget::Tile(x as u16, y as u16).into();
+            let color = PickerTarget::Tile { x: x as u16, y: y as u16 }.into();
             tile_picker_vertices.push(TileVertex::new(first_position, color));
             tile_picker_vertices.push(TileVertex::new(second_position, color));
             tile_picker_vertices.push(TileVertex::new(third_position, color));

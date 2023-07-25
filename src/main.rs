@@ -1017,6 +1017,7 @@ fn main() {
                 #[cfg(feature = "debug")]
                 let prepare_frame_measuremen = start_measurement("prepare frame");
 
+                let walk_indicator_color = *interface.get_theme().indicator.walking;
                 let image_number = swapchain_holder.get_image_number();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
@@ -1129,6 +1130,22 @@ fn main() {
 
                         #[debug_condition(render_settings.show_water)]
                         map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
+
+                        if let Some(PickerTarget::Tile { x, y }) = mouse_target && !entities.is_empty() {
+                            let position = Vector2::new(x as usize, y as usize);
+                            let tile = map.get_tile(position);
+
+                            if tile.is_walkable() {
+                                map.render_walk_indicator(
+                                    screen_target,
+                                    &deferred_renderer,
+                                    current_camera,
+                                    walk_indicator_color,
+                                    position,
+                                    tile,
+                                );
+                            }
+                        }
 
                         screen_target.lighting_pass();
 

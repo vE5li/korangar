@@ -357,6 +357,19 @@ impl Default for StatusBarTheme {
     }
 }
 
+#[derive(Serialize, Deserialize, PrototypeElement)]
+pub struct IndicatorTheme {
+    pub walking: Mutable<Color, Rerender>,
+}
+
+impl Default for IndicatorTheme {
+    fn default() -> Self {
+        Self {
+            walking: Mutable::new(Color::rgba(0, 255, 170, 170)),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
 #[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
@@ -382,6 +395,7 @@ pub struct Theme {
     pub cursor: CursorTheme,
     pub profiler: ProfilerTheme,
     pub status_bar: StatusBarTheme,
+    pub indicator: IndicatorTheme,
 }
 
 impl Theme {

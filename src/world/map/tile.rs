@@ -9,6 +9,7 @@ const SNIPABLE: u8 = 0b00000100;
 const CLIFF: u8 = 0b00001000;
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub struct TileType(pub u8);
 
 impl ByteConvertable for TileType {
@@ -41,7 +42,7 @@ impl TileType {
 }
 
 #[allow(dead_code)]
-#[derive(ByteConvertable)]
+#[derive(ByteConvertable, Debug)]
 pub struct Tile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,

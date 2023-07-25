@@ -873,6 +873,18 @@ struct BroadcastMessagePacket {
     pub message: String,
 }
 
+/// Sent by the map server to the client when when someone writes in proximity
+/// chat. Provides the source player and message to be displayed in the chat
+/// window and the speach bubble.
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x8d, 0x00)]
+struct OverheadMessagePacket {
+    pub packet_length: u16,
+    pub entity_id: EntityId,
+    #[length_hint(self.packet_length - 6)]
+    pub message: String,
+}
+
 /// Sent by the map server to the client when there is a new chat message from
 /// an entity. Provides the message to be displayed in the chat window, the
 /// color of the message, and the ID of the entity it originated from.
@@ -2655,6 +2667,10 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = Broadcast2MessagePacket::try_from_bytes(&mut byte_stream) {
                     // NOTE: Drop the alpha channel because it might be 0.
                     let color = Color::rgb(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
+                    let chat_message = ChatMessage::new(packet.message, color);
+                    events.push(NetworkEvent::ChatMessage(chat_message));
+                } else if let Ok(packet) = OverheadMessagePacket::try_from_bytes(&mut byte_stream) {
+                    let color = Color::monochrome(230);
                     let chat_message = ChatMessage::new(packet.message, color);
                     events.push(NetworkEvent::ChatMessage(chat_message));
                 } else if let Ok(packet) = ServerMessagePacket::try_from_bytes(&mut byte_stream) {

@@ -39,8 +39,6 @@ unsafe impl bytemuck::Pod for Constants {}
 pub struct IndicatorRenderer {
     memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
     nearest_sampler: Arc<Sampler>,
 }
 
@@ -55,8 +53,6 @@ impl IndicatorRenderer {
         Self {
             memory_allocator,
             pipeline,
-            vertex_shader,
-            fragment_shader,
             nearest_sampler,
         }
     }

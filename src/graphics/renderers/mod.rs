@@ -42,7 +42,6 @@ use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::Tile;
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     color_op: BlendOp::Add,

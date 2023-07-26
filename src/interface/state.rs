@@ -62,12 +62,6 @@ impl<T> TrackedState<Vec<T>> {
         inner.1 = inner.1.wrapping_add(1);
     }
 
-    pub fn append(&mut self, other: &mut Vec<T>) {
-        let mut inner = self.0.borrow_mut();
-        inner.0.append(other);
-        inner.1 = inner.1.wrapping_add(1);
-    }
-
     pub fn retain<F>(&mut self, mut f: F)
     where
         F: FnMut(&T) -> bool,

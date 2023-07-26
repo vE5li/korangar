@@ -70,10 +70,6 @@ impl InternalVersion {
         self.major < major || (self.major == major && self.minor < minor)
     }
 
-    pub fn equals(&self, major: u8, minor: u8) -> bool {
-        self.major == major && self.minor >= minor
-    }
-
     pub fn equals_or_above(&self, major: u8, minor: u8) -> bool {
         self.major > major || (self.major == major && self.minor >= minor)
     }

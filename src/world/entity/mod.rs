@@ -8,7 +8,7 @@ use procedural::*;
 use crate::graphics::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::graphics::ModelVertexBuffer;
-use crate::graphics::{Camera, Color, DeferredRenderer, EntityRenderer, Renderer};
+use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, Renderer};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Theme, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, Sex, StatusType};
@@ -905,10 +905,6 @@ impl Entity {
             return true;
         }
         false
-    }
-
-    pub fn get_job(&self) -> usize {
-        self.get_common().job_id
     }
 
     pub fn get_entity_type(&self) -> EntityType {

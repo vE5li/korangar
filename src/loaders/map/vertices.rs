@@ -188,7 +188,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
     let mut count = 0;
     for y in 0..gat_data.map_height {
         for x in 0..gat_data.map_width {
-            let mut tile = &mut gat_data.tiles[count];
+            let tile = &mut gat_data.tiles[count];
 
             tile.upper_left_height = -tile.upper_left_height;
             tile.upper_right_height = -tile.upper_right_height;

@@ -1,3 +1,5 @@
+use cgmath::Vector2;
+
 use crate::graphics::Texture;
 use crate::interface::{ElementCell, ItemSource};
 use crate::inventory::Item;
@@ -11,6 +13,7 @@ pub enum MouseInputMode {
     DragElement((ElementCell, usize)),
     ClickInterface,
     RotateCamera,
+    Walk(Vector2<usize>),
     #[default]
     None,
 }
@@ -18,6 +21,10 @@ pub enum MouseInputMode {
 impl MouseInputMode {
     pub fn is_none(&self) -> bool {
         matches!(self, MouseInputMode::None)
+    }
+
+    pub fn is_walk(&self) -> bool {
+        matches!(self, MouseInputMode::Walk(..))
     }
 
     pub fn grabbed_texture(&self) -> Option<Texture> {

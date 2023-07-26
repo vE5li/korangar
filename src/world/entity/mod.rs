@@ -428,7 +428,10 @@ impl Common {
             // If there is only a single step the player is already on the correct tile.
             if steps.len() > 1 {
                 self.active_movement = Movement::new(steps, starting_timestamp.0).into();
-                self.animation_state.walk(self.movement_speed, starting_timestamp);
+
+                if self.animation_state.action != 1 {
+                    self.animation_state.walk(self.movement_speed, starting_timestamp);
+                }
             }
         }
     }

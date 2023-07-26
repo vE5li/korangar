@@ -363,7 +363,7 @@ impl InputSystem {
             }
             MouseInputMode::ClickInterface => interface.set_mouse_cursor_state(MouseCursorState::Click, client_tick),
             MouseInputMode::None => {}
-            MouseInputMode::MoveItem(..) | MouseInputMode::MoveSkill(..) => {}
+            MouseInputMode::MoveItem(..) | MouseInputMode::MoveSkill(..) | MouseInputMode::Walk(..) => {}
         }
 
         if self.scroll_delta != 0.0 {
@@ -541,7 +541,7 @@ impl InputSystem {
             }
         }
 
-        if window_index.is_none() && self.mouse_input_mode.is_none() {
+        if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
             if let Some(fence) = picker_target.state.try_take_fence() {
                 fence.wait(None).unwrap();
             }
@@ -555,23 +555,31 @@ impl InputSystem {
                 if pixel != 0 {
                     let picker_target = PickerTarget::from(pixel);
 
-                    if self.left_mouse_button.pressed() && self.mouse_input_mode.is_none() {
+                    if self.left_mouse_button.pressed() {
                         match picker_target {
                             PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
-                            PickerTarget::Tile { x, y } => {}
+                            PickerTarget::Tile { x, y } => {
+                                let position = Vector2::new(x as usize, y as usize);
+                                self.mouse_input_mode = MouseInputMode::Walk(position);
+
+                                events.push(UserEvent::RequestPlayerMove(position));
+                            }
                             #[cfg(feature = "debug")]
                             PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
                         }
-                    } else if self.left_mouse_button.down() && self.mouse_input_mode.is_none() {
-                        match picker_target {
-                            PickerTarget::Entity(entity_id) => {}
-                            PickerTarget::Tile { x, y } => events.push(UserEvent::RequestPlayerMove(Vector2::new(x as usize, y as usize))),
-                            #[cfg(feature = "debug")]
-                            PickerTarget::Marker(marker_identifier) => {}
+                    } else if self.left_mouse_button.down() && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode && let PickerTarget::Tile { x, y } = picker_target {
+                        let new_position = Vector2::new(x as usize, y as usize);
+
+                        if new_position != *requested_position {
+                            *requested_position = new_position;
+
+                            events.push(UserEvent::RequestPlayerMove(new_position));
                         }
                     }
 
-                    mouse_target = Some(picker_target);
+                    if !self.mouse_input_mode.is_walk() {
+                        mouse_target = Some(picker_target);
+                    }
                 }
             }
         }

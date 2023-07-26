@@ -57,40 +57,33 @@ impl PacketEntry {
     }
 }
 
-pub struct PacketView {
-    packets: TrackedState<Vec<PacketEntry>>,
-    cleared: Remote<()>,
+pub struct PacketView<const N: usize> {
+    packets: Remote<RingBuffer<PacketEntry, N>>,
     show_pings: Remote<bool>,
     update: Remote<bool>,
     weak_self: Option<WeakElementCell>,
-    cached_packet_count: usize,
     state: ContainerState,
 }
 
-impl PacketView {
-    pub fn new(packets: TrackedState<Vec<PacketEntry>>, cleared: Remote<()>, show_pings: Remote<bool>, update: Remote<bool>) -> Self {
+impl<const N: usize> PacketView<N> {
+    pub fn new(packets: Remote<RingBuffer<PacketEntry, N>>, show_pings: Remote<bool>, update: Remote<bool>) -> Self {
         let weak_self = None;
-        let (elements, cached_packet_count) = {
+        let elements = {
             let packets = packets.borrow();
-            let elements = packets.iter().map(PacketEntry::to_element).collect();
-            let cached_packet_count = packets.len();
-
-            (elements, cached_packet_count)
+            packets.iter().map(PacketEntry::to_element).collect()
         };
 
         Self {
             packets,
-            cleared,
             show_pings,
             update,
             weak_self,
-            cached_packet_count,
             state: ContainerState::new(elements),
         }
     }
 }
 
-impl Element for PacketView {
+impl<const N: usize> Element for PacketView<N> {
     fn get_state(&self) -> &ElementState {
         &self.state.state
     }
@@ -128,27 +121,16 @@ impl Element for PacketView {
 
     fn update(&mut self) -> Option<ChangeEvent> {
         let mut reresolve = false;
-        let mut packet_count = match *self.update.borrow() {
-            true => self.packets.borrow().len(),
-            false => self.cached_packet_count,
-        };
 
-        if self.cleared.consume_changed() {
+        // TODO: Improve this logic so that existing elements are not replaced. This
+        // will make for a better experience when using the packet window
+        if *self.update.borrow() && self.show_pings.consume_changed() | self.packets.consume_changed() {
             self.state.elements.clear();
-            self.cached_packet_count = 0;
-            packet_count = 0;
-            reresolve = true;
-        }
 
-        if self.show_pings.consume_changed() {
-            self.state.elements.clear();
-            self.cached_packet_count = 0;
-            reresolve = true;
-        }
-
-        if self.cached_packet_count < packet_count {
             let show_pings = *self.show_pings.borrow();
-            let mut new_elements: Vec<ElementCell> = self.packets.borrow()[self.cached_packet_count..packet_count]
+            let mut new_elements: Vec<ElementCell> = self
+                .packets
+                .borrow()
                 .iter()
                 .filter(|entry| show_pings || !entry.is_ping())
                 .map(PacketEntry::to_element)
@@ -160,7 +142,6 @@ impl Element for PacketView {
             });
 
             self.state.elements.append(&mut new_elements);
-            self.cached_packet_count = packet_count;
             reresolve = true;
         }
 

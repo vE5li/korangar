@@ -811,10 +811,12 @@ fn main() {
                         UserEvent::OpenThemeViewerWindow => interface.open_theme_viewer_window(&mut focus_state),
                         #[cfg(feature = "debug")]
                         UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::new()),
-                        #[cfg(feature = "debug_network")]
+                        #[cfg(feature = "debug")]
                         UserEvent::OpenPacketWindow => {
-                            interface.open_window(&mut focus_state, &PacketWindow::new(networking_system.packets()))
+                            interface.open_window(&mut focus_state, &PacketWindow::new(networking_system.get_packets()))
                         }
+                        #[cfg(feature = "debug")]
+                        UserEvent::ClearPacketHistory => networking_system.clear_packet_history(),
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleUseDebugCamera => render_settings.toggle_use_debug_camera(),
                         #[cfg(feature = "debug")]

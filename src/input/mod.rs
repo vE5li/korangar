@@ -485,7 +485,7 @@ impl InputSystem {
                 events.push(UserEvent::OpenTimeWindow);
             }
 
-            #[cfg(feature = "debug_network")]
+            #[cfg(feature = "debug")]
             if self.get_key(VirtualKeyCode::P).pressed() {
                 events.push(UserEvent::OpenPacketWindow);
             }

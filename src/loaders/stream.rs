@@ -4,11 +4,11 @@ use super::version::InternalVersion;
 use super::Version;
 #[cfg(feature = "debug")]
 use crate::debug::*;
-#[cfg(feature = "debug_network")]
+#[cfg(feature = "debug")]
 use crate::interface::PacketEntry;
-#[cfg(feature = "debug_network")]
+#[cfg(feature = "debug")]
 use crate::interface::TrackedState;
-#[cfg(feature = "debug_network")]
+#[cfg(feature = "debug")]
 use crate::network::Packet;
 
 #[derive(new)]
@@ -18,7 +18,7 @@ pub struct ByteStream<'b> {
     offset: usize,
     #[new(default)]
     version: Option<InternalVersion>,
-    #[cfg(feature = "debug_network")]
+    #[cfg(feature = "debug")]
     #[new(default)]
     packet_history: Vec<PacketEntry>,
 }
@@ -86,19 +86,24 @@ impl<'b> ByteStream<'b> {
         self.offset
     }
 
-    #[cfg(feature = "debug_network")]
+    #[cfg(feature = "debug")]
     pub fn incoming_packet(&mut self, packet: &(impl Packet + 'static), name: &'static str, is_ping: bool) {
         self.packet_history.push(PacketEntry::new_incoming(packet, name, is_ping));
     }
 
-    #[cfg(feature = "debug_network")]
+    #[cfg(feature = "debug")]
     pub fn incoming_unknown_packet(&mut self, bytes: Vec<u8>) {
         self.packet_history.push(PacketEntry::new_incoming(&bytes, "UNKNOWN", false));
     }
 
-    #[cfg(feature = "debug_network")]
-    pub fn transfer_packet_history(&mut self, packet_history: &mut TrackedState<Vec<PacketEntry>>) {
-        packet_history.append(&mut self.packet_history);
+    #[cfg(feature = "debug")]
+    pub fn transfer_packet_history<const N: usize>(&mut self, packet_history: &mut TrackedState<RingBuffer<PacketEntry, N>>) {
+        if !self.packet_history.is_empty() {
+            packet_history.with_mut(|buffer, changed| {
+                self.packet_history.drain(..).for_each(|packet| buffer.push(packet));
+                changed()
+            });
+        }
     }
 
     #[cfg(feature = "debug")]

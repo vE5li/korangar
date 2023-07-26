@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use self::measurement::ActiveMeasurement;
 pub use self::measurement::Measurement;
-use self::ring_buffer::RingBuffer;
+pub use self::ring_buffer::RingBuffer;
 pub use self::statistics::{get_frame_by_index, get_number_of_saved_frames, get_statistics_data, FrameData, MeasurementStatistics};
 use crate::debug::*;
 

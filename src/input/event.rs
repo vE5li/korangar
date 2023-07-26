@@ -66,8 +66,10 @@ pub enum UserEvent {
     OpenThemeViewerWindow,
     #[cfg(feature = "debug")]
     OpenProfilerWindow,
-    #[cfg(feature = "debug_network")]
+    #[cfg(feature = "debug")]
     OpenPacketWindow,
+    #[cfg(feature = "debug")]
+    ClearPacketHistory,
     #[cfg(feature = "debug")]
     ToggleUseDebugCamera,
     #[cfg(feature = "debug")]

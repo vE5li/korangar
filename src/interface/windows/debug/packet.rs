@@ -2,61 +2,41 @@ use procedural::*;
 
 use crate::interface::*;
 
-pub struct PacketWindow {
-    packets: TrackedState<Vec<PacketEntry>>,
-    cleared: TrackedState<()>,
+pub struct PacketWindow<const N: usize> {
+    packets: Remote<RingBuffer<PacketEntry, N>>,
     show_pings: TrackedState<bool>,
     update: TrackedState<bool>,
 }
 
-impl PacketWindow {
+impl<const N: usize> PacketWindow<N> {
     pub const WINDOW_CLASS: &'static str = "network";
 
-    pub fn new(packets: TrackedState<Vec<PacketEntry>>) -> Self {
-        let cleared = TrackedState::new(());
+    pub fn new(packets: Remote<RingBuffer<PacketEntry, N>>) -> Self {
         let show_pings = TrackedState::new(false);
         let update = TrackedState::new(true);
 
         Self {
             packets,
-            cleared,
             show_pings,
             update,
         }
     }
 }
 
-impl PrototypeWindow for PacketWindow {
+impl<const N: usize> PrototypeWindow for PacketWindow<N> {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements = vec![
-            PacketView::new(
-                self.packets.clone(),
-                self.cleared.new_remote(),
-                self.show_pings.new_remote(),
-                self.update.new_remote(),
-            )
-            .wrap(),
-        ];
+        let elements = vec![PacketView::new(self.packets.clone(), self.show_pings.new_remote(), self.update.new_remote()).wrap()];
 
         let clear_selector = {
             let packets = self.packets.clone();
             move || !packets.borrow().is_empty()
         };
 
-        let clear_action = {
-            let mut packets = self.packets.clone();
-            let mut cleared = self.cleared.clone();
-
-            move || {
-                packets.clear();
-                cleared.update();
-                None
-            }
-        };
+        let clear_action = { move || Some(ClickAction::Event(UserEvent::ClearPacketHistory)) };
 
         let elements = vec![
             Button::default()

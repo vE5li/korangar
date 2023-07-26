@@ -4,7 +4,7 @@ mod dialog;
 mod equipment;
 mod expandable;
 mod inventory;
-#[cfg(feature = "debug_network")]
+#[cfg(feature = "debug")]
 mod packet;
 mod scroll;
 
@@ -21,7 +21,7 @@ pub use self::dialog::{DialogContainer, DialogElement};
 pub use self::equipment::EquipmentContainer;
 pub use self::expandable::Expandable;
 pub use self::inventory::InventoryContainer;
-#[cfg(feature = "debug_network")]
+#[cfg(feature = "debug")]
 pub use self::packet::{PacketEntry, PacketView};
 pub use self::scroll::ScrollView;
 use crate::input::MouseInputMode;

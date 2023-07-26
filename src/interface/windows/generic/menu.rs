@@ -67,7 +67,7 @@ impl PrototypeWindow for MenuWindow {
                 .with_event(UserEvent::OpenProfilerWindow)
                 .with_foreground_color(|theme| *theme.button.debug_foreground_color)
                 .wrap(),
-            #[cfg(feature = "debug_network")]
+            #[cfg(feature = "debug")]
             Button::default()
                 .with_text("packets")
                 .with_event(UserEvent::OpenPacketWindow)

@@ -34,6 +34,14 @@ impl<T, const N: usize> RingBuffer<T, N> {
             done: false,
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.iter().next().is_none()
+    }
+
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
 }
 
 pub struct RingBufferIter<'a, T, const N: usize> {

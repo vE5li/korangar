@@ -61,7 +61,7 @@ pub fn derive_packet_struct(
                     false => Err(format!("invalid signature 0x{:02x} 0x{:02x}", byte_stream.peek(0), byte_stream.peek(1))),
                 };
 
-                #[cfg(feature = "debug_network")]
+                #[cfg(feature = "debug")]
                 if let Ok(packet) = &result {
                     byte_stream.incoming_packet(packet, Self::PACKET_NAME, Self::IS_PING);
                 }

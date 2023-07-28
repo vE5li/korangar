@@ -48,12 +48,12 @@ impl<'b> ByteStream<'b> {
         self.version.unwrap()
     }
 
-    pub fn match_signature(&mut self, signature: [u8; 2]) -> bool {
+    pub fn match_signature(&mut self, signature: u16) -> bool {
         if self.data.len() - self.offset < 2 {
             return false;
         }
 
-        let signature_matches = self.data[self.offset] == signature[0] && self.data[self.offset + 1] == signature[1];
+        let signature_matches = self.data[self.offset..self.offset + 2] == signature.to_le_bytes();
 
         if signature_matches {
             self.offset += 2;

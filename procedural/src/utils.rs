@@ -4,16 +4,30 @@ use syn::{Attribute, Error, LitInt};
 
 #[derive(Clone)]
 pub struct PacketSignature {
-    pub first: LitInt,
-    pub second: LitInt,
+    pub signature: u16,
 }
 
 impl Parse for PacketSignature {
     fn parse(input: ParseStream) -> Result<Self, Error> {
-        let first = input.parse().expect("packet header must be two bytes long");
-        input.parse::<Punct>().expect("packet header must be seperated by commas");
-        let second = input.parse().expect("packet header must be two bytes long");
-        Ok(PacketSignature { first, second })
+        let signature: LitInt = input.parse().expect("packet header must be u16");
+        Ok(PacketSignature {
+            signature: signature.base10_parse::<u16>()?,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct Version {
+    pub major: LitInt,
+    pub minor: LitInt,
+}
+
+impl Parse for Version {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let major = input.parse().expect("version must be two bytes long");
+        input.parse::<Punct>().expect("version must be seperated by commas");
+        let minor = input.parse().expect("version must be two bytes long");
+        Ok(Version { major, minor })
     }
 }
 

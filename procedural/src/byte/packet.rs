@@ -20,7 +20,7 @@ pub fn derive_packet_struct(
         .expect("failed to parse packet header");
     let is_ping = get_unique_attribute(&mut attributes, "ping").is_some();
 
-    let (first, second) = (packet_signature.first, packet_signature.second);
+    let signature = packet_signature.signature;
     let (from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) = byte_convertable_helper(data_struct);
 
     let instanciate = match delimiter {
@@ -28,7 +28,7 @@ pub fn derive_packet_struct(
         proc_macro2::Delimiter::Parenthesis => quote!(Self ( #(#implemented_fields),* )),
         _ => panic!(),
     };
-    let to_bytes = quote!([&[#first, #second][..], #(#to_bytes_implementations),*].concat());
+    let to_bytes = quote!([&#signature.to_le_bytes()[..], #(#to_bytes_implementations),*].concat());
 
     quote! {
 
@@ -37,8 +37,8 @@ pub fn derive_packet_struct(
             const PACKET_NAME: &'static str = #packet_name;
             const IS_PING: bool = #is_ping;
 
-            fn header() -> [u8; 2] {
-                [#first, #second]
+            fn header() -> u16 {
+                #signature
             }
 
             // Temporary until serialization is always possible

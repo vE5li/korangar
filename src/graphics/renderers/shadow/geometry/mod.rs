@@ -37,6 +37,7 @@ use vulkano::shader::ShaderModule;
 use self::vertex_shader::ty::{Constants, Matrices};
 #[cfg(feature = "debug")]
 use crate::debug::*;
+use crate::graphics::renderers::shadow::ShadowSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -102,7 +103,7 @@ impl GeometryRenderer {
     }
 
     #[profile]
-    pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
+    fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
         #[cfg(feature = "debug")]
         let measurement = start_measurement("get descriptor layout");
 
@@ -188,11 +189,16 @@ impl GeometryRenderer {
     pub fn render(
         &self,
         render_target: &mut <ShadowRenderer as Renderer>::Target,
-        _camera: &dyn Camera,
+        camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
         textures: &[Texture],
         world_matrix: Matrix4<f32>,
+        time: f32,
     ) {
+        if render_target.bind_subrenderer(ShadowSubrenderer::Geometry) {
+            self.bind_pipeline(render_target, camera, time)
+        }
+
         if textures.is_empty() {
             return;
         }

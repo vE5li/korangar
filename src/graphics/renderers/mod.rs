@@ -410,10 +410,6 @@ impl DeferredRenderTarget {
         !already_bound
     }
 
-    pub fn unbind_subrenderer(&mut self) {
-        self.bound_subrenderer = None;
-    }
-
     pub fn lighting_pass(&mut self) {
         self.state.get_builder().next_subpass(SubpassContents::Inline).unwrap();
     }
@@ -565,11 +561,6 @@ impl PickerRenderTarget {
         !already_bound
     }
 
-    #[profile]
-    pub fn unbind_subrenderer(&mut self) {
-        self.bound_subrenderer = None;
-    }
-
     #[profile("finish buffer")]
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
@@ -645,11 +636,6 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
             bound_subrenderer,
             _phantom_data: Default::default(),
         }
-    }
-
-    #[profile]
-    pub fn unbind_subrenderer(&mut self) {
-        self.bound_subrenderer = None;
     }
 
     #[profile]

@@ -56,9 +56,19 @@ use crate::world::{BoundingBox, MarkerIdentifier};
 pub enum DeferredSubrenderer {
     Geometry,
     Entity,
+    Water,
+    AmbientLight,
+    DirectionalLight,
     PointLight,
+    WaterLight,
+    Indicator,
     #[cfg(feature = "debug")]
     BoundingBox,
+    #[cfg(feature = "debug")]
+    Buffers,
+    Overlay,
+    Rectangle,
+    Sprite,
 }
 
 pub struct DeferredRenderer {
@@ -274,12 +284,10 @@ impl DeferredRenderer {
         vertex_buffer: WaterVertexBuffer,
         day_timer: f32,
     ) {
-        render_target.unbind_subrenderer();
         self.water_renderer.render(render_target, camera, vertex_buffer, day_timer);
     }
 
     pub fn ambient_light(&self, render_target: &mut <Self as Renderer>::Target, color: Color) {
-        render_target.unbind_subrenderer();
         self.ambient_light_renderer.render(render_target, color);
     }
 
@@ -293,7 +301,6 @@ impl DeferredRenderer {
         color: Color,
         intensity: f32,
     ) {
-        render_target.unbind_subrenderer();
         self.directional_light_renderer
             .render(render_target, camera, light_image, light_matrix, direction, color, intensity);
     }
@@ -306,22 +313,42 @@ impl DeferredRenderer {
         color: Color,
         range: f32,
     ) {
-        if render_target.bind_subrenderer(DeferredSubrenderer::PointLight) {
-            self.point_light_renderer.bind_pipeline(render_target, camera);
-        }
-
         self.point_light_renderer.render(render_target, camera, position, color, range);
     }
 
     pub fn water_light(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
-        render_target.unbind_subrenderer();
         self.water_light_renderer.render(render_target, camera, water_level);
     }
 
-    #[profile]
     pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: ImageBuffer) {
-        render_target.unbind_subrenderer();
         self.overlay_renderer.render(render_target, interface_image);
+    }
+
+    pub fn render_rectangle(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        position: Vector2<f32>,
+        size: Vector2<f32>,
+        color: Color,
+    ) {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        self.rectangle_renderer.render(render_target, window_size, position, size, color);
+    }
+
+    pub fn render_bar(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        position: Vector2<f32>,
+        size: Vector2<f32>,
+        color: Color,
+        maximum: f32,
+        current: f32,
+    ) {
+        let bar_offset = Vector2::new(size.x / 2.0, 0.0);
+        let bar_size = Vector2::new((size.x / maximum) * current, size.y);
+
+        self.render_rectangle(render_target, position - bar_offset, bar_size, color);
     }
 
     pub fn render_sprite(
@@ -334,7 +361,6 @@ impl DeferredRenderer {
     ) {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
 
-        render_target.unbind_subrenderer();
         self.sprite_renderer
             .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, false);
     }
@@ -348,8 +374,6 @@ impl DeferredRenderer {
         font_size: f32,
     ) {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-
-        render_target.unbind_subrenderer();
 
         for character in text.as_bytes() {
             let index = (*character as usize).saturating_sub(31);
@@ -368,32 +392,31 @@ impl DeferredRenderer {
         }
     }
 
-    pub fn render_rectangle(
+    pub fn render_damage_text(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
+        text: &str,
+        mut position: Vector2<f32>,
         color: Color,
+        font_size: f32,
     ) {
         let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
 
-        render_target.unbind_subrenderer();
-        self.rectangle_renderer.render(render_target, window_size, position, size, color);
-    }
-
-    pub fn render_bar(
-        &self,
-        render_target: &mut <Self as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        color: Color,
-        maximum: f32,
-        current: f32,
-    ) {
-        let bar_offset = Vector2::new(size.x / 2.0, 0.0);
-        let bar_size = Vector2::new((size.x / maximum) * current, size.y);
-
-        self.render_rectangle(render_target, position - bar_offset, bar_size, color);
+        for character in text.as_bytes() {
+            let index = (*character as usize).saturating_sub(31);
+            self.sprite_renderer.render_indexed(
+                render_target,
+                self.font_map.clone(),
+                window_size,
+                position,
+                Vector2::new(font_size, font_size),
+                color,
+                10,
+                index,
+                true,
+            );
+            position.x += font_size / 2.0;
+        }
     }
 
     #[cfg(feature = "debug")]
@@ -424,11 +447,7 @@ impl DeferredRenderer {
         bounding_box: &BoundingBox,
         color: Color,
     ) {
-        if render_target.bind_subrenderer(DeferredSubrenderer::BoundingBox) {
-            self.box_renderer.bind_pipeline(render_target, camera);
-        }
-
-        self.box_renderer.render(render_target, transform, bounding_box, color);
+        self.box_renderer.render(render_target, camera, transform, bounding_box, color);
     }
 
     #[cfg(feature = "debug")]
@@ -440,7 +459,6 @@ impl DeferredRenderer {
         font_atlas: Arc<ImageView<StorageImage>>,
         render_settings: &RenderSettings,
     ) {
-        render_target.unbind_subrenderer();
         self.buffer_renderer
             .render(render_target, picker_image, light_image, font_atlas, render_settings);
     }
@@ -462,12 +480,8 @@ impl GeometryRendererTrait for DeferredRenderer {
     ) where
         Self: Renderer,
     {
-        if render_target.bind_subrenderer(DeferredSubrenderer::Geometry) {
-            self.geometry_renderer.bind_pipeline(render_target, camera, time);
-        }
-
         self.geometry_renderer
-            .render(render_target, camera, vertex_buffer, textures, world_matrix);
+            .render(render_target, camera, vertex_buffer, textures, world_matrix, time);
     }
 }
 
@@ -487,10 +501,6 @@ impl EntityRendererTrait for DeferredRenderer {
     ) where
         Self: Renderer,
     {
-        if render_target.bind_subrenderer(DeferredSubrenderer::Entity) {
-            self.entity_renderer.bind_pipeline(render_target, camera);
-        }
-
         self.entity_renderer.render(
             render_target,
             camera,
@@ -522,7 +532,6 @@ impl MarkerRenderer for DeferredRenderer {
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
             let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
 
-            render_target.unbind_subrenderer();
             self.sprite_renderer
                 .render_marker(render_target, marker_identifier, screen_position, screen_size, hovered);
         }
@@ -542,7 +551,6 @@ impl IndicatorRendererTrait for DeferredRenderer {
     ) where
         Self: Renderer,
     {
-        render_target.unbind_subrenderer();
         self.indicator_renderer.render_ground_indicator(
             render_target,
             camera,

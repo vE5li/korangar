@@ -23,6 +23,7 @@ use crate::network::EntityId;
 pub enum ShadowSubrenderer {
     Geometry,
     Entity,
+    Indicator,
 }
 
 pub struct ShadowRenderer {
@@ -121,12 +122,8 @@ impl GeometryRendererTrait for ShadowRenderer {
     ) where
         Self: Renderer,
     {
-        if render_target.bind_subrenderer(ShadowSubrenderer::Geometry) {
-            self.geometry_renderer.bind_pipeline(render_target, camera, time);
-        }
-
         self.geometry_renderer
-            .render(render_target, camera, vertex_buffer, textures, world_matrix);
+            .render(render_target, camera, vertex_buffer, textures, world_matrix, time);
     }
 }
 
@@ -146,10 +143,6 @@ impl EntityRendererTrait for ShadowRenderer {
     ) where
         Self: Renderer,
     {
-        if render_target.bind_subrenderer(ShadowSubrenderer::Entity) {
-            self.entity_renderer.bind_pipeline(render_target, camera);
-        }
-
         self.entity_renderer.render(
             render_target,
             camera,
@@ -177,7 +170,6 @@ impl IndicatorRendererTrait for ShadowRenderer {
     ) where
         Self: Renderer,
     {
-        render_target.unbind_subrenderer();
         self.indicator_renderer.render_ground_indicator(
             render_target,
             camera,

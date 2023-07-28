@@ -64,7 +64,7 @@ impl Particle for DamageNumber {
         let screen_position = screen_position / 2.0;
         let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
 
-        renderer.render_text(render_target, &self.damage_amount, final_position, Color::monochrome(255), 16.0);
+        renderer.render_damage_text(render_target, &self.damage_amount, final_position, Color::monochrome(255), 16.0);
     }
 }
 

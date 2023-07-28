@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
+use procedural::profile;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -41,6 +42,7 @@ unsafe impl bytemuck::Zeroable for Matrices {}
 unsafe impl bytemuck::Pod for Matrices {}
 
 use self::vertex_shader::ty::{Constants, Matrices};
+use super::DeferredSubrenderer;
 use crate::graphics::*;
 
 pub struct EntityRenderer {
@@ -79,6 +81,7 @@ impl EntityRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -105,7 +108,8 @@ impl EntityRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -129,6 +133,7 @@ impl EntityRenderer {
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
+    #[profile("render entity")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -141,6 +146,10 @@ impl EntityRenderer {
         cell_position: Vector2<usize>,
         mirror: bool,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::Entity) {
+            self.bind_pipeline(render_target, camera);
+        }
+
         let image_dimensions = Vector2::<u32>::from(texture.image().dimensions().width_height());
         let size = Vector2::new(
             image_dimensions.x as f32 * scale.x / 10.0,

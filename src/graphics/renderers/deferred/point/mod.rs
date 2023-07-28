@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::Vector3;
+use procedural::profile;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -32,6 +33,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::ty::{Constants, Matrices};
+use super::DeferredSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -72,6 +74,7 @@ impl PointLightRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -94,7 +97,8 @@ impl PointLightRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -119,6 +123,7 @@ impl PointLightRenderer {
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
+    #[profile("render point light")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -127,6 +132,10 @@ impl PointLightRenderer {
         color: Color,
         range: f32,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::PointLight) {
+            self.bind_pipeline(render_target, camera);
+        }
+
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, 10.0 * (range / 0.05).ln());
 
         if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 && camera.distance_to(position) > range {

@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::Vector2;
+use procedural::profile;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
@@ -28,6 +29,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
+use super::PickerSubrenderer;
 use crate::graphics::*;
 use crate::world::MarkerIdentifier;
 
@@ -54,6 +56,7 @@ impl MarkerRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -75,6 +78,12 @@ impl MarkerRenderer {
             .unwrap()
     }
 
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render marker")]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,
@@ -82,6 +91,10 @@ impl MarkerRenderer {
         screen_size: Vector2<f32>,
         marker_identifier: MarkerIdentifier,
     ) {
+        if render_target.bind_subrenderer(PickerSubrenderer::Marker) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
         let picker_target = PickerTarget::Marker(marker_identifier);
 
@@ -94,7 +107,6 @@ impl MarkerRenderer {
         render_target
             .state
             .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0)
             .unwrap();

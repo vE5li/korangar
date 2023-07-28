@@ -19,6 +19,7 @@ mod fragment_shader {
 use std::iter;
 use std::sync::Arc;
 
+use procedural::profile;
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -32,6 +33,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Matrices;
+use super::PickerSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Matrices {}
@@ -70,6 +72,7 @@ impl TileRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -93,7 +96,17 @@ impl TileRenderer {
             .unwrap()
     }
 
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render tiles")]
     pub fn render(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
+        if render_target.bind_subrenderer(PickerSubrenderer::Tile) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 

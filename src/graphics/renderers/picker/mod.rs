@@ -29,6 +29,9 @@ use crate::world::MarkerIdentifier;
 pub enum PickerSubrenderer {
     Geometry,
     Entity,
+    Tile,
+    #[cfg(feature = "debug")]
+    Marker,
 }
 
 pub struct PickerRenderer {
@@ -115,7 +118,6 @@ impl PickerRenderer {
     }
 
     pub fn render_tiles(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
-        render_target.unbind_subrenderer();
         self.tile_renderer.render(render_target, camera, vertex_buffer);
     }
 }
@@ -136,10 +138,6 @@ impl GeometryRendererTrait for PickerRenderer {
     ) where
         Self: Renderer,
     {
-        if render_target.bind_subrenderer(PickerSubrenderer::Geometry) {
-            self.geometry_renderer.bind_pipeline(render_target, camera);
-        }
-
         self.geometry_renderer
             .render(render_target, camera, vertex_buffer, textures, world_matrix);
     }
@@ -161,10 +159,6 @@ impl EntityRendererTrait for PickerRenderer {
     ) where
         Self: Renderer,
     {
-        if render_target.bind_subrenderer(PickerSubrenderer::Entity) {
-            self.entity_renderer.bind_pipeline(render_target, camera);
-        }
-
         self.entity_renderer.render(
             render_target,
             camera,
@@ -197,7 +191,6 @@ impl MarkerRendererTrait for PickerRenderer {
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
             let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
 
-            render_target.unbind_subrenderer();
             self.marker_renderer
                 .render(render_target, screen_position, screen_size, marker_identifier);
         }

@@ -22,6 +22,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
+use procedural::profile;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
@@ -34,6 +35,7 @@ use vulkano::sampler::{Filter, Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
+use super::InterfaceSubrenderer;
 use crate::graphics::*;
 use crate::loaders::FontLoader;
 
@@ -73,6 +75,7 @@ impl TextRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -99,6 +102,12 @@ impl TextRenderer {
             .unwrap()
     }
 
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render text")]
     pub fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
@@ -109,6 +118,10 @@ impl TextRenderer {
         color: Color,
         font_size: f32,
     ) -> f32 {
+        if render_target.bind_subrenderer(InterfaceSubrenderer::Text) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -126,7 +139,6 @@ impl TextRenderer {
         render_target
             .state
             .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
 
         character_layout.iter().for_each(|(texture_coordinates, position, color)| {

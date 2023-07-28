@@ -19,6 +19,7 @@ mod fragment_shader {
 use std::iter;
 use std::sync::Arc;
 
+use procedural::profile;
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -33,6 +34,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
+use super::DeferredSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -73,6 +75,7 @@ impl WaterRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -110,6 +113,12 @@ impl WaterRenderer {
             .unwrap()
     }
 
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render water")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -117,6 +126,10 @@ impl WaterRenderer {
         vertex_buffer: WaterVertexBuffer,
         day_timer: f32,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::Water) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -139,7 +152,6 @@ impl WaterRenderer {
         render_target
             .state
             .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
             .bind_vertex_buffers(0, vertex_buffer)

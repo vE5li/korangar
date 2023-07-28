@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::Matrix4;
+use procedural::profile;
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -35,6 +36,7 @@ use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
+use crate::graphics::renderers::picker::PickerSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -86,6 +88,7 @@ impl GeometryRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport, wireframe: bool) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader, wireframe);
     }
@@ -110,7 +113,8 @@ impl GeometryRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -133,14 +137,19 @@ impl GeometryRenderer {
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
+    #[profile("render geometry")]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,
-        _camera: &dyn Camera,
+        camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
         textures: &[Texture],
         world_matrix: Matrix4<f32>,
     ) {
+        if render_target.bind_subrenderer(PickerSubrenderer::Geometry) {
+            self.bind_pipeline(render_target, camera);
+        }
+
         if textures.is_empty() {
             return;
         }

@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector3};
+use procedural::profile;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -33,6 +34,7 @@ use vulkano::sampler::{Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::ty::{Constants, Matrices};
+use super::DeferredSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -77,6 +79,7 @@ impl DirectionalLightRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -99,6 +102,12 @@ impl DirectionalLightRenderer {
             .unwrap()
     }
 
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render directional light")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -109,6 +118,10 @@ impl DirectionalLightRenderer {
         color: Color,
         intensity: f32,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::DirectionalLight) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -140,7 +153,6 @@ impl DirectionalLightRenderer {
         render_target
             .state
             .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0)

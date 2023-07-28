@@ -31,6 +31,7 @@ use vulkano::sampler::{Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::ty::Constants;
+use super::ShadowSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -75,6 +76,11 @@ impl IndicatorRenderer {
     }
 
     #[profile]
+    fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render ground indicator")]
     pub fn render_ground_indicator(
         &self,
         render_target: &mut <ShadowRenderer as Renderer>::Target,
@@ -85,6 +91,10 @@ impl IndicatorRenderer {
         lower_left: Vector3<f32>,
         lower_right: Vector3<f32>,
     ) {
+        if render_target.bind_subrenderer(ShadowSubrenderer::Indicator) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -108,8 +118,6 @@ impl IndicatorRenderer {
         render_target
             .state
             .get_builder()
-            // TODO: If this gets called more than once per frame we should bind before rendering
-            .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0)

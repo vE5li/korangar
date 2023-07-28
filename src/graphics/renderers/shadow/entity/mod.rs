@@ -34,6 +34,7 @@ use vulkano::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
+use super::ShadowSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -99,7 +100,7 @@ impl EntityRenderer {
     }
 
     #[profile]
-    pub fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
+    fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -150,6 +151,10 @@ impl EntityRenderer {
         cell_position: Vector2<usize>,
         mirror: bool,
     ) {
+        if render_target.bind_subrenderer(ShadowSubrenderer::Entity) {
+            self.bind_pipeline(render_target, camera);
+        }
+
         let image_dimensions = Vector2::<u32>::from(texture.image().dimensions().width_height());
         let size = Vector2::new(
             image_dimensions.x as f32 * scale.x / 10.0,

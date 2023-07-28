@@ -21,6 +21,13 @@ use super::IntoFormat;
 use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, Texture};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
+#[derive(PartialEq, Eq)]
+pub enum InterfaceSubrenderer {
+    Rectangle,
+    Sprite,
+    Text,
+}
+
 pub struct InterfaceRenderer {
     memory_allocator: Arc<MemoryAllocator>,
     font_loader: Rc<RefCell<FontLoader>>,
@@ -215,5 +222,5 @@ impl IntoFormat for InterfaceFormat {
 }
 
 impl Renderer for InterfaceRenderer {
-    type Target = SingleRenderTarget<InterfaceFormat, (), ClearColorValue>;
+    type Target = SingleRenderTarget<InterfaceFormat, InterfaceSubrenderer, ClearColorValue>;
 }

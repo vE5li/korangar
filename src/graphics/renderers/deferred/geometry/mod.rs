@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::Matrix4;
+use procedural::profile;
 use vulkano::buffer::{BufferAccess, BufferUsage};
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -38,6 +39,7 @@ use vulkano::shader::ShaderModule;
 
 use self::fragment_shader::SpecializationConstants;
 use self::vertex_shader::ty::{Constants, Matrices};
+use crate::graphics::renderers::deferred::DeferredSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -109,6 +111,7 @@ impl GeometryRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(
         &mut self,
         device: Arc<Device>,
@@ -171,7 +174,8 @@ impl GeometryRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -195,14 +199,20 @@ impl GeometryRenderer {
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
+    #[profile("render geometry")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        _camera: &dyn Camera,
+        camera: &dyn Camera,
         vertex_buffer: ModelVertexBuffer,
         textures: &[Texture],
         world_matrix: Matrix4<f32>,
+        time: f32,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::Geometry) {
+            self.bind_pipeline(render_target, camera, time);
+        }
+
         if textures.is_empty() {
             return;
         }

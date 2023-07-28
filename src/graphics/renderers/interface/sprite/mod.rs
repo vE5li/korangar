@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
+use procedural::profile;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
@@ -32,6 +33,7 @@ use vulkano::sampler::{Filter, Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
+use super::InterfaceSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -72,6 +74,7 @@ impl SpriteRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -96,6 +99,11 @@ impl SpriteRenderer {
             .render_pass(subpass)
             .build(device)
             .unwrap()
+    }
+
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
     }
 
     fn build(
@@ -135,13 +143,13 @@ impl SpriteRenderer {
         render_target
             .state
             .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0)
             .unwrap();
     }
 
+    #[profile("render sprite")]
     pub fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
@@ -153,6 +161,10 @@ impl SpriteRenderer {
         color: Color,
         smooth: bool,
     ) {
+        if render_target.bind_subrenderer(InterfaceSubrenderer::Sprite) {
+            self.bind_pipeline(render_target);
+        }
+
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
         let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);

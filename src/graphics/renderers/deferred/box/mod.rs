@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
+use procedural::profile;
 use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
@@ -33,6 +34,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::{Constants, Matrices};
+use super::DeferredSubrenderer;
 use crate::graphics::*;
 use crate::world::{BoundingBox, Model};
 
@@ -154,6 +156,7 @@ impl BoxRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -179,7 +182,8 @@ impl BoxRenderer {
             .unwrap()
     }
 
-    pub fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let layout = self.pipeline.layout().clone();
         let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
 
@@ -204,13 +208,19 @@ impl BoxRenderer {
             .bind_index_buffer(self.index_buffer.clone());
     }
 
+    #[profile("render bounding box")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        camera: &dyn Camera,
         transform: &Transform,
         bounding_box: &BoundingBox,
         color: Color,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::BoundingBox) {
+            self.bind_pipeline(render_target, camera);
+        }
+
         let layout = self.pipeline.layout().clone();
 
         let world_matrix = Model::bounding_box_matrix(bounding_box, transform);

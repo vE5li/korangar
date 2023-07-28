@@ -20,6 +20,7 @@ use std::iter;
 use std::sync::Arc;
 
 use cgmath::Vector2;
+use procedural::profile;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::color_blend::ColorBlendState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
@@ -29,6 +30,7 @@ use vulkano::render_pass::Subpass;
 use vulkano::shader::ShaderModule;
 
 use self::vertex_shader::ty::Constants;
+use super::DeferredSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
@@ -54,6 +56,7 @@ impl RectangleRenderer {
         }
     }
 
+    #[profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -76,6 +79,12 @@ impl RectangleRenderer {
             .unwrap()
     }
 
+    #[profile]
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
+        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    }
+
+    #[profile("render rectangle")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -84,6 +93,10 @@ impl RectangleRenderer {
         screen_size: Vector2<f32>,
         color: Color,
     ) {
+        if render_target.bind_subrenderer(DeferredSubrenderer::Rectangle) {
+            self.bind_pipeline(render_target);
+        }
+
         let layout = self.pipeline.layout().clone();
 
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
@@ -99,7 +112,6 @@ impl RectangleRenderer {
         render_target
             .state
             .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0)
             .unwrap();

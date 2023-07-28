@@ -14,7 +14,7 @@ pub use self::login::LoginSettings;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Color, ColorBGRA, ColorRGBA};
-use crate::interface::{CharacterSelectionWindow, ElementCell, PrototypeElement, TrackedState};
+use crate::interface::{CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, PrototypeElement, TrackedState};
 #[cfg(feature = "debug")]
 use crate::interface::{PacketEntry, Remote};
 use crate::loaders::{ByteConvertable, ByteStream, FixedByteSize};
@@ -2062,7 +2062,7 @@ impl PrototypeElement for UnknownPacket {
             }
         };
 
-        crate::interface::ElementWrap::wrap(crate::interface::Expandable::new(display, elements, false))
+        Expandable::new(display, elements, false).wrap()
     }
 }
 

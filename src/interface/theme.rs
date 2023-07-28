@@ -37,7 +37,7 @@ impl Default for ButtonTheme {
             disabled_foreground_color: Mutable::new(Color::monochrome(140)),
             debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            icon_offset: MutableRange::new(Vector2::new(7.0, 2.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
+            icon_offset: MutableRange::new(Vector2::new(7.0, 2.5), Vector2::zero(), Vector2::new(20.0, 20.0)),
             icon_size: MutableRange::new(Vector2::new(10.0, 10.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
             icon_text_offset: MutableRange::new(Vector2::new(20.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
@@ -370,18 +370,57 @@ impl Default for IndicatorTheme {
     }
 }
 
+#[derive(Default)]
+pub struct ThemeSelector;
+
+impl PrototypeElement for ThemeSelector {
+    fn to_element(&self, display: String) -> ElementCell {
+        let theme_name = Rc::new(RefCell::new("".to_owned()));
+        let name_action = Box::new(move || Some(ClickAction::FocusNext(FocusMode::FocusNext)));
+
+        let load_action = {
+            let theme_name = theme_name.clone();
+
+            Box::new(move || {
+                let mut taken_name = String::new();
+                let mut theme_name = theme_name.borrow_mut();
+                std::mem::swap(&mut taken_name, &mut theme_name);
+
+                let file_name = format!("client/themes/{}.ron", taken_name);
+
+                Some(ClickAction::Event(UserEvent::SetThemeFile(file_name)))
+            })
+        };
+
+        let elements = vec![
+            InputField::<40>::new(theme_name, "theme name", name_action, dimension!(75%)).wrap(),
+            Button::default()
+                .with_text("load")
+                .with_event(load_action)
+                .with_width(dimension!(!))
+                .wrap(),
+            Button::default()
+                .with_text("save theme")
+                .with_event(UserEvent::SaveTheme)
+                .with_width(dimension!(50%))
+                .wrap(),
+            Button::default()
+                .with_text("reload theme")
+                .with_event(UserEvent::ReloadTheme)
+                .with_width(dimension!(!))
+                .wrap(),
+        ];
+
+        Expandable::new(display, elements, false).wrap()
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, PrototypeWindow)]
 #[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
 pub struct Theme {
-    //#[skip_element]
-    //button_0: EventButton<"reload theme", ReloadeTheme>,
-    //#[skip_element]
-    //button_1: EventButton<"save theme", SaveTheme>,
-    // or:
-    //control_panel: ThemeControlPanel,
-    #[event_button("reload theme", ReloadTheme)]
-    #[event_button("save theme", SaveTheme)]
+    #[serde(skip)]
+    pub theme_selector: ThemeSelector,
     pub button: ButtonTheme,
     pub window: WindowTheme,
     pub expandable: ExpandableTheme,

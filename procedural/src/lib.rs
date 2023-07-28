@@ -137,7 +137,7 @@ pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
     }
 }
 
-#[proc_macro_derive(PrototypeElement, attributes(name, hidden_element, event_button))]
+#[proc_macro_derive(PrototypeElement, attributes(name, hidden_element))]
 pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     let DeriveInput {
         ident,
@@ -154,7 +154,7 @@ pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> Interface
     }
 }
 
-#[proc_macro_derive(PrototypeWindow, attributes(name, hidden_element, event_button, window_title, window_class))]
+#[proc_macro_derive(PrototypeWindow, attributes(name, hidden_element, window_title, window_class))]
 pub fn derive_prototype_window(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     let DeriveInput {
         ident,

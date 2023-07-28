@@ -679,8 +679,12 @@ fn main() {
                             interface.open_window(&mut focus_state, &GraphicsSettingsWindow::new(present_mode_info))
                         }
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&mut focus_state, &AudioSettingsWindow::default()),
-                        UserEvent::ReloadTheme => interface.reload_theme(),
+                        UserEvent::SetThemeFile(theme_file) => {
+                            interface.set_theme_file(theme_file);
+                            interface.reload_theme();
+                        }
                         UserEvent::SaveTheme => interface.save_theme(),
+                        UserEvent::ReloadTheme => interface.reload_theme(),
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot) {
                                 Ok((character_information, map_name)) => {

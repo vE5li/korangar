@@ -104,16 +104,20 @@ impl Interface {
         }
     }
 
-    #[profile]
-    pub fn reload_theme(&mut self) {
-        if self.theme.reload(&self.interface_settings.theme_file) {
-            self.reresolve = true;
-        }
+    pub fn set_theme_file(&mut self, theme_file: String) {
+        self.interface_settings.theme_file = theme_file;
     }
 
     #[profile]
     pub fn save_theme(&self) {
         self.theme.save(&self.interface_settings.theme_file);
+    }
+
+    #[profile]
+    pub fn reload_theme(&mut self) {
+        if self.theme.reload(&self.interface_settings.theme_file) {
+            self.reresolve = true;
+        }
     }
 
     pub fn get_theme(&self) -> &Theme {

@@ -70,7 +70,12 @@ impl<const N: usize> PacketView<N> {
         let weak_self = None;
         let elements = {
             let packets = packets.borrow();
-            packets.iter().map(PacketEntry::to_element).collect()
+            let show_pings = *show_pings.borrow();
+            packets
+                .iter()
+                .filter(|entry| show_pings || !entry.is_ping())
+                .map(PacketEntry::to_element)
+                .collect()
         };
 
         Self {

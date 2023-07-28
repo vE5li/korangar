@@ -73,12 +73,12 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
 
         let version_smaller = get_unique_attribute(&mut field.attrs, "version_smaller")
             .map(|attribute| attribute.parse_args().expect("failed to parse version"))
-            .map(|version: PacketSignature| (version.first, version.second))
+            .map(|version: Version| (version.major, version.minor))
             .map(|(major, minor)| quote!(smaller(#major, #minor)));
 
         let version_equals_or_above = get_unique_attribute(&mut field.attrs, "version_equals_or_above")
             .map(|attribute| attribute.parse_args().expect("failed to parse version"))
-            .map(|version: PacketSignature| (version.first, version.second))
+            .map(|version: Version| (version.major, version.minor))
             .map(|(major, minor)| quote!(equals_or_above(#major, #minor)));
 
         assert!(

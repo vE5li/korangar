@@ -62,20 +62,13 @@ impl<'b> ByteStream<'b> {
         signature_matches
     }
 
-    pub fn slice(&mut self, count: usize) -> Vec<u8> {
-        let mut value = Vec::new();
+    pub fn slice(&mut self, count: usize) -> &[u8] {
+        assert!(self.offset + count <= self.data.len(), "byte stream is shorter than expected");
 
-        for _index in 0..count {
-            let byte = self.next();
-            value.push(byte);
-        }
+        let start_index = self.offset;
+        self.offset += count;
 
-        value
-    }
-
-    pub fn remaining_bytes(&mut self) -> Vec<u8> {
-        // temporary ?
-        self.slice(self.data.len() - self.offset)
+        &self.data[start_index..self.offset]
     }
 
     pub fn skip(&mut self, count: usize) {
@@ -87,13 +80,14 @@ impl<'b> ByteStream<'b> {
     }
 
     #[cfg(feature = "debug")]
-    pub fn incoming_packet(&mut self, packet: &(impl Packet + 'static), name: &'static str, is_ping: bool) {
-        self.packet_history.push(PacketEntry::new_incoming(packet, name, is_ping));
+    pub fn remaining_bytes(&mut self) -> Vec<u8> {
+        self.slice(self.data.len() - self.offset).into_iter().copied().collect()
     }
 
     #[cfg(feature = "debug")]
-    pub fn incoming_unknown_packet(&mut self, bytes: Vec<u8>) {
-        self.packet_history.push(PacketEntry::new_incoming(&bytes, "UNKNOWN", false));
+    pub fn incoming_packet<T: Packet + Clone + 'static>(&mut self, packet: &T) {
+        self.packet_history
+            .push(PacketEntry::new_incoming(packet, T::PACKET_NAME, T::IS_PING));
     }
 
     #[cfg(feature = "debug")]

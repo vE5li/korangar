@@ -116,6 +116,7 @@ auto trait NoPrototype {}
 impl<T> !NoPrototype for std::sync::Arc<T> {}
 impl<T> !NoPrototype for Option<T> {}
 impl<T, const N: usize> !NoPrototype for [T; N] {}
+impl<T> !NoPrototype for &[T] {}
 impl<T> !NoPrototype for Vec<T> {}
 impl<T> !NoPrototype for Rc<T> {}
 
@@ -164,6 +165,18 @@ impl<T: PrototypeElement> PrototypeElement for Option<T> {
         let elements = vec![StaticLabel::new(display).wrap(), StringValue::new("none".to_string()).wrap()];
 
         Container::new(elements).wrap()
+    }
+}
+
+impl<T: PrototypeElement> PrototypeElement for &[T] {
+    fn to_element(&self, display: String) -> ElementCell {
+        let elements = self
+            .iter()
+            .enumerate()
+            .map(|(index, item)| item.to_element(index.to_string()))
+            .collect();
+
+        Expandable::new(display, elements, false).wrap()
     }
 }
 

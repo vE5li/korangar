@@ -271,7 +271,7 @@ impl WorldPosition2 {
 impl ByteConvertable for WorldPosition2 {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         assert!(length_hint.is_none());
-        let coordinates: Vec<usize> = byte_stream.slice(6).into_iter().map(|byte| byte as usize).collect();
+        let coordinates: Vec<usize> = byte_stream.slice(6).iter().map(|byte| *byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
         let y1 = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
@@ -2027,6 +2027,45 @@ struct DisconnectResponsePacket {
     pub result: DisconnectResponseStatus,
 }
 
+#[derive(Clone, new)]
+struct UnknownPacket {
+    bytes: Vec<u8>,
+}
+
+impl Packet for UnknownPacket {
+    const IS_PING: bool = false;
+    const PACKET_NAME: &'static str = "^ff8030Unknown^000000";
+
+    fn header() -> u16 {
+        unimplemented!()
+    }
+
+    fn to_bytes(&self) -> Vec<u8> {
+        unimplemented!()
+    }
+}
+
+impl PrototypeElement for UnknownPacket {
+    fn to_element(&self, display: String) -> ElementCell {
+        let mut byte_stream = ByteStream::new(&self.bytes);
+
+        let elements = match self.bytes.len() > 2 {
+            true => {
+                let signature = u16::from_bytes(&mut byte_stream, None);
+                let header = format!("0x{:0>4x}", signature);
+                let data = &self.bytes[byte_stream.get_offset()..];
+
+                vec![header.to_element("header".to_owned()), data.to_element("data".to_owned())]
+            }
+            false => {
+                vec![self.bytes.to_element("data".to_owned())]
+            }
+        };
+
+        crate::interface::ElementWrap::wrap(crate::interface::Expandable::new(display, elements, false))
+    }
+}
+
 #[derive(new)]
 struct NetworkTimer {
     period: Duration,
@@ -2865,8 +2904,8 @@ impl NetworkingSystem {
                 } else {
                     #[cfg(feature = "debug")]
                     {
-                        let remaining_bytes = byte_stream.remaining_bytes();
-                        byte_stream.incoming_unknown_packet(remaining_bytes);
+                        let packet = UnknownPacket::new(byte_stream.remaining_bytes());
+                        byte_stream.incoming_packet(&packet);
                     }
 
                     break;

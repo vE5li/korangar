@@ -63,7 +63,7 @@ pub fn derive_packet_struct(
 
                 #[cfg(feature = "debug")]
                 if let Ok(packet) = &result {
-                    byte_stream.incoming_packet(packet, Self::PACKET_NAME, Self::IS_PING);
+                    byte_stream.incoming_packet(packet);
                 }
 
                 result

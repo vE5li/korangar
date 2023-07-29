@@ -58,7 +58,7 @@ impl MapLoader {
         let map_data_clone = map_data.clone();
 
         let ground_data = parse_ground_data(map_data.ground_file.as_str(), game_file_loader)?;
-        let mut gat_data = parse_gat_data(map_data.gat_file.unwrap().as_str(), game_file_loader)?;
+        let mut gat_data = parse_gat_data(map_data.gat_file.as_str(), game_file_loader)?;
 
         let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
         let water_level = -map_data.water_settings.water_level.unwrap();

@@ -1,3 +1,5 @@
+mod settings;
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -6,6 +8,7 @@ use derive_new::new;
 use procedural::*;
 use yazi::*;
 
+use self::settings::GameFileSettings;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::loaders::{ByteConvertable, ByteStream};
@@ -193,13 +196,40 @@ impl GameArchive {
     }
 }
 
-#[derive(Default)]
 pub struct GameFileLoader {
     archives: Vec<GameArchive>,
+    game_file_settings: GameFileSettings,
     lua_files: Vec<String>,
 }
 
+impl Default for GameFileLoader {
+    fn default() -> Self {
+        let game_file_settings = GameFileSettings::new();
+        let archives: Vec<GameArchive> = Vec::new();
+        let lua_files: Vec<String> = Vec::new();
+
+        Self {
+            archives,
+            game_file_settings,
+            lua_files,
+        }
+    }
+}
+
 impl GameFileLoader {
+    pub fn add_archives_from_settings(&mut self) {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new_dynamic(format!("load game files list from settings"));
+
+        for path in &self.game_file_settings.archives {
+            let game_archive = GameArchive::load(&path, &mut self.lua_files);
+            self.archives.insert(0, game_archive);
+        }
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+    }
+
     pub fn add_archive(&mut self, path: String) {
         let game_archive = GameArchive::load(&path, &mut self.lua_files);
         self.archives.insert(0, game_archive);

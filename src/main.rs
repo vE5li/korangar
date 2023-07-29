@@ -192,9 +192,7 @@ fn main() {
 
     let mut game_file_loader = GameFileLoader::default();
 
-    game_file_loader.add_archive("data.grf".to_string());
-    game_file_loader.add_archive("rdata.grf".to_string());
-    game_file_loader.add_archive("korangar.grf".to_string());
+    game_file_loader.add_archives_from_settings();
 
     // Patch precompiled lua files to lua 5.1 64 bit.
     game_file_loader.patch();

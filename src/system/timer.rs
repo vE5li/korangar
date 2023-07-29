@@ -103,6 +103,7 @@ mod test {
         let day_timer = game_timer.get_day_timer();
         let animation_timer = game_timer.get_animation_timer();
 
+        std::thread::sleep(std::time::Duration::from_millis(10));
         game_timer.update();
 
         let updated_day_timer = game_timer.get_day_timer();

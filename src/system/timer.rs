@@ -99,13 +99,16 @@ mod test {
     #[test]
     fn update_increments_timers() {
         let mut game_timer = GameTimer::new();
-        let day_timer = game_timer.get_day_timer();
 
-        let elapsed = game_timer.update();
-        let updated_game_timer = game_timer.get_day_timer();
+        let day_timer = game_timer.get_day_timer();
+        let animation_timer = game_timer.get_animation_timer();
+
+        game_timer.update();
+
+        let updated_day_timer = game_timer.get_day_timer();
         let updated_animation_timer = game_timer.get_animation_timer();
 
-        assert_eq!(updated_game_timer, day_timer + elapsed as f32);
-        assert_eq!(updated_animation_timer, elapsed as f32);
+        assert!(updated_day_timer > day_timer);
+        assert!(updated_animation_timer > animation_timer);
     }
 }

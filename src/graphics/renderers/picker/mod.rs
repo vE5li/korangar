@@ -2,6 +2,7 @@ mod entity;
 mod geometry;
 #[cfg(feature = "debug")]
 mod marker;
+mod target;
 mod tile;
 
 use std::sync::Arc;
@@ -17,6 +18,7 @@ use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
 #[cfg(feature = "debug")]
 use self::marker::MarkerRenderer;
+pub use self::target::PickerTarget;
 use self::tile::TileRenderer;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;

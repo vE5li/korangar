@@ -29,8 +29,8 @@ use vulkano::sync::{FenceSignalFuture, GpuFuture, SemaphoreSignalFuture};
 pub use self::deferred::DeferredRenderer;
 use self::deferred::DeferredSubrenderer;
 pub use self::interface::InterfaceRenderer;
-pub use self::picker::PickerRenderer;
 use self::picker::PickerSubrenderer;
+pub use self::picker::{PickerRenderer, PickerTarget};
 #[cfg(feature = "debug")]
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
@@ -116,84 +116,6 @@ pub trait IndicatorRenderer {
         lower_right: Vector3<f32>,
     ) where
         Self: Renderer;
-}
-
-#[derive(Debug)]
-pub enum PickerTarget {
-    Tile {
-        x: u16,
-        y: u16,
-    },
-    Entity(EntityId),
-    #[cfg(feature = "debug")]
-    Marker(MarkerIdentifier),
-}
-
-impl From<u32> for PickerTarget {
-    fn from(data: u32) -> Self {
-        if data >> 31 == 1 {
-            let x = ((data >> 16) as u16) ^ (1 << 15);
-            let y = data as u16;
-            return Self::Tile { x, y };
-        }
-
-        #[cfg(feature = "debug")]
-        if data >> 24 == 10 {
-            return Self::Marker(MarkerIdentifier::Object(data as usize & 0xfff));
-        }
-
-        #[cfg(feature = "debug")]
-        if data >> 24 == 11 {
-            return Self::Marker(MarkerIdentifier::LightSource(data as usize & 0xfff));
-        }
-
-        #[cfg(feature = "debug")]
-        if data >> 24 == 12 {
-            return Self::Marker(MarkerIdentifier::SoundSource(data as usize & 0xfff));
-        }
-
-        #[cfg(feature = "debug")]
-        if data >> 24 == 13 {
-            return Self::Marker(MarkerIdentifier::EffectSource(data as usize & 0xfff));
-        }
-
-        #[cfg(feature = "debug")]
-        if data >> 24 == 14 {
-            return Self::Marker(MarkerIdentifier::Entity(data as usize & 0xfff));
-        }
-
-        let entity_id = match data >> 24 == 5 {
-            true => data ^ (5 << 24),
-            false => data,
-        };
-
-        Self::Entity(EntityId(entity_id))
-    }
-}
-
-impl From<PickerTarget> for u32 {
-    fn from(picker_target: PickerTarget) -> Self {
-        match picker_target {
-            PickerTarget::Tile { x, y } => {
-                let mut encoded = ((x as u32) << 16) | y as u32;
-                encoded |= 1 << 31;
-                encoded
-            }
-            PickerTarget::Entity(EntityId(entity_id)) => match entity_id >> 24 == 0 {
-                true => entity_id | (5 << 24),
-                false => entity_id,
-            },
-            #[cfg(feature = "debug")]
-            PickerTarget::Marker(marker_identifier) => match marker_identifier {
-                MarkerIdentifier::Object(index) => (10 << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::LightSource(index) => (11 << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::SoundSource(index) => (12 << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::EffectSource(index) => (13 << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::Entity(index) => (14 << 24) | (index as u32 & 0xfff),
-                _ => panic!(),
-            },
-        }
-    }
 }
 
 #[cfg(feature = "debug")]

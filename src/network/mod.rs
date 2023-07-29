@@ -1897,8 +1897,10 @@ pub enum EquipPosition {
     ShadowRightAccessory,
     #[numeric_value(2097152)]
     ShadowLeftAccessory,
-    #[numeric_value(34)]
+    #[numeric_value(136)]
     LeftRightAccessory,
+    #[numeric_value(34)]
+    LeftRightHand,
     #[numeric_value(3145728)]
     ShadowLeftRightAccessory,
 }
@@ -1936,6 +1938,7 @@ impl EquipPosition {
             EquipPosition::ShadowRightAccessory => "shadow right accessory",
             EquipPosition::ShadowLeftAccessory => "shadow left accessory",
             EquipPosition::LeftRightAccessory => "accessory",
+            EquipPosition::LeftRightHand => "two hand weapon",
             EquipPosition::ShadowLeftRightAccessory => "shadow accessory",
         }
     }

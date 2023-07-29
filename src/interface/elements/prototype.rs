@@ -120,6 +120,7 @@ impl<T> !NoPrototype for &[T] {}
 impl<T> !NoPrototype for Vec<T> {}
 impl<T> !NoPrototype for Rc<T> {}
 
+impl NoPrototype for &str {}
 impl NoPrototype for String {}
 impl NoPrototype for Ipv4Addr {}
 

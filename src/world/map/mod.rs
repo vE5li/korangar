@@ -3,6 +3,7 @@ mod tile;
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
+#[cfg(feature = "debug")]
 use option_ext::OptionExt;
 use procedural::profile;
 
@@ -73,6 +74,7 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
     }
 }
 
+#[cfg(feature = "debug")]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MarkerIdentifier {
     Object(usize),
@@ -83,6 +85,7 @@ pub enum MarkerIdentifier {
     Entity(usize),
 }
 
+#[cfg(feature = "debug")]
 impl MarkerIdentifier {
     pub const SIZE: f32 = 1.5;
 }

@@ -231,7 +231,9 @@ impl GameFileLoader {
     }
 
     pub fn patch(&mut self) {
-        use lunify::{unify, Format, LunifyError, Settings};
+        #[cfg(feature = "debug")]
+        use lunify::LunifyError;
+        use lunify::{unify, Format, Settings};
 
         if Path::new(LUA_GRF_FILE_NAME).exists() {
             return;
@@ -250,11 +252,11 @@ impl GameFileLoader {
         for file_name in lua_files {
             let bytes = match self.get(&file_name) {
                 Ok(bytes) => bytes,
-                Err(error) => {
+                Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
                         print_debug!(
-                            "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {error:?}",
+                            "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {_error:?}",
                             YELLOW,
                             NONE,
                             MAGENTA,
@@ -274,11 +276,11 @@ impl GameFileLoader {
                 // pre-compiled binary but rather a source file, so we can safely ignore it.
                 #[cfg(feature = "debug")]
                 Err(LunifyError::IncorrectSignature) => total_count -= 1,
-                Err(error) => {
+                Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
                         print_debug!(
-                            "[{}warning{}] error upcasting {}{file_name}{}: {error:?}",
+                            "[{}warning{}] error upcasting {}{file_name}{}: {_error:?}",
                             YELLOW,
                             NONE,
                             MAGENTA,

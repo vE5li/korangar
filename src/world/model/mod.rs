@@ -38,6 +38,7 @@ impl Model {
             .render_geometry(render_target, renderer, camera, root_transform, client_tick, time);
     }
 
+    #[cfg(feature = "debug")]
     pub fn bounding_box_matrix(bounding_box: &BoundingBox, transform: &Transform) -> Matrix4<f32> {
         let size = bounding_box.size() / 2.0;
         let scale = size.zip(transform.scale, f32::mul);

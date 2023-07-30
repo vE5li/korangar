@@ -51,7 +51,7 @@ impl ProfilerThread {
 }
 
 pub const SAVED_FRAME_COUNT: usize = 128;
-pub const ROOT_MEASUREMENT_NAME: &str = "main loop";
+pub const ROOT_MEASUREMENT_NAME: &str = "total";
 
 #[derive(Default)]
 pub struct Profiler {

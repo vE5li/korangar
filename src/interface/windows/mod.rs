@@ -4,6 +4,7 @@ mod cache;
 mod character;
 #[cfg(feature = "debug")]
 mod debug;
+mod friends;
 mod generic;
 mod mutable;
 mod prototype;
@@ -17,6 +18,7 @@ pub use self::cache::*;
 pub use self::character::*;
 #[cfg(feature = "debug")]
 pub use self::debug::*;
+pub use self::friends::*;
 pub use self::generic::*;
 pub use self::mutable::*;
 pub use self::prototype::PrototypeWindow;

@@ -39,6 +39,14 @@ pub enum UserEvent {
     CloseDialog(EntityId),
     ChooseDialogOption(EntityId, i8),
     MoveItem(ItemMove),
+    RejectFriendRequest {
+        account_id: AccountId,
+        character_id: CharacterId,
+    },
+    AcceptFriendRequest {
+        account_id: AccountId,
+        character_id: CharacterId,
+    },
     #[cfg(feature = "debug")]
     ToggleFrustumCulling,
     #[cfg(feature = "debug")]

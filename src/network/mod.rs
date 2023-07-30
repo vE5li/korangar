@@ -104,6 +104,7 @@ pub enum NetworkEvent {
     ChangeJob(AccountId, u32),
     SetPlayerPosition(Vector2<usize>),
     Disconnect,
+    FriendRequest(Friend),
 }
 
 pub struct ChatMessage {
@@ -2030,6 +2031,87 @@ struct DisconnectResponsePacket {
     pub result: DisconnectResponseStatus,
 }
 
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+pub struct Friend {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    #[length_hint(24)]
+    pub name: String,
+}
+
+impl FixedByteSize for Friend {
+    fn size_in_bytes() -> usize {
+        32
+    }
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0202)]
+struct AddFriendPacket {
+    #[length_hint(24)]
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0201)]
+struct FriendListPacket {
+    #[packet_length]
+    pub packet_length: u16,
+    #[repeating_remaining]
+    pub friends: Vec<Friend>,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0207)]
+struct FriendRequestPacket {
+    pub friend: Friend,
+}
+
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[numeric_value(u32)]
+enum FriendRequestResponse {
+    Reject,
+    Accept,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0208)]
+struct FriendRequestResponsePacket {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    pub response: FriendRequestResponse,
+    #[new(default)]
+    pub unknown: [u8; 3],
+}
+
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[numeric_type(u16)]
+enum FriendRequestResult {
+    Accepted,
+    Rejected,
+    OwnFriendListFull,
+    OtherFriendListFull,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0209)]
+struct FriendRequestResultPacket {
+    pub result: FriendRequestResult,
+    pub friend: Friend,
+}
+
+impl FriendRequestResultPacket {
+    pub fn into_message(self) -> String {
+        // Messages taken from rAthena
+        match self.result {
+            FriendRequestResult::Accepted => format!("You have become friends with {}.", self.friend.name),
+            FriendRequestResult::Rejected => format!("{} does not want to be friends with you.", self.friend.name),
+            FriendRequestResult::OwnFriendListFull => "Your Friend List is full.".to_owned(),
+            FriendRequestResult::OtherFriendListFull => format!("{}'s Friend List is full.", self.friend.name),
+        }
+    }
+}
+
 #[derive(Clone, new)]
 struct UnknownPacket {
     bytes: Vec<u8>,
@@ -2700,6 +2782,31 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(RequestUnequipItemPacket::new(item_index));
     }
 
+    pub fn add_friend(&mut self, name: String) {
+        if name.len() > 24 {
+            print_debug!("[{RED}error{NONE}] friend name {MAGENTA}{name}{NONE} is too long",);
+            return;
+        }
+
+        self.send_packet_to_map_server(AddFriendPacket::new(name));
+    }
+
+    pub fn reject_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) {
+        self.send_packet_to_map_server(FriendRequestResponsePacket::new(
+            account_id,
+            character_id,
+            FriendRequestResponse::Reject,
+        ));
+    }
+
+    pub fn accept_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) {
+        self.send_packet_to_map_server(FriendRequestResponsePacket::new(
+            account_id,
+            character_id,
+            FriendRequestResponse::Accept,
+        ));
+    }
+
     #[profile]
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
@@ -2904,6 +3011,13 @@ impl NetworkingSystem {
                             events.push(NetworkEvent::ChatMessage(chat_message));
                         }
                     }
+                } else if let Ok(_) = FriendListPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = FriendRequestPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::FriendRequest(packet.friend));
+                } else if let Ok(packet) = FriendRequestResultPacket::try_from_bytes(&mut byte_stream) {
+                    let color = Color::rgb(220, 200, 30);
+                    let chat_message = ChatMessage::new(packet.into_message(), color);
+                    events.push(NetworkEvent::ChatMessage(chat_message));
                 } else {
                     #[cfg(feature = "debug")]
                     {

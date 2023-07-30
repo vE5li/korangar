@@ -623,6 +623,7 @@ fn main() {
                             start_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
                             directional_shadow_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
                         }
+                        NetworkEvent::FriendRequest(friend) => interface.open_window(&mut focus_state, &FriendRequestWindow::new(friend)),
                     }
                 }
 
@@ -785,6 +786,14 @@ fn main() {
                             }
                             _ => {}
                         },
+                        UserEvent::RejectFriendRequest { account_id, character_id } => {
+                            networking_system.reject_friend_request(account_id, character_id);
+                            interface.close_window_with_class(&mut focus_state, FriendRequestWindow::WINDOW_CLASS);
+                        }
+                        UserEvent::AcceptFriendRequest { account_id, character_id } => {
+                            networking_system.accept_friend_request(account_id, character_id);
+                            interface.close_window_with_class(&mut focus_state, FriendRequestWindow::WINDOW_CLASS);
+                        }
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleFrustumCulling => render_settings.toggle_frustum_culling(),
                         #[cfg(feature = "debug")]

@@ -2112,6 +2112,22 @@ impl FriendRequestResultPacket {
     }
 }
 
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement, FixedByteSize)]
+struct ReputationEntry {
+    pub reputation_type: u64,
+    pub points: i64,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0b8d)]
+struct ReputationPacket {
+    #[packet_length]
+    pub packet_length: u16,
+    pub success: u8,
+    #[repeating_remaining]
+    pub entries: Vec<ReputationEntry>,
+}
+
 #[derive(Clone, new)]
 struct UnknownPacket {
     bytes: Vec<u8>,
@@ -3018,6 +3034,7 @@ impl NetworkingSystem {
                     let color = Color::rgb(220, 200, 30);
                     let chat_message = ChatMessage::new(packet.into_message(), color);
                     events.push(NetworkEvent::ChatMessage(chat_message));
+                } else if let Ok(_) = ReputationPacket::try_from_bytes(&mut byte_stream) {
                 } else {
                     #[cfg(feature = "debug")]
                     {

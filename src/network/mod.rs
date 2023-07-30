@@ -2800,6 +2800,7 @@ impl NetworkingSystem {
 
     pub fn add_friend(&mut self, name: String) {
         if name.len() > 24 {
+            #[cfg(feature = "debug")]
             print_debug!("[{RED}error{NONE}] friend name {MAGENTA}{name}{NONE} is too long",);
             return;
         }

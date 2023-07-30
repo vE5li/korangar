@@ -1,7 +1,7 @@
 use cgmath::Vector2;
 
 use crate::interface::ItemMove;
-use crate::network::{CharacterId, EntityId};
+use crate::network::{AccountId, CharacterId, EntityId};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

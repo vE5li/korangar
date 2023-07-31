@@ -680,6 +680,7 @@ fn main() {
                             interface.open_window(&mut focus_state, &GraphicsSettingsWindow::new(present_mode_info))
                         }
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&mut focus_state, &AudioSettingsWindow::default()),
+                        UserEvent::OpenFriendsWindow => interface.open_window(&mut focus_state, &networking_system.friends_window()),
                         UserEvent::SetThemeFile(theme_file) => {
                             interface.set_theme_file(theme_file);
                             interface.reload_theme();
@@ -786,6 +787,12 @@ fn main() {
                             }
                             _ => {}
                         },
+                        UserEvent::AddFriend(name) => {
+                            networking_system.add_friend(name);
+                        }
+                        UserEvent::RemoveFriend { account_id, character_id } => {
+                            networking_system.remove_friend(account_id, character_id);
+                        }
                         UserEvent::RejectFriendRequest { account_id, character_id } => {
                             networking_system.reject_friend_request(account_id, character_id);
                             interface.close_window_with_class(&mut focus_state, FriendRequestWindow::WINDOW_CLASS);

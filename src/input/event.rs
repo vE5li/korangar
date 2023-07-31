@@ -21,6 +21,7 @@ pub enum UserEvent {
     OpenEquipmentWindow,
     OpenGraphicsSettingsWindow,
     OpenAudioSettingsWindow,
+    OpenFriendsWindow,
     SetThemeFile(String),
     SaveTheme,
     ReloadTheme,
@@ -39,6 +40,11 @@ pub enum UserEvent {
     CloseDialog(EntityId),
     ChooseDialogOption(EntityId, i8),
     MoveItem(ItemMove),
+    AddFriend(String),
+    RemoveFriend {
+        account_id: AccountId,
+        character_id: CharacterId,
+    },
     RejectFriendRequest {
         account_id: AccountId,
         character_id: CharacterId,

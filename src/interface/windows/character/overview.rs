@@ -32,6 +32,10 @@ impl PrototypeWindow for CharacterOverviewWindow {
                 .with_text("equipment")
                 .with_event(UserEvent::OpenEquipmentWindow)
                 .wrap(),
+            Button::default()
+                .with_text("friends")
+                .with_event(UserEvent::OpenFriendsWindow)
+                .wrap(),
             Button::default().with_text("menu").with_event(UserEvent::OpenMenuWindow).wrap(),
         ];
 

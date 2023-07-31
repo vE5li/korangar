@@ -3,6 +3,7 @@ mod default;
 mod dialog;
 mod equipment;
 mod expandable;
+mod friends;
 mod inventory;
 #[cfg(feature = "debug")]
 mod packet;
@@ -20,6 +21,7 @@ pub use self::default::Container;
 pub use self::dialog::{DialogContainer, DialogElement};
 pub use self::equipment::EquipmentContainer;
 pub use self::expandable::Expandable;
+pub use self::friends::FriendView;
 pub use self::inventory::InventoryContainer;
 #[cfg(feature = "debug")]
 pub use self::packet::{PacketEntry, PacketView};

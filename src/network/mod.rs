@@ -19,7 +19,9 @@ use crate::graphics::{Color, ColorBGRA, ColorRGBA};
 use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::PacketWindow;
-use crate::interface::{CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, PrototypeElement, TrackedState, WeakElementCell};
+use crate::interface::{
+    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, WeakElementCell,
+};
 use crate::loaders::{ByteConvertable, ByteStream, FixedByteSize};
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
@@ -2055,6 +2057,20 @@ struct AddFriendPacket {
     pub name: String,
 }
 
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0203)]
+struct RemoveFriendPacket {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x020a)]
+struct NotifyFriendRemovedPacket {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+}
+
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x0201)]
 struct FriendListPacket {
@@ -2087,7 +2103,7 @@ struct FriendRequestResponsePacket {
     pub unknown: [u8; 3],
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, PartialEq, Eq, ByteConvertable, PrototypeElement)]
 #[numeric_type(u16)]
 enum FriendRequestResult {
     Accepted,
@@ -2205,6 +2221,7 @@ pub struct NetworkingSystem {
     login_data: Option<LoginData>,
     characters: TrackedState<Vec<CharacterInformation>>,
     move_request: TrackedState<Option<usize>>,
+    friend_list: TrackedState<Vec<(Friend, UnsafeCell<Option<WeakElementCell>>)>>,
     slot_count: usize,
     login_keep_alive_timer: NetworkTimer,
     character_keep_alive_timer: NetworkTimer,
@@ -2231,6 +2248,7 @@ impl NetworkingSystem {
         let login_data = None;
         let characters = TrackedState::default();
         let move_request = TrackedState::default();
+        let friend_list = TrackedState::default();
         let slot_count = 0;
         let login_keep_alive_timer = NetworkTimer::new(Duration::from_secs(58));
         let character_keep_alive_timer = NetworkTimer::new(Duration::from_secs(10));
@@ -2247,11 +2265,12 @@ impl NetworkingSystem {
             login_settings,
             login_stream,
             character_stream,
-            move_request,
             slot_count,
             login_data,
             map_stream,
             characters,
+            move_request,
+            friend_list,
             login_keep_alive_timer,
             character_keep_alive_timer,
             map_keep_alive_timer,
@@ -2396,6 +2415,10 @@ impl NetworkingSystem {
 
     pub fn character_selection_window(&self) -> CharacterSelectionWindow {
         CharacterSelectionWindow::new(self.characters.clone(), self.move_request.clone(), self.slot_count)
+    }
+
+    pub fn friends_window(&self) -> FriendsWindow {
+        FriendsWindow::new(self.friend_list.new_remote())
     }
 
     pub fn log_out(&mut self) -> Result<(), String> {
@@ -2825,10 +2848,15 @@ impl NetworkingSystem {
         if name.len() > 24 {
             #[cfg(feature = "debug")]
             print_debug!("[{RED}error{NONE}] friend name {MAGENTA}{name}{NONE} is too long",);
+
             return;
         }
 
         self.send_packet_to_map_server(AddFriendPacket::new(name));
+    }
+
+    pub fn remove_friend(&mut self, account_id: AccountId, character_id: CharacterId) {
+        self.send_packet_to_map_server(RemoveFriendPacket::new(account_id, character_id));
     }
 
     pub fn reject_friend_request(&mut self, account_id: AccountId, character_id: CharacterId) {
@@ -3051,13 +3079,27 @@ impl NetworkingSystem {
                             events.push(NetworkEvent::ChatMessage(chat_message));
                         }
                     }
-                } else if let Ok(_) = FriendListPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = FriendListPacket::try_from_bytes(&mut byte_stream) {
+                    self.friend_list.with_mut(|friends, chaged| {
+                        *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();
+                        chaged();
+                    });
                 } else if let Ok(packet) = FriendRequestPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::FriendRequest(packet.friend));
                 } else if let Ok(packet) = FriendRequestResultPacket::try_from_bytes(&mut byte_stream) {
+                    if packet.result == FriendRequestResult::Accepted {
+                        self.friend_list.push((packet.friend.clone(), UnsafeCell::new(None)));
+                    }
+
                     let color = Color::rgb(220, 200, 30);
                     let chat_message = ChatMessage::new(packet.into_message(), color);
                     events.push(NetworkEvent::ChatMessage(chat_message));
+                } else if let Ok(packet) = NotifyFriendRemovedPacket::try_from_bytes(&mut byte_stream) {
+                    self.friend_list.with_mut(|friends, changed| {
+                        friends
+                            .retain(|(friend, _)| !(friend.account_id == packet.account_id && friend.character_id == packet.character_id));
+                        changed();
+                    });
                 } else if let Ok(_) = ReputationPacket::try_from_bytes(&mut byte_stream) {
                 } else {
                     #[cfg(feature = "debug")]

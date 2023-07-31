@@ -22,6 +22,9 @@ use crate::network::ClientTick;
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
 
+#[derive(Clone, Copy, Debug)]
+pub struct HotbarSlot(pub usize);
+
 #[derive(Default)]
 pub struct FocusState {
     focused_element: Option<WeakElementCell>,
@@ -468,6 +471,30 @@ impl InputSystem {
 
             if self.get_key(VirtualKeyCode::H).pressed() && shift_down {
                 events.push(UserEvent::ToggleShowInterface);
+            }
+
+            if self.get_key(VirtualKeyCode::J).pressed() {
+                events.push(UserEvent::CastSkill(HotbarSlot(0)));
+            }
+
+            if self.get_key(VirtualKeyCode::J).released() {
+                events.push(UserEvent::StopSkill(HotbarSlot(0)));
+            }
+
+            if self.get_key(VirtualKeyCode::L).pressed() {
+                events.push(UserEvent::CastSkill(HotbarSlot(1)));
+            }
+
+            if self.get_key(VirtualKeyCode::L).released() {
+                events.push(UserEvent::StopSkill(HotbarSlot(1)));
+            }
+
+            if self.get_key(VirtualKeyCode::U).pressed() {
+                events.push(UserEvent::CastSkill(HotbarSlot(2)));
+            }
+
+            if self.get_key(VirtualKeyCode::U).released() {
+                events.push(UserEvent::StopSkill(HotbarSlot(2)));
             }
 
             #[cfg(feature = "debug")]

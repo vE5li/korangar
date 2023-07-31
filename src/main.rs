@@ -37,6 +37,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Zero};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
+use network::SkillType;
 use procedural::debug_condition;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
@@ -56,9 +57,17 @@ use crate::input::{FocusState, InputSystem, UserEvent};
 use crate::interface::*;
 use crate::inventory::Inventory;
 use crate::loaders::*;
-use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
+use crate::network::{ChatMessage, EntityId, NetworkEvent, NetworkingSystem, SkillId, SkillLevel};
 use crate::system::{choose_physical_device, get_device_extensions, get_instance_extensions, get_layers, GameTimer};
 use crate::world::*;
+
+const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
+// FIX: temporary lookup for testing
+const SKILLS: &[(SkillId, SkillLevel, SkillType)] = &[
+    (SkillId(28), SkillLevel(10), SkillType::Support),
+    (SkillId(25), SkillLevel(1), SkillType::Ground),
+    (SkillId(2036), SkillLevel(5), SkillType::SelfCast),
+];
 
 fn main() {
     const DEFAULT_MAP: &str = "geffen";
@@ -787,6 +796,41 @@ fn main() {
                             }
                             _ => {}
                         },
+                        UserEvent::CastSkill(slot) => {
+                            let (skill_id, skill_level, skill_type) = SKILLS[slot.0];
+
+                            match skill_type {
+                                SkillType::Passive => {}
+                                SkillType::Attack => {
+                                    if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                                        networking_system.cast_skill(skill_id, skill_level, entity_id);
+                                    }
+                                }
+                                SkillType::Ground | SkillType::Trap => {
+                                    if let Some(PickerTarget::Tile { x, y }) = mouse_target {
+                                        networking_system.cast_ground_skill(skill_id, skill_level, x, y);
+                                    }
+                                }
+                                SkillType::SelfCast => match skill_id == ROLLING_CUTTER_ID {
+                                    true => networking_system.cast_channeling_skill(skill_id, skill_level, EntityId(2000009)),
+                                    false => networking_system.cast_skill(skill_id, skill_level, EntityId(2000009)),
+                                },
+                                SkillType::Support => {
+                                    if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                                        networking_system.cast_skill(skill_id, skill_level, entity_id);
+                                    } else {
+                                        networking_system.cast_skill(skill_id, skill_level, EntityId(2000009));
+                                    }
+                                }
+                            }
+                        }
+                        UserEvent::StopSkill(slot) => {
+                            let (skill_id, ..) = SKILLS[slot.0];
+
+                            if skill_id == ROLLING_CUTTER_ID {
+                                networking_system.stop_channeling_skill(skill_id);
+                            }
+                        }
                         UserEvent::AddFriend(name) => {
                             networking_system.add_friend(name);
                         }

@@ -41,6 +41,12 @@ pub struct PartyId(pub u32);
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct EntityId(pub u32);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct SkillId(pub u16);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct SkillLevel(pub u16);
+
 /// Item index is always actual index + 2.
 #[derive(Clone, Copy, Debug, PrototypeElement, FixedByteSize, PartialEq, Eq, Hash)]
 pub struct ItemIndex(u16);
@@ -1429,11 +1435,28 @@ impl From<MovingEntityAppearedPacket> for EntityData {
     }
 }
 
+#[derive(Clone, Copy, Debug, ByteConvertable, PrototypeElement)]
+#[numeric_type(u32)]
+pub enum SkillType {
+    #[numeric_value(0)]
+    Passive,
+    #[numeric_value(1)]
+    Attack,
+    #[numeric_value(2)]
+    Ground,
+    #[numeric_value(4)]
+    SelfCast,
+    #[numeric_value(16)]
+    Support,
+    #[numeric_value(32)]
+    Trap,
+}
+
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 struct SkillInformation {
-    pub skill_id: u16,
-    pub skill_type: u32,
-    pub skill_level: u16,
+    pub skill_id: SkillId,
+    pub skill_type: SkillType,
+    pub skill_level: SkillLevel,
     pub spell_point_cost: u16,
     pub attack_range: u16,
     #[length_hint(24)]
@@ -1461,7 +1484,7 @@ struct UpdateSkillTreePacket {
 struct HotkeyData {
     pub is_skill: u8,
     pub skill_id: u32,
-    pub quantity_or_skill_level: u16,
+    pub quantity_or_skill_level: SkillLevel,
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
@@ -1553,7 +1576,7 @@ struct DisplaySpecialEffectPacket {
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x09cb)]
 struct DisplaySkillEffectPacket {
-    pub skill_id: u16,
+    pub skill_id: SkillId,
     pub heal: u32,
     pub destination_entity_id: EntityId,
     pub source_entity_id: EntityId,
@@ -2045,6 +2068,95 @@ enum DisconnectResponseStatus {
 #[header(0x018b)]
 struct DisconnectResponsePacket {
     pub result: DisconnectResponseStatus,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0438)]
+struct UseSkillAtIdPacket {
+    pub skill_level: SkillLevel,
+    pub skill_id: SkillId,
+    pub target_id: EntityId,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0af4)]
+struct UseSkillOnGroundPacket {
+    pub skill_level: SkillLevel,
+    pub skill_id: SkillId,
+    pub target_x: u16,
+    pub target_y: u16,
+    #[new(default)]
+    pub unused: u8,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0b10)]
+struct StartUseSkillPacket {
+    pub skill_id: SkillId,
+    pub skill_level: SkillLevel,
+    pub target_id: EntityId,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement, new)]
+#[header(0x0b11)]
+struct EndUseSkillPacket {
+    pub skill_id: SkillId,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x07fb)]
+struct UseSkillSuccessPacket {
+    pub source_entity: EntityId,
+    pub destination_entity: EntityId,
+    pub x: u16,
+    pub y: u16,
+    pub skill_id: SkillId,
+    pub element: u32,
+    pub delay_time: u32,
+    pub disposable: u8,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0110)]
+struct ToUseSkillSuccessPacket {
+    pub skill_id: SkillId,
+    pub btype: i32,
+    pub item_id: ItemId,
+    pub flag: u8,
+    pub cause: u8,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x09ca)]
+struct NotifySkillUnitPacket {
+    pub lenght: u16,
+    pub creator_id: EntityId,
+    /// Confirm
+    pub skill_id: u32,
+    pub x: u16,
+    pub y: u16,
+    pub unit_id: EntityId,
+    pub range: u8,
+    pub visible: u8,
+    pub skill_level: u8,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0117)]
+struct NotifyGroundSkillPacket {
+    pub skill_id: SkillId,
+    /// Confirm
+    pub animation_id: u32,
+    pub level: SkillLevel,
+    pub x: u16,
+    pub y: u16,
+    pub start_time: ClientTick,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0120)]
+struct SkillDisappearPacket {
+    pub id: u32,
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
@@ -2863,6 +2975,22 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(RequestUnequipItemPacket::new(item_index));
     }
 
+    pub fn cast_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, entity_id: EntityId) {
+        self.send_packet_to_map_server(UseSkillAtIdPacket::new(skill_level, skill_id, entity_id));
+    }
+
+    pub fn cast_ground_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, x: u16, y: u16) {
+        self.send_packet_to_map_server(UseSkillOnGroundPacket::new(skill_level, skill_id, x, y));
+    }
+
+    pub fn cast_channeling_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, entity_id: EntityId) {
+        self.send_packet_to_map_server(StartUseSkillPacket::new(skill_id, skill_level, entity_id));
+    }
+
+    pub fn stop_channeling_skill(&mut self, skill_id: SkillId) {
+        self.send_packet_to_map_server(EndUseSkillPacket::new(skill_id));
+    }
+
     pub fn add_friend(&mut self, name: String) {
         if name.len() > 24 {
             #[cfg(feature = "debug")]
@@ -3098,6 +3226,11 @@ impl NetworkingSystem {
                             events.push(NetworkEvent::ChatMessage(chat_message));
                         }
                     }
+                } else if let Ok(_) = UseSkillSuccessPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = ToUseSkillSuccessPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = NotifySkillUnitPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = NotifyGroundSkillPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = SkillDisappearPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = FriendListPacket::try_from_bytes(&mut byte_stream) {
                     self.friend_list.with_mut(|friends, chaged| {
                         *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();

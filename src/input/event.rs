@@ -1,5 +1,6 @@
 use cgmath::Vector2;
 
+use super::HotbarSlot;
 use crate::interface::ItemMove;
 use crate::network::{AccountId, CharacterId, EntityId};
 #[cfg(feature = "debug")]
@@ -40,6 +41,8 @@ pub enum UserEvent {
     CloseDialog(EntityId),
     ChooseDialogOption(EntityId, i8),
     MoveItem(ItemMove),
+    CastSkill(HotbarSlot),
+    StopSkill(HotbarSlot),
     AddFriend(String),
     RemoveFriend {
         account_id: AccountId,

@@ -230,7 +230,7 @@ struct Packet180b {
     pub unknown: u16,
 }
 
-#[derive(Clone, Debug, new, PrototypeElement)]
+#[derive(Clone, Debug, PrototypeElement, new)]
 pub struct WorldPosition {
     pub x: usize,
     pub y: usize,
@@ -577,8 +577,7 @@ struct RequestPlayerMovePacket {
 struct RequestWarpToMapPacket {
     #[length_hint(16)]
     pub map_name: String,
-    pub x: u16,
-    pub y: u16,
+    pub position: Vector2<u16>,
 }
 
 /// Sent by the map server to the client.
@@ -597,8 +596,7 @@ struct EntityMovePacket {
 #[header(0x0088)]
 struct EntityStopMovePacket {
     pub entity_id: EntityId,
-    pub x: u16,
-    pub y: u16,
+    pub position: Vector2<u16>,
 }
 
 /// Sent by the map server to the client.
@@ -1200,10 +1198,8 @@ struct GlobalMessagePacket {
 #[header(0x0139)]
 struct RequestPlayerAttackFailedPacket {
     pub target_entity_id: EntityId,
-    pub target_x: u16,
-    pub target_y: u16,
-    pub x: u16,
-    pub y: u16,
+    pub target_position: Vector2<u16>,
+    pub position: Vector2<u16>,
     pub attack_range: u16,
 }
 
@@ -1269,8 +1265,7 @@ struct SwitchCharacterSlotResponsePacket {
 struct ChangeMapPacket {
     #[length_hint(16)]
     pub map_name: String,
-    pub x: u16,
-    pub y: u16,
+    pub position: Vector2<u16>,
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
@@ -2108,8 +2103,7 @@ struct EndUseSkillPacket {
 struct UseSkillSuccessPacket {
     pub source_entity: EntityId,
     pub destination_entity: EntityId,
-    pub x: u16,
-    pub y: u16,
+    pub position: Vector2<u16>,
     pub skill_id: SkillId,
     pub element: u32,
     pub delay_time: u32,
@@ -2133,8 +2127,7 @@ struct NotifySkillUnitPacket {
     pub creator_id: EntityId,
     /// Confirm
     pub skill_id: u32,
-    pub x: u16,
-    pub y: u16,
+    pub position: Vector2<u16>,
     pub unit_id: EntityId,
     pub range: u8,
     pub visible: u8,
@@ -2148,8 +2141,7 @@ struct NotifyGroundSkillPacket {
     /// Confirm
     pub animation_id: u32,
     pub level: SkillLevel,
-    pub x: u16,
-    pub y: u16,
+    pub position: Vector2<u16>,
     pub start_time: ClientTick,
 }
 
@@ -2927,7 +2919,10 @@ impl NetworkingSystem {
     }
 
     pub fn request_warp_to_map(&mut self, map_name: String, position: Vector2<usize>) {
-        self.send_packet_to_map_server(RequestWarpToMapPacket::new(map_name, position.x as u16, position.y as u16));
+        self.send_packet_to_map_server(RequestWarpToMapPacket::new(
+            map_name,
+            position.map(|component| component as u16),
+        ));
     }
 
     pub fn map_loaded(&mut self) {
@@ -3067,7 +3062,7 @@ impl NetworkingSystem {
                 } else if let Ok(packet) = ChangeMapPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::ChangeMap(
                         packet.map_name.replace(".gat", ""),
-                        Vector2::new(packet.x as usize, packet.y as usize),
+                        packet.position.map(|component| component as usize),
                     ));
                 } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddEntity(packet.into()));

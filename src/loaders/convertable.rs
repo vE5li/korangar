@@ -207,7 +207,7 @@ impl<T: ByteConvertable> ByteConvertable for Vec<T> {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         let length = length_hint.expect("vector requires a size hint");
         let data = byte_stream.slice(length);
-        let mut byte_stream = ByteStream::new(&data);
+        let mut byte_stream = ByteStream::new(data);
         let mut vector = Vec::new();
 
         while !byte_stream.is_empty() {
@@ -227,6 +227,12 @@ impl<T: ByteConvertable> ByteConvertable for Vector2<T> {
 
         Vector2::new(first, second)
     }
+
+    fn to_bytes(&self, _length_hint: Option<usize>) -> Vec<u8> {
+        let mut bytes = self.x.to_bytes(None);
+        bytes.append(&mut self.y.to_bytes(None));
+        bytes
+    }
 }
 
 impl<T: ByteConvertable> ByteConvertable for Vector3<T> {
@@ -238,6 +244,13 @@ impl<T: ByteConvertable> ByteConvertable for Vector3<T> {
         let third = T::from_bytes(byte_stream, None);
 
         Vector3::new(first, second, third)
+    }
+
+    fn to_bytes(&self, _length_hint: Option<usize>) -> Vec<u8> {
+        let mut bytes = self.x.to_bytes(None);
+        bytes.append(&mut self.y.to_bytes(None));
+        bytes.append(&mut self.z.to_bytes(None));
+        bytes
     }
 }
 
@@ -251,6 +264,14 @@ impl<T: ByteConvertable> ByteConvertable for Vector4<T> {
         let fourth = T::from_bytes(byte_stream, None);
 
         Vector4::new(first, second, third, fourth)
+    }
+
+    fn to_bytes(&self, _length_hint: Option<usize>) -> Vec<u8> {
+        let mut bytes = self.x.to_bytes(None);
+        bytes.append(&mut self.y.to_bytes(None));
+        bytes.append(&mut self.z.to_bytes(None));
+        bytes.append(&mut self.w.to_bytes(None));
+        bytes
     }
 }
 

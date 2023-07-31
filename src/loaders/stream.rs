@@ -1,3 +1,6 @@
+#[cfg(feature = "debug")]
+use std::cell::UnsafeCell;
+
 use derive_new::new;
 
 use super::version::InternalVersion;
@@ -8,6 +11,7 @@ use crate::debug::*;
 use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::TrackedState;
+use crate::interface::WeakElementCell;
 #[cfg(feature = "debug")]
 use crate::network::Packet;
 
@@ -91,10 +95,15 @@ impl<'b> ByteStream<'b> {
     }
 
     #[cfg(feature = "debug")]
-    pub fn transfer_packet_history<const N: usize>(&mut self, packet_history: &mut TrackedState<RingBuffer<PacketEntry, N>>) {
+    pub fn transfer_packet_history<const N: usize>(
+        &mut self,
+        packet_history: &mut TrackedState<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>,
+    ) {
         if !self.packet_history.is_empty() {
             packet_history.with_mut(|buffer, changed| {
-                self.packet_history.drain(..).for_each(|packet| buffer.push(packet));
+                self.packet_history
+                    .drain(..)
+                    .for_each(|packet| buffer.push((packet, UnsafeCell::new(None))));
                 changed()
             });
         }

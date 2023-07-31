@@ -1,3 +1,4 @@
+use std::cell::UnsafeCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Weak;
 
@@ -7,6 +8,39 @@ use procedural::*;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
+
+struct HiddenElement;
+
+impl Element for HiddenElement {
+    fn get_state(&self) -> &ElementState {
+        unimplemented!()
+    }
+
+    fn get_state_mut(&mut self) -> &mut ElementState {
+        unimplemented!()
+    }
+
+    fn resolve(&mut self, _placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+        unimplemented!()
+    }
+
+    fn render(
+        &self,
+        _render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        _render: &InterfaceRenderer,
+        _state_provider: &StateProvider,
+        _interface_settings: &InterfaceSettings,
+        _theme: &Theme,
+        _parent_position: Position,
+        _clip_size: ClipSize,
+        _hovered_element: Option<&dyn Element>,
+        _focused_element: Option<&dyn Element>,
+        _mouse_mode: &MouseInputMode,
+        _second_theme: bool,
+    ) {
+        unimplemented!()
+    }
+}
 
 enum Direction {
     Incoming,
@@ -58,31 +92,46 @@ impl PacketEntry {
 }
 
 pub struct PacketView<const N: usize> {
-    packets: Remote<RingBuffer<PacketEntry, N>>,
+    packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>,
     show_pings: Remote<bool>,
-    update: Remote<bool>,
     weak_self: Option<WeakElementCell>,
+    hidden_element: ElementCell,
     state: ContainerState,
 }
 
 impl<const N: usize> PacketView<N> {
-    pub fn new(packets: Remote<RingBuffer<PacketEntry, N>>, show_pings: Remote<bool>, update: Remote<bool>) -> Self {
+    pub fn new(packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>, show_pings: Remote<bool>) -> Self {
         let weak_self = None;
+        let hidden_element = HiddenElement.wrap();
         let elements = {
             let packets = packets.borrow();
             let show_pings = *show_pings.borrow();
+
             packets
                 .iter()
-                .filter(|entry| show_pings || !entry.is_ping())
-                .map(PacketEntry::to_element)
+                .filter_map(|(packet, linked_element)| {
+                    let show_packet = show_pings || !packet.is_ping();
+
+                    match show_packet {
+                        true => {
+                            let element = PacketEntry::to_element(packet);
+                            unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
+                            Some(element)
+                        }
+                        false => {
+                            unsafe { *linked_element.get() = Some(Rc::downgrade(&hidden_element)) };
+                            None
+                        }
+                    }
+                })
                 .collect()
         };
 
         Self {
             packets,
             show_pings,
-            update,
             weak_self,
+            hidden_element,
             state: ContainerState::new(elements),
         }
     }
@@ -127,27 +176,87 @@ impl<const N: usize> Element for PacketView<N> {
     fn update(&mut self) -> Option<ChangeEvent> {
         let mut reresolve = false;
 
-        // TODO: Improve this logic so that existing elements are not replaced. This
-        // will make for a better experience when using the packet window
-        if *self.update.borrow() && self.show_pings.consume_changed() | self.packets.consume_changed() {
-            self.state.elements.clear();
+        if self.show_pings.consume_changed() | self.packets.consume_changed() {
+            fn compare(linked_element: &UnsafeCell<Option<WeakElementCell>>, element: &ElementCell) -> bool {
+                let linked_element = unsafe { &*linked_element.get() };
+                let linked_element = linked_element.as_ref().map(|weak| weak.as_ptr());
+                linked_element.is_some_and(|pointer| pointer != Rc::downgrade(element).as_ptr())
+            }
 
-            let show_pings = *self.show_pings.borrow();
-            let mut new_elements: Vec<ElementCell> = self
+            // Remove elements of packets that are no longer in the list.
+            if let Some(first_visible_packet) = self
                 .packets
                 .borrow()
                 .iter()
-                .filter(|entry| show_pings || !entry.is_ping())
-                .map(PacketEntry::to_element)
-                .collect();
+                .find(|(_, linked_element)| compare(linked_element, &self.hidden_element))
+            {
+                let first_visible_element = unsafe { &*first_visible_packet.1.get() };
+                let first_visible_element = first_visible_element.as_ref().unwrap().as_ptr();
 
-            new_elements.iter().for_each(|element| {
-                let weak_element = Rc::downgrade(element);
-                element.borrow_mut().link_back(weak_element, self.weak_self.clone());
+                for _index in 0..self.state.elements.len() {
+                    if first_visible_element != Rc::downgrade(&self.state.elements[0]).as_ptr() {
+                        self.state.elements.remove(0);
+                        reresolve = true;
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                // This means that there are no visible packets at all, so remove every element.
+                self.state.elements.clear();
+                reresolve = true;
+            }
+
+            let show_pings = *self.show_pings.borrow();
+            let mut index = 0;
+
+            // Add or remove elements that need to be shown/hidden based on filtering. Also
+            // append new elements for packets that are new.
+            self.packets.borrow().iter().for_each(|(packet, linked_element)| {
+                // Getting here means thatt the packet was already processed once.
+                let show_packet = show_pings || !packet.is_ping();
+
+                if let Some(linked_element) = unsafe { &mut (*linked_element.get()) } {
+                    let was_hidden = linked_element.as_ptr() == Rc::downgrade(&self.hidden_element).as_ptr();
+
+                    // Packet was previously hidden but should be visible now.
+                    if show_packet && was_hidden {
+                        let element = PacketEntry::to_element(packet);
+                        *linked_element = Rc::downgrade(&element);
+                        element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
+
+                        self.state.elements.insert(index, element);
+                        reresolve = true;
+                    }
+
+                    // Packet was previously visible but now should be hidden.
+                    if !show_packet && !was_hidden {
+                        *linked_element = Rc::downgrade(&self.hidden_element);
+
+                        self.state.elements.remove(index);
+                        reresolve = true;
+                    }
+                } else {
+                    // Getting here means thatt the packet was newly added.
+                    match show_packet {
+                        true => {
+                            let element = PacketEntry::to_element(packet);
+                            unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
+                            element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
+
+                            self.state.elements.push(element);
+                            reresolve = true;
+                        }
+                        false => {
+                            unsafe { *linked_element.get() = Some(Rc::downgrade(&self.hidden_element)) };
+                        }
+                    }
+                }
+
+                if show_packet {
+                    index += 1;
+                }
             });
-
-            self.state.elements.append(&mut new_elements);
-            reresolve = true;
         }
 
         match reresolve {

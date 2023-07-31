@@ -1,5 +1,6 @@
 mod login;
 
+use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::io::prelude::*;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
@@ -14,9 +15,11 @@ pub use self::login::LoginSettings;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Color, ColorBGRA, ColorRGBA};
-use crate::interface::{CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, PrototypeElement, TrackedState};
 #[cfg(feature = "debug")]
-use crate::interface::{PacketEntry, Remote};
+use crate::interface::PacketEntry;
+#[cfg(feature = "debug")]
+use crate::interface::PacketWindow;
+use crate::interface::{CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, PrototypeElement, TrackedState, WeakElementCell};
 use crate::loaders::{ByteConvertable, ByteStream, FixedByteSize};
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement)]
@@ -2208,7 +2211,9 @@ pub struct NetworkingSystem {
     map_keep_alive_timer: NetworkTimer,
     player_name: String,
     #[cfg(feature = "debug")]
-    packet_history: TrackedState<RingBuffer<PacketEntry, 256>>,
+    update_packets: TrackedState<bool>,
+    #[cfg(feature = "debug")]
+    packet_history: TrackedState<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), 256>>,
 }
 
 impl NetworkingSystem {
@@ -2232,6 +2237,8 @@ impl NetworkingSystem {
         let map_keep_alive_timer = NetworkTimer::new(Duration::from_secs(4));
         let player_name = String::new();
         #[cfg(feature = "debug")]
+        let update_packets = TrackedState::new(true);
+        #[cfg(feature = "debug")]
         let packet_history = TrackedState::default();
 
         login_stream.set_read_timeout(Duration::from_secs(1).into()).unwrap();
@@ -2249,6 +2256,8 @@ impl NetworkingSystem {
             character_keep_alive_timer,
             map_keep_alive_timer,
             player_name,
+            #[cfg(feature = "debug")]
+            update_packets,
             #[cfg(feature = "debug")]
             packet_history,
         }
@@ -2330,7 +2339,7 @@ impl NetworkingSystem {
             .map_err(|_| "failed to send packet to character server")?;
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         let response = self.get_data_from_character_server();
 
@@ -2354,7 +2363,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(RequestCharacterListPacket::default());
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -2375,7 +2384,7 @@ impl NetworkingSystem {
         };
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         self.slot_count = character_server_login_success_packet.normal_slot_count as usize;
 
@@ -2401,15 +2410,35 @@ impl NetworkingSystem {
         Ok(())
     }
 
+    #[cfg(feature = "debug")]
+    fn update_packet_history(&mut self, byte_stream: &mut ByteStream) {
+        if *self.update_packets.borrow() {
+            byte_stream.transfer_packet_history(&mut self.packet_history);
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    fn new_outgoing<T>(&mut self, packet: &T)
+    where
+        T: Packet + 'static,
+    {
+        if *self.update_packets.borrow() {
+            self.packet_history.with_mut(|buffer, changed| {
+                buffer.push((
+                    PacketEntry::new_outgoing(packet, T::PACKET_NAME, T::IS_PING),
+                    UnsafeCell::new(None),
+                ));
+                changed()
+            });
+        }
+    }
+
     fn send_packet_to_login_server<T>(&mut self, packet: T)
     where
         T: Packet + 'static,
     {
         #[cfg(feature = "debug")]
-        self.packet_history.with_mut(|buffer, changed| {
-            buffer.push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
-            changed()
-        });
+        self.new_outgoing(&packet);
 
         let packet_bytes = packet.to_bytes();
         self.login_stream
@@ -2422,10 +2451,7 @@ impl NetworkingSystem {
         T: Packet + 'static,
     {
         #[cfg(feature = "debug")]
-        self.packet_history.with_mut(|buffer, changed| {
-            buffer.push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
-            changed()
-        });
+        self.new_outgoing(&packet);
 
         let packet_bytes = packet.to_bytes();
         let character_stream = self.character_stream.as_mut().expect("no character server connection");
@@ -2439,10 +2465,7 @@ impl NetworkingSystem {
         T: Packet + 'static,
     {
         #[cfg(feature = "debug")]
-        self.packet_history.with_mut(|buffer, changed| {
-            buffer.push(PacketEntry::new_outgoing(&packet, T::PACKET_NAME, T::IS_PING));
-            changed()
-        });
+        self.new_outgoing(&packet);
 
         let packet_bytes = packet.to_bytes();
         let map_stream = self.map_stream.as_mut().expect("no map server connection");
@@ -2541,7 +2564,7 @@ impl NetworkingSystem {
         let create_character_success_packet = CreateCharacterSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         self.characters.push(create_character_success_packet.character_information);
 
@@ -2584,7 +2607,7 @@ impl NetworkingSystem {
         CharacterDeletionSuccessPacket::try_from_bytes(&mut byte_stream).unwrap();
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         self.characters.retain(|character| character.character_id != character_id);
 
@@ -2657,7 +2680,7 @@ impl NetworkingSystem {
         ));
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         let character_information = self
             .characters
@@ -2735,7 +2758,7 @@ impl NetworkingSystem {
         }
 
         #[cfg(feature = "debug")]
-        byte_stream.transfer_packet_history(&mut self.packet_history);
+        self.update_packet_history(&mut byte_stream);
 
         self.move_request.take();
 
@@ -3048,10 +3071,7 @@ impl NetworkingSystem {
             }
 
             #[cfg(feature = "debug")]
-            {
-                let _ = crate::debug::start_measurement("transfer packet history");
-                byte_stream.transfer_packet_history(&mut self.packet_history);
-            }
+            self.update_packet_history(&mut byte_stream);
         }
 
         events
@@ -3066,7 +3086,7 @@ impl NetworkingSystem {
     }
 
     #[cfg(feature = "debug")]
-    pub fn get_packets(&self) -> Remote<RingBuffer<PacketEntry, 256>> {
-        self.packet_history.new_remote()
+    pub fn packet_window(&self) -> PacketWindow<256> {
+        PacketWindow::new(self.packet_history.new_remote(), self.update_packets.clone())
     }
 }

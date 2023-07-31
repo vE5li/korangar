@@ -1,9 +1,11 @@
+use std::cell::UnsafeCell;
+
 use procedural::*;
 
 use crate::interface::*;
 
 pub struct PacketWindow<const N: usize> {
-    packets: Remote<RingBuffer<PacketEntry, N>>,
+    packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>,
     show_pings: TrackedState<bool>,
     update: TrackedState<bool>,
 }
@@ -11,9 +13,8 @@ pub struct PacketWindow<const N: usize> {
 impl<const N: usize> PacketWindow<N> {
     pub const WINDOW_CLASS: &'static str = "network";
 
-    pub fn new(packets: Remote<RingBuffer<PacketEntry, N>>) -> Self {
+    pub fn new(packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>, update: TrackedState<bool>) -> Self {
         let show_pings = TrackedState::new(false);
-        let update = TrackedState::new(true);
 
         Self {
             packets,
@@ -29,7 +30,7 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements = vec![PacketView::new(self.packets.clone(), self.show_pings.new_remote(), self.update.new_remote()).wrap()];
+        let elements = vec![PacketView::new(self.packets.clone(), self.show_pings.new_remote()).wrap()];
 
         let clear_selector = {
             let packets = self.packets.clone();

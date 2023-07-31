@@ -825,9 +825,7 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenProfilerWindow => interface.open_window(&mut focus_state, &ProfilerWindow::new()),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenPacketWindow => {
-                            interface.open_window(&mut focus_state, &PacketWindow::new(networking_system.get_packets()))
-                        }
+                        UserEvent::OpenPacketWindow => interface.open_window(&mut focus_state, &networking_system.packet_window()),
                         #[cfg(feature = "debug")]
                         UserEvent::ClearPacketHistory => networking_system.clear_packet_history(),
                         #[cfg(feature = "debug")]

@@ -36,6 +36,9 @@ pub struct AccountId(pub u32);
 pub struct CharacterId(pub u32);
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
+pub struct PartyId(pub u32);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct EntityId(pub u32);
 
 /// Item index is always actual index + 2.
@@ -2131,6 +2134,14 @@ impl FriendRequestResultPacket {
     }
 }
 
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x02c6)]
+struct PartyInvitePacket {
+    pub party_id: PartyId,
+    #[length_hint(24)]
+    pub party_name: String,
+}
+
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement, FixedByteSize)]
 struct ReputationEntry {
     pub reputation_type: u64,
@@ -3100,6 +3111,7 @@ impl NetworkingSystem {
                             .retain(|(friend, _)| !(friend.account_id == packet.account_id && friend.character_id == packet.character_id));
                         changed();
                     });
+                } else if let Ok(_) = PartyInvitePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = ReputationPacket::try_from_bytes(&mut byte_stream) {
                 } else {
                     #[cfg(feature = "debug")]

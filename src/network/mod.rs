@@ -1081,6 +1081,14 @@ struct UpdateStatusPacket {
     pub status_type: StatusType,
 }
 
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0196)]
+struct StatusChangeSequencePacket {
+    pub index: u16,
+    pub id: u32,
+    pub state: u8,
+}
+
 /// Sent by the character server to the client when loading onto a new map.
 /// This packet is ignored by Korangar since all of the provided values are set
 /// again individually using the UpdateStatusPackets.
@@ -3112,6 +3120,7 @@ impl NetworkingSystem {
                         changed();
                     });
                 } else if let Ok(_) = PartyInvitePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = StatusChangeSequencePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = ReputationPacket::try_from_bytes(&mut byte_stream) {
                 } else {
                     #[cfg(feature = "debug")]

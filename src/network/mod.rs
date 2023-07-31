@@ -2414,7 +2414,7 @@ impl NetworkingSystem {
     }
 
     pub fn character_selection_window(&self) -> CharacterSelectionWindow {
-        CharacterSelectionWindow::new(self.characters.clone(), self.move_request.clone(), self.slot_count)
+        CharacterSelectionWindow::new(self.characters.new_remote(), self.move_request.new_remote(), self.slot_count)
     }
 
     pub fn friends_window(&self) -> FriendsWindow {

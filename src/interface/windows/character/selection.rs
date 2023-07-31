@@ -6,8 +6,8 @@ use crate::network::CharacterInformation;
 
 #[derive(new)]
 pub struct CharacterSelectionWindow {
-    characters: TrackedState<Vec<CharacterInformation>>,
-    move_request: TrackedState<Option<usize>>,
+    characters: Remote<Vec<CharacterInformation>>,
+    move_request: Remote<Option<usize>>,
     slot_count: usize,
 }
 
@@ -22,7 +22,7 @@ impl PrototypeWindow for CharacterSelectionWindow {
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
         let elements = (0..self.slot_count)
-            .map(|slot| CharacterPreview::new(self.characters.new_remote(), self.move_request.new_remote(), slot).wrap())
+            .map(|slot| CharacterPreview::new(self.characters.clone(), self.move_request.clone(), slot).wrap())
             .collect();
 
         WindowBuilder::default()

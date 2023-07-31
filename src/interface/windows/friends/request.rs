@@ -44,7 +44,7 @@ impl PrototypeWindow for FriendRequestWindow {
             // of the trait. This way we can open multiple windos of this type but we can still
             // close them with the class name.
             .with_class(Self::WINDOW_CLASS.to_owned())
-            .with_size(constraint!(200 > 250 < 300, ? < 80%))
+            .with_size(constraint!(250, ?))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

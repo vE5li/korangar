@@ -249,7 +249,7 @@ impl Common {
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(client_tick);
 
-        Self {
+        let mut common = Self {
             grid_position,
             position,
             entity_id,
@@ -265,7 +265,13 @@ impl Common {
             actions,
             details,
             animation_state,
+        };
+
+        if let Some(destination) = entity_data.destination {
+            common.move_from_to(map, entity_data.position, destination, client_tick);
         }
+
+        common
     }
 
     pub fn reload_sprite(

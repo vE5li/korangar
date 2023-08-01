@@ -1382,9 +1382,9 @@ pub struct EntityData {
 }
 
 impl EntityData {
-    pub fn from_character(character_information: CharacterInformation, position: Vector2<usize>) -> Self {
+    pub fn from_character(account_id: AccountId, character_information: CharacterInformation, position: Vector2<usize>) -> Self {
         Self {
-            entity_id: EntityId(character_information.character_id.0), // TODO: should not mix like that
+            entity_id: EntityId(account_id.0),
             movement_speed: character_information.movement_speed as u16,
             job: character_information.job as u16,
             position,
@@ -2762,7 +2762,7 @@ impl NetworkingSystem {
         Ok(())
     }
 
-    pub fn select_character(&mut self, slot: usize) -> Result<(CharacterInformation, String), String> {
+    pub fn select_character(&mut self, slot: usize) -> Result<(AccountId, CharacterInformation, String), String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new("select character");
 
@@ -2816,8 +2816,10 @@ impl NetworkingSystem {
         self.map_stream = Some(map_stream);
 
         let login_data = self.login_data.as_ref().unwrap();
+        let account_id = login_data.account_id;
+
         self.send_packet_to_map_server(MapServerLoginPacket::new(
-            login_data.account_id,
+            account_id,
             character_selection_success_packet.character_id,
             login_data.login_id1,
             ClientTick(100), // TODO: what is the logic here?
@@ -2841,6 +2843,7 @@ impl NetworkingSystem {
         timer.stop();
 
         Ok((
+            account_id,
             character_information,
             character_selection_success_packet.map_name.replace(".gat", ""),
         ))

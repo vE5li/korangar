@@ -594,14 +594,10 @@ fn main() {
                             player_inventory.update_equipped_position(index, equipped_position);
                         }
                         NetworkEvent::ChangeJob(account_id, job_id) => {
-                            let entity = entities.iter_mut().find(|entity| entity.with_account_id(account_id)).unwrap();
+                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id().0 == account_id.0).unwrap();
 
-                            let Entity::Player(player) = entity else {
-                                panic!();
-                            };
-
-                            player.set_job(job_id as usize);
-                            player.reload_sprite(&mut game_file_loader, &mut sprite_loader, &mut action_loader, &script_loader);
+                            entity.set_job(job_id as usize);
+                            entity.reload_sprite(&mut game_file_loader, &mut sprite_loader, &mut action_loader, &script_loader);
                         }
                         NetworkEvent::Disconnect => {
                             networking_system.disconnect_from_map_server();
@@ -695,7 +691,7 @@ fn main() {
                         UserEvent::ReloadTheme => interface.reload_theme(),
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot) {
-                                Ok((character_information, map_name)) => {
+                                Ok((account_id, character_information, map_name)) => {
                                     map = map_loader
                                         .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
                                         .unwrap();
@@ -706,6 +702,7 @@ fn main() {
                                         &mut action_loader,
                                         &script_loader,
                                         &map,
+                                        account_id,
                                         character_information,
                                         Vector2::zero(),
                                         client_tick,

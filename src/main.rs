@@ -57,7 +57,7 @@ use crate::input::{FocusState, InputSystem, UserEvent};
 use crate::interface::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
-use crate::network::{ChatMessage, EntityId, NetworkEvent, NetworkingSystem, SkillId};
+use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem, SkillId};
 use crate::system::{choose_physical_device, get_device_extensions, get_instance_extensions, get_layers, GameTimer};
 use crate::world::*;
 

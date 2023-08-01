@@ -2080,7 +2080,6 @@ struct RequestUnequipItemStatusPacket {
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-#[numeric_type(u8)]
 enum RestartType {
     Respawn,
     Disconnect,
@@ -2095,7 +2094,6 @@ struct RestartPacket {
 // TODO: check that this can be only 1 and 0, if not ByteConvertable should be
 // implemented manually
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement, PartialEq, Eq)]
-#[numeric_type(u8)]
 enum RestartResponseStatus {
     Nothing,
     Ok,
@@ -2251,6 +2249,22 @@ struct FriendListPacket {
     pub friends: Vec<Friend>,
 }
 
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+enum OnlineState {
+    Online,
+    Offline,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0206)]
+struct FriendOnlineStatusPacket {
+    pub account_id: AccountId,
+    pub character_id: CharacterId,
+    pub state: OnlineState,
+    #[length_hint(24)]
+    pub name: String,
+}
+
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x0207)]
 struct FriendRequestPacket {
@@ -2258,7 +2272,7 @@ struct FriendRequestPacket {
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-#[numeric_value(u32)]
+#[numeric_type(u32)]
 enum FriendRequestResponse {
     Reject,
     Accept,
@@ -2270,8 +2284,6 @@ struct FriendRequestResponsePacket {
     pub account_id: AccountId,
     pub character_id: CharacterId,
     pub response: FriendRequestResponse,
-    #[new(default)]
-    pub unknown: [u8; 3],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, ByteConvertable, PrototypeElement)]
@@ -3293,6 +3305,7 @@ impl NetworkingSystem {
                         *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();
                         chaged();
                     });
+                } else if let Ok(_) = FriendOnlineStatusPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = FriendRequestPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::FriendRequest(packet.friend));
                 } else if let Ok(packet) = FriendRequestResultPacket::try_from_bytes(&mut byte_stream) {

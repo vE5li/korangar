@@ -260,7 +260,7 @@ impl ModelLoader {
                 ..Default::default()
             },
             false,
-            vertices.into_iter(),
+            vertices,
         )
         .unwrap();
 

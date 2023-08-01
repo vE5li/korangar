@@ -995,7 +995,7 @@ pub enum StatusType {
 impl ByteConvertable for StatusType {
     fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
         let data = byte_stream.slice(length_hint.unwrap());
-        let mut byte_stream = ByteStream::new(&data);
+        let mut byte_stream = ByteStream::new(data);
 
         match u16::from_bytes(&mut byte_stream, None) {
             0 => Self::MovementSpeed(u32::from_bytes(&mut byte_stream, None)),

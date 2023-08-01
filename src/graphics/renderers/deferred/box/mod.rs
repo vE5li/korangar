@@ -141,8 +141,8 @@ impl BoxRenderer {
             ..BufferUsage::empty()
         };
 
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(&*memory_allocator, vertex_buffer_usage, false, vertices.into_iter()).unwrap();
-        let index_buffer = CpuAccessibleBuffer::from_iter(&*memory_allocator, index_buffer_usage, false, indices.into_iter()).unwrap();
+        let vertex_buffer = CpuAccessibleBuffer::from_iter(&*memory_allocator, vertex_buffer_usage, false, vertices).unwrap();
+        let index_buffer = CpuAccessibleBuffer::from_iter(&*memory_allocator, index_buffer_usage, false, indices).unwrap();
         let matrices_buffer = CpuBufferPool::new(memory_allocator.clone(), matrices_buffer_usage, MemoryUsage::Upload);
 
         Self {

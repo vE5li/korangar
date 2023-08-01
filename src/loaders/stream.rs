@@ -85,7 +85,7 @@ impl<'b> ByteStream<'b> {
 
     #[cfg(feature = "debug")]
     pub fn remaining_bytes(&mut self) -> Vec<u8> {
-        self.slice(self.data.len() - self.offset).into_iter().copied().collect()
+        self.slice(self.data.len() - self.offset).to_vec()
     }
 
     #[cfg(feature = "debug")]

@@ -481,6 +481,11 @@ fn main() {
                 for event in network_events {
                     match event {
                         NetworkEvent::AddEntity(entity_appeared_data) => {
+                            // Sometimes (like after a job change) the server will tell the client
+                            // that a new entity appeared, even though it was already on screen. So
+                            // to prevent this we remove the old entity.
+                            entities.retain(|entity| entity.get_entity_id() != entity_appeared_data.entity_id);
+
                             let npc = Npc::new(
                                 &mut game_file_loader,
                                 &mut sprite_loader,

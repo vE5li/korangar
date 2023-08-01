@@ -1328,8 +1328,49 @@ struct MovingEntityAppearedPacket {
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
-#[header(0x09ff)]
+#[header(0x09fe)]
 struct EntityAppearedPacket {
+    pub packet_length: u16,
+    pub object_type: u8,
+    pub entity_id: EntityId,
+    pub group_id: u32, // may be reversed - or completely wrong
+    pub movement_speed: u16,
+    pub body_state: u16,
+    pub health_state: u16,
+    pub effect_state: u32,
+    pub job: u16,
+    pub head: u16,
+    pub weapon: u32,
+    pub shield: u32,
+    pub accessory: u16,
+    pub accessory2: u16,
+    pub accessory3: u16,
+    pub head_palette: u16,
+    pub body_palette: u16,
+    pub head_direction: u16,
+    pub robe: u16,
+    pub guild_id: u32, // may be reversed - or completely wrong
+    pub emblem_version: u16,
+    pub honor: u16,
+    pub virtue: u32,
+    pub is_pk_mode_on: u8,
+    pub sex: Sex,
+    pub position: WorldPosition,
+    pub x_size: u8,
+    pub y_size: u8,
+    pub c_level: u16,
+    pub font: u16,
+    pub maximum_health_points: i32,
+    pub health_points: i32,
+    pub is_boss: u8,
+    pub body: u16,
+    #[length_hint(24)]
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x09ff)]
+struct EntityAppeared2Packet {
     pub packet_length: u16,
     pub object_type: u8,
     pub entity_id: EntityId,
@@ -1399,6 +1440,22 @@ impl EntityData {
 
 impl From<EntityAppearedPacket> for EntityData {
     fn from(packet: EntityAppearedPacket) -> Self {
+        Self {
+            entity_id: packet.entity_id,
+            movement_speed: packet.movement_speed,
+            job: packet.job,
+            position: packet.position.to_vector(),
+            destination: None,
+            health_points: packet.health_points,
+            maximum_health_points: packet.maximum_health_points,
+            head_direction: packet.head_direction as usize,
+            sex: packet.sex,
+        }
+    }
+}
+
+impl From<EntityAppeared2Packet> for EntityData {
+    fn from(packet: EntityAppeared2Packet) -> Self {
         Self {
             entity_id: packet.entity_id,
             movement_speed: packet.movement_speed,
@@ -3067,6 +3124,8 @@ impl NetworkingSystem {
                         packet.position.map(|component| component as usize),
                     ));
                 } else if let Ok(packet) = EntityAppearedPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::AddEntity(packet.into()));
+                } else if let Ok(packet) = EntityAppeared2Packet::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddEntity(packet.into()));
                 } else if let Ok(packet) = MovingEntityAppearedPacket::try_from_bytes(&mut byte_stream) {
                     events.push(NetworkEvent::AddEntity(packet.into()));

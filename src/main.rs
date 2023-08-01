@@ -495,6 +495,7 @@ fn main() {
                                 entity_appeared_data,
                                 client_tick,
                             );
+
                             let npc = Entity::Npc(npc);
                             entities.push(npc);
                         }
@@ -820,16 +821,20 @@ fn main() {
                                         }
                                     }
                                     SkillType::SelfCast => match skill.skill_id == ROLLING_CUTTER_ID {
-                                        true => {
-                                            networking_system.cast_channeling_skill(skill.skill_id, skill.skill_level, EntityId(2000009))
+                                        true => networking_system.cast_channeling_skill(
+                                            skill.skill_id,
+                                            skill.skill_level,
+                                            entities[0].get_entity_id(),
+                                        ),
+                                        false => {
+                                            networking_system.cast_skill(skill.skill_id, skill.skill_level, entities[0].get_entity_id())
                                         }
-                                        false => networking_system.cast_skill(skill.skill_id, skill.skill_level, EntityId(2000009)),
                                     },
                                     SkillType::Support => {
                                         if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
                                             networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
                                         } else {
-                                            networking_system.cast_skill(skill.skill_id, skill.skill_level, EntityId(2000009));
+                                            networking_system.cast_skill(skill.skill_id, skill.skill_level, entities[0].get_entity_id());
                                         }
                                     }
                                 }

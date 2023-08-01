@@ -15,7 +15,7 @@ pub use self::action::*;
 pub use self::convertable::ByteConvertable;
 pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
 pub use self::font::FontLoader;
-pub use self::gamefile::{GameFileLoader, LUA_GRF_FILE_NAME};
+pub use self::gamefile::GameFileLoader;
 #[cfg(feature = "debug")]
 pub use self::map::MapData;
 //pub use self::model::ModelLoader;

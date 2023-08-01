@@ -192,13 +192,8 @@ fn main() {
 
     let mut game_file_loader = GameFileLoader::default();
 
-    game_file_loader.add_archives_from_settings();
-
-    // Patch precompiled lua files to lua 5.1 64 bit.
-    game_file_loader.patch();
-
-    // Load patched files to overwrite the original ones.
-    game_file_loader.add_archive(LUA_GRF_FILE_NAME.to_string());
+    game_file_loader.load_archives_from_settings();
+    game_file_loader.load_patched_lua_files();
 
     let memory_allocator = Arc::new(MemoryAllocator::new(device.clone()));
 

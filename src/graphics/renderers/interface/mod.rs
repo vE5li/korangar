@@ -18,7 +18,7 @@ use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
 use super::IntoFormat;
-use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, Texture};
+use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait, Texture};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
 #[derive(PartialEq, Eq)]
@@ -135,21 +135,6 @@ impl InterfaceRenderer {
         )
     }
 
-    pub fn render_sprite(
-        &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        texture: Texture,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        color: Color,
-        smooth: bool,
-    ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-        self.sprite_renderer
-            .render(render_target, texture, window_size, position, size, clip_size, color, smooth);
-    }
-
     pub fn render_rectangle(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
@@ -223,4 +208,24 @@ impl IntoFormat for InterfaceFormat {
 
 impl Renderer for InterfaceRenderer {
     type Target = SingleRenderTarget<InterfaceFormat, InterfaceSubrenderer, ClearColorValue>;
+}
+
+impl SpriteRendererTrait for InterfaceRenderer {
+    fn render_sprite(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        texture: Texture,
+        position: Vector2<f32>,
+        size: Vector2<f32>,
+        clip_size: Vector4<f32>,
+        color: Color,
+        smooth: bool,
+    ) where
+        Self: Renderer,
+    {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        self.sprite_renderer
+            .render(render_target, texture, window_size, position, size, clip_size, color, smooth);
+    }
 }

@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
-use cgmath::{Array, Vector2};
+use cgmath::{Array, Vector2, Vector4, Zero};
 
 use super::InterfaceSettings;
-use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
+use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
+use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
 use crate::network::ClientTick;
 
@@ -70,18 +71,32 @@ impl MouseCursor {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         mouse_position: Vector2<f32>,
-        grabbed_texture: Option<Texture>,
+        grabbed: Option<Grabbed>,
         color: Color,
         interface_settings: &InterfaceSettings,
     ) {
-        if let Some(texture) = grabbed_texture {
-            renderer.render_sprite(
-                render_target,
-                texture,
-                mouse_position - Vector2::from_value(15.0 * *interface_settings.scaling),
-                Vector2::from_value(30.0 * *interface_settings.scaling),
-                Color::monochrome(255),
-            );
+        if let Some(grabbed) = grabbed {
+            match grabbed {
+                Grabbed::Texture(texture) => renderer.render_sprite(
+                    render_target,
+                    texture,
+                    mouse_position - Vector2::from_value(15.0 * *interface_settings.scaling),
+                    Vector2::from_value(30.0 * *interface_settings.scaling),
+                    Vector4::zero(),
+                    Color::monochrome(255),
+                    false,
+                ),
+                Grabbed::Action(sprite, actions, animation_state) => actions.render2(
+                    render_target,
+                    renderer,
+                    &sprite,
+                    &animation_state,
+                    mouse_position,
+                    0,
+                    Color::monochrome(255),
+                    interface_settings,
+                ),
+            }
         }
 
         // TODO: figure out how this is actually supposed to work

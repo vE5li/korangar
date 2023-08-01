@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Vector2, Vector3, Vector4};
 use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
@@ -45,7 +45,8 @@ use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
 use crate::graphics::{
-    EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait, *,
+    EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait,
+    SpriteRenderer as SpriteRendererTrait, *,
 };
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::EntityId;
@@ -351,20 +352,6 @@ impl DeferredRenderer {
         self.render_rectangle(render_target, position - bar_offset, bar_size, color);
     }
 
-    pub fn render_sprite(
-        &self,
-        render_target: &mut <Self as Renderer>::Target,
-        texture: Texture,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        color: Color,
-    ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-
-        self.sprite_renderer
-            .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, false);
-    }
-
     pub fn render_text(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -512,6 +499,26 @@ impl EntityRendererTrait for DeferredRenderer {
             cell_position,
             mirror,
         );
+    }
+}
+
+impl SpriteRendererTrait for DeferredRenderer {
+    fn render_sprite(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        texture: Texture,
+        position: Vector2<f32>,
+        size: Vector2<f32>,
+        _clip_size: Vector4<f32>,
+        color: Color,
+        smooth: bool,
+    ) where
+        Self: Renderer,
+    {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        self.sprite_renderer
+            .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, smooth);
     }
 }
 

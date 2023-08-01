@@ -9,7 +9,7 @@ mod swapchain;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Vector2, Vector3, Vector4};
 use option_ext::OptionExt;
 use procedural::profile;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
@@ -114,6 +114,20 @@ pub trait IndicatorRenderer {
         upper_right: Vector3<f32>,
         lower_left: Vector3<f32>,
         lower_right: Vector3<f32>,
+    ) where
+        Self: Renderer;
+}
+
+pub trait SpriteRenderer {
+    fn render_sprite(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        texture: Texture,
+        position: Vector2<f32>,
+        size: Vector2<f32>,
+        clip_size: Vector4<f32>,
+        color: Color,
+        smooth: bool,
     ) where
         Self: Renderer;
 }

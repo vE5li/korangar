@@ -12,7 +12,7 @@ use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
 pub use self::event::UserEvent;
 pub use self::key::Key;
-pub use self::mode::MouseInputMode;
+pub use self::mode::{Grabbed, MouseInputMode};
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
 use crate::graphics::{PickerRenderTarget, PickerTarget};
@@ -22,7 +22,7 @@ use crate::network::ClientTick;
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HotbarSlot(pub usize);
 
 #[derive(Default)]
@@ -292,6 +292,13 @@ impl InputSystem {
                             interface.schedule_rerender();
                         },
 
+                        ClickAction::MoveSkill(skill_source, skill) => {
+                            self.mouse_input_mode = MouseInputMode::MoveSkill(skill_source, skill);
+                            // Needs to rerender because some elements will render differently
+                            // based on the mouse input mode.
+                            interface.schedule_rerender();
+                        },
+
                         ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
 
                         ClickAction::CloseWindow => interface.close_window(focus_state, *window_index),
@@ -312,12 +319,22 @@ impl InputSystem {
                 // based on the mouse input mode.
                 interface.schedule_rerender();
 
-                if let MouseInputMode::MoveItem(item_source, item) = mouse_input_mode {
-                    if let Some(hovered_element) = &hovered_element {
-                        if let Some(item_move) = hovered_element.borrow_mut().drop_item(item_source, item) {
-                            events.push(UserEvent::MoveItem(item_move));
+                match mouse_input_mode {
+                    MouseInputMode::MoveItem(item_source, item) => {
+                        if let Some(hovered_element) = &hovered_element {
+                            if let Some(item_move) = hovered_element.borrow_mut().drop_item(item_source, item) {
+                                events.push(UserEvent::MoveItem(item_move));
+                            }
                         }
                     }
+                    MouseInputMode::MoveSkill(skill_source, skill) => {
+                        if let Some(hovered_element) = &hovered_element {
+                            if let Some(skill_move) = hovered_element.borrow_mut().drop_skill(skill_source, skill) {
+                                events.push(UserEvent::MoveSkill(skill_move));
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
@@ -449,6 +466,7 @@ impl InputSystem {
                                 }
                                 // TODO: should just move immediately ?
                                 ClickAction::MoveItem(..) => {}
+                                ClickAction::MoveSkill(..) => {}
                                 ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
                                 ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
                             }

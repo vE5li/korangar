@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Mul;
 use std::sync::Arc;
 
-use cgmath::{Array, Vector2};
+use cgmath::{Array, Vector2, Vector4};
 use derive_new::new;
 use procedural::*;
 use vulkano::image::ImageAccess;
@@ -10,15 +10,12 @@ use vulkano::image::ImageAccess;
 use super::Sprite;
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{Color, DeferredRenderer, Renderer, Texture};
+use crate::graphics::{Color, Renderer, SpriteRenderer, Texture};
 use crate::interface::InterfaceSettings;
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
 use crate::network::ClientTick;
 
-//pub enum Animations {
-//}
-
-#[derive(new)]
+#[derive(Clone, Debug, new)]
 pub struct AnimationState {
     #[new(default)]
     pub action: usize,
@@ -66,7 +63,7 @@ impl AnimationState {
     }
 }
 
-#[derive(PrototypeElement)]
+#[derive(Debug, PrototypeElement)]
 pub struct Actions {
     actions: Vec<Action>,
     delays: Vec<f32>,
@@ -110,17 +107,19 @@ impl Actions {
         )
     }
 
-    pub fn render2(
+    pub fn render2<T>(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        renderer: &DeferredRenderer,
+        render_target: &mut T::Target,
+        renderer: &T,
         sprite: &Sprite,
         animation_state: &AnimationState,
         position: Vector2<f32>,
         camera_direction: usize,
         color: Color,
         interface_settings: &InterfaceSettings,
-    ) {
+    ) where
+        T: Renderer + SpriteRenderer,
+    {
         let direction = camera_direction % 8;
         let aa = animation_state.action * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
@@ -153,7 +152,15 @@ impl Actions {
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;
             let final_position = position + offset - final_size / 2.0;
 
-            renderer.render_sprite(render_target, texture.clone(), final_position, final_size, color);
+            renderer.render_sprite(
+                render_target,
+                texture.clone(),
+                final_position,
+                final_size,
+                Vector4::new(0.0, 0.0, f32::MAX, f32::MAX),
+                color,
+                false,
+            );
         }
     }
 }

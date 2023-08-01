@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cgmath::{Array, Vector2, Vector3};
+use cgmath::{Array, Vector2, Vector3, Vector4, Zero};
 use derive_new::new;
 use procedural::profile;
 use rand::{thread_rng, Rng};
@@ -120,7 +120,9 @@ impl QuestIcon {
             self.texture.clone(),
             final_position - Vector2::from_value(15.0),
             Vector2::from_value(30.0),
+            Vector4::zero(),
             self.color,
+            true,
         );
     }
 }

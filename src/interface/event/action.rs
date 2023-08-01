@@ -1,7 +1,7 @@
-use super::ItemSource;
+use super::{ItemSource, SkillSource};
 use crate::input::UserEvent;
 use crate::interface::{ChangeEvent, FocusMode, PrototypeWindow};
-use crate::inventory::Item;
+use crate::inventory::{Item, Skill};
 
 pub enum ClickAction {
     FocusElement,
@@ -10,6 +10,7 @@ pub enum ClickAction {
     Event(UserEvent),
     DragElement,
     MoveItem(ItemSource, Item),
+    MoveSkill(SkillSource, Skill),
     MoveInterface,
     OpenWindow(Box<dyn PrototypeWindow>),
     CloseWindow,

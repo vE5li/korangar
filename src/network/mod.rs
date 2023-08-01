@@ -111,6 +111,7 @@ pub enum NetworkEvent {
     RemoveQuestEffect(EntityId),
     Inventory(Vec<(ItemIndex, ItemId, EquipPosition, EquipPosition)>),
     AddIventoryItem(ItemIndex, ItemId, EquipPosition, EquipPosition),
+    SkillTree(Vec<SkillInformation>),
     UpdateEquippedPosition {
         index: ItemIndex,
         equipped_position: EquipPosition,
@@ -1448,7 +1449,7 @@ pub enum SkillType {
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-struct SkillInformation {
+pub struct SkillInformation {
     pub skill_id: SkillId,
     pub skill_type: SkillType,
     pub skill_level: SkillLevel,
@@ -1517,8 +1518,7 @@ struct NavigateToMonsterPacket {
     pub hide_window: u8,
     #[length_hint(16)]
     pub map_name: String,
-    pub target_x: u16,
-    pub target_y: u16,
+    pub target_position: Vector2<u16>,
     pub target_monster_id: u16,
 }
 
@@ -2078,8 +2078,7 @@ struct UseSkillAtIdPacket {
 struct UseSkillOnGroundPacket {
     pub skill_level: SkillLevel,
     pub skill_id: SkillId,
-    pub target_x: u16,
-    pub target_y: u16,
+    pub target_position: Vector2<u16>,
     #[new(default)]
     pub unused: u8,
 }
@@ -2974,8 +2973,8 @@ impl NetworkingSystem {
         self.send_packet_to_map_server(UseSkillAtIdPacket::new(skill_level, skill_id, entity_id));
     }
 
-    pub fn cast_ground_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, x: u16, y: u16) {
-        self.send_packet_to_map_server(UseSkillOnGroundPacket::new(skill_level, skill_id, x, y));
+    pub fn cast_ground_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, target_position: Vector2<u16>) {
+        self.send_packet_to_map_server(UseSkillOnGroundPacket::new(skill_level, skill_id, target_position));
     }
 
     pub fn cast_channeling_skill(&mut self, skill_id: SkillId, skill_level: SkillLevel, entity_id: EntityId) {
@@ -3117,7 +3116,8 @@ impl NetworkingSystem {
                     events.push(NetworkEvent::Inventory(item_data));
                 } else if let Ok(_) = EquippableSwitchItemListPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = MapTypePacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = UpdateSkillTreePacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::SkillTree(packet.skill_information));
                 } else if let Ok(_) = UpdateHotkeysPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = InitialStatusPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = UpdatePartyInvitationStatePacket::try_from_bytes(&mut byte_stream) {

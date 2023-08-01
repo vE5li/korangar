@@ -5,7 +5,7 @@ use crate::inventory::Item;
 
 #[derive(new)]
 pub struct InventoryWindow {
-    items: TrackedState<Vec<Item>>,
+    items: Remote<Vec<Item>>,
 }
 
 impl InventoryWindow {
@@ -18,7 +18,7 @@ impl PrototypeWindow for InventoryWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let elements = vec![InventoryContainer::new(self.items.new_remote()).wrap()];
+        let elements = vec![InventoryContainer::new(self.items.clone()).wrap()];
 
         WindowBuilder::default()
             .with_title("Inventory".to_string())

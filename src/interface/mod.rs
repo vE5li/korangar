@@ -28,8 +28,8 @@ pub use self::theme::Theme;
 pub use self::windows::*;
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer, Texture};
-use crate::input::{FocusState, MouseInputMode, UserEvent};
+use crate::graphics::{Color, DeferredRenderer, InterfaceRenderer, Renderer};
+use crate::input::{FocusState, Grabbed, MouseInputMode, UserEvent};
 use crate::loaders::{ActionLoader, FontLoader, GameFileLoader, SpriteLoader};
 use crate::network::{ClientTick, EntityId};
 
@@ -437,7 +437,7 @@ impl Interface {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         mouse_position: Position,
-        grabbed_texture: Option<Texture>,
+        grabbed: Option<Grabbed>,
     ) {
         if !self.mouse_cursor_hidden {
             #[cfg(feature = "debug")]
@@ -447,7 +447,7 @@ impl Interface {
                 render_target,
                 renderer,
                 mouse_position,
-                grabbed_texture,
+                grabbed,
                 *self.theme.cursor.color,
                 &self.interface_settings,
             );

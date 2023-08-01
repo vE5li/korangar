@@ -33,6 +33,10 @@ impl PrototypeWindow for CharacterOverviewWindow {
                 .with_event(UserEvent::OpenEquipmentWindow)
                 .wrap(),
             Button::default()
+                .with_text("skill tree")
+                .with_event(UserEvent::OpenSkillTreeWindow)
+                .wrap(),
+            Button::default()
                 .with_text("friends")
                 .with_event(UserEvent::OpenFriendsWindow)
                 .wrap(),

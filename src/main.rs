@@ -55,19 +55,13 @@ use crate::debug::*;
 use crate::graphics::*;
 use crate::input::{FocusState, InputSystem, UserEvent};
 use crate::interface::*;
-use crate::inventory::Inventory;
+use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
-use crate::network::{ChatMessage, EntityId, NetworkEvent, NetworkingSystem, SkillId, SkillLevel};
+use crate::network::{ChatMessage, EntityId, NetworkEvent, NetworkingSystem, SkillId};
 use crate::system::{choose_physical_device, get_device_extensions, get_instance_extensions, get_layers, GameTimer};
 use crate::world::*;
 
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
-// FIX: temporary lookup for testing
-const SKILLS: &[(SkillId, SkillLevel, SkillType)] = &[
-    (SkillId(28), SkillLevel(10), SkillType::Support),
-    (SkillId(25), SkillLevel(1), SkillType::Ground),
-    (SkillId(2036), SkillLevel(5), SkillType::SelfCast),
-];
 
 fn main() {
     const DEFAULT_MAP: &str = "geffen";
@@ -368,6 +362,8 @@ fn main() {
     let mut particle_holder = ParticleHolder::default();
     let mut entities = Vec::<Entity>::new();
     let mut player_inventory = Inventory::default();
+    let mut player_skill_tree = SkillTree::default();
+    let mut hotbar = Hotbar::default();
 
     let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220));
     let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
@@ -598,6 +594,9 @@ fn main() {
                                 equipped_position,
                             );
                         }
+                        NetworkEvent::SkillTree(skill_information) => {
+                            player_skill_tree.fill(&mut game_file_loader, &mut sprite_loader, &mut action_loader, skill_information);
+                        }
                         NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                             player_inventory.update_equipped_position(index, equipped_position);
                         }
@@ -677,12 +676,17 @@ fn main() {
                         }
                         UserEvent::OpenInventoryWindow => {
                             if !entities.is_empty() {
-                                interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_item_state()))
+                                interface.open_window(&mut focus_state, &InventoryWindow::new(player_inventory.get_items()))
                             }
                         }
                         UserEvent::OpenEquipmentWindow => {
                             if !entities.is_empty() {
-                                interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_item_state()))
+                                interface.open_window(&mut focus_state, &EquipmentWindow::new(player_inventory.get_items()))
+                            }
+                        }
+                        UserEvent::OpenSkillTreeWindow => {
+                            if !entities.is_empty() {
+                                interface.open_window(&mut focus_state, &SkillTreeWindow::new(player_skill_tree.get_skills()))
                             }
                         }
                         UserEvent::OpenGraphicsSettingsWindow => {
@@ -723,6 +727,7 @@ fn main() {
                                     interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
                                     interface.open_window(&mut focus_state, &CharacterOverviewWindow::new());
                                     interface.open_window(&mut focus_state, &ChatWindow::new(chat_messages.clone(), font_loader.clone()));
+                                    interface.open_window(&mut focus_state, &HotbarWindow::new(hotbar.get_skills()));
 
                                     particle_holder.clear();
                                     networking_system.map_loaded();
@@ -796,39 +801,50 @@ fn main() {
                             }
                             _ => {}
                         },
+                        UserEvent::MoveSkill(skill_move) => match (skill_move.source, skill_move.destination) {
+                            (SkillSource::SkillTree, SkillSource::Hotbar { slot }) => {
+                                hotbar.set_slot(skill_move.skill, slot);
+                            }
+                            (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
+                                hotbar.swap_slot(source_slot, destination_slot);
+                            }
+                            _ => {}
+                        },
                         UserEvent::CastSkill(slot) => {
-                            let (skill_id, skill_level, skill_type) = SKILLS[slot.0];
-
-                            match skill_type {
-                                SkillType::Passive => {}
-                                SkillType::Attack => {
-                                    if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-                                        networking_system.cast_skill(skill_id, skill_level, entity_id);
+                            if let Some(skill) = hotbar.get_skill_in_slot(slot).as_ref() {
+                                match skill.skill_type {
+                                    SkillType::Passive => {}
+                                    SkillType::Attack => {
+                                        if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                                            networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
+                                        }
                                     }
-                                }
-                                SkillType::Ground | SkillType::Trap => {
-                                    if let Some(PickerTarget::Tile { x, y }) = mouse_target {
-                                        networking_system.cast_ground_skill(skill_id, skill_level, x, y);
+                                    SkillType::Ground | SkillType::Trap => {
+                                        if let Some(PickerTarget::Tile { x, y }) = mouse_target {
+                                            networking_system.cast_ground_skill(skill.skill_id, skill.skill_level, Vector2::new(x, y));
+                                        }
                                     }
-                                }
-                                SkillType::SelfCast => match skill_id == ROLLING_CUTTER_ID {
-                                    true => networking_system.cast_channeling_skill(skill_id, skill_level, EntityId(2000009)),
-                                    false => networking_system.cast_skill(skill_id, skill_level, EntityId(2000009)),
-                                },
-                                SkillType::Support => {
-                                    if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-                                        networking_system.cast_skill(skill_id, skill_level, entity_id);
-                                    } else {
-                                        networking_system.cast_skill(skill_id, skill_level, EntityId(2000009));
+                                    SkillType::SelfCast => match skill.skill_id == ROLLING_CUTTER_ID {
+                                        true => {
+                                            networking_system.cast_channeling_skill(skill.skill_id, skill.skill_level, EntityId(2000009))
+                                        }
+                                        false => networking_system.cast_skill(skill.skill_id, skill.skill_level, EntityId(2000009)),
+                                    },
+                                    SkillType::Support => {
+                                        if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                                            networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
+                                        } else {
+                                            networking_system.cast_skill(skill.skill_id, skill.skill_level, EntityId(2000009));
+                                        }
                                     }
                                 }
                             }
                         }
                         UserEvent::StopSkill(slot) => {
-                            let (skill_id, ..) = SKILLS[slot.0];
-
-                            if skill_id == ROLLING_CUTTER_ID {
-                                networking_system.stop_channeling_skill(skill_id);
+                            if let Some(skill) = hotbar.get_skill_in_slot(slot).as_ref() {
+                                if skill.skill_id == ROLLING_CUTTER_ID {
+                                    networking_system.stop_channeling_skill(skill.skill_id);
+                                }
                             }
                         }
                         UserEvent::AddFriend(name) => {
@@ -1363,7 +1379,7 @@ fn main() {
                         screen_target,
                         &deferred_renderer,
                         input_system.get_mouse_position(),
-                        input_system.get_mouse_mode().grabbed_texture(),
+                        input_system.get_mouse_mode().grabbed(),
                     );
                 }
 

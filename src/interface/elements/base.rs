@@ -3,10 +3,10 @@ use std::rc::{Rc, Weak};
 
 use cgmath::{Vector2, Vector4, Zero};
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer, Texture};
+use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer, Texture};
 use crate::input::MouseInputMode;
 use crate::interface::*;
-use crate::inventory::Item;
+use crate::inventory::{Item, Skill};
 
 pub type ElementCell = Rc<RefCell<dyn Element>>;
 pub type WeakElementCell = Weak<RefCell<dyn Element>>;
@@ -313,6 +313,12 @@ pub trait Element {
     }
 
     fn drop_item(&mut self, _item_source: ItemSource, _item: Item) -> Option<ItemMove> {
+        None
+    }
+
+    fn drop_skill(&mut self, skill_source: SkillSource, skill: Skill) -> Option<SkillMove> {
+        let _ = skill_source;
+        let _ = skill;
         None
     }
 

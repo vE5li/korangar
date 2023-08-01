@@ -1,13 +1,16 @@
+use std::sync::Arc;
+
 use cgmath::Vector2;
 
 use crate::graphics::Texture;
-use crate::interface::{ElementCell, ItemSource};
-use crate::inventory::Item;
+use crate::interface::{ElementCell, ItemSource, SkillSource};
+use crate::inventory::{Item, Skill};
+use crate::loaders::{Actions, AnimationState, Sprite};
 
 #[derive(Default)]
 pub enum MouseInputMode {
     MoveItem(ItemSource, Item),
-    MoveSkill(usize),
+    MoveSkill(SkillSource, Skill),
     MoveInterface(usize),
     ResizeInterface(usize),
     DragElement((ElementCell, usize)),
@@ -16,6 +19,11 @@ pub enum MouseInputMode {
     Walk(Vector2<usize>),
     #[default]
     None,
+}
+
+pub enum Grabbed {
+    Texture(Texture),
+    Action(Arc<Sprite>, Arc<Actions>, AnimationState),
 }
 
 impl MouseInputMode {
@@ -27,9 +35,14 @@ impl MouseInputMode {
         matches!(self, MouseInputMode::Walk(..))
     }
 
-    pub fn grabbed_texture(&self) -> Option<Texture> {
+    pub fn grabbed(&self) -> Option<Grabbed> {
         match self {
-            MouseInputMode::MoveItem(_, item) => Some(item.texture.clone()),
+            MouseInputMode::MoveItem(_, item) => Some(Grabbed::Texture(item.texture.clone())),
+            MouseInputMode::MoveSkill(_, skill) => Some(Grabbed::Action(
+                skill.sprite.clone(),
+                skill.actions.clone(),
+                skill.animation_state.clone(),
+            )),
             _ => None,
         }
     }

@@ -1,5 +1,10 @@
+mod hotbar;
+mod skills;
+
+pub use self::hotbar::Hotbar;
+pub use self::skills::{Skill, SkillTree};
 use crate::graphics::Texture;
-use crate::interface::TrackedState;
+use crate::interface::{Remote, TrackedState};
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
 use crate::network::{EquipPosition, ItemId, ItemIndex, ItemOptions};
 
@@ -107,7 +112,7 @@ impl Inventory {
         });
     }
 
-    pub fn get_item_state(&self) -> TrackedState<Vec<Item>> {
-        self.items.clone()
+    pub fn get_items(&self) -> Remote<Vec<Item>> {
+        self.items.new_remote()
     }
 }

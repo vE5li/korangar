@@ -4,10 +4,12 @@ mod dialog;
 mod equipment;
 mod expandable;
 mod friends;
+mod hotbar;
 mod inventory;
 #[cfg(feature = "debug")]
 mod packet;
 mod scroll;
+mod skill_tree;
 
 use std::cell::Cell;
 use std::ops::Add;
@@ -22,10 +24,12 @@ pub use self::dialog::{DialogContainer, DialogElement};
 pub use self::equipment::EquipmentContainer;
 pub use self::expandable::Expandable;
 pub use self::friends::FriendView;
+pub use self::hotbar::HotbarContainer;
 pub use self::inventory::InventoryContainer;
 #[cfg(feature = "debug")]
 pub use self::packet::{PacketEntry, PacketView};
 pub use self::scroll::ScrollView;
+pub use self::skill_tree::SkillTreeContainer;
 use crate::input::MouseInputMode;
 use crate::interface::*;
 

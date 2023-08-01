@@ -16,7 +16,7 @@ use crate::graphics::{MemoryAllocator, Texture};
 use crate::interface::{ElementCell, PrototypeElement};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
 
-#[derive(Clone, PrototypeElement)]
+#[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
     #[hidden_element]
     pub textures: Vec<Texture>,

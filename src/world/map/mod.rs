@@ -94,7 +94,7 @@ impl MarkerIdentifier {
 pub struct Map {
     width: usize,
     height: usize,
-    water_settings: WaterSettings,
+    water_settings: Option<WaterSettings>,
     light_settings: LightSettings,
     tiles: Vec<Tile>,
     ground_vertex_buffer: ModelVertexBuffer,
@@ -341,7 +341,13 @@ impl Map {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        renderer.water_light(render_target, camera, self.water_settings.water_level.unwrap());
+        let water_level = self
+            .water_settings
+            .as_ref()
+            .and_then(|settings| settings.water_level)
+            .unwrap_or_default();
+
+        renderer.water_light(render_target, camera, water_level);
     }
 
     #[cfg(feature = "debug")]

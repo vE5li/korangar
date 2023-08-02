@@ -28,14 +28,17 @@ impl ResourceType {
 #[derive(Clone, ByteConvertable, PrototypeElement)]
 pub struct ObjectData {
     #[length_hint(40)]
-    #[version_equals_or_above(1, 6)]
+    #[version_equals_or_above(1, 3)]
     pub name: Option<String>,
-    #[version_equals_or_above(1, 6)]
+    #[version_equals_or_above(1, 3)]
     pub _animation_type: Option<i32>,
-    #[version_equals_or_above(1, 6)]
+    #[version_equals_or_above(1, 3)]
     pub _animation_speed: Option<f32>,
-    #[version_equals_or_above(1, 6)]
+    #[version_equals_or_above(1, 3)]
     pub _block_type: Option<i32>,
+    // FIX: only if build_version >= 186
+    #[version_equals_or_above(2, 6)]
+    pub _unknown: Option<u8>,
     #[length_hint(80)]
     pub model_name: String,
     #[length_hint(80)]

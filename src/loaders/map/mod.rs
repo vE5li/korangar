@@ -61,7 +61,11 @@ impl MapLoader {
         let mut gat_data = parse_gat_data(map_data.gat_file.as_str(), game_file_loader)?;
 
         let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
-        let water_level = -map_data.water_settings.water_level.unwrap();
+        let water_level = -map_data
+            .water_settings
+            .as_ref()
+            .and_then(|settings| settings.water_level)
+            .unwrap_or_default();
         let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
 
         let ground_vertices = NativeModelVertex::to_vertices(ground_vertices);

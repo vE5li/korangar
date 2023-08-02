@@ -12,10 +12,10 @@ use crate::world::Tile;
 pub struct MapData {
     #[version]
     pub version: Version<MajorFirst>,
-    #[version_equals_or_above(2, 2)]
-    pub build_number: Option<u8>,
     #[version_equals_or_above(2, 5)]
-    pub _unknown: Option<u32>,
+    pub build_number: Option<i32>,
+    #[version_equals_or_above(2, 2)]
+    pub _unknown: Option<u8>,
     #[length_hint(40)]
     pub _ini_file: String,
     #[length_hint(40)]
@@ -25,7 +25,8 @@ pub struct MapData {
     #[version_equals_or_above(1, 4)]
     #[length_hint(40)]
     pub _source_file: Option<String>,
-    pub water_settings: WaterSettings,
+    #[version_smaller(2, 6)]
+    pub water_settings: Option<WaterSettings>,
     pub light_settings: LightSettings,
     #[version_equals_or_above(1, 6)]
     pub ground_top: Option<i32>,
@@ -35,6 +36,9 @@ pub struct MapData {
     pub ground_left: Option<i32>,
     #[version_equals_or_above(1, 6)]
     pub ground_right: Option<i32>,
+    // TODO: verify version
+    //`#[version_equals_or_above(2, 6)]
+    //pub quad_tree: QuadTree,
     pub resources: MapResources,
 }
 

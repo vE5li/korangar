@@ -81,7 +81,7 @@ impl GameArchive {
         let file_table = FileTable::from_bytes(&mut byte_stream, None);
 
         let compressed = byte_stream.slice(file_table.get_compressed_size());
-        let (decompressed, _checksum) = decompress(&compressed, Format::Zlib).unwrap();
+        let (decompressed, _checksum) = decompress(compressed, Format::Zlib).unwrap();
 
         let file_count = file_header.get_file_count();
 

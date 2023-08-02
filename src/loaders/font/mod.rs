@@ -124,7 +124,7 @@ impl FontLoader {
             Format::R8_UNORM,
             image_usage,
             ImageCreateFlags::empty(),
-            0..2,
+            0..1,
         )
         .unwrap();
 

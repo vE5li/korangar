@@ -28,13 +28,8 @@ void main() {
 
     if (alpha_channel + additional_color < 1.0) {
         discard;
-    } 
-    
+    }
+
     fragment_color = diffuse_color + vec4(additional_color);
-
-    fragment_color.r = pow(fragment_color.r, 1.0 / 1.8);
-    fragment_color.g = pow(fragment_color.g, 1.0 / 1.8);
-    fragment_color.b = pow(fragment_color.b, 1.0 / 1.8);
-
     fragment_normal = normal; //normal_color.xyz;
 }

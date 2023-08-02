@@ -75,7 +75,7 @@ impl TextureLoader {
             image_data.iter().cloned(),
             dimensions,
             MipmapsCount::Log2,
-            Format::R8G8B8A8_SRGB,
+            Format::R8G8B8A8_UNORM,
             load_buffer,
         )
         .unwrap();

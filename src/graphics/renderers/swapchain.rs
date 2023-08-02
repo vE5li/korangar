@@ -4,10 +4,10 @@ use cgmath::Vector2;
 use procedural::profile;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
-use vulkano::format::Format;
+use vulkano::format::{Format, NumericType};
 use vulkano::image::{ImageUsage, SwapchainImage};
 use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::swapchain::{acquire_next_image, AcquireError, ColorSpace, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo};
+use vulkano::swapchain::{acquire_next_image, AcquireError, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo};
 use vulkano::sync::GpuFuture;
 use winit::window::Window;
 
@@ -57,11 +57,19 @@ impl SwapchainHolder {
             .surface_capabilities(&surface, SurfaceInfo::default())
             .expect("failed to get surface capabilities");
         let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
-        let image_format = physical_device.surface_formats(&surface, SurfaceInfo::default()).unwrap()[0].0;
+        let (image_format, image_color_space) = physical_device
+            .surface_formats(&surface, SurfaceInfo::default())
+            .unwrap()
+            .into_iter()
+            .find(|(format, _)| format.type_color().is_some_and(|numeric_type| numeric_type == NumericType::UNORM))
+            .expect("failed to find a suitable swapchain format");
         let present_mode = PresentMode::Fifo;
         let image_number = 0;
         let recreate = false;
         let acquire_future = None;
+
+        #[cfg(feature = "debug")]
+        print_debug!("Swapchain format is {MAGENTA}{:?}{NONE}", image_format);
 
         let swapchain_create_info = SwapchainCreateInfo {
             min_image_count: capabilities.min_image_count,
@@ -72,7 +80,7 @@ impl SwapchainHolder {
                 ..Default::default()
             },
             composite_alpha,
-            image_color_space: ColorSpace::SrgbNonLinear, // Is this really needed?
+            image_color_space,
             present_mode,
             ..Default::default()
         };

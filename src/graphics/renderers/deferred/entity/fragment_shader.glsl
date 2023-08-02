@@ -17,10 +17,5 @@ void main() {
     }
 
     fragment_color = diffuse_color;
-
-    fragment_color.r = pow(fragment_color.r, 1.0 / 1.8);
-    fragment_color.g = pow(fragment_color.g, 1.0 / 1.8);
-    fragment_color.b = pow(fragment_color.b, 1.0 / 1.8);
-
     fragment_normal = normalize(normal);
 }

@@ -202,7 +202,7 @@ impl SpriteLoader {
                         array_layers: 1,
                     },
                     MipmapsCount::One,
-                    Format::R8G8B8A8_SRGB,
+                    Format::R8G8B8A8_UNORM,
                     load_buffer,
                 )
                 .unwrap();

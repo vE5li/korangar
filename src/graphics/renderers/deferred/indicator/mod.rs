@@ -21,8 +21,10 @@ use std::sync::Arc;
 
 use cgmath::Vector3;
 use procedural::profile;
+use vulkano::buffer::BufferUsage;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::{Device, DeviceOwned};
+use vulkano::memory::allocator::MemoryUsage;
 use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
 use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
 use vulkano::pipeline::graphics::multisample::MultisampleState;
@@ -32,18 +34,22 @@ use vulkano::render_pass::Subpass;
 use vulkano::sampler::{Sampler, SamplerCreateInfo};
 use vulkano::shader::ShaderModule;
 
-use self::fragment_shader::ty::Constants;
+use self::vertex_shader::ty::{Constants, Matrices};
 use super::DeferredSubrenderer;
 use crate::graphics::*;
 
 unsafe impl bytemuck::Zeroable for Constants {}
 unsafe impl bytemuck::Pod for Constants {}
 
+unsafe impl bytemuck::Zeroable for Matrices {}
+unsafe impl bytemuck::Pod for Matrices {}
+
 pub struct IndicatorRenderer {
     memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
     vertex_shader: Arc<ShaderModule>,
     fragment_shader: Arc<ShaderModule>,
+    matrices_buffer: CpuBufferPool<Matrices, MemoryAllocator>,
     nearest_sampler: Arc<Sampler>,
 }
 
@@ -53,6 +59,16 @@ impl IndicatorRenderer {
         let vertex_shader = vertex_shader::load(device.clone()).unwrap();
         let fragment_shader = fragment_shader::load(device.clone()).unwrap();
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
+
+        let matrices_buffer = CpuBufferPool::new(
+            memory_allocator.clone(),
+            BufferUsage {
+                uniform_buffer: true,
+                ..Default::default()
+            },
+            MemoryUsage::Upload,
+        );
+
         let nearest_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
 
         Self {
@@ -60,6 +76,7 @@ impl IndicatorRenderer {
             pipeline,
             vertex_shader,
             fragment_shader,
+            matrices_buffer,
             nearest_sampler,
         }
     }
@@ -92,8 +109,27 @@ impl IndicatorRenderer {
     }
 
     #[profile]
-    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
-        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
+        let layout = self.pipeline.layout().clone();
+        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
+
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let matrices = Matrices {
+            view_projection: (projection_matrix * view_matrix).into(),
+        };
+
+        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
+        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [WriteDescriptorSet::buffer(
+            0,
+            matrices_subbuffer,
+        )])
+        .unwrap();
+
+        render_target
+            .state
+            .get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set);
     }
 
     #[profile]
@@ -109,20 +145,18 @@ impl IndicatorRenderer {
         lower_right: Vector3<f32>,
     ) {
         if render_target.bind_subrenderer(DeferredSubrenderer::Indicator) {
-            self.bind_pipeline(render_target);
+            self.bind_pipeline(render_target, camera);
         }
 
         let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
+        let descriptor_layout = layout.set_layouts().get(1).unwrap().clone();
 
         let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
             WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone()),
         ])
         .unwrap();
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let constants = Constants {
-            view_projection: (projection_matrix * view_matrix).into(),
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
             upper_left: upper_left.into(),
             upper_right: upper_right.into(),
@@ -137,7 +171,7 @@ impl IndicatorRenderer {
         render_target
             .state
             .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 1, set)
             .push_constants(layout, 0, constants)
             .draw(6, 1, 0, 0)
             .unwrap();

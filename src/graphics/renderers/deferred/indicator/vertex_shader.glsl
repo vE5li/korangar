@@ -3,8 +3,11 @@
 layout(location = 0) out vec2 texture_coordinates;
 layout(location = 1) out vec3 normal;
 
-layout(push_constant) uniform Constants {
+layout(set = 0, binding = 0) uniform Matrices {
     mat4 view_projection;
+} matrices;
+
+layout(push_constant) uniform Constants {
     vec3 color;
     vec3 upper_left;
     vec3 upper_right;
@@ -46,7 +49,7 @@ void main() {
          second_normal
     );
 
-    gl_Position = constants.view_projection * vec4(vertex_lookup[gl_VertexIndex], 1.0);
+    gl_Position = matrices.view_projection * vec4(vertex_lookup[gl_VertexIndex], 1.0);
     texture_coordinates = texture_coordinates_lookup[gl_VertexIndex];
     normal = normal_lookup[gl_VertexIndex];
 }

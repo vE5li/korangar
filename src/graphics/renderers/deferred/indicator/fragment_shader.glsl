@@ -6,10 +6,9 @@ layout(location = 1) in vec3 normal;
 layout(location = 0) out vec4 fragment_color;
 layout(location = 1) out vec3 fragment_normal;
 
-layout(set = 0, binding = 0) uniform sampler2D sampled_texture;
+layout(set = 1, binding = 0) uniform sampler2D sampled_texture;
 
 layout(push_constant) uniform Constants {
-    mat4 view_projection;
     vec3 color;
     vec3 upper_left;
     vec3 upper_right;

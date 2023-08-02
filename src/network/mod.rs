@@ -2338,6 +2338,45 @@ struct ReputationPacket {
     pub entries: Vec<ReputationEntry>,
 }
 
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+struct Aliance {
+    #[length_hint(24)]
+    pub name: String,
+}
+
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+struct Antagonist {
+    #[length_hint(24)]
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x098a)]
+struct ClanInfoPacket {
+    #[packet_length]
+    pub packet_length: u16,
+    pub clan_id: u32,
+    #[length_hint(24)]
+    pub clan_name: String,
+    #[length_hint(24)]
+    pub clan_master: String,
+    #[length_hint(16)]
+    pub clan_map: String,
+    pub aliance_count: u8,
+    pub antagonist_count: u8,
+    #[repeating(self.aliance_count)]
+    pub aliances: Vec<Aliance>,
+    #[repeating(self.antagonist_count)]
+    pub antagonists: Vec<Antagonist>,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0988)]
+struct ClanOnlineCountPacket {
+    pub online_members: u16,
+    pub maximum_members: u16,
+}
+
 #[derive(Clone, new)]
 struct UnknownPacket {
     bytes: Vec<u8>,
@@ -3325,6 +3364,8 @@ impl NetworkingSystem {
                 } else if let Ok(_) = PartyInvitePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = StatusChangeSequencePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = ReputationPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = ClanInfoPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = ClanOnlineCountPacket::try_from_bytes(&mut byte_stream) {
                 } else {
                     #[cfg(feature = "debug")]
                     {

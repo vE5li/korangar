@@ -348,7 +348,7 @@ impl Common {
     }
 
     pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: ClientTick) {
-        use pathfinding::prelude::bfs;
+        use pathfinding::prelude::astar;
 
         #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
         struct Pos(usize, usize);
@@ -419,7 +419,25 @@ impl Common {
             }
         }
 
-        let result = bfs(&Pos(from.x, from.y), |p| p.successors(map), |p| *p == Pos(to.x, to.y));
+        let result = astar(
+            &Pos(from.x, from.y),
+            |position| position.successors(map).into_iter().map(|position| (position, 0)),
+            |position| -> usize {
+                // Values taken from rAthena.
+                const MOVE_COST: usize = 10;
+                const DIAGONAL_MOVE_COST: usize = 14;
+
+                let distance_x = usize::abs_diff(position.0, to.x);
+                let distance_y = usize::abs_diff(position.1, to.y);
+
+                let straight_moves = usize::abs_diff(distance_x, distance_y);
+                let diagonal_moves = usize::min(distance_x, distance_y);
+
+                DIAGONAL_MOVE_COST * diagonal_moves + MOVE_COST * straight_moves
+            },
+            |position| *position == Pos(to.x, to.y),
+        )
+        .map(|x| x.0);
 
         if let Some(path) = result {
             let steps: Vec<(Vector2<usize>, u32)> = path

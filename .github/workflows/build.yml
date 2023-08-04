@@ -6,26 +6,22 @@ on:
 
 name: Build
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  check:
+  build:
     name: Build
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+
       - name: Install latest nightly
-        uses: actions-rs/toolchain@v1
-        with:
-            toolchain: nightly
-            override: true
-            #components: rustfmt, clippy
+        run: rustup update
 
       - name: Build Korangar (release)
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
+        run: cargo build
 
       - name: Build Korangar (debug)
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --features debug
+        run: cargo build --features "debug"

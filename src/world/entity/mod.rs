@@ -440,12 +440,33 @@ impl Common {
         .map(|x| x.0);
 
         if let Some(path) = result {
+            let mut last_timestamp = starting_timestamp.0;
+            let mut last_position: Option<Vector2<usize>> = None;
+
             let steps: Vec<(Vector2<usize>, u32)> = path
                 .into_iter()
-                .enumerate()
-                .map(|(index, pos)| {
-                    let arrival_timestamp = starting_timestamp.0 + index as u32 * self.movement_speed as u32;
-                    (pos.convert_to_vector(), arrival_timestamp)
+                .map(|pos| {
+                    if let Some(position) = last_position {
+                        const DIAGONAL_MULTIPLIER: f32 = 1.4;
+
+                        let speed = match position.x == pos.0 || position.y == pos.1 {
+                            // true means we are moving orthogonally
+                            true => self.movement_speed as u32,
+                            // false means we are moving diagonally
+                            false => (self.movement_speed as f32 * DIAGONAL_MULTIPLIER) as u32,
+                        };
+
+                        let arrival_position = pos.convert_to_vector();
+                        let arrival_timestamp = last_timestamp + speed;
+
+                        last_timestamp = arrival_timestamp;
+                        last_position = Some(arrival_position);
+
+                        (arrival_position, arrival_timestamp)
+                    } else {
+                        last_position = Some(from);
+                        (from, last_timestamp)
+                    }
                 })
                 .collect();
 

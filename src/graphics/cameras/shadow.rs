@@ -4,7 +4,7 @@ use super::Camera;
 use crate::graphics::Transform;
 
 pub struct ShadowCamera {
-    focus_position: Point3<f32>,
+    focus_point: Point3<f32>,
     look_up_vector: Vector3<f32>,
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
@@ -16,7 +16,7 @@ pub struct ShadowCamera {
 impl ShadowCamera {
     pub fn new() -> Self {
         Self {
-            focus_position: Point3::new(0.0, 0.0, 0.0),
+            focus_point: Point3::new(0.0, 0.0, 0.0),
             look_up_vector: Vector3::new(0.0, -1.0, 0.0),
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
@@ -26,8 +26,8 @@ impl ShadowCamera {
         }
     }
 
-    pub fn set_focus_point(&mut self, position: Vector3<f32>) {
-        self.focus_position = Point3::new(position.x, position.y, position.z);
+    pub fn set_focus_point(&mut self, focus_point: Point3<f32>) {
+        self.focus_point = focus_point;
     }
 
     pub fn update(&mut self, day_timer: f32) {
@@ -37,15 +37,15 @@ impl ShadowCamera {
     fn camera_position(&self) -> Point3<f32> {
         let direction = crate::world::get_light_direction(self.day_timer).normalize();
         let scaled_direction = direction * 100.0;
-        self.focus_position + scaled_direction
+        self.focus_point + scaled_direction
     }
 
     fn view_direction(&self) -> Vector3<f32> {
         let camera_position = self.camera_position();
         Vector3::new(
-            self.focus_position.x - camera_position.x,
-            self.focus_position.y - camera_position.y,
-            self.focus_position.z - camera_position.z,
+            self.focus_point.x - camera_position.x,
+            self.focus_point.y - camera_position.y,
+            self.focus_point.z - camera_position.z,
         )
         .normalize()
     }
@@ -70,7 +70,7 @@ impl Camera for ShadowCamera {
         let z_far = 500.0;
 
         self.projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, z_near, z_far);
-        self.view_matrix = Matrix4::look_at_rh(self.camera_position(), self.focus_position, self.look_up_vector);
+        self.view_matrix = Matrix4::look_at_rh(self.camera_position(), self.focus_point, self.look_up_vector);
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
         self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();
     }

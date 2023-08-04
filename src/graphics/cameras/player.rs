@@ -10,9 +10,10 @@ const ROTATION_SPEED: f32 = 0.02;
 const MINIMUM_ZOOM: f32 = 150.0;
 const MAXIMUM_ZOOM: f32 = 600.0;
 const DEFAULT_ZOOM: f32 = 400.0;
+const THRESHHOLD: f32 = 0.01;
 
 pub struct PlayerCamera {
-    focus_position: Point3<f32>,
+    focus_point: Point3<SmoothedValue>,
     look_up_vector: Vector3<f32>,
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
@@ -26,20 +27,32 @@ pub struct PlayerCamera {
 impl PlayerCamera {
     pub fn new() -> Self {
         Self {
-            focus_position: Point3::new(0.0, 0.0, 0.0),
+            focus_point: [SmoothedValue::new(0.0, THRESHHOLD, 5.0); 3].into(),
             look_up_vector: Vector3::new(0.0, -1.0, 0.0),
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
             world_to_screen_matrix: Matrix4::from_value(0.0),
             screen_to_world_matrix: Matrix4::from_value(0.0),
-            view_angle: SmoothedValue::new(FRAC_PI_2, 0.01, 15.0),
-            zoom: SmoothedValue::new(DEFAULT_ZOOM, 0.01, 5.0),
+            view_angle: SmoothedValue::new(FRAC_PI_2, THRESHHOLD, 15.0),
+            zoom: SmoothedValue::new(DEFAULT_ZOOM, THRESHHOLD, 5.0),
             aspect_ratio: 0.0,
         }
     }
 
+    pub fn get_focus_point(&mut self) -> Point3<f32> {
+        self.focus_point.map(|component| component.get_current())
+    }
+
     pub fn set_focus_point(&mut self, position: Vector3<f32>) {
-        self.focus_position = Point3::new(position.x, position.y, position.z);
+        self.focus_point.x.set(position.x);
+        self.focus_point.y.set(position.y);
+        self.focus_point.z.set(position.z);
+    }
+
+    pub fn set_smoothed_focus_point(&mut self, position: Vector3<f32>) {
+        self.focus_point.x.set_desired(position.x);
+        self.focus_point.y.set_desired(position.y);
+        self.focus_point.z.set_desired(position.z);
     }
 
     pub fn soft_zoom(&mut self, zoom_factor: f32) {
@@ -51,6 +64,9 @@ impl PlayerCamera {
     }
 
     pub fn update(&mut self, delta_time: f64) {
+        self.focus_point.x.update(delta_time);
+        self.focus_point.y.update(delta_time);
+        self.focus_point.z.update(delta_time);
         self.zoom.update(delta_time);
         self.view_angle.update(delta_time);
     }
@@ -59,18 +75,18 @@ impl PlayerCamera {
         let zoom = self.zoom.get_current();
         let view_angle = self.view_angle.get_current();
         Point3::new(
-            self.focus_position.x + zoom * view_angle.cos(),
-            self.focus_position.y + zoom,
-            self.focus_position.z + -zoom * view_angle.sin(),
+            self.focus_point.x.get_current() + zoom * view_angle.cos(),
+            self.focus_point.y.get_current() + zoom,
+            self.focus_point.z.get_current() + -zoom * view_angle.sin(),
         )
     }
 
     fn view_direction(&self) -> Vector3<f32> {
         let camera_position = self.camera_position();
         Vector3::new(
-            self.focus_position.x - camera_position.x,
-            self.focus_position.y - camera_position.y,
-            self.focus_position.z - camera_position.z,
+            self.focus_point.x.get_current() - camera_position.x,
+            self.focus_point.y.get_current() - camera_position.y,
+            self.focus_point.z.get_current() - camera_position.z,
         )
         .normalize()
     }
@@ -93,7 +109,7 @@ impl Camera for PlayerCamera {
         self.projection_matrix = cgmath::perspective(Rad(0.2617), self.aspect_ratio, 1.0, 2000.0);
 
         let camera_position = self.camera_position();
-        self.view_matrix = Matrix4::look_at_rh(camera_position, self.focus_position, self.look_up_vector);
+        self.view_matrix = Matrix4::look_at_rh(camera_position, self.get_focus_point(), self.look_up_vector);
 
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
         self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();

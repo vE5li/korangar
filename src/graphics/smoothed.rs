@@ -1,3 +1,4 @@
+#[derive(Clone, Copy)]
 pub struct SmoothedValue {
     current: f32,
     desired: f32,
@@ -25,6 +26,15 @@ impl SmoothedValue {
             let new_current = self.current - ((self.current - self.desired) * self.speed * delta_time as f32);
             self.current = self.desired.max(new_current);
         }
+    }
+
+    pub fn set(&mut self, value: f32) {
+        self.current = value;
+        self.desired = value;
+    }
+
+    pub fn set_desired(&mut self, value: f32) {
+        self.desired = value;
     }
 
     pub fn move_desired(&mut self, offset: f32) {

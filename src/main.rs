@@ -333,8 +333,8 @@ fn main() {
     let mut player_camera = PlayerCamera::new();
     let mut directional_shadow_camera = ShadowCamera::new();
 
-    start_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
-    directional_shadow_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
+    start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+    directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -526,6 +526,7 @@ fn main() {
                                 .unwrap();
 
                             entities[0].set_position(&map, player_position, client_tick);
+                            player_camera.set_focus_point(entities[0].get_position());
 
                             particle_holder.clear();
                             networking_system.map_loaded();
@@ -535,6 +536,7 @@ fn main() {
                         }
                         NetworkEvent::SetPlayerPosition(player_position) => {
                             entities[0].set_position(&map, player_position, client_tick);
+                            player_camera.set_focus_point(entities[0].get_position());
                         }
                         NetworkEvent::UpdateClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
@@ -623,8 +625,8 @@ fn main() {
                             let character_selection_window = networking_system.character_selection_window();
                             interface.open_window(&mut focus_state, &character_selection_window);
 
-                            start_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
-                            directional_shadow_camera.set_focus_point(cgmath::Vector3::new(600.0, 0.0, 240.0));
+                            start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+                            directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
                         }
                         NetworkEvent::FriendRequest(friend) => interface.open_window(&mut focus_state, &FriendRequestWindow::new(friend)),
                     }
@@ -997,8 +999,8 @@ fn main() {
 
                 if !entities.is_empty() {
                     let player_position = entities[0].get_position();
-                    player_camera.set_focus_point(player_position);
-                    directional_shadow_camera.set_focus_point(player_position);
+                    player_camera.set_smoothed_focus_point(player_position);
+                    directional_shadow_camera.set_focus_point(player_camera.get_focus_point());
                 }
 
                 #[cfg(feature = "debug")]

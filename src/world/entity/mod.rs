@@ -189,6 +189,14 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4190 => "½´ÆÛ³ëºñ½º",      // SUPERNOVICE2
         4211 => "KAGEROU",         // KAGEROU
         4212 => "OBORO",           // OBORO
+        4222 => "´ÑÀÚ",            // NINJA_B
+        4223 => "KAGEROU",         // KAGEROU_B
+        4224 => "OBORO",           // OBORO_B
+        4225 => "ÅÂ±Ç¼Ò³â",        // TAEKWON_B
+        4226 => "±Ç¼º",            // STAR_B
+        4227 => "¼Ò¿ï¸µÄ¿",        // LINKER_B
+        4228 => "°Ç³Ê",            // GUNSLINGER_B
+        4229 => "REBELLION",       // REBELLION_B
         4252 => "DRAGON_KNIGHT",   // DRAGON KNIGHT
         4253 => "MEISTER",         // MEISTER
         4254 => "SHADOW_CROSS",    // SHADOW CROSS

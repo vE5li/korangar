@@ -8,10 +8,10 @@ pub fn prototype_element_helper(
     data_struct: DataStruct,
     mut attributes: Vec<Attribute>,
     name: String,
-) -> (Vec<TokenStream>, TokenStream, Option<TokenStream>) {
-    let fields: Vec<Field> = match data_struct.fields {
-        syn::Fields::Named(named_fields) => named_fields.named.into_iter().collect(),
-        syn::Fields::Unnamed(unnamed_fields) => unnamed_fields.unnamed.into_iter().collect(),
+) -> (Vec<TokenStream>, bool, TokenStream, Option<TokenStream>) {
+    let (fields, is_unnamed): (Vec<Field>, bool) = match data_struct.fields {
+        syn::Fields::Named(named_fields) => (named_fields.named.into_iter().collect(), false),
+        syn::Fields::Unnamed(unnamed_fields) => (unnamed_fields.unnamed.into_iter().collect(), true),
         syn::Fields::Unit => panic!("unit types are not supported"),
     };
 
@@ -46,5 +46,5 @@ pub fn prototype_element_helper(
         initializers.push(quote!(crate::interface::PrototypeElement::to_element(&self.#field_identifier, #display_name.to_string())));
     }
 
-    (initializers, window_title, window_class)
+    (initializers, is_unnamed, window_title, window_class)
 }

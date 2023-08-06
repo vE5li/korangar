@@ -10,7 +10,7 @@ pub fn derive_prototype_window_struct(
     attributes: Vec<Attribute>,
     name: Ident,
 ) -> InterfaceTokenStream {
-    let (initializers, window_title, window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
+    let (initializers, _is_unnamed, window_title, window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let (window_class_option, window_class_ref_option) = window_class

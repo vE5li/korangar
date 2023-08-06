@@ -10,8 +10,19 @@ pub fn derive_prototype_element_struct(
     attributes: Vec<Attribute>,
     name: Ident,
 ) -> InterfaceTokenStream {
-    let (initializers, _window_title, _window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
+    let (initializers, is_unnamed, _window_title, _window_class) = prototype_element_helper(data_struct, attributes, name.to_string());
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    if initializers.len() == 1 && is_unnamed {
+        return quote! {
+            impl #impl_generics crate::interface::PrototypeElement for #name #type_generics #where_clause {
+                fn to_element(&self, display: String) -> crate::interface::ElementCell {
+                    crate::interface::PrototypeElement::to_element(&self.0, display)
+                }
+            }
+        }
+        .into();
+    }
 
     quote! {
         impl #impl_generics crate::interface::PrototypeElement for #name #type_generics #where_clause {

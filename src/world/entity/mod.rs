@@ -197,6 +197,10 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4227 => "¼Ò¿ï¸µÄ¿",        // LINKER_B
         4228 => "°Ç³Ê",            // GUNSLINGER_B
         4229 => "REBELLION",       // REBELLION_B
+        4239 => "¼ºÁ¦",            // STAR EMPEROR
+        4240 => "¼Ò¿ï¸®ÆÛ",        // SOUL REAPER
+        4241 => "¼ºÁ¦",            // STAR_EMPEROR_B
+        4242 => "¼Ò¿ï¸®ÆÛ",        // SOUL_REAPER_B
         4252 => "DRAGON_KNIGHT",   // DRAGON KNIGHT
         4253 => "MEISTER",         // MEISTER
         4254 => "SHADOW_CROSS",    // SHADOW CROSS

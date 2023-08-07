@@ -215,6 +215,12 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4262 => "INQUISITOR",      // INQUISITOR
         4263 => "TROUBADOUR",      // TROUBADOUR
         4264 => "TROUVERE",        // TROUVERE
+        4302 => "SKY_EMPEROR",     // SKY EMPEROR
+        4303 => "SOUL_ASCETIC",    // SOUL ASCETIC
+        4304 => "SHINKIRO",        // SHINKIRO
+        4305 => "SHIRANUI",        // SHIRANUI
+        4306 => "NIGHT_WATCH",     // NIGHT WATCH
+        4307 => "HYPER_NOVICE",    // HYPER NOVICE
         _ => "ÃÊº¸ÀÚ",             // NOVICE
     }
 }

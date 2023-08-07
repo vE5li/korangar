@@ -189,6 +189,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4190 => "½´ÆÛ³ëºñ½º",      // SUPERNOVICE2
         4211 => "KAGEROU",         // KAGEROU
         4212 => "OBORO",           // OBORO
+        4215 => "REBELLION",       // REBELLION
         4222 => "´ÑÀÚ",            // NINJA_B
         4223 => "KAGEROU",         // KAGEROU_B
         4224 => "OBORO",           // OBORO_B

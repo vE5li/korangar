@@ -70,6 +70,15 @@ pub const INTERFACE_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
     alpha_destination: BlendFactor::DstAlpha,
 };
 
+pub const EFFECT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
+    color_op: BlendOp::Max,
+    color_source: BlendFactor::One,
+    color_destination: BlendFactor::One,
+    alpha_op: BlendOp::Max,
+    alpha_source: BlendFactor::One,
+    alpha_destination: BlendFactor::One,
+};
+
 pub trait Renderer {
     type Target;
 }

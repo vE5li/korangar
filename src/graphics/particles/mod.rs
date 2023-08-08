@@ -68,6 +68,46 @@ impl Particle for DamageNumber {
     }
 }
 
+#[derive(new)]
+pub struct HealNumber {
+    position: Vector3<f32>,
+    heal_amount: String,
+    #[new(value = "50.0")]
+    velocity_y: f32,
+    #[new(value = "1.0")]
+    timer: f32,
+}
+
+impl Particle for HealNumber {
+    fn update(&mut self, delta_time: f32) -> bool {
+        self.velocity_y -= 50.0 * delta_time;
+
+        self.position.y += self.velocity_y * delta_time;
+
+        self.timer -= delta_time;
+        self.timer > 0.0
+    }
+
+    fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+        window_size: Vector2<f32>,
+    ) {
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
+        let screen_position = Vector2::new(
+            clip_space_position.x / clip_space_position.w + 1.0,
+            clip_space_position.y / clip_space_position.w + 1.0,
+        );
+        let screen_position = screen_position / 2.0;
+        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+
+        renderer.render_damage_text(render_target, &self.heal_amount, final_position, Color::rgb(30, 255, 30), 16.0);
+    }
+}
+
 pub struct QuestIcon {
     position: Vector3<f32>,
     texture: Texture,

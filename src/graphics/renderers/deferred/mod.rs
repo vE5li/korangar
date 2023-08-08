@@ -4,6 +4,7 @@ mod r#box;
 #[cfg(feature = "debug")]
 mod buffer;
 mod directional;
+mod effect;
 mod entity;
 mod geometry;
 mod indicator;
@@ -35,6 +36,7 @@ use self::r#box::BoxRenderer;
 #[cfg(feature = "debug")]
 use self::buffer::BufferRenderer;
 use self::directional::DirectionalLightRenderer;
+use self::effect::EffectRenderer;
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
 use self::indicator::IndicatorRenderer;
@@ -70,6 +72,7 @@ pub enum DeferredSubrenderer {
     Overlay,
     Rectangle,
     Sprite,
+    Effect,
 }
 
 pub struct DeferredRenderer {
@@ -87,6 +90,7 @@ pub struct DeferredRenderer {
     overlay_renderer: OverlayRenderer,
     rectangle_renderer: RectangleRenderer,
     sprite_renderer: SpriteRenderer,
+    effect_renderer: EffectRenderer,
     #[cfg(feature = "debug")]
     buffer_renderer: BufferRenderer,
     #[cfg(feature = "debug")]
@@ -180,6 +184,7 @@ impl DeferredRenderer {
             #[cfg(feature = "debug")]
             texture_loader,
         );
+        let effect_renderer = EffectRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
         let buffer_renderer = BufferRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
@@ -214,6 +219,7 @@ impl DeferredRenderer {
             overlay_renderer,
             rectangle_renderer,
             sprite_renderer,
+            effect_renderer,
             #[cfg(feature = "debug")]
             buffer_renderer,
             #[cfg(feature = "debug")]
@@ -258,6 +264,8 @@ impl DeferredRenderer {
         self.rectangle_renderer
             .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         self.sprite_renderer
+            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
+        self.effect_renderer
             .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
         self.buffer_renderer
@@ -404,6 +412,32 @@ impl DeferredRenderer {
             );
             position.x += font_size / 2.0;
         }
+    }
+
+    pub fn render_effect(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        texture: Texture,
+        screen_positions: [Vector2<f32>; 4],
+        texture_coordinates: [Vector2<f32>; 4],
+        screen_space_position: Vector2<f32>,
+        offset: Vector2<f32>,
+        angle: f32,
+        color: Color,
+    ) {
+        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+
+        self.effect_renderer.render(
+            render_target,
+            texture,
+            window_size,
+            screen_positions,
+            texture_coordinates,
+            screen_space_position,
+            offset,
+            angle,
+            color,
+        );
     }
 
     #[cfg(feature = "debug")]

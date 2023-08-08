@@ -1,3 +1,5 @@
+mod lookup;
+
 use cgmath::Vector3;
 use procedural::*;
 

@@ -102,6 +102,7 @@ pub enum NetworkEvent {
     UpdateEntityDetails(EntityId, String),
     UpdateEntityHealth(EntityId, usize, usize),
     DamageEffect(EntityId, usize),
+    HealEffect(EntityId, usize),
     UpdateStatus(StatusType),
     OpenDialog(String, EntityId),
     AddNextButton,
@@ -120,6 +121,9 @@ pub enum NetworkEvent {
     SetPlayerPosition(Vector2<usize>),
     Disconnect,
     FriendRequest(Friend),
+    VisualEffect(&'static str, EntityId),
+    AddSkillUnit(EntityId, UnitId, Vector2<usize>),
+    RemoveSkillUnit(EntityId),
 }
 
 pub struct ChatMessage {
@@ -1626,10 +1630,48 @@ struct DisplaySpecialEffectPacket {
 }
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
-#[header(0x09cb)]
-struct DisplaySkillEffectPacket {
+#[header(0x043d)]
+struct DisplaySkillCooldownPacket {
     pub skill_id: SkillId,
-    pub heal: u32,
+    pub until: ClientTick,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x01de)]
+struct DisplaySkillEffectAndDamagePacket {
+    pub skill_id: SkillId,
+    pub source_entity_id: EntityId,
+    pub destination_entity_id: EntityId,
+    pub start_time: ClientTick,
+    pub soruce_delay: u32,
+    pub destination_delay: u32,
+    pub damage: u32,
+    pub level: SkillLevel,
+    pub div: u16,
+    pub skill_type: u8,
+}
+
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[numeric_type(u16)]
+enum HealType {
+    #[numeric_value(5)]
+    Health,
+    #[numeric_value(7)]
+    SpellPoints,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0a27)]
+struct DisplayPlayerHealEffect {
+    pub heal_type: HealType,
+    pub heal_amount: u32,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x09cb)]
+struct DisplaySkillEffectNoDamagePacket {
+    pub skill_id: SkillId,
+    pub heal_amount: u32,
     pub destination_entity_id: EntityId,
     pub source_entity_id: EntityId,
     pub result: u8,
@@ -2174,15 +2216,208 @@ struct ToUseSkillSuccessPacket {
     pub cause: u8,
 }
 
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[numeric_type(u32)]
+pub enum UnitId {
+    #[numeric_value(0x7e)]
+    Safetywall,
+    Firewall,
+    WarpWaiting,
+    WarpActive,
+    Benedictio,
+    Sanctuary,
+    Magnus,
+    Pneuma,
+    Dummyskill,
+    FirepillarWaiting,
+    FirepillarActive,
+    HiddenTrap,
+    Trap,
+    HiddenWarpNpc,
+    UsedTraps,
+    Icewall,
+    Quagmire,
+    Blastmine,
+    Skidtrap,
+    Anklesnare,
+    Venomdust,
+    Landmine,
+    Shockwave,
+    Sandman,
+    Flasher,
+    Freezingtrap,
+    Claymoretrap,
+    Talkiebox,
+    Volcano,
+    Deluge,
+    Violentgale,
+    Landprotector,
+    Lullaby,
+    Richmankim,
+    Eternalchaos,
+    Drumbattlefield,
+    Ringnibelungen,
+    Rokisweil,
+    Intoabyss,
+    Siegfried,
+    Dissonance,
+    Whistle,
+    Assassincross,
+    Poembragi,
+    Appleidun,
+    Uglydance,
+    Humming,
+    Dontforgetme,
+    Fortunekiss,
+    Serviceforyou,
+    Graffiti,
+    Demonstration,
+    Callfamily,
+    Gospel,
+    Basilica,
+    Moonlit,
+    Fogwall,
+    Spiderweb,
+    Gravitation,
+    Hermode,
+    Kaensin,
+    Suiton,
+    Tatamigaeshi,
+    Kaen,
+    GrounddriftWind,
+    GrounddriftDark,
+    GrounddriftPoison,
+    GrounddriftWater,
+    GrounddriftFire,
+    Deathwave,
+    Waterattack,
+    Windattack,
+    Earthquake,
+    Evilland,
+    DarkRunner,
+    DarkTransfer,
+    Epiclesis,
+    Earthstrain,
+    Manhole,
+    Dimensiondoor,
+    Chaospanic,
+    Maelstrom,
+    Bloodylust,
+    Feintbomb,
+    Magentatrap,
+    Cobalttrap,
+    Maizetrap,
+    Verduretrap,
+    Firingtrap,
+    Iceboundtrap,
+    Electricshocker,
+    Clusterbomb,
+    Reverberation,
+    SevereRainstorm,
+    Firewalk,
+    Electricwalk,
+    Netherworld,
+    PsychicWave,
+    CloudKill,
+    Poisonsmoke,
+    Neutralbarrier,
+    Stealthfield,
+    Warmer,
+    ThornsTrap,
+    Wallofthorn,
+    DemonicFire,
+    FireExpansionSmokePowder,
+    FireExpansionTearGas,
+    HellsPlant,
+    VacuumExtreme,
+    Banding,
+    FireMantle,
+    WaterBarrier,
+    Zephyr,
+    PowerOfGaia,
+    FireInsignia,
+    WaterInsignia,
+    WindInsignia,
+    EarthInsignia,
+    PoisonMist,
+    LavaSlide,
+    VolcanicAsh,
+    ZenkaiWater,
+    ZenkaiLand,
+    ZenkaiFire,
+    ZenkaiWind,
+    Makibishi,
+    Venomfog,
+    Icemine,
+    Flamecross,
+    Hellburning,
+    MagmaEruption,
+    KingsGrace,
+    GlitteringGreed,
+    BTrap,
+    FireRain,
+    Catnippowder,
+    Nyanggrass,
+    Creatingstar,
+    Dummy0,
+    RainOfCrystal,
+    MysteryIllusion,
+    #[numeric_value(269)]
+    StrantumTremor,
+    ViolentQuake,
+    AllBloom,
+    TornadoStorm,
+    FloralFlareRoad,
+    AstralStrike,
+    CrossRain,
+    PneumaticusProcella,
+    AbyssSquare,
+    AcidifiedZoneWater,
+    AcidifiedZoneGround,
+    AcidifiedZoneWind,
+    AcidifiedZoneFire,
+    LightningLand,
+    VenomSwamp,
+    Conflagration,
+    CaneOfEvilEye,
+    TwinklingGalaxy,
+    StarCannon,
+    GrenadesDropping,
+    #[numeric_value(290)]
+    Fuumashouaku,
+    MissionBombard,
+    TotemOfTutelary,
+    HyunRoksBreeze,
+    Shinkirou, // mirage
+    JackFrostNova,
+    GroundGravitation,
+    #[numeric_value(298)]
+    Kunaiwaikyoku,
+    #[numeric_value(20852)]
+    Deepblindtrap,
+    Solidtrap,
+    Swifttrap,
+    Flametrap,
+    #[numeric_value(0xc1)]
+    GdLeadership,
+    #[numeric_value(0xc2)]
+    GdGlorywounds,
+    #[numeric_value(0xc3)]
+    GdSoulcold,
+    #[numeric_value(0xc4)]
+    GdHawkeyes,
+    #[numeric_value(0x190)]
+    Max,
+}
+
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x09ca)]
 struct NotifySkillUnitPacket {
     pub lenght: u16,
+    pub entity_id: EntityId,
     pub creator_id: EntityId,
-    /// Confirm
-    pub skill_id: u32,
     pub position: Vector2<u16>,
-    pub unit_id: EntityId,
+    pub unit_id: UnitId,
     pub range: u8,
     pub visible: u8,
     pub skill_level: u8,
@@ -2192,8 +2427,7 @@ struct NotifySkillUnitPacket {
 #[header(0x0117)]
 struct NotifyGroundSkillPacket {
     pub skill_id: SkillId,
-    /// Confirm
-    pub animation_id: u32,
+    pub entity_id: EntityId,
     pub level: SkillLevel,
     pub position: Vector2<u16>,
     pub start_time: ClientTick,
@@ -2201,8 +2435,8 @@ struct NotifyGroundSkillPacket {
 
 #[derive(Clone, Debug, Packet, PrototypeElement)]
 #[header(0x0120)]
-struct SkillDisappearPacket {
-    pub id: u32,
+struct SkillUnitDisappearPacket {
+    pub entity_id: EntityId,
 }
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
@@ -2375,6 +2609,15 @@ struct ClanInfoPacket {
 struct ClanOnlineCountPacket {
     pub online_members: u16,
     pub maximum_members: u16,
+}
+
+#[derive(Clone, Debug, Packet, PrototypeElement)]
+#[header(0x0192)]
+struct ChangeMapCellPacket {
+    position: Vector2<u16>,
+    cell_type: u16,
+    #[length_hint(16)]
+    map_name: String,
 }
 
 #[derive(Clone, new)]
@@ -3252,14 +3495,37 @@ impl NetworkingSystem {
 
                     events.push(NetworkEvent::AddChoiceButtons(choices));
                 } else if let Ok(_) = DisplaySpecialEffectPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_) = DisplaySkillEffectPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplaySkillCooldownPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = DisplaySkillEffectAndDamagePacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = DisplaySkillEffectNoDamagePacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::HealEffect(
+                        packet.destination_entity_id,
+                        packet.heal_amount as usize,
+                    ));
+
+                    //events.push(NetworkEvent::VisualEffect());
+                } else if let Ok(_) = DisplayPlayerHealEffect::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = StatusChangePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = QuestNotificationPacket1::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = HuntingQuestNotificationPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = HuntingQuestUpdateObjectivePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = QuestRemovedPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = QuestListPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_) = VisualEffectPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = VisualEffectPacket::try_from_bytes(&mut byte_stream) {
+                    let path = match packet.effect {
+                        VisualEffect::BaseLevelUp => "angel.str",
+                        VisualEffect::JobLevelUp => "joblvup.str",
+                        VisualEffect::RefineFailure => "bs_refinefailed.str",
+                        VisualEffect::RefineSuccess => "bs_refinesuccess.str",
+                        VisualEffect::GameOver => "help_angel\\help_angel\\help_angel.str",
+                        VisualEffect::PharmacySuccess => "p_success.str",
+                        VisualEffect::PharmacyFailure => "p_failed.str",
+                        VisualEffect::BaseLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
+                        VisualEffect::JobLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
+                        VisualEffect::BaseLevelUpTaekwon => "help_angel\\help_angel\\help_angel.str",
+                    };
+
+                    events.push(NetworkEvent::VisualEffect(path, packet.entity_id));
                 } else if let Ok(_) = DisplayGainedExperiencePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = DisplayImagePacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = StateChangePacket::try_from_bytes(&mut byte_stream) {
@@ -3336,9 +3602,15 @@ impl NetworkingSystem {
                     }
                 } else if let Ok(_) = UseSkillSuccessPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = ToUseSkillSuccessPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_) = NotifySkillUnitPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(packet) = NotifySkillUnitPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::AddSkillUnit(
+                        packet.entity_id,
+                        packet.unit_id,
+                        packet.position.map(|component| component as usize),
+                    ));
+                } else if let Ok(packet) = SkillUnitDisappearPacket::try_from_bytes(&mut byte_stream) {
+                    events.push(NetworkEvent::RemoveSkillUnit(packet.entity_id));
                 } else if let Ok(_) = NotifyGroundSkillPacket::try_from_bytes(&mut byte_stream) {
-                } else if let Ok(_) = SkillDisappearPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(packet) = FriendListPacket::try_from_bytes(&mut byte_stream) {
                     self.friend_list.with_mut(|friends, chaged| {
                         *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();
@@ -3366,6 +3638,7 @@ impl NetworkingSystem {
                 } else if let Ok(_) = ReputationPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = ClanInfoPacket::try_from_bytes(&mut byte_stream) {
                 } else if let Ok(_) = ClanOnlineCountPacket::try_from_bytes(&mut byte_stream) {
+                } else if let Ok(_) = ChangeMapCellPacket::try_from_bytes(&mut byte_stream) {
                 } else {
                     #[cfg(feature = "debug")]
                     {

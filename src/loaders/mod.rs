@@ -1,5 +1,6 @@
 mod action;
 mod convertable;
+mod effect;
 mod fixed;
 mod font;
 mod gamefile;
@@ -13,6 +14,7 @@ mod version;
 
 pub use self::action::*;
 pub use self::convertable::ByteConvertable;
+pub use self::effect::{EffectHolder, EffectLoader, *};
 pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
 pub use self::font::FontLoader;
 pub use self::gamefile::GameFileLoader;

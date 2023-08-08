@@ -34,7 +34,7 @@ use std::io::Cursor;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Zero};
+use cgmath::{Vector2, Vector3, Zero};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
 use network::SkillType;
@@ -57,7 +57,7 @@ use crate::input::{FocusState, InputSystem, UserEvent};
 use crate::interface::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
-use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem, SkillId};
+use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem, SkillId, UnitId};
 use crate::system::{choose_physical_device, get_device_extensions, get_instance_extensions, get_layers, GameTimer};
 use crate::world::*;
 
@@ -208,6 +208,7 @@ fn main() {
     let mut map_loader = MapLoader::new(memory_allocator.clone());
     let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
     let mut action_loader = ActionLoader::default();
+    let mut effect_loader = EffectLoader::default();
     let script_loader = ScriptLoader::new(&mut game_file_loader);
 
     #[cfg(feature = "debug")]
@@ -353,6 +354,7 @@ fn main() {
     timer.stop();
 
     let mut particle_holder = ParticleHolder::default();
+    let mut effect_holder = EffectHolder::default();
     let mut entities = Vec::<Entity>::new();
     let mut player_inventory = Inventory::default();
     let mut player_skill_tree = SkillTree::default();
@@ -513,13 +515,12 @@ fn main() {
                         }
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
                             entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
+
                             /*#[cfg(feature = "debug")]
                             entities[0].generate_steps_vertex_buffer(device.clone(), &map);*/
                         }
                         NetworkEvent::ChangeMap(map_name, player_position) => {
-                            while entities.len() > 1 {
-                                entities.pop();
-                            }
+                            entities.truncate(1);
 
                             map = map_loader
                                 .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
@@ -529,6 +530,7 @@ fn main() {
                             player_camera.set_focus_point(entities[0].get_position());
 
                             particle_holder.clear();
+                            effect_holder.clear();
                             networking_system.map_loaded();
                             // TODO: this is just a workaround until i find a better solution to make the
                             // cursor always look correct.
@@ -558,6 +560,14 @@ fn main() {
                                 .unwrap_or(&entities[0]);
 
                             particle_holder.spawn_particle(Box::new(DamageNumber::new(entity.get_position(), damage_amount.to_string())));
+                        }
+                        NetworkEvent::HealEffect(entity_id, damage_amount) => {
+                            let entity = entities
+                                .iter()
+                                .find(|entity| entity.get_entity_id() == entity_id)
+                                .unwrap_or(&entities[0]);
+
+                            particle_holder.spawn_particle(Box::new(HealNumber::new(entity.get_position(), damage_amount.to_string())));
                         }
                         NetworkEvent::UpdateEntityHealth(entity_id, health_points, maximum_health_points) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -610,6 +620,8 @@ fn main() {
                         NetworkEvent::Disconnect => {
                             networking_system.disconnect_from_map_server();
                             entities.clear();
+                            particle_holder.clear();
+                            effect_holder.clear();
 
                             map = map_loader
                                 .get(
@@ -629,6 +641,69 @@ fn main() {
                             directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
                         }
                         NetworkEvent::FriendRequest(friend) => interface.open_window(&mut focus_state, &FriendRequestWindow::new(friend)),
+                        NetworkEvent::VisualEffect(path, entity_id) => {
+                            let effect = effect_loader.get(path, &mut game_file_loader, &mut texture_loader).unwrap();
+                            let frame_timer = effect.new_frame_timer();
+
+                            effect_holder.add_effect(Box::new(EffectWithLight::new(
+                                effect,
+                                frame_timer,
+                                EffectCenter::Entity(entity_id, cgmath::Vector3::new(0.0, 0.0, 0.0)),
+                                Vector3::new(0.0, 9.0, 0.0),
+                                Vector3::new(0.0, 12.0, 0.0),
+                                Color::monochrome(255),
+                                50.0,
+                                false,
+                            )));
+                        }
+                        NetworkEvent::AddSkillUnit(entity_id, unit_id, position) => match unit_id {
+                            UnitId::Firewall => {
+                                let position = map.get_world_position(position);
+                                let effect = effect_loader
+                                    .get("firewall.str", &mut game_file_loader, &mut texture_loader)
+                                    .unwrap();
+                                let frame_timer = effect.new_frame_timer();
+
+                                effect_holder.add_unit(
+                                    Box::new(EffectWithLight::new(
+                                        effect,
+                                        frame_timer,
+                                        EffectCenter::Position(position),
+                                        Vector3::new(0.0, 0.0, 0.0),
+                                        Vector3::new(0.0, 3.0, 0.0),
+                                        Color::rgb(255, 30, 0),
+                                        20.0,
+                                        true,
+                                    )),
+                                    entity_id,
+                                );
+                            }
+                            UnitId::Pneuma => {
+                                let position = map.get_world_position(position);
+                                let effect = effect_loader
+                                    .get("pneuma1.str", &mut game_file_loader, &mut texture_loader)
+                                    .unwrap();
+                                let frame_timer = effect.new_frame_timer();
+
+                                effect_holder.add_unit(
+                                    Box::new(EffectWithLight::new(
+                                        effect,
+                                        frame_timer,
+                                        EffectCenter::Position(position),
+                                        Vector3::new(0.0, 0.0, 0.0),
+                                        Vector3::new(0.0, 3.0, 0.0),
+                                        Color::rgb(83, 220, 108),
+                                        40.0,
+                                        false,
+                                    )),
+                                    entity_id,
+                                );
+                            }
+                            _ => {}
+                        },
+                        NetworkEvent::RemoveSkillUnit(entity_id) => {
+                            effect_holder.remove_unit(entity_id);
+                        }
                     }
                 }
 
@@ -1316,6 +1391,9 @@ fn main() {
                         interface_target.finish(font_future);
                     }
                 });
+
+                effect_holder.update(entities, delta_time as f32);
+                effect_holder.render(screen_target, &deferred_renderer, current_camera);
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_buffers() {

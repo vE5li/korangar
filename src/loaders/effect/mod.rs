@@ -227,8 +227,12 @@ impl Effect {
                 screen_space_position,
                 frame.offset,
                 frame.angle,
-                Color::rgb_f32(frame.color[0] / 255.0, frame.color[1] / 255.0, frame.color[2] / 255.0)
-                    .multiply_alpha_f32(frame.color[3] / 255.0),
+                Color::rgba_f32(
+                    frame.color[0] / 255.0,
+                    frame.color[1] / 255.0,
+                    frame.color[2] / 255.0,
+                    frame.color[3] / 255.0,
+                ),
             );
         }
     }

@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Rad, SquareMatrix, Vector2, Vector3, Vector4};
 
-use super::{Camera, SmoothedValue, ENTITY_CURVATURE_FRACTION};
+use super::{Camera, SmoothedValue};
 use crate::graphics::Transform;
 
 const ZOOM_SPEED: f32 = 2.0;
@@ -187,6 +187,7 @@ impl Camera for PlayerCamera {
 
     fn calculate_depth_offset_and_curvature(&self, world_matrix: &Matrix4<f32>) -> (f32, f32) {
         let zero_point = world_matrix * Vector4::new(0.0, 0.0, 0.0, 1.0);
+        let front_point = world_matrix * Vector4::new(0.0, -2.0, 4.0, 1.0);
         let top_point = world_matrix * Vector4::new(0.0, -2.0, 0.0, 1.0);
         let visual_length = zero_point.distance(top_point);
         let visual_top_point = zero_point + Vector4::new(0.0, visual_length, 0.0, 0.0);
@@ -196,10 +197,12 @@ impl Camera for PlayerCamera {
                 / (Self::FAR_PLANE + Self::NEAR_PLANE - linear_depth * (Self::FAR_PLANE - Self::NEAR_PLANE))
         };
 
+        let front_depth = linear_to_non_linear((self.world_to_screen_matrix * front_point).z);
         let top_depth = linear_to_non_linear((self.world_to_screen_matrix * top_point).z);
         let visual_top_depth = linear_to_non_linear((self.world_to_screen_matrix * visual_top_point).z);
 
-        let curvature = visual_top_depth / ENTITY_CURVATURE_FRACTION;
+        let curvature = top_depth - front_depth;
+        // FIX: This calculation is still not 100% correct. On steeper angles it breaks
         let depth_offset = visual_top_depth - top_depth;
 
         (depth_offset, curvature)

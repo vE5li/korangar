@@ -13,8 +13,6 @@ pub use self::shadow::ShadowCamera;
 pub use self::start::StartCamera;
 use crate::graphics::{SmoothedValue, Transform};
 
-const ENTITY_CURVATURE_FRACTION: f32 = 120.0;
-
 fn direction(vector: Vector2<f32>) -> usize {
     let inverted = false;
     let k = ((f32::atan2(vector.normalize().x, vector.y) * (180.0 / std::f32::consts::PI) + 360.0 - 22.5) / 45.0) as usize;

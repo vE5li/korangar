@@ -22,6 +22,7 @@ void main() {
         discard;
     }
 
-    float curvature_offset = (0.5 - pow(curvature, 2)) * constants.curvature;
+    // We use min here to only make shadow entities curve back. This helps reduce self-shadowing
+    float curvature_offset = min(0, (0.5 - pow(curvature, 2)) * constants.curvature);
     gl_FragDepth = gl_FragCoord.z + depth_offset - curvature_offset;
 }

@@ -1,6 +1,6 @@
 use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, SquareMatrix, Vector2, Vector3, Vector4};
 
-use super::{Camera, ENTITY_CURVATURE_FRACTION};
+use super::Camera;
 use crate::graphics::Transform;
 
 pub struct ShadowCamera {
@@ -153,7 +153,9 @@ impl Camera for ShadowCamera {
         let visual_top_depth = (self.world_to_screen_matrix * visual_top_point).z;
 
         let depth_offset = visual_top_depth - top_depth;
-        let curvature = visual_top_depth / ENTITY_CURVATURE_FRACTION;
+        // TODO: derive this somehow to make this code generic. Probaly zfar - znear /
+        // magic
+        let curvature = 0.003;
 
         (depth_offset, curvature)
     }

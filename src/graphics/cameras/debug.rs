@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_4;
 
 use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Rad, SquareMatrix, Vector2, Vector3, Vector4};
 
-use super::Camera;
+use super::{Camera, ENTITY_CURVATURE_FRACTION};
 use crate::graphics::Transform;
 
 const LOOK_AROUND_SPEED: f32 = 0.005;
@@ -22,6 +22,9 @@ pub struct DebugCamera {
 }
 
 impl DebugCamera {
+    const FAR_PLANE: f32 = 10000.0;
+    const NEAR_PLANE: f32 = 0.5;
+
     pub fn new() -> Self {
         Self {
             camera_position: Point3::new(0.0, 10.0, 0.0),
@@ -183,5 +186,25 @@ impl Camera for DebugCamera {
     fn get_camera_direction(&self) -> usize {
         let view_direction = self.view_direction();
         super::direction(Vector2::new(view_direction.x, view_direction.z))
+    }
+
+    fn calculate_depth_offset_and_curvature(&self, world_matrix: &Matrix4<f32>) -> (f32, f32) {
+        let zero_point = world_matrix * Vector4::new(0.0, 0.0, 0.0, 1.0);
+        let top_point = world_matrix * Vector4::new(0.0, -2.0, 0.0, 1.0);
+        let visual_length = zero_point.distance(top_point);
+        let visual_top_point = zero_point + Vector4::new(0.0, visual_length, 0.0, 0.0);
+
+        let linear_to_non_linear = |linear_depth: f32| {
+            (2.0 * Self::FAR_PLANE * Self::NEAR_PLANE)
+                / (Self::FAR_PLANE + Self::NEAR_PLANE - linear_depth * (Self::FAR_PLANE - Self::NEAR_PLANE))
+        };
+
+        let top_depth = linear_to_non_linear((self.world_to_screen_matrix * top_point).z);
+        let visual_top_depth = linear_to_non_linear((self.world_to_screen_matrix * visual_top_point).z);
+
+        let curvature = visual_top_depth / ENTITY_CURVATURE_FRACTION;
+        let depth_offset = visual_top_depth - top_depth;
+
+        (depth_offset, curvature)
     }
 }

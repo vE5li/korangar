@@ -172,11 +172,14 @@ impl EntityRenderer {
         let world_matrix = camera.billboard_matrix(position, origin, size);
         let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
         let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
+        let (depth_offset, curvature) = camera.calculate_depth_offset_and_curvature(&world_matrix);
 
         let constants = Constants {
             world: world_matrix.into(),
             texture_position: [texture_position.x, texture_position.y],
             texture_size: [texture_size.x, texture_size.y],
+            depth_offset,
+            curvature,
             mirror: mirror as u32,
         };
 

@@ -1,6 +1,6 @@
 use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, SquareMatrix, Vector2, Vector3, Vector4};
 
-use super::Camera;
+use super::{Camera, ENTITY_CURVATURE_FRACTION};
 use crate::graphics::Transform;
 
 pub struct ShadowCamera {
@@ -14,6 +14,9 @@ pub struct ShadowCamera {
 }
 
 impl ShadowCamera {
+    const FAR_PLANE: f32 = 500.0;
+    const NEAR_PLANE: f32 = -1000.0;
+
     pub fn new() -> Self {
         Self {
             focus_point: Point3::new(0.0, 0.0, 0.0),
@@ -66,10 +69,8 @@ impl ShadowCamera {
 impl Camera for ShadowCamera {
     fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
         let bounds = Vector4::new(-300.0, 300.0, -300.0, 300.0);
-        let z_near = -1000.0;
-        let z_far = 500.0;
 
-        self.projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, z_near, z_far);
+        self.projection_matrix = cgmath::ortho(bounds.x, bounds.y, bounds.w, bounds.z, Self::NEAR_PLANE, Self::FAR_PLANE);
         self.view_matrix = Matrix4::look_at_rh(self.camera_position(), self.focus_point, self.look_up_vector);
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
         self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();
@@ -140,5 +141,20 @@ impl Camera for ShadowCamera {
     fn get_camera_direction(&self) -> usize {
         let view_direction = self.view_direction();
         super::direction(Vector2::new(view_direction.x, view_direction.z))
+    }
+
+    fn calculate_depth_offset_and_curvature(&self, world_matrix: &Matrix4<f32>) -> (f32, f32) {
+        let zero_point = world_matrix * Vector4::new(0.0, 0.0, 0.0, 1.0);
+        let top_point = world_matrix * Vector4::new(0.0, -2.0, 0.0, 1.0);
+        let visual_length = zero_point.distance(top_point);
+        let visual_top_point = zero_point + Vector4::new(0.0, visual_length, 0.0, 0.0);
+
+        let top_depth = (self.world_to_screen_matrix * top_point).z;
+        let visual_top_depth = (self.world_to_screen_matrix * visual_top_point).z;
+
+        let depth_offset = visual_top_depth - top_depth;
+        let curvature = visual_top_depth / ENTITY_CURVATURE_FRACTION;
+
+        (depth_offset, curvature)
     }
 }

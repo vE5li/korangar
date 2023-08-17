@@ -40,12 +40,13 @@ use image::{EncodableLayout, ImageFormat};
 use network::SkillType;
 use procedural::debug_condition;
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
+use vulkano::instance::debug::DebugUtilsMessengerCallback;
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessenger, DebugUtilsMessengerCreateInfo};
-use vulkano::instance::{Instance, InstanceCreateInfo};
+use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo, InstanceExtensions};
+use vulkano::swapchain::Surface;
 use vulkano::sync::{now, GpuFuture};
 use vulkano::VulkanLibrary;
-use vulkano_win::VkSurfaceBuild;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{Icon, WindowBuilder};
@@ -58,7 +59,7 @@ use crate::interface::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
 use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem, SkillId, UnitId};
-use crate::system::{choose_physical_device, get_device_extensions, get_instance_extensions, get_layers, GameTimer};
+use crate::system::{choose_physical_device, get_device_extensions, get_layers, GameTimer};
 use crate::world::*;
 
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
@@ -74,35 +75,29 @@ fn main() {
     let timer = Timer::new("create device");
 
     let library = VulkanLibrary::new().unwrap();
+    let event_loop = EventLoop::new();
     let create_info = InstanceCreateInfo {
-        enabled_extensions: get_instance_extensions(&library),
+        enabled_extensions: InstanceExtensions {
+            ext_debug_utils: true,
+            ..Surface::required_extensions(&event_loop)
+        },
         enabled_layers: get_layers(&library),
-        enumerate_portability: true,
+        flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
         ..Default::default()
     };
 
     let instance = Instance::new(library, create_info).expect("failed to create instance");
 
     #[cfg(feature = "debug")]
-    let _debug_callback = unsafe {
-        DebugUtilsMessenger::new(instance.clone(), DebugUtilsMessengerCreateInfo {
-            message_severity: DebugUtilsMessageSeverity {
-                error: true,
-                warning: true,
-                information: true,
-                verbose: true,
-                ..Default::default()
-            },
-            message_type: DebugUtilsMessageType {
-                general: true,
-                validation: true,
-                performance: true,
-                ..Default::default()
-            },
-            ..DebugUtilsMessengerCreateInfo::user_callback(Arc::new(vulkan_message_callback))
-        })
-        .ok()
-    };
+    let _debug_callback = DebugUtilsMessenger::new(instance.clone(), DebugUtilsMessengerCreateInfo {
+        message_severity: DebugUtilsMessageSeverity::ERROR
+            | DebugUtilsMessageSeverity::WARNING
+            | DebugUtilsMessageSeverity::INFO
+            | DebugUtilsMessageSeverity::VERBOSE,
+        message_type: DebugUtilsMessageType::GENERAL | DebugUtilsMessageType::VALIDATION | DebugUtilsMessageType::PERFORMANCE,
+        ..DebugUtilsMessengerCreateInfo::user_callback(unsafe { DebugUtilsMessengerCallback::new(vulkan_message_callback) })
+    })
+    .ok();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}instance{}", MAGENTA, NONE);
@@ -124,19 +119,15 @@ fn main() {
     let icon = Icon::from_rgba(image_data, image_buffer.width(), image_buffer.height()).unwrap();
     //
 
-    let events_loop = EventLoop::new();
-    let surface = WindowBuilder::new()
+    let window = WindowBuilder::new()
         .with_title("Korangar".to_string())
         .with_window_icon(Some(icon))
-        .build_vk_surface(&events_loop, instance.clone())
+        .build(&event_loop)
         .unwrap();
+    window.set_cursor_visible(false);
+    let window = Arc::new(window);
 
-    surface
-        .object()
-        .unwrap()
-        .downcast_ref::<winit::window::Window>()
-        .unwrap()
-        .set_cursor_visible(false);
+    let surface = Surface::from_window(instance.clone(), window).unwrap();
 
     #[cfg(feature = "debug")]
     print_debug!("created {}window{}", MAGENTA, NONE);
@@ -162,6 +153,8 @@ fn main() {
         enabled_extensions: get_device_extensions(),
         enabled_features: vulkano::device::Features {
             sampler_anisotropy: true,
+            #[cfg(feature = "debug")]
+            wide_lines: true,
             #[cfg(feature = "debug")]
             fill_mode_non_solid: true,
             ..Default::default()
@@ -203,9 +196,10 @@ fn main() {
         &mut game_file_loader,
     )));
 
-    let mut model_loader = ModelLoader::new(memory_allocator.clone());
+    let mut buffer_allocator = BufferAllocator::new(memory_allocator.clone(), queue.clone());
+    let mut model_loader = ModelLoader::new();
     let mut texture_loader = TextureLoader::new(memory_allocator.clone(), queue.clone());
-    let mut map_loader = MapLoader::new(memory_allocator.clone());
+    let mut map_loader = MapLoader::new();
     let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
     let mut action_loader = ActionLoader::default();
     let mut effect_loader = EffectLoader::default();
@@ -221,6 +215,7 @@ fn main() {
         .get(
             DEFAULT_MAP.to_string(),
             &mut game_file_loader,
+            &mut buffer_allocator,
             &mut model_loader,
             &mut texture_loader,
         )
@@ -243,22 +238,23 @@ fn main() {
 
     let mut deferred_renderer = DeferredRenderer::new(
         memory_allocator.clone(),
+        &mut buffer_allocator,
+        &mut game_file_loader,
+        &mut texture_loader,
         queue.clone(),
         swapchain_holder.swapchain_format(),
         viewport.clone(),
         swapchain_holder.window_size_u32(),
-        &mut game_file_loader,
-        &mut texture_loader,
     );
 
     let mut interface_renderer = InterfaceRenderer::new(
         memory_allocator.clone(),
-        queue.clone(),
-        viewport.clone(),
-        swapchain_holder.window_size_u32(),
         &mut game_file_loader,
         &mut texture_loader,
         font_loader.clone(),
+        queue.clone(),
+        viewport.clone(),
+        swapchain_holder.window_size_u32(),
     );
 
     let mut picker_renderer = PickerRenderer::new(
@@ -268,7 +264,7 @@ fn main() {
         swapchain_holder.window_size_u32(),
     );
 
-    let shadow_renderer = ShadowRenderer::new(memory_allocator, queue, &mut game_file_loader, &mut texture_loader);
+    let shadow_renderer = ShadowRenderer::new(memory_allocator, &mut game_file_loader, &mut texture_loader, queue);
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -365,7 +361,7 @@ fn main() {
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
-    events_loop.run(move |event, _, control_flow| {
+    event_loop.run(move |event, _, control_flow| {
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -523,7 +519,13 @@ fn main() {
                             entities.truncate(1);
 
                             map = map_loader
-                                .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
+                                .get(
+                                    map_name,
+                                    &mut game_file_loader,
+                                    &mut buffer_allocator,
+                                    &mut model_loader,
+                                    &mut texture_loader,
+                                )
                                 .unwrap();
 
                             entities[0].set_position(&map, player_position, client_tick);
@@ -627,6 +629,7 @@ fn main() {
                                 .get(
                                     DEFAULT_MAP.to_string(),
                                     &mut game_file_loader,
+                                    &mut buffer_allocator,
                                     &mut model_loader,
                                     &mut texture_loader,
                                 )
@@ -776,7 +779,13 @@ fn main() {
                             match networking_system.select_character(character_slot) {
                                 Ok((account_id, character_information, map_name)) => {
                                     map = map_loader
-                                        .get(map_name, &mut game_file_loader, &mut model_loader, &mut texture_loader)
+                                        .get(
+                                            map_name,
+                                            &mut game_file_loader,
+                                            &mut buffer_allocator,
+                                            &mut model_loader,
+                                            &mut texture_loader,
+                                        )
                                         .unwrap();
 
                                     let player = Player::new(
@@ -1057,10 +1066,9 @@ fn main() {
                 #[cfg(feature = "debug")]
                 user_event_measuremen.stop();
 
+                let buffer_fence = buffer_allocator.submit_load_buffer();
                 let texture_fence = texture_loader.submit_load_buffer();
                 let sprite_fence = sprite_loader.submit_load_buffer();
-
-                particle_holder.update(delta_time as f32);
 
                 #[cfg(feature = "debug")]
                 let update_entities_measuremen = start_measurement("update entities");
@@ -1087,6 +1095,9 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 update_cameras_measuremen.stop();
+
+                particle_holder.update(delta_time as f32);
+                effect_holder.update(&entities, delta_time as f32);
 
                 let (clear_interface, rerender_interface) = interface.update(font_loader.clone(), &mut focus_state, client_tick);
 
@@ -1125,30 +1136,6 @@ fn main() {
                     return;
                 }
 
-                if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for frame in current slot");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
-                if let Some(mut fence) = texture_fence {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for textures");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
-                if let Some(mut fence) = sprite_fence {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for sprites");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
                 #[cfg(feature = "debug")]
                 let matrices_measuremen = start_measurement("generate view and projection matrices");
 
@@ -1172,6 +1159,38 @@ fn main() {
                     true => &start_camera,
                     false => &player_camera,
                 };
+
+                if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for frame in current slot");
+
+                    fence.wait(None).unwrap();
+                    fence.cleanup_finished();
+                }
+
+                if let Some(mut fence) = buffer_fence {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for buffers");
+
+                    fence.wait(None).unwrap();
+                    fence.cleanup_finished();
+                }
+
+                if let Some(mut fence) = texture_fence {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for textures");
+
+                    fence.wait(None).unwrap();
+                    fence.cleanup_finished();
+                }
+
+                if let Some(mut fence) = sprite_fence {
+                    #[cfg(feature = "debug")]
+                    profile_block!("wait for sprites");
+
+                    fence.wait(None).unwrap();
+                    fence.cleanup_finished();
+                }
 
                 #[cfg(feature = "debug")]
                 let prepare_frame_measuremen = start_measurement("prepare frame");
@@ -1363,6 +1382,7 @@ fn main() {
                         }
 
                         particle_holder.render(screen_target, &deferred_renderer, current_camera, window_size, entities);
+                        effect_holder.render(screen_target, &deferred_renderer, current_camera);
                     });
 
                     if rerender_interface {
@@ -1391,9 +1411,6 @@ fn main() {
                         interface_target.finish(font_future);
                     }
                 });
-
-                effect_holder.update(entities, delta_time as f32);
-                effect_holder.render(screen_target, &deferred_renderer, current_camera);
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_buffers() {

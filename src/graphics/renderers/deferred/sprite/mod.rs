@@ -1,64 +1,45 @@
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/graphics/renderers/deferred/sprite/vertex_shader.glsl"
-    }
-}
+vertex_shader!("src/graphics/renderers/deferred/sprite/vertex_shader.glsl");
+fragment_shader!("src/graphics/renderers/deferred/sprite/fragment_shader.glsl");
 
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/graphics/renderers/deferred/sprite/fragment_shader.glsl"
-    }
-}
-
-use std::iter;
 use std::sync::Arc;
 
 use cgmath::Vector2;
 use procedural::profile;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::image::sampler::Sampler;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerCreateInfo};
-use vulkano::shader::ShaderModule;
+use vulkano::shader::EntryPoint;
 
-use self::vertex_shader::ty::Constants;
+use self::vertex_shader::Constants;
 use super::DeferredSubrenderer;
+use crate::graphics::renderers::pipeline::PipelineBuilder;
+use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
 #[cfg(feature = "debug")]
 use crate::loaders::{GameFileLoader, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-unsafe impl bytemuck::Zeroable for Constants {}
-unsafe impl bytemuck::Pod for Constants {}
-
 pub struct SpriteRenderer {
     memory_allocator: Arc<MemoryAllocator>,
-    pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
+    vertex_shader: EntryPoint,
+    fragment_shader: EntryPoint,
     #[cfg(feature = "debug")]
-    object_marker_texture: Texture,
+    object_marker_texture: Arc<ImageView>,
     #[cfg(feature = "debug")]
-    light_source_marker_texture: Texture,
+    light_source_marker_texture: Arc<ImageView>,
     #[cfg(feature = "debug")]
-    sound_source_marker_texture: Texture,
+    sound_source_marker_texture: Arc<ImageView>,
     #[cfg(feature = "debug")]
-    effect_source_marker_texture: Texture,
+    effect_source_marker_texture: Arc<ImageView>,
     #[cfg(feature = "debug")]
-    entity_marker_texture: Texture,
+    entity_marker_texture: Arc<ImageView>,
     nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
+    pipeline: Arc<GraphicsPipeline>,
 }
 
 impl SpriteRenderer {
@@ -70,9 +51,8 @@ impl SpriteRenderer {
         #[cfg(feature = "debug")] texture_loader: &mut TextureLoader,
     ) -> Self {
         let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
-        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
+        let vertex_shader = vertex_shader::entry_point(&device);
+        let fragment_shader = fragment_shader::entry_point(&device);
 
         #[cfg(feature = "debug")]
         let object_marker_texture = texture_loader.get("object.png", game_file_loader).unwrap();
@@ -85,18 +65,12 @@ impl SpriteRenderer {
         #[cfg(feature = "debug")]
         let entity_marker_texture = texture_loader.get("entity.png", game_file_loader).unwrap();
 
-        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
-            mag_filter: Filter::Linear,
-            min_filter: Filter::Linear,
-            ..Default::default()
-        })
-        .unwrap();
-
-        let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
+        let nearest_sampler = create_new_sampler(&device, SamplerType::Nearest);
+        let linear_sampler = create_new_sampler(&device, SamplerType::Linear);
+        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
             memory_allocator,
-            pipeline,
             vertex_shader,
             fragment_shader,
             #[cfg(feature = "debug")]
@@ -111,6 +85,7 @@ impl SpriteRenderer {
             entity_marker_texture,
             nearest_sampler,
             linear_sampler,
+            pipeline,
         }
     }
 
@@ -123,29 +98,28 @@ impl SpriteRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
-        vertex_shader: &ShaderModule,
-        fragment_shader: &ShaderModule,
+        vertex_shader: &EntryPoint,
+        fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        GraphicsPipeline::start()
-            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
-            .input_assembly_state(InputAssemblyState::new())
-            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend_alpha())
-            .render_pass(subpass)
-            .build(device)
-            .unwrap()
+        PipelineBuilder::<_, { DeferredRenderer::lighting_subpass() }>::new([vertex_shader, fragment_shader])
+            .fixed_viewport(viewport)
+            .blend_alpha()
+            .build(device, subpass)
     }
 
     #[profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
-        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+        render_target
+            .state
+            .get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .unwrap();
     }
 
     fn build(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,
         texture_position: Vector2<f32>,
@@ -157,18 +131,14 @@ impl SpriteRenderer {
             self.bind_pipeline(render_target);
         }
 
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
-
         let sampler = match smooth {
             true => self.linear_sampler.clone(),
             false => self.nearest_sampler.clone(),
         };
 
-        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
             WriteDescriptorSet::image_view_sampler(0, texture, sampler),
-        ])
-        .unwrap();
+        ]);
 
         let constants = Constants {
             screen_position: [screen_position.x, screen_position.y],
@@ -181,8 +151,10 @@ impl SpriteRenderer {
         render_target
             .state
             .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
+            .unwrap()
             .push_constants(layout, 0, constants)
+            .unwrap()
             .draw(6, 1, 0, 0)
             .unwrap();
     }
@@ -191,7 +163,7 @@ impl SpriteRenderer {
     pub fn render_indexed(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         window_size: Vector2<usize>,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,

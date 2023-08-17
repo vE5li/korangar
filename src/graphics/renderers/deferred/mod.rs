@@ -23,9 +23,7 @@ use cgmath::{Matrix4, Vector2, Vector3, Vector4};
 use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
-#[cfg(feature = "debug")]
-use vulkano::image::StorageImage;
-use vulkano::image::SwapchainImage;
+use vulkano::image::Image;
 use vulkano::ordered_passes_renderpass;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{RenderPass, Subpass};
@@ -46,6 +44,7 @@ use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
+use super::SubpassAttachments;
 use crate::graphics::{
     EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait,
     SpriteRenderer as SpriteRendererTrait, *,
@@ -96,54 +95,66 @@ pub struct DeferredRenderer {
     #[cfg(feature = "debug")]
     box_renderer: BoxRenderer,
     #[cfg(feature = "debug")]
-    tile_textures: [Texture; 7],
-    font_map: Texture,
-    walk_indicator: Texture,
+    tile_textures: [Arc<ImageView>; 7],
+    font_map: Arc<ImageView>,
+    walk_indicator: Arc<ImageView>,
     dimensions: [u32; 2],
 }
 
+unsafe impl Send for DeferredRenderer {}
+unsafe impl Sync for DeferredRenderer {}
+
 impl DeferredRenderer {
+    const fn deferred_subpass() -> SubpassAttachments {
+        SubpassAttachments { color: 3, depth: 1 }
+    }
+
+    const fn lighting_subpass() -> SubpassAttachments {
+        SubpassAttachments { color: 1, depth: 0 }
+    }
+
     pub fn new(
         memory_allocator: Arc<MemoryAllocator>,
+        buffer_allocator: &mut BufferAllocator,
+        game_file_loader: &mut GameFileLoader,
+        texture_loader: &mut TextureLoader,
         queue: Arc<Queue>,
         swapchain_format: Format,
         viewport: Viewport,
         dimensions: [u32; 2],
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
     ) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = ordered_passes_renderpass!(device,
             attachments: {
                 output: {
-                    load: Clear,
-                    store: Store,
                     format: swapchain_format,
                     samples: 1,
+                    load_op: Clear,
+                    store_op: Store,
                 },
                 diffuse: {
-                    load: Clear,
-                    store: Store,
                     format: Format::R32G32B32A32_SFLOAT,
                     samples: 4,
+                    load_op: Clear,
+                    store_op: Store,
                 },
                 normal: {
-                    load: Clear,
-                    store: Store,
                     format: Format::R16G16B16A16_SFLOAT,
                     samples: 4,
+                    load_op: Clear,
+                    store_op: Store,
                 },
                 water: {
-                    load: Clear,
-                    store: Store,
                     format: Format::R8G8B8A8_UNORM,
                     samples: 4,
+                    load_op: Clear,
+                    store_op: Store,
                 },
                 depth: {
-                    load: Clear,
-                    store: Store,
                     format: Format::D32_SFLOAT,
                     samples: 4,
+                    load_op: Clear,
+                    store_op: Store,
                 }
             },
             passes: [
@@ -188,7 +199,7 @@ impl DeferredRenderer {
         #[cfg(feature = "debug")]
         let buffer_renderer = BufferRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
         #[cfg(feature = "debug")]
-        let box_renderer = BoxRenderer::new(memory_allocator.clone(), lighting_subpass, viewport);
+        let box_renderer = BoxRenderer::new(memory_allocator.clone(), buffer_allocator, lighting_subpass, viewport);
 
         let font_map = texture_loader.get("font.png", game_file_loader).unwrap();
         let walk_indicator = texture_loader.get("grid.tga", game_file_loader).unwrap();
@@ -276,7 +287,7 @@ impl DeferredRenderer {
     }
 
     #[profile("create deferred render target")]
-    pub fn create_render_target(&self, swapchain_image: Arc<SwapchainImage>) -> <Self as Renderer>::Target {
+    pub fn create_render_target(&self, swapchain_image: Arc<Image>) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),
             self.queue.clone(),
@@ -290,7 +301,7 @@ impl DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        vertex_buffer: WaterVertexBuffer,
+        vertex_buffer: Subbuffer<[WaterVertex]>,
         day_timer: f32,
     ) {
         self.water_renderer.render(render_target, camera, vertex_buffer, day_timer);
@@ -304,7 +315,7 @@ impl DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        light_image: ImageBuffer,
+        light_image: Arc<ImageView>,
         light_matrix: Matrix4<f32>,
         direction: Vector3<f32>,
         color: Color,
@@ -329,7 +340,7 @@ impl DeferredRenderer {
         self.water_light_renderer.render(render_target, camera, water_level);
     }
 
-    pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: ImageBuffer) {
+    pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: Arc<ImageView>) {
         self.overlay_renderer.render(render_target, interface_image);
     }
 
@@ -417,7 +428,7 @@ impl DeferredRenderer {
     pub fn render_effect(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         screen_positions: [Vector2<f32>; 4],
         texture_coordinates: [Vector2<f32>; 4],
         screen_space_position: Vector2<f32>,
@@ -445,7 +456,7 @@ impl DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        vertex_buffer: ModelVertexBuffer,
+        vertex_buffer: Subbuffer<[ModelVertex]>,
     ) {
         // FIX: This is broken on account of the TileTypes not storing their original
         // index. Should choose an index based on flags instead.
@@ -475,9 +486,9 @@ impl DeferredRenderer {
     pub fn overlay_buffers(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        picker_image: ImageBuffer,
-        light_image: ImageBuffer,
-        font_atlas: Arc<ImageView<StorageImage>>,
+        picker_image: Arc<ImageView>,
+        light_image: Arc<ImageView>,
+        font_atlas: Arc<ImageView>,
         render_settings: &RenderSettings,
     ) {
         self.buffer_renderer
@@ -494,8 +505,8 @@ impl GeometryRendererTrait for DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        vertex_buffer: ModelVertexBuffer,
-        textures: &[Texture],
+        vertex_buffer: Subbuffer<[ModelVertex]>,
+        textures: &[Arc<ImageView>],
         world_matrix: Matrix4<f32>,
         time: f32,
     ) where
@@ -511,7 +522,7 @@ impl EntityRendererTrait for DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,
@@ -540,7 +551,7 @@ impl SpriteRendererTrait for DeferredRenderer {
     fn render_sprite(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector2<f32>,
         size: Vector2<f32>,
         _clip_size: Vector4<f32>,

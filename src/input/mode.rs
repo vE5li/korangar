@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use cgmath::Vector2;
+use vulkano::image::view::ImageView;
 
-use crate::graphics::Texture;
 use crate::interface::{ElementCell, ItemSource, SkillSource};
 use crate::inventory::{Item, Skill};
 use crate::loaders::{Actions, AnimationState, Sprite};
@@ -22,7 +22,7 @@ pub enum MouseInputMode {
 }
 
 pub enum Grabbed {
-    Texture(Texture),
+    Texture(Arc<ImageView>),
     Action(Arc<Sprite>, Arc<Actions>, AnimationState),
 }
 

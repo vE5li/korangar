@@ -1,68 +1,42 @@
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/graphics/renderers/interface/sprite/vertex_shader.glsl"
-    }
-}
+vertex_shader!("src/graphics/renderers/interface/sprite/vertex_shader.glsl");
+fragment_shader!("src/graphics/renderers/interface/sprite/fragment_shader.glsl");
 
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/graphics/renderers/interface/sprite/fragment_shader.glsl"
-    }
-}
-
-use std::iter;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
 use procedural::profile;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::multisample::MultisampleState;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::image::sampler::Sampler;
+use vulkano::image::SampleCount;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerCreateInfo};
-use vulkano::shader::ShaderModule;
+use vulkano::shader::EntryPoint;
 
-use self::vertex_shader::ty::Constants;
+use self::vertex_shader::Constants;
 use super::InterfaceSubrenderer;
+use crate::graphics::renderers::pipeline::PipelineBuilder;
+use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
-
-unsafe impl bytemuck::Zeroable for Constants {}
-unsafe impl bytemuck::Pod for Constants {}
 
 pub struct SpriteRenderer {
     memory_allocator: Arc<MemoryAllocator>,
-    pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
+    vertex_shader: EntryPoint,
+    fragment_shader: EntryPoint,
     nearest_sampler: Arc<Sampler>,
     linear_sampler: Arc<Sampler>,
+    pipeline: Arc<GraphicsPipeline>,
 }
 
 impl SpriteRenderer {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
         let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
-        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-
-        let nearest_sampler = Sampler::new(device.clone(), SamplerCreateInfo {
-            mag_filter: Filter::Nearest,
-            min_filter: Filter::Nearest,
-            ..Default::default()
-        })
-        .unwrap();
-
-        let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
+        let vertex_shader = vertex_shader::entry_point(&device);
+        let fragment_shader = fragment_shader::entry_point(&device);
+        let nearest_sampler = create_new_sampler(&device, SamplerType::Nearest);
+        let linear_sampler = create_new_sampler(&device, SamplerType::Linear);
+        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
             memory_allocator,
@@ -83,69 +57,22 @@ impl SpriteRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
-        vertex_shader: &ShaderModule,
-        fragment_shader: &ShaderModule,
+        vertex_shader: &EntryPoint,
+        fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        GraphicsPipeline::start()
-            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
-            .input_assembly_state(InputAssemblyState::new())
-            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend(INTERFACE_ATTACHMENT_BLEND))
-            .multisample_state(MultisampleState {
-                rasterization_samples: vulkano::image::SampleCount::Sample4,
-                ..Default::default()
-            })
-            .render_pass(subpass)
-            .build(device)
-            .unwrap()
+        PipelineBuilder::<_, { InterfaceRenderer::subpass() }>::new([vertex_shader, fragment_shader])
+            .fixed_viewport(viewport)
+            .multisample(SampleCount::Sample4)
+            .color_blend(INTERFACE_ATTACHMENT_BLEND)
+            .build(device, subpass)
     }
 
     #[profile]
     fn bind_pipeline(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target) {
-        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
-    }
-
-    fn build(
-        &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        texture: Texture,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        texture_position: Vector2<f32>,
-        texture_size: Vector2<f32>,
-        color: Color,
-        smooth: bool,
-    ) {
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
-
-        let sampler = match smooth {
-            true => self.linear_sampler.clone(),
-            false => self.nearest_sampler.clone(),
-        };
-
-        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
-            WriteDescriptorSet::image_view_sampler(0, texture, sampler),
-        ])
-        .unwrap();
-
-        let constants = Constants {
-            screen_position: screen_position.into(),
-            screen_size: screen_size.into(),
-            clip_size: clip_size.into(),
-            texture_position: texture_position.into(),
-            texture_size: texture_size.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
-        };
-
         render_target
             .state
             .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
-            .push_constants(layout, 0, constants)
-            .draw(6, 1, 0, 0)
+            .bind_pipeline_graphics(self.pipeline.clone())
             .unwrap();
     }
 
@@ -153,7 +80,7 @@ impl SpriteRenderer {
     pub fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         window_size: Vector2<usize>,
         screen_position: Vector2<f32>,
         screen_size: Vector2<f32>,
@@ -169,17 +96,30 @@ impl SpriteRenderer {
         let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
         let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
 
-        // TODO: don't invoke build. inline code
-        self.build(
-            render_target,
-            texture,
-            screen_position,
-            screen_size,
-            clip_size,
-            Vector2::new(0.0, 0.0),
-            Vector2::new(1.0, 1.0),
-            color,
-            smooth,
-        );
+        let sampler = match smooth {
+            true => self.linear_sampler.clone(),
+            false => self.nearest_sampler.clone(),
+        };
+
+        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
+            WriteDescriptorSet::image_view_sampler(0, texture, sampler),
+        ]);
+
+        let constants = Constants {
+            screen_position: screen_position.into(),
+            screen_size: screen_size.into(),
+            clip_size: clip_size.into(),
+            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+        };
+
+        render_target
+            .state
+            .get_builder()
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
+            .unwrap()
+            .push_constants(layout, 0, constants)
+            .unwrap()
+            .draw(6, 1, 0, 0)
+            .unwrap();
     }
 }

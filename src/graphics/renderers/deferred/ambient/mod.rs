@@ -1,53 +1,33 @@
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/graphics/renderers/deferred/ambient/vertex_shader.glsl"
-    }
-}
+vertex_shader!("src/graphics/renderers/deferred/ambient/vertex_shader.glsl");
+fragment_shader!("src/graphics/renderers/deferred/ambient/fragment_shader.glsl");
 
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/graphics/renderers/deferred/ambient/fragment_shader.glsl"
-    }
-}
-
-use std::iter;
 use std::sync::Arc;
 
 use procedural::profile;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::shader::ShaderModule;
+use vulkano::shader::EntryPoint;
 
-use self::fragment_shader::ty::Constants;
-use super::DeferredSubrenderer;
-use crate::graphics::*;
-
-unsafe impl bytemuck::Zeroable for Constants {}
-unsafe impl bytemuck::Pod for Constants {}
+use self::fragment_shader::Constants;
+use super::{DeferredRenderer, DeferredSubrenderer};
+use crate::graphics::renderers::pipeline::PipelineBuilder;
+use crate::graphics::{allocate_descriptor_set, *};
 
 pub struct AmbientLightRenderer {
     memory_allocator: Arc<MemoryAllocator>,
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
+    vertex_shader: EntryPoint,
+    fragment_shader: EntryPoint,
 }
 
 impl AmbientLightRenderer {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
         let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
-        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
+        let vertex_shader = vertex_shader::entry_point(&device);
+        let fragment_shader = fragment_shader::entry_point(&device);
         let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
@@ -67,23 +47,23 @@ impl AmbientLightRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
-        vertex_shader: &ShaderModule,
-        fragment_shader: &ShaderModule,
+        vertex_shader: &EntryPoint,
+        fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        GraphicsPipeline::start()
-            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
-            .input_assembly_state(InputAssemblyState::new())
-            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend(LIGHT_ATTACHMENT_BLEND))
-            .render_pass(subpass)
-            .build(device)
-            .unwrap()
+        PipelineBuilder::<_, { DeferredRenderer::lighting_subpass() }>::new([vertex_shader, fragment_shader])
+            .vertex_input_state::<ModelVertex>(vertex_shader)
+            .fixed_viewport(viewport)
+            .color_blend(LIGHT_ATTACHMENT_BLEND)
+            .build(device, subpass)
     }
 
     #[profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
-        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+        render_target
+            .state
+            .get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .unwrap();
     }
 
     #[profile("render ambient light")]
@@ -92,14 +72,10 @@ impl AmbientLightRenderer {
             self.bind_pipeline(render_target);
         }
 
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
-
-        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
             WriteDescriptorSet::image_view(0, render_target.diffuse_image.clone()),
             WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
-        ])
-        .unwrap();
+        ]);
 
         let constants = Constants {
             color: [color.red_f32(), color.green_f32(), color.blue_f32()],
@@ -108,8 +84,10 @@ impl AmbientLightRenderer {
         render_target
             .state
             .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
+            .unwrap()
             .push_constants(layout, 0, constants)
+            .unwrap()
             .draw(6, 1, 0, 0)
             .unwrap();
     }

@@ -3,23 +3,28 @@ use std::sync::Arc;
 
 use derive_new::new;
 use procedural::*;
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract};
+use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
+};
 use vulkano::device::Queue;
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
-use vulkano::image::{ImageDimensions, ImmutableImage, MipmapsCount};
-use vulkano::sync::{FenceSignalFuture, GpuFuture};
+use vulkano::image::{Image, ImageCreateInfo, ImageUsage};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
+use vulkano::sync::future::FenceSignalFuture;
+use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{MemoryAllocator, Texture};
+use crate::graphics::MemoryAllocator;
 use crate::interface::{ElementCell, PrototypeElement};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
     #[hidden_element]
-    pub textures: Vec<Texture>,
+    pub textures: Vec<Arc<ImageView>>,
     #[cfg(feature = "debug")]
     sprite_data: SpriteData,
 }
@@ -136,7 +141,7 @@ pub struct SpriteLoader {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     #[new(default)]
-    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>>,
+    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator>>,
     #[new(default)]
     cache: HashMap<String, Arc<Sprite>>,
 }
@@ -193,21 +198,37 @@ impl SpriteLoader {
         let textures = rgba_images
             .chain(palette_images)
             .map(|image_data| {
-                let image = ImmutableImage::from_iter(
+                let buffer = Buffer::from_iter(
                     &*self.memory_allocator,
-                    image_data.data.iter().cloned(),
-                    ImageDimensions::Dim2d {
-                        width: image_data.width as u32,
-                        height: image_data.height as u32,
-                        array_layers: 1,
+                    BufferCreateInfo {
+                        usage: BufferUsage::TRANSFER_SRC,
+                        ..Default::default()
                     },
-                    MipmapsCount::One,
-                    Format::R8G8B8A8_UNORM,
-                    load_buffer,
+                    AllocationCreateInfo {
+                        memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                        ..Default::default()
+                    },
+                    image_data.data.iter().copied(),
                 )
                 .unwrap();
 
-                ImageView::new_default(Arc::new(image)).unwrap()
+                let image = Image::new(
+                    &*self.memory_allocator,
+                    ImageCreateInfo {
+                        format: Format::R8G8B8A8_UNORM,
+                        extent: [image_data.width as u32, image_data.height as u32, 1],
+                        usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
+                        ..Default::default()
+                    },
+                    AllocationCreateInfo::default(),
+                )
+                .unwrap();
+
+                load_buffer
+                    .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(buffer, image.clone()))
+                    .unwrap();
+
+                ImageView::new_default(image).unwrap()
             })
             .collect();
 

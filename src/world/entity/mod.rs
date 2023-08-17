@@ -3,12 +3,11 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2, Vector3, VectorSpace};
 use derive_new::new;
 use procedural::*;
+use vulkano::buffer::Subbuffer;
 
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
-#[cfg(feature = "debug")]
-use crate::graphics::ModelVertexBuffer;
-use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, Renderer};
+use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, ModelVertex, Renderer};
 use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Theme, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, Sex, StatusType};
@@ -39,7 +38,7 @@ pub struct Movement {
     #[cfg(feature = "debug")]
     #[new(default)]
     #[hidden_element]
-    pub steps_vertex_buffer: Option<ModelVertexBuffer>,
+    pub steps_vertex_buffer: Option<Subbuffer<[ModelVertex]>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

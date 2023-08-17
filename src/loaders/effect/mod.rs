@@ -4,11 +4,12 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
 use procedural::*;
+use vulkano::image::view::ImageView;
 
 use super::{MajorFirst, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{Camera, Color, DeferredRenderer, Renderer, Texture};
+use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
 use crate::network::EntityId;
 
@@ -125,7 +126,7 @@ pub struct EffectLoader {
 }
 
 pub struct Layer {
-    pub textures: Vec<Texture>,
+    pub textures: Vec<Arc<ImageView>>,
     pub frames: Vec<Frame>,
     pub indices: Vec<Option<usize>>,
 }
@@ -169,7 +170,7 @@ impl FrameTimer {
             return false;
         }
 
-        return true;
+        true
     }
 }
 
@@ -429,15 +430,15 @@ impl EffectBase for EffectWithLight {
 
 #[derive(Default)]
 pub struct EffectHolder {
-    effects: Vec<(Box<dyn EffectBase>, Option<EntityId>)>,
+    effects: Vec<(Box<dyn EffectBase + Send + Sync>, Option<EntityId>)>,
 }
 
 impl EffectHolder {
-    pub fn add_effect(&mut self, effect: Box<dyn EffectBase>) {
+    pub fn add_effect(&mut self, effect: Box<dyn EffectBase + Send + Sync>) {
         self.effects.push((effect, None));
     }
 
-    pub fn add_unit(&mut self, effect: Box<dyn EffectBase>, entity_id: EntityId) {
+    pub fn add_unit(&mut self, effect: Box<dyn EffectBase + Send + Sync>, entity_id: EntityId) {
         self.effects.push((effect, Some(entity_id)));
     }
 

@@ -1,14 +1,17 @@
 mod hotbar;
 mod skills;
 
+use std::sync::Arc;
+
+use vulkano::image::view::ImageView;
+
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
-use crate::graphics::Texture;
 use crate::interface::{Remote, TrackedState};
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
-use crate::network::{EquipPosition, ItemId, ItemIndex, ItemOptions};
+use crate::network::{EquipPosition, ItemId, ItemIndex};
 
-enum ItemDetails {
+/*enum ItemDetails {
     Regular {
         amount: u16,
         fags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
@@ -24,7 +27,7 @@ enum ItemDetails {
         enchantment_level: u8,
         fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
     },
-}
+}*/
 
 #[derive(Clone, Debug)]
 pub struct Item {
@@ -36,7 +39,7 @@ pub struct Item {
     //pub wear_state: u32,
     //pub slot: [u32; 4], // card ?
     //pub hire_expiration_date: i32,
-    pub texture: Texture,
+    pub texture: Arc<ImageView>,
 }
 
 #[derive(Default)]

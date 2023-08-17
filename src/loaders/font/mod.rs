@@ -3,15 +3,17 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2};
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
+use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, BufferImageCopy, ClearColorImageInfo, CommandBufferUsage, CopyBufferToImageInfo, PrimaryCommandBufferAbstract,
 };
 use vulkano::device::Queue;
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
-use vulkano::image::{ImageAccess, ImageCreateFlags, ImageDimensions, ImageUsage, StorageImage};
-use vulkano::sync::{FenceSignalFuture, GpuFuture};
+use vulkano::image::{Image, ImageCreateInfo, ImageUsage};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
+use vulkano::sync::future::FenceSignalFuture;
+use vulkano::sync::GpuFuture;
 
 use super::GameFileLoader;
 use crate::graphics::{Color, CommandBuilder, MemoryAllocator};
@@ -19,7 +21,7 @@ use crate::graphics::{Color, CommandBuilder, MemoryAllocator};
 pub struct FontLoader {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
-    font_atlas: Arc<ImageView<StorageImage>>,
+    font_atlas: Arc<ImageView>,
     cache: Box<Cache<'static>>,
     load_buffer: Option<CommandBuilder>,
     font: Box<Font<'static>>,
@@ -104,30 +106,17 @@ impl FontLoader {
         let cache_size = Vector2::from_value(512);
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
 
-        let image_usage = ImageUsage {
-            transfer_dst: true,
-            sampled: true,
-            ..ImageUsage::empty()
-        };
-
-        let image_dimensions = ImageDimensions::Dim2d {
-            width: cache_size.x,
-            height: cache_size.y,
-            array_layers: 1,
-        };
-
-        // TODO: don't hardcode 2. This number is only used to determine the sharing
-        // mode of the image. 1 = exclusive, 2 = concurrent
-        let font_atlas_image = StorageImage::with_usage(
+        let font_atlas_image = Image::new(
             &*memory_allocator,
-            image_dimensions,
-            Format::R8_UNORM,
-            image_usage,
-            ImageCreateFlags::empty(),
-            0..1,
+            ImageCreateInfo {
+                format: Format::R8_UNORM,
+                extent: [cache_size.x, cache_size.y, 1],
+                usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
         )
         .unwrap();
-
         let font_atlas = ImageView::new_default(font_atlas_image.clone()).unwrap();
 
         let font_path = "data\\WenQuanYiMicroHei.ttf";
@@ -185,11 +174,6 @@ impl FontLoader {
             self.cache.queue_glyph(0, glyph.glyph.clone());
         }
 
-        let buffer_usage = BufferUsage {
-            transfer_src: true,
-            ..BufferUsage::empty()
-        };
-
         self.cache
             .cache_queued(|rect, data| {
                 let builder = self.load_buffer.get_or_insert_with(|| {
@@ -202,7 +186,20 @@ impl FontLoader {
                 });
 
                 let pixels = data.iter().map(|&value| value as i8);
-                let buffer = CpuAccessibleBuffer::from_iter(&*self.memory_allocator, buffer_usage, false, pixels).unwrap();
+                let buffer = Buffer::from_iter(
+                    &*self.memory_allocator,
+                    BufferCreateInfo {
+                        usage: BufferUsage::TRANSFER_SRC,
+                        ..Default::default()
+                    },
+                    AllocationCreateInfo {
+                        memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                        ..Default::default()
+                    },
+                    pixels,
+                )
+                .unwrap();
+
                 let image = self.font_atlas.image().clone();
 
                 let region = BufferImageCopy {
@@ -248,7 +245,7 @@ impl FontLoader {
         })
     }
 
-    pub fn get_font_atlas(&self) -> Arc<ImageView<StorageImage>> {
+    pub fn get_font_atlas(&self) -> Arc<ImageView> {
         self.font_atlas.clone()
     }
 }

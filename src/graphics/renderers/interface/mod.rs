@@ -10,6 +10,7 @@ use cgmath::{Vector2, Vector4};
 use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
+use vulkano::image::view::ImageView;
 use vulkano::image::{ImageUsage, SampleCount};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::RenderPass;
@@ -17,8 +18,8 @@ use vulkano::render_pass::RenderPass;
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
-use super::IntoFormat;
-use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait, Texture};
+use super::{IntoFormat, SubpassAttachments};
+use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
 #[derive(PartialEq, Eq)]
@@ -36,32 +37,36 @@ pub struct InterfaceRenderer {
     rectangle_renderer: RectangleRenderer,
     sprite_renderer: SpriteRenderer,
     text_renderer: TextRenderer,
-    checked_box_texture: Texture,
-    unchecked_box_texture: Texture,
-    expanded_arrow_texture: Texture,
-    collapsed_arrow_texture: Texture,
+    checked_box_texture: Arc<ImageView>,
+    unchecked_box_texture: Arc<ImageView>,
+    expanded_arrow_texture: Arc<ImageView>,
+    collapsed_arrow_texture: Arc<ImageView>,
     dimensions: [u32; 2],
 }
 
 impl InterfaceRenderer {
+    const fn subpass() -> SubpassAttachments {
+        SubpassAttachments { color: 1, depth: 0 }
+    }
+
     pub fn new(
         memory_allocator: Arc<MemoryAllocator>,
-        queue: Arc<Queue>,
-        viewport: Viewport,
-        dimensions: [u32; 2],
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         font_loader: Rc<RefCell<FontLoader>>,
+        queue: Arc<Queue>,
+        viewport: Viewport,
+        dimensions: [u32; 2],
     ) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
             device,
             attachments: {
                 interface: {
-                    load: DontCare,
-                    store: Store,
                     format: Format::R8G8B8A8_UNORM,
                     samples: 4,
+                    load_op: DontCare,
+                    store_op: Store,
                 }
             },
             pass: {
@@ -116,21 +121,13 @@ impl InterfaceRenderer {
 
     #[profile("create interface render target")]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
-        let image_usage = ImageUsage {
-            sampled: true,
-            transfer_dst: true,
-            color_attachment: true,
-            input_attachment: true,
-            ..ImageUsage::empty()
-        };
-
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),
             self.queue.clone(),
             self.render_pass.clone(),
             self.dimensions,
             SampleCount::Sample4,
-            image_usage,
+            ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST | ImageUsage::COLOR_ATTACHMENT | ImageUsage::INPUT_ATTACHMENT,
             ClearColorValue::Float([0.0, 0.0, 0.0, 0.0]),
         )
     }
@@ -214,7 +211,7 @@ impl SpriteRendererTrait for InterfaceRenderer {
     fn render_sprite(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector2<f32>,
         size: Vector2<f32>,
         clip_size: Vector4<f32>,

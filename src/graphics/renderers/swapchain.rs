@@ -4,11 +4,12 @@ use cgmath::Vector2;
 use procedural::profile;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
-use vulkano::format::{Format, NumericType};
-use vulkano::image::{ImageUsage, SwapchainImage};
+use vulkano::format::{Format, NumericFormat};
+use vulkano::image::{Image, ImageUsage};
 use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::swapchain::{acquire_next_image, AcquireError, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo};
+use vulkano::swapchain::{acquire_next_image, PresentMode, Surface, SurfaceInfo, Swapchain, SwapchainCreateInfo};
 use vulkano::sync::GpuFuture;
+use vulkano::{Validated, VulkanError};
 use winit::window::Window;
 
 #[cfg(feature = "debug")]
@@ -42,7 +43,7 @@ impl PresentModeInfo {
 
 pub struct SwapchainHolder {
     swapchain: Arc<Swapchain>,
-    swapchain_images: Vec<Arc<SwapchainImage>>,
+    swapchain_images: Vec<Arc<Image>>,
     present_mode: PresentMode,
     window_size: [u32; 2],
     image_number: usize,
@@ -56,12 +57,16 @@ impl SwapchainHolder {
         let capabilities = physical_device
             .surface_capabilities(&surface, SurfaceInfo::default())
             .expect("failed to get surface capabilities");
-        let composite_alpha = capabilities.supported_composite_alpha.iter().next().unwrap();
+        let composite_alpha = capabilities.supported_composite_alpha.into_iter().next().unwrap();
         let (image_format, image_color_space) = physical_device
             .surface_formats(&surface, SurfaceInfo::default())
             .unwrap()
             .into_iter()
-            .find(|(format, _)| format.type_color().is_some_and(|numeric_type| numeric_type == NumericType::UNORM))
+            .find(|(format, _)| {
+                format
+                    .numeric_format_color()
+                    .is_some_and(|numeric_type| numeric_type == NumericFormat::UNORM)
+            })
             .expect("failed to find a suitable swapchain format");
         let present_mode = PresentMode::Fifo;
         let image_number = 0;
@@ -73,12 +78,9 @@ impl SwapchainHolder {
 
         let swapchain_create_info = SwapchainCreateInfo {
             min_image_count: capabilities.min_image_count,
-            image_format: Some(image_format),
+            image_format,
             image_extent: window_size,
-            image_usage: ImageUsage {
-                color_attachment: true,
-                ..Default::default()
-            },
+            image_usage: ImageUsage::COLOR_ATTACHMENT,
             composite_alpha,
             image_color_space,
             present_mode,
@@ -100,10 +102,11 @@ impl SwapchainHolder {
 
     #[profile]
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
-        let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None) {
+        let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None).map_err(Validated::unwrap) {
             Ok(image) => image,
-            Err(AcquireError::OutOfDate) => {
+            Err(VulkanError::OutOfDate) => {
                 self.recreate = true;
+                print!("out of date");
                 return Err(());
             }
             Err(error) => panic!("Failed to acquire next image: {error:?}"),
@@ -153,7 +156,7 @@ impl SwapchainHolder {
         self.swapchain.clone()
     }
 
-    pub fn get_swapchain_images(&self) -> Vec<Arc<SwapchainImage>> {
+    pub fn get_swapchain_images(&self) -> Vec<Arc<Image>> {
         self.swapchain_images.clone()
     }
 
@@ -167,9 +170,9 @@ impl SwapchainHolder {
 
     pub fn viewport(&self) -> Viewport {
         Viewport {
-            origin: [0.0, 0.0],
-            dimensions: self.window_size.map(|component| component as f32),
-            depth_range: 0.0..1.0,
+            offset: [0.0, 0.0],
+            extent: self.window_size.map(|component| component as f32),
+            depth_range: 0.0..=1.0,
         }
     }
 

@@ -1,11 +1,15 @@
 mod tile;
 
+use std::sync::Arc;
+
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 use procedural::profile;
+use vulkano::buffer::Subbuffer;
+use vulkano::image::view::ImageView;
 
 pub use self::tile::{Tile, TileType};
 #[cfg(feature = "debug")]
@@ -97,15 +101,15 @@ pub struct Map {
     water_settings: Option<WaterSettings>,
     light_settings: LightSettings,
     tiles: Vec<Tile>,
-    ground_vertex_buffer: ModelVertexBuffer,
-    water_vertex_buffer: Option<WaterVertexBuffer>,
-    ground_textures: Vec<Texture>,
+    ground_vertex_buffer: Subbuffer<[ModelVertex]>,
+    water_vertex_buffer: Option<Subbuffer<[WaterVertex]>>,
+    ground_textures: Vec<Arc<ImageView>>,
     objects: Vec<Object>,
     light_sources: Vec<LightSource>,
     sound_sources: Vec<SoundSource>,
     effect_sources: Vec<EffectSource>,
-    tile_picker_vertex_buffer: TileVertexBuffer,
-    tile_vertex_buffer: ModelVertexBuffer,
+    tile_picker_vertex_buffer: Subbuffer<[TileVertex]>,
+    tile_vertex_buffer: Subbuffer<[ModelVertex]>,
     #[cfg(feature = "debug")]
     map_data: MapData,
 }
@@ -300,7 +304,7 @@ impl Map {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        light_image: ImageBuffer,
+        light_image: Arc<ImageView>,
         light_matrix: Matrix4<f32>,
         day_timer: f32,
     ) {

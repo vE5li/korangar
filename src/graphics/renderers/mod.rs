@@ -1,33 +1,70 @@
+macro_rules! vertex_shader {
+    ($path:literal) => {
+        mod vertex_shader {
+            vulkano_shaders::shader! {
+                ty: "vertex",
+                path: $path
+            }
+
+            pub fn entry_point(device: &std::sync::Arc<vulkano::device::Device>) -> vulkano::shader::EntryPoint {
+                load(device.clone()).unwrap().entry_point("main").unwrap()
+            }
+        }
+    };
+}
+
+macro_rules! fragment_shader {
+    ($path:literal) => {
+        mod fragment_shader {
+            vulkano_shaders::shader! {
+                ty: "fragment",
+                path: $path
+            }
+
+            pub fn entry_point(device: &std::sync::Arc<vulkano::device::Device>) -> vulkano::shader::EntryPoint {
+                load(device.clone()).unwrap().entry_point("main").unwrap()
+            }
+        }
+    };
+}
+
 mod deferred;
+mod image;
 mod interface;
 mod picker;
+mod pipeline;
+mod sampler;
 #[cfg(feature = "debug")]
 mod settings;
 mod shadow;
 mod swapchain;
 
-use std::marker::PhantomData;
+use std::marker::{ConstParamTy, PhantomData};
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3, Vector4};
 use option_ext::OptionExt;
 use procedural::profile;
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
+use vulkano::buffer::{Buffer, BufferUsage, Subbuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, ClearAttachment, ClearRect, CommandBufferUsage, CopyImageToBufferInfo, PrimaryAutoCommandBuffer,
-    PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassContents,
+    PrimaryCommandBufferAbstract, RenderPassBeginInfo, SubpassBeginInfo, SubpassEndInfo,
 };
 use vulkano::device::Queue;
 use vulkano::format::{ClearColorValue, ClearValue, Format};
 use vulkano::image::view::ImageView;
-use vulkano::image::{AttachmentImage, ImageUsage, SampleCount, SwapchainImage};
+use vulkano::image::{Image, ImageCreateInfo, ImageUsage, SampleCount};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::pipeline::graphics::color_blend::{AttachmentBlend, BlendFactor, BlendOp};
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::{Swapchain, SwapchainPresentInfo};
-use vulkano::sync::{FenceSignalFuture, GpuFuture, SemaphoreSignalFuture};
+use vulkano::sync::future::{FenceSignalFuture, SemaphoreSignalFuture};
+use vulkano::sync::GpuFuture;
+use vulkano::Validated;
 
 pub use self::deferred::DeferredRenderer;
 use self::deferred::DeferredSubrenderer;
+use self::image::{AttachmentImageFactory, AttachmentImageType};
 pub use self::interface::InterfaceRenderer;
 use self::picker::PickerSubrenderer;
 pub use self::picker::{PickerRenderer, PickerTarget};
@@ -35,61 +72,69 @@ pub use self::picker::{PickerRenderer, PickerTarget};
 pub use self::settings::RenderSettings;
 pub use self::shadow::ShadowRenderer;
 pub use self::swapchain::{PresentModeInfo, SwapchainHolder};
-use super::{Color, MemoryAllocator};
+use super::{Color, MemoryAllocator, ModelVertex};
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{Camera, ImageBuffer, ModelVertexBuffer, Texture};
+use crate::graphics::Camera;
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 pub const LIGHT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
-    color_op: BlendOp::Add,
-    color_source: BlendFactor::One,
-    color_destination: BlendFactor::One,
-    alpha_op: BlendOp::Max,
-    alpha_source: BlendFactor::One,
-    alpha_destination: BlendFactor::One,
+    color_blend_op: BlendOp::Add,
+    src_color_blend_factor: BlendFactor::One,
+    dst_color_blend_factor: BlendFactor::One,
+    alpha_blend_op: BlendOp::Max,
+    src_alpha_blend_factor: BlendFactor::One,
+    dst_alpha_blend_factor: BlendFactor::One,
 };
 
 pub const WATER_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
-    color_op: BlendOp::ReverseSubtract,
-    color_source: BlendFactor::One,
-    color_destination: BlendFactor::One,
-    alpha_op: BlendOp::Max,
-    alpha_source: BlendFactor::One,
-    alpha_destination: BlendFactor::One,
+    color_blend_op: BlendOp::ReverseSubtract,
+    src_color_blend_factor: BlendFactor::One,
+    dst_color_blend_factor: BlendFactor::One,
+    alpha_blend_op: BlendOp::Max,
+    src_alpha_blend_factor: BlendFactor::One,
+    dst_alpha_blend_factor: BlendFactor::One,
 };
 
 pub const INTERFACE_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
-    color_op: BlendOp::Add,
-    color_source: BlendFactor::SrcAlpha,
-    color_destination: BlendFactor::OneMinusSrcAlpha,
-    alpha_op: BlendOp::Max,
-    alpha_source: BlendFactor::SrcAlpha,
-    alpha_destination: BlendFactor::DstAlpha,
+    color_blend_op: BlendOp::Add,
+    src_color_blend_factor: BlendFactor::SrcAlpha,
+    dst_color_blend_factor: BlendFactor::OneMinusSrcAlpha,
+    alpha_blend_op: BlendOp::Max,
+    src_alpha_blend_factor: BlendFactor::SrcAlpha,
+    dst_alpha_blend_factor: BlendFactor::DstAlpha,
 };
 
 pub const EFFECT_ATTACHMENT_BLEND: AttachmentBlend = AttachmentBlend {
-    color_op: BlendOp::Max,
-    color_source: BlendFactor::One,
-    color_destination: BlendFactor::One,
-    alpha_op: BlendOp::Max,
-    alpha_source: BlendFactor::One,
-    alpha_destination: BlendFactor::One,
+    color_blend_op: BlendOp::Max,
+    src_color_blend_factor: BlendFactor::One,
+    dst_color_blend_factor: BlendFactor::One,
+    alpha_blend_op: BlendOp::Max,
+    src_alpha_blend_factor: BlendFactor::One,
+    dst_alpha_blend_factor: BlendFactor::One,
 };
 
 pub trait Renderer {
     type Target;
 }
 
+#[derive(Eq, PartialEq)]
+struct SubpassAttachments {
+    color: u32,
+    depth: u32,
+}
+
+impl ConstParamTy for SubpassAttachments {}
+
 pub trait GeometryRenderer {
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        vertex_buffer: ModelVertexBuffer,
-        textures: &[Texture],
+        vertex_buffer: Subbuffer<[ModelVertex]>,
+        textures: &[Arc<ImageView>],
         world_matrix: Matrix4<f32>,
         time: f32,
     ) where
@@ -101,7 +146,7 @@ pub trait EntityRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,
@@ -131,7 +176,7 @@ pub trait SpriteRenderer {
     fn render_sprite(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector2<f32>,
         size: Vector2<f32>,
         clip_size: Vector4<f32>,
@@ -156,7 +201,7 @@ pub trait MarkerRenderer {
 
 pub enum RenderTargetState {
     Ready,
-    Rendering(AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>),
+    Rendering(AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator>),
     Semaphore(SemaphoreSignalFuture<Box<dyn GpuFuture>>),
     Fence(FenceSignalFuture<Box<dyn GpuFuture>>),
     OutOfDate,
@@ -165,7 +210,7 @@ pub enum RenderTargetState {
 unsafe impl Send for RenderTargetState {}
 
 impl RenderTargetState {
-    pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator> {
+    pub fn get_builder(&mut self) -> &mut AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator> {
         let RenderTargetState::Rendering(builder) = self else {
             panic!("render target is not in the render state");
         };
@@ -173,7 +218,7 @@ impl RenderTargetState {
         builder
     }
 
-    pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator> {
+    pub fn take_builder(&mut self) -> AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator> {
         let RenderTargetState::Rendering(builder) = std::mem::replace(self, RenderTargetState::Ready) else {
             panic!("render target is not in the render state");
         };
@@ -218,10 +263,10 @@ pub struct DeferredRenderTarget {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
-    diffuse_image: ImageBuffer,
-    normal_image: ImageBuffer,
-    water_image: ImageBuffer,
-    depth_image: ImageBuffer,
+    diffuse_image: Arc<ImageView>,
+    normal_image: Arc<ImageView>,
+    water_image: Arc<ImageView>,
+    depth_image: Arc<ImageView>,
     pub state: RenderTargetState,
     bound_subrenderer: Option<DeferredSubrenderer>,
 }
@@ -231,70 +276,15 @@ impl DeferredRenderTarget {
         memory_allocator: Arc<MemoryAllocator>,
         queue: Arc<Queue>,
         render_pass: Arc<RenderPass>,
-        swapchain_image: Arc<SwapchainImage>,
+        swapchain_image: Arc<Image>,
         dimensions: [u32; 2],
     ) -> Self {
-        let color_image_usage = ImageUsage {
-            sampled: true,
-            color_attachment: true,
-            input_attachment: true,
-            ..ImageUsage::empty()
-        };
+        let image_factory = AttachmentImageFactory::new(&memory_allocator, dimensions, SampleCount::Sample4);
 
-        let depth_image_usage = ImageUsage {
-            sampled: true,
-            depth_stencil_attachment: true,
-            input_attachment: true,
-            ..ImageUsage::empty()
-        };
-
-        let diffuse_image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(
-                &*memory_allocator,
-                dimensions,
-                SampleCount::Sample4,
-                Format::R32G32B32A32_SFLOAT,
-                color_image_usage,
-            )
-            .unwrap(),
-        ))
-        .unwrap();
-
-        let normal_image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(
-                &*memory_allocator,
-                dimensions,
-                SampleCount::Sample4,
-                Format::R16G16B16A16_SFLOAT,
-                color_image_usage,
-            )
-            .unwrap(),
-        ))
-        .unwrap();
-
-        let water_image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(
-                &*memory_allocator,
-                dimensions,
-                SampleCount::Sample4,
-                Format::R8G8B8A8_UNORM,
-                color_image_usage,
-            )
-            .unwrap(),
-        ))
-        .unwrap();
-
-        let depth_image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(
-                &*memory_allocator,
-                dimensions,
-                SampleCount::Sample4,
-                Format::D32_SFLOAT,
-                depth_image_usage,
-            )
-            .unwrap(),
-        ))
-        .unwrap();
+        let diffuse_image = image_factory.new_image(Format::R32G32B32A32_SFLOAT, AttachmentImageType::InputColor);
+        let normal_image = image_factory.new_image(Format::R16G16B16A16_SFLOAT, AttachmentImageType::InputColor);
+        let water_image = image_factory.new_image(Format::R8G8B8A8_UNORM, AttachmentImageType::InputColor);
+        let depth_image = image_factory.new_image(Format::D32_SFLOAT, AttachmentImageType::InputDepth);
 
         let framebuffer_create_info = FramebufferCreateInfo {
             attachments: vec![
@@ -344,7 +334,9 @@ impl DeferredRenderTarget {
             ..RenderPassBeginInfo::framebuffer(self.framebuffer.clone())
         };
 
-        builder.begin_render_pass(render_pass_begin_info, SubpassContents::Inline).unwrap();
+        builder
+            .begin_render_pass(render_pass_begin_info, SubpassBeginInfo::default())
+            .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
@@ -356,7 +348,10 @@ impl DeferredRenderTarget {
     }
 
     pub fn lighting_pass(&mut self) {
-        self.state.get_builder().next_subpass(SubpassContents::Inline).unwrap();
+        self.state
+            .get_builder()
+            .next_subpass(SubpassEndInfo::default(), SubpassBeginInfo::default())
+            .unwrap();
     }
 
     #[profile("finish swapchain image")]
@@ -366,7 +361,7 @@ impl DeferredRenderTarget {
         #[cfg(feature = "debug")]
         let end_render_pass_measurement = start_measurement("end render pass");
 
-        builder.end_render_pass().unwrap();
+        builder.end_render_pass(SubpassEndInfo::default()).unwrap();
 
         #[cfg(feature = "debug")]
         end_render_pass_measurement.stop();
@@ -404,7 +399,16 @@ impl DeferredRenderTarget {
         self.state = future
             .then_signal_fence_and_flush()
             .map(RenderTargetState::Fence)
+            .map_err(Validated::unwrap)
+            .map_err(|error| {
+                println!("{:?}", error);
+                error
+            })
             .unwrap_or(RenderTargetState::OutOfDate);
+
+        if matches!(self.state, RenderTargetState::OutOfDate) {
+            println!(">> OUT OF DATE");
+        }
 
         #[cfg(feature = "debug")]
         flush_measurement.stop();
@@ -417,55 +421,40 @@ pub struct PickerRenderTarget {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
-    pub image: ImageBuffer,
-    pub buffer: Arc<CpuAccessibleBuffer<[u32]>>,
+    pub image: Arc<ImageView>,
+    pub buffer: Subbuffer<[u32]>,
     pub state: RenderTargetState,
     bound_subrenderer: Option<PickerSubrenderer>,
 }
 
 impl PickerRenderTarget {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, render_pass: Arc<RenderPass>, dimensions: [u32; 2]) -> Self {
-        let image_usage = ImageUsage {
-            sampled: true,
-            transfer_src: true,
-            color_attachment: true,
-            ..ImageUsage::empty()
-        };
+        let image_factory = AttachmentImageFactory::new(&memory_allocator, dimensions, SampleCount::Sample1);
 
-        let depth_image_usage = ImageUsage {
-            depth_stencil_attachment: true,
-            ..ImageUsage::empty()
-        };
-
-        let image = ImageView::new_default(Arc::new(
-            AttachmentImage::with_usage(&*memory_allocator, dimensions, Format::R32_UINT, image_usage).unwrap(),
-        ))
-        .unwrap();
-
-        let depth_buffer = ImageView::new_default(Arc::new(
-            AttachmentImage::with_usage(&*memory_allocator, dimensions, Format::D16_UNORM, depth_image_usage).unwrap(),
-        ))
-        .unwrap();
+        let image = image_factory.new_image(Format::R32_UINT, AttachmentImageType::CopyColor);
+        let depth_image = image_factory.new_image(Format::D16_UNORM, AttachmentImageType::Depth);
 
         let framebuffer_create_info = FramebufferCreateInfo {
-            attachments: vec![image.clone(), depth_buffer],
+            attachments: vec![image.clone(), depth_image],
             ..Default::default()
         };
 
         let framebuffer = Framebuffer::new(render_pass, framebuffer_create_info).unwrap();
 
-        let buffer = unsafe {
-            CpuAccessibleBuffer::uninitialized_array(
-                &*memory_allocator,
-                dimensions[0] as u64 * dimensions[1] as u64,
-                BufferUsage {
-                    transfer_dst: true,
-                    ..Default::default()
-                },
-                false,
-            )
-            .unwrap()
-        };
+        let buffer = Buffer::new_slice(
+            &*memory_allocator,
+            vulkano::buffer::BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_DST,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_RANDOM_ACCESS,
+                ..Default::default()
+            },
+            dimensions[0] as u64 * dimensions[1] as u64,
+        )
+        .unwrap();
+
         let state = RenderTargetState::Ready;
         let bound_subrenderer = None;
 
@@ -482,7 +471,7 @@ impl PickerRenderTarget {
 
     #[profile("start frame")]
     pub fn start(&mut self) {
-        let mut builder = AutoCommandBufferBuilder::primary(
+        let mut builder = AutoCommandBufferBuilder::<_, MemoryAllocator>::primary(
             &*self.memory_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
@@ -494,7 +483,9 @@ impl PickerRenderTarget {
             ..RenderPassBeginInfo::framebuffer(self.framebuffer.clone())
         };
 
-        builder.begin_render_pass(render_pass_begin_info, SubpassContents::Inline).unwrap();
+        builder
+            .begin_render_pass(render_pass_begin_info, SubpassBeginInfo::default())
+            .unwrap();
 
         self.state = RenderTargetState::Rendering(builder);
     }
@@ -510,7 +501,7 @@ impl PickerRenderTarget {
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
 
-        builder.end_render_pass().unwrap();
+        builder.end_render_pass(SubpassEndInfo::default()).unwrap();
         builder
             .copy_image_to_buffer(CopyImageToBufferInfo::image_buffer(
                 self.image.image().clone(),
@@ -539,7 +530,7 @@ pub struct SingleRenderTarget<F: IntoFormat, S: PartialEq, C> {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     framebuffer: Arc<Framebuffer>,
-    pub image: ImageBuffer,
+    pub image: Arc<ImageView>,
     pub state: RenderTargetState,
     clear_value: C,
     bound_subrenderer: Option<S>,
@@ -556,10 +547,19 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         image_usage: ImageUsage,
         clear_value: C,
     ) -> Self {
-        let image = ImageView::new_default(Arc::new(
-            AttachmentImage::multisampled_with_usage(&*memory_allocator, dimensions, sample_count, F::into_format(), image_usage).unwrap(),
-        ))
+        let image = Image::new(
+            &*memory_allocator,
+            ImageCreateInfo {
+                format: F::into_format(),
+                extent: [dimensions[0], dimensions[1], 1],
+                samples: sample_count,
+                usage: image_usage,
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
+        )
         .unwrap();
+        let image = ImageView::new_default(image).unwrap();
 
         let framebuffer_create_info = FramebufferCreateInfo {
             attachments: vec![image.clone()],
@@ -606,7 +606,9 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
             ..RenderPassBeginInfo::framebuffer(self.framebuffer.clone())
         };
 
-        builder.begin_render_pass(render_pass_begin_info, SubpassContents::Inline).unwrap();
+        builder
+            .begin_render_pass(render_pass_begin_info, SubpassBeginInfo::default())
+            .unwrap();
         self.state = RenderTargetState::Rendering(builder);
     }
 
@@ -614,7 +616,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
 
-        builder.end_render_pass().unwrap();
+        builder.end_render_pass(SubpassEndInfo::default()).unwrap();
 
         let command_buffer = builder.build().unwrap();
         let semaphore = command_buffer
@@ -646,28 +648,26 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
             ..RenderPassBeginInfo::framebuffer(self.framebuffer.clone())
         };
 
-        builder.begin_render_pass(render_pass_begin_info, SubpassContents::Inline).unwrap();
+        builder
+            .begin_render_pass(render_pass_begin_info, SubpassBeginInfo::default())
+            .unwrap();
 
         if clear_interface {
-            /*let image: Arc<dyn ImageAccess> = Arc::clone(&self.image);
-            let clear_color_image_info = ClearColorImageInfo {
-                clear_value: self.clear_value,
-                ..ClearColorImageInfo::image(image)
-            };
-
-            builder.clear_color_image(clear_color_image_info).unwrap();*/
-
             builder
                 .clear_attachments(
                     [ClearAttachment::Color {
                         color_attachment: 0,
                         clear_value: self.clear_value,
-                    }],
+                    }]
+                    .into_iter()
+                    .collect(),
                     [ClearRect {
                         offset: [0; 2],
                         extent: dimensions,
                         array_layers: 0..1,
-                    }],
+                    }]
+                    .into_iter()
+                    .collect(),
                 )
                 .unwrap();
         }
@@ -686,7 +686,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
         }
 
         let mut builder = self.state.take_builder();
-        builder.end_render_pass().unwrap();
+        builder.end_render_pass(SubpassEndInfo::default()).unwrap();
 
         let command_buffer = builder.build().unwrap();
         let semaphore = command_buffer

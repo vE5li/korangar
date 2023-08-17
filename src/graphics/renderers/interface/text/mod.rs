@@ -1,77 +1,52 @@
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/graphics/renderers/interface/text/vertex_shader.glsl"
-    }
-}
-
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/graphics/renderers/interface/text/fragment_shader.glsl"
-    }
-}
+vertex_shader!("src/graphics/renderers/interface/text/vertex_shader.glsl");
+fragment_shader!("src/graphics/renderers/interface/text/fragment_shader.glsl");
 
 use std::cell::RefCell;
-use std::iter;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4};
 use procedural::profile;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::multisample::MultisampleState;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::image::sampler::Sampler;
+use vulkano::image::SampleCount;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Filter, Sampler, SamplerCreateInfo};
-use vulkano::shader::ShaderModule;
+use vulkano::shader::EntryPoint;
 
-use self::vertex_shader::ty::Constants;
+use self::vertex_shader::Constants;
 use super::InterfaceSubrenderer;
+use crate::graphics::renderers::pipeline::PipelineBuilder;
+use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
 use crate::loaders::FontLoader;
 
-unsafe impl bytemuck::Zeroable for Constants {}
-unsafe impl bytemuck::Pod for Constants {}
-
 pub struct TextRenderer {
     memory_allocator: Arc<MemoryAllocator>,
-    pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
-    nearest_sampler: Arc<Sampler>,
     font_loader: Rc<RefCell<FontLoader>>,
+    vertex_shader: EntryPoint,
+    fragment_shader: EntryPoint,
+    nearest_sampler: Arc<Sampler>,
+    pipeline: Arc<GraphicsPipeline>,
 }
 
 impl TextRenderer {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport, font_loader: Rc<RefCell<FontLoader>>) -> Self {
         let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
-        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
+        let vertex_shader = vertex_shader::entry_point(&device);
+        let fragment_shader = fragment_shader::entry_point(&device);
+        let nearest_sampler = create_new_sampler(&device, SamplerType::Linear);
         let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-
-        let nearest_sampler = Sampler::new(device, SamplerCreateInfo {
-            mag_filter: Filter::Linear,
-            min_filter: Filter::Linear,
-            ..Default::default()
-        })
-        .unwrap();
 
         Self {
             memory_allocator,
+            font_loader,
             pipeline,
             vertex_shader,
             fragment_shader,
             nearest_sampler,
-            font_loader,
         }
     }
 
@@ -84,27 +59,23 @@ impl TextRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
-        vertex_shader: &ShaderModule,
-        fragment_shader: &ShaderModule,
+        vertex_shader: &EntryPoint,
+        fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        GraphicsPipeline::start()
-            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
-            .input_assembly_state(InputAssemblyState::new())
-            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend(INTERFACE_ATTACHMENT_BLEND))
-            .multisample_state(MultisampleState {
-                rasterization_samples: vulkano::image::SampleCount::Sample4,
-                ..Default::default()
-            })
-            .render_pass(subpass)
-            .build(device)
-            .unwrap()
+        PipelineBuilder::<_, { InterfaceRenderer::subpass() }>::new([vertex_shader, fragment_shader])
+            .fixed_viewport(viewport)
+            .multisample(SampleCount::Sample4)
+            .color_blend(INTERFACE_ATTACHMENT_BLEND)
+            .build(device, subpass)
     }
 
     #[profile]
     fn bind_pipeline(&self, render_target: &mut <InterfaceRenderer as Renderer>::Target) {
-        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+        render_target
+            .state
+            .get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .unwrap();
     }
 
     #[profile("render text")]
@@ -122,24 +93,20 @@ impl TextRenderer {
             self.bind_pipeline(render_target);
         }
 
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
-
         let mut font_loader = self.font_loader.borrow_mut();
         let texture = font_loader.get_font_atlas();
         let (character_layout, heigth) = font_loader.get(text, color, font_size, clip_size.z - screen_position.x);
-
         let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
 
-        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
             WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone()),
-        ])
-        .unwrap();
+        ]);
 
         render_target
             .state
             .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set);
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
+            .unwrap();
 
         character_layout.iter().for_each(|(texture_coordinates, position, color)| {
             let screen_position = Vector2::new(
@@ -168,6 +135,7 @@ impl TextRenderer {
                 .state
                 .get_builder()
                 .push_constants(layout.clone(), 0, constants)
+                .unwrap()
                 .draw(6, 1, 0, 0)
                 .unwrap();
         });

@@ -4,11 +4,11 @@ use std::sync::Arc;
 use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use procedural::*;
-use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
+use vulkano::image::view::ImageView;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{MemoryAllocator, NativeModelVertex, Texture};
+use crate::graphics::{BufferAllocator, NativeModelVertex};
 use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MajorFirst, TextureLoader, Version};
 use crate::system::multiply_matrix4_and_vector3;
 use crate::world::{BoundingBox, Model, Node};
@@ -131,7 +131,6 @@ pub struct ModelData {
 
 #[derive(new)]
 pub struct ModelLoader {
-    memory_allocator: Arc<MemoryAllocator>,
     #[new(default)]
     cache: HashMap<(String, bool), Arc<Model>>,
 }
@@ -242,10 +241,10 @@ impl ModelLoader {
     }
 
     fn process_node_mesh(
-        memory_allocator: &MemoryAllocator,
+        buffer_allocator: &mut BufferAllocator,
         current_node: &NodeData,
         nodes: &Vec<NodeData>,
-        textures: &Vec<Texture>,
+        textures: &Vec<Arc<ImageView>>,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut BoundingBox,
         root_node_name: &ModelString,
@@ -253,16 +252,8 @@ impl ModelLoader {
     ) -> Node {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
         let vertices = NativeModelVertex::to_vertices(Self::make_vertices(current_node, &main_matrix, reverse_order));
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(
-            memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            vertices,
-        )
-        .unwrap();
+
+        let vertex_buffer = buffer_allocator.allocate_vertex_buffer(vertices);
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = BoundingBox::new(
@@ -297,7 +288,7 @@ impl ModelLoader {
             .filter(|node| node.parent_node_name != node.node_name)
             .map(|node| {
                 Self::process_node_mesh(
-                    memory_allocator,
+                    buffer_allocator,
                     node,
                     nodes,
                     textures,
@@ -320,6 +311,7 @@ impl ModelLoader {
 
     fn load(
         &mut self,
+        buffer_allocator: &mut BufferAllocator,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         model_file: &str,
@@ -353,7 +345,7 @@ impl ModelLoader {
 
         let mut bounding_box = BoundingBox::uninitialized();
         let root_node = Self::process_node_mesh(
-            &self.memory_allocator,
+            buffer_allocator,
             root_node,
             &model_data.nodes,
             &textures,
@@ -379,6 +371,7 @@ impl ModelLoader {
 
     pub fn get(
         &mut self,
+        buffer_allocator: &mut BufferAllocator,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         model_file: &str,
@@ -387,7 +380,7 @@ impl ModelLoader {
         match self.cache.get(&(model_file.to_string(), reverse_order)) {
             // kinda dirty
             Some(model) => Ok(model.clone()),
-            None => self.load(game_file_loader, texture_loader, model_file, reverse_order),
+            None => self.load(buffer_allocator, game_file_loader, texture_loader, model_file, reverse_order),
         }
     }
 }

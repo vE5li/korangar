@@ -13,6 +13,7 @@ use vulkano::render_pass::RenderPass;
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
 use self::indicator::IndicatorRenderer;
+use super::SubpassAttachments;
 use crate::graphics::{
     EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait, *,
 };
@@ -33,25 +34,32 @@ pub struct ShadowRenderer {
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     indicator_renderer: IndicatorRenderer,
-    walk_indicator: Texture,
+    walk_indicator: Arc<ImageView>,
 }
 
+unsafe impl Send for ShadowRenderer {}
+unsafe impl Sync for ShadowRenderer {}
+
 impl ShadowRenderer {
+    const fn subpass() -> SubpassAttachments {
+        SubpassAttachments { color: 0, depth: 1 }
+    }
+
     pub fn new(
         memory_allocator: Arc<MemoryAllocator>,
-        queue: Arc<Queue>,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
+        queue: Arc<Queue>,
     ) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
             device,
             attachments: {
                 depth: {
-                    load: Clear,
-                    store: Store,
                     format: Format::D32_SFLOAT,
                     samples: 1,
+                    load_op: Clear,
+                    store_op: Store,
                 }
             },
             pass: {
@@ -80,19 +88,13 @@ impl ShadowRenderer {
     }
 
     pub fn create_render_target(&self, size: u32) -> <Self as Renderer>::Target {
-        let image_usage = ImageUsage {
-            sampled: true,
-            depth_stencil_attachment: true,
-            ..ImageUsage::empty()
-        };
-
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),
             self.queue.clone(),
             self.render_pass.clone(),
             [size; 2],
             SampleCount::Sample1,
-            image_usage,
+            ImageUsage::SAMPLED | ImageUsage::DEPTH_STENCIL_ATTACHMENT,
             ClearValue::Depth(1.0),
         )
     }
@@ -115,8 +117,8 @@ impl GeometryRendererTrait for ShadowRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        vertex_buffer: ModelVertexBuffer,
-        textures: &[Texture],
+        vertex_buffer: Subbuffer<[ModelVertex]>,
+        textures: &[Arc<ImageView>],
         world_matrix: Matrix4<f32>,
         time: f32,
     ) where
@@ -132,7 +134,7 @@ impl EntityRendererTrait for ShadowRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,

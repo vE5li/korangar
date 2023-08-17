@@ -1,8 +1,12 @@
+use std::sync::Arc;
+
 use cgmath::{Array, Matrix4, SquareMatrix, Vector3, Vector4};
 use derive_new::new;
 use procedural::*;
+use vulkano::buffer::Subbuffer;
+use vulkano::image::view::ImageView;
 
-use crate::graphics::{Camera, GeometryRenderer, ModelVertexBuffer, Renderer, Texture, Transform};
+use crate::graphics::{Camera, GeometryRenderer, ModelVertex, Renderer, Transform};
 use crate::loaders::RotationKeyframeData;
 use crate::network::ClientTick;
 use crate::system::multiply_matrix4_and_vector3;
@@ -103,9 +107,9 @@ pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
     #[hidden_element]
-    pub vertex_buffer: ModelVertexBuffer,
+    pub vertex_buffer: Subbuffer<[ModelVertex]>,
     #[hidden_element]
-    pub textures: Vec<Texture>,
+    pub textures: Vec<Arc<ImageView>>,
     pub child_nodes: Vec<Node>,
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }

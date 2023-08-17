@@ -1,13 +1,19 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Vector2, Vector3};
+use vulkano::pipeline::graphics::vertex_input::Vertex;
 
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy, Zeroable, Pod)]
+#[derive(Default, Debug, Clone, Copy, Zeroable, Pod, Vertex)]
 pub struct ModelVertex {
+    #[format(R32G32B32_SFLOAT)]
     pub position: [f32; 3],
+    #[format(R32G32B32_SFLOAT)]
     pub normal: [f32; 3],
+    #[format(R32G32_SFLOAT)]
     pub texture_coordinates: [f32; 2],
+    #[format(R32_SINT)]
     pub texture_index: i32,
+    #[format(R32_SFLOAT)]
     pub wind_affinity: f32,
 }
 
@@ -28,5 +34,3 @@ impl ModelVertex {
         }
     }
 }
-
-vulkano::impl_vertex!(ModelVertex, position, normal, texture_coordinates, texture_index, wind_affinity);

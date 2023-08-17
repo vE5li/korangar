@@ -110,7 +110,7 @@ impl Particle for HealNumber {
 
 pub struct QuestIcon {
     position: Vector3<f32>,
-    texture: Texture,
+    texture: Arc<ImageView>,
     color: Color,
 }
 

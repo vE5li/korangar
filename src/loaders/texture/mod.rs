@@ -5,16 +5,21 @@ use std::sync::Arc;
 use derive_new::new;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat, Rgba};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract};
+use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
+};
 use vulkano::device::Queue;
 use vulkano::format::Format;
 use vulkano::image::view::ImageView;
-use vulkano::image::{ImageDimensions, ImmutableImage, MipmapsCount};
-use vulkano::sync::{FenceSignalFuture, GpuFuture};
+use vulkano::image::{Image, ImageCreateInfo, ImageUsage};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
+use vulkano::sync::future::FenceSignalFuture;
+use vulkano::sync::GpuFuture;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::graphics::{MemoryAllocator, Texture};
+use crate::graphics::MemoryAllocator;
 use crate::loaders::GameFileLoader;
 
 #[derive(new)]
@@ -22,13 +27,13 @@ pub struct TextureLoader {
     memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
     #[new(default)]
-    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer, MemoryAllocator>>,
+    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator>>,
     #[new(value = "HashMap::new()")]
-    cache: HashMap<String, Texture>,
+    cache: HashMap<String, Arc<ImageView>>,
 }
 
 impl TextureLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Texture, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {MAGENTA}{path}{NONE}"));
 
@@ -54,13 +59,6 @@ impl TextureLoader {
                 .for_each(|pixel| *pixel = Rgba([0; 4]));
         }
 
-        let image_data = image_buffer.as_bytes().to_vec();
-        let dimensions = ImageDimensions::Dim2d {
-            width: image_buffer.width(),
-            height: image_buffer.height(),
-            array_layers: 1,
-        };
-
         let load_buffer = self.load_buffer.get_or_insert_with(|| {
             AutoCommandBufferBuilder::primary(
                 &*self.memory_allocator,
@@ -70,17 +68,37 @@ impl TextureLoader {
             .unwrap()
         });
 
-        let image = ImmutableImage::from_iter(
+        let buffer = Buffer::from_iter(
             &*self.memory_allocator,
-            image_data.iter().cloned(),
-            dimensions,
-            MipmapsCount::Log2,
-            Format::R8G8B8A8_UNORM,
-            load_buffer,
+            BufferCreateInfo {
+                usage: BufferUsage::TRANSFER_SRC,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            image_buffer.as_bytes().iter().copied(),
         )
         .unwrap();
 
-        let texture = ImageView::new_default(Arc::new(image)).unwrap();
+        let image = Image::new(
+            &*self.memory_allocator,
+            ImageCreateInfo {
+                format: Format::R8G8B8A8_UNORM,
+                extent: [image_buffer.width(), image_buffer.height(), 1],
+                usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
+                ..Default::default()
+            },
+            AllocationCreateInfo::default(),
+        )
+        .unwrap();
+
+        load_buffer
+            .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(buffer, image.clone()))
+            .unwrap();
+
+        let texture = ImageView::new_default(image).unwrap();
         self.cache.insert(path.to_string(), texture.clone());
 
         #[cfg(feature = "debug")]
@@ -89,7 +107,7 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Texture, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
         match self.cache.get(path) {
             Some(texture) => Ok(texture.clone()),
             None => self.load(path, game_file_loader),

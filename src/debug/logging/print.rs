@@ -1,3 +1,5 @@
+use vulkano::instance::debug::{DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessengerCallbackData};
+
 use super::*;
 
 pub macro print_debug {
@@ -36,24 +38,28 @@ pub fn print_indented(message: String, newline: bool) {
     }
 }
 
-pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
-    let severity = if message.severity.error {
+pub fn vulkan_message_callback(
+    message_severity: DebugUtilsMessageSeverity,
+    message_type: DebugUtilsMessageType,
+    callback_data: DebugUtilsMessengerCallbackData<'_>,
+) {
+    let severity = if message_severity.intersects(DebugUtilsMessageSeverity::ERROR) {
         "error"
-    } else if message.severity.warning {
+    } else if message_severity.intersects(DebugUtilsMessageSeverity::WARNING) {
         "warning"
-    } else if message.severity.information {
+    } else if message_severity.intersects(DebugUtilsMessageSeverity::INFO) {
         "information"
-    } else if message.severity.verbose {
+    } else if message_severity.intersects(DebugUtilsMessageSeverity::VERBOSE) {
         "verbose"
     } else {
         panic!("no-impl");
     };
 
-    let message_type = if message.ty.general {
+    let message_type = if message_type.intersects(DebugUtilsMessageType::GENERAL) {
         "general"
-    } else if message.ty.validation {
+    } else if message_type.intersects(DebugUtilsMessageType::VALIDATION) {
         "validation"
-    } else if message.ty.performance {
+    } else if message_type.intersects(DebugUtilsMessageType::PERFORMANCE) {
         "performance"
     } else {
         panic!("no-impl");
@@ -62,7 +68,7 @@ pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
     print_debug!(
         "{}{}{} [{}{}{}] [{}{}{}]: {}",
         MAGENTA,
-        message.layer_prefix.unwrap_or("unknown"),
+        callback_data.message_id_name.unwrap_or("unknown"),
         NONE,
         YELLOW,
         message_type,
@@ -70,6 +76,6 @@ pub fn vulkan_message_callback(message: &vulkano::instance::debug::Message) {
         RED,
         severity,
         NONE,
-        message.description
+        callback_data.message
     );
 }

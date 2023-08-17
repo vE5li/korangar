@@ -1,9 +1,11 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 
 use cgmath::{Vector2, Vector4, Zero};
+use vulkano::image::view::ImageView;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer, Texture};
+use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
 use crate::inventory::{Item, Skill};
@@ -98,7 +100,7 @@ impl<'a> ElementRenderer<'a> {
         );
     }
 
-    pub fn render_sprite(&mut self, texture: Texture, offset: Position, size: Size, color: Color) {
+    pub fn render_sprite(&mut self, texture: Arc<ImageView>, offset: Position, size: Size, color: Color) {
         self.renderer.render_sprite(
             self.render_target,
             texture,

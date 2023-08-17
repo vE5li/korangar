@@ -2,21 +2,13 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector3};
 use vulkano::device::physical::PhysicalDevice;
-use vulkano::device::DeviceExtensions;
-use vulkano::instance::{Instance, InstanceExtensions};
+use vulkano::device::{DeviceExtensions, QueueFlags};
+use vulkano::instance::Instance;
 use vulkano::swapchain::Surface;
 use vulkano::VulkanLibrary;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-
-pub fn get_instance_extensions(library: &VulkanLibrary) -> InstanceExtensions {
-    InstanceExtensions {
-        ext_debug_utils: true,
-        //khr_get_physical_device_properties2: true,
-        ..vulkano_win::required_extensions(library)
-    }
-}
 
 pub fn get_layers(library: &VulkanLibrary) -> Vec<String> {
     let available_layers: Vec<_> = library.layer_properties().unwrap().collect();
@@ -70,7 +62,7 @@ pub fn choose_physical_device(
             p.queue_family_properties()
                 .iter()
                 .enumerate()
-                .position(|(i, q)| q.queue_flags.graphics && p.surface_support(i as u32, surface).unwrap_or(false))
+                .position(|(i, q)| q.queue_flags.intersects(QueueFlags::GRAPHICS) && p.surface_support(i as u32, surface).unwrap_or(false))
                 .map(|i| (p, i as u32))
         })
         .min_by_key(|(p, _)| match p.properties().device_type {

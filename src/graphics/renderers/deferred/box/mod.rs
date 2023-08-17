@@ -1,158 +1,74 @@
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/graphics/renderers/deferred/box/vertex_shader.glsl"
-    }
-}
+vertex_shader!("src/graphics/renderers/deferred/box/vertex_shader.glsl");
+fragment_shader!("src/graphics/renderers/deferred/box/fragment_shader.glsl");
 
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/graphics/renderers/deferred/box/fragment_shader.glsl"
-    }
-}
-
-use std::iter;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector3};
+use cgmath::Vector3;
 use procedural::profile;
-use vulkano::buffer::BufferUsage;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
-use vulkano::memory::allocator::MemoryUsage;
-use vulkano::pipeline::graphics::depth_stencil::DepthStencilState;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::vertex_input::BuffersDefinition;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::pipeline::graphics::input_assembly::PrimitiveTopology;
+use vulkano::pipeline::graphics::rasterization::RasterizationState;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint, StateMode};
 use vulkano::render_pass::Subpass;
-use vulkano::shader::ShaderModule;
+use vulkano::shader::EntryPoint;
 
-use self::vertex_shader::ty::{Constants, Matrices};
+use self::vertex_shader::{Constants, Matrices};
 use super::DeferredSubrenderer;
+use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::*;
 use crate::world::{BoundingBox, Model};
 
-unsafe impl bytemuck::Zeroable for Constants {}
-unsafe impl bytemuck::Pod for Constants {}
-
-unsafe impl bytemuck::Zeroable for Matrices {}
-unsafe impl bytemuck::Pod for Matrices {}
-
 pub struct BoxRenderer {
     memory_allocator: Arc<MemoryAllocator>,
+    vertex_shader: EntryPoint,
+    fragment_shader: EntryPoint,
+    vertex_buffer: Subbuffer<[WaterVertex]>,
+    index_buffer: Subbuffer<[u16]>,
+    matrices_buffer: MatrixAllocator<Matrices>,
     pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
-    vertex_buffer: ModelVertexBuffer,
-    index_buffer: Arc<CpuAccessibleBuffer<[u16]>>,
-    matrices_buffer: CpuBufferPool<Matrices, MemoryAllocator>,
 }
 
 impl BoxRenderer {
-    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
+    pub fn new(
+        memory_allocator: Arc<MemoryAllocator>,
+        buffer_allocator: &mut BufferAllocator,
+        subpass: Subpass,
+        viewport: Viewport,
+    ) -> Self {
         let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
-        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
+        let vertex_shader = vertex_shader::entry_point(&device);
+        let fragment_shader = fragment_shader::entry_point(&device);
 
-        let vertices = vec![
-            ModelVertex::new(
-                Vector3::new(-1.0, -1.0, -1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 0.0),
-                0,
-                0.0,
-            ), // bottom left front
-            ModelVertex::new(
-                Vector3::new(-1.0, 1.0, -1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 1.0),
-                0,
-                0.0,
-            ), // top left front
-            ModelVertex::new(
-                Vector3::new(1.0, -1.0, -1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 0.0),
-                0,
-                0.0,
-            ), // bottom right front
-            ModelVertex::new(
-                Vector3::new(1.0, 1.0, -1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 1.0),
-                0,
-                0.0,
-            ), // top right front
-            ModelVertex::new(
-                Vector3::new(-1.0, -1.0, 1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 0.0),
-                0,
-                0.0,
-            ), // bottom left back
-            ModelVertex::new(
-                Vector3::new(-1.0, 1.0, 1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(1.0, 1.0),
-                0,
-                0.0,
-            ), // top left back
-            ModelVertex::new(
-                Vector3::new(1.0, -1.0, 1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 0.0),
-                0,
-                0.0,
-            ), // bottom right back
-            ModelVertex::new(
-                Vector3::new(1.0, 1.0, 1.0),
-                Vector3::new(0.0, 1.0, 0.0),
-                Vector2::new(0.0, 1.0),
-                0,
-                0.0,
-            ), // top right back
-        ];
+        let vertex_buffer = buffer_allocator.allocate_vertex_buffer([
+            WaterVertex::new(Vector3::new(-1.0, -1.0, -1.0)), // bottom left front
+            WaterVertex::new(Vector3::new(-1.0, 1.0, -1.0)),  // top left front
+            WaterVertex::new(Vector3::new(1.0, -1.0, -1.0)),  // bottom right front
+            WaterVertex::new(Vector3::new(1.0, 1.0, -1.0)),   // top right front
+            WaterVertex::new(Vector3::new(-1.0, -1.0, 1.0)),  // bottom left back
+            WaterVertex::new(Vector3::new(-1.0, 1.0, 1.0)),   // top left back
+            WaterVertex::new(Vector3::new(1.0, -1.0, 1.0)),   // bottom right back
+            WaterVertex::new(Vector3::new(1.0, 1.0, 1.0)),    // top right back
+        ]);
 
-        let indices = vec![
+        let index_buffer = buffer_allocator.allocate_index_buffer([
             0, 1, 2, 3, 4, 5, 6, 7, // sides
             1, 3, 3, 7, 7, 5, 5, 1, // top
             0, 2, 2, 6, 6, 4, 4, 0, // bottom
-        ];
+        ]);
 
-        let vertex_buffer_usage = BufferUsage {
-            vertex_buffer: true,
-            ..BufferUsage::empty()
-        };
-
-        let index_buffer_usage = BufferUsage {
-            index_buffer: true,
-            ..BufferUsage::empty()
-        };
-
-        let matrices_buffer_usage = BufferUsage {
-            uniform_buffer: true,
-            ..BufferUsage::empty()
-        };
-
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(&*memory_allocator, vertex_buffer_usage, false, vertices).unwrap();
-        let index_buffer = CpuAccessibleBuffer::from_iter(&*memory_allocator, index_buffer_usage, false, indices).unwrap();
-        let matrices_buffer = CpuBufferPool::new(memory_allocator.clone(), matrices_buffer_usage, MemoryUsage::Upload);
+        let matrices_buffer = MatrixAllocator::new(&memory_allocator);
+        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
             memory_allocator,
-            pipeline,
             vertex_shader,
             fragment_shader,
             vertex_buffer,
             index_buffer,
             matrices_buffer,
+            pipeline,
         }
     }
 
@@ -165,47 +81,44 @@ impl BoxRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
-        vertex_shader: &ShaderModule,
-        fragment_shader: &ShaderModule,
+        vertex_shader: &EntryPoint,
+        fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        GraphicsPipeline::start()
-            .vertex_input_state(BuffersDefinition::new().vertex::<ModelVertex>())
-            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
-            .input_assembly_state(
-                InputAssemblyState::new().topology(vulkano::pipeline::graphics::input_assembly::PrimitiveTopology::LineList),
-            )
-            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .depth_stencil_state(DepthStencilState::simple_depth_test())
-            .render_pass(subpass)
-            .build(device)
-            .unwrap()
+        let rasterization_state = RasterizationState {
+            line_width: StateMode::Fixed(3.0),
+            ..Default::default()
+        };
+
+        PipelineBuilder::<_, { DeferredRenderer::lighting_subpass() }>::new([vertex_shader, fragment_shader])
+            .vertex_input_state::<WaterVertex>(vertex_shader)
+            .topology(PrimitiveTopology::LineList)
+            .fixed_viewport(viewport)
+            .rasterization_state(rasterization_state)
+            .build(device, subpass)
     }
 
     #[profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
-
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let matrices = Matrices {
+        let buffer = self.matrices_buffer.allocate(Matrices {
             view_projection: (projection_matrix * view_matrix).into(),
-        };
+        });
 
-        let matrices_subbuffer = Arc::new(self.matrices_buffer.from_data(matrices).unwrap());
-        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [WriteDescriptorSet::buffer(
-            0,
-            matrices_subbuffer,
-        )])
-        .unwrap();
+        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [WriteDescriptorSet::buffer(
+            0, buffer,
+        )]);
 
         render_target
             .state
             .get_builder()
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, 0, set)
+            .unwrap()
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, set_id, set)
+            .unwrap()
             .bind_vertex_buffers(0, self.vertex_buffer.clone())
-            .bind_index_buffer(self.index_buffer.clone());
+            .unwrap()
+            .bind_index_buffer(self.index_buffer.clone())
+            .unwrap();
     }
 
     #[profile("render bounding box")]
@@ -222,7 +135,6 @@ impl BoxRenderer {
         }
 
         let layout = self.pipeline.layout().clone();
-
         let world_matrix = Model::bounding_box_matrix(bounding_box, transform);
 
         let constants = Constants {
@@ -234,6 +146,7 @@ impl BoxRenderer {
             .state
             .get_builder()
             .push_constants(layout, 0, constants)
+            .unwrap()
             .draw_indexed(24, 1, 0, 0, 0)
             .unwrap();
     }

@@ -20,6 +20,7 @@ use self::geometry::GeometryRenderer;
 use self::marker::MarkerRenderer;
 pub use self::target::PickerTarget;
 use self::tile::TileRenderer;
+use super::SubpassAttachments;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
@@ -48,23 +49,30 @@ pub struct PickerRenderer {
     dimensions: [u32; 2],
 }
 
+unsafe impl Send for PickerRenderer {}
+unsafe impl Sync for PickerRenderer {}
+
 impl PickerRenderer {
+    const fn subpass() -> SubpassAttachments {
+        SubpassAttachments { color: 1, depth: 1 }
+    }
+
     pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
         let device = memory_allocator.device().clone();
         let render_pass = vulkano::single_pass_renderpass!(
             device,
             attachments: {
                 color: {
-                    load: Clear,
-                    store: Store,
                     format: Format::R32_UINT,
                     samples: 1,
+                    load_op: Clear,
+                    store_op: Store,
                 },
                 depth: {
-                    load: Clear,
-                    store: DontCare,
                     format: Format::D16_UNORM,
                     samples: 1,
+                    load_op: Clear,
+                    store_op: DontCare,
                 }
             },
             pass: {
@@ -119,7 +127,12 @@ impl PickerRenderer {
         )
     }
 
-    pub fn render_tiles(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, vertex_buffer: TileVertexBuffer) {
+    pub fn render_tiles(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        camera: &dyn Camera,
+        vertex_buffer: Subbuffer<[TileVertex]>,
+    ) {
         self.tile_renderer.render(render_target, camera, vertex_buffer);
     }
 }
@@ -133,8 +146,8 @@ impl GeometryRendererTrait for PickerRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        vertex_buffer: ModelVertexBuffer,
-        textures: &[Texture],
+        vertex_buffer: Subbuffer<[ModelVertex]>,
+        textures: &[Arc<ImageView>],
         world_matrix: Matrix4<f32>,
         _time: f32,
     ) where
@@ -150,7 +163,7 @@ impl EntityRendererTrait for PickerRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         camera: &dyn Camera,
-        texture: Texture,
+        texture: Arc<ImageView>,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,

@@ -1,66 +1,46 @@
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod vertex_shader {
-    vulkano_shaders::shader! {
-        ty: "vertex",
-        path: "src/graphics/renderers/deferred/effect/vertex_shader.glsl"
-    }
-}
+vertex_shader!("src/graphics/renderers/deferred/effect/vertex_shader.glsl");
+fragment_shader!("src/graphics/renderers/deferred/effect/fragment_shader.glsl");
 
-// TODO: remove once no longer needed
-#[allow(clippy::needless_question_mark)]
-mod fragment_shader {
-    vulkano_shaders::shader! {
-        ty: "fragment",
-        path: "src/graphics/renderers/deferred/effect/fragment_shader.glsl"
-    }
-}
-
-use std::iter;
 use std::sync::Arc;
 
 use cgmath::{Matrix2, Vector2};
 use procedural::profile;
-use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
+use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
-use vulkano::pipeline::graphics::color_blend::ColorBlendState;
-use vulkano::pipeline::graphics::input_assembly::InputAssemblyState;
-use vulkano::pipeline::graphics::viewport::{Viewport, ViewportState};
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
+use vulkano::image::sampler::Sampler;
+use vulkano::pipeline::graphics::viewport::Viewport;
+use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
-use vulkano::sampler::{Sampler, SamplerCreateInfo};
-use vulkano::shader::ShaderModule;
+use vulkano::shader::EntryPoint;
 
-use self::vertex_shader::ty::Constants;
+use self::vertex_shader::Constants;
 use super::DeferredSubrenderer;
+use crate::graphics::renderers::pipeline::PipelineBuilder;
+use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
-
-unsafe impl bytemuck::Zeroable for Constants {}
-unsafe impl bytemuck::Pod for Constants {}
 
 pub struct EffectRenderer {
     memory_allocator: Arc<MemoryAllocator>,
-    pipeline: Arc<GraphicsPipeline>,
-    vertex_shader: Arc<ShaderModule>,
-    fragment_shader: Arc<ShaderModule>,
+    vertex_shader: EntryPoint,
+    fragment_shader: EntryPoint,
     linear_sampler: Arc<Sampler>,
+    pipeline: Arc<GraphicsPipeline>,
 }
 
 impl EffectRenderer {
     pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
         let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::load(device.clone()).unwrap();
-        let fragment_shader = fragment_shader::load(device.clone()).unwrap();
-        let pipeline = Self::create_pipeline(device.clone(), subpass, viewport, &vertex_shader, &fragment_shader);
-
-        let linear_sampler = Sampler::new(device, SamplerCreateInfo::simple_repeat_linear_no_mipmap()).unwrap();
+        let vertex_shader = vertex_shader::entry_point(&device);
+        let fragment_shader = fragment_shader::entry_point(&device);
+        let linear_sampler = create_new_sampler(&device, SamplerType::Linear);
+        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
 
         Self {
             memory_allocator,
-            pipeline,
             vertex_shader,
             fragment_shader,
             linear_sampler,
+            pipeline,
         }
     }
 
@@ -73,30 +53,29 @@ impl EffectRenderer {
         device: Arc<Device>,
         subpass: Subpass,
         viewport: Viewport,
-        vertex_shader: &ShaderModule,
-        fragment_shader: &ShaderModule,
+        vertex_shader: &EntryPoint,
+        fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        GraphicsPipeline::start()
-            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
-            .input_assembly_state(InputAssemblyState::new())
-            .viewport_state(ViewportState::viewport_fixed_scissor_irrelevant(iter::once(viewport)))
-            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
-            .color_blend_state(ColorBlendState::new(1).blend(EFFECT_ATTACHMENT_BLEND))
-            .render_pass(subpass)
-            .build(device)
-            .unwrap()
+        PipelineBuilder::<_, { DeferredRenderer::lighting_subpass() }>::new([vertex_shader, fragment_shader])
+            .fixed_viewport(viewport)
+            .color_blend(EFFECT_ATTACHMENT_BLEND)
+            .build(device, subpass)
     }
 
     #[profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
-        render_target.state.get_builder().bind_pipeline_graphics(self.pipeline.clone());
+        render_target
+            .state
+            .get_builder()
+            .bind_pipeline_graphics(self.pipeline.clone())
+            .unwrap();
     }
 
     #[profile("render effect")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        texture: Texture,
+        texture: Arc<ImageView>,
         window_size: Vector2<usize>,
         mut screen_positions: [Vector2<f32>; 4],
         texture_coordinates: [Vector2<f32>; 4],
@@ -129,13 +108,9 @@ impl EffectRenderer {
         // TODO: as_array()
         let texture_coordinates = texture_coordinates.map(|coordinate| [coordinate.x, coordinate.y]);
 
-        let layout = self.pipeline.layout().clone();
-        let descriptor_layout = layout.set_layouts().get(0).unwrap().clone();
-
-        let set = PersistentDescriptorSet::new(&*self.memory_allocator, descriptor_layout, [
+        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
             WriteDescriptorSet::image_view_sampler(0, texture, self.linear_sampler.clone()),
-        ])
-        .unwrap();
+        ]);
 
         // TODO: apply angle
         let constants = Constants {
@@ -153,8 +128,10 @@ impl EffectRenderer {
         render_target
             .state
             .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), 0, set)
+            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
+            .unwrap()
             .push_constants(layout, 0, constants)
+            .unwrap()
             .draw(6, 1, 0, 0)
             .unwrap();
     }

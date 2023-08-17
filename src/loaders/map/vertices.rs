@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
-use vulkano::buffer::{BufferContents, BufferUsage, CpuAccessibleBuffer};
+use vulkano::image::view::ImageView;
 
 use super::data::{GatData, GroundData, GroundTile, SurfaceType};
-use crate::graphics::{MemoryAllocator, ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
 use crate::loaders::{GameFileLoader, TextureLoader};
 
 const TILE_SIZE: f32 = 10.0;
@@ -15,32 +15,6 @@ pub enum Heights {
     UpperRight,
     LowerLeft,
     LowerRight,
-}
-
-pub fn get_vertex_buffer<T>(memory_allocator: &Arc<MemoryAllocator>, data: Vec<T>) -> Arc<CpuAccessibleBuffer<[T]>>
-where
-    [T]: BufferContents,
-{
-    CpuAccessibleBuffer::from_iter(
-        &*memory_allocator.clone(),
-        BufferUsage {
-            vertex_buffer: true,
-            ..Default::default()
-        },
-        false,
-        data,
-    )
-    .unwrap()
-}
-
-pub fn optional_vertex_buffer<T>(memory_allocator: &Arc<MemoryAllocator>, data: Vec<T>) -> Option<Arc<CpuAccessibleBuffer<[T]>>>
-where
-    [T]: BufferContents,
-{
-    match !data.is_empty() {
-        true => Some(get_vertex_buffer(memory_allocator, data)),
-        false => None,
-    }
 }
 
 pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<NativeModelVertex>, Vec<WaterVertex>) {
@@ -173,7 +147,11 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
     (native_ground_vertices, water_vertices)
 }
 
-pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoader, game_file_loader: &mut GameFileLoader) -> Vec<Texture> {
+pub fn load_textures(
+    ground_data: &GroundData,
+    texture_loader: &mut TextureLoader,
+    game_file_loader: &mut GameFileLoader,
+) -> Vec<Arc<ImageView>> {
     ground_data
         .textures
         .iter()

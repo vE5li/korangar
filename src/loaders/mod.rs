@@ -1,4 +1,5 @@
 mod action;
+mod archive;
 mod convertable;
 mod effect;
 mod fixed;
@@ -20,11 +21,7 @@ pub use self::font::FontLoader;
 pub use self::gamefile::GameFileLoader;
 #[cfg(feature = "debug")]
 pub use self::map::MapData;
-//pub use self::model::ModelLoader;
-pub use self::map::MapLoader;
-pub use self::map::{LightSettings, WaterSettings};
-//pub use self::sprite::SpriteLoader;
-//pub use self::action::ActionLoader;
+pub use self::map::{LightSettings, MapLoader, WaterSettings};
 pub use self::model::*;
 pub use self::script::ScriptLoader;
 pub use self::sprite::*;

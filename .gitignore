@@ -6,4 +6,5 @@ procedural/target
 client/
 data.grf
 rdata.grf
+lua_files/
 lua_files.grf

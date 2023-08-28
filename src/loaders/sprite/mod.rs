@@ -93,7 +93,7 @@ struct PaletteImageData {
 struct RgbaImageData {
     pub width: u16,
     pub height: u16,
-    #[length_hint(self.width * self.height * 4)]
+    #[length_hint(self.width as u32 * self.height as u32 * 4)]
     pub data: Vec<u8>,
 }
 

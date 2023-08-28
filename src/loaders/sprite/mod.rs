@@ -82,10 +82,10 @@ struct PaletteImageData {
     pub width: u16,
     pub height: u16,
     #[version_equals_or_above(2, 1)]
-    #[length_hint(self.width * self.height)]
+    #[length_hint(self.width as usize * self.height as usize)]
     pub encoded_data: Option<EncodedData>,
     #[version_smaller(2, 1)]
-    #[length_hint(self.width * self.height)]
+    #[length_hint(self.width as usize * self.height as usize)]
     pub raw_data: Option<Vec<u8>>,
 }
 
@@ -93,7 +93,7 @@ struct PaletteImageData {
 struct RgbaImageData {
     pub width: u16,
     pub height: u16,
-    #[length_hint(self.width as u32 * self.height as u32 * 4)]
+    #[length_hint(self.width as usize * self.height as usize * 4)]
     pub data: Vec<u8>,
 }
 

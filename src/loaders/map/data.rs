@@ -77,7 +77,7 @@ pub struct GroundData {
     pub surface_count: i32,
     #[repeating(self.surface_count)]
     pub surfaces: Vec<Surface>,
-    #[repeating(self.width * self.height)]
+    #[repeating(self.width as usize * self.height as usize)]
     pub ground_tiles: Vec<GroundTile>,
 }
 

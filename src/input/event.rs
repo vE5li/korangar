@@ -2,13 +2,15 @@ use cgmath::Vector2;
 
 use super::HotbarSlot;
 use crate::interface::{ItemMove, SkillMove};
+use crate::loaders::Service;
 use crate::network::{AccountId, CharacterId, EntityId};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 #[derive(Clone, Debug)]
 pub enum UserEvent {
-    LogIn(String, String),
+    SelectService(Service),
+    LogIn(Service, String, String),
     LogOut,
     Exit,
     ToggleRemeberUsername,

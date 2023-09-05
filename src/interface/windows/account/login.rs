@@ -7,10 +7,12 @@ use procedural::*;
 
 use crate::input::UserEvent;
 use crate::interface::*;
+use crate::loaders::Service;
 use crate::network::LoginSettings;
 
 #[derive(new)]
 pub struct LoginWindow {
+    service: Service,
     login_settings: LoginSettings,
 }
 
@@ -36,8 +38,11 @@ impl PrototypeWindow for LoginWindow {
         let action = {
             let username = username.clone();
             let password = password.clone();
+            let service = self.service.clone();
+
             move || {
                 Some(ClickAction::Event(UserEvent::LogIn(
+                    service.clone(),
                     username.borrow().clone(),
                     password.borrow().clone(),
                 )))
@@ -58,11 +63,13 @@ impl PrototypeWindow for LoginWindow {
         let password_action = {
             let username = username.clone();
             let password = password.clone();
+            let service = self.service.clone();
 
             Box::new(move || match password.borrow().is_empty() {
                 _ if username.borrow().is_empty() => Some(ClickAction::FocusNext(FocusMode::FocusPrevious)),
                 true => None,
                 false => Some(ClickAction::Event(UserEvent::LogIn(
+                    service.clone(),
                     username.borrow().clone(),
                     password.borrow().clone(),
                 ))),

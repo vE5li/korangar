@@ -339,12 +339,10 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize networking");
 
+    let client_info = load_client_info(&mut game_file_loader);
     let mut networking_system = NetworkingSystem::new();
 
-    interface.open_window(
-        &mut focus_state,
-        &LoginWindow::new(networking_system.get_login_settings().clone()),
-    );
+    interface.open_window(&mut focus_state, &SelectServiceWindow::new(client_info.services.clone()));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -718,17 +716,27 @@ fn main() {
 
                 for event in user_events {
                     match event {
-                        UserEvent::LogIn(username, password) => match networking_system.log_in(username, password) {
-                            Ok(()) => {
-                                // TODO: this will do one unnecessary restore_focus. check if
-                                // that will be problematic
-                                interface.close_window_with_class(&mut focus_state, LoginWindow::WINDOW_CLASS);
+                        UserEvent::SelectService(service) => {
+                            interface.close_window_with_class(&mut focus_state, SelectServiceWindow::WINDOW_CLASS);
 
-                                let character_selection_window = networking_system.character_selection_window();
-                                interface.open_window(&mut focus_state, &character_selection_window);
+                            interface.open_window(
+                                &mut focus_state,
+                                &LoginWindow::new(service, networking_system.get_login_settings().clone()),
+                            );
+                        }
+                        UserEvent::LogIn(service, username, password) => {
+                            match networking_system.log_in(service, username, password) {
+                                Ok(()) => {
+                                    // TODO: this will do one unnecessary restore_focus. check if
+                                    // that will be problematic
+                                    interface.close_window_with_class(&mut focus_state, LoginWindow::WINDOW_CLASS);
+
+                                    let character_selection_window = networking_system.character_selection_window();
+                                    interface.open_window(&mut focus_state, &character_selection_window);
+                                }
+                                Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
                             }
-                            Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
-                        },
+                        }
                         UserEvent::LogOut => networking_system.log_out().unwrap(),
                         UserEvent::Exit => *control_flow = ControlFlow::Exit,
                         UserEvent::ToggleRemeberUsername => networking_system.toggle_remember_username(),

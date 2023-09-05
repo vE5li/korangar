@@ -757,11 +757,13 @@ dependencies = [
  "ron",
  "rusttype",
  "serde",
+ "serde-xml-rs",
  "vulkano",
  "vulkano-shaders",
  "vulkano-win",
  "walkdir",
  "winit",
+ "xml-rs",
  "yazi",
 ]
 
@@ -1588,6 +1590,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30e27d1e4fd7659406c492fd6cfaf2066ba8773de45ca75e855590f856dc34a9"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-xml-rs"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb3aa78ecda1ebc9ec9847d5d3aba7d618823446a049ba2491940506da6e2782"
+dependencies = [
+ "log",
+ "serde",
+ "thiserror",
+ "xml-rs",
 ]
 
 [[package]]

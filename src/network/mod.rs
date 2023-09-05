@@ -23,7 +23,8 @@ use crate::interface::{
     CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, WeakElementCell,
 };
 use crate::loaders::{
-    check_length_hint, check_length_hint_none, conversion_result, ByteStream, ConversionError, FixedByteSize, FromBytes, Named, ToBytes,
+    check_length_hint, check_length_hint_none, conversion_result, ByteStream, ConversionError, FixedByteSize, FromBytes, Named, Service,
+    ToBytes,
 };
 
 #[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
@@ -2772,7 +2773,7 @@ struct LoginData {
 
 pub struct NetworkingSystem {
     login_settings: LoginSettings,
-    login_stream: TcpStream,
+    login_stream: Option<TcpStream>,
     character_stream: Option<TcpStream>,
     map_stream: Option<TcpStream>,
     login_data: Option<LoginData>,
@@ -2792,14 +2793,9 @@ pub struct NetworkingSystem {
 
 impl NetworkingSystem {
     pub fn new() -> Self {
-        let login_server_ip = match cfg!(feature = "local") {
-            true => "127.0.0.1:6900",
-            false => "49.12.109.207:6900",
-        };
-
         let login_settings = LoginSettings::new();
-        let login_stream = TcpStream::connect(login_server_ip).expect("failed to connect to login server");
 
+        let login_stream = None;
         let character_stream = None;
         let map_stream = None;
         let login_data = None;
@@ -2815,8 +2811,6 @@ impl NetworkingSystem {
         let update_packets = TrackedState::new(true);
         #[cfg(feature = "debug")]
         let packet_history = TrackedState::default();
-
-        login_stream.set_read_timeout(Duration::from_secs(1).into()).unwrap();
 
         Self {
             login_settings,
@@ -2851,9 +2845,15 @@ impl NetworkingSystem {
         self.login_settings.remember_password = !self.login_settings.remember_password;
     }
 
-    pub fn log_in(&mut self, username: String, password: String) -> Result<(), String> {
+    pub fn log_in(&mut self, service: Service, username: String, password: String) -> Result<(), String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new("log in");
+
+        let service_address = format!("{}:{}", service.address, service.port);
+
+        let login_stream = TcpStream::connect(&service_address).expect("failed to connect to login server");
+        login_stream.set_read_timeout(Duration::from_secs(1).into()).unwrap();
+        self.login_stream = Some(login_stream);
 
         self.send_packet_to_login_server(LoginServerLoginPacket::new(username.clone(), password.clone()));
 
@@ -3027,7 +3027,9 @@ impl NetworkingSystem {
         self.new_outgoing(&packet);
 
         let packet_bytes = packet.to_bytes().unwrap();
-        self.login_stream
+        let login_stream = self.login_stream.as_mut().expect("no login server connection");
+
+        login_stream
             .write_all(&packet_bytes)
             .expect("failed to send packet to login server");
     }
@@ -3060,10 +3062,8 @@ impl NetworkingSystem {
 
     fn get_data_from_login_server(&mut self) -> Vec<u8> {
         let mut buffer = [0; 4096];
-        let response_length = self
-            .login_stream
-            .read(&mut buffer)
-            .expect("failed to get response from login server");
+        let login_stream = self.login_stream.as_mut().expect("no login server connection");
+        let response_length = login_stream.read(&mut buffer).expect("failed to get response from login server");
         buffer[..response_length].to_vec()
     }
 
@@ -3096,7 +3096,7 @@ impl NetworkingSystem {
     }
 
     pub fn keep_alive(&mut self, delta_time: f64, client_tick: ClientTick) {
-        if self.login_keep_alive_timer.update(delta_time) {
+        if self.login_keep_alive_timer.update(delta_time) && self.login_stream.is_some() {
             self.send_packet_to_login_server(LoginServerKeepalivePacket::default());
         }
 

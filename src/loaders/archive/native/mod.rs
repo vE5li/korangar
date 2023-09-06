@@ -21,7 +21,7 @@ use crate::loaders::archive::Archive;
 use crate::loaders::{ByteConvertable, ByteStream, FixedByteSize};
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
-/// Each GRF contains a [`ArchiveHeader`] with metadata (ammount of files, size,
+/// Each GRF contains an [`ArchiveHeader`] with metadata (number of files, size,
 /// etc.) and a table [`AssetTable`] with information ([`AssetInformation`])
 /// about individual assets.
 type FileTable = HashMap<String, FileTableRow>;
@@ -37,8 +37,8 @@ const UNPACKED_SIZE_OF_ARCHIVEHEADER: usize = Header::size_in_bytes();
 const UNPACKED_SIZE_OF_FILETABLE: usize = AssetTable::size_in_bytes();
 
 impl Archive for NativeArchive {
-    // Keeping the convenince of using [`loaders::stream::ByteStream`]
-    /// while being able to read without buffering all file.
+    // Keeping the convenience of using [`loaders::stream::ByteStream`]
+    /// while being able to read without buffering the entire file.
     fn from_path(path: &Path) -> Self {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {MAGENTA}{0}{NONE}", path.display()));

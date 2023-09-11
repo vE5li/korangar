@@ -12,7 +12,7 @@ use super::Sprite;
 use crate::debug::*;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::InterfaceSettings;
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
+use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version};
 use crate::network::ClientTick;
 
 #[derive(Clone, Debug, new)]
@@ -168,7 +168,7 @@ impl Actions {
     }
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
 struct SpriteClip {
     pub position: Vector2<i32>,
     pub sprite_number: u32,
@@ -187,14 +187,14 @@ struct SpriteClip {
     pub size: Option<Vector2<u32>>,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
 struct AttachPoint {
     pub ignored: u32,
     pub position: Vector2<i32>,
     pub attribute: u32,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
 struct Motion {
     pub range1: [i32; 4], // maybe just skip this?
     pub range2: [i32; 4], // maybe just skip this?
@@ -210,20 +210,20 @@ struct Motion {
     pub attach_points: Vec<AttachPoint>,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
 struct Action {
     pub motion_count: u32,
     #[repeating(self.motion_count)]
     pub motions: Vec<Motion>,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 struct Event {
     #[length_hint(40)]
     pub name: String,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 struct ActionsData {
     #[version]
     pub version: Version<MinorFirst>,
@@ -253,11 +253,11 @@ impl ActionLoader {
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 2]>::from_bytes(&mut byte_stream, None) != [b'A', b'C'] {
+        if <[u8; 2]>::from_bytes(&mut byte_stream, None).unwrap() != [b'A', b'C'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let actions_data = ActionsData::from_bytes(&mut byte_stream, None);
+        let actions_data = ActionsData::from_bytes(&mut byte_stream, None).unwrap();
 
         let delays = actions_data
             .delays

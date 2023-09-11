@@ -100,6 +100,7 @@ impl From<PickerTarget> for u32 {
 mod test {
     use crate::graphics::PickerTarget;
     use crate::network::EntityId;
+    #[cfg(feature = "debug")]
     use crate::world::MarkerIdentifier;
 
     // Position

@@ -88,6 +88,19 @@ pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTo
     }
 }
 
+#[proc_macro_derive(Named)]
+pub fn derive_named(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics crate::loaders::Named for #ident #type_generics #where_clause {
+            const NAME: &'static str = stringify!(#ident);
+        }
+    }
+    .into()
+}
+
 #[proc_macro_derive(
     ByteConvertable,
     attributes(
@@ -118,9 +131,90 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
     }
 }
 
-/// Derive the Packet trait. A packet header must be specified and all fields
-/// must implement ByteConvertable.
-#[proc_macro_derive(Packet, attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining))]
+#[proc_macro_derive(
+    FromBytes,
+    attributes(
+        packet_length,
+        length_hint,
+        repeating,
+        repeating_remaining,
+        numeric_type,
+        numeric_value,
+        version,
+        version_smaller,
+        version_equals_or_above
+    )
+)]
+pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput {
+        ident,
+        attrs,
+        data,
+        generics,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
+
+    match data {
+        Data::Struct(data_struct) => derive_from_bytes_struct(data_struct, generics, ident),
+        Data::Enum(data_enum) => derive_from_bytes_enum(data_enum, generics, attrs, ident),
+        Data::Union(..) => panic!("union types may not be derived"),
+    }
+}
+
+#[proc_macro_derive(
+    ToBytes,
+    attributes(
+        packet_length,
+        length_hint,
+        repeating,
+        repeating_remaining,
+        numeric_type,
+        numeric_value,
+        version,
+        version_smaller,
+        version_equals_or_above
+    )
+)]
+pub fn derive_to_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput {
+        ident,
+        attrs,
+        data,
+        generics,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
+
+    match data {
+        Data::Struct(data_struct) => derive_to_bytes_struct(data_struct, generics, ident),
+        Data::Enum(data_enum) => derive_to_bytes_enum(data_enum, generics, attrs, ident),
+        Data::Union(..) => panic!("union types may not be derived"),
+    }
+}
+
+#[proc_macro_derive(
+    IncomingPacket,
+    attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining)
+)]
+pub fn derive_incoming_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput {
+        ident,
+        generics,
+        data,
+        attrs,
+        ..
+    } = parse(token_stream).expect("failed to parse token stream");
+
+    match data {
+        Data::Struct(data_struct) => derive_incoming_packet_struct(data_struct, generics, attrs, ident),
+        Data::Enum(..) => panic!("enum types may not be derived"),
+        Data::Union(..) => panic!("union types may not be derived"),
+    }
+}
+
+#[proc_macro_derive(
+    OutgoingPacket,
+    attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining)
+)]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     let DeriveInput {
         ident,
@@ -131,7 +225,7 @@ pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
     } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
-        Data::Struct(data_struct) => derive_packet_struct(data_struct, generics, attrs, ident),
+        Data::Struct(data_struct) => derive_outgoing_packet_struct(data_struct, generics, attrs, ident),
         Data::Enum(..) => panic!("enum types may not be derived"),
         Data::Union(..) => panic!("union types may not be derived"),
     }

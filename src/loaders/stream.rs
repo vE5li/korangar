@@ -3,8 +3,9 @@ use std::cell::UnsafeCell;
 
 use derive_new::new;
 
+use super::convertable::ConversionError;
 use super::version::InternalVersion;
-use super::Version;
+use super::{Named, Version};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 #[cfg(feature = "debug")]
@@ -12,8 +13,9 @@ use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::TrackedState;
 use crate::interface::WeakElementCell;
+use crate::loaders::convertable::check_upper_bound;
 #[cfg(feature = "debug")]
-use crate::network::Packet;
+use crate::network::IncomingPacket;
 
 #[derive(new)]
 pub struct ByteStream<'b> {
@@ -28,16 +30,11 @@ pub struct ByteStream<'b> {
 }
 
 impl<'b> ByteStream<'b> {
-    pub fn next(&mut self) -> u8 {
-        assert!(self.offset < self.data.len(), "byte stream is shorter than expected");
+    pub fn next<S: Named>(&mut self) -> Result<u8, Box<ConversionError>> {
+        check_upper_bound::<S>(self.offset, self.data.len())?;
         let byte = self.data[self.offset];
         self.offset += 1;
-        byte
-    }
-
-    pub fn peek(&self, index: usize) -> u8 {
-        assert!(self.offset + index < self.data.len(), "byte stream is shorter than expected");
-        self.data[self.offset + index]
+        Ok(byte)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -52,27 +49,13 @@ impl<'b> ByteStream<'b> {
         self.version.unwrap()
     }
 
-    pub fn match_signature(&mut self, signature: u16) -> bool {
-        if self.data.len() - self.offset < 2 {
-            return false;
-        }
-
-        let signature_matches = self.data[self.offset..self.offset + 2] == signature.to_le_bytes();
-
-        if signature_matches {
-            self.offset += 2;
-        }
-
-        signature_matches
-    }
-
-    pub fn slice(&mut self, count: usize) -> &[u8] {
-        assert!(self.offset + count <= self.data.len(), "byte stream is shorter than expected");
+    pub fn slice<S: Named>(&mut self, count: usize) -> Result<&[u8], Box<ConversionError>> {
+        check_upper_bound::<S>(self.offset + count, self.data.len() + 1)?;
 
         let start_index = self.offset;
         self.offset += count;
 
-        &self.data[start_index..self.offset]
+        Ok(&self.data[start_index..self.offset])
     }
 
     pub fn skip(&mut self, count: usize) {
@@ -85,13 +68,15 @@ impl<'b> ByteStream<'b> {
 
     #[cfg(feature = "debug")]
     pub fn remaining_bytes(&mut self) -> Vec<u8> {
-        self.slice(self.data.len() - self.offset).to_vec()
+        let end_index = self.data.len();
+        let data = self.data[self.offset..end_index].to_vec();
+        self.offset = end_index;
+        data
     }
 
     #[cfg(feature = "debug")]
-    pub fn incoming_packet<T: Packet + Clone + 'static>(&mut self, packet: &T) {
-        self.packet_history
-            .push(PacketEntry::new_incoming(packet, T::PACKET_NAME, T::IS_PING));
+    pub fn incoming_packet<T: IncomingPacket + Clone + 'static>(&mut self, packet: &T) {
+        self.packet_history.push(PacketEntry::new_incoming(packet, T::NAME, T::IS_PING));
     }
 
     #[cfg(feature = "debug")]

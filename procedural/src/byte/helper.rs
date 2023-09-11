@@ -95,16 +95,35 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         }
 
         // base from bytes implementation
-        let from_implementation = quote!(crate::loaders::ByteConvertable::from_bytes(byte_stream, #from_length_hint));
+        let from_implementation =
+            quote!(crate::loaders::conversion_result::<Self, _>(crate::loaders::FromBytes::from_bytes(byte_stream, #from_length_hint))?);
 
         // wrap base implementation in a loop if the element can appear multiple times
         let from_implementation = match repeating {
-            Some(repeat_count) => quote!((0..(#repeat_count)).map(|_| #from_implementation).collect()),
+            Some(repeat_count) => quote!({
+                let repeat_count = #repeat_count;
+                let mut vector = Vec::with_capacity(repeat_count as usize);
+
+                for _ in 0..repeat_count {
+                    vector.push(#from_implementation);
+                }
+
+                vector
+            }),
             None if repeating_remaining => {
                 let packet_length = packet_length
                     .as_ref()
                     .expect("repeating_remaining is used but no packet_length attribute is set");
-                quote!((0..((#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes() as u16))).map(|_| #from_implementation).collect())
+                quote!({
+                    let repeat_count = (#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes() as u16);
+                    let mut vector = Vec::with_capacity(repeat_count as usize);
+
+                    for _ in 0..repeat_count {
+                        vector.push(#from_implementation);
+                    }
+
+                    vector
+                })
             }
             None => from_implementation,
         };
@@ -129,7 +148,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                 panic!("implement for to_bytes aswell");
                 [0u8].as_slice()
             }),
-            false => quote!(crate::loaders::ByteConvertable::to_bytes(&self.#field_identifier, #length_hint).as_slice()),
+            false => quote!(crate::loaders::conversion_result::<Self, _>(crate::loaders::ToBytes::to_bytes(&self.#field_identifier, #length_hint))?.as_slice()),
         };
 
         implemented_fields.push(quote!(#field_variable));

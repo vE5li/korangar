@@ -15,11 +15,12 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
+use super::{conversion_result, ConversionError};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::MemoryAllocator;
 use crate::interface::{ElementCell, PrototypeElement};
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MinorFirst, Version};
+use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version};
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
@@ -29,31 +30,33 @@ pub struct Sprite {
     sprite_data: SpriteData,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Named)]
 struct EncodedData(pub Vec<u8>);
 
-impl ByteConvertable for EncodedData {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+impl FromBytes for EncodedData {
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
         let image_size = length_hint.unwrap();
 
         if image_size == 0 {
-            return Self(Vec::new());
+            return Ok(Self(Vec::new()));
         }
 
         let mut data = vec![0; image_size];
-        let mut encoded = u16::from_bytes(byte_stream, None);
+        let mut encoded = conversion_result::<Self, _>(u16::from_bytes(byte_stream, None))?;
         let mut next = 0;
 
         while next < image_size && encoded > 0 {
-            let byte = byte_stream.next();
+            let byte = byte_stream.next::<Self>()?;
             encoded -= 1;
 
             if byte == 0 {
-                let length = usize::max(byte_stream.next() as usize, 1);
+                let length = usize::max(byte_stream.next::<Self>()? as usize, 1);
                 encoded -= 1;
 
                 if next + length > image_size {
-                    panic!("too much data encoded in palette image");
+                    return Err(ConversionError::from_message(
+                        "too much data encoded in palette image".to_owned(),
+                    ));
                 }
 
                 next += length;
@@ -64,10 +67,10 @@ impl ByteConvertable for EncodedData {
         }
 
         if next != image_size || encoded > 0 {
-            panic!("badly encoded palette image");
+            return Err(ConversionError::from_message("badly encoded palette image".to_owned()));
         }
 
-        Self(data)
+        Ok(Self(data))
     }
 }
 
@@ -77,7 +80,7 @@ impl PrototypeElement for EncodedData {
     }
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
 struct PaletteImageData {
     pub width: u16,
     pub height: u16,
@@ -89,7 +92,7 @@ struct PaletteImageData {
     pub raw_data: Option<Vec<u8>>,
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
 struct RgbaImageData {
     pub width: u16,
     pub height: u16,
@@ -97,7 +100,7 @@ struct RgbaImageData {
     pub data: Vec<u8>,
 }
 
-#[derive(Copy, Clone, Debug, Default, ByteConvertable, PrototypeElement)]
+#[derive(Copy, Clone, Debug, Default, Named, FromBytes, PrototypeElement)]
 struct PaletteColor {
     pub red: u8,
     pub green: u8,
@@ -116,12 +119,12 @@ impl PaletteColor {
     }
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
 struct Palette {
     pub colors: [PaletteColor; 256],
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
 struct SpriteData {
     #[version]
     pub version: Version<MinorFirst>,
@@ -154,11 +157,11 @@ impl SpriteLoader {
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 2]>::from_bytes(&mut byte_stream, None) != [b'S', b'P'] {
+        if <[u8; 2]>::from_bytes(&mut byte_stream, None).unwrap() != [b'S', b'P'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let sprite_data = SpriteData::from_bytes(&mut byte_stream, None);
+        let sprite_data = SpriteData::from_bytes(&mut byte_stream, None).unwrap();
         #[cfg(feature = "debug")]
         let cloned_sprite_data = sprite_data.clone();
 

@@ -1,6 +1,6 @@
-use procedural::ByteConvertable;
+use procedural::{FromBytes, Named};
 
-use crate::loaders::{ByteConvertable, ByteStream};
+use crate::loaders::{check_length_hint_none, ByteStream, ConversionError, FromBytes};
 
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;
@@ -9,12 +9,13 @@ const SNIPABLE: u8 = 0b00000100;
 const CLIFF: u8 = 0b00001000;
 
 #[allow(dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Named)]
 pub struct TileType(pub u8);
 
-impl ByteConvertable for TileType {
-    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
-        Self::new(byte_stream.next())
+impl FromBytes for TileType {
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+        check_length_hint_none::<Self>(length_hint)?;
+        byte_stream.next::<Self>().map(Self::new)
     }
 }
 
@@ -42,7 +43,7 @@ impl TileType {
 }
 
 #[allow(dead_code)]
-#[derive(ByteConvertable, Debug)]
+#[derive(Named, FromBytes, Debug)]
 pub struct Tile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,

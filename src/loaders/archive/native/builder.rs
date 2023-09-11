@@ -11,7 +11,7 @@ use super::filetablerow::FileTableRow;
 use super::header::Header;
 use super::{FileTable, MAGIC_BYTES};
 use crate::loaders::archive::Writable;
-use crate::loaders::ByteConvertable;
+use crate::loaders::ToBytes;
 
 pub struct NativeArchiveBuilder {
     os_file_path: PathBuf,
@@ -62,19 +62,19 @@ impl Writable for NativeArchiveBuilder {
         let mut bytes = Vec::new();
 
         bytes.extend_from_slice(MAGIC_BYTES);
-        bytes.extend_from_slice(&file_header.to_bytes(None));
+        bytes.extend_from_slice(&file_header.to_bytes(None).unwrap());
         bytes.extend_from_slice(&self.data);
 
         let mut file_table_data = Vec::new();
 
         for file_information in self.file_table.values() {
-            file_table_data.extend_from_slice(&file_information.to_bytes(None));
+            file_table_data.extend_from_slice(&file_information.to_bytes(None).unwrap());
         }
 
         let compressed_file_information_data = compress(&file_table_data, Format::Zlib, CompressionLevel::Default).unwrap();
         let file_table = AssetTable::new(compressed_file_information_data.len() as u32, file_table_data.len() as u32);
 
-        bytes.extend_from_slice(&file_table.to_bytes(None));
+        bytes.extend_from_slice(&file_table.to_bytes(None).unwrap());
         bytes.extend_from_slice(&compressed_file_information_data);
 
         std::fs::write(&self.os_file_path, bytes).expect("unable to write file");

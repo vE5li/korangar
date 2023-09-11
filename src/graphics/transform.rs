@@ -3,7 +3,9 @@ use std::ops::Add;
 use cgmath::{Deg, Rad, Vector3};
 use procedural::*;
 
-#[derive(Copy, Clone, Debug, PrototypeElement)]
+use crate::loaders::{check_length_hint_none, conversion_result, ConversionError, FromBytes};
+
+#[derive(Copy, Clone, Debug, Named, PrototypeElement)]
 pub struct Transform {
     pub position: Vector3<f32>,
     #[hidden_element] // TODO: unhide
@@ -11,16 +13,18 @@ pub struct Transform {
     pub scale: Vector3<f32>,
 }
 
-impl crate::loaders::ByteConvertable for Transform {
-    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, _length_hint: Option<usize>) -> Self {
-        let mut position = <Vector3<f32>>::from_bytes(byte_stream, None);
-        let rotation = <Vector3<f32>>::from_bytes(byte_stream, None);
-        let scale = <Vector3<f32>>::from_bytes(byte_stream, None);
+impl FromBytes for Transform {
+    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+        check_length_hint_none::<Self>(length_hint)?;
+
+        let mut position = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream, None))?;
+        let rotation = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream, None))?;
+        let scale = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream, None))?;
 
         // TODO: make this nicer
         position.y = -position.y;
 
-        Transform::from(position, rotation.map(Deg), scale)
+        Ok(Transform::from(position, rotation.map(Deg), scale))
     }
 }
 

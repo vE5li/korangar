@@ -18,7 +18,7 @@ use self::header::Header;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::loaders::archive::Archive;
-use crate::loaders::{ByteConvertable, ByteStream, FixedByteSize};
+use crate::loaders::{ByteStream, FixedByteSize, FromBytes};
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
 /// Each GRF contains an [`ArchiveHeader`] with metadata (number of files, size,
@@ -49,14 +49,14 @@ impl Archive for NativeArchive {
 
         let mut file_header_buffer = [0u8; UNPACKED_SIZE_OF_ARCHIVEHEADER];
         file.read_exact(&mut file_header_buffer).unwrap();
-        let file_header = Header::from_bytes(&mut ByteStream::new(&file_header_buffer), None);
+        let file_header = Header::from_bytes(&mut ByteStream::new(&file_header_buffer), None).unwrap();
         file_header.validate_version();
 
         let _ = file.seek(SeekFrom::Current(file_header.get_file_table_offset() as i64)).unwrap();
         let mut file_table_buffer = [0u8; UNPACKED_SIZE_OF_FILETABLE];
 
         file.read_exact(&mut file_table_buffer).unwrap();
-        let file_table = AssetTable::from_bytes(&mut ByteStream::new(&file_table_buffer), None);
+        let file_table = AssetTable::from_bytes(&mut ByteStream::new(&file_table_buffer), None).unwrap();
 
         let mut compressed_file_table_buffer = vec![0u8; file_table.get_compressed_size()];
         file.read_exact(&mut compressed_file_table_buffer).unwrap();
@@ -68,7 +68,7 @@ impl Archive for NativeArchive {
         let mut assets = HashMap::with_capacity(file_count);
 
         for _index in 0..file_count {
-            let file_information = FileTableRow::from_bytes(&mut file_table_byte_stream, None);
+            let file_information = FileTableRow::from_bytes(&mut file_table_byte_stream, None).unwrap();
             let file_name = file_information.file_name.to_lowercase();
 
             assets.insert(file_name, file_information);

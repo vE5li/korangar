@@ -1,8 +1,8 @@
 use derive_new::new;
-use procedural::{ByteConvertable, FixedByteSize};
+use procedural::{ByteConvertable, FixedByteSize, Named};
 
 /// Stores the table of files the parent GRF is holding.
-#[derive(Clone, ByteConvertable, FixedByteSize, new)]
+#[derive(Clone, Named, ByteConvertable, FixedByteSize, new)]
 pub(super) struct AssetTable {
     compressed_size: u32,
     uncompressed_size: u32,

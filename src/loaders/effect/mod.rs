@@ -10,16 +10,16 @@ use super::{MajorFirst, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, Version};
+use crate::loaders::{ByteStream, FromBytes, GameFileLoader, Version};
 use crate::network::EntityId;
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 struct TextureName {
     #[length_hint(128)]
     pub name: String,
 }
 
-#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, Named, FromBytes, PrototypeElement)]
 pub struct Frame {
     pub frame_index: i32,
     pub frame_type: i32,
@@ -98,7 +98,7 @@ impl Frame {
     }
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 struct LayerData {
     pub texture_count: i32,
     #[repeating(self.texture_count)]
@@ -108,7 +108,7 @@ struct LayerData {
     pub frames: Vec<Frame>,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 struct EffectData {
     pub version: Version<MajorFirst>,
     pub _skip0: [u8; 2],
@@ -252,14 +252,11 @@ impl EffectLoader {
         let bytes = game_file_loader.get(&format!("data\\texture\\effect\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 4]>::from_bytes(&mut byte_stream, None) != [b'S', b'T', b'R', b'M'] {
+        if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'S', b'T', b'R', b'M'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let effect_data = EffectData::from_bytes(&mut byte_stream, None);
-
-        //println!("{:#?}", effect_data);
-        //println!("remaining: {}", byte_stream.remaining_bytes().len());
+        let effect_data = EffectData::from_bytes(&mut byte_stream, None).unwrap();
 
         let prefix = match path.chars().rev().position(|character| character == '\\') {
             Some(offset) => path.split_at(path.len() - offset).0,
@@ -311,8 +308,6 @@ impl EffectLoader {
                         for _ in list_index..effect_data.max_key as usize {
                             map.push(None)
                         }
-
-                        //println!("\n{:?}", map);
 
                         map
                     },

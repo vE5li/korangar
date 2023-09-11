@@ -3,30 +3,31 @@ use std::sync::Arc;
 
 use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
-use procedural::*;
+use procedural::{Named, *};
 use vulkano::image::view::ImageView;
 
+use super::{conversion_result, ConversionError};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
-use crate::loaders::{ByteConvertable, ByteStream, GameFileLoader, MajorFirst, TextureLoader, Version};
+use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MajorFirst, TextureLoader, Version};
 use crate::system::multiply_matrix4_and_vector3;
 use crate::world::{BoundingBox, Model, Node};
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 pub struct PositionKeyframeData {
     pub frame: u32,
     pub position: Vector3<f32>,
 }
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
 pub struct RotationKeyframeData {
     pub frame: u32,
     pub quaternions: Quaternion<f32>,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 pub struct FaceData {
     pub vertex_position_indices: [u16; 3],
     pub texture_coordinate_indices: [u16; 3],
@@ -36,14 +37,14 @@ pub struct FaceData {
     pub smooth_group: i32,
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 pub struct TextureCoordinateData {
     #[version_equals_or_above(1, 2)]
     pub color: Option<u32>,
     pub coordinates: Vector2<f32>, // possibly wrong if version < 1.2
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 pub struct NodeData {
     #[length_hint(40)]
     pub node_name: ModelString,
@@ -77,24 +78,24 @@ pub struct NodeData {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Named)]
 pub struct ModelString {
     pub inner: String,
 }
 
-impl ByteConvertable for ModelString {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
+impl FromBytes for ModelString {
+    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
         let inner = if byte_stream.get_version().equals_or_above(2, 2) {
-            let length = u32::from_bytes(byte_stream, None) as usize;
-            let mut inner = String::from_bytes(byte_stream, Some(length));
+            let length = conversion_result::<Self, _>(u32::from_bytes(byte_stream, None))? as usize;
+            let mut inner = conversion_result::<Self, _>(String::from_bytes(byte_stream, Some(length)))?;
             // need to remove the last character for some reason
             inner.pop();
             inner
         } else {
-            String::from_bytes(byte_stream, length_hint)
+            conversion_result::<Self, _>(String::from_bytes(byte_stream, length_hint))?
         };
 
-        Self { inner }
+        Ok(Self { inner })
     }
 }
 
@@ -104,7 +105,7 @@ impl crate::interface::PrototypeElement for ModelString {
     }
 }
 
-#[derive(Debug, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Named, FromBytes, PrototypeElement)]
 pub struct ModelData {
     #[version]
     pub version: Version<MajorFirst>,
@@ -323,11 +324,11 @@ impl ModelLoader {
         let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 4]>::from_bytes(&mut byte_stream, None) != [b'G', b'R', b'S', b'M'] {
+        if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'G', b'R', b'S', b'M'] {
             return Err(format!("failed to read magic number from {model_file}"));
         }
 
-        let model_data = ModelData::from_bytes(&mut byte_stream, None);
+        let model_data = ModelData::from_bytes(&mut byte_stream, None).unwrap();
 
         let textures = model_data
             .texture_names

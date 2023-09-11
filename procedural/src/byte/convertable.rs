@@ -6,7 +6,13 @@ use syn::{Attribute, DataEnum, DataStruct, Generics, Ident};
 use super::helper::byte_convertable_helper;
 use crate::utils::*;
 
-pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
+fn derive_for_struct(
+    data_struct: DataStruct,
+    generics: Generics,
+    name: Ident,
+    implement_from: bool,
+    implement_to: bool,
+) -> InterfaceTokenStream {
     let (from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) = byte_convertable_helper(data_struct);
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -16,32 +22,46 @@ pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generic
         _ => panic!(),
     };
 
-    quote! {
-        impl #impl_generics crate::loaders::ByteConvertable for #name #type_generics #where_clause {
+    let from = implement_from.then(|| quote! {
+        impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
+            fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                crate::loaders::check_length_hint_none::<Self>(length_hint)?;
 
-            fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Self {
-                assert!(length_hint.is_none(), "structs may not have a length hint");
                 let base_offset = byte_stream.get_offset();
                 #(#from_bytes_implementations)*
-                #instanciate
-            }
-
-            // Temporary until serialization is always possible
-            #[allow(unreachable_code)]
-            fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-                assert!(length_hint.is_none(), "structs may not have a length hint");
-                [#(#to_bytes_implementations),*].concat()
+                Ok(#instanciate)
             }
         }
+    });
+
+    let to = implement_to.then(|| {
+        quote! {
+            impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
+                // Temporary until serialization is always possible
+                #[allow(unreachable_code)]
+                fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
+                    crate::loaders::check_length_hint_none::<Self>(length_hint)?;
+
+                    Ok([#(#to_bytes_implementations),*].concat())
+                }
+            }
+        }
+    });
+
+    quote! {
+        #from
+        #to
     }
     .into()
 }
 
-pub fn derive_byte_convertable_enum(
+fn derive_for_enum(
     data_enum: DataEnum,
     generics: Generics,
     mut attributes: Vec<Attribute>,
     name: Ident,
+    add_from: bool,
+    add_to: bool,
 ) -> InterfaceTokenStream {
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
@@ -67,26 +87,67 @@ pub fn derive_byte_convertable_enum(
         current_index += 1;
     }
 
-    quote! {
-        impl #impl_generics ByteConvertable for #name #type_generics #where_clause {
+    let from = add_from.then(|| quote! {
+        impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
+            fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                crate::loaders::check_length_hint_none::<Self>(length_hint)?;
 
-            fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Self {
-                assert!(length_hint.is_none(), "length hint may not be given to enums");
-                match #numeric_type::from_bytes(byte_stream, None) as usize {
-                    #( #indices => Self::#values, )*
-                    invalid => panic!("invalid value {}", invalid),
-                }
-            }
-
-            // Temporary until serialization is always possible
-            #[allow(unreachable_code)]
-            fn to_bytes(&self, length_hint: Option<usize>) -> Vec<u8> {
-                assert!(length_hint.is_none(), "length hint may not be given to enums");
-                match self {
-                    #( #name::#values => (#indices as #numeric_type).to_bytes(None), )*
+                match crate::loaders::conversion_result::<Self, _>(#numeric_type::from_bytes(byte_stream, None))? as usize {
+                    #( #indices => Ok(Self::#values), )*
+                    invalid => Err(crate::loaders::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
                 }
             }
         }
+    });
+
+    let to = add_to.then(|| {
+        quote! {
+            impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
+                // Temporary until serialization is always possible
+                #[allow(unreachable_code)]
+                fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
+                    crate::loaders::check_length_hint_none::<Self>(length_hint)?;
+
+                    match self {
+                        #( #name::#values => crate::loaders::conversion_result::<Self, _>((#indices as #numeric_type).to_bytes(None)), )*
+                    }
+                }
+            }
+        }
+    });
+
+    quote! {
+        #from
+        #to
     }
     .into()
+}
+
+pub fn derive_byte_convertable_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
+    derive_for_struct(data_struct, generics, name, true, true)
+}
+
+pub fn derive_byte_convertable_enum(
+    data_enum: DataEnum,
+    generics: Generics,
+    attributes: Vec<Attribute>,
+    name: Ident,
+) -> InterfaceTokenStream {
+    derive_for_enum(data_enum, generics, attributes, name, true, true)
+}
+
+pub fn derive_from_bytes_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
+    derive_for_struct(data_struct, generics, name, true, false)
+}
+
+pub fn derive_from_bytes_enum(data_enum: DataEnum, generics: Generics, attributes: Vec<Attribute>, name: Ident) -> InterfaceTokenStream {
+    derive_for_enum(data_enum, generics, attributes, name, true, false)
+}
+
+pub fn derive_to_bytes_struct(data_struct: DataStruct, generics: Generics, name: Ident) -> InterfaceTokenStream {
+    derive_for_struct(data_struct, generics, name, false, true)
+}
+
+pub fn derive_to_bytes_enum(data_enum: DataEnum, generics: Generics, attributes: Vec<Attribute>, name: Ident) -> InterfaceTokenStream {
+    derive_for_enum(data_enum, generics, attributes, name, false, true)
 }

@@ -1,9 +1,9 @@
-use std::fmt::{Display, Formatter, Result};
+use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
 use derive_new::new;
 
-use super::ByteConvertable;
+use super::{check_length_hint_none, conversion_result, ConversionError, FromBytes, Named};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -16,38 +16,46 @@ pub struct Version<T> {
     phantom_data: PhantomData<T>,
 }
 
-impl ByteConvertable for Version<MajorFirst> {
-    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
+impl Named for Version<MajorFirst> {
+    const NAME: &'static str = "Version<MajorFirst>";
+}
 
-        let major = byte_stream.next();
-        let minor = byte_stream.next();
+impl Named for Version<MinorFirst> {
+    const NAME: &'static str = "Version<MinorFirst>";
+}
 
-        Self {
+impl FromBytes for Version<MajorFirst> {
+    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+        check_length_hint_none::<Self>(length_hint)?;
+
+        let major = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
+        let minor = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
+
+        Ok(Self {
             major,
             minor,
             phantom_data: PhantomData,
-        }
+        })
     }
 }
 
-impl ByteConvertable for Version<MinorFirst> {
-    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Self {
-        assert!(length_hint.is_none());
+impl FromBytes for Version<MinorFirst> {
+    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+        check_length_hint_none::<Self>(length_hint)?;
 
-        let minor = byte_stream.next();
-        let major = byte_stream.next();
+        let minor = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
+        let major = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
 
-        Self {
+        Ok(Self {
             minor,
             major,
             phantom_data: PhantomData,
-        }
+        })
     }
 }
 
 impl<T> Display for Version<T> {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "{}.{}", self.major, self.minor)
     }
 }
@@ -76,7 +84,7 @@ impl InternalVersion {
 }
 
 impl Display for InternalVersion {
-    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "{}.{}", self.major, self.minor)
     }
 }

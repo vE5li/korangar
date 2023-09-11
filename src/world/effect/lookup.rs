@@ -1,8 +1,8 @@
-use procedural::{ByteConvertable, PrototypeElement};
+use procedural::{ByteConvertable, Named, PrototypeElement};
 
-use crate::{ByteConvertable, ByteStream};
+use crate::ByteStream;
 
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
 #[numeric_type(u32)]
 pub enum EffectId {
     //#[numeric_value(-1)]

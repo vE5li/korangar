@@ -3,10 +3,10 @@ use procedural::*;
 pub use super::resource::MapResources;
 use crate::graphics::ColorBGRA;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
-use crate::loaders::{ByteConvertable, ByteStream, MajorFirst, Version};
+use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes, MajorFirst, Version};
 use crate::world::Tile;
 
-#[derive(Clone, ByteConvertable, PrototypeElement, PrototypeWindow)]
+#[derive(Clone, Named, FromBytes, PrototypeElement, PrototypeWindow)]
 #[window_title("Map Viewer")]
 #[window_class("map_viewer")]
 pub struct MapData {
@@ -42,7 +42,7 @@ pub struct MapData {
     pub resources: MapResources,
 }
 
-#[derive(ByteConvertable)]
+#[derive(Named, FromBytes)]
 pub struct GatData {
     #[version]
     pub version: Version<MajorFirst>,
@@ -52,7 +52,7 @@ pub struct GatData {
     pub tiles: Vec<Tile>,
 }
 
-#[derive(ByteConvertable)]
+#[derive(Named, FromBytes)]
 pub struct GroundData {
     #[version]
     pub version: Version<MajorFirst>,
@@ -81,6 +81,7 @@ pub struct GroundData {
     pub ground_tiles: Vec<GroundTile>,
 }
 
+#[derive(Named)]
 pub struct GroundTile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,
@@ -105,29 +106,29 @@ impl GroundTile {
     }
 }
 
-impl ByteConvertable for GroundTile {
-    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Self {
-        let upper_left_height = f32::from_bytes(byte_stream, None);
-        let upper_right_height = f32::from_bytes(byte_stream, None);
-        let lower_left_height = f32::from_bytes(byte_stream, None);
-        let lower_right_height = f32::from_bytes(byte_stream, None);
+impl FromBytes for GroundTile {
+    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Result<Self, Box<ConversionError>> {
+        let upper_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
+        let upper_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
+        let lower_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
+        let lower_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
 
         let top_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => i32::from_bytes(byte_stream, None),
-            false => i16::from_bytes(byte_stream, None) as i32,
+            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?,
+            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream, None))? as i32,
         };
 
         let front_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => i32::from_bytes(byte_stream, None),
-            false => i16::from_bytes(byte_stream, None) as i32,
+            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?,
+            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream, None))? as i32,
         };
 
         let right_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => i32::from_bytes(byte_stream, None),
-            false => i16::from_bytes(byte_stream, None) as i32,
+            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?,
+            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream, None))? as i32,
         };
 
-        Self {
+        Ok(Self {
             upper_left_height,
             upper_right_height,
             lower_left_height,
@@ -135,7 +136,7 @@ impl ByteConvertable for GroundTile {
             top_surface_index,
             front_surface_index,
             right_surface_index,
-        }
+        })
     }
 }
 
@@ -146,7 +147,7 @@ pub enum SurfaceType {
     Top,
 }
 
-#[derive(ByteConvertable)]
+#[derive(Named, FromBytes)]
 pub struct Surface {
     pub u: [f32; 4],
     pub v: [f32; 4],

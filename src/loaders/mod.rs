@@ -14,7 +14,7 @@ mod texture;
 mod version;
 
 pub use self::action::*;
-pub use self::convertable::ByteConvertable;
+pub use self::convertable::*;
 pub use self::effect::{EffectHolder, EffectLoader, *};
 pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
 pub use self::font::FontLoader;

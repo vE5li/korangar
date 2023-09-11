@@ -400,15 +400,7 @@ impl DeferredRenderTarget {
             .then_signal_fence_and_flush()
             .map(RenderTargetState::Fence)
             .map_err(Validated::unwrap)
-            .map_err(|error| {
-                println!("{:?}", error);
-                error
-            })
             .unwrap_or(RenderTargetState::OutOfDate);
-
-        if matches!(self.state, RenderTargetState::OutOfDate) {
-            println!(">> OUT OF DATE");
-        }
 
         #[cfg(feature = "debug")]
         flush_measurement.stop();

@@ -1,8 +1,8 @@
 use derive_new::new;
-use procedural::{ByteConvertable, FixedByteSize};
+use procedural::{ByteConvertable, FixedByteSize, Named};
 
 /// Represents the Header of the GRF file.
-#[derive(Clone, ByteConvertable, FixedByteSize, new)]
+#[derive(Clone, Named, ByteConvertable, FixedByteSize, new)]
 pub(super) struct Header {
     #[new(default)]
     encryption: [u8; 14],

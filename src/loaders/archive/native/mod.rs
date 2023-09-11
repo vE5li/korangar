@@ -33,8 +33,8 @@ pub struct NativeArchive {
 
 const MAGIC_BYTES: &[u8] = b"Master of Magic\0";
 const UNPACKED_SIZE_OF_MAGIC_STRING: usize = MAGIC_BYTES.len();
-const UNPACKED_SIZE_OF_ARCHIVEHEADER: usize = Header::size_in_bytes();
-const UNPACKED_SIZE_OF_FILETABLE: usize = AssetTable::size_in_bytes();
+const UNPACKED_SIZE_OF_ARCHIVEHEADER: usize = Header::size_in_bytes(None);
+const UNPACKED_SIZE_OF_FILETABLE: usize = AssetTable::size_in_bytes(None);
 
 impl Archive for NativeArchive {
     // Keeping the convenience of using [`loaders::stream::ByteStream`]

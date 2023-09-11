@@ -115,7 +115,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                     .as_ref()
                     .expect("repeating_remaining is used but no packet_length attribute is set");
                 quote!({
-                    let repeat_count = (#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes() as u16);
+                    let repeat_count = (#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes(None) as u16);
                     let mut vector = Vec::with_capacity(repeat_count as usize);
 
                     for _ in 0..repeat_count {

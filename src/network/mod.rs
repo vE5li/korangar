@@ -23,8 +23,7 @@ use crate::interface::{
     CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, WeakElementCell,
 };
 use crate::loaders::{
-    check_length_hint, check_length_hint_none, conversion_result, ByteStream, ConversionError, FixedByteSize, FromBytes, Named, Service,
-    ToBytes,
+    check_length_hint, check_length_hint_none, conversion_result, ByteStream, ConversionError, FromBytes, Named, Service, ToBytes,
 };
 
 #[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
@@ -182,7 +181,7 @@ impl ChatMessage {
     }
 }
 
-#[derive(Copy, Clone, Debug, Named, ByteConvertable, PrototypeElement, PartialEq)]
+#[derive(Copy, Clone, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq)]
 pub enum Sex {
     Female,
     Male,
@@ -530,7 +529,7 @@ struct CreateCharacterPacket {
     pub sex: Sex,
 }
 
-#[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct CharacterInformation {
     pub character_id: CharacterId,
     pub experience: i64,
@@ -578,13 +577,6 @@ pub struct CharacterInformation {
     pub character_slot_change_count: i32,
     pub character_name_change_count: i32,
     pub sex: Sex,
-}
-
-// TODO: derive
-impl const FixedByteSize for CharacterInformation {
-    fn size_in_bytes() -> usize {
-        175
-    }
 }
 
 /// Sent by the character server as a response to [CreateCharacterPacket]
@@ -856,7 +848,7 @@ struct RegularItemListPacket {
     pub item_information: Vec<RegularItemInformation>,
 }
 
-#[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 struct EquippableItemInformation {
     pub index: ItemIndex,
     pub item_id: ItemId,
@@ -872,12 +864,6 @@ struct EquippableItemInformation {
     pub refinement_level: u8,
     pub enchantment_level: u8,
     pub fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
-}
-
-impl const FixedByteSize for EquippableItemInformation {
-    fn size_in_bytes() -> usize {
-        68 // This is actually wrong but for some reason its correct
-    }
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
@@ -1576,7 +1562,7 @@ impl From<MovingEntityAppearedPacket> for EntityData {
     }
 }
 
-#[derive(Clone, Copy, Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 #[numeric_type(u32)]
 pub enum SkillType {
     #[numeric_value(0)]
@@ -1593,7 +1579,7 @@ pub enum SkillType {
     Trap,
 }
 
-#[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct SkillInformation {
     pub skill_id: SkillId,
     pub skill_type: SkillType,
@@ -1603,13 +1589,6 @@ pub struct SkillInformation {
     #[length_hint(24)]
     pub skill_name: String,
     pub upgraded: u8,
-}
-
-// TODO: derive
-impl const FixedByteSize for SkillInformation {
-    fn size_in_bytes() -> usize {
-        37
-    }
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
@@ -2068,7 +2047,7 @@ struct ChooseDialogOptionPacket {
     pub option: i8,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Named, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 #[numeric_type(u32)]
 pub enum EquipPosition {
     #[numeric_value(0)]
@@ -2121,13 +2100,6 @@ pub enum EquipPosition {
     LeftRightHand,
     #[numeric_value(3145728)]
     ShadowLeftRightAccessory,
-}
-
-// TODO: derive
-impl const FixedByteSize for EquipPosition {
-    fn size_in_bytes() -> usize {
-        4
-    }
 }
 
 impl EquipPosition {
@@ -2523,18 +2495,12 @@ struct SkillUnitDisappearPacket {
     pub entity_id: EntityId,
 }
 
-#[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Clone, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct Friend {
     pub account_id: AccountId,
     pub character_id: CharacterId,
     #[length_hint(24)]
     pub name: String,
-}
-
-impl FixedByteSize for Friend {
-    fn size_in_bytes() -> usize {
-        32
-    }
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]

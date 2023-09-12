@@ -29,6 +29,10 @@ impl ConversionError {
     pub(super) fn add_to_stack(&mut self, type_name: &'static str) {
         self.stack.insert(0, type_name);
     }
+
+    pub fn is_byte_stream_too_short(&self) -> bool {
+        matches!(self.error_type, ConversionErrorType::ByteStreamTooShort { .. })
+    }
 }
 
 impl std::fmt::Debug for ConversionError {
@@ -103,5 +107,26 @@ mod add_to_stack {
         error.add_to_stack(FIRST);
 
         assert_eq!(error.stack, vec![FIRST, SECOND, THIRD]);
+    }
+}
+
+#[cfg(test)]
+mod type_check {
+    use super::{ConversionError, ConversionErrorType};
+
+    #[test]
+    fn is_byte_stream_too_short() {
+        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let error = ConversionError::from_error_type(error_type.clone());
+
+        assert!(error.is_byte_stream_too_short());
+    }
+
+    #[test]
+    fn other() {
+        let error_type = ConversionErrorType::MissingLengthHint { type_name: "test" };
+        let error = ConversionError::from_error_type(error_type.clone());
+
+        assert!(!error.is_byte_stream_too_short());
     }
 }

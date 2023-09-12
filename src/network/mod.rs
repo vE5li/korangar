@@ -2742,6 +2742,8 @@ pub struct NetworkingSystem {
     login_stream: Option<TcpStream>,
     character_stream: Option<TcpStream>,
     map_stream: Option<TcpStream>,
+    // TODO: Make this a heapless Vec or something
+    map_stream_buffer: Vec<u8>,
     login_data: Option<LoginData>,
     characters: TrackedState<Vec<CharacterInformation>>,
     move_request: TrackedState<Option<usize>>,
@@ -2764,6 +2766,7 @@ impl NetworkingSystem {
         let login_stream = None;
         let character_stream = None;
         let map_stream = None;
+        let map_stream_buffer = Vec::new();
         let login_data = None;
         let characters = TrackedState::default();
         let move_request = TrackedState::default();
@@ -2785,6 +2788,7 @@ impl NetworkingSystem {
             slot_count,
             login_data,
             map_stream,
+            map_stream_buffer,
             characters,
             move_request,
             friend_list,
@@ -3044,21 +3048,19 @@ impl NetworkingSystem {
 
     fn try_get_data_from_map_server(&mut self) -> Option<Vec<u8>> {
         let mut buffer = [0; 8096];
+
+        let stream_buffer_length = self.map_stream_buffer.len();
         let map_stream = self.map_stream.as_mut()?;
-        let response_length = map_stream.read(&mut buffer).ok()?;
+        let response_length = map_stream.read(&mut buffer[stream_buffer_length..]).ok()?;
 
-        match response_length {
-            // TODO: make sure this will always work
-            1400 => {
-                let mut first_buffer = buffer[..response_length].to_vec();
-                let mut second_buffer = self.try_get_data_from_map_server().unwrap();
-                first_buffer.append(&mut second_buffer);
+        // We copy the buffered data *after* the read call, to save so unnecessary
+        // computation.
+        buffer[..stream_buffer_length].copy_from_slice(&self.map_stream_buffer);
 
-                println!("combined {}", first_buffer.len());
-                Some(first_buffer)
-            }
-            length => Some(buffer[..length].to_vec()),
-        }
+        self.map_stream_buffer.clear();
+
+        let total_length = stream_buffer_length + response_length;
+        Some(buffer[..total_length].to_vec())
     }
 
     pub fn keep_alive(&mut self, delta_time: f64, client_tick: ClientTick) {
@@ -3448,464 +3450,35 @@ impl NetworkingSystem {
             let mut byte_stream = ByteStream::new(&data);
 
             while !byte_stream.is_empty() {
-                match u16::from_bytes(&mut byte_stream, None).unwrap() {
-                    BroadcastMessagePacket::HEADER => {
-                        let packet = BroadcastMessagePacket::from_bytes(&mut byte_stream).unwrap();
-                        let color = Color::rgb(220, 200, 30);
-                        let chat_message = ChatMessage::new(packet.message, color);
-                        events.push(NetworkEvent::ChatMessage(chat_message));
-                    }
-                    Broadcast2MessagePacket::HEADER => {
-                        let packet = Broadcast2MessagePacket::from_bytes(&mut byte_stream).unwrap();
-                        // NOTE: Drop the alpha channel because it might be 0.
-                        let color = Color::rgb(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
-                        let chat_message = ChatMessage::new(packet.message, color);
-                        events.push(NetworkEvent::ChatMessage(chat_message));
-                    }
-                    OverheadMessagePacket::HEADER => {
-                        let packet = OverheadMessagePacket::from_bytes(&mut byte_stream).unwrap();
-                        let color = Color::monochrome(230);
-                        let chat_message = ChatMessage::new(packet.message, color);
-                        events.push(NetworkEvent::ChatMessage(chat_message));
-                    }
-                    ServerMessagePacket::HEADER => {
-                        let packet = ServerMessagePacket::from_bytes(&mut byte_stream).unwrap();
-                        let chat_message = ChatMessage::new(packet.message, Color::monochrome(255));
-                        events.push(NetworkEvent::ChatMessage(chat_message));
-                    }
-                    EntityMessagePacket::HEADER => {
-                        let packet = EntityMessagePacket::from_bytes(&mut byte_stream).unwrap();
-                        // NOTE: Drop the alpha channel because it might be 0.
-                        let color = Color::rgb(packet.color.red, packet.color.green, packet.color.blue);
-                        let chat_message = ChatMessage::new(packet.message, color);
-                        events.push(NetworkEvent::ChatMessage(chat_message));
-                    }
-                    DisplayEmotionPacket::HEADER => {
-                        let _packet = DisplayEmotionPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    EntityMovePacket::HEADER => {
-                        let packet = EntityMovePacket::from_bytes(&mut byte_stream).unwrap();
-                        let (origin, destination) = packet.from_to.to_vectors();
-                        events.push(NetworkEvent::EntityMove(
-                            packet.entity_id,
-                            origin,
-                            destination,
-                            packet.timestamp,
-                        ));
-                    }
-                    EntityStopMovePacket::HEADER => {
-                        let _packet = EntityStopMovePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    PlayerMovePacket::HEADER => {
-                        let packet = PlayerMovePacket::from_bytes(&mut byte_stream).unwrap();
-                        let (origin, destination) = packet.from_to.to_vectors();
-                        events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
-                    }
-                    ChangeMapPacket::HEADER => {
-                        let packet = ChangeMapPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::ChangeMap(
-                            packet.map_name.replace(".gat", ""),
-                            packet.position.map(|component| component as usize),
-                        ));
-                    }
-                    EntityAppearedPacket::HEADER => {
-                        let packet = EntityAppearedPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddEntity(packet.into()));
-                    }
-                    EntityAppeared2Packet::HEADER => {
-                        let packet = EntityAppeared2Packet::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddEntity(packet.into()));
-                    }
-                    MovingEntityAppearedPacket::HEADER => {
-                        let packet = MovingEntityAppearedPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddEntity(packet.into()));
-                    }
-                    EntityDisappearedPacket::HEADER => {
-                        let packet = EntityDisappearedPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::RemoveEntity(packet.entity_id));
-                    }
-                    UpdateStatusPacket::HEADER => {
-                        let packet = UpdateStatusPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateStatus(packet.status_type));
-                    }
-                    UpdateStatusPacket1::HEADER => {
-                        let packet = UpdateStatusPacket1::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateStatus(packet.status_type));
-                    }
-                    UpdateStatusPacket2::HEADER => {
-                        let packet = UpdateStatusPacket2::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateStatus(packet.status_type));
-                    }
-                    UpdateStatusPacket3::HEADER => {
-                        let packet = UpdateStatusPacket3::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateStatus(packet.status_type));
-                    }
-                    UpdateAttackRangePacket::HEADER => {
-                        let _packet = UpdateAttackRangePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    NewMailStatusPacket::HEADER => {
-                        let _packet = NewMailStatusPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    AchievementUpdatePacket::HEADER => {
-                        let _packet = AchievementUpdatePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    AchievementListPacket::HEADER => {
-                        let _packet = AchievementListPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    CriticalWeightUpdatePacket::HEADER => {
-                        let _packet = CriticalWeightUpdatePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    SpriteChangePacket::HEADER => {
-                        let packet = SpriteChangePacket::from_bytes(&mut byte_stream).unwrap();
-                        if packet.sprite_type == 0 {
-                            events.push(NetworkEvent::ChangeJob(packet.account_id, packet.value));
-                        }
-                    }
-                    InventoyStartPacket::HEADER => {
-                        let _packet = InventoyStartPacket::from_bytes(&mut byte_stream).unwrap();
-                        let mut item_data = Vec::new();
+                let saved_offset = byte_stream.get_offset();
 
-                        loop {
-                            let header = u16::from_bytes(&mut byte_stream, None).unwrap();
+                // Packet is cut-off at the header
+                let Ok(header) = u16::from_bytes(&mut byte_stream, None) else {
+                    byte_stream.set_offset(saved_offset);
+                    self.map_stream_buffer = byte_stream.remaining_bytes();
+                    break;
+                };
 
-                            match header {
-                                InventoyEndPacket::HEADER => {
-                                    break;
-                                }
-                                RegularItemListPacket::HEADER => {
-                                    let packet = RegularItemListPacket::from_bytes(&mut byte_stream).unwrap();
-                                    for item_information in packet.item_information {
-                                        item_data.push((
-                                            item_information.index,
-                                            item_information.item_id,
-                                            EquipPosition::None,
-                                            EquipPosition::None,
-                                        )); // TODO: Don't add that data here, only equippable items need this data.
-                                    }
-                                }
-                                EquippableItemListPacket::HEADER => {
-                                    let packet = EquippableItemListPacket::from_bytes(&mut byte_stream).unwrap();
-                                    for item_information in packet.item_information {
-                                        item_data.push((
-                                            item_information.index,
-                                            item_information.item_id,
-                                            item_information.equip_position,
-                                            item_information.equipped_position,
-                                        ));
-                                    }
-                                }
-                                // FIX: figure out what to do here
-                                _ => panic!(),
-                            }
-                        }
-
-                        let _ = InventoyEndPacket::from_bytes(&mut byte_stream).unwrap();
-
-                        events.push(NetworkEvent::Inventory(item_data));
-                    }
-                    EquippableSwitchItemListPacket::HEADER => {
-                        let _packet = EquippableSwitchItemListPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    MapTypePacket::HEADER => {
-                        let _packet = MapTypePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    UpdateSkillTreePacket::HEADER => {
-                        let packet = UpdateSkillTreePacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::SkillTree(packet.skill_information));
-                    }
-                    UpdateHotkeysPacket::HEADER => {
-                        let _packet = UpdateHotkeysPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    InitialStatusPacket::HEADER => {
-                        let _packet = InitialStatusPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    UpdatePartyInvitationStatePacket::HEADER => {
-                        let _packet = UpdatePartyInvitationStatePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    UpdateShowEquipPacket::HEADER => {
-                        let _packet = UpdateShowEquipPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    UpdateConfigurationPacket::HEADER => {
-                        let _packet = UpdateConfigurationPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    NavigateToMonsterPacket::HEADER => {
-                        let _packet = NavigateToMonsterPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    MarkMinimapPositionPacket::HEADER => {
-                        let _packet = MarkMinimapPositionPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    NextButtonPacket::HEADER => {
-                        let _packet = NextButtonPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddNextButton);
-                    }
-                    CloseButtonPacket::HEADER => {
-                        let _packet = CloseButtonPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddCloseButton);
-                    }
-                    DialogMenuPacket::HEADER => {
-                        let packet = DialogMenuPacket::from_bytes(&mut byte_stream).unwrap();
-                        let choices = packet
-                            .message
-                            .split(':')
-                            .map(String::from)
-                            .filter(|text| !text.is_empty())
-                            .collect();
-
-                        events.push(NetworkEvent::AddChoiceButtons(choices));
-                    }
-                    DisplaySpecialEffectPacket::HEADER => {
-                        let _packet = DisplaySpecialEffectPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    DisplaySkillCooldownPacket::HEADER => {
-                        let _packet = DisplaySkillCooldownPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    DisplaySkillEffectAndDamagePacket::HEADER => {
-                        let _packet = DisplaySkillEffectAndDamagePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    DisplaySkillEffectNoDamagePacket::HEADER => {
-                        let packet = DisplaySkillEffectNoDamagePacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::HealEffect(
-                            packet.destination_entity_id,
-                            packet.heal_amount as usize,
-                        ));
-
-                        //events.push(NetworkEvent::VisualEffect());
-                    }
-                    DisplayPlayerHealEffect::HEADER => {
-                        let _packet = DisplayPlayerHealEffect::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    StatusChangePacket::HEADER => {
-                        let _packet = StatusChangePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    QuestNotificationPacket1::HEADER => {
-                        let _packet = QuestNotificationPacket1::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    HuntingQuestNotificationPacket::HEADER => {
-                        let _packet = HuntingQuestNotificationPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    HuntingQuestUpdateObjectivePacket::HEADER => {
-                        let _packet = HuntingQuestUpdateObjectivePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    QuestRemovedPacket::HEADER => {
-                        let _packet = QuestRemovedPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    QuestListPacket::HEADER => {
-                        let _packet = QuestListPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    VisualEffectPacket::HEADER => {
-                        let packet = VisualEffectPacket::from_bytes(&mut byte_stream).unwrap();
-                        let path = match packet.effect {
-                            VisualEffect::BaseLevelUp => "angel.str",
-                            VisualEffect::JobLevelUp => "joblvup.str",
-                            VisualEffect::RefineFailure => "bs_refinefailed.str",
-                            VisualEffect::RefineSuccess => "bs_refinesuccess.str",
-                            VisualEffect::GameOver => "help_angel\\help_angel\\help_angel.str",
-                            VisualEffect::PharmacySuccess => "p_success.str",
-                            VisualEffect::PharmacyFailure => "p_failed.str",
-                            VisualEffect::BaseLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
-                            VisualEffect::JobLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
-                            VisualEffect::BaseLevelUpTaekwon => "help_angel\\help_angel\\help_angel.str",
-                        };
-
-                        events.push(NetworkEvent::VisualEffect(path, packet.entity_id));
-                    }
-                    DisplayGainedExperiencePacket::HEADER => {
-                        let _packet = DisplayGainedExperiencePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    DisplayImagePacket::HEADER => {
-                        let _packet = DisplayImagePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    StateChangePacket::HEADER => {
-                        let _packet = StateChangePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-
-                    QuestEffectPacket::HEADER => {
-                        let packet = QuestEffectPacket::from_bytes(&mut byte_stream).unwrap();
-                        let event = match packet.effect {
-                            QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
-                            _ => NetworkEvent::AddQuestEffect(packet),
-                        };
-                        events.push(event);
-                    }
-                    ItemPickupPacket::HEADER => {
-                        let packet = ItemPickupPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddIventoryItem(
-                            packet.index,
-                            packet.item_id,
-                            packet.equip_position,
-                            EquipPosition::None,
-                        ));
-                    }
-                    RemoveItemFromInventoryPacket::HEADER => {
-                        let _packet = RemoveItemFromInventoryPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    ServerTickPacket::HEADER => {
-                        let packet = ServerTickPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
-                    }
-                    RequestPlayerDetailsSuccessPacket::HEADER => {
-                        let packet = RequestPlayerDetailsSuccessPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateEntityDetails(EntityId(packet.character_id.0), packet.name));
-                    }
-                    RequestEntityDetailsSuccessPacket::HEADER => {
-                        let packet = RequestEntityDetailsSuccessPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
-                    }
-                    UpdateEntityHealthPointsPacket::HEADER => {
-                        let packet = UpdateEntityHealthPointsPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateEntityHealth(
-                            packet.entity_id,
-                            packet.health_points as usize,
-                            packet.maximum_health_points as usize,
-                        ));
-                    }
-                    RequestPlayerAttackFailedPacket::HEADER => {
-                        let _packet = RequestPlayerAttackFailedPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    DamagePacket::HEADER => {
-                        let packet = DamagePacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::DamageEffect(
-                            packet.destination_entity_id,
-                            packet.damage_amount as usize,
-                        ));
-                    }
-                    NpcDialogPacket::HEADER => {
-                        let packet = NpcDialogPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::OpenDialog(packet.text, packet.npc_id));
-                    }
-                    RequestEquipItemStatusPacket::HEADER => {
-                        let packet = RequestEquipItemStatusPacket::from_bytes(&mut byte_stream).unwrap();
-                        if let RequestEquipItemStatus::Success = packet.result {
-                            events.push(NetworkEvent::UpdateEquippedPosition {
-                                index: packet.inventory_index,
-                                equipped_position: packet.equipped_position,
-                            });
-                        }
-                    }
-                    RequestUnequipItemStatusPacket::HEADER => {
-                        let packet = RequestUnequipItemStatusPacket::from_bytes(&mut byte_stream).unwrap();
-                        if let RequestUnequipItemStatus::Success = packet.result {
-                            events.push(NetworkEvent::UpdateEquippedPosition {
-                                index: packet.inventory_index,
-                                equipped_position: EquipPosition::None,
-                            });
-                        }
-                    }
-                    Packet8302::HEADER => {
-                        let _packet = Packet8302::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    Packet180b::HEADER => {
-                        let _packet = Packet180b::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    MapServerLoginSuccessPacket::HEADER => {
-                        let packet = MapServerLoginSuccessPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
-                        events.push(NetworkEvent::SetPlayerPosition(packet.position.to_vector()));
-                    }
-                    RestartResponsePacket::HEADER => {
-                        let packet = RestartResponsePacket::from_bytes(&mut byte_stream).unwrap();
-                        match packet.result {
-                            RestartResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
-                            RestartResponseStatus::Nothing => {
-                                let color = Color::rgb(255, 100, 100);
-                                let chat_message = ChatMessage::new("Failed to log out.".to_string(), color);
-                                events.push(NetworkEvent::ChatMessage(chat_message));
-                            }
-                        }
-                    }
-                    DisconnectResponsePacket::HEADER => {
-                        let packet = DisconnectResponsePacket::from_bytes(&mut byte_stream).unwrap();
-                        match packet.result {
-                            DisconnectResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
-                            DisconnectResponseStatus::Wait10Seconds => {
-                                let color = Color::rgb(255, 100, 100);
-                                let chat_message = ChatMessage::new("Please wait 10 seconds before trying to log out.".to_string(), color);
-                                events.push(NetworkEvent::ChatMessage(chat_message));
-                            }
-                        }
-                    }
-                    UseSkillSuccessPacket::HEADER => {
-                        let _packet = UseSkillSuccessPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    ToUseSkillSuccessPacket::HEADER => {
-                        let _packet = ToUseSkillSuccessPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    NotifySkillUnitPacket::HEADER => {
-                        let packet = NotifySkillUnitPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::AddSkillUnit(
-                            packet.entity_id,
-                            packet.unit_id,
-                            packet.position.map(|component| component as usize),
-                        ));
-                    }
-                    SkillUnitDisappearPacket::HEADER => {
-                        let packet = SkillUnitDisappearPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::RemoveSkillUnit(packet.entity_id));
-                    }
-                    NotifyGroundSkillPacket::HEADER => {
-                        let _packet = NotifyGroundSkillPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    FriendListPacket::HEADER => {
-                        let packet = FriendListPacket::from_bytes(&mut byte_stream).unwrap();
-                        self.friend_list.with_mut(|friends, chaged| {
-                            *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();
-                            chaged();
-                        });
-                    }
-                    FriendOnlineStatusPacket::HEADER => {
-                        let _packet = FriendOnlineStatusPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    FriendRequestPacket::HEADER => {
-                        let packet = FriendRequestPacket::from_bytes(&mut byte_stream).unwrap();
-                        events.push(NetworkEvent::FriendRequest(packet.friend));
-                    }
-                    FriendRequestResultPacket::HEADER => {
-                        let packet = FriendRequestResultPacket::from_bytes(&mut byte_stream).unwrap();
-                        if packet.result == FriendRequestResult::Accepted {
-                            self.friend_list.push((packet.friend.clone(), UnsafeCell::new(None)));
-                        }
-
-                        let color = Color::rgb(220, 200, 30);
-                        let chat_message = ChatMessage::new(packet.into_message(), color);
-                        events.push(NetworkEvent::ChatMessage(chat_message));
-                    }
-                    NotifyFriendRemovedPacket::HEADER => {
-                        let packet = NotifyFriendRemovedPacket::from_bytes(&mut byte_stream).unwrap();
-                        self.friend_list.with_mut(|friends, changed| {
-                            friends.retain(|(friend, _)| {
-                                !(friend.account_id == packet.account_id && friend.character_id == packet.character_id)
-                            });
-                            changed();
-                        });
-                    }
-                    PartyInvitePacket::HEADER => {
-                        let _packet = PartyInvitePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    StatusChangeSequencePacket::HEADER => {
-                        let _packet = StatusChangeSequencePacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    ReputationPacket::HEADER => {
-                        let _packet = ReputationPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    ClanInfoPacket::HEADER => {
-                        let _packet = ClanInfoPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    ClanOnlineCountPacket::HEADER => {
-                        let _packet = ClanOnlineCountPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    ChangeMapCellPacket::HEADER => {
-                        let _packet = ChangeMapCellPacket::from_bytes(&mut byte_stream).unwrap();
-                    }
-                    _ => {
+                match self.handle_packet(&mut byte_stream, header, &mut events) {
+                    Ok(true) => {}
+                    // Unknown packet
+                    Ok(false) => {
                         #[cfg(feature = "debug")]
                         {
-                            // FIX: this doesn't push the header currently
+                            byte_stream.set_offset(saved_offset);
                             let packet = UnknownPacket::new(byte_stream.remaining_bytes());
                             byte_stream.incoming_packet(&packet);
                         }
 
                         break;
                     }
+                    // Cut-off packet
+                    Err(error) if error.is_byte_stream_too_short() => {
+                        byte_stream.set_offset(saved_offset);
+                        self.map_stream_buffer = byte_stream.remaining_bytes();
+                        break;
+                    }
+                    Err(error) => panic!("{:?}", error),
                 }
             }
 
@@ -3914,6 +3487,467 @@ impl NetworkingSystem {
         }
 
         events
+    }
+
+    #[profile]
+    fn handle_packet(
+        &mut self,
+        byte_stream: &mut ByteStream,
+        header: u16,
+        events: &mut Vec<NetworkEvent>,
+    ) -> Result<bool, Box<ConversionError>> {
+        match header {
+            BroadcastMessagePacket::HEADER => {
+                let packet = BroadcastMessagePacket::from_bytes(byte_stream)?;
+                let color = Color::rgb(220, 200, 30);
+                let chat_message = ChatMessage::new(packet.message, color);
+                events.push(NetworkEvent::ChatMessage(chat_message));
+            }
+            Broadcast2MessagePacket::HEADER => {
+                let packet = Broadcast2MessagePacket::from_bytes(byte_stream)?;
+                // NOTE: Drop the alpha channel because it might be 0.
+                let color = Color::rgb(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
+                let chat_message = ChatMessage::new(packet.message, color);
+                events.push(NetworkEvent::ChatMessage(chat_message));
+            }
+            OverheadMessagePacket::HEADER => {
+                let packet = OverheadMessagePacket::from_bytes(byte_stream)?;
+                let color = Color::monochrome(230);
+                let chat_message = ChatMessage::new(packet.message, color);
+                events.push(NetworkEvent::ChatMessage(chat_message));
+            }
+            ServerMessagePacket::HEADER => {
+                let packet = ServerMessagePacket::from_bytes(byte_stream)?;
+                let chat_message = ChatMessage::new(packet.message, Color::monochrome(255));
+                events.push(NetworkEvent::ChatMessage(chat_message));
+            }
+            EntityMessagePacket::HEADER => {
+                let packet = EntityMessagePacket::from_bytes(byte_stream)?;
+                // NOTE: Drop the alpha channel because it might be 0.
+                let color = Color::rgb(packet.color.red, packet.color.green, packet.color.blue);
+                let chat_message = ChatMessage::new(packet.message, color);
+                events.push(NetworkEvent::ChatMessage(chat_message));
+            }
+            DisplayEmotionPacket::HEADER => {
+                let _packet = DisplayEmotionPacket::from_bytes(byte_stream)?;
+            }
+            EntityMovePacket::HEADER => {
+                let packet = EntityMovePacket::from_bytes(byte_stream)?;
+                let (origin, destination) = packet.from_to.to_vectors();
+                events.push(NetworkEvent::EntityMove(
+                    packet.entity_id,
+                    origin,
+                    destination,
+                    packet.timestamp,
+                ));
+            }
+            EntityStopMovePacket::HEADER => {
+                let _packet = EntityStopMovePacket::from_bytes(byte_stream)?;
+            }
+            PlayerMovePacket::HEADER => {
+                let packet = PlayerMovePacket::from_bytes(byte_stream)?;
+                let (origin, destination) = packet.from_to.to_vectors();
+                events.push(NetworkEvent::PlayerMove(origin, destination, packet.timestamp));
+            }
+            ChangeMapPacket::HEADER => {
+                let packet = ChangeMapPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::ChangeMap(
+                    packet.map_name.replace(".gat", ""),
+                    packet.position.map(|component| component as usize),
+                ));
+            }
+            EntityAppearedPacket::HEADER => {
+                let packet = EntityAppearedPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddEntity(packet.into()));
+            }
+            EntityAppeared2Packet::HEADER => {
+                let packet = EntityAppeared2Packet::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddEntity(packet.into()));
+            }
+            MovingEntityAppearedPacket::HEADER => {
+                let packet = MovingEntityAppearedPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddEntity(packet.into()));
+            }
+            EntityDisappearedPacket::HEADER => {
+                let packet = EntityDisappearedPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::RemoveEntity(packet.entity_id));
+            }
+            UpdateStatusPacket::HEADER => {
+                let packet = UpdateStatusPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateStatus(packet.status_type));
+            }
+            UpdateStatusPacket1::HEADER => {
+                let packet = UpdateStatusPacket1::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateStatus(packet.status_type));
+            }
+            UpdateStatusPacket2::HEADER => {
+                let packet = UpdateStatusPacket2::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateStatus(packet.status_type));
+            }
+            UpdateStatusPacket3::HEADER => {
+                let packet = UpdateStatusPacket3::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateStatus(packet.status_type));
+            }
+            UpdateAttackRangePacket::HEADER => {
+                let _packet = UpdateAttackRangePacket::from_bytes(byte_stream)?;
+            }
+            NewMailStatusPacket::HEADER => {
+                let _packet = NewMailStatusPacket::from_bytes(byte_stream)?;
+            }
+            AchievementUpdatePacket::HEADER => {
+                let _packet = AchievementUpdatePacket::from_bytes(byte_stream)?;
+            }
+            AchievementListPacket::HEADER => {
+                let _packet = AchievementListPacket::from_bytes(byte_stream)?;
+            }
+            CriticalWeightUpdatePacket::HEADER => {
+                let _packet = CriticalWeightUpdatePacket::from_bytes(byte_stream)?;
+            }
+            SpriteChangePacket::HEADER => {
+                let packet = SpriteChangePacket::from_bytes(byte_stream)?;
+                if packet.sprite_type == 0 {
+                    events.push(NetworkEvent::ChangeJob(packet.account_id, packet.value));
+                }
+            }
+            InventoyStartPacket::HEADER => {
+                let _packet = InventoyStartPacket::from_bytes(byte_stream)?;
+                let mut item_data = Vec::new();
+
+                // TODO: it might be better for performance and resilience to instead save a
+                // state in the networking system instaed of buffering *all*
+                // inventory packets if one of them is cut off
+                loop {
+                    let header = u16::from_bytes(byte_stream, None)?;
+
+                    match header {
+                        InventoyEndPacket::HEADER => {
+                            break;
+                        }
+                        RegularItemListPacket::HEADER => {
+                            let packet = RegularItemListPacket::from_bytes(byte_stream)?;
+                            for item_information in packet.item_information {
+                                item_data.push((
+                                    item_information.index,
+                                    item_information.item_id,
+                                    EquipPosition::None,
+                                    EquipPosition::None,
+                                )); // TODO: Don't add that data here, only equippable items need this data.
+                            }
+                        }
+                        EquippableItemListPacket::HEADER => {
+                            let packet = EquippableItemListPacket::from_bytes(byte_stream)?;
+                            for item_information in packet.item_information {
+                                item_data.push((
+                                    item_information.index,
+                                    item_information.item_id,
+                                    item_information.equip_position,
+                                    item_information.equipped_position,
+                                ));
+                            }
+                        }
+                        _ => return Err(ConversionError::from_message("expected inventory packet")),
+                    }
+                }
+
+                let _ = InventoyEndPacket::from_bytes(byte_stream)?;
+
+                events.push(NetworkEvent::Inventory(item_data));
+            }
+            EquippableSwitchItemListPacket::HEADER => {
+                let _packet = EquippableSwitchItemListPacket::from_bytes(byte_stream)?;
+            }
+            MapTypePacket::HEADER => {
+                let _packet = MapTypePacket::from_bytes(byte_stream)?;
+            }
+            UpdateSkillTreePacket::HEADER => {
+                let packet = UpdateSkillTreePacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::SkillTree(packet.skill_information));
+            }
+            UpdateHotkeysPacket::HEADER => {
+                let _packet = UpdateHotkeysPacket::from_bytes(byte_stream)?;
+            }
+            InitialStatusPacket::HEADER => {
+                let _packet = InitialStatusPacket::from_bytes(byte_stream)?;
+            }
+            UpdatePartyInvitationStatePacket::HEADER => {
+                let _packet = UpdatePartyInvitationStatePacket::from_bytes(byte_stream)?;
+            }
+            UpdateShowEquipPacket::HEADER => {
+                let _packet = UpdateShowEquipPacket::from_bytes(byte_stream)?;
+            }
+            UpdateConfigurationPacket::HEADER => {
+                let _packet = UpdateConfigurationPacket::from_bytes(byte_stream)?;
+            }
+            NavigateToMonsterPacket::HEADER => {
+                let _packet = NavigateToMonsterPacket::from_bytes(byte_stream)?;
+            }
+            MarkMinimapPositionPacket::HEADER => {
+                let _packet = MarkMinimapPositionPacket::from_bytes(byte_stream)?;
+            }
+            NextButtonPacket::HEADER => {
+                let _packet = NextButtonPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddNextButton);
+            }
+            CloseButtonPacket::HEADER => {
+                let _packet = CloseButtonPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddCloseButton);
+            }
+            DialogMenuPacket::HEADER => {
+                let packet = DialogMenuPacket::from_bytes(byte_stream)?;
+                let choices = packet
+                    .message
+                    .split(':')
+                    .map(String::from)
+                    .filter(|text| !text.is_empty())
+                    .collect();
+
+                events.push(NetworkEvent::AddChoiceButtons(choices));
+            }
+            DisplaySpecialEffectPacket::HEADER => {
+                let _packet = DisplaySpecialEffectPacket::from_bytes(byte_stream)?;
+            }
+            DisplaySkillCooldownPacket::HEADER => {
+                let _packet = DisplaySkillCooldownPacket::from_bytes(byte_stream)?;
+            }
+            DisplaySkillEffectAndDamagePacket::HEADER => {
+                let _packet = DisplaySkillEffectAndDamagePacket::from_bytes(byte_stream)?;
+            }
+            DisplaySkillEffectNoDamagePacket::HEADER => {
+                let packet = DisplaySkillEffectNoDamagePacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::HealEffect(
+                    packet.destination_entity_id,
+                    packet.heal_amount as usize,
+                ));
+
+                //events.push(NetworkEvent::VisualEffect());
+            }
+            DisplayPlayerHealEffect::HEADER => {
+                let _packet = DisplayPlayerHealEffect::from_bytes(byte_stream)?;
+            }
+            StatusChangePacket::HEADER => {
+                let _packet = StatusChangePacket::from_bytes(byte_stream)?;
+            }
+            QuestNotificationPacket1::HEADER => {
+                let _packet = QuestNotificationPacket1::from_bytes(byte_stream)?;
+            }
+            HuntingQuestNotificationPacket::HEADER => {
+                let _packet = HuntingQuestNotificationPacket::from_bytes(byte_stream)?;
+            }
+            HuntingQuestUpdateObjectivePacket::HEADER => {
+                let _packet = HuntingQuestUpdateObjectivePacket::from_bytes(byte_stream)?;
+            }
+            QuestRemovedPacket::HEADER => {
+                let _packet = QuestRemovedPacket::from_bytes(byte_stream)?;
+            }
+            QuestListPacket::HEADER => {
+                let _packet = QuestListPacket::from_bytes(byte_stream)?;
+            }
+            VisualEffectPacket::HEADER => {
+                let packet = VisualEffectPacket::from_bytes(byte_stream)?;
+                let path = match packet.effect {
+                    VisualEffect::BaseLevelUp => "angel.str",
+                    VisualEffect::JobLevelUp => "joblvup.str",
+                    VisualEffect::RefineFailure => "bs_refinefailed.str",
+                    VisualEffect::RefineSuccess => "bs_refinesuccess.str",
+                    VisualEffect::GameOver => "help_angel\\help_angel\\help_angel.str",
+                    VisualEffect::PharmacySuccess => "p_success.str",
+                    VisualEffect::PharmacyFailure => "p_failed.str",
+                    VisualEffect::BaseLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
+                    VisualEffect::JobLevelUpSuperNovice => "help_angel\\help_angel\\help_angel.str",
+                    VisualEffect::BaseLevelUpTaekwon => "help_angel\\help_angel\\help_angel.str",
+                };
+
+                events.push(NetworkEvent::VisualEffect(path, packet.entity_id));
+            }
+            DisplayGainedExperiencePacket::HEADER => {
+                let _packet = DisplayGainedExperiencePacket::from_bytes(byte_stream)?;
+            }
+            DisplayImagePacket::HEADER => {
+                let _packet = DisplayImagePacket::from_bytes(byte_stream)?;
+            }
+            StateChangePacket::HEADER => {
+                let _packet = StateChangePacket::from_bytes(byte_stream)?;
+            }
+
+            QuestEffectPacket::HEADER => {
+                let packet = QuestEffectPacket::from_bytes(byte_stream)?;
+                let event = match packet.effect {
+                    QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
+                    _ => NetworkEvent::AddQuestEffect(packet),
+                };
+                events.push(event);
+            }
+            ItemPickupPacket::HEADER => {
+                let packet = ItemPickupPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddIventoryItem(
+                    packet.index,
+                    packet.item_id,
+                    packet.equip_position,
+                    EquipPosition::None,
+                ));
+            }
+            RemoveItemFromInventoryPacket::HEADER => {
+                let _packet = RemoveItemFromInventoryPacket::from_bytes(byte_stream)?;
+            }
+            ServerTickPacket::HEADER => {
+                let packet = ServerTickPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
+            }
+            RequestPlayerDetailsSuccessPacket::HEADER => {
+                let packet = RequestPlayerDetailsSuccessPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateEntityDetails(EntityId(packet.character_id.0), packet.name));
+            }
+            RequestEntityDetailsSuccessPacket::HEADER => {
+                let packet = RequestEntityDetailsSuccessPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name));
+            }
+            UpdateEntityHealthPointsPacket::HEADER => {
+                let packet = UpdateEntityHealthPointsPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateEntityHealth(
+                    packet.entity_id,
+                    packet.health_points as usize,
+                    packet.maximum_health_points as usize,
+                ));
+            }
+            RequestPlayerAttackFailedPacket::HEADER => {
+                let _packet = RequestPlayerAttackFailedPacket::from_bytes(byte_stream)?;
+            }
+            DamagePacket::HEADER => {
+                let packet = DamagePacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::DamageEffect(
+                    packet.destination_entity_id,
+                    packet.damage_amount as usize,
+                ));
+            }
+            NpcDialogPacket::HEADER => {
+                let packet = NpcDialogPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::OpenDialog(packet.text, packet.npc_id));
+            }
+            RequestEquipItemStatusPacket::HEADER => {
+                let packet = RequestEquipItemStatusPacket::from_bytes(byte_stream)?;
+                if let RequestEquipItemStatus::Success = packet.result {
+                    events.push(NetworkEvent::UpdateEquippedPosition {
+                        index: packet.inventory_index,
+                        equipped_position: packet.equipped_position,
+                    });
+                }
+            }
+            RequestUnequipItemStatusPacket::HEADER => {
+                let packet = RequestUnequipItemStatusPacket::from_bytes(byte_stream)?;
+                if let RequestUnequipItemStatus::Success = packet.result {
+                    events.push(NetworkEvent::UpdateEquippedPosition {
+                        index: packet.inventory_index,
+                        equipped_position: EquipPosition::None,
+                    });
+                }
+            }
+            Packet8302::HEADER => {
+                let _packet = Packet8302::from_bytes(byte_stream)?;
+            }
+            Packet180b::HEADER => {
+                let _packet = Packet180b::from_bytes(byte_stream)?;
+            }
+            MapServerLoginSuccessPacket::HEADER => {
+                let packet = MapServerLoginSuccessPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::UpdateClientTick(packet.client_tick));
+                events.push(NetworkEvent::SetPlayerPosition(packet.position.to_vector()));
+            }
+            RestartResponsePacket::HEADER => {
+                let packet = RestartResponsePacket::from_bytes(byte_stream)?;
+                match packet.result {
+                    RestartResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
+                    RestartResponseStatus::Nothing => {
+                        let color = Color::rgb(255, 100, 100);
+                        let chat_message = ChatMessage::new("Failed to log out.".to_string(), color);
+                        events.push(NetworkEvent::ChatMessage(chat_message));
+                    }
+                }
+            }
+            DisconnectResponsePacket::HEADER => {
+                let packet = DisconnectResponsePacket::from_bytes(byte_stream)?;
+                match packet.result {
+                    DisconnectResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
+                    DisconnectResponseStatus::Wait10Seconds => {
+                        let color = Color::rgb(255, 100, 100);
+                        let chat_message = ChatMessage::new("Please wait 10 seconds before trying to log out.".to_string(), color);
+                        events.push(NetworkEvent::ChatMessage(chat_message));
+                    }
+                }
+            }
+            UseSkillSuccessPacket::HEADER => {
+                let _packet = UseSkillSuccessPacket::from_bytes(byte_stream)?;
+            }
+            ToUseSkillSuccessPacket::HEADER => {
+                let _packet = ToUseSkillSuccessPacket::from_bytes(byte_stream)?;
+            }
+            NotifySkillUnitPacket::HEADER => {
+                let packet = NotifySkillUnitPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::AddSkillUnit(
+                    packet.entity_id,
+                    packet.unit_id,
+                    packet.position.map(|component| component as usize),
+                ));
+            }
+            SkillUnitDisappearPacket::HEADER => {
+                let packet = SkillUnitDisappearPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::RemoveSkillUnit(packet.entity_id));
+            }
+            NotifyGroundSkillPacket::HEADER => {
+                let _packet = NotifyGroundSkillPacket::from_bytes(byte_stream)?;
+            }
+            FriendListPacket::HEADER => {
+                let packet = FriendListPacket::from_bytes(byte_stream)?;
+                self.friend_list.with_mut(|friends, chaged| {
+                    *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();
+                    chaged();
+                });
+            }
+            FriendOnlineStatusPacket::HEADER => {
+                let _packet = FriendOnlineStatusPacket::from_bytes(byte_stream)?;
+            }
+            FriendRequestPacket::HEADER => {
+                let packet = FriendRequestPacket::from_bytes(byte_stream)?;
+                events.push(NetworkEvent::FriendRequest(packet.friend));
+            }
+            FriendRequestResultPacket::HEADER => {
+                let packet = FriendRequestResultPacket::from_bytes(byte_stream)?;
+                if packet.result == FriendRequestResult::Accepted {
+                    self.friend_list.push((packet.friend.clone(), UnsafeCell::new(None)));
+                }
+
+                let color = Color::rgb(220, 200, 30);
+                let chat_message = ChatMessage::new(packet.into_message(), color);
+                events.push(NetworkEvent::ChatMessage(chat_message));
+            }
+            NotifyFriendRemovedPacket::HEADER => {
+                let packet = NotifyFriendRemovedPacket::from_bytes(byte_stream)?;
+                self.friend_list.with_mut(|friends, changed| {
+                    friends.retain(|(friend, _)| !(friend.account_id == packet.account_id && friend.character_id == packet.character_id));
+                    changed();
+                });
+            }
+            PartyInvitePacket::HEADER => {
+                let _packet = PartyInvitePacket::from_bytes(byte_stream)?;
+            }
+            StatusChangeSequencePacket::HEADER => {
+                let _packet = StatusChangeSequencePacket::from_bytes(byte_stream)?;
+            }
+            ReputationPacket::HEADER => {
+                let _packet = ReputationPacket::from_bytes(byte_stream)?;
+            }
+            ClanInfoPacket::HEADER => {
+                let _packet = ClanInfoPacket::from_bytes(byte_stream)?;
+            }
+            ClanOnlineCountPacket::HEADER => {
+                let _packet = ClanOnlineCountPacket::from_bytes(byte_stream)?;
+            }
+            ChangeMapCellPacket::HEADER => {
+                let _packet = ChangeMapCellPacket::from_bytes(byte_stream)?;
+            }
+            _ => return Ok(false),
+        }
+
+        Ok(true)
     }
 
     #[cfg(feature = "debug")]

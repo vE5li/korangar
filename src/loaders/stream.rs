@@ -66,6 +66,10 @@ impl<'b> ByteStream<'b> {
         self.offset
     }
 
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset
+    }
+
     #[cfg(feature = "debug")]
     pub fn remaining_bytes(&mut self) -> Vec<u8> {
         let end_index = self.data.len();

@@ -130,7 +130,7 @@ mod conversion_result {
 
     #[test]
     fn err() {
-        let error = Err(ConversionError::from_message("test".to_owned()));
+        let error = Err(ConversionError::from_message("test"));
         let result = conversion_result::<Dummy, ()>(error);
 
         assert!(result.is_err());

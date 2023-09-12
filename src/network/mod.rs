@@ -103,7 +103,7 @@ where
         let header = u16::from_bytes(byte_stream, None)?;
 
         if header != Self::HEADER {
-            return Err(ConversionError::from_message("mismatched header".to_owned()));
+            return Err(ConversionError::from_message("mismatched header"));
         }
 
         Self::from_bytes(byte_stream)

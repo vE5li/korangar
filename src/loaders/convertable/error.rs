@@ -20,8 +20,10 @@ impl ConversionError {
         })
     }
 
-    pub fn from_message(message: String) -> Box<Self> {
-        Self::from_error_type(ConversionErrorType::Specific { message })
+    pub fn from_message(message: impl ToString) -> Box<Self> {
+        Self::from_error_type(ConversionErrorType::Specific {
+            message: message.to_string(),
+        })
     }
 
     pub(super) fn add_to_stack(&mut self, type_name: &'static str) {

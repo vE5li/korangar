@@ -54,9 +54,7 @@ impl FromBytes for EncodedData {
                 encoded -= 1;
 
                 if next + length > image_size {
-                    return Err(ConversionError::from_message(
-                        "too much data encoded in palette image".to_owned(),
-                    ));
+                    return Err(ConversionError::from_message("too much data encoded in palette image"));
                 }
 
                 next += length;
@@ -67,7 +65,7 @@ impl FromBytes for EncodedData {
         }
 
         if next != image_size || encoded > 0 {
-            return Err(ConversionError::from_message("badly encoded palette image".to_owned()));
+            return Err(ConversionError::from_message("badly encoded palette image"));
         }
 
         Ok(Self(data))

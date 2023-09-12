@@ -2693,7 +2693,7 @@ impl PrototypeElement for UnknownPacket {
     fn to_element(&self, display: String) -> ElementCell {
         let mut byte_stream = ByteStream::new(&self.bytes);
 
-        let elements = match self.bytes.len() > 2 {
+        let elements = match self.bytes.len() >= 2 {
             true => {
                 let signature = u16::from_bytes(&mut byte_stream, None).unwrap();
                 let header = format!("0x{:0>4x}", signature);

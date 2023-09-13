@@ -70,7 +70,6 @@ impl<'b> ByteStream<'b> {
         self.offset = offset
     }
 
-    #[cfg(feature = "debug")]
     pub fn remaining_bytes(&mut self) -> Vec<u8> {
         let end_index = self.data.len();
         let data = self.data[self.offset..end_index].to_vec();

@@ -466,7 +466,7 @@ impl FromBytes for Ipv4Addr {
 }
 
 #[derive(Clone, Debug, Named, FromBytes, FixedByteSize, PrototypeElement)]
-struct CharacterServerInformation {
+pub struct CharacterServerInformation {
     pub server_ip: Ipv4Addr,
     pub server_port: u16,
     pub server_name: [u8; 20],

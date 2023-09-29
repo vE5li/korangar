@@ -2817,7 +2817,7 @@ impl NetworkingSystem {
         self.login_settings.remember_password = !self.login_settings.remember_password;
     }
 
-    pub fn log_in(&mut self, service: Service, username: String, password: String) -> Result<(), String> {
+    pub fn log_in(&mut self, service: Service, username: String, password: String) -> Result<Vec<CharacterServerInformation>, String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new("log in");
 
@@ -2868,11 +2868,37 @@ impl NetworkingSystem {
         )
         .into();
 
-        let character_server_information = login_server_login_success_packet
-            .character_server_information
-            .into_iter()
-            .next()
-            .ok_or("no character server available")?;
+        let character_server_information_list: Vec<CharacterServerInformation> =
+            login_server_login_success_packet.character_server_information.into();
+
+        if character_server_information_list.len() == 0 {
+            return Err("no character server available".to_string());
+        }
+
+        self.login_settings.username = match self.login_settings.remember_username {
+            true => username,
+            // clear in case it was previously saved
+            false => String::new(),
+        };
+
+        self.login_settings.password = match self.login_settings.remember_password {
+            true => password,
+            // clear in case it was previously saved
+            false => String::new(),
+        };
+
+        #[cfg(feature = "debug")]
+        self.update_packet_history(&mut byte_stream);
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        Ok(character_server_information_list)
+    }
+
+    pub fn select_server(&mut self, character_server_information: CharacterServerInformation) -> Result<(), String> {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new("select server");
 
         let server_ip = IpAddr::V4(character_server_information.server_ip);
         let socket_address = SocketAddr::new(server_ip, character_server_information.server_port);
@@ -2880,11 +2906,13 @@ impl NetworkingSystem {
             .map_err(|_| "Failed to connect to character server. Please try again")?
             .into();
 
+        let login_data = self.login_data.clone().unwrap();
+
         let character_server_login_packet = CharacterServerLoginPacket::new(
-            login_server_login_success_packet.account_id,
-            login_server_login_success_packet.login_id1,
-            login_server_login_success_packet.login_id2,
-            login_server_login_success_packet.sex,
+            login_data.account_id,
+            login_data.login_id1,
+            login_data.login_id2,
+            login_data.sex,
         );
 
         let character_stream = self.character_stream.as_mut().ok_or("no character server connection")?;
@@ -2892,14 +2920,14 @@ impl NetworkingSystem {
             .write_all(&character_server_login_packet.to_bytes().unwrap())
             .map_err(|_| "failed to send packet to character server")?;
 
-        #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
-
         let response = self.get_data_from_character_server();
 
         let mut byte_stream = ByteStream::new(&response);
         let account_id = AccountId::from_bytes(&mut byte_stream, None).unwrap();
-        assert_eq!(account_id, login_server_login_success_packet.account_id);
+        assert_eq!(account_id, login_data.account_id);
+
+        #[cfg(feature = "debug")]
+        self.update_packet_history(&mut byte_stream);
 
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
@@ -2928,18 +2956,6 @@ impl NetworkingSystem {
 
         let request_character_list_success_packet = RequestCharacterListSuccessPacket::take_from_bytes(&mut byte_stream).unwrap();
         self.characters.set(request_character_list_success_packet.character_information);
-
-        self.login_settings.username = match self.login_settings.remember_username {
-            true => username,
-            // clear in case it was previously saved
-            false => String::new(),
-        };
-
-        self.login_settings.password = match self.login_settings.remember_password {
-            true => password,
-            // clear in case it was previously saved
-            false => String::new(),
-        };
 
         #[cfg(feature = "debug")]
         self.update_packet_history(&mut byte_stream);

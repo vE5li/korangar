@@ -726,10 +726,22 @@ fn main() {
                         }
                         UserEvent::LogIn(service, username, password) => {
                             match networking_system.log_in(service, username, password) {
-                                Ok(()) => {
+                                Ok(servers) => {
                                     // TODO: this will do one unnecessary restore_focus. check if
                                     // that will be problematic
                                     interface.close_window_with_class(&mut focus_state, LoginWindow::WINDOW_CLASS);
+
+                                    interface.open_window(&mut focus_state, &SelectServerWindow::new(servers));
+                                }
+                                Err(message) => interface.open_window(&mut focus_state, &ErrorWindow::new(message)),
+                            }
+                        }
+                        UserEvent::SelectServer(server) => {
+                            match networking_system.select_server(server) {
+                                Ok(()) => {
+                                    // TODO: this will do one unnecessary restore_focus. check if
+                                    // that will be problematic
+                                    interface.close_window_with_class(&mut focus_state, SelectServerWindow::WINDOW_CLASS);
 
                                     let character_selection_window = networking_system.character_selection_window();
                                     interface.open_window(&mut focus_state, &character_selection_window);

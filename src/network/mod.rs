@@ -2731,10 +2731,11 @@ impl NetworkTimer {
     }
 }
 
-#[derive(new)]
+#[derive(new, Clone)]
 struct LoginData {
     pub account_id: AccountId,
     pub login_id1: u32,
+    pub login_id2: u32,
     pub sex: Sex,
 }
 
@@ -2862,6 +2863,7 @@ impl NetworkingSystem {
         self.login_data = LoginData::new(
             login_server_login_success_packet.account_id,
             login_server_login_success_packet.login_id1,
+            login_server_login_success_packet.login_id2,
             login_server_login_success_packet.sex,
         )
         .into();

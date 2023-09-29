@@ -3,7 +3,7 @@ use cgmath::Vector2;
 use super::HotbarSlot;
 use crate::interface::{ItemMove, SkillMove};
 use crate::loaders::Service;
-use crate::network::{AccountId, CharacterId, EntityId};
+use crate::network::{AccountId, CharacterId, CharacterServerInformation, EntityId};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -11,6 +11,7 @@ use crate::world::MarkerIdentifier;
 pub enum UserEvent {
     SelectService(Service),
     LogIn(Service, String, String),
+    SelectServer(CharacterServerInformation),
     LogOut,
     Exit,
     ToggleRemeberUsername,

@@ -469,7 +469,8 @@ impl FromBytes for Ipv4Addr {
 pub struct CharacterServerInformation {
     pub server_ip: Ipv4Addr,
     pub server_port: u16,
-    pub server_name: [u8; 20],
+    #[length_hint(20)]
+    pub server_name: String,
     pub user_count: u16,
     pub server_type: u16, // ServerType
     pub display_new: u16, // bool16 ?

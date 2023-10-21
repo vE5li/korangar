@@ -2868,10 +2868,7 @@ impl NetworkingSystem {
         )
         .into();
 
-        let character_server_information_list: Vec<CharacterServerInformation> =
-            login_server_login_success_packet.character_server_information.into();
-
-        if character_server_information_list.len() == 0 {
+        if login_server_login_success_packet.character_server_information.is_empty() {
             return Err("no character server available".to_string());
         }
 
@@ -2893,7 +2890,7 @@ impl NetworkingSystem {
         #[cfg(feature = "debug")]
         timer.stop();
 
-        Ok(character_server_information_list)
+        Ok(login_server_login_success_packet.character_server_information)
     }
 
     pub fn select_server(&mut self, character_server_information: CharacterServerInformation) -> Result<(), String> {
@@ -2924,6 +2921,7 @@ impl NetworkingSystem {
 
         let mut byte_stream = ByteStream::new(&response);
         let account_id = AccountId::from_bytes(&mut byte_stream, None).unwrap();
+
         assert_eq!(account_id, login_data.account_id);
 
         #[cfg(feature = "debug")]

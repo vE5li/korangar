@@ -1,4 +1,5 @@
 //! An OS folder containing game assets.
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -8,6 +9,15 @@ use super::{Archive, Writable};
 
 pub struct FolderArchive {
     folder_path: PathBuf,
+    /// In the native archives, file names are case insensitive and use '\' as a
+    /// separator, but our file system might not. This mapping let's us do a
+    /// lookup from a unified format to the actual file name in the file system.
+    ///
+    /// Example:
+    /// ```
+    /// "texture\\data\\angel.str" -> texture/data/Angel.str
+    /// ```
+    file_mapping: HashMap<String, PathBuf>,
 }
 
 impl FolderArchive {
@@ -17,28 +27,47 @@ impl FolderArchive {
             false => PathBuf::from(path.replace('\\', "/")),
         }
     }
+
+    /// Load the file mapping of a given directory.
+    fn load_mapping(directory: &PathBuf) -> HashMap<String, PathBuf> {
+        WalkDir::new(directory)
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_file())
+            .map(|file| {
+                let asset_path = file
+                    .path()
+                    .strip_prefix(directory)
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .replace('/', "\\")
+                    .to_lowercase();
+
+                (asset_path, file.into_path())
+            })
+            .collect()
+    }
 }
 
 impl Archive for FolderArchive {
     fn from_path(path: &Path) -> Self {
-        Self {
-            folder_path: PathBuf::from(path),
-        }
+        let folder_path = PathBuf::from(path);
+        let file_mapping = Self::load_mapping(&folder_path);
+
+        Self { folder_path, file_mapping }
     }
 
     fn get_file_by_path(&mut self, asset_path: &str) -> Option<Vec<u8>> {
-        let normalized_asset_path = Self::os_specific_path(asset_path);
-        let full_path = self.folder_path.join(normalized_asset_path);
-
-        full_path.is_file().then(|| fs::read(full_path).ok()).flatten()
+        self.file_mapping.get(asset_path).and_then(|file_path| fs::read(file_path).ok())
     }
 
     fn get_lua_files(&self, lua_files: &mut Vec<String>) {
-        let files = WalkDir::new(&self.folder_path)
-            .into_iter()
-            .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.file_type().is_file() && entry.path().extension().unwrap() == "lub")
-            .map(|file| String::from(file.path().strip_prefix(&self.folder_path).unwrap().to_str().unwrap()));
+        let files = self
+            .file_mapping
+            .keys()
+            .filter(|file_name| file_name.ends_with(".lub"))
+            .map(|file_name| file_name.clone());
 
         lua_files.extend(files);
     }

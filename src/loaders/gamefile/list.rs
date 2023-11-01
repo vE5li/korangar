@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::debug::*;
 
 const FILENAME: &str = "client/game_archives.ron";
-const DEFAULT_FILES: &[&str] = &["data.grf", "rdata.grf", "korangar.grf"];
+const DEFAULT_FILES: &[&str] = &["data.grf", "rdata.grf", "korangar/"];
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub(super) struct GameArchiveList {

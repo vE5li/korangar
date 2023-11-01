@@ -37,8 +37,6 @@ const UNPACKED_SIZE_OF_ARCHIVEHEADER: usize = Header::size_in_bytes(None);
 const UNPACKED_SIZE_OF_FILETABLE: usize = AssetTable::size_in_bytes(None);
 
 impl Archive for NativeArchive {
-    // Keeping the convenience of using [`loaders::stream::ByteStream`]
-    /// while being able to read without buffering the entire file.
     fn from_path(path: &Path) -> Self {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {MAGENTA}{0}{NONE}", path.display()));
@@ -47,6 +45,8 @@ impl Archive for NativeArchive {
         let mut magic_number_buffer = [0u8; UNPACKED_SIZE_OF_MAGIC_STRING];
         file.read_exact(&mut magic_number_buffer).unwrap();
 
+        // Keeping the convenience of using [`loaders::stream::ByteStream`]
+        // while being able to read without buffering the entire file.
         let mut file_header_buffer = [0u8; UNPACKED_SIZE_OF_ARCHIVEHEADER];
         file.read_exact(&mut file_header_buffer).unwrap();
         let file_header = Header::from_bytes(&mut ByteStream::new(&file_header_buffer), None).unwrap();
@@ -85,11 +85,8 @@ impl Archive for NativeArchive {
         }
     }
 
-    /// Returns an asset from the archive.
-    /// Checks if the file is cached and if so, returns it from memory.
-    /// If not, read from the [`GameArchive`]
-    fn get_file_by_path(&mut self, path: &str) -> Option<Vec<u8>> {
-        self.file_table.get(path).and_then(|file_information| {
+    fn get_file_by_path(&mut self, asset_path: &str) -> Option<Vec<u8>> {
+        self.file_table.get(asset_path).and_then(|file_information| {
             let mut compressed_file_buffer = vec![0u8; file_information.compressed_size_aligned as usize];
 
             // TODO: Figure out what the GRF_FLAG_MIXCRYPT flag actually means and load the

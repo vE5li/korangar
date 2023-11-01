@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="euc-kr" ?>
+<clientinfo>
+    <desc>Ragnarok Client Information</desc>
+    <servicetype>korea</servicetype>
+    <servertype>sakray</servertype>
+    <readfolder />
+    <connection>
+        <display>Korangar</display>
+        <desc>Ragnarok Online</desc>
+        <balloon>Sakray Server</balloon>
+        <address>49.12.109.207</address>
+        <port>6900</port>
+        <version>20</version>
+        <langtype>1</langtype>
+        <yellow />
+        <aid />
+        <loading>
+            <image>loading00.jpg</image>
+        </loading>
+    </connection>
+</clientinfo>

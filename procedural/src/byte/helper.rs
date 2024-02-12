@@ -148,7 +148,9 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                 panic!("implement for to_bytes aswell");
                 [0u8].as_slice()
             }),
-            false => quote!(crate::loaders::conversion_result::<Self, _>(crate::loaders::ToBytes::to_bytes(&self.#field_identifier, #length_hint))?.as_slice()),
+            false => {
+                quote!(crate::loaders::conversion_result::<Self, _>(crate::loaders::ToBytes::to_bytes(&self.#field_identifier, #length_hint))?.as_slice())
+            }
         };
 
         implemented_fields.push(quote!(#field_variable));

@@ -241,18 +241,21 @@ impl InputSystem {
             }
         }
 
-        if let Some(index) = window_index && self.left_mouse_button.pressed() {
+        if let Some(index) = window_index
+            && self.left_mouse_button.pressed()
+        {
             focus_state.set_focused_window(index)
         }
 
         let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;
-        if let Some(window_index) = &mut window_index && self.mouse_input_mode.is_none() && condition {
-
+        if let Some(window_index) = &mut window_index
+            && self.mouse_input_mode.is_none()
+            && condition
+        {
             *window_index = interface.move_window_to_top(*window_index);
             self.mouse_input_mode = MouseInputMode::ClickInterface;
 
             if let Some(hovered_element) = &hovered_element {
-
                 let action = match self.left_mouse_button.pressed() {
                     true => interface.left_click_element(hovered_element, *window_index),
                     false => interface.right_click_element(hovered_element, *window_index),
@@ -260,22 +263,19 @@ impl InputSystem {
 
                 if let Some(action) = action {
                     match action {
-
                         ClickAction::ChangeEvent(..) => {}
 
                         ClickAction::FocusElement => {
-
                             let element_cell = hovered_element.clone();
                             let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::downwards()); // TODO: check
                             focus_state.set_focused_element(new_focused_element, *window_index);
-                        },
+                        }
 
                         ClickAction::FocusNext(focus_mode) => {
-
                             let element_cell = hovered_element.clone();
                             let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
                             focus_state.update_focused_element(new_focused_element, *window_index);
-                        },
+                        }
 
                         ClickAction::Event(event) => events.push(event),
 
@@ -290,14 +290,14 @@ impl InputSystem {
                             // Needs to rerender because some elements will render differently
                             // based on the mouse input mode.
                             interface.schedule_rerender();
-                        },
+                        }
 
                         ClickAction::MoveSkill(skill_source, skill) => {
                             self.mouse_input_mode = MouseInputMode::MoveSkill(skill_source, skill);
                             // Needs to rerender because some elements will render differently
                             // based on the mouse input mode.
                             interface.schedule_rerender();
-                        },
+                        }
 
                         ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
 
@@ -612,7 +612,10 @@ impl InputSystem {
                             #[cfg(feature = "debug")]
                             PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
                         }
-                    } else if self.left_mouse_button.down() && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode && let PickerTarget::Tile { x, y } = picker_target {
+                    } else if self.left_mouse_button.down()
+                        && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode
+                        && let PickerTarget::Tile { x, y } = picker_target
+                    {
                         let new_position = Vector2::new(x as usize, y as usize);
 
                         if new_position != *requested_position {

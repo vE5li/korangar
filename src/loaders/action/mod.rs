@@ -50,8 +50,9 @@ impl AnimationState {
         // from time to time so that animations won't start to drop frames as
         // soon as start_time - client_tick can no longer be stored in an f32
         // accurately. When fixed remove set_start_time in MouseCursor.
-        if let Some(duration) = self.duration && time > duration {
-
+        if let Some(duration) = self.duration
+            && time > duration
+        {
             //self.action = self.next_action;
             self.start_time = client_tick;
             self.duration = None;

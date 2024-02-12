@@ -40,7 +40,9 @@ impl GameFileLoader {
     fn get_archive_type_by_path(path: &Path) -> ArchiveType {
         if path.is_dir() || path.display().to_string().ends_with('/') {
             ArchiveType::Folder
-        } else if let Some(extension) = path.extension() && let Some("grf") = extension.to_str() {
+        } else if let Some(extension) = path.extension()
+            && let Some("grf") = extension.to_str()
+        {
             ArchiveType::Native
         } else {
             panic!("Provided archive must be a directory or have a .grf extension")

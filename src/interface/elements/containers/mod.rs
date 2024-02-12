@@ -223,15 +223,13 @@ impl ContainerState {
             });
         let cached_index = self.focus_cache.get();
 
-        if let Some(parent_element) = &self.state.parent_element && (wrapped_around || focusable_element.is_none() || focus.mode == FocusMode::FocusPrevious) {
-
+        if let Some(parent_element) = &self.state.parent_element
+            && (wrapped_around || focusable_element.is_none() || focus.mode == FocusMode::FocusPrevious)
+        {
             let parent_element = parent_element.upgrade().unwrap();
-            let next_element = parent_element
-                .borrow()
-                .focus_next(parent_element.clone(), Some(self_cell), focus);
+            let next_element = parent_element.borrow().focus_next(parent_element.clone(), Some(self_cell), focus);
 
             if next_element.is_some() {
-
                 // important to clear here since this element might be used as a fallback if the
                 // next sibling is removed.
                 self.focus_cache.take();
@@ -246,9 +244,13 @@ impl ContainerState {
     }
 
     fn restore_focus(&self, self_cell: ElementCell) -> Option<ElementCell> {
-        if let Some(index) = self.focus_cache.get() && !self.elements.is_empty() {
-
-            let focused_element = self.elements[0..index.add(1).min(self.elements.len())].iter().rev().find_map(|element| element.borrow().restore_focus(element.clone()));
+        if let Some(index) = self.focus_cache.get()
+            && !self.elements.is_empty()
+        {
+            let focused_element = self.elements[0..index.add(1).min(self.elements.len())]
+                .iter()
+                .rev()
+                .find_map(|element| element.borrow().restore_focus(element.clone()));
 
             if focused_element.is_some() {
                 return focused_element;

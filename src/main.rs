@@ -15,6 +15,7 @@
 #![feature(lazy_cell)]
 #![feature(div_duration)]
 #![feature(iter_next_chunk)]
+#![feature(effects)]
 
 #[cfg(feature = "debug")]
 #[macro_use]
@@ -1295,7 +1296,9 @@ fn main() {
                             true,
                         );
 
-                        if let Some(PickerTarget::Tile { x, y }) = mouse_target && !entities.is_empty() {
+                        if let Some(PickerTarget::Tile { x, y }) = mouse_target
+                            && !entities.is_empty()
+                        {
                             #[debug_condition(render_settings.show_indicators)]
                             map.render_walk_indicator(
                                 directional_shadow_target,
@@ -1340,7 +1343,9 @@ fn main() {
                         #[debug_condition(render_settings.show_water)]
                         map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
 
-                        if let Some(PickerTarget::Tile { x, y }) = mouse_target && !entities.is_empty() {
+                        if let Some(PickerTarget::Tile { x, y }) = mouse_target
+                            && !entities.is_empty()
+                        {
                             #[debug_condition(render_settings.show_indicators)]
                             map.render_walk_indicator(
                                 screen_target,

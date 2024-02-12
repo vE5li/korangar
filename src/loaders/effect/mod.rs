@@ -378,7 +378,9 @@ impl EffectBase for EffectWithLight {
     fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) -> bool {
         const FADE_SPEED: f32 = 5.0;
 
-        if let EffectCenter::Entity(entity_id, position) = &mut self.center && let Some(entity) = entities.iter().find(|entity| entity.get_entity_id() == *entity_id) {
+        if let EffectCenter::Entity(entity_id, position) = &mut self.center
+            && let Some(entity) = entities.iter().find(|entity| entity.get_entity_id() == *entity_id)
+        {
             let new_position = entity.get_position();
             *position = new_position;
         }

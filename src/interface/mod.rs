@@ -179,7 +179,9 @@ impl Interface {
                     window.resolve(font_loader.clone(), &self.interface_settings, &self.theme, self.available_space);
 
                 // should only ever be the last window
-                if let Some(focused_index) = focus_state.focused_window() && focused_index == window_index {
+                if let Some(focused_index) = focus_state.focused_window()
+                    && focused_index == window_index
+                {
                     restore_focus = true;
                 }
 

@@ -99,7 +99,9 @@ impl Profiler {
 
         // Save the completed frame so we can inspect it in the profiler later on.
         let profiler_halted = unsafe { PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) };
-        if let Some(previous_measurement) = previous_measurement && !profiler_halted {
+        if let Some(previous_measurement) = previous_measurement
+            && !profiler_halted
+        {
             self.saved_frames.push(previous_measurement);
         }
 

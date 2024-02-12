@@ -46,27 +46,27 @@ impl From<u32> for PickerTarget {
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::Object as u32 {
-            return Self::Marker(MarkerIdentifier::Object(data as usize & 0xfff));
+            return Self::Marker(MarkerIdentifier::Object(data as usize & 0xFFF));
         }
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::LightSource as u32 {
-            return Self::Marker(MarkerIdentifier::LightSource(data as usize & 0xfff));
+            return Self::Marker(MarkerIdentifier::LightSource(data as usize & 0xFFF));
         }
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::SoundSource as u32 {
-            return Self::Marker(MarkerIdentifier::SoundSource(data as usize & 0xfff));
+            return Self::Marker(MarkerIdentifier::SoundSource(data as usize & 0xFFF));
         }
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::EffectSource as u32 {
-            return Self::Marker(MarkerIdentifier::EffectSource(data as usize & 0xfff));
+            return Self::Marker(MarkerIdentifier::EffectSource(data as usize & 0xFFF));
         }
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::Entity as u32 {
-            return Self::Marker(MarkerIdentifier::Entity(data as usize & 0xfff));
+            return Self::Marker(MarkerIdentifier::Entity(data as usize & 0xFFF));
         }
 
         Self::Entity(EntityId(data))
@@ -84,11 +84,11 @@ impl From<PickerTarget> for u32 {
             PickerTarget::Entity(EntityId(entity_id)) => entity_id,
             #[cfg(feature = "debug")]
             PickerTarget::Marker(marker_identifier) => match marker_identifier {
-                MarkerIdentifier::Object(index) => ((MarkerEncoding::Object as u32) << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::LightSource(index) => ((MarkerEncoding::LightSource as u32) << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::SoundSource(index) => ((MarkerEncoding::SoundSource as u32) << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::EffectSource(index) => ((MarkerEncoding::EffectSource as u32) << 24) | (index as u32 & 0xfff),
-                MarkerIdentifier::Entity(index) => ((MarkerEncoding::Entity as u32) << 24) | (index as u32 & 0xfff),
+                MarkerIdentifier::Object(index) => ((MarkerEncoding::Object as u32) << 24) | (index as u32 & 0xFFF),
+                MarkerIdentifier::LightSource(index) => ((MarkerEncoding::LightSource as u32) << 24) | (index as u32 & 0xFFF),
+                MarkerIdentifier::SoundSource(index) => ((MarkerEncoding::SoundSource as u32) << 24) | (index as u32 & 0xFFF),
+                MarkerIdentifier::EffectSource(index) => ((MarkerEncoding::EffectSource as u32) << 24) | (index as u32 & 0xFFF),
+                MarkerIdentifier::Entity(index) => ((MarkerEncoding::Entity as u32) << 24) | (index as u32 & 0xFFF),
                 _ => panic!(),
             },
         }

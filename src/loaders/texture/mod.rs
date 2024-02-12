@@ -55,7 +55,7 @@ impl TextureLoader {
             // These numbers are taken from https://github.com/Duckwhale/RagnarokFileFormats
             image_buffer
                 .pixels_mut()
-                .filter(|pixel| pixel.0[0] > 0xf0 && pixel.0[1] < 0x10 && pixel.0[2] > 0x0f)
+                .filter(|pixel| pixel.0[0] > 0xF0 && pixel.0[1] < 0x10 && pixel.0[2] > 0x0F)
                 .for_each(|pixel| *pixel = Rgba([0; 4]));
         }
 

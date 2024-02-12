@@ -212,7 +212,7 @@ struct LoginServerLoginPacket {
 /// the character servers provided by this packet.
 #[allow(dead_code)]
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0ac4)]
+#[header(0x0AC4)]
 struct LoginServerLoginSuccessPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -236,7 +236,7 @@ struct LoginServerLoginSuccessPacket {
 /// character slots.
 #[allow(dead_code)]
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x082d)]
+#[header(0x082D)]
 struct CharacterServerLoginSuccessPacket {
     /// Always 29 on rAthena
     pub unknown: u16,
@@ -250,7 +250,7 @@ struct CharacterServerLoginSuccessPacket {
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x006b)]
+#[header(0x006B)]
 struct Packet6b00 {
     pub unused: u16,
     pub maximum_slot_count: u8,
@@ -261,7 +261,7 @@ struct Packet6b00 {
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b18)]
+#[header(0x0B18)]
 struct Packet180b {
     /// Possibly inventory related
     pub unknown: u16,
@@ -303,7 +303,7 @@ impl ToBytes for WorldPosition {
         let mut coordinates = vec![0, 0, 0];
 
         coordinates[0] = (self.x >> 2) as u8;
-        coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3f) as u8);
+        coordinates[1] = ((self.x << 6) as u8) | (((self.y >> 4) & 0x3F) as u8);
         coordinates[2] = (self.y << 4) as u8;
 
         Ok(coordinates)
@@ -342,7 +342,7 @@ impl FromBytes for WorldPosition2 {
 
 /// Sent by the map server as a response to [MapServerLoginPacket] succeeding.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02eb)]
+#[header(0x02EB)]
 struct MapServerLoginSuccessPacket {
     pub client_tick: ClientTick,
     pub position: WorldPosition,
@@ -389,7 +389,7 @@ pub enum LoginFailedReason2 {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x083e)]
+#[header(0x083E)]
 struct LoginFailedPacket2 {
     pub reason: LoginFailedReason2,
 }
@@ -402,7 +402,7 @@ pub enum CharacterSelectionFailedReason {
 /// Sent by the character server as a response to [SelectCharacterPacket]
 /// failing. Provides a reason for the character selection failing.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x006c)]
+#[header(0x006C)]
 struct CharacterSelectionFailedPacket {
     pub reason: CharacterSelectionFailedReason,
 }
@@ -411,7 +411,7 @@ struct CharacterSelectionFailedPacket {
 /// succeeding. Provides a map server to connect to, along with the ID of our
 /// selected character.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0ac5)]
+#[header(0x0AC5)]
 struct CharacterSelectionSuccessPacket {
     pub character_id: CharacterId,
     #[length_hint(16)]
@@ -434,7 +434,7 @@ pub enum CharacterCreationFailedReason {
 /// Sent by the character server as a response to [CreateCharacterPacket]
 /// failing. Provides a reason for the character creation failing.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x006e)]
+#[header(0x006E)]
 struct CharacterCreationFailedPacket {
     pub reason: CharacterCreationFailedReason,
 }
@@ -517,7 +517,7 @@ struct Packet8302 {
 /// Attempts to create a new character in an empty slot using the provided
 /// information.
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x0a39)]
+#[header(0x0A39)]
 struct CreateCharacterPacket {
     #[length_hint(24)]
     pub name: String,
@@ -584,7 +584,7 @@ pub struct CharacterInformation {
 /// succeeding. Provides all character information of the newly created
 /// character.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b6f)]
+#[header(0x0B6F)]
 struct CreateCharacterSuccessPacket {
     pub character_information: CharacterInformation,
 }
@@ -592,13 +592,13 @@ struct CreateCharacterSuccessPacket {
 /// Sent by the client to the character server.
 /// Requests a list of every character associated with the account.
 #[derive(Clone, Debug, Default, Named, OutgoingPacket, PrototypeElement)]
-#[header(0x09a1)]
+#[header(0x09A1)]
 struct RequestCharacterListPacket {}
 
 /// Sent by the character server as a response to [RequestCharacterListPacket]
 /// succeeding. Provides the requested list of character information.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b72)]
+#[header(0x0B72)]
 struct RequestCharacterListSuccessPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -660,7 +660,7 @@ struct PlayerMovePacket {
 /// Attempts to delete a character from the user account using the provided
 /// information.
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x01fb)]
+#[header(0x01FB)]
 struct DeleteCharacterPacket {
     character_id: CharacterId,
     /// This field can be used for email or date of birth, depending on the
@@ -690,7 +690,7 @@ struct CharacterDeletionFailedPacket {
 /// Sent by the character server as a response to [DeleteCharacterPacket]
 /// succeeding.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x006f)]
+#[header(0x006F)]
 struct CharacterDeletionSuccessPacket {}
 
 /// Sent by the client to the character server when the user selects a
@@ -704,7 +704,7 @@ struct SelectCharacterPacket {
 /// Sent by the map server to the client when there is a new chat message from
 /// the server. Provides the message to be displayed in the chat window.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x008e)]
+#[header(0x008E)]
 struct ServerMessagePacket {
     pub packet_length: u16,
     #[length_hint(self.packet_length - 4)]
@@ -723,7 +723,7 @@ struct RequestDetailsPacket {
 /// Sent by the map server to the client as a response to
 /// [RequestDetailsPacket]. Provides additional information about the player.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0a30)]
+#[header(0x0A30)]
 struct RequestPlayerDetailsSuccessPacket {
     pub character_id: CharacterId,
     #[length_hint(24)]
@@ -740,7 +740,7 @@ struct RequestPlayerDetailsSuccessPacket {
 /// Sent by the map server to the client as a response to
 /// [RequestDetailsPacket]. Provides additional information about the entity.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0adf)]
+#[header(0x0ADF)]
 struct RequestEntityDetailsSuccessPacket {
     pub entity_id: EntityId,
     pub group_id: u32,
@@ -751,7 +751,7 @@ struct RequestEntityDetailsSuccessPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09e7)]
+#[header(0x09E7)]
 struct NewMailStatusPacket {
     pub new_available: u8,
 }
@@ -766,7 +766,7 @@ struct AchievementData {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0a24)]
+#[header(0x0A24)]
 struct AchievementUpdatePacket {
     pub total_score: u32,
     pub level: u16,
@@ -776,7 +776,7 @@ struct AchievementUpdatePacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0a23)]
+#[header(0x0A23)]
 struct AchievementListPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -790,13 +790,13 @@ struct AchievementListPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0ade)]
+#[header(0x0ADE)]
 struct CriticalWeightUpdatePacket {
     pub packet_length: u32,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x01d7)]
+#[header(0x01D7)]
 struct SpriteChangePacket {
     pub account_id: AccountId,
     pub sprite_type: u8, // TODO: Is it actually the sprite type?
@@ -805,7 +805,7 @@ struct SpriteChangePacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b08)]
+#[header(0x0B08)]
 struct InventoyStartPacket {
     pub packet_length: u16,
     pub inventory_type: u8,
@@ -814,7 +814,7 @@ struct InventoyStartPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b0b)]
+#[header(0x0B0B)]
 struct InventoyEndPacket {
     pub inventory_type: u8,
     pub flag: u8, // maybe char ?
@@ -840,7 +840,7 @@ struct RegularItemInformation {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b09)]
+#[header(0x0B09)]
 struct RegularItemListPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -868,7 +868,7 @@ struct EquippableItemInformation {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b39)]
+#[header(0x0B39)]
 struct EquippableItemListPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -884,7 +884,7 @@ struct EquippableSwitchItemInformation {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0a9b)]
+#[header(0x0A9B)]
 struct EquippableSwitchItemListPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -893,7 +893,7 @@ struct EquippableSwitchItemListPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x099b)]
+#[header(0x099B)]
 struct MapTypePacket {
     pub map_type: u16,
     pub flags: u32,
@@ -903,7 +903,7 @@ struct MapTypePacket {
 /// ??. Provides the message to be displayed in the chat window, as well as
 /// information on how the message should be displayed.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x01c3)]
+#[header(0x01C3)]
 struct Broadcast2MessagePacket {
     pub packet_length: u16,
     pub font_color: ColorRGBA,
@@ -918,7 +918,7 @@ struct Broadcast2MessagePacket {
 /// Sent by the map server to the client when when someone uses the @broadcast
 /// command. Provides the message to be displayed in the chat window.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x009a)]
+#[header(0x009A)]
 struct BroadcastMessagePacket {
     pub packet_length: u16,
     #[length_hint(self.packet_length - 2)]
@@ -929,7 +929,7 @@ struct BroadcastMessagePacket {
 /// chat. Provides the source player and message to be displayed in the chat
 /// window and the speach bubble.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x008d)]
+#[header(0x008D)]
 struct OverheadMessagePacket {
     pub packet_length: u16,
     pub entity_id: EntityId,
@@ -941,7 +941,7 @@ struct OverheadMessagePacket {
 /// an entity. Provides the message to be displayed in the chat window, the
 /// color of the message, and the ID of the entity it originated from.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02c1)]
+#[header(0x02C1)]
 struct EntityMessagePacket {
     pub packet_length: u16,
     pub entity_id: EntityId,
@@ -951,7 +951,7 @@ struct EntityMessagePacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00c0)]
+#[header(0x00C0)]
 struct DisplayEmotionPacket {
     pub entity_id: EntityId,
     pub emotion: u8,
@@ -1155,7 +1155,7 @@ impl PrototypeElement for StatusType {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00b0)]
+#[header(0x00B0)]
 struct UpdateStatusPacket {
     #[length_hint(6)]
     pub status_type: StatusType,
@@ -1173,7 +1173,7 @@ struct StatusChangeSequencePacket {
 /// This packet is ignored by Korangar since all of the provided values are set
 /// again individually using the UpdateStatusPackets.
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00bd)]
+#[header(0x00BD)]
 struct InitialStatusPacket {
     pub status_points: u16,
     pub strength: u8,
@@ -1213,27 +1213,27 @@ struct UpdateStatusPacket1 {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0acb)]
+#[header(0x0ACB)]
 struct UpdateStatusPacket2 {
     #[length_hint(10)]
     pub status_type: StatusType,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00be)]
+#[header(0x00BE)]
 struct UpdateStatusPacket3 {
     #[length_hint(3)]
     pub status_type: StatusType,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x013a)]
+#[header(0x013A)]
 struct UpdateAttackRangePacket {
     pub attack_range: u16,
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x08d4)]
+#[header(0x08D4)]
 struct SwitchCharacterSlotPacket {
     pub origin_slot: u16,
     pub destination_slot: u16,
@@ -1264,7 +1264,7 @@ struct RequestActionPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x00f3)]
+#[header(0x00F3)]
 struct GlobalMessagePacket {
     pub packet_length: u16,
     pub message: String,
@@ -1292,7 +1292,7 @@ enum DamageType {
 }*/
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x08c8)]
+#[header(0x08C8)]
 struct DamagePacket {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
@@ -1308,7 +1308,7 @@ struct DamagePacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x007f)]
+#[header(0x007F)]
 #[ping]
 struct ServerTickPacket {
     pub client_tick: ClientTick,
@@ -1329,7 +1329,7 @@ pub enum SwitchCharacterSlotResponseStatus {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b70)]
+#[header(0x0B70)]
 struct SwitchCharacterSlotResponsePacket {
     pub unknown: u16, // is always 8 ?
     pub status: SwitchCharacterSlotResponseStatus,
@@ -1361,7 +1361,7 @@ struct EntityDisappearedPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09fd)]
+#[header(0x09FD)]
 struct MovingEntityAppearedPacket {
     pub packet_length: u16,
     pub object_type: u8,
@@ -1403,7 +1403,7 @@ struct MovingEntityAppearedPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09fe)]
+#[header(0x09FE)]
 struct EntityAppearedPacket {
     pub packet_length: u16,
     pub object_type: u8,
@@ -1444,7 +1444,7 @@ struct EntityAppearedPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09ff)]
+#[header(0x09FF)]
 struct EntityAppeared2Packet {
     pub packet_length: u16,
     pub object_type: u8,
@@ -1593,7 +1593,7 @@ pub struct SkillInformation {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x010f)]
+#[header(0x010F)]
 struct UpdateSkillTreePacket {
     #[packet_length]
     pub packet_length: u16,
@@ -1609,7 +1609,7 @@ struct HotkeyData {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b20)]
+#[header(0x0B20)]
 struct UpdateHotkeysPacket {
     pub rotate: u8,
     pub tab: u16,
@@ -1617,26 +1617,26 @@ struct UpdateHotkeysPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02c9)]
+#[header(0x02C9)]
 struct UpdatePartyInvitationStatePacket {
     pub allowed: u8, // always 0 on rAthena
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02da)]
+#[header(0x02DA)]
 struct UpdateShowEquipPacket {
     pub open_equip_window: u8,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02d9)]
+#[header(0x02D9)]
 struct UpdateConfigurationPacket {
     pub config_type: u32,
     pub value: u32, // only enabled and disabled ?
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x08e2)]
+#[header(0x08E2)]
 struct NavigateToMonsterPacket {
     pub target_type: u8, // 3 - entity; 0 - coordinates; 1 - coordinates but fails if you're alweady on the map
     pub flags: u8,
@@ -1666,19 +1666,19 @@ struct MarkMinimapPositionPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00b5)]
+#[header(0x00B5)]
 struct NextButtonPacket {
     pub entity_id: EntityId,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00b6)]
+#[header(0x00B6)]
 struct CloseButtonPacket {
     pub entity_id: EntityId,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00b7)]
+#[header(0x00B7)]
 struct DialogMenuPacket {
     pub packet_length: u16,
     pub entity_id: EntityId,
@@ -1687,21 +1687,21 @@ struct DialogMenuPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x01f3)]
+#[header(0x01F3)]
 struct DisplaySpecialEffectPacket {
     pub entity_id: EntityId,
     pub effect_id: u32,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x043d)]
+#[header(0x043D)]
 struct DisplaySkillCooldownPacket {
     pub skill_id: SkillId,
     pub until: ClientTick,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x01de)]
+#[header(0x01DE)]
 struct DisplaySkillEffectAndDamagePacket {
     pub skill_id: SkillId,
     pub source_entity_id: EntityId,
@@ -1725,14 +1725,14 @@ enum HealType {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0a27)]
+#[header(0x0A27)]
 struct DisplayPlayerHealEffect {
     pub heal_type: HealType,
     pub heal_amount: u32,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09cb)]
+#[header(0x09CB)]
 struct DisplaySkillEffectNoDamagePacket {
     pub skill_id: SkillId,
     pub heal_amount: u32,
@@ -1765,7 +1765,7 @@ struct ObjectiveDetails1 {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09f9)]
+#[header(0x09F9)]
 struct QuestNotificationPacket1 {
     pub quest_id: u32,
     pub active: u8,
@@ -1786,7 +1786,7 @@ struct HuntingObjective {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x08fe)]
+#[header(0x08FE)]
 struct HuntingQuestNotificationPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -1795,7 +1795,7 @@ struct HuntingQuestNotificationPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09fa)]
+#[header(0x09FA)]
 struct HuntingQuestUpdateObjectivePacket {
     #[packet_length]
     pub packet_length: u16,
@@ -1805,7 +1805,7 @@ struct HuntingQuestUpdateObjectivePacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02b4)]
+#[header(0x02B4)]
 struct QuestRemovedPacket {
     pub quest_id: u32,
 }
@@ -1836,7 +1836,7 @@ struct Quest {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09f8)]
+#[header(0x09F8)]
 struct QuestListPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -1861,7 +1861,7 @@ enum VisualEffect {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x019b)]
+#[header(0x019B)]
 struct VisualEffectPacket {
     pub entity_id: EntityId,
     pub effect: VisualEffect,
@@ -1883,7 +1883,7 @@ enum ExperienceSource {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0acc)]
+#[header(0x0ACC)]
 struct DisplayGainedExperiencePacket {
     pub account_id: AccountId,
     pub amount: u64,
@@ -1903,7 +1903,7 @@ enum ImageLocation {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x01b3)]
+#[header(0x01B3)]
 struct DisplayImagePacket {
     #[length_hint(64)]
     pub image_name: String,
@@ -1921,7 +1921,7 @@ struct StateChangePacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b41)]
+#[header(0x0B41)]
 struct ItemPickupPacket {
     pub index: ItemIndex,
     pub count: u16,
@@ -1955,7 +1955,7 @@ enum RemoveItemReason {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x07fa)]
+#[header(0x07FA)]
 struct RemoveItemFromInventoryPacket {
     pub remove_reason: RemoveItemReason,
     pub index: u16,
@@ -2000,7 +2000,7 @@ pub struct QuestEffectPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00b4)]
+#[header(0x00B4)]
 struct NpcDialogPacket {
     pub packet_length: u16,
     pub npc_id: EntityId,
@@ -2009,7 +2009,7 @@ struct NpcDialogPacket {
 }
 
 #[derive(Clone, Debug, Default, Named, OutgoingPacket, PrototypeElement)]
-#[header(0x007d)]
+#[header(0x007D)]
 struct MapLoadedPacket {}
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
@@ -2030,7 +2030,7 @@ struct StartDialogPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x00b9)]
+#[header(0x00B9)]
 struct NextDialogPacket {
     pub npc_id: EntityId,
 }
@@ -2042,7 +2042,7 @@ struct CloseDialogPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x00b8)]
+#[header(0x00B8)]
 struct ChooseDialogOptionPacket {
     pub npc_id: EntityId,
     pub option: i8,
@@ -2159,7 +2159,7 @@ struct RequestEquipItemStatusPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x00ab)]
+#[header(0x00AB)]
 struct RequestUnequipItemPacket {
     pub inventory_index: ItemIndex,
 }
@@ -2171,7 +2171,7 @@ enum RequestUnequipItemStatus {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x099a)]
+#[header(0x099A)]
 struct RequestUnequipItemStatusPacket {
     pub inventory_index: ItemIndex,
     pub equipped_position: EquipPosition,
@@ -2185,7 +2185,7 @@ enum RestartType {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x00b2)]
+#[header(0x00B2)]
 struct RestartPacket {
     pub restart_type: RestartType,
 }
@@ -2199,7 +2199,7 @@ enum RestartResponseStatus {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x00b3)]
+#[header(0x00B3)]
 struct RestartResponsePacket {
     pub result: RestartResponseStatus,
 }
@@ -2214,7 +2214,7 @@ enum DisconnectResponseStatus {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x018b)]
+#[header(0x018B)]
 struct DisconnectResponsePacket {
     pub result: DisconnectResponseStatus,
 }
@@ -2228,7 +2228,7 @@ struct UseSkillAtIdPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x0af4)]
+#[header(0x0AF4)]
 struct UseSkillOnGroundPacket {
     pub skill_level: SkillLevel,
     pub skill_id: SkillId,
@@ -2238,7 +2238,7 @@ struct UseSkillOnGroundPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x0b10)]
+#[header(0x0B10)]
 struct StartUseSkillPacket {
     pub skill_id: SkillId,
     pub skill_level: SkillLevel,
@@ -2246,13 +2246,13 @@ struct StartUseSkillPacket {
 }
 
 #[derive(Clone, Debug, Named, OutgoingPacket, PrototypeElement, new)]
-#[header(0x0b11)]
+#[header(0x0B11)]
 struct EndUseSkillPacket {
     pub skill_id: SkillId,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x07fb)]
+#[header(0x07FB)]
 struct UseSkillSuccessPacket {
     pub source_entity: EntityId,
     pub destination_entity: EntityId,
@@ -2276,7 +2276,7 @@ struct ToUseSkillSuccessPacket {
 #[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
 #[numeric_type(u32)]
 pub enum UnitId {
-    #[numeric_value(0x7e)]
+    #[numeric_value(0x7E)]
     Safetywall,
     Firewall,
     WarpWaiting,
@@ -2455,20 +2455,20 @@ pub enum UnitId {
     Solidtrap,
     Swifttrap,
     Flametrap,
-    #[numeric_value(0xc1)]
+    #[numeric_value(0xC1)]
     GdLeadership,
-    #[numeric_value(0xc2)]
+    #[numeric_value(0xC2)]
     GdGlorywounds,
-    #[numeric_value(0xc3)]
+    #[numeric_value(0xC3)]
     GdSoulcold,
-    #[numeric_value(0xc4)]
+    #[numeric_value(0xC4)]
     GdHawkeyes,
     #[numeric_value(0x190)]
     Max,
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x09ca)]
+#[header(0x09CA)]
 struct NotifySkillUnitPacket {
     pub lenght: u16,
     pub entity_id: EntityId,
@@ -2519,7 +2519,7 @@ struct RemoveFriendPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x020a)]
+#[header(0x020A)]
 struct NotifyFriendRemovedPacket {
     pub account_id: AccountId,
     pub character_id: CharacterId,
@@ -2600,7 +2600,7 @@ impl FriendRequestResultPacket {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x02c6)]
+#[header(0x02C6)]
 struct PartyInvitePacket {
     pub party_id: PartyId,
     #[length_hint(24)]
@@ -2614,7 +2614,7 @@ struct ReputationEntry {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x0b8d)]
+#[header(0x0B8D)]
 struct ReputationPacket {
     #[packet_length]
     pub packet_length: u16,
@@ -2636,7 +2636,7 @@ struct Antagonist {
 }
 
 #[derive(Clone, Debug, Named, IncomingPacket, PrototypeElement)]
-#[header(0x098a)]
+#[header(0x098A)]
 struct ClanInfoPacket {
     #[packet_length]
     pub packet_length: u16,

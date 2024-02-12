@@ -12,7 +12,7 @@ vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f
 vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
 vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
 bytemuck = { version = "1.9", features = ["derive", "extern_crate_std", "min_const_generics"] }
-winit = "0.28"
+winit = "0.28.7"
 num = "*"
 cgmath = { version = "0.18", features = ["serde"] }
 serde = "1.0.137"

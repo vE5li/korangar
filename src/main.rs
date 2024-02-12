@@ -2,7 +2,6 @@
 #![allow(clippy::too_many_arguments)]
 #![feature(option_zip)]
 #![feature(adt_const_params)]
-#![feature(arc_unwrap_or_clone)]
 #![feature(proc_macro_hygiene)]
 #![feature(negative_impls)]
 #![feature(iter_intersperse)]

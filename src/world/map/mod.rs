@@ -11,7 +11,7 @@ use procedural::profile;
 use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
 
-pub use self::tile::{Tile, TileType};
+pub use self::tile::Tile;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::*;

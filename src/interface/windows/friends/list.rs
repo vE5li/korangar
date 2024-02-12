@@ -12,7 +12,7 @@ pub struct FriendsWindow {
 }
 
 impl FriendsWindow {
-    pub const WINDOW_CLASS: &str = "friends";
+    pub const WINDOW_CLASS: &'static str = "friends";
 }
 
 impl PrototypeWindow for FriendsWindow {

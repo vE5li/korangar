@@ -101,7 +101,7 @@ impl Element for FriendView {
                 .enumerate()
                 .for_each(|(index, (friend, linked_element))| {
                     if let Some(linked_element) = unsafe { &(*linked_element.get()) } {
-                        while linked_element.as_ptr() != Rc::downgrade(&self.state.elements[index]).as_ptr() {
+                        while !std::ptr::addr_eq(linked_element.as_ptr(), Rc::downgrade(&self.state.elements[index]).as_ptr()) {
                             self.state.elements.remove(index);
                         }
                     } else {

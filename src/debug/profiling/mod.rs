@@ -10,7 +10,7 @@ use std::time::Instant;
 use self::measurement::ActiveMeasurement;
 pub use self::measurement::Measurement;
 pub use self::ring_buffer::RingBuffer;
-pub use self::statistics::{get_frame_by_index, get_number_of_saved_frames, get_statistics_data, FrameData, MeasurementStatistics};
+pub use self::statistics::{get_frame_by_index, get_number_of_saved_frames, get_statistics_data};
 use crate::debug::*;
 
 #[thread_local]
@@ -141,7 +141,7 @@ impl Profiler {
         let measurement = unsafe { &mut *(top_measurement as *mut Measurement) };
 
         // Assert that the names match to emit a warning when something went wrong.
-        if name as *const _ != measurement.name as *const _ {
+        if !std::ptr::addr_eq(name, measurement.name) {
             print_debug!(
                 "[{}warning{}] active measurement mismatch; exepcted {}{}{} but got {}{}{}",
                 YELLOW,

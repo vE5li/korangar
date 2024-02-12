@@ -11,7 +11,7 @@ pub struct FriendRequestWindow {
 }
 
 impl FriendRequestWindow {
-    pub const WINDOW_CLASS: &str = "friend_request";
+    pub const WINDOW_CLASS: &'static str = "friend_request";
 }
 
 impl PrototypeWindow for FriendRequestWindow {

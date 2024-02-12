@@ -180,7 +180,7 @@ impl<const N: usize> Element for PacketView<N> {
             fn compare(linked_element: &UnsafeCell<Option<WeakElementCell>>, element: &ElementCell) -> bool {
                 let linked_element = unsafe { &*linked_element.get() };
                 let linked_element = linked_element.as_ref().map(|weak| weak.as_ptr());
-                linked_element.is_some_and(|pointer| pointer != Rc::downgrade(element).as_ptr())
+                linked_element.is_some_and(|pointer| !std::ptr::addr_eq(pointer, Rc::downgrade(element).as_ptr()))
             }
 
             // Remove elements of packets that are no longer in the list.
@@ -194,7 +194,7 @@ impl<const N: usize> Element for PacketView<N> {
                 let first_visible_element = first_visible_element.as_ref().unwrap().as_ptr();
 
                 for _index in 0..self.state.elements.len() {
-                    if first_visible_element != Rc::downgrade(&self.state.elements[0]).as_ptr() {
+                    if !std::ptr::addr_eq(first_visible_element, Rc::downgrade(&self.state.elements[0]).as_ptr()) {
                         self.state.elements.remove(0);
                         reresolve = true;
                     } else {
@@ -217,7 +217,7 @@ impl<const N: usize> Element for PacketView<N> {
                 let show_packet = show_pings || !packet.is_ping();
 
                 if let Some(linked_element) = unsafe { &mut (*linked_element.get()) } {
-                    let was_hidden = linked_element.as_ptr() == Rc::downgrade(&self.hidden_element).as_ptr();
+                    let was_hidden = std::ptr::addr_eq(linked_element.as_ptr(), Rc::downgrade(&self.hidden_element).as_ptr());
 
                     // Packet was previously hidden but should be visible now.
                     if show_packet && was_hidden {

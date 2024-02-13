@@ -145,24 +145,43 @@ impl Interface {
         self.mouse_cursor.set_start_time(client_tick);
     }
 
+    /// The update and render functions take care of merging the window specific
+    /// flags with the interface wide flags.
+    fn handle_change_event(
+        rerender: &mut bool,
+        reresolve: &mut bool,
+        rerender_window: &mut bool,
+        reresolve_window: &mut bool,
+        change_event: ChangeEvent,
+    ) {
+        if change_event.contains(ChangeEvent::RERENDER_WINDOW) {
+            *rerender_window = true;
+        }
+
+        if change_event.contains(ChangeEvent::RERESOLVE_WINDOW) {
+            *reresolve_window = true;
+        }
+
+        if change_event.contains(ChangeEvent::RERENDER) {
+            *rerender = true;
+        }
+
+        if change_event.contains(ChangeEvent::RERESOLVE) {
+            *reresolve = true;
+        }
+    }
+
     #[profile("update user interface")]
     pub fn update(&mut self, font_loader: Rc<RefCell<FontLoader>>, focus_state: &mut FocusState, client_tick: ClientTick) -> (bool, bool) {
         self.mouse_cursor.update(client_tick);
 
-        for (window, _reresolve, rerender) in &mut self.windows {
+        for (window, reresolve, rerender) in &mut self.windows {
             #[cfg(feature = "debug")]
 
             profile_block!("update window");
 
             if let Some(change_event) = window.update() {
-                match change_event {
-                    ChangeEvent::Reresolve => self.reresolve = true,
-                    ChangeEvent::Rerender => self.rerender = true,
-                    ChangeEvent::RerenderWindow => match window.has_transparency(&self.theme) {
-                        true => self.rerender = true,
-                        false => *rerender = true,
-                    },
-                }
+                Self::handle_change_event(&mut self.rerender, &mut self.reresolve, rerender, reresolve, change_event);
             }
         }
 
@@ -270,42 +289,28 @@ impl Interface {
         //let (_window, _reresolve, _rerender) = &mut self.windows[window_index];
 
         if let Some(change_event) = element.borrow_mut().drag(mouse_delta) {
-            match change_event {
-                ChangeEvent::Reresolve => self.reresolve = true,
-                ChangeEvent::Rerender => self.rerender = true,
-                ChangeEvent::RerenderWindow => panic!(),
-            }
+            Self::handle_change_event(&mut self.rerender, &mut self.reresolve, &mut false, &mut false, change_event);
         }
     }
 
     #[profile]
     pub fn scroll_element(&mut self, element: &ElementCell, window_index: usize, scroll_delta: f32) {
-        let (_, _, rerender) = &mut self.windows[window_index];
+        let (_, reresolve, rerender) = &mut self.windows[window_index];
 
         if let Some(change_event) = element.borrow_mut().scroll(scroll_delta) {
-            match change_event {
-                ChangeEvent::Reresolve => self.reresolve = true,
-                ChangeEvent::Rerender => self.rerender = true,
-                ChangeEvent::RerenderWindow => *rerender = true,
-            }
+            Self::handle_change_event(&mut self.rerender, &mut self.reresolve, rerender, reresolve, change_event);
         }
     }
 
     #[profile]
     pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) -> Option<ClickAction> {
-        let (window, _reresolve, rerender) = &mut self.windows[window_index];
-        let has_transparency = window.has_transparency(&self.theme);
+        let (_, reresolve, rerender) = &mut self.windows[window_index];
 
         if let Some(click_event) = element.borrow_mut().input_character(character) {
             match click_event {
-                ClickAction::ChangeEvent(change_event) => match change_event {
-                    ChangeEvent::Reresolve => self.reresolve = true,
-                    ChangeEvent::Rerender => self.rerender = true,
-                    ChangeEvent::RerenderWindow => match has_transparency {
-                        true => self.rerender = true,
-                        false => *rerender = true,
-                    },
-                },
+                ClickAction::ChangeEvent(change_event) => {
+                    Self::handle_change_event(&mut self.rerender, &mut self.reresolve, rerender, reresolve, change_event)
+                }
                 other => return Some(other),
             }
         }
@@ -339,6 +344,10 @@ impl Interface {
         }
     }
 
+    /// This function is solely responsible for making sure that trying to
+    /// re-render a window with transparency will result in re-rendering the
+    /// entire interface. This serves as a single point of truth and simplifies
+    /// the rest of the code.
     fn flag_rerender_windows(&mut self, start_index: usize, area: Option<(Position, Size)>) {
         for window_index in start_index..self.windows.len() {
             let rerender = self.windows[window_index].2;

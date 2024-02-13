@@ -88,7 +88,7 @@ impl Element for HotbarContainer {
             // scrolling would break
             self.link_back(weak_self, weak_parent);
 
-            return Some(ChangeEvent::Reresolve); // TODO: ReresolveWindow
+            return Some(ChangeEvent::RERESOLVE_WINDOW);
         }
 
         None

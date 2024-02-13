@@ -46,7 +46,7 @@ impl Element for FrameView {
 
         if *self.always_update.borrow() || self.frame_counter == SAVED_FRAME_COUNT {
             self.frame_counter = 0;
-            return Some(ChangeEvent::RerenderWindow);
+            return Some(ChangeEvent::RERENDER_WINDOW);
         }
 
         None

@@ -105,7 +105,7 @@ impl Window {
             .iter_mut()
             .map(|element| element.borrow_mut().update())
             .fold(None, |current, other| {
-                current.zip_with(other, ChangeEvent::combine).or(current).or(other)
+                current.zip_with(other, ChangeEvent::union).or(current).or(other)
             })
     }
 

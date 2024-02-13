@@ -70,7 +70,7 @@ where
         if self.cached_inner != current_value {
             self.cached_inner = current_value;
             self.cached_values = self.cached_inner.display();
-            return Some(ChangeEvent::RerenderWindow);
+            return Some(ChangeEvent::RERENDER_WINDOW);
         }
 
         None

@@ -260,7 +260,7 @@ impl<const N: usize> Element for PacketView<N> {
         }
 
         match reresolve {
-            true => Some(ChangeEvent::Reresolve), // TODO: ReresolveWindow
+            true => Some(ChangeEvent::RERESOLVE_WINDOW),
             false => None,
         }
     }

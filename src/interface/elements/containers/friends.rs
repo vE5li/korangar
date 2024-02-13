@@ -123,7 +123,7 @@ impl Element for FriendView {
         }
 
         match reresolve {
-            true => Some(ChangeEvent::Reresolve), // TODO: ReresolveWindow
+            true => Some(ChangeEvent::RERESOLVE_WINDOW),
             false => None,
         }
     }

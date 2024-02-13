@@ -77,7 +77,7 @@ impl Element for ScrollView {
     fn scroll(&mut self, delta: f32) -> Option<ChangeEvent> {
         self.scroll -= delta * SCROLL_SPEED;
         self.scroll = self.scroll.max(0.0);
-        Some(ChangeEvent::RerenderWindow)
+        Some(ChangeEvent::RERENDER_WINDOW)
     }
 
     fn render(

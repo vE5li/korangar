@@ -729,6 +729,7 @@ dependencies = [
 name = "korangar"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.4.2",
  "bytemuck",
  "cgmath",
  "chrono",

@@ -57,7 +57,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         if self.cached_inner != current_value {
             self.cached_inner = current_value;
             self.cached_values = format!("{:.1}", self.cached_inner);
-            return Some(ChangeEvent::RerenderWindow);
+            return Some(ChangeEvent::RERENDER_WINDOW);
         }
 
         None

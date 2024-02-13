@@ -27,7 +27,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
         }
 
         display.pop();
-        Some(ClickAction::ChangeEvent(ChangeEvent::RerenderWindow))
+        Some(ClickAction::ChangeEvent(ChangeEvent::RERENDER_WINDOW))
     }
 
     fn add_character(&mut self, character: char) -> Option<ClickAction> {
@@ -38,7 +38,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
         }
 
         display.push(character);
-        Some(ClickAction::ChangeEvent(ChangeEvent::RerenderWindow))
+        Some(ClickAction::ChangeEvent(ChangeEvent::RERENDER_WINDOW))
     }
 }
 

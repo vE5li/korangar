@@ -53,7 +53,7 @@ impl Element for MutableColorValue {
                 "{}, {}, {}, {}",
                 self.cached_color.red, self.cached_color.green, self.cached_color.blue, self.cached_color.alpha
             );
-            return Some(ChangeEvent::RerenderWindow);
+            return Some(ChangeEvent::RERENDER_WINDOW);
         }
 
         None

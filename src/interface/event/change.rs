@@ -1,21 +1,12 @@
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ChangeEvent {
-    Reresolve,
-    Rerender,
-    RerenderWindow,
-}
+use bitflags::bitflags;
 
-impl ChangeEvent {
-    pub fn combine(self, other: Self) -> Self {
-        let precedence = |&event: &ChangeEvent| match event {
-            ChangeEvent::Reresolve => 0,
-            ChangeEvent::Rerender => 1,
-            ChangeEvent::RerenderWindow => 2,
-        };
-
-        IntoIterator::into_iter([self, other])
-            .min_by_key(|event| precedence(event))
-            .unwrap()
+bitflags! {
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    pub struct ChangeEvent: u8 {
+        const RERENDER_WINDOW = 0b00000001;
+        const RERESOLVE_WINDOW = 0b00000010;
+        const RERENDER = 0b00000100;
+        const RERESOLVE = 0b00001000;
     }
 }
 
@@ -29,13 +20,13 @@ pub struct Nothing {}
 
 impl IntoChangeEvent for Rerender {
     fn into_change_event() -> Option<ChangeEvent> {
-        Some(ChangeEvent::Rerender)
+        Some(ChangeEvent::RERENDER)
     }
 }
 
 impl IntoChangeEvent for Reresolve {
     fn into_change_event() -> Option<ChangeEvent> {
-        Some(ChangeEvent::Reresolve)
+        Some(ChangeEvent::RERESOLVE)
     }
 }
 

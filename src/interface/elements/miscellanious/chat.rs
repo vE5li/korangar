@@ -71,7 +71,7 @@ impl Element for Chat {
 
         if messages.len() != self.cached_message_count {
             self.cached_message_count = messages.len();
-            return Some(ChangeEvent::Reresolve); // TODO: reresolve window would be preferred
+            return Some(ChangeEvent::RERESOLVE_WINDOW);
         }
 
         None

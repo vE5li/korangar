@@ -39,8 +39,8 @@ impl Default for ButtonTheme {
             border_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
             icon_offset: MutableRange::new(Vector2::new(7.0, 2.5), Vector2::zero(), Vector2::new(20.0, 20.0)),
             icon_size: MutableRange::new(Vector2::new(10.0, 10.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            icon_text_offset: MutableRange::new(Vector2::new(20.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
+            icon_text_offset: MutableRange::new(Vector2::new(20.0, 1.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
+            text_offset: MutableRange::new(Vector2::new(5.0, 1.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             height_constraint: dimension!(16),
         }
@@ -106,7 +106,7 @@ impl Default for ExpandableTheme {
             element_offset: MutableRange::new(Vector2::new(7.0, -2.0), Vector2::new(-10.0, -10.0), Vector2::new(30.0, 30.0)),
             icon_offset: MutableRange::new(Vector2::new(6.0, 5.0), Vector2::zero(), Vector2::new(30.0, 50.0)),
             icon_size: MutableRange::new(Vector2::new(6.0, 6.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            text_offset: MutableRange::new(Vector2::new(14.0, 1.0), Vector2::zero(), Vector2::new(50.0, 20.0)),
+            text_offset: MutableRange::new(Vector2::new(14.0, 1.5), Vector2::zero(), Vector2::new(50.0, 20.0)),
             gaps: MutableRange::new(Vector2::new(6.0, 6.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
         }
@@ -393,19 +393,19 @@ impl PrototypeElement for ThemeSelector {
         };
 
         let elements = vec![
-            InputField::<40>::new(theme_name, "theme name", name_action, dimension!(75%)).wrap(),
+            InputField::<40>::new(theme_name, "Theme name", name_action, dimension!(75%)).wrap(),
             Button::default()
-                .with_text("load")
+                .with_text("Load")
                 .with_event(load_action)
                 .with_width(dimension!(!))
                 .wrap(),
             Button::default()
-                .with_text("save theme")
+                .with_text("Save theme")
                 .with_event(UserEvent::SaveTheme)
                 .with_width(dimension!(50%))
                 .wrap(),
             Button::default()
-                .with_text("reload theme")
+                .with_text("Reload theme")
                 .with_event(UserEvent::ReloadTheme)
                 .with_width(dimension!(!))
                 .wrap(),

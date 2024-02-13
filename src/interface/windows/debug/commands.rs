@@ -51,11 +51,11 @@ impl PrototypeWindow for CommandsWindow {
             Text::default().with_text("change job").wrap(),
             InputField::<30>::new(input_text, "job name or job ID", class_action, dimension!(75%)).wrap(),
             Button::default()
-                .with_text("change")
+                .with_text("Change")
                 .with_width(dimension!(25%))
                 .with_event(Box::new(change_action))
                 .wrap(),
-            Text::default().with_text("base level").wrap(),
+            Text::default().with_text("Base level").wrap(),
             Button::default()
                 .with_text("+1")
                 .with_width(dimension!(25%))
@@ -76,7 +76,7 @@ impl PrototypeWindow for CommandsWindow {
                 .with_width(dimension!(25%))
                 .with_event(UserEvent::SendMessage("@blvl 9999".to_string()))
                 .wrap(),
-            Text::default().with_text("job level").wrap(),
+            Text::default().with_text("Job level").wrap(),
             Button::default()
                 .with_text("+1")
                 .with_width(dimension!(25%))
@@ -97,31 +97,31 @@ impl PrototypeWindow for CommandsWindow {
                 .with_width(dimension!(25%))
                 .with_event(UserEvent::SendMessage("@jlvl 9999".to_string()))
                 .wrap(),
-            Text::default().with_text("stats").wrap(),
+            Text::default().with_text("Stats").wrap(),
             Button::default()
-                .with_text("set all stats to max")
+                .with_text("Set all stats to max")
                 .with_event(UserEvent::SendMessage("@allstats".to_string()))
                 .wrap(),
-            Text::default().with_text("skills").wrap(),
+            Text::default().with_text("Skills").wrap(),
             Button::default()
-                .with_text("unlock all skills")
+                .with_text("Unlock all skills")
                 .with_event(UserEvent::SendMessage("@allskill".to_string()))
                 .wrap(),
-            Text::default().with_text("player state").wrap(),
+            Text::default().with_text("Player state").wrap(),
             Button::default()
-                .with_text("mount")
+                .with_text("Mount")
                 .with_event(UserEvent::SendMessage("@mount".to_string()))
                 .wrap(),
             Button::default()
-                .with_text("heal")
+                .with_text("Heal")
                 .with_event(UserEvent::SendMessage("@heal".to_string()))
                 .wrap(),
             Button::default()
-                .with_text("fill AP")
+                .with_text("Fill AP")
                 .with_event(UserEvent::SendMessage("@healap".to_string()))
                 .wrap(),
             Button::default()
-                .with_text("resurrect")
+                .with_text("Resurrect")
                 .with_event(UserEvent::SendMessage("@alive".to_string()))
                 .wrap(),
         ];

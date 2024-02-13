@@ -16,12 +16,13 @@ impl PrototypeWindow for TimeWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+        // TODO: Unify Set* events into one that takes a specific time
         let elements = vec![
-            Button::default().with_text("set dawn").with_event(UserEvent::SetDawn).wrap(),
-            Button::default().with_text("set noon").with_event(UserEvent::SetNoon).wrap(),
-            Button::default().with_text("set dusk").with_event(UserEvent::SetDusk).wrap(),
+            Button::default().with_text("Set dawn").with_event(UserEvent::SetDawn).wrap(),
+            Button::default().with_text("Set noon").with_event(UserEvent::SetNoon).wrap(),
+            Button::default().with_text("Set dusk").with_event(UserEvent::SetDusk).wrap(),
             Button::default()
-                .with_text("set midnight")
+                .with_text("Set midnight")
                 .with_event(UserEvent::SetMidnight)
                 .wrap(),
         ];

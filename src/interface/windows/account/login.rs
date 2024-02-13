@@ -77,22 +77,22 @@ impl PrototypeWindow for LoginWindow {
         };
 
         let elements = vec![
-            InputField::<24>::new(username, "username", username_action, dimension!(100%)).wrap(),
-            InputField::<24, true>::new(password, "password", password_action, dimension!(100%)).wrap(),
+            InputField::<24>::new(username, "Username", username_action, dimension!(100%)).wrap(),
+            InputField::<24, true>::new(password, "Password", password_action, dimension!(100%)).wrap(),
             StateButton::default()
-                .with_text("remember username")
+                .with_text("Remember username")
                 .with_selector(|state_provider| state_provider.login_settings.remember_username)
                 .with_event(UserEvent::ToggleRemeberUsername)
                 .with_transparent_background()
                 .wrap(),
             StateButton::default()
-                .with_text("remember password")
+                .with_text("Remember password")
                 .with_selector(|state_provider| state_provider.login_settings.remember_password)
                 .with_event(UserEvent::ToggleRemeberPassword)
                 .with_transparent_background()
                 .wrap(),
             Button::default()
-                .with_text("log in")
+                .with_text("Log in")
                 .with_disabled_selector(selector)
                 .with_event(Box::new(action))
                 .wrap(),

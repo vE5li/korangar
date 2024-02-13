@@ -80,37 +80,37 @@ impl PrototypeWindow for ProfilerWindow {
 
         let elements = vec![
             StateButton::default()
-                .with_text("halt")
+                .with_text("Halt")
                 .with_selector(|_: &StateProvider| is_profiler_halted())
                 .with_event(Box::new(toggle_halting))
                 .with_width(dimension!(16.6%))
                 .wrap(),
             StateButton::default()
-                .with_text("always update")
+                .with_text("Always update")
                 .with_selector(self.always_update.selector())
                 .with_event(self.always_update.toggle_action())
                 .with_width(dimension!(16.6%))
                 .wrap(),
             StateButton::default()
-                .with_text("main thread")
+                .with_text("Main thread")
                 .with_selector(main_selector)
                 .with_event(Box::new(show_main_thread))
                 .with_width(dimension!(16.6%))
                 .wrap(),
             StateButton::default()
-                .with_text("picker thread")
+                .with_text("Picker thread")
                 .with_selector(picker_selector)
                 .with_event(Box::new(show_picker_thread))
                 .with_width(dimension!(16.6%))
                 .wrap(),
             StateButton::default()
-                .with_text("shadow thread")
+                .with_text("Shadow thread")
                 .with_selector(shadow_selector)
                 .with_event(Box::new(show_shadow_thread))
                 .with_width(dimension!(16.6%))
                 .wrap(),
             StateButton::default()
-                .with_text("deferred thread")
+                .with_text("Deferred thread")
                 .with_selector(deferred_selector)
                 .with_event(Box::new(show_deferred_thread))
                 .with_width(dimension!(!))

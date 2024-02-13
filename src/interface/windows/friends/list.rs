@@ -35,9 +35,9 @@ impl PrototypeWindow for FriendsWindow {
         };
 
         let elements = vec![
-            InputField::<24>::new(friend_name, "name", add_action.clone(), dimension!(80%)).wrap(),
+            InputField::<24>::new(friend_name, "Name", add_action.clone(), dimension!(80%)).wrap(),
             Button::default()
-                .with_text("add")
+                .with_text("Add")
                 .with_event(add_action)
                 .with_width(dimension!(!))
                 .wrap(),

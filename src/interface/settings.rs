@@ -8,6 +8,7 @@ use crate::interface::*;
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct InterfaceSettings {
+    #[name("Scaling")]
     pub scaling: MutableRange<f32, Reresolve>,
     #[hidden_element]
     pub theme_file: String,

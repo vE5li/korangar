@@ -41,19 +41,19 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
 
         let elements = vec![
             Button::default()
-                .with_text("clear")
+                .with_text("Clear")
                 .with_disabled_selector(clear_selector)
                 .with_event(Box::new(clear_action))
                 .with_width(dimension!(33.33%))
                 .wrap(),
             StateButton::default()
-                .with_text("show pings")
+                .with_text("Show pings")
                 .with_selector(self.show_pings.selector())
                 .with_event(self.show_pings.toggle_action())
                 .with_width(dimension!(33.33%))
                 .wrap(),
             StateButton::default()
-                .with_text("update")
+                .with_text("Update")
                 .with_selector(self.update.selector())
                 .with_event(self.update.toggle_action())
                 .with_width(dimension!(!))

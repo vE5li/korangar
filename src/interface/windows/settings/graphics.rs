@@ -19,7 +19,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let mut elements = vec![interface_settings.to_element("interface settings".to_string())];
+        let mut elements = vec![interface_settings.to_element("Interface settings".to_string())];
 
         // TODO: Instead of not showing this option, disable the checkbox and add a
         // tooltip
@@ -27,7 +27,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
             elements.insert(
                 0,
                 StateButton::default()
-                    .with_text("framerate limit")
+                    .with_text("Framerate limit")
                     .with_selector(|state_provider| state_provider.graphics_settings.frame_limit)
                     .with_event(UserEvent::ToggleFrameLimit)
                     .wrap(),

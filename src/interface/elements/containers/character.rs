@@ -21,8 +21,8 @@ impl CharacterPreview {
     fn get_elements(characters: &Remote<Vec<CharacterInformation>>, move_request: &Remote<Option<usize>>, slot: usize) -> Vec<ElementCell> {
         if let Some(origin_slot) = *move_request.borrow() {
             let text = match origin_slot == slot {
-                true => "click to cancel",
-                false => "switch",
+                true => "Click to cancel",
+                false => "Switch",
             };
 
             return vec![
@@ -44,13 +44,13 @@ impl CharacterPreview {
                     .with_font_size(|_| 18.0)
                     .wrap(),
                 Button::default()
-                    .with_text("switch")
+                    .with_text("Switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
                     .with_background_color(|_| Color::rgb(161, 141, 141))
                     .with_width(dimension!(50%))
                     .wrap(),
                 Button::default()
-                    .with_text("delete")
+                    .with_text("Delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
                     .with_background_color(|theme| *theme.close_button.background_color)
                     .with_foreground_color(|theme| *theme.close_button.foreground_color)
@@ -61,7 +61,7 @@ impl CharacterPreview {
 
         vec![
             Text::default()
-                .with_text("new character")
+                .with_text("New character")
                 .with_foreground_color(|_| Color::rgb(200, 140, 180))
                 .wrap(),
         ]

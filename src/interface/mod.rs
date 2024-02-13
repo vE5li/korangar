@@ -10,6 +10,7 @@ mod cursor;
 mod windows;
 
 use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use cgmath::Vector2;
@@ -63,8 +64,66 @@ struct DialogHandle {
     clear: bool,
 }
 
+#[derive(Clone)]
+struct PerWindow;
+
+#[derive(Clone)]
+struct PostUpdate<T> {
+    resolve: bool,
+    render: bool,
+    marker: PhantomData<T>,
+}
+
+impl<T> PostUpdate<T> {
+    pub fn new() -> Self {
+        Self {
+            resolve: false,
+            render: false,
+            marker: PhantomData,
+        }
+    }
+
+    pub fn render(&mut self) {
+        self.render = true;
+    }
+
+    pub fn resolve(&mut self) {
+        self.resolve = true;
+    }
+
+    pub fn with_render(mut self) -> Self {
+        self.render = true;
+        self
+    }
+
+    pub fn with_resolve(mut self) -> Self {
+        self.resolve = true;
+        self
+    }
+
+    pub fn needs_render(&self) -> bool {
+        self.render
+    }
+
+    pub fn needs_resolve(&self) -> bool {
+        self.resolve
+    }
+
+    pub fn take_render(&mut self) -> bool {
+        let state = self.render;
+        self.render = false;
+        state
+    }
+
+    pub fn take_resolve(&mut self) -> bool {
+        let state = self.resolve;
+        self.resolve = false;
+        state
+    }
+}
+
 pub struct Interface {
-    windows: Vec<(Window, bool, bool)>,
+    windows: Vec<(Window, PostUpdate<PerWindow>)>,
     window_cache: WindowCache,
     interface_settings: InterfaceSettings,
     available_space: Size,
@@ -72,8 +131,7 @@ pub struct Interface {
     dialog_handle: Option<DialogHandle>,
     mouse_cursor: MouseCursor,
     mouse_cursor_hidden: bool,
-    reresolve: bool,
-    rerender: bool,
+    post_update: PostUpdate<Self>,
 }
 
 impl Interface {
@@ -89,6 +147,8 @@ impl Interface {
         let dialog_handle = None;
         let mouse_cursor = MouseCursor::new(game_file_loader, sprite_loader, action_loader);
         let mouse_cursor_hidden = false;
+        // NOTE: We need to initially clear the interface buffer
+        let post_update = PostUpdate::new().with_render();
 
         Self {
             windows: Vec::new(),
@@ -99,8 +159,7 @@ impl Interface {
             dialog_handle,
             mouse_cursor,
             mouse_cursor_hidden,
-            reresolve: false,
-            rerender: true, // set to true initially to clear the interface buffer
+            post_update,
         }
     }
 
@@ -116,7 +175,7 @@ impl Interface {
     #[profile]
     pub fn reload_theme(&mut self) {
         if self.theme.reload(&self.interface_settings.theme_file) {
-            self.reresolve = true;
+            self.post_update.resolve();
         }
     }
 
@@ -124,18 +183,14 @@ impl Interface {
         &self.theme
     }
 
-    pub fn schedule_rerender(&mut self) {
-        self.rerender = true;
+    pub fn schedule_render(&mut self) {
+        self.post_update.render();
     }
 
-    pub fn schedule_rerender_window(&mut self, window_index: usize) {
+    pub fn schedule_render_window(&mut self, window_index: usize) {
         if window_index < self.windows.len() {
-            let (window, _reresolve, rerender) = &mut self.windows[window_index];
-
-            match window.has_transparency(&self.theme) {
-                true => self.rerender = true,
-                false => *rerender = true,
-            }
+            let (_, post_update) = &mut self.windows[window_index];
+            post_update.render();
         }
     }
 
@@ -147,27 +202,21 @@ impl Interface {
 
     /// The update and render functions take care of merging the window specific
     /// flags with the interface wide flags.
-    fn handle_change_event(
-        rerender: &mut bool,
-        reresolve: &mut bool,
-        rerender_window: &mut bool,
-        reresolve_window: &mut bool,
-        change_event: ChangeEvent,
-    ) {
-        if change_event.contains(ChangeEvent::RERENDER_WINDOW) {
-            *rerender_window = true;
+    fn handle_change_event(post_update: &mut PostUpdate<Self>, window_post_update: &mut PostUpdate<PerWindow>, change_event: ChangeEvent) {
+        if change_event.contains(ChangeEvent::RENDER_WINDOW) {
+            window_post_update.render();
         }
 
-        if change_event.contains(ChangeEvent::RERESOLVE_WINDOW) {
-            *reresolve_window = true;
+        if change_event.contains(ChangeEvent::RESOLVE_WINDOW) {
+            window_post_update.resolve();
         }
 
-        if change_event.contains(ChangeEvent::RERENDER) {
-            *rerender = true;
+        if change_event.contains(ChangeEvent::RENDER) {
+            post_update.render();
         }
 
-        if change_event.contains(ChangeEvent::RERESOLVE) {
-            *reresolve = true;
+        if change_event.contains(ChangeEvent::RESOLVE) {
+            post_update.resolve();
         }
     }
 
@@ -175,23 +224,23 @@ impl Interface {
     pub fn update(&mut self, font_loader: Rc<RefCell<FontLoader>>, focus_state: &mut FocusState, client_tick: ClientTick) -> (bool, bool) {
         self.mouse_cursor.update(client_tick);
 
-        for (window, reresolve, rerender) in &mut self.windows {
+        for (window, post_update) in &mut self.windows {
             #[cfg(feature = "debug")]
 
             profile_block!("update window");
 
             if let Some(change_event) = window.update() {
-                Self::handle_change_event(&mut self.rerender, &mut self.reresolve, rerender, reresolve, change_event);
+                Self::handle_change_event(&mut self.post_update, post_update, change_event);
             }
         }
 
         let mut restore_focus = false;
 
-        for (window_index, (window, reresolve, rerender)) in self.windows.iter_mut().enumerate() {
-            if self.reresolve || *reresolve {
+        for (window_index, (window, post_update)) in self.windows.iter_mut().enumerate() {
+            if self.post_update.needs_resolve() || post_update.take_resolve() {
                 #[cfg(feature = "debug")]
 
-                profile_block!("reresolve window");
+                profile_block!("resolve window");
 
                 let (_position, previous_size) = window.get_area();
                 let (window_class, new_position, new_size) =
@@ -208,13 +257,12 @@ impl Interface {
                     self.window_cache.register_window(window_class, new_position, new_size);
                 }
 
-                self.rerender |= previous_size.x > new_size.x || previous_size.y > new_size.y;
-
-                match window.has_transparency(&self.theme) {
-                    true => self.rerender = true,
-                    false => *rerender = true,
+                // NOTE: If the window got smaller, we need to re-render the entire interface.
+                // If it got bigger, we can just draw over the previous frame.
+                match previous_size.x > new_size.x || previous_size.y > new_size.y {
+                    true => self.post_update.render(),
+                    false => post_update.render(),
                 }
-                *reresolve = false;
             }
         }
 
@@ -222,32 +270,33 @@ impl Interface {
             self.restore_focus(focus_state);
         }
 
-        self.rerender |= self.reresolve;
-        self.reresolve = false;
+        if self.post_update.take_resolve() {
+            self.post_update.render();
+        }
 
-        if !self.rerender {
+        if !self.post_update.needs_render() {
             // We profile this block rather than the flag function itself because it calls
             // itself recursively
             #[cfg(feature = "debug")]
-            profile_block!("flag rerender windows");
+            profile_block!("flag render windows");
 
-            self.flag_rerender_windows(0, None);
+            self.flag_render_windows(0, None);
         }
 
-        (
-            self.rerender,
-            self.rerender | self.windows.iter().any(|(_window, _reresolve, rerender)| *rerender),
-        )
+        let render_interface = self.post_update.needs_render();
+        let render_window = self.post_update.needs_render() | self.windows.iter().any(|(_window, post_update)| post_update.needs_render());
+
+        (render_interface, render_window)
     }
 
     pub fn update_window_size(&mut self, screen_size: Size) {
         self.available_space = screen_size;
-        self.reresolve = true;
+        self.post_update.resolve();
     }
 
     #[profile("get hovered element")]
     pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> (Option<ElementCell>, Option<usize>) {
-        for (window_index, (window, _reresolve, _rerender)) in self.windows.iter().enumerate().rev() {
+        for (window_index, (window, _)) in self.windows.iter().enumerate().rev() {
             match window.hovered_element(mouse_position, mouse_mode) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
                 HoverInformation::Hovered => return (None, Some(window_index)),
@@ -260,57 +309,68 @@ impl Interface {
 
     #[profile]
     pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
-        let (window, reresolve, _rerender) = self.windows.remove(window_index);
+        let (window, post_update) = self.windows.remove(window_index);
         let new_window_index = self.windows.len();
-        let has_transparency = window.has_transparency(&self.theme);
 
-        self.windows.push((window, reresolve, !has_transparency));
-        self.rerender |= has_transparency;
+        self.windows.push((window, post_update.with_render()));
 
         new_window_index
     }
 
     #[profile]
     pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
-        let (_window, reresolve, _rerender) = &mut self.windows[window_index];
-        hovered_element.borrow_mut().left_click(reresolve) // TODO: add same change_event check as
-        // for input character ?
+        let (_, post_update) = &mut self.windows[window_index];
+        let mut resolve = false;
+
+        let action = hovered_element.borrow_mut().left_click(&mut resolve); // TODO: add same change_event check as for input character ?
+
+        if resolve {
+            post_update.resolve();
+        }
+
+        action
     }
 
     #[profile]
     pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
-        let (_window, reresolve, _rerender) = &mut self.windows[window_index];
-        hovered_element.borrow_mut().right_click(reresolve) // TODO: add same change_event check as
-        // for input character ?
+        let (_, post_update) = &mut self.windows[window_index];
+        let mut resolve = false;
+
+        let action = hovered_element.borrow_mut().right_click(&mut resolve); // TODO: add same change_event check as for input character ?
+
+        if resolve {
+            post_update.resolve();
+        }
+
+        action
     }
 
     #[profile]
     pub fn drag_element(&mut self, element: &ElementCell, _window_index: usize, mouse_delta: Position) {
-        //let (_window, _reresolve, _rerender) = &mut self.windows[window_index];
+        //let (_window, post_update) = &mut self.windows[window_index];
 
         if let Some(change_event) = element.borrow_mut().drag(mouse_delta) {
-            Self::handle_change_event(&mut self.rerender, &mut self.reresolve, &mut false, &mut false, change_event);
+            // TODO: Use the window post_update here (?)
+            Self::handle_change_event(&mut self.post_update, &mut PostUpdate::new(), change_event);
         }
     }
 
     #[profile]
     pub fn scroll_element(&mut self, element: &ElementCell, window_index: usize, scroll_delta: f32) {
-        let (_, reresolve, rerender) = &mut self.windows[window_index];
+        let (_, post_update) = &mut self.windows[window_index];
 
         if let Some(change_event) = element.borrow_mut().scroll(scroll_delta) {
-            Self::handle_change_event(&mut self.rerender, &mut self.reresolve, rerender, reresolve, change_event);
+            Self::handle_change_event(&mut self.post_update, post_update, change_event);
         }
     }
 
     #[profile]
     pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) -> Option<ClickAction> {
-        let (_, reresolve, rerender) = &mut self.windows[window_index];
+        let (_, post_update) = &mut self.windows[window_index];
 
         if let Some(click_event) = element.borrow_mut().input_character(character) {
             match click_event {
-                ClickAction::ChangeEvent(change_event) => {
-                    Self::handle_change_event(&mut self.rerender, &mut self.reresolve, rerender, reresolve, change_event)
-                }
+                ClickAction::ChangeEvent(change_event) => Self::handle_change_event(&mut self.post_update, post_update, change_event),
                 other => return Some(other),
             }
         }
@@ -324,12 +384,12 @@ impl Interface {
             self.window_cache.update_position(window_class, position);
         }
 
-        self.rerender = true;
+        self.post_update.render();
     }
 
     #[profile]
     pub fn resize_window(&mut self, window_index: usize, growth: Size) {
-        let (window, reresolve, _rerender) = &mut self.windows[window_index];
+        let (window, post_update) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
         let (window_class, new_size) = window.resize(&self.interface_settings, &self.theme, self.available_space, growth);
@@ -339,8 +399,11 @@ impl Interface {
                 self.window_cache.update_size(window_class, new_size);
             }
 
-            *reresolve = true;
-            self.rerender |= previous_size.x > new_size.x || previous_size.y > new_size.y;
+            post_update.resolve();
+
+            if previous_size.x > new_size.x || previous_size.y > new_size.y {
+                self.post_update.render();
+            }
         }
     }
 
@@ -348,25 +411,25 @@ impl Interface {
     /// re-render a window with transparency will result in re-rendering the
     /// entire interface. This serves as a single point of truth and simplifies
     /// the rest of the code.
-    fn flag_rerender_windows(&mut self, start_index: usize, area: Option<(Position, Size)>) {
+    fn flag_render_windows(&mut self, start_index: usize, area: Option<(Position, Size)>) {
         for window_index in start_index..self.windows.len() {
-            let rerender = self.windows[window_index].2;
+            let needs_render = self.windows[window_index].1.needs_render();
             let is_hovering = |(position, scale)| self.windows[window_index].0.hovers_area(position, scale);
 
-            if rerender || area.map(is_hovering).unwrap_or(false) {
+            if needs_render || area.map(is_hovering).unwrap_or(false) {
                 let (position, scale) = {
-                    let (window, _reresolve, rerender) = &mut self.windows[window_index];
+                    let (window, post_update) = &mut self.windows[window_index];
 
                     if window.has_transparency(&self.theme) {
-                        self.rerender = true;
+                        self.post_update.render();
                         return;
                     }
 
-                    *rerender = true;
+                    post_update.render();
                     window.get_area()
                 };
 
-                self.flag_rerender_windows(window_index + 1, Some((position, scale)));
+                self.flag_render_windows(window_index + 1, Some((position, scale)));
             }
         }
     }
@@ -384,8 +447,8 @@ impl Interface {
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
         let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
 
-        for (window, _reresolve, rerender) in &mut self.windows {
-            if self.rerender || *rerender {
+        for (window, post_update) in &mut self.windows {
+            if self.post_update.needs_render() || post_update.take_render() {
                 #[cfg(feature = "debug")]
                 profile_block!("render window");
 
@@ -399,11 +462,10 @@ impl Interface {
                     focused_element,
                     mouse_mode,
                 );
-                *rerender = false;
             }
         }
 
-        self.rerender = false;
+        self.post_update.take_render();
     }
 
     #[profile]
@@ -479,7 +541,7 @@ impl Interface {
     }
 
     fn open_new_window(&mut self, focus_state: &mut FocusState, window: Window) {
-        self.windows.push((window, true, true));
+        self.windows.push((window, PostUpdate::new().with_resolve()));
         focus_state.set_focused_window(self.windows.len() - 1);
     }
 
@@ -566,7 +628,7 @@ impl Interface {
     #[profile]
     pub fn close_window(&mut self, focus_state: &mut FocusState, window_index: usize) {
         let (window, ..) = self.windows.remove(window_index);
-        self.rerender = true;
+        self.post_update.render();
 
         // drop window in another thread to avoid frame drops when deallocation a large
         // amount of elements

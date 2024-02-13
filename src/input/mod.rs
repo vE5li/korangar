@@ -287,16 +287,16 @@ impl InputSystem {
 
                         ClickAction::MoveItem(item_source, item) => {
                             self.mouse_input_mode = MouseInputMode::MoveItem(item_source, item);
-                            // Needs to rerender because some elements will render differently
+                            // Needs to re-render because some elements will render differently
                             // based on the mouse input mode.
-                            interface.schedule_rerender();
+                            interface.schedule_render();
                         }
 
                         ClickAction::MoveSkill(skill_source, skill) => {
                             self.mouse_input_mode = MouseInputMode::MoveSkill(skill_source, skill);
-                            // Needs to rerender because some elements will render differently
+                            // Needs to re-render because some elements will render differently
                             // based on the mouse input mode.
-                            interface.schedule_rerender();
+                            interface.schedule_render();
                         }
 
                         ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
@@ -315,9 +315,9 @@ impl InputSystem {
                 }
             } else {
                 let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
-                // Needs to rerender because some elements will render differently
+                // Needs to re-render because some elements will render differently
                 // based on the mouse input mode.
-                interface.schedule_rerender();
+                interface.schedule_render();
 
                 match mouse_input_mode {
                     MouseInputMode::MoveItem(item_source, item) => {
@@ -641,21 +641,21 @@ impl InputSystem {
 
         if focus_state.did_hovered_element_change(&hovered_element) {
             if let Some(window_index) = focus_state.previous_hovered_window() {
-                interface.schedule_rerender_window(window_index);
+                interface.schedule_render_window(window_index);
             }
 
             if let Some(window_index) = window_index {
-                interface.schedule_rerender_window(window_index);
+                interface.schedule_render_window(window_index);
             }
         }
 
         if focus_state.did_focused_element_change() {
             if let Some(window_index) = focus_state.previous_focused_window() {
-                interface.schedule_rerender_window(window_index);
+                interface.schedule_render_window(window_index);
             }
 
             if let Some(window_index) = focus_state.focused_window() {
-                interface.schedule_rerender_window(window_index);
+                interface.schedule_render_window(window_index);
             }
         }
 

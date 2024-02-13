@@ -761,7 +761,7 @@ fn main() {
 
                             // NOTE: For some reason the interface buffer becomes messed up when
                             // recreating the swapchain, so we need to render it again.
-                            interface.schedule_rerender();
+                            interface.schedule_render();
                         }
                         UserEvent::ToggleShowInterface => graphics_settings.toggle_show_interface(),
                         UserEvent::OpenMenuWindow => {
@@ -1028,7 +1028,7 @@ fn main() {
 
                             // NOTE: For some reason the interface buffer becomes messed up when
                             // recreating the swapchain, so we need to render it again.
-                            interface.schedule_rerender();
+                            interface.schedule_render();
                         }
                         #[cfg(feature = "debug")]
                         UserEvent::ToggleShowMap => render_settings.toggle_show_map(),
@@ -1119,7 +1119,7 @@ fn main() {
                 particle_holder.update(delta_time as f32);
                 effect_holder.update(&entities, delta_time as f32);
 
-                let (clear_interface, rerender_interface) = interface.update(font_loader.clone(), &mut focus_state, client_tick);
+                let (clear_interface, render_interface) = interface.update(font_loader.clone(), &mut focus_state, client_tick);
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
@@ -1409,7 +1409,7 @@ fn main() {
                         effect_holder.render(screen_target, &deferred_renderer, current_camera);
                     });
 
-                    if rerender_interface {
+                    if render_interface {
                         #[cfg(feature = "debug")]
                         profile_block!("render user interface");
 

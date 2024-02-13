@@ -78,7 +78,7 @@ impl Element for InventoryContainer {
             // scrolling would break
             self.link_back(weak_self, weak_parent);
 
-            return Some(ChangeEvent::RERESOLVE_WINDOW);
+            return Some(ChangeEvent::RESOLVE_WINDOW);
         }
 
         None

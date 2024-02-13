@@ -174,7 +174,7 @@ impl<const N: usize> Element for PacketView<N> {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let mut reresolve = false;
+        let mut resolve = false;
 
         if self.show_pings.consume_changed() | self.packets.consume_changed() {
             fn compare(linked_element: &UnsafeCell<Option<WeakElementCell>>, element: &ElementCell) -> bool {
@@ -196,7 +196,7 @@ impl<const N: usize> Element for PacketView<N> {
                 for _index in 0..self.state.elements.len() {
                     if !std::ptr::addr_eq(first_visible_element, Rc::downgrade(&self.state.elements[0]).as_ptr()) {
                         self.state.elements.remove(0);
-                        reresolve = true;
+                        resolve = true;
                     } else {
                         break;
                     }
@@ -204,7 +204,7 @@ impl<const N: usize> Element for PacketView<N> {
             } else {
                 // This means that there are no visible packets at all, so remove every element.
                 self.state.elements.clear();
-                reresolve = true;
+                resolve = true;
             }
 
             let show_pings = *self.show_pings.borrow();
@@ -226,7 +226,7 @@ impl<const N: usize> Element for PacketView<N> {
                         element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
 
                         self.state.elements.insert(index, element);
-                        reresolve = true;
+                        resolve = true;
                     }
 
                     // Packet was previously visible but now should be hidden.
@@ -234,7 +234,7 @@ impl<const N: usize> Element for PacketView<N> {
                         *linked_element = Rc::downgrade(&self.hidden_element);
 
                         self.state.elements.remove(index);
-                        reresolve = true;
+                        resolve = true;
                     }
                 } else {
                     // Getting here means thatt the packet was newly added.
@@ -245,7 +245,7 @@ impl<const N: usize> Element for PacketView<N> {
                             element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
 
                             self.state.elements.push(element);
-                            reresolve = true;
+                            resolve = true;
                         }
                         false => {
                             unsafe { *linked_element.get() = Some(Rc::downgrade(&self.hidden_element)) };
@@ -259,8 +259,8 @@ impl<const N: usize> Element for PacketView<N> {
             });
         }
 
-        match reresolve {
-            true => Some(ChangeEvent::RERESOLVE_WINDOW),
+        match resolve {
+            true => Some(ChangeEvent::RESOLVE_WINDOW),
             false => None,
         }
     }

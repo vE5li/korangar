@@ -195,7 +195,7 @@ impl Element for FrameInspectorView {
             self.start_offset += total_offset.mul_f32(side_bias);
         }
 
-        Some(ChangeEvent::RERENDER_WINDOW)
+        Some(ChangeEvent::RENDER_WINDOW)
     }
 
     fn render(

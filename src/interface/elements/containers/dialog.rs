@@ -87,7 +87,7 @@ impl Element for DialogContainer {
 
             // TODO: link back like in character container
 
-            return Some(ChangeEvent::RERESOLVE_WINDOW);
+            return Some(ChangeEvent::RESOLVE_WINDOW);
         }
 
         None

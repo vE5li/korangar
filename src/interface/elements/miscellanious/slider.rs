@@ -39,7 +39,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
 
         if self.cached_value != current_value {
             self.cached_value = current_value;
-            return Some(ChangeEvent::RERENDER_WINDOW);
+            return Some(ChangeEvent::RENDER_WINDOW);
         }
 
         None

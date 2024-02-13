@@ -90,7 +90,7 @@ impl Element for FriendView {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let mut reresolve = false;
+        let mut resolve = false;
 
         if self.friends.consume_changed() {
             // Remove elements of old friends from the start of the list and add new friends
@@ -110,7 +110,7 @@ impl Element for FriendView {
                         element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
 
                         self.state.elements.insert(index, element);
-                        reresolve = true;
+                        resolve = true;
                     }
                 });
 
@@ -118,12 +118,12 @@ impl Element for FriendView {
             let friend_count = self.friends.borrow().len();
             if friend_count < self.state.elements.len() {
                 self.state.elements.truncate(friend_count);
-                reresolve = true;
+                resolve = true;
             }
         }
 
-        match reresolve {
-            true => Some(ChangeEvent::RERESOLVE_WINDOW),
+        match resolve {
+            true => Some(ChangeEvent::RESOLVE_WINDOW),
             false => None,
         }
     }

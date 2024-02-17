@@ -68,6 +68,8 @@ impl AnimationState {
 pub struct Actions {
     actions: Vec<Action>,
     delays: Vec<f32>,
+    #[cfg(feature = "debug")]
+    actions_data: ActionsData,
 }
 
 impl Actions {
@@ -169,7 +171,7 @@ impl Actions {
     }
 }
 
-#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
 struct SpriteClip {
     pub position: Vector2<i32>,
     pub sprite_number: u32,
@@ -188,14 +190,14 @@ struct SpriteClip {
     pub size: Option<Vector2<u32>>,
 }
 
-#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
 struct AttachPoint {
     pub ignored: u32,
     pub position: Vector2<i32>,
     pub attribute: u32,
 }
 
-#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
 struct Motion {
     pub range1: [i32; 4], // maybe just skip this?
     pub range2: [i32; 4], // maybe just skip this?
@@ -211,20 +213,20 @@ struct Motion {
     pub attach_points: Vec<AttachPoint>,
 }
 
-#[derive(Debug, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
 struct Action {
     pub motion_count: u32,
     #[repeating(self.motion_count)]
     pub motions: Vec<Motion>,
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, Clone, Named, FromBytes, PrototypeElement)]
 struct Event {
     #[length_hint(40)]
     pub name: String,
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, Clone, Named, FromBytes, PrototypeElement)]
 struct ActionsData {
     #[version]
     pub version: Version<MinorFirst>,
@@ -260,6 +262,9 @@ impl ActionLoader {
 
         let actions_data = ActionsData::from_bytes(&mut byte_stream, None).unwrap();
 
+        #[cfg(feature = "debug")]
+        let saved_actions_data = actions_data.clone();
+
         let delays = actions_data
             .delays
             .unwrap_or_else(|| actions_data.actions.iter().map(|_| 0.0).collect());
@@ -267,6 +272,8 @@ impl ActionLoader {
         let sprite = Arc::new(Actions {
             actions: actions_data.actions,
             delays,
+            #[cfg(feature = "debug")]
+            actions_data: saved_actions_data,
         });
 
         self.cache.insert(path.to_string(), sprite.clone());

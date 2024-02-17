@@ -172,10 +172,11 @@ impl GameFileLoader {
 
             let delimiter = path.len() - 4;
             match &path[delimiter..] {
-                ".bmp" | ".BMP" => return self.get("data\\texture\\backside.bmp"),
-                ".rsm" => return self.get("data\\model\\abyss\\coin_j_01.rsm"),
-                ".spr" => return self.get("data\\sprite\\npc\\1_f_maria.spr"),
-                ".act" => return self.get("data\\sprite\\npc\\1_f_maria.act"),
+                ".bmp" | ".BMP" => return self.get("data\\texture\\missing.bmp"),
+                ".tga" | ".TGA" => return self.get("data\\texture\\missing.tga"),
+                ".rsm" => return self.get("data\\model\\missing.rsm"),
+                ".spr" => return self.get("data\\sprite\\npc\\missing.spr"),
+                ".act" => return self.get("data\\sprite\\npc\\missing.act"),
                 _other => {}
             }
         }

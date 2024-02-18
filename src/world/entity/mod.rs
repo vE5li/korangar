@@ -728,7 +728,7 @@ impl Common {
             texture,
             self.position,
             Vector3::new(position.x, position.y, 0.0),
-            Vector2::from_value(1.0),
+            Vector2::from_value(0.7),
             Vector2::new(1, 1),
             Vector2::new(0, 0),
             mirror,

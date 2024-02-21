@@ -465,7 +465,7 @@ mod default_string {
 
 #[cfg(test)]
 mod length_hint_string {
-    use crate::loaders::{ByteStream, FromBytes, ToBytes};
+    use crate::loaders::{ByteStream, FromBytesExt, ToBytesExt};
 
     #[test]
     fn serialization_test() {
@@ -501,7 +501,7 @@ mod const_length_hint_string {
     #[test]
     fn serialization_test() {
         let test_value = TestStruct::new("test".to_string());
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![116, 101, 115, 116, 0, 0, 0, 0]);
     }
 
@@ -531,7 +531,7 @@ mod dynamic_length_hint_string {
     #[test]
     fn serialization_test() {
         let test_value = TestStruct::new(4, "test".to_string());
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![4, 116, 101, 115, 116, 0, 0, 0, 0]);
     }
 
@@ -561,7 +561,7 @@ mod default_struct {
     #[test]
     fn serialization_test() {
         let test_value = TestStruct::new(16, 3000, -1);
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![16, 184, 11, 255, 255, 255, 255]);
     }
 

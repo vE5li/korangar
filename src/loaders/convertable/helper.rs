@@ -19,51 +19,6 @@ pub fn conversion_result<S: Named, T>(result: Result<T, Box<ConversionError>>) -
 }
 
 #[cfg(test)]
-mod length_hint_none {
-    use procedural::Named;
-
-    use super::check_length_hint_none;
-
-    #[derive(Named)]
-    struct Dummy {}
-
-    #[test]
-    fn none() {
-        let result = check_length_hint_none::<Dummy>(None);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn some() {
-        let result = check_length_hint_none::<Dummy>(Some(0));
-        assert!(result.is_err());
-    }
-}
-
-#[cfg(test)]
-mod length_hint {
-    use procedural::Named;
-
-    use super::check_length_hint;
-
-    #[derive(Named)]
-    struct Dummy {}
-
-    #[test]
-    fn none() {
-        let result = check_length_hint::<Dummy>(None);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn some() {
-        const LENGTH_HINT: usize = 0;
-        let result = check_length_hint::<Dummy>(Some(LENGTH_HINT));
-        assert!(result.is_ok_and(|value| value == LENGTH_HINT));
-    }
-}
-
-#[cfg(test)]
 mod upper_bound {
     use procedural::Named;
 

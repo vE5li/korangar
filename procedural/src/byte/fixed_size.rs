@@ -15,23 +15,21 @@ pub fn derive_fixed_byte_size_struct(data_struct: DataStruct, generics: Generics
         syn::Fields::Unit => panic!("unit types are not supported"),
     };
 
-    let length_hints = fields.into_iter().map(|mut field| {
+    let sizes = fields.into_iter().zip(types.iter()).map(|(mut field, field_type)| {
         get_unique_attribute(&mut field.attrs, "length_hint")
             .map(|attribute| match attribute.meta {
                 syn::Meta::List(list) => list.tokens,
                 syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
             })
-            .map(|length_hint| quote!(Some(((#length_hint) as usize))))
-            .unwrap_or(quote!(None))
+            .map(|length_hint| quote!((#length_hint) as usize))
+            .unwrap_or(quote!(<#field_type as crate::loaders::FixedByteSize>::size_in_bytes()))
     });
 
     quote! {
         impl #impl_generics const crate::loaders::FixedByteSize for #name #type_generics #where_clause {
-            fn size_in_bytes(length_hint: Option<usize>) -> usize {
-                assert!(length_hint.is_none());
-
+            fn size_in_bytes() -> usize {
                 let mut total = 0;
-                #(total += <#types as crate::loaders::FixedByteSize>::size_in_bytes(#length_hints);)*
+                #(total += #sizes;)*
                 total
             }
         }
@@ -48,10 +46,8 @@ pub fn derive_fixed_byte_size_enum(generics: Generics, mut attributes: Vec<Attri
 
     quote! {
         impl #impl_generics const crate::loaders::FixedByteSize for #name #type_generics #where_clause {
-            fn size_in_bytes(length_hint: Option<usize>) -> usize {
-                assert!(length_hint.is_none());
-
-                <#numeric_type as crate::loaders::FixedByteSize>::size_in_bytes(None)
+            fn size_in_bytes() -> usize {
+                <#numeric_type as crate::loaders::FixedByteSize>::size_in_bytes()
             }
         }
     }

@@ -228,8 +228,8 @@ impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
         let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
 
         for element in &mut data[..] {
-            let foo = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-            *element = MaybeUninit::new(foo);
+            let item = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+            *element = MaybeUninit::new(item);
         }
 
         // rust wont let us do this currently
@@ -250,8 +250,8 @@ impl<T: ToBytes, const SIZE: usize> ToBytes for [T; SIZE] {
         let mut bytes = Vec::new();
 
         for item in self.iter() {
-            let foo = conversion_result::<Self, _>(item.to_bytes(None))?;
-            bytes.extend(foo);
+            let item = conversion_result::<Self, _>(item.to_bytes(None))?;
+            bytes.extend(item);
         }
 
         Ok(bytes)
@@ -312,8 +312,8 @@ impl<T: FromBytes> FromBytes for Vec<T> {
         let mut vector = Vec::new();
 
         while !byte_stream.is_empty() {
-            let foo = conversion_result::<Self, _>(T::from_bytes(&mut byte_stream, None))?;
-            vector.push(foo);
+            let item = conversion_result::<Self, _>(T::from_bytes(&mut byte_stream, None))?;
+            vector.push(item);
         }
 
         Ok(vector)

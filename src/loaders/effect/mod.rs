@@ -256,6 +256,7 @@ impl EffectLoader {
             return Err(format!("failed to read magic number from {path}"));
         }
 
+        // TODO: Add fallback
         let effect_data = EffectData::from_bytes(&mut byte_stream, None).unwrap();
 
         let prefix = match path.chars().rev().position(|character| character == '\\') {

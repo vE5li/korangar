@@ -17,6 +17,7 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
+use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::MemoryAllocator;
@@ -46,10 +47,26 @@ impl TextureLoader {
 
         let file_data = game_file_loader.get(&format!("data\\texture\\{path}"))?;
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
-        let mut image_buffer = reader
-            .decode()
-            .map_err(|error| format!("failed to decode image file ({error})"))?
-            .to_rgba8();
+
+        let mut image_buffer = match reader.decode() {
+            Ok(image) => image.to_rgba8(),
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to decode image: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                let fallback_path = match image_format {
+                    ImageFormat::Png => FALLBACK_PNG_FILE,
+                    ImageFormat::Bmp => FALLBACK_BMP_FILE,
+                    ImageFormat::Tga => FALLBACK_TGA_FILE,
+                    _ => unreachable!(),
+                };
+
+                return self.get(fallback_path, game_file_loader);
+            }
+        };
 
         if image_format == ImageFormat::Bmp {
             // These numbers are taken from https://github.com/Duckwhale/RagnarokFileFormats

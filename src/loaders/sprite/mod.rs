@@ -15,7 +15,7 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
-use super::{conversion_result, ConversionError};
+use super::{conversion_result, ConversionError, FALLBACK_SPRITE_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::MemoryAllocator;
@@ -159,7 +159,19 @@ impl SpriteLoader {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let sprite_data = SpriteData::from_bytes(&mut byte_stream, None).unwrap();
+        let sprite_data = match SpriteData::from_bytes(&mut byte_stream, None) {
+            Ok(sprite_data) => sprite_data,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load sprite: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.get(FALLBACK_SPRITE_FILE, game_file_loader);
+            }
+        };
+
         #[cfg(feature = "debug")]
         let cloned_sprite_data = sprite_data.clone();
 

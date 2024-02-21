@@ -6,7 +6,7 @@ use derive_new::new;
 use procedural::{Named, *};
 use vulkano::image::view::ImageView;
 
-use super::{conversion_result, ConversionError};
+use super::{conversion_result, ConversionError, FALLBACK_MODEL_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
@@ -328,7 +328,24 @@ impl ModelLoader {
             return Err(format!("failed to read magic number from {model_file}"));
         }
 
-        let model_data = ModelData::from_bytes(&mut byte_stream, None).unwrap();
+        let model_data = match ModelData::from_bytes(&mut byte_stream, None) {
+            Ok(model_data) => model_data,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load model: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.get(
+                    buffer_allocator,
+                    game_file_loader,
+                    texture_loader,
+                    FALLBACK_MODEL_FILE,
+                    reverse_order,
+                );
+            }
+        };
 
         let textures = model_data
             .texture_names

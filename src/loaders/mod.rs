@@ -19,7 +19,7 @@ pub use self::convertable::*;
 pub use self::effect::{EffectHolder, EffectLoader, *};
 pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
 pub use self::font::FontLoader;
-pub use self::gamefile::GameFileLoader;
+pub use self::gamefile::*;
 #[cfg(feature = "debug")]
 pub use self::map::MapData;
 pub use self::map::{LightSettings, MapLoader, WaterSettings};

@@ -19,6 +19,13 @@ const LUA_GRF_FILE_NAME: &str = "lua_files/";
 #[cfg(not(feature = "patched_as_folder"))]
 const LUA_GRF_FILE_NAME: &str = "lua_files.grf";
 
+pub const FALLBACK_PNG_FILE: &str = "data\\texture\\missing.png";
+pub const FALLBACK_BMP_FILE: &str = "data\\texture\\missing.bmp";
+pub const FALLBACK_TGA_FILE: &str = "data\\texture\\missing.tga";
+pub const FALLBACK_MODEL_FILE: &str = "data\\model\\missing.rsm";
+pub const FALLBACK_SPRITE_FILE: &str = "data\\sprite\\npc\\missing.spr";
+pub const FALLBACK_ACTIONS_FILE: &str = "data\\sprite\\npc\\missing.act";
+
 /// Type implementing the game files loader.
 ///
 /// Currently, there are two types implementing
@@ -109,11 +116,12 @@ impl GameFileLoader {
                     #[cfg(feature = "debug")]
                     {
                         print_debug!(
-                            "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {_error:?}",
+                            "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {:?}",
                             YELLOW,
                             NONE,
                             MAGENTA,
-                            NONE
+                            NONE,
+                            _error
                         );
                         failed_count += 1;
                     }
@@ -133,11 +141,12 @@ impl GameFileLoader {
                     #[cfg(feature = "debug")]
                     {
                         print_debug!(
-                            "[{}warning{}] error upcasting {}{file_name}{}: {_error:?}",
+                            "[{}warning{}] error upcasting {}{file_name}{}: {:?}",
                             YELLOW,
                             NONE,
                             MAGENTA,
-                            NONE
+                            NONE,
+                            _error,
                         );
                         failed_count += 1;
                     }
@@ -170,15 +179,20 @@ impl GameFileLoader {
             #[cfg(feature = "debug")]
             print_debug!("failed to find file {}; tying to replace it with placeholder", path);
 
-            let delimiter = path.len() - 4;
-            match &path[delimiter..] {
-                ".bmp" | ".BMP" => return self.get("data\\texture\\missing.bmp"),
-                ".tga" | ".TGA" => return self.get("data\\texture\\missing.tga"),
-                ".rsm" => return self.get("data\\model\\missing.rsm"),
-                ".spr" => return self.get("data\\sprite\\npc\\missing.spr"),
-                ".act" => return self.get("data\\sprite\\npc\\missing.act"),
-                _other => {}
-            }
+            let delimiter_position = path.len() - 4;
+            let extension = path[delimiter_position..].to_ascii_lowercase();
+
+            let fallback_file = match extension.as_str() {
+                ".png" => FALLBACK_PNG_FILE,
+                ".bmp" => FALLBACK_BMP_FILE,
+                ".tga" => FALLBACK_TGA_FILE,
+                ".rsm" => FALLBACK_MODEL_FILE,
+                ".spr" => FALLBACK_SPRITE_FILE,
+                ".act" => FALLBACK_ACTIONS_FILE,
+                _other => return result,
+            };
+
+            return self.get(fallback_file);
         }
 
         result

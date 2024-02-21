@@ -12,7 +12,7 @@ use super::Sprite;
 use crate::debug::*;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::InterfaceSettings;
-use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version};
+use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version, FALLBACK_ACTIONS_FILE};
 use crate::network::ClientTick;
 
 #[derive(Clone, Debug, new)]
@@ -260,7 +260,18 @@ impl ActionLoader {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let actions_data = ActionsData::from_bytes(&mut byte_stream, None).unwrap();
+        let actions_data = match ActionsData::from_bytes(&mut byte_stream, None) {
+            Ok(actions_data) => actions_data,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load actions: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.get(FALLBACK_ACTIONS_FILE, game_file_loader);
+            }
+        };
 
         #[cfg(feature = "debug")]
         let saved_actions_data = actions_data.clone();

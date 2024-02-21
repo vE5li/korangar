@@ -15,11 +15,10 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
-use super::{conversion_result, ConversionError, FALLBACK_SPRITE_FILE};
+use super::{conversion_result, ConversionError, FromBytesExt, FALLBACK_SPRITE_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::MemoryAllocator;
-use crate::interface::{ElementCell, PrototypeElement};
 use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version};
 
 #[derive(Clone, Debug, PrototypeElement)]
@@ -30,64 +29,67 @@ pub struct Sprite {
     sprite_data: SpriteData,
 }
 
-#[derive(Clone, Debug, Named)]
-struct EncodedData(pub Vec<u8>);
-
-impl FromBytes for EncodedData {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        let image_size = length_hint.unwrap();
-
-        if image_size == 0 {
-            return Ok(Self(Vec::new()));
-        }
-
-        let mut data = vec![0; image_size];
-        let mut encoded = conversion_result::<Self, _>(u16::from_bytes(byte_stream, None))?;
-        let mut next = 0;
-
-        while next < image_size && encoded > 0 {
-            let byte = byte_stream.next::<Self>()?;
-            encoded -= 1;
-
-            if byte == 0 {
-                let length = usize::max(byte_stream.next::<Self>()? as usize, 1);
-                encoded -= 1;
-
-                if next + length > image_size {
-                    return Err(ConversionError::from_message("too much data encoded in palette image"));
-                }
-
-                next += length;
-            } else {
-                data[next] = byte;
-                next += 1;
-            }
-        }
-
-        if next != image_size || encoded > 0 {
-            return Err(ConversionError::from_message("badly encoded palette image"));
-        }
-
-        Ok(Self(data))
-    }
-}
-
-impl PrototypeElement for EncodedData {
-    fn to_element(&self, display: String) -> ElementCell {
-        self.0.to_element(display)
-    }
-}
-
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, Named, PrototypeElement)]
 struct PaletteImageData {
     pub width: u16,
     pub height: u16,
-    #[version_equals_or_above(2, 1)]
-    #[length_hint(self.width as usize * self.height as usize)]
-    pub encoded_data: Option<EncodedData>,
-    #[version_smaller(2, 1)]
-    #[length_hint(self.width as usize * self.height as usize)]
-    pub raw_data: Option<Vec<u8>>,
+    pub data: EncodedData,
+}
+
+#[derive(Clone, Debug, Named, PrototypeElement)]
+struct EncodedData(pub Vec<u8>);
+
+impl FromBytes for PaletteImageData {
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>>
+    where
+        Self: Sized,
+    {
+        let width = conversion_result::<Self, _>(u16::from_bytes(byte_stream))?;
+        let height = conversion_result::<Self, _>(u16::from_bytes(byte_stream))?;
+
+        let data = match width as usize * height as usize {
+            0 => Vec::new(),
+            image_size if byte_stream.get_version().smaller(2, 1) => {
+                conversion_result::<Self, _>(Vec::from_n_bytes(byte_stream, image_size))?
+            }
+            image_size => {
+                let mut data = vec![0; image_size];
+                let mut encoded = conversion_result::<Self, _>(u16::from_bytes(byte_stream))?;
+                let mut next = 0;
+
+                while next < image_size && encoded > 0 {
+                    let byte = byte_stream.next::<Self>()?;
+                    encoded -= 1;
+
+                    if byte == 0 {
+                        let length = usize::max(byte_stream.next::<Self>()? as usize, 1);
+                        encoded -= 1;
+
+                        if next + length > image_size {
+                            return Err(ConversionError::from_message("too much data encoded in palette image"));
+                        }
+
+                        next += length;
+                    } else {
+                        data[next] = byte;
+                        next += 1;
+                    }
+                }
+
+                if next != image_size || encoded > 0 {
+                    return Err(ConversionError::from_message("badly encoded palette image"));
+                }
+
+                data
+            }
+        };
+
+        Ok(Self {
+            width,
+            height,
+            data: EncodedData(data),
+        })
+    }
 }
 
 #[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
@@ -155,11 +157,11 @@ impl SpriteLoader {
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 2]>::from_bytes(&mut byte_stream, None).unwrap() != [b'S', b'P'] {
+        if <[u8; 2]>::from_bytes(&mut byte_stream).unwrap() != [b'S', b'P'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let sprite_data = match SpriteData::from_bytes(&mut byte_stream, None) {
+        let sprite_data = match SpriteData::from_bytes(&mut byte_stream) {
             Ok(sprite_data) => sprite_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]
@@ -185,9 +187,8 @@ impl SpriteLoader {
         let palette_images = sprite_data.palette_image_data.into_iter().map(|image_data| {
             // decode palette image data if necessary
             let data: Vec<u8> = image_data
-                .encoded_data
-                .map(|encoded| encoded.0)
-                .unwrap_or_else(|| image_data.raw_data.unwrap())
+                .data
+                .0
                 .iter()
                 .flat_map(|palette_index| palette.colors[*palette_index as usize].color_bytes(*palette_index))
                 .collect();

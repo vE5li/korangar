@@ -1,8 +1,7 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConversionErrorType {
-    UnusedLengthHint { type_name: &'static str, length_hint: usize },
-    MissingLengthHint { type_name: &'static str },
     ByteStreamTooShort { type_name: &'static str },
+    DataTooBig { type_name: &'static str },
     Specific { message: String },
 }
 
@@ -40,16 +39,11 @@ impl std::fmt::Debug for ConversionError {
         let stack = self.stack.join("::");
 
         match &self.error_type {
-            ConversionErrorType::UnusedLengthHint { type_name, length_hint } => write!(
-                formatter,
-                "unused length hint ({}) while parsing {} in {}",
-                length_hint, type_name, stack
-            ),
-            ConversionErrorType::MissingLengthHint { type_name } => {
-                write!(formatter, "missing length hint while parsing {} in {}", type_name, stack)
-            }
             ConversionErrorType::ByteStreamTooShort { type_name } => {
                 write!(formatter, "byte stream too short while parsing {} in {}", type_name, stack)
+            }
+            ConversionErrorType::DataTooBig { type_name } => {
+                write!(formatter, "data is too big for the available space {} in {}", type_name, stack)
             }
             ConversionErrorType::Specific { message } => write!(formatter, "{} in {}", message, stack),
         }
@@ -120,13 +114,5 @@ mod type_check {
         let error = ConversionError::from_error_type(error_type.clone());
 
         assert!(error.is_byte_stream_too_short());
-    }
-
-    #[test]
-    fn other() {
-        let error_type = ConversionErrorType::MissingLengthHint { type_name: "test" };
-        let error = ConversionError::from_error_type(error_type.clone());
-
-        assert!(!error.is_byte_stream_too_short());
     }
 }

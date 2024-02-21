@@ -2,7 +2,7 @@ use cgmath::Vector3;
 use procedural::{FromBytes, Named, PrototypeElement};
 
 use crate::graphics::{ColorRGB, Transform};
-use crate::loaders::{check_length_hint_none, conversion_result, ByteStream, ConversionError, FromBytes};
+use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes};
 use crate::world::{EffectSource, LightSource, SoundSource};
 
 #[derive(Copy, Clone, Debug, Named)]
@@ -14,10 +14,8 @@ pub enum ResourceType {
 }
 
 impl FromBytes for ResourceType {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let index = conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let index = conversion_result::<Self, _>(i32::from_bytes(byte_stream))?;
         match index {
             1 => Ok(ResourceType::Object),
             2 => Ok(ResourceType::LightSource),
@@ -66,9 +64,8 @@ pub struct MapResources {
 }
 
 impl FromBytes for MapResources {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-        let resources_amount = conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))? as usize;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let resources_amount = conversion_result::<Self, _>(i32::from_bytes(byte_stream))? as usize;
 
         let mut objects = Vec::new();
         let mut light_sources = Vec::new();
@@ -76,22 +73,22 @@ impl FromBytes for MapResources {
         let mut effect_sources = Vec::new();
 
         for index in 0..resources_amount {
-            let resource_type = conversion_result::<Self, _>(ResourceType::from_bytes(byte_stream, None))?;
+            let resource_type = conversion_result::<Self, _>(ResourceType::from_bytes(byte_stream))?;
 
             match resource_type {
                 ResourceType::Object => {
-                    let mut object = conversion_result::<Self, _>(ObjectData::from_bytes(byte_stream, None))?;
+                    let mut object = conversion_result::<Self, _>(ObjectData::from_bytes(byte_stream))?;
                     // offset the objects slightly to avoid depth buffer fighting
                     object.transform.position += Vector3::new(0.0, 0.0005, 0.0) * index as f32;
                     objects.push(object);
                 }
                 ResourceType::LightSource => {
-                    let mut light_source = conversion_result::<Self, _>(LightSource::from_bytes(byte_stream, None))?;
+                    let mut light_source = conversion_result::<Self, _>(LightSource::from_bytes(byte_stream))?;
                     light_source.position.y = -light_source.position.y;
                     light_sources.push(light_source);
                 }
                 ResourceType::SoundSource => {
-                    let mut sound_source = conversion_result::<Self, _>(SoundSource::from_bytes(byte_stream, None))?;
+                    let mut sound_source = conversion_result::<Self, _>(SoundSource::from_bytes(byte_stream))?;
                     sound_source.position.y = -sound_source.position.y;
 
                     if sound_source.cycle.is_none() {
@@ -101,7 +98,7 @@ impl FromBytes for MapResources {
                     sound_sources.push(sound_source);
                 }
                 ResourceType::EffectSource => {
-                    let mut effect_source = conversion_result::<Self, _>(EffectSource::from_bytes(byte_stream, None))?;
+                    let mut effect_source = conversion_result::<Self, _>(EffectSource::from_bytes(byte_stream))?;
                     effect_source.position.y = -effect_source.position.y;
                     effect_sources.push(effect_source);
                 }

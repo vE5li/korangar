@@ -3,7 +3,7 @@ use std::ops::Add;
 use cgmath::{Deg, Rad, Vector3};
 use procedural::*;
 
-use crate::loaders::{check_length_hint_none, conversion_result, ConversionError, FromBytes};
+use crate::loaders::{conversion_result, ConversionError, FromBytes};
 
 #[derive(Copy, Clone, Debug, Named, PrototypeElement)]
 pub struct Transform {
@@ -14,12 +14,10 @@ pub struct Transform {
 }
 
 impl FromBytes for Transform {
-    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let mut position = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream, None))?;
-        let rotation = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream, None))?;
-        let scale = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream) -> Result<Self, Box<ConversionError>> {
+        let mut position = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
+        let rotation = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
+        let scale = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
 
         // TODO: make this nicer
         position.y = -position.y;

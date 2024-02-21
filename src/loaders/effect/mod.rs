@@ -252,12 +252,12 @@ impl EffectLoader {
         let bytes = game_file_loader.get(&format!("data\\texture\\effect\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'S', b'T', b'R', b'M'] {
+        if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'S', b'T', b'R', b'M'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 
         // TODO: Add fallback
-        let effect_data = EffectData::from_bytes(&mut byte_stream, None).unwrap();
+        let effect_data = EffectData::from_bytes(&mut byte_stream).unwrap();
 
         let prefix = match path.chars().rev().position(|character| character == '\\') {
             Some(offset) => path.split_at(path.len() - offset).0,

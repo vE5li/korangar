@@ -1,27 +1,6 @@
 use super::{ConversionError, ConversionErrorType, Named};
 
 #[inline(always)]
-pub fn check_length_hint_none<S: Named>(length_hint: Option<usize>) -> Result<(), Box<ConversionError>> {
-    match length_hint {
-        Some(length_hint) => Err(ConversionError::from_error_type(ConversionErrorType::UnusedLengthHint {
-            type_name: S::NAME,
-            length_hint,
-        })),
-        None => Ok(()),
-    }
-}
-
-#[inline(always)]
-pub fn check_length_hint<S: Named>(length_hint: Option<usize>) -> Result<usize, Box<ConversionError>> {
-    match length_hint {
-        Some(length_hint) => Ok(length_hint),
-        None => Err(ConversionError::from_error_type(ConversionErrorType::MissingLengthHint {
-            type_name: S::NAME,
-        })),
-    }
-}
-
-#[inline(always)]
 pub fn check_upper_bound<S: Named>(offset: usize, length: usize) -> Result<(), Box<ConversionError>> {
     match offset < length {
         true => Ok(()),

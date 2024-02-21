@@ -10,14 +10,71 @@ pub use self::error::{ConversionError, ConversionErrorType};
 pub use self::helper::*;
 pub use self::named::Named;
 
+/// Trait to deserialize from a [`ByteStream`].
 pub trait FromBytes: Named {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>>
+    /// Takes bytes from a [`ByteStream`] and deserializes them into a type `T`.
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>>
     where
         Self: Sized;
 }
 
+/// Extension trait for [`FromBytes`].
+pub trait FromBytesExt: FromBytes {
+    /// Takes a fixed number of bytes from the [`ByteStream`] and tries to
+    /// deserialize them into a type `T`.
+    fn from_n_bytes(byte_stream: &mut ByteStream, size: usize) -> Result<Self, Box<ConversionError>>
+    where
+        Self: Sized;
+}
+
+impl<T> FromBytesExt for T
+where
+    T: FromBytes,
+{
+    fn from_n_bytes(byte_stream: &mut ByteStream, size: usize) -> Result<Self, Box<ConversionError>>
+    where
+        Self: Sized,
+    {
+        let data = byte_stream.slice::<T>(size)?;
+        let mut byte_stream = ByteStream::new(data);
+        T::from_bytes(&mut byte_stream)
+    }
+}
+
+/// Trait to serialize into bytes.
 pub trait ToBytes: Named {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>>;
+    /// Converts self to a [`Vec`] of bytes.
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>>;
+}
+
+/// Extension trait for [`ToBytes`].
+pub trait ToBytesExt: ToBytes {
+    /// Converts self to a [`Vec`] of bytes and pads it with zeros to match the
+    /// size of `size`.
+    fn to_n_bytes(&self, size: usize) -> Result<Vec<u8>, Box<ConversionError>>
+    where
+        Self: Sized;
+}
+
+impl<T> ToBytesExt for T
+where
+    T: ToBytes,
+{
+    fn to_n_bytes(&self, size: usize) -> Result<Vec<u8>, Box<ConversionError>>
+    where
+        Self: Sized,
+    {
+        let mut data = T::to_bytes(self)?;
+
+        if data.len() > size {
+            return Err(ConversionError::from_error_type(ConversionErrorType::DataTooBig {
+                type_name: T::NAME,
+            }));
+        }
+
+        data.resize(size, 0);
+        Ok(data)
+    }
 }
 
 impl Named for u8 {
@@ -25,15 +82,13 @@ impl Named for u8 {
 }
 
 impl FromBytes for u8 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         byte_stream.next::<Self>()
     }
 }
 
 impl ToBytes for u8 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(vec![*self])
     }
 }
@@ -43,15 +98,13 @@ impl Named for u16 {
 }
 
 impl FromBytes for u16 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([byte_stream.next::<Self>()?, byte_stream.next::<Self>()?]))
     }
 }
 
 impl ToBytes for u16 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -61,8 +114,7 @@ impl Named for u32 {
 }
 
 impl FromBytes for u32 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -73,8 +125,7 @@ impl FromBytes for u32 {
 }
 
 impl ToBytes for u32 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -84,8 +135,7 @@ impl Named for u64 {
 }
 
 impl FromBytes for u64 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -100,8 +150,7 @@ impl FromBytes for u64 {
 }
 
 impl ToBytes for u64 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -111,15 +160,13 @@ impl Named for i8 {
 }
 
 impl FromBytes for i8 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(byte_stream.next::<Self>()? as i8)
     }
 }
 
 impl ToBytes for i8 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(vec![*self as u8])
     }
 }
@@ -129,15 +176,13 @@ impl Named for i16 {
 }
 
 impl FromBytes for i16 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([byte_stream.next::<Self>()?, byte_stream.next::<Self>()?]))
     }
 }
 
 impl ToBytes for i16 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -147,8 +192,7 @@ impl Named for i32 {
 }
 
 impl FromBytes for i32 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -159,8 +203,7 @@ impl FromBytes for i32 {
 }
 
 impl ToBytes for i32 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -170,8 +213,7 @@ impl Named for i64 {
 }
 
 impl FromBytes for i64 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -186,8 +228,7 @@ impl FromBytes for i64 {
 }
 
 impl ToBytes for i64 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -197,8 +238,7 @@ impl Named for f32 {
 }
 
 impl FromBytes for f32 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -209,8 +249,7 @@ impl FromBytes for f32 {
 }
 
 impl ToBytes for f32 {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         Ok(self.to_ne_bytes().to_vec())
     }
 }
@@ -220,15 +259,13 @@ impl<T: Named, const SIZE: usize> Named for [T; SIZE] {
 }
 
 impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         use std::mem::MaybeUninit;
-
-        check_length_hint_none::<Self>(length_hint)?;
 
         let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
 
         for element in &mut data[..] {
-            let item = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+            let item = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
             *element = MaybeUninit::new(item);
         }
 
@@ -244,13 +281,11 @@ impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
 }
 
 impl<T: ToBytes, const SIZE: usize> ToBytes for [T; SIZE] {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         let mut bytes = Vec::new();
 
         for item in self.iter() {
-            let item = conversion_result::<Self, _>(item.to_bytes(None))?;
+            let item = conversion_result::<Self, _>(item.to_bytes())?;
             bytes.extend(item);
         }
 
@@ -263,21 +298,14 @@ impl Named for String {
 }
 
 impl FromBytes for String {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         let mut value = String::new();
-        let mut offset = 0;
 
         loop {
-            offset += 1;
-
             match byte_stream.next::<Self>()? {
                 0 => break,
                 byte => value.push(byte as char),
             }
-        }
-
-        if let Some(length) = length_hint {
-            byte_stream.skip(length - offset);
         }
 
         Ok(value)
@@ -285,17 +313,8 @@ impl FromBytes for String {
 }
 
 impl ToBytes for String {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        use std::iter;
-
-        match length_hint {
-            Some(length) => {
-                assert!(self.len() <= length, "string is to long for the byte stream");
-                let padding = (0..length - self.len()).map(|_| 0);
-                Ok(self.bytes().chain(padding).collect())
-            }
-            None => Ok(self.bytes().chain(iter::once(0)).collect()),
-        }
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+        Ok(self.bytes().chain(std::iter::once(0)).collect())
     }
 }
 
@@ -304,15 +323,11 @@ impl<T: Named> Named for Vec<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vec<T> {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        let length = check_length_hint::<Self>(length_hint)?;
-
-        let data = byte_stream.slice::<Self>(length)?;
-        let mut byte_stream = ByteStream::new(data);
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         let mut vector = Vec::new();
 
         while !byte_stream.is_empty() {
-            let item = conversion_result::<Self, _>(T::from_bytes(&mut byte_stream, None))?;
+            let item = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
             vector.push(item);
         }
 
@@ -325,22 +340,18 @@ impl<T: Named> Named for Vector2<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector2<T> {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
         Ok(Vector2::new(first, second))
     }
 }
 
 impl<T: ToBytes> ToBytes for Vector2<T> {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let mut bytes = conversion_result::<Self, _>(self.x.to_bytes(None))?;
-        bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes(None))?);
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+        let mut bytes = conversion_result::<Self, _>(self.x.to_bytes())?;
+        bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes())?);
 
         Ok(bytes)
     }
@@ -351,24 +362,20 @@ impl<T: Named> Named for Vector3<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector3<T> {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let third = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
         Ok(Vector3::new(first, second, third))
     }
 }
 
 impl<T: ToBytes> ToBytes for Vector3<T> {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let mut bytes = conversion_result::<Self, _>(self.x.to_bytes(None))?;
-        bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes(None))?);
-        bytes.append(&mut conversion_result::<Self, _>(self.z.to_bytes(None))?);
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+        let mut bytes = conversion_result::<Self, _>(self.x.to_bytes())?;
+        bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes())?);
+        bytes.append(&mut conversion_result::<Self, _>(self.z.to_bytes())?);
 
         Ok(bytes)
     }
@@ -379,26 +386,22 @@ impl<T: Named> Named for Vector4<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector4<T> {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let third = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let fourth = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let fourth = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
         Ok(Vector4::new(first, second, third, fourth))
     }
 }
 
 impl<T: ToBytes> ToBytes for Vector4<T> {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let mut bytes = conversion_result::<Self, _>(self.x.to_bytes(None))?;
-        bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes(None))?);
-        bytes.append(&mut conversion_result::<Self, _>(self.z.to_bytes(None))?);
-        bytes.append(&mut conversion_result::<Self, _>(self.w.to_bytes(None))?);
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+        let mut bytes = conversion_result::<Self, _>(self.x.to_bytes())?;
+        bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes())?);
+        bytes.append(&mut conversion_result::<Self, _>(self.z.to_bytes())?);
+        bytes.append(&mut conversion_result::<Self, _>(self.w.to_bytes())?);
         Ok(bytes)
     }
 }
@@ -408,13 +411,11 @@ impl<T: Named> Named for Quaternion<T> {
 }
 
 impl<T: FromBytes> FromBytes for Quaternion<T> {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let third = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let fourth = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let fourth = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
         Ok(Quaternion::new(fourth, first, second, third))
     }
@@ -425,20 +426,18 @@ impl<T: Named> Named for Matrix3<T> {
 }
 
 impl<T: FromBytes> FromBytes for Matrix3<T> {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let c0r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let c0r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let c0r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
-        let c0r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let c0r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let c0r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+        let c1r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let c1r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let c1r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
-        let c1r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let c1r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let c1r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-
-        let c2r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let c2r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
-        let c2r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream, None))?;
+        let c2r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let c2r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
+        let c2r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
         Ok(Matrix3::new(c0r0, c0r1, c0r2, c1r0, c1r1, c1r2, c2r0, c2r1, c2r2))
     }
@@ -451,14 +450,14 @@ mod default_string {
     #[test]
     fn serialization_test() {
         let test_value = String::from("test");
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![116, 101, 115, 116, 0]);
     }
 
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0]);
-        let test_value = String::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = String::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.as_str(), "test");
         assert!(byte_stream.is_empty());
     }
@@ -471,14 +470,14 @@ mod length_hint_string {
     #[test]
     fn serialization_test() {
         let test_value = String::from("test");
-        let data = test_value.to_bytes(Some(8)).unwrap();
+        let data = test_value.to_n_bytes(8).unwrap();
         assert_eq!(data, vec![116, 101, 115, 116, 0, 0, 0, 0]);
     }
 
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
-        let test_value = String::from_bytes(&mut byte_stream, Some(8)).unwrap();
+        let test_value = String::from_n_bytes(&mut byte_stream, 8).unwrap();
         assert_eq!(test_value.as_str(), "test");
         assert!(byte_stream.is_empty());
     }
@@ -509,7 +508,7 @@ mod const_length_hint_string {
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.string.as_str(), "test");
         assert!(byte_stream.is_empty());
     }
@@ -539,7 +538,7 @@ mod dynamic_length_hint_string {
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[4, 116, 101, 115, 116, 0, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value, TestStruct::new(4, "test".to_string()));
         assert!(byte_stream.is_empty());
     }
@@ -569,7 +568,7 @@ mod default_struct {
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[16, 184, 11, 255, 255, 255, 255]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value, TestStruct::new(16, 3000, -1));
         assert!(byte_stream.is_empty());
     }
@@ -593,7 +592,7 @@ mod version_struct_smaller {
     #[test]
     fn deserialize_smaller() {
         let mut byte_stream = ByteStream::new(&[4, 0, 16, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, Some(16));
         assert!(byte_stream.is_empty());
     }
@@ -601,14 +600,14 @@ mod version_struct_smaller {
     #[test]
     fn deserialize_equals() {
         let mut byte_stream = ByteStream::new(&[4, 1, 16, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, None);
     }
 
     #[test]
     fn deserialize_bigger() {
         let mut byte_stream = ByteStream::new(&[4, 6, 16, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, None);
     }
 }
@@ -631,14 +630,14 @@ mod version_struct_equals_or_above {
     #[test]
     fn deserialize_smaller() {
         let mut byte_stream = ByteStream::new(&[4, 0, 16, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, None);
     }
 
     #[test]
     fn deserialize_equals() {
         let mut byte_stream = ByteStream::new(&[4, 1, 16, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, Some(16));
         assert!(byte_stream.is_empty());
     }
@@ -646,7 +645,7 @@ mod version_struct_equals_or_above {
     #[test]
     fn deserialize_bigger() {
         let mut byte_stream = ByteStream::new(&[4, 2, 16, 0, 0, 0]);
-        let test_value = TestStruct::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, Some(16));
         assert!(byte_stream.is_empty());
     }
@@ -668,14 +667,14 @@ mod default_enum {
     #[test]
     fn serialization_test() {
         let test_value = TestEnum::Second;
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![1]);
     }
 
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[1]);
-        let test_value = TestEnum::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestEnum::from_bytes(&mut byte_stream).unwrap();
         assert!(matches!(test_value, TestEnum::Second));
         assert!(byte_stream.is_empty());
     }
@@ -700,14 +699,14 @@ mod numeric_value_enum {
     #[test]
     fn serialization_test() {
         let test_value = TestEnum::Second;
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![10]);
     }
 
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[10]);
-        let test_value = TestEnum::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestEnum::from_bytes(&mut byte_stream).unwrap();
         assert!(matches!(test_value, TestEnum::Second));
         assert!(byte_stream.is_empty());
     }
@@ -730,14 +729,14 @@ mod numeric_type_enum {
     #[test]
     fn serialization_test() {
         let test_value = TestEnum::Second;
-        let data = test_value.to_bytes(None).unwrap();
+        let data = test_value.to_bytes().unwrap();
         assert_eq!(data, vec![1, 0]);
     }
 
     #[test]
     fn deserialization_test() {
         let mut byte_stream = ByteStream::new(&[1, 0]);
-        let test_value = TestEnum::from_bytes(&mut byte_stream, None).unwrap();
+        let test_value = TestEnum::from_bytes(&mut byte_stream).unwrap();
         assert!(matches!(test_value, TestEnum::Second));
         assert!(byte_stream.is_empty());
     }

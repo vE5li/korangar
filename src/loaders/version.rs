@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use derive_new::new;
 
-use super::{check_length_hint_none, conversion_result, ConversionError, FromBytes, Named};
+use super::{ConversionError, FromBytes, Named};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -25,11 +25,9 @@ impl Named for Version<MinorFirst> {
 }
 
 impl FromBytes for Version<MajorFirst> {
-    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let major = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
-        let minor = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
+    fn from_bytes(byte_stream: &mut super::ByteStream) -> Result<Self, Box<ConversionError>> {
+        let major = byte_stream.next::<Self>()?;
+        let minor = byte_stream.next::<Self>()?;
 
         Ok(Self {
             major,
@@ -40,11 +38,9 @@ impl FromBytes for Version<MajorFirst> {
 }
 
 impl FromBytes for Version<MinorFirst> {
-    fn from_bytes(byte_stream: &mut super::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let minor = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
-        let major = conversion_result::<Self, _>(byte_stream.next::<Self>())?;
+    fn from_bytes(byte_stream: &mut super::ByteStream) -> Result<Self, Box<ConversionError>> {
+        let minor = byte_stream.next::<Self>()?;
+        let major = byte_stream.next::<Self>()?;
 
         Ok(Self {
             minor,

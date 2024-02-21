@@ -143,7 +143,11 @@ impl Actions {
         let fs = &a.motions[frame as usize % a.motions.len()];
 
         for sprite_clip in &fs.sprite_clips {
-            let texture = &sprite.textures[sprite_clip.sprite_number as usize];
+            // NOTE: `get` instead of a direct index in case a fallback was loaded
+            let Some(texture) = sprite.textures.get(sprite_clip.sprite_number as usize) else {
+                return;
+            };
+
             let offset = sprite_clip.position.map(|component| component as f32);
             let dimesions = sprite_clip
                 .size
@@ -256,11 +260,11 @@ impl ActionLoader {
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 2]>::from_bytes(&mut byte_stream, None).unwrap() != [b'A', b'C'] {
+        if <[u8; 2]>::from_bytes(&mut byte_stream).unwrap() != [b'A', b'C'] {
             return Err(format!("failed to read magic number from {path}"));
         }
 
-        let actions_data = match ActionsData::from_bytes(&mut byte_stream, None) {
+        let actions_data = match ActionsData::from_bytes(&mut byte_stream) {
             Ok(actions_data) => actions_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]

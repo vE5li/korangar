@@ -58,10 +58,6 @@ impl<'b> ByteStream<'b> {
         Ok(&self.data[start_index..self.offset])
     }
 
-    pub fn skip(&mut self, count: usize) {
-        self.offset += count;
-    }
-
     pub fn get_offset(&self) -> usize {
         self.offset
     }

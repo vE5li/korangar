@@ -22,14 +22,14 @@ fn derive_for_struct(
         _ => panic!(),
     };
 
-    let from = implement_from.then(|| quote! {
-        impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-            fn from_bytes(byte_stream: &mut crate::loaders::ByteStream, length_hint: Option<usize>) -> Result<Self, Box<crate::loaders::ConversionError>> {
-                crate::loaders::check_length_hint_none::<Self>(length_hint)?;
-
-                let base_offset = byte_stream.get_offset();
-                #(#from_bytes_implementations)*
-                Ok(#instanciate)
+    let from = implement_from.then(|| {
+        quote! {
+            impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
+                fn from_bytes(byte_stream: &mut crate::loaders::ByteStream) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                    let base_offset = byte_stream.get_offset();
+                    #(#from_bytes_implementations)*
+                    Ok(#instanciate)
+                }
             }
         }
     });
@@ -39,9 +39,7 @@ fn derive_for_struct(
             impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
-                    crate::loaders::check_length_hint_none::<Self>(length_hint)?;
-
+                fn to_bytes(&self) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
                     Ok([#(#to_bytes_implementations),*].concat())
                 }
             }
@@ -87,14 +85,14 @@ fn derive_for_enum(
         current_index += 1;
     }
 
-    let from = add_from.then(|| quote! {
-        impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-            fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<crate::loaders::ConversionError>> {
-                crate::loaders::check_length_hint_none::<Self>(length_hint)?;
-
-                match crate::loaders::conversion_result::<Self, _>(#numeric_type::from_bytes(byte_stream, None))? as usize {
-                    #( #indices => Ok(Self::#values), )*
-                    invalid => Err(crate::loaders::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
+    let from = add_from.then(|| {
+        quote! {
+            impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
+                fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                    match crate::loaders::conversion_result::<Self, _>(#numeric_type::from_bytes(byte_stream))? as usize {
+                        #( #indices => Ok(Self::#values), )*
+                        invalid => Err(crate::loaders::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
+                    }
                 }
             }
         }
@@ -105,11 +103,9 @@ fn derive_for_enum(
             impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
-                    crate::loaders::check_length_hint_none::<Self>(length_hint)?;
-
+                fn to_bytes(&self) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
                     match self {
-                        #( #name::#values => crate::loaders::conversion_result::<Self, _>((#indices as #numeric_type).to_bytes(None)), )*
+                        #( #name::#values => crate::loaders::conversion_result::<Self, _>((#indices as #numeric_type).to_bytes()), )*
                     }
                 }
             }

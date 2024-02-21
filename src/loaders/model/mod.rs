@@ -6,7 +6,7 @@ use derive_new::new;
 use procedural::{Named, *};
 use vulkano::image::view::ImageView;
 
-use super::{conversion_result, ConversionError, FALLBACK_MODEL_FILE};
+use super::{conversion_result, ConversionError, FromBytesExt, FALLBACK_MODEL_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
@@ -46,10 +46,8 @@ pub struct TextureCoordinateData {
 
 #[derive(Debug, Named, FromBytes, PrototypeElement)]
 pub struct NodeData {
-    #[length_hint(40)]
-    pub node_name: ModelString,
-    #[length_hint(40)]
-    pub parent_node_name: ModelString, // This is where 2.2 starts failing
+    pub node_name: ModelString<40>,
+    pub parent_node_name: ModelString<40>, // This is where 2.2 starts failing
     pub texture_count: u32,
     #[repeating(self.texture_count)]
     pub texture_indices: Vec<u32>,
@@ -79,27 +77,27 @@ pub struct NodeData {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Named)]
-pub struct ModelString {
+pub struct ModelString<const LENGTH: usize> {
     pub inner: String,
 }
 
-impl FromBytes for ModelString {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
+impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         let inner = if byte_stream.get_version().equals_or_above(2, 2) {
-            let length = conversion_result::<Self, _>(u32::from_bytes(byte_stream, None))? as usize;
-            let mut inner = conversion_result::<Self, _>(String::from_bytes(byte_stream, Some(length)))?;
+            let length = conversion_result::<Self, _>(u32::from_bytes(byte_stream))? as usize;
+            let mut inner = conversion_result::<Self, _>(String::from_n_bytes(byte_stream, length))?;
             // need to remove the last character for some reason
             inner.pop();
             inner
         } else {
-            conversion_result::<Self, _>(String::from_bytes(byte_stream, length_hint))?
+            conversion_result::<Self, _>(String::from_n_bytes(byte_stream, LENGTH))?
         };
 
         Ok(Self { inner })
     }
 }
 
-impl crate::interface::PrototypeElement for ModelString {
+impl<const LENGTH: usize> crate::interface::PrototypeElement for ModelString<LENGTH> {
     fn to_element(&self, display: String) -> crate::interface::ElementCell {
         self.inner.to_element(display)
     }
@@ -119,12 +117,10 @@ pub struct ModelData {
     pub reserved1: Option<[u8; 4]>,
     pub texture_count: u32,
     #[repeating(self.texture_count)]
-    #[length_hint(40)]
-    pub texture_names: Vec<ModelString>,
+    pub texture_names: Vec<ModelString<40>>,
     #[version_equals_or_above(2, 2)]
     pub skip: Option<u32>,
-    #[length_hint(40)]
-    pub root_node_name: ModelString,
+    pub root_node_name: ModelString<40>,
     pub node_count: u32,
     #[repeating(self.node_count)]
     pub nodes: Vec<NodeData>,
@@ -248,7 +244,7 @@ impl ModelLoader {
         textures: &Vec<Arc<ImageView>>,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut BoundingBox,
-        root_node_name: &ModelString,
+        root_node_name: &ModelString<40>,
         reverse_order: bool,
     ) -> Node {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
@@ -324,11 +320,11 @@ impl ModelLoader {
         let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
         let mut byte_stream = ByteStream::new(&bytes);
 
-        if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'G', b'R', b'S', b'M'] {
+        if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'S', b'M'] {
             return Err(format!("failed to read magic number from {model_file}"));
         }
 
-        let model_data = match ModelData::from_bytes(&mut byte_stream, None) {
+        let model_data = match ModelData::from_bytes(&mut byte_stream) {
             Ok(model_data) => model_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]

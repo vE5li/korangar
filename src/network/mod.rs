@@ -22,9 +22,7 @@ use crate::interface::PacketWindow;
 use crate::interface::{
     CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, WeakElementCell,
 };
-use crate::loaders::{
-    check_length_hint, check_length_hint_none, conversion_result, ByteStream, ConversionError, FromBytes, Named, Service, ToBytes,
-};
+use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes, Named, Service, ToBytes};
 
 #[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct ClientTick(pub u32);
@@ -54,14 +52,14 @@ pub struct SkillLevel(pub u16);
 pub struct ItemIndex(u16);
 
 impl FromBytes for ItemIndex {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        u16::from_bytes(byte_stream, length_hint).map(|raw| Self(raw - 2))
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        u16::from_bytes(byte_stream).map(|raw| Self(raw - 2))
     }
 }
 
 impl ToBytes for ItemIndex {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        u16::to_bytes(&(self.0 + 2), length_hint)
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+        u16::to_bytes(&(self.0 + 2))
     }
 }
 
@@ -100,7 +98,7 @@ where
     T: IncomingPacket,
 {
     fn take_from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
-        let header = u16::from_bytes(byte_stream, None)?;
+        let header = u16::from_bytes(byte_stream)?;
 
         if header != Self::HEADER {
             return Err(ConversionError::from_message("mismatched header"));
@@ -280,10 +278,8 @@ impl WorldPosition {
 }
 
 impl FromBytes for WorldPosition {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
-        let coordinates = conversion_result::<Self, _>(byte_stream.slice::<Self>(3))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let coordinates = byte_stream.slice::<Self>(3)?;
 
         let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
         let y = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
@@ -297,9 +293,7 @@ impl FromBytes for WorldPosition {
 }
 
 impl ToBytes for WorldPosition {
-    fn to_bytes(&self, length_hint: Option<usize>) -> Result<Vec<u8>, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
+    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
         let mut coordinates = vec![0, 0, 0];
 
         coordinates[0] = (self.x >> 2) as u8;
@@ -325,9 +319,7 @@ impl WorldPosition2 {
 }
 
 impl FromBytes for WorldPosition2 {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         let coordinates: Vec<usize> = byte_stream.slice::<Self>(6)?.iter().map(|byte| *byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -453,14 +445,12 @@ impl Named for Ipv4Addr {
 }
 
 impl FromBytes for Ipv4Addr {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        check_length_hint_none::<Self>(length_hint)?;
-
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
         Ok(Ipv4Addr::new(
-            conversion_result::<Self, _>(byte_stream.next::<Self>())?,
-            conversion_result::<Self, _>(byte_stream.next::<Self>())?,
-            conversion_result::<Self, _>(byte_stream.next::<Self>())?,
-            conversion_result::<Self, _>(byte_stream.next::<Self>())?,
+            byte_stream.next::<Self>()?,
+            byte_stream.next::<Self>()?,
+            byte_stream.next::<Self>()?,
+            byte_stream.next::<Self>()?,
         ))
     }
 }
@@ -1031,119 +1021,78 @@ pub enum StatusType {
 }
 
 impl FromBytes for StatusType {
-    fn from_bytes(byte_stream: &mut ByteStream, length_hint: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        let length_hint = check_length_hint::<Self>(length_hint)?;
-        let data = byte_stream.slice::<Self>(length_hint)?;
-        let mut byte_stream = ByteStream::new(data);
-
-        match conversion_result::<Self, _>(u16::from_bytes(&mut byte_stream, None))? {
-            0 => Ok(Self::MovementSpeed(u32::from_bytes(&mut byte_stream, None)?)),
-            1 => Ok(Self::BaseExperience(u64::from_bytes(&mut byte_stream, None)?)),
-            2 => Ok(Self::JobExperience(u64::from_bytes(&mut byte_stream, None)?)),
-            3 => Ok(Self::Karma(u32::from_bytes(&mut byte_stream, None)?)),
-            4 => Ok(Self::Manner(u32::from_bytes(&mut byte_stream, None)?)),
-            5 => Ok(Self::HealthPoints(u32::from_bytes(&mut byte_stream, None)?)),
-            6 => Ok(Self::MaximumHealthPoints(u32::from_bytes(&mut byte_stream, None)?)),
-            7 => Ok(Self::SpellPoints(u32::from_bytes(&mut byte_stream, None)?)),
-            8 => Ok(Self::MaximumSpellPoints(u32::from_bytes(&mut byte_stream, None)?)),
-            9 => Ok(Self::StatusPoint(u32::from_bytes(&mut byte_stream, None)?)),
-            11 => Ok(Self::BaseLevel(u32::from_bytes(&mut byte_stream, None)?)),
-            12 => Ok(Self::SkillPoint(u32::from_bytes(&mut byte_stream, None)?)),
-            13 => Ok(Self::Strength(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            14 => Ok(Self::Agility(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            15 => Ok(Self::Vitality(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            16 => Ok(Self::Intelligence(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            17 => Ok(Self::Dexterity(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            18 => Ok(Self::Luck(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            20 => Ok(Self::Zeny(u32::from_bytes(&mut byte_stream, None)?)),
-            22 => Ok(Self::NextBaseExperience(u64::from_bytes(&mut byte_stream, None)?)),
-            23 => Ok(Self::NextJobExperience(u64::from_bytes(&mut byte_stream, None)?)),
-            24 => Ok(Self::Weight(u32::from_bytes(&mut byte_stream, None)?)),
-            25 => Ok(Self::MaximumWeight(u32::from_bytes(&mut byte_stream, None)?)),
-            32 => Ok(Self::SpUstr(u8::from_bytes(&mut byte_stream, None)?)),
-            33 => Ok(Self::SpUagi(u8::from_bytes(&mut byte_stream, None)?)),
-            34 => Ok(Self::SpUvit(u8::from_bytes(&mut byte_stream, None)?)),
-            35 => Ok(Self::SpUint(u8::from_bytes(&mut byte_stream, None)?)),
-            36 => Ok(Self::SpUdex(u8::from_bytes(&mut byte_stream, None)?)),
-            37 => Ok(Self::SpUluk(u8::from_bytes(&mut byte_stream, None)?)),
-            41 => Ok(Self::Attack1(u32::from_bytes(&mut byte_stream, None)?)),
-            42 => Ok(Self::Attack2(u32::from_bytes(&mut byte_stream, None)?)),
-            43 => Ok(Self::MagicAttack1(u32::from_bytes(&mut byte_stream, None)?)),
-            44 => Ok(Self::MagicAttack2(u32::from_bytes(&mut byte_stream, None)?)),
-            45 => Ok(Self::Defense1(u32::from_bytes(&mut byte_stream, None)?)),
-            46 => Ok(Self::Defense2(u32::from_bytes(&mut byte_stream, None)?)),
-            47 => Ok(Self::MagicDefense1(u32::from_bytes(&mut byte_stream, None)?)),
-            48 => Ok(Self::MagicDefense2(u32::from_bytes(&mut byte_stream, None)?)),
-            49 => Ok(Self::Hit(u32::from_bytes(&mut byte_stream, None)?)),
-            50 => Ok(Self::Flee1(u32::from_bytes(&mut byte_stream, None)?)),
-            51 => Ok(Self::Flee2(u32::from_bytes(&mut byte_stream, None)?)),
-            52 => Ok(Self::Critical(u32::from_bytes(&mut byte_stream, None)?)),
-            53 => Ok(Self::AttackSpeed(u32::from_bytes(&mut byte_stream, None)?)),
-            55 => Ok(Self::JobLevel(u32::from_bytes(&mut byte_stream, None)?)),
-            99 => Ok(Self::CartInfo(
-                u16::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            219 => Ok(Self::Power(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            220 => Ok(Self::Stamina(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            221 => Ok(Self::Wisdom(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            222 => Ok(Self::Spell(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            223 => Ok(Self::Concentration(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            224 => Ok(Self::Creativity(
-                u32::from_bytes(&mut byte_stream, None)?,
-                u32::from_bytes(&mut byte_stream, None)?,
-            )),
-            225 => Ok(Self::PhysicalAttack(u32::from_bytes(&mut byte_stream, None)?)),
-            226 => Ok(Self::SpellMagicAttack(u32::from_bytes(&mut byte_stream, None)?)),
-            227 => Ok(Self::Resistance(u32::from_bytes(&mut byte_stream, None)?)),
-            228 => Ok(Self::MagicResistance(u32::from_bytes(&mut byte_stream, None)?)),
-            229 => Ok(Self::HealingPlus(u32::from_bytes(&mut byte_stream, None)?)),
-            230 => Ok(Self::CriticalDamageRate(u32::from_bytes(&mut byte_stream, None)?)),
-            231 => Ok(Self::TraitPoint(u32::from_bytes(&mut byte_stream, None)?)),
-            232 => Ok(Self::ActivityPoints(u32::from_bytes(&mut byte_stream, None)?)),
-            233 => Ok(Self::MaximumActivityPoints(u32::from_bytes(&mut byte_stream, None)?)),
-            247 => Ok(Self::SpUpow(u8::from_bytes(&mut byte_stream, None)?)),
-            248 => Ok(Self::SpUsta(u8::from_bytes(&mut byte_stream, None)?)),
-            249 => Ok(Self::SpUwis(u8::from_bytes(&mut byte_stream, None)?)),
-            250 => Ok(Self::SpUspl(u8::from_bytes(&mut byte_stream, None)?)),
-            251 => Ok(Self::SpUcon(u8::from_bytes(&mut byte_stream, None)?)),
-            252 => Ok(Self::SpUcrt(u8::from_bytes(&mut byte_stream, None)?)),
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let status = match conversion_result::<Self, _>(u16::from_bytes(byte_stream))? {
+            0 => u32::from_bytes(byte_stream).map(Self::MovementSpeed),
+            1 => u64::from_bytes(byte_stream).map(Self::BaseExperience),
+            2 => u64::from_bytes(byte_stream).map(Self::JobExperience),
+            3 => u32::from_bytes(byte_stream).map(Self::Karma),
+            4 => u32::from_bytes(byte_stream).map(Self::Manner),
+            5 => u32::from_bytes(byte_stream).map(Self::HealthPoints),
+            6 => u32::from_bytes(byte_stream).map(Self::MaximumHealthPoints),
+            7 => u32::from_bytes(byte_stream).map(Self::SpellPoints),
+            8 => u32::from_bytes(byte_stream).map(Self::MaximumSpellPoints),
+            9 => u32::from_bytes(byte_stream).map(Self::StatusPoint),
+            11 => u32::from_bytes(byte_stream).map(Self::BaseLevel),
+            12 => u32::from_bytes(byte_stream).map(Self::SkillPoint),
+            13 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Strength(a, u32::from_bytes(byte_stream)?))),
+            14 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Agility(a, u32::from_bytes(byte_stream)?))),
+            15 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Vitality(a, u32::from_bytes(byte_stream)?))),
+            16 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Intelligence(a, u32::from_bytes(byte_stream)?))),
+            17 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Dexterity(a, u32::from_bytes(byte_stream)?))),
+            18 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Luck(a, u32::from_bytes(byte_stream)?))),
+            20 => u32::from_bytes(byte_stream).map(Self::Zeny),
+            22 => u64::from_bytes(byte_stream).map(Self::NextBaseExperience),
+            23 => u64::from_bytes(byte_stream).map(Self::NextJobExperience),
+            24 => u32::from_bytes(byte_stream).map(Self::Weight),
+            25 => u32::from_bytes(byte_stream).map(Self::MaximumWeight),
+            32 => u8::from_bytes(byte_stream).map(Self::SpUstr),
+            33 => u8::from_bytes(byte_stream).map(Self::SpUagi),
+            34 => u8::from_bytes(byte_stream).map(Self::SpUvit),
+            35 => u8::from_bytes(byte_stream).map(Self::SpUint),
+            36 => u8::from_bytes(byte_stream).map(Self::SpUdex),
+            37 => u8::from_bytes(byte_stream).map(Self::SpUluk),
+            41 => u32::from_bytes(byte_stream).map(Self::Attack1),
+            42 => u32::from_bytes(byte_stream).map(Self::Attack2),
+            43 => u32::from_bytes(byte_stream).map(Self::MagicAttack1),
+            44 => u32::from_bytes(byte_stream).map(Self::MagicAttack2),
+            45 => u32::from_bytes(byte_stream).map(Self::Defense1),
+            46 => u32::from_bytes(byte_stream).map(Self::Defense2),
+            47 => u32::from_bytes(byte_stream).map(Self::MagicDefense1),
+            48 => u32::from_bytes(byte_stream).map(Self::MagicDefense2),
+            49 => u32::from_bytes(byte_stream).map(Self::Hit),
+            50 => u32::from_bytes(byte_stream).map(Self::Flee1),
+            51 => u32::from_bytes(byte_stream).map(Self::Flee2),
+            52 => u32::from_bytes(byte_stream).map(Self::Critical),
+            53 => u32::from_bytes(byte_stream).map(Self::AttackSpeed),
+            55 => u32::from_bytes(byte_stream).map(Self::JobLevel),
+            99 => u16::from_bytes(byte_stream)
+                .and_then(|a| Ok(Self::CartInfo(a, u32::from_bytes(byte_stream)?, u32::from_bytes(byte_stream)?))),
+            219 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Power(a, u32::from_bytes(byte_stream)?))),
+            220 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Stamina(a, u32::from_bytes(byte_stream)?))),
+            221 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Wisdom(a, u32::from_bytes(byte_stream)?))),
+            222 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Spell(a, u32::from_bytes(byte_stream)?))),
+            223 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Concentration(a, u32::from_bytes(byte_stream)?))),
+            224 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Creativity(a, u32::from_bytes(byte_stream)?))),
+            225 => u32::from_bytes(byte_stream).map(Self::PhysicalAttack),
+            226 => u32::from_bytes(byte_stream).map(Self::SpellMagicAttack),
+            227 => u32::from_bytes(byte_stream).map(Self::Resistance),
+            228 => u32::from_bytes(byte_stream).map(Self::MagicResistance),
+            229 => u32::from_bytes(byte_stream).map(Self::HealingPlus),
+            230 => u32::from_bytes(byte_stream).map(Self::CriticalDamageRate),
+            231 => u32::from_bytes(byte_stream).map(Self::TraitPoint),
+            232 => u32::from_bytes(byte_stream).map(Self::ActivityPoints),
+            233 => u32::from_bytes(byte_stream).map(Self::MaximumActivityPoints),
+            247 => u8::from_bytes(byte_stream).map(Self::SpUpow),
+            248 => u8::from_bytes(byte_stream).map(Self::SpUsta),
+            249 => u8::from_bytes(byte_stream).map(Self::SpUwis),
+            250 => u8::from_bytes(byte_stream).map(Self::SpUspl),
+            251 => u8::from_bytes(byte_stream).map(Self::SpUcon),
+            252 => u8::from_bytes(byte_stream).map(Self::SpUcrt),
             invalid => Err(ConversionError::from_message(format!("invalid status code {invalid}"))),
-        }
+        };
+
+        conversion_result::<Self, _>(status)
     }
 }
 
@@ -2696,7 +2645,7 @@ impl PrototypeElement for UnknownPacket {
 
         let elements = match self.bytes.len() >= 2 {
             true => {
-                let signature = u16::from_bytes(&mut byte_stream, None).unwrap();
+                let signature = u16::from_bytes(&mut byte_stream).unwrap();
                 let header = format!("0x{:0>4x}", signature);
                 let data = &self.bytes[byte_stream.get_offset()..];
 
@@ -2832,7 +2781,7 @@ impl NetworkingSystem {
         let response = self.get_data_from_login_server();
         let mut byte_stream = ByteStream::new(&response);
 
-        let header = u16::from_bytes(&mut byte_stream, None).unwrap();
+        let header = u16::from_bytes(&mut byte_stream).unwrap();
         let login_server_login_success_packet = match header {
             LoginFailedPacket::HEADER => {
                 let packet = LoginFailedPacket::from_bytes(&mut byte_stream).unwrap();
@@ -2920,7 +2869,7 @@ impl NetworkingSystem {
         let response = self.get_data_from_character_server();
 
         let mut byte_stream = ByteStream::new(&response);
-        let account_id = AccountId::from_bytes(&mut byte_stream, None).unwrap();
+        let account_id = AccountId::from_bytes(&mut byte_stream).unwrap();
 
         assert_eq!(account_id, login_data.account_id);
 
@@ -2930,7 +2879,7 @@ impl NetworkingSystem {
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
-        let header = u16::from_bytes(&mut byte_stream, None).unwrap();
+        let header = u16::from_bytes(&mut byte_stream).unwrap();
         let character_server_login_success_packet = match header {
             LoginFailedPacket::HEADER => {
                 let packet = LoginFailedPacket::from_bytes(&mut byte_stream).unwrap();
@@ -3121,7 +3070,7 @@ impl NetworkingSystem {
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
-        let header = u16::from_bytes(&mut byte_stream, None).unwrap();
+        let header = u16::from_bytes(&mut byte_stream).unwrap();
         let create_character_success_packet = match header {
             CharacterCreationFailedPacket::HEADER => {
                 let packet = CharacterCreationFailedPacket::from_bytes(&mut byte_stream).unwrap();
@@ -3171,7 +3120,7 @@ impl NetworkingSystem {
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
-        let header = u16::from_bytes(&mut byte_stream, None).unwrap();
+        let header = u16::from_bytes(&mut byte_stream).unwrap();
         match header {
             CharacterDeletionFailedPacket::HEADER => {
                 let packet = CharacterDeletionFailedPacket::from_bytes(&mut byte_stream).unwrap();
@@ -3210,7 +3159,7 @@ impl NetworkingSystem {
         let response = self.get_data_from_character_server();
         let mut byte_stream = ByteStream::new(&response);
 
-        let header = u16::from_bytes(&mut byte_stream, None).unwrap();
+        let header = u16::from_bytes(&mut byte_stream).unwrap();
         let character_selection_success_packet = match header {
             CharacterSelectionFailedPacket::HEADER => {
                 let packet = CharacterSelectionFailedPacket::from_bytes(&mut byte_stream).unwrap();
@@ -3335,7 +3284,7 @@ impl NetworkingSystem {
                 self.characters.clear();
 
                 for _index in 0..character_count {
-                    let character_information = CharacterInformation::from_bytes(&mut byte_stream, None).unwrap();
+                    let character_information = CharacterInformation::from_bytes(&mut byte_stream).unwrap();
                     self.characters.push(character_information);
                 }
 
@@ -3470,7 +3419,7 @@ impl NetworkingSystem {
                 let saved_offset = byte_stream.get_offset();
 
                 // Packet is cut-off at the header
-                let Ok(header) = u16::from_bytes(&mut byte_stream, None) else {
+                let Ok(header) = u16::from_bytes(&mut byte_stream) else {
                     byte_stream.set_offset(saved_offset);
                     self.map_stream_buffer = byte_stream.remaining_bytes();
                     break;
@@ -3634,7 +3583,7 @@ impl NetworkingSystem {
                 // state in the networking system instaed of buffering *all*
                 // inventory packets if one of them is cut off
                 loop {
-                    let header = u16::from_bytes(byte_stream, None)?;
+                    let header = u16::from_bytes(byte_stream)?;
 
                     match header {
                         InventoyEndPacket::HEADER => {

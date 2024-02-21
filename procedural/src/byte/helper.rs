@@ -51,7 +51,6 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         let field_type = field.ty;
 
         let is_version = get_unique_attribute(&mut field.attrs, "version").is_some();
-
         let is_packet_length = get_unique_attribute(&mut field.attrs, "packet_length").is_some();
 
         let length_hint = get_unique_attribute(&mut field.attrs, "length_hint")
@@ -59,10 +58,20 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                 syn::Meta::List(list) => list.tokens,
                 syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
             })
-            .map(|length_hint| quote!(((#length_hint) as usize).into()))
-            .unwrap_or(quote!(None));
+            .map(|length_hint| quote!((#length_hint) as usize));
 
-        let from_length_hint = remove_self_from_stream(length_hint.clone());
+        let from_length_hint = match length_hint.clone() {
+            Some(length_hint) => {
+                let length_hint = remove_self_from_stream(length_hint.clone());
+                quote!(crate::loaders::FromBytesExt::from_n_bytes(byte_stream, #length_hint))
+            }
+            None => quote!(crate::loaders::FromBytes::from_bytes(byte_stream)),
+        };
+
+        let to_length_hint = match length_hint {
+            Some(length_hint) => quote!(crate::loaders::ToBytesExt::to_n_bytes(&self.#field_identifier, #length_hint)),
+            None => quote!(crate::loaders::ToBytes::to_bytes(&self.#field_identifier)),
+        };
 
         let repeating: Option<TokenStream> = get_unique_attribute(&mut field.attrs, "repeating").map(|attribute| match attribute.meta {
             syn::Meta::List(list) => remove_self_from_stream(list.tokens),
@@ -95,13 +104,13 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         }
 
         // base from bytes implementation
-        let from_implementation =
-            quote!(crate::loaders::conversion_result::<Self, _>(crate::loaders::FromBytes::from_bytes(byte_stream, #from_length_hint))?);
+        let from_implementation = quote!(crate::loaders::conversion_result::<Self, _>(#from_length_hint)?);
 
         // wrap base implementation in a loop if the element can appear multiple times
         let from_implementation = match repeating {
             Some(repeat_count) => quote!({
                 let repeat_count = #repeat_count;
+                // TODO: Add check to make sure this allocation is not too big.
                 let mut vector = Vec::with_capacity(repeat_count as usize);
 
                 for _ in 0..repeat_count {
@@ -114,8 +123,10 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                 let packet_length = packet_length
                     .as_ref()
                     .expect("repeating_remaining is used but no packet_length attribute is set");
+
                 quote!({
                     let repeat_count = (#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes(None) as u16);
+                    // TODO: Add check to make sure this allocation is not too big.
                     let mut vector = Vec::with_capacity(repeat_count as usize);
 
                     for _ in 0..repeat_count {
@@ -145,11 +156,11 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         // base to byte implementation
         let to_implementation = match is_repeating || version_restricted {
             true => quote!({
-                panic!("implement for to_bytes aswell");
+                panic!("implement for to_bytes as well");
                 [0u8].as_slice()
             }),
             false => {
-                quote!(crate::loaders::conversion_result::<Self, _>(crate::loaders::ToBytes::to_bytes(&self.#field_identifier, #length_hint))?.as_slice())
+                quote!(crate::loaders::conversion_result::<Self, _>(#to_length_hint)?.as_slice())
             }
         };
 

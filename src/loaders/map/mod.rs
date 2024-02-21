@@ -158,11 +158,11 @@ fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) ->
     let bytes = game_file_loader.get(&format!("data\\{}.rsw", &resource_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
 
-    if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'G', b'R', b'S', b'W'] {
+    if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'S', b'W'] {
         return Err(format!("failed to read magic number from {}.rsw", &resource_file));
     }
 
-    let map_data = MapData::from_bytes(&mut byte_stream, None).unwrap();
+    let map_data = MapData::from_bytes(&mut byte_stream).unwrap();
 
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(resource_file);
@@ -174,11 +174,11 @@ fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -
     let bytes = game_file_loader.get(&format!("data\\{}", &ground_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
 
-    if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'G', b'R', b'G', b'N'] {
+    if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'G', b'N'] {
         return Err(format!("failed to read magic number from {}", &ground_file));
     }
 
-    let ground_data = GroundData::from_bytes(&mut byte_stream, None).unwrap();
+    let ground_data = GroundData::from_bytes(&mut byte_stream).unwrap();
 
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(ground_file);
@@ -190,11 +190,11 @@ fn parse_gat_data(gat_file: &str, game_file_loader: &mut GameFileLoader) -> Resu
     let bytes = game_file_loader.get(&format!("data\\{}", &gat_file))?;
     let mut byte_stream = ByteStream::new(&bytes);
 
-    if <[u8; 4]>::from_bytes(&mut byte_stream, None).unwrap() != [b'G', b'R', b'A', b'T'] {
+    if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'A', b'T'] {
         return Err(format!("failed to read magic number from {}", &gat_file));
     }
 
-    let gat_data = GatData::from_bytes(&mut byte_stream, None).unwrap();
+    let gat_data = GatData::from_bytes(&mut byte_stream).unwrap();
 
     #[cfg(feature = "debug")]
     byte_stream.assert_empty(gat_file);

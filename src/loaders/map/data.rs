@@ -107,25 +107,25 @@ impl GroundTile {
 }
 
 impl FromBytes for GroundTile {
-    fn from_bytes(byte_stream: &mut ByteStream, _: Option<usize>) -> Result<Self, Box<ConversionError>> {
-        let upper_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
-        let upper_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
-        let lower_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
-        let lower_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream, None))?;
+    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+        let upper_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
+        let upper_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
+        let lower_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
+        let lower_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
 
         let top_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?,
-            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream, None))? as i32,
+            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
+            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
         };
 
         let front_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?,
-            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream, None))? as i32,
+            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
+            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
         };
 
         let right_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
-            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream, None))?,
-            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream, None))? as i32,
+            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
+            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
         };
 
         Ok(Self {

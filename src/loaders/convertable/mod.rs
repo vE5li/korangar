@@ -216,7 +216,7 @@ impl ToBytes for f32 {
 }
 
 impl<T: Named, const SIZE: usize> Named for [T; SIZE] {
-    const NAME: &'static str = "[T; SIZE]"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "[T; SIZE]";
 }
 
 impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
@@ -300,7 +300,7 @@ impl ToBytes for String {
 }
 
 impl<T: Named> Named for Vec<T> {
-    const NAME: &'static str = "Vec<T>"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "Vec<T>";
 }
 
 impl<T: FromBytes> FromBytes for Vec<T> {
@@ -321,7 +321,7 @@ impl<T: FromBytes> FromBytes for Vec<T> {
 }
 
 impl<T: Named> Named for Vector2<T> {
-    const NAME: &'static str = "Vector2<T>"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "Vector2<T>";
 }
 
 impl<T: FromBytes> FromBytes for Vector2<T> {
@@ -347,7 +347,7 @@ impl<T: ToBytes> ToBytes for Vector2<T> {
 }
 
 impl<T: Named> Named for Vector3<T> {
-    const NAME: &'static str = "Vector3<T>"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "Vector3<T>";
 }
 
 impl<T: FromBytes> FromBytes for Vector3<T> {
@@ -375,7 +375,7 @@ impl<T: ToBytes> ToBytes for Vector3<T> {
 }
 
 impl<T: Named> Named for Vector4<T> {
-    const NAME: &'static str = "Vector4<T>"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "Vector4<T>";
 }
 
 impl<T: FromBytes> FromBytes for Vector4<T> {
@@ -404,7 +404,7 @@ impl<T: ToBytes> ToBytes for Vector4<T> {
 }
 
 impl<T: Named> Named for Quaternion<T> {
-    const NAME: &'static str = "Quaternion<T>"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "Quaternion<T>";
 }
 
 impl<T: FromBytes> FromBytes for Quaternion<T> {
@@ -421,7 +421,7 @@ impl<T: FromBytes> FromBytes for Quaternion<T> {
 }
 
 impl<T: Named> Named for Matrix3<T> {
-    const NAME: &'static str = "Matrix3<T>"; // TODO: use const string concat to get correct name
+    const NAME: &'static str = "Matrix3<T>";
 }
 
 impl<T: FromBytes> FromBytes for Matrix3<T> {

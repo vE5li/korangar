@@ -37,7 +37,7 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
             move || !packets.borrow().is_empty()
         };
 
-        let clear_action = { move || Some(ClickAction::Event(UserEvent::ClearPacketHistory)) };
+        let clear_action = { move || vec![ClickAction::Event(UserEvent::ClearPacketHistory)] };
 
         let elements = vec![
             Button::default()

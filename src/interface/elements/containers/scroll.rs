@@ -12,18 +12,26 @@ pub struct ScrollView {
     scroll: f32,
     state: ContainerState,
     size_constraint: SizeConstraint,
+    background_color: Option<ColorSelector>,
 }
 
 impl ScrollView {
     pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
         let scroll = 0.0;
         let state = ContainerState::new(elements);
+        let background_color = None;
 
         Self {
             scroll,
             state,
             size_constraint,
+            background_color,
         }
+    }
+
+    pub fn with_background_color(mut self, background_color: impl Fn(&InterfaceTheme) -> Color + 'static) -> Self {
+        self.background_color = Some(Box::new(background_color));
+        self
     }
 }
 
@@ -52,7 +60,7 @@ impl Element for ScrollView {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(
             placement_resolver,
             interface_settings,
@@ -86,7 +94,7 @@ impl Element for ScrollView {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
@@ -98,6 +106,10 @@ impl Element for ScrollView {
             .state
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+
+        if let Some(color_selector) = &self.background_color {
+            renderer.render_background((*theme.button.corner_radius).into(), color_selector(theme));
+        }
 
         renderer.set_scroll(self.scroll);
 

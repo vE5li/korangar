@@ -29,7 +29,7 @@ impl Element for SkillBox {
         self.skill.is_some()
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &constraint!(30, 30));
     }
 
@@ -40,12 +40,12 @@ impl Element for SkillBox {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
         if let Some(skill) = &self.skill {
-            return Some(ClickAction::MoveSkill(self.source, skill.clone()));
+            return vec![ClickAction::MoveSkill(self.source, skill.clone())];
         }
 
-        None
+        Vec::new()
     }
 
     fn drop_skill(&mut self, skill_source: SkillSource, skill: Skill) -> Option<SkillMove> {
@@ -62,7 +62,7 @@ impl Element for SkillBox {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

@@ -270,6 +270,19 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
+    let timer = Timer::new("load settings");
+
+    let mut input_system = InputSystem::new();
+    let mut graphics_settings = GraphicsSettings::new();
+    #[cfg(feature = "debug")]
+    let mut render_settings = RenderSettings::new();
+
+    #[cfg(feature = "debug")]
+    timer.stop();
+
+    let mut shadow_detail = Remote::new(graphics_settings.shadow_detail);
+
+    #[cfg(feature = "debug")]
     let timer = Timer::new("create render targets");
 
     let mut screen_targets = swapchain_holder
@@ -289,7 +302,7 @@ fn main() {
     let mut directional_shadow_targets = swapchain_holder
         .get_swapchain_images()
         .into_iter()
-        .map(|_| shadow_renderer.create_render_target(8192))
+        .map(|_| shadow_renderer.create_render_target(shadow_detail.get().into_resolution()))
         .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
 
     #[cfg(feature = "debug")]
@@ -305,10 +318,6 @@ fn main() {
         swapchain_holder.window_size_f32(),
     );
     let mut focus_state = FocusState::default();
-    let mut input_system = InputSystem::new();
-    let mut graphics_settings = GraphicsSettings::new();
-    #[cfg(feature = "debug")]
-    let mut render_settings = RenderSettings::new();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -342,7 +351,7 @@ fn main() {
     let client_info = load_client_info(&mut game_file_loader);
     let mut networking_system = NetworkingSystem::new();
 
-    interface.open_window(&mut focus_state, &SelectServiceWindow::new(client_info.services.clone()));
+    interface.open_window(&mut focus_state, &LoginWindow::new(&client_info));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -633,7 +642,7 @@ fn main() {
                                 )
                                 .expect("failed to load initial map");
 
-                            interface.close_all_windows(&mut focus_state);
+                            interface.close_all_windows_except(&mut focus_state);
 
                             let character_selection_window = networking_system.character_selection_window();
                             interface.open_window(&mut focus_state, &character_selection_window);
@@ -716,16 +725,12 @@ fn main() {
 
                 for event in user_events {
                     match event {
-                        UserEvent::SelectService(service) => {
-                            interface.close_window_with_class(&mut focus_state, SelectServiceWindow::WINDOW_CLASS);
-
-                            interface.open_window(
-                                &mut focus_state,
-                                &LoginWindow::new(service, networking_system.get_login_settings().clone()),
-                            );
-                        }
-                        UserEvent::LogIn(service, username, password) => {
-                            match networking_system.log_in(service, username, password) {
+                        UserEvent::LogIn {
+                            service_id,
+                            username,
+                            password,
+                        } => {
+                            match networking_system.log_in(&client_info, service_id, username, password) {
                                 Ok(servers) => {
                                     // TODO: this will do one unnecessary restore_focus. check if
                                     // that will be problematic
@@ -751,8 +756,6 @@ fn main() {
                         }
                         UserEvent::LogOut => networking_system.log_out().unwrap(),
                         UserEvent::Exit => *control_flow = ControlFlow::Exit,
-                        UserEvent::ToggleRemeberUsername => networking_system.toggle_remember_username(),
-                        UserEvent::ToggleRemeberPassword => networking_system.toggle_remember_password(),
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::ToggleFrameLimit => {
@@ -784,17 +787,18 @@ fn main() {
                                 interface.open_window(&mut focus_state, &SkillTreeWindow::new(player_skill_tree.get_skills()))
                             }
                         }
-                        UserEvent::OpenGraphicsSettingsWindow => {
-                            interface.open_window(&mut focus_state, &GraphicsSettingsWindow::new(present_mode_info))
-                        }
+                        UserEvent::OpenGraphicsSettingsWindow => interface.open_window(
+                            &mut focus_state,
+                            &GraphicsSettingsWindow::new(present_mode_info, shadow_detail.clone_state()),
+                        ),
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&mut focus_state, &AudioSettingsWindow::default()),
                         UserEvent::OpenFriendsWindow => interface.open_window(&mut focus_state, &networking_system.friends_window()),
-                        UserEvent::SetThemeFile(theme_file) => {
-                            interface.set_theme_file(theme_file);
-                            interface.reload_theme();
+                        UserEvent::SetThemeFile { theme_file, theme_kind } => {
+                            interface.set_theme_file(theme_file, theme_kind);
+                            interface.reload_theme(theme_kind);
                         }
-                        UserEvent::SaveTheme => interface.save_theme(),
-                        UserEvent::ReloadTheme => interface.reload_theme(),
+                        UserEvent::SaveTheme { theme_kind } => interface.save_theme(theme_kind),
+                        UserEvent::ReloadTheme { theme_kind } => interface.reload_theme(theme_kind),
                         UserEvent::SelectCharacter(character_slot) => {
                             match networking_system.select_character(character_slot) {
                                 Ok((account_id, character_information, map_name)) => {
@@ -1123,7 +1127,7 @@ fn main() {
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
-                    profile_block!("recreate buffers");
+                    profile_block!("re-create buffers");
 
                     let viewport = swapchain_holder.recreate_swapchain();
 
@@ -1154,6 +1158,23 @@ fn main() {
                 if swapchain_holder.acquire_next_image().is_err() {
                     // temporary check?
                     return;
+                }
+
+                if shadow_detail.consume_changed() {
+                    #[cfg(feature = "debug")]
+                    print_debug!("re-creating {}directional shadow targets{}", MAGENTA, NONE);
+
+                    #[cfg(feature = "debug")]
+                    profile_block!("re-create shadow maps");
+
+                    let new_shadow_detail = shadow_detail.get();
+                    graphics_settings.shadow_detail = new_shadow_detail;
+
+                    directional_shadow_targets = swapchain_holder
+                        .get_swapchain_images()
+                        .into_iter()
+                        .map(|_| shadow_renderer.create_render_target(new_shadow_detail.into_resolution()))
+                        .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
                 }
 
                 #[cfg(feature = "debug")]
@@ -1215,7 +1236,7 @@ fn main() {
                 #[cfg(feature = "debug")]
                 let prepare_frame_measuremen = start_measurement("prepare frame");
 
-                let walk_indicator_color = *interface.get_theme().indicator.walking;
+                let walk_indicator_color = *interface.get_game_theme().indicator.walking;
                 let image_number = swapchain_holder.get_image_number();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
@@ -1419,7 +1440,6 @@ fn main() {
                             &graphics_settings,
                             #[cfg(feature = "debug")]
                             &render_settings,
-                            networking_system.get_login_settings(),
                         );
 
                         interface.render(
@@ -1464,7 +1484,7 @@ fn main() {
                             screen_target,
                             &deferred_renderer,
                             current_camera,
-                            interface.get_theme(),
+                            interface.get_game_theme(),
                             window_size,
                         );
 
@@ -1483,7 +1503,7 @@ fn main() {
                         screen_target,
                         &deferred_renderer,
                         current_camera,
-                        interface.get_theme(),
+                        interface.get_game_theme(),
                         window_size,
                     );
                 }

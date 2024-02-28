@@ -1,15 +1,48 @@
+use std::collections::HashMap;
+
 use ron::ser::PrettyConfig;
-use serde::{Deserialize, Serialize};
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
+use crate::loaders::ServiceId;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct LoginSettings {
+    pub service: String,
+    pub service_settings: HashMap<ServiceId, ServiceSettings>,
+    pub recent_service_id: Option<ServiceId>,
+}
+
+#[derive(Clone, Default, Deserialize)]
+pub struct ServiceSettings {
     pub username: String,
     pub password: String,
     pub remember_username: bool,
     pub remember_password: bool,
+}
+
+impl Serialize for ServiceSettings {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut serde_state = Serializer::serialize_struct(serializer, "ServiceSettings", 4)?;
+        SerializeStruct::serialize_field(
+            &mut serde_state,
+            "username",
+            self.remember_username.then_some(self.username.as_str()).unwrap_or_default(),
+        )?;
+        SerializeStruct::serialize_field(
+            &mut serde_state,
+            "password",
+            self.remember_password.then_some(self.password.as_str()).unwrap_or_default(),
+        )?;
+        SerializeStruct::serialize_field(&mut serde_state, "remember_username", &self.remember_username)?;
+        SerializeStruct::serialize_field(&mut serde_state, "remember_password", &self.remember_password)?;
+        SerializeStruct::end(serde_state)
+    }
 }
 
 impl LoginSettings {

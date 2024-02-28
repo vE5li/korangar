@@ -29,7 +29,7 @@ impl Element for ItemBox {
         self.item.is_some()
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &constraint!(30, 30));
     }
 
@@ -40,12 +40,12 @@ impl Element for ItemBox {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
         if let Some(item) = &self.item {
-            return Some(ClickAction::MoveItem(self.source, item.clone()));
+            return vec![ClickAction::MoveItem(self.source, item.clone())];
         }
 
-        None
+        Vec::new()
     }
 
     fn drop_item(&mut self, item_source: ItemSource, item: Item) -> Option<ItemMove> {
@@ -62,7 +62,7 @@ impl Element for ItemBox {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

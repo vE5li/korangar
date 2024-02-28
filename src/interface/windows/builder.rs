@@ -10,6 +10,7 @@ pub struct WindowBuilder {
     elements: Vec<ElementCell>,
     closable: bool,
     background_color: Option<ColorSelector>,
+    theme_kind: ThemeKind,
 }
 
 impl WindowBuilder {
@@ -41,6 +42,11 @@ impl WindowBuilder {
         self
     }
 
+    pub fn with_theme_kind(mut self, theme_kind: ThemeKind) -> Self {
+        self.theme_kind = theme_kind;
+        self
+    }
+
     pub fn closable(mut self) -> Self {
         self.closable = true;
         self
@@ -54,6 +60,7 @@ impl WindowBuilder {
             mut elements,
             closable,
             background_color,
+            theme_kind,
         } = self;
 
         if closable {
@@ -104,8 +111,10 @@ impl WindowBuilder {
             size_constraint,
             size,
             elements,
+            popup_element: None,
             closable,
             background_color,
+            theme_kind,
         }
     }
 }

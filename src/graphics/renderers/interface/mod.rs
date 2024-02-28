@@ -106,7 +106,7 @@ impl InterfaceRenderer {
         self.font_loader.borrow().get_text_dimensions(text, font_size, available_width)
     }
 
-    #[profile("recreate interface pipeline")]
+    #[profile("re-create interface pipeline")]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
         let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();

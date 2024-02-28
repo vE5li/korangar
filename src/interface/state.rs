@@ -49,6 +49,15 @@ impl<T> TrackedState<T> {
     }
 }
 
+impl<T> TrackedState<T>
+where
+    T: Clone,
+{
+    pub fn get(&self) -> T {
+        self.0.borrow().0.clone()
+    }
+}
+
 impl<T> TrackedState<Vec<T>> {
     pub fn clear(&mut self) {
         let mut inner = self.0.borrow_mut();
@@ -103,11 +112,11 @@ where
         inner.1 = inner.1.wrapping_add(1);
     }
 
-    pub fn toggle_action(&self) -> Box<impl FnMut() -> Option<ClickAction>> {
+    pub fn toggle_action(&self) -> Box<impl FnMut() -> Vec<ClickAction>> {
         let mut cloned = self.clone();
         Box::new(move || {
             cloned.toggle();
-            None
+            Vec::new()
         })
     }
 }
@@ -115,7 +124,7 @@ where
 impl TrackedState<bool> {
     pub fn selector(&self) -> impl Fn(&StateProvider) -> bool {
         let cloned = self.clone();
-        move |_: &StateProvider| *cloned.borrow()
+        move |_: &StateProvider| cloned.get()
     }
 }
 
@@ -131,6 +140,14 @@ pub struct Remote<T> {
 }
 
 impl<T> Remote<T> {
+    pub fn new(value: T) -> Remote<T> {
+        TrackedState::new(value).new_remote()
+    }
+
+    pub fn clone_state(&self) -> TrackedState<T> {
+        self.tracked_state.clone()
+    }
+
     pub fn borrow(&self) -> Ref<'_, T> {
         self.tracked_state.borrow()
     }
@@ -141,6 +158,15 @@ impl<T> Remote<T> {
         self.version = version;
 
         changed
+    }
+}
+
+impl<T> Remote<T>
+where
+    T: Clone,
+{
+    pub fn get(&self) -> T {
+        self.tracked_state.get()
     }
 }
 

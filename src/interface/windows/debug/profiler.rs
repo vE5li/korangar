@@ -27,93 +27,32 @@ impl PrototypeWindow for ProfilerWindow {
         let toggle_halting = || {
             let is_profiler_halted = is_profiler_halted();
             set_profiler_halted(!is_profiler_halted);
-            None
-        };
-
-        let main_selector = {
-            let visible_thread = self.visible_thread.clone();
-            move |_: &StateProvider| *visible_thread.borrow() == ProfilerThread::Main
-        };
-        let show_main_thread = {
-            let mut visible_thread = self.visible_thread.clone();
-            move || {
-                visible_thread.set(ProfilerThread::Main);
-                None
-            }
-        };
-
-        let picker_selector = {
-            let visible_thread = self.visible_thread.clone();
-            move |_: &StateProvider| *visible_thread.borrow() == ProfilerThread::Picker
-        };
-        let show_picker_thread = {
-            let mut visible_thread = self.visible_thread.clone();
-            move || {
-                visible_thread.set(ProfilerThread::Picker);
-                None
-            }
-        };
-
-        let shadow_selector = {
-            let visible_thread = self.visible_thread.clone();
-            move |_: &StateProvider| *visible_thread.borrow() == ProfilerThread::Shadow
-        };
-        let show_shadow_thread = {
-            let mut visible_thread = self.visible_thread.clone();
-            move || {
-                visible_thread.set(ProfilerThread::Shadow);
-                None
-            }
-        };
-
-        let deferred_selector = {
-            let visible_thread = self.visible_thread.clone();
-            move |_: &StateProvider| *visible_thread.borrow() == ProfilerThread::Deferred
-        };
-        let show_deferred_thread = {
-            let mut visible_thread = self.visible_thread.clone();
-            move || {
-                visible_thread.set(ProfilerThread::Deferred);
-                None
-            }
+            Vec::new()
         };
 
         let elements = vec![
-            StateButton::default()
-                .with_text("Halt")
-                .with_selector(|_: &StateProvider| is_profiler_halted())
-                .with_event(Box::new(toggle_halting))
-                .with_width(dimension!(16.6%))
+            PickList::default()
+                .with_options(vec![
+                    ("Main thread", ProfilerThread::Main),
+                    ("Picker thread", ProfilerThread::Picker),
+                    ("Shadow thread", ProfilerThread::Shadow),
+                    ("Deferred thread", ProfilerThread::Deferred),
+                ])
+                .with_selected(self.visible_thread.clone())
+                .with_width(dimension!(150))
+                .with_event(Box::new(Vec::new))
                 .wrap(),
             StateButton::default()
                 .with_text("Always update")
                 .with_selector(self.always_update.selector())
                 .with_event(self.always_update.toggle_action())
-                .with_width(dimension!(16.6%))
+                .with_width(dimension!(150))
                 .wrap(),
             StateButton::default()
-                .with_text("Main thread")
-                .with_selector(main_selector)
-                .with_event(Box::new(show_main_thread))
-                .with_width(dimension!(16.6%))
-                .wrap(),
-            StateButton::default()
-                .with_text("Picker thread")
-                .with_selector(picker_selector)
-                .with_event(Box::new(show_picker_thread))
-                .with_width(dimension!(16.6%))
-                .wrap(),
-            StateButton::default()
-                .with_text("Shadow thread")
-                .with_selector(shadow_selector)
-                .with_event(Box::new(show_shadow_thread))
-                .with_width(dimension!(16.6%))
-                .wrap(),
-            StateButton::default()
-                .with_text("Deferred thread")
-                .with_selector(deferred_selector)
-                .with_event(Box::new(show_deferred_thread))
-                .with_width(dimension!(!))
+                .with_text("Halt")
+                .with_selector(|_: &StateProvider| is_profiler_halted())
+                .with_event(Box::new(toggle_halting))
+                .with_width(dimension!(150))
                 .wrap(),
             ElementWrap::wrap(FrameView::new(
                 self.always_update.new_remote(),

@@ -57,7 +57,7 @@ impl Element for Expandable {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let closed_size = self
             .closed_size_constraint
             .resolve_partial(
@@ -141,10 +141,10 @@ impl Element for Expandable {
         HoverInformation::Missed
     }
 
-    fn left_click(&mut self, force_update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, force_update: &mut bool) -> Vec<ClickAction> {
         self.expanded = !self.expanded;
         *force_update = true;
-        None
+        Vec::new()
     }
 
     fn render(
@@ -153,7 +153,7 @@ impl Element for Expandable {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

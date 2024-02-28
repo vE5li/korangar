@@ -22,7 +22,7 @@ use crate::interface::PacketWindow;
 use crate::interface::{
     CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, WeakElementCell,
 };
-use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes, Named, Service, ToBytes};
+use crate::loaders::{conversion_result, ByteStream, ClientInfo, ConversionError, FromBytes, Named, ServiceId, ToBytes};
 
 #[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct ClientTick(pub u32);
@@ -2688,21 +2688,37 @@ struct LoginData {
     pub sex: Sex,
 }
 
+// TODO: Use struct like this
+// enum GameState {
+//     LoggingIn {},
+//     SelectingCharacter {
+//         login_data: LoginData,
+//         characters: TrackedState<Vec<CharacterInformation>>,
+//         move_request: TrackedState<Option<usize>>,
+//         slot_count: usize,
+//     },
+//     Playing {
+//         friend_list: TrackedState<Vec<(Friend,
+// UnsafeCell<Option<WeakElementCell>>)>>,         player_name: String,
+//     },
+// }
+
 pub struct NetworkingSystem {
-    login_settings: LoginSettings,
     login_stream: Option<TcpStream>,
     character_stream: Option<TcpStream>,
     map_stream: Option<TcpStream>,
     // TODO: Make this a heapless Vec or something
     map_stream_buffer: Vec<u8>,
+    login_keep_alive_timer: NetworkTimer,
+    character_keep_alive_timer: NetworkTimer,
+    map_keep_alive_timer: NetworkTimer,
+
+    // TODO: Move to GameState
     login_data: Option<LoginData>,
     characters: TrackedState<Vec<CharacterInformation>>,
     move_request: TrackedState<Option<usize>>,
     friend_list: TrackedState<Vec<(Friend, UnsafeCell<Option<WeakElementCell>>)>>,
     slot_count: usize,
-    login_keep_alive_timer: NetworkTimer,
-    character_keep_alive_timer: NetworkTimer,
-    map_keep_alive_timer: NetworkTimer,
     player_name: String,
     #[cfg(feature = "debug")]
     update_packets: TrackedState<bool>,
@@ -2712,8 +2728,6 @@ pub struct NetworkingSystem {
 
 impl NetworkingSystem {
     pub fn new() -> Self {
-        let login_settings = LoginSettings::new();
-
         let login_stream = None;
         let character_stream = None;
         let map_stream = None;
@@ -2733,7 +2747,6 @@ impl NetworkingSystem {
         let packet_history = TrackedState::default();
 
         Self {
-            login_settings,
             login_stream,
             character_stream,
             slot_count,
@@ -2754,25 +2767,24 @@ impl NetworkingSystem {
         }
     }
 
-    pub fn get_login_settings(&self) -> &LoginSettings {
-        &self.login_settings
-    }
-
-    pub fn toggle_remember_username(&mut self) {
-        self.login_settings.remember_username = !self.login_settings.remember_username;
-    }
-
-    pub fn toggle_remember_password(&mut self) {
-        self.login_settings.remember_password = !self.login_settings.remember_password;
-    }
-
-    pub fn log_in(&mut self, service: Service, username: String, password: String) -> Result<Vec<CharacterServerInformation>, String> {
+    pub fn log_in(
+        &mut self,
+        client_info: &ClientInfo,
+        service_id: ServiceId,
+        username: String,
+        password: String,
+    ) -> Result<Vec<CharacterServerInformation>, String> {
         #[cfg(feature = "debug")]
         let timer = Timer::new("log in");
 
+        let service = client_info
+            .services
+            .iter()
+            .find(|service| service.service_id() == service_id)
+            .unwrap();
         let service_address = format!("{}:{}", service.address, service.port);
 
-        let login_stream = TcpStream::connect(&service_address).expect("failed to connect to login server");
+        let login_stream = TcpStream::connect(service_address).map_err(|_| "failed to connect to login server".to_owned())?;
         login_stream.set_read_timeout(Duration::from_secs(1).into()).unwrap();
         self.login_stream = Some(login_stream);
 
@@ -2809,29 +2821,16 @@ impl NetworkingSystem {
             _ => panic!(),
         };
 
-        self.login_data = LoginData::new(
+        self.login_data = Some(LoginData::new(
             login_server_login_success_packet.account_id,
             login_server_login_success_packet.login_id1,
             login_server_login_success_packet.login_id2,
             login_server_login_success_packet.sex,
-        )
-        .into();
+        ));
 
         if login_server_login_success_packet.character_server_information.is_empty() {
             return Err("no character server available".to_string());
         }
-
-        self.login_settings.username = match self.login_settings.remember_username {
-            true => username,
-            // clear in case it was previously saved
-            false => String::new(),
-        };
-
-        self.login_settings.password = match self.login_settings.remember_password {
-            true => password,
-            // clear in case it was previously saved
-            false => String::new(),
-        };
 
         #[cfg(feature = "debug")]
         self.update_packet_history(&mut byte_stream);
@@ -2947,7 +2946,7 @@ impl NetworkingSystem {
     where
         T: OutgoingPacket + 'static,
     {
-        if *self.update_packets.borrow() {
+        if self.update_packets.get() {
             self.packet_history.with_mut(|buffer, changed| {
                 buffer.push((PacketEntry::new_outgoing(packet, T::NAME, T::IS_PING), UnsafeCell::new(None)));
                 changed()

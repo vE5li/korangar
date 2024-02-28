@@ -8,7 +8,7 @@ use vulkano::buffer::Subbuffer;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
 use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, ModelVertex, Renderer};
-use crate::interface::{InterfaceSettings, PrototypeWindow, Size, Theme, Window, WindowCache};
+use crate::interface::{GameTheme, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, Sex, StatusType};
 use crate::world::Map;
@@ -820,7 +820,7 @@ impl Player {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        theme: &Theme,
+        theme: &GameTheme,
         window_size: Vector2<f32>,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
@@ -920,7 +920,7 @@ impl Npc {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        theme: &Theme,
+        theme: &GameTheme,
         window_size: Vector2<f32>,
     ) {
         if self.common.entity_type != EntityType::Monster {
@@ -1078,7 +1078,7 @@ impl Entity {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        theme: &Theme,
+        theme: &GameTheme,
         window_size: Vector2<f32>,
     ) {
         match self {

@@ -40,7 +40,7 @@ impl FrameInspectorView {
 
     fn render_lines(
         renderer: &mut ElementRenderer<'_>,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         text: &str,
         text_width: f32,
         mut x_position: f32,
@@ -82,7 +82,7 @@ impl FrameInspectorView {
     fn render_measurement(
         renderer: &mut ElementRenderer<'_>,
         color_lookup: &mut super::ColorLookup,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         measurement: &Measurement,
         start_time: Instant,
         total_width: f32,
@@ -168,7 +168,7 @@ impl Element for FrameInspectorView {
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
         let size_constraint = &constraint!(100%, 300);
         self.state.resolve(placement_resolver, size_constraint);
     }
@@ -204,7 +204,7 @@ impl Element for FrameInspectorView {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,

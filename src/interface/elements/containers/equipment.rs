@@ -86,7 +86,7 @@ impl Element for EquipmentContainer {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = &constraint!(100%, ?);
         self.state.resolve(
             placement_resolver,
@@ -126,7 +126,7 @@ impl Element for EquipmentContainer {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

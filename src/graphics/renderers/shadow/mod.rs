@@ -5,6 +5,7 @@ mod indicator;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
+use serde::{Deserialize, Serialize};
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearValue, Format};
 use vulkano::image::{ImageUsage, SampleCount};
@@ -19,6 +20,25 @@ use crate::graphics::{
 };
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::EntityId;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ShadowDetail {
+    Low,
+    Medium,
+    High,
+    Ultra,
+}
+
+impl ShadowDetail {
+    pub fn into_resolution(self) -> u32 {
+        match self {
+            ShadowDetail::Low => 512,
+            ShadowDetail::Medium => 1024,
+            ShadowDetail::High => 2048,
+            ShadowDetail::Ultra => 8192,
+        }
+    }
+}
 
 #[derive(PartialEq, Eq)]
 pub enum ShadowSubrenderer {

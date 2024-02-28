@@ -54,7 +54,7 @@ impl Element for Container {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = self.size_constraint.as_ref().unwrap_or(&constraint!(100%, ?));
         let border = self.border_size.unwrap_or_else(Vector2::zero);
 
@@ -76,7 +76,7 @@ impl Element for Container {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

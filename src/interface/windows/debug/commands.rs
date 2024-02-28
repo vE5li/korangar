@@ -26,13 +26,13 @@ impl PrototypeWindow for CommandsWindow {
                 let mut text = input_text.borrow_mut();
 
                 if text.is_empty() {
-                    return None;
+                    return Vec::new();
                 }
 
                 let message = format!("@jobchange {text}");
                 text.clear();
 
-                Some(ClickAction::Event(UserEvent::SendMessage(message)))
+                vec![ClickAction::Event(UserEvent::SendMessage(message))]
             })
         };
 
@@ -43,7 +43,7 @@ impl PrototypeWindow for CommandsWindow {
                 let mut text = input_text.borrow_mut();
                 let message = format!("@jobchange {text}");
                 text.clear();
-                Some(ClickAction::Event(UserEvent::SendMessage(message)))
+                vec![ClickAction::Event(UserEvent::SendMessage(message))]
             }
         };
 

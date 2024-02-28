@@ -20,7 +20,7 @@ impl Element for HiddenElement {
         unimplemented!()
     }
 
-    fn resolve(&mut self, _placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn resolve(&mut self, _placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
         unimplemented!()
     }
 
@@ -30,7 +30,7 @@ impl Element for HiddenElement {
         _render: &InterfaceRenderer,
         _state_provider: &StateProvider,
         _interface_settings: &InterfaceSettings,
-        _theme: &Theme,
+        _theme: &InterfaceTheme,
         _parent_position: Position,
         _clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,
@@ -94,14 +94,12 @@ impl PacketEntry {
 pub struct PacketView<const N: usize> {
     packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>,
     show_pings: Remote<bool>,
-    weak_self: Option<WeakElementCell>,
     hidden_element: ElementCell,
     state: ContainerState,
 }
 
 impl<const N: usize> PacketView<N> {
     pub fn new(packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>, show_pings: Remote<bool>) -> Self {
-        let weak_self = None;
         let hidden_element = HiddenElement.wrap();
         let elements = {
             let packets = packets.borrow();
@@ -130,7 +128,6 @@ impl<const N: usize> PacketView<N> {
         Self {
             packets,
             show_pings,
-            weak_self,
             hidden_element,
             state: ContainerState::new(elements),
         }
@@ -147,7 +144,6 @@ impl<const N: usize> Element for PacketView<N> {
     }
 
     fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
-        self.weak_self = Some(weak_self.clone());
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -163,7 +159,7 @@ impl<const N: usize> Element for PacketView<N> {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(
             placement_resolver,
             interface_settings,
@@ -223,7 +219,9 @@ impl<const N: usize> Element for PacketView<N> {
                     if show_packet && was_hidden {
                         let element = PacketEntry::to_element(packet);
                         *linked_element = Rc::downgrade(&element);
-                        element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
+                        element
+                            .borrow_mut()
+                            .link_back(Rc::downgrade(&element), self.state.state.self_element.clone());
 
                         self.state.elements.insert(index, element);
                         resolve = true;
@@ -242,7 +240,9 @@ impl<const N: usize> Element for PacketView<N> {
                         true => {
                             let element = PacketEntry::to_element(packet);
                             unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
-                            element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
+                            element
+                                .borrow_mut()
+                                .link_back(Rc::downgrade(&element), self.state.state.self_element.clone());
 
                             self.state.elements.push(element);
                             resolve = true;
@@ -278,7 +278,7 @@ impl<const N: usize> Element for PacketView<N> {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

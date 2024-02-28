@@ -25,7 +25,7 @@ pub use self::map::MapData;
 pub use self::map::{LightSettings, MapLoader, WaterSettings};
 pub use self::model::*;
 pub use self::script::ScriptLoader;
-pub use self::server::{load_client_info, Service};
+pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::sprite::*;
 pub use self::stream::ByteStream;
 pub use self::texture::TextureLoader;

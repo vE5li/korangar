@@ -60,7 +60,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &theme.value.size_constraint);
     }
 
@@ -83,7 +83,7 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
         let prototype_window = VectorWindow::new(
             self.name.clone(),
             self.inner_pointer,
@@ -92,7 +92,7 @@ where
             self.change_event,
         );
 
-        Some(ClickAction::OpenWindow(Box::new(prototype_window)))
+        vec![ClickAction::OpenWindow(Box::new(prototype_window))]
     }
 
     fn render(
@@ -101,7 +101,7 @@ where
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

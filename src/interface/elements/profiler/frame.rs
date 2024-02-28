@@ -36,7 +36,7 @@ impl Element for FrameView {
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
         let size_constraint = &constraint!(100%, 300);
         self.state.resolve(placement_resolver, size_constraint);
     }
@@ -59,7 +59,7 @@ impl Element for FrameView {
         }
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction> {
         let visible_thread = *self.visible_thread.borrow();
         let mouse_position = self.state.mouse_position.get();
         let number_of_frames = get_number_of_saved_frames(visible_thread);
@@ -68,7 +68,7 @@ impl Element for FrameView {
         let clicked_frame = (mouse_position.x / bar_width) as usize;
 
         let measurement = get_frame_by_index(visible_thread, clicked_frame);
-        Some(ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement))))
+        vec![ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement)))]
     }
 
     fn render(
@@ -77,7 +77,7 @@ impl Element for FrameView {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        _theme: &Theme,
+        _theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,

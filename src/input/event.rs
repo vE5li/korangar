@@ -1,21 +1,23 @@
 use cgmath::Vector2;
 
 use super::HotbarSlot;
-use crate::interface::{ItemMove, SkillMove};
-use crate::loaders::Service;
+use crate::interface::{ItemMove, SkillMove, ThemeKind};
+use crate::loaders::ServiceId;
 use crate::network::{AccountId, CharacterId, CharacterServerInformation, EntityId};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 #[derive(Clone, Debug)]
+// TODO: A lot of these are not user events, just a element events
 pub enum UserEvent {
-    SelectService(Service),
-    LogIn(Service, String, String),
+    LogIn {
+        service_id: ServiceId,
+        username: String,
+        password: String,
+    },
     SelectServer(CharacterServerInformation),
     LogOut,
     Exit,
-    ToggleRemeberUsername,
-    ToggleRemeberPassword,
     CameraZoom(f32),
     CameraRotate(f32),
     ToggleFrameLimit,
@@ -27,9 +29,16 @@ pub enum UserEvent {
     OpenGraphicsSettingsWindow,
     OpenAudioSettingsWindow,
     OpenFriendsWindow,
-    SetThemeFile(String),
-    SaveTheme,
-    ReloadTheme,
+    SetThemeFile {
+        theme_file: String,
+        theme_kind: ThemeKind,
+    },
+    SaveTheme {
+        theme_kind: ThemeKind,
+    },
+    ReloadTheme {
+        theme_kind: ThemeKind,
+    },
     SelectCharacter(usize),
     OpenCharacterCreationWindow(usize),
     CreateCharacter(usize, String),

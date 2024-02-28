@@ -36,10 +36,10 @@ impl PrototypeWindow for CharacterCreationWindow {
             let slot = self.slot;
             let name = name.clone();
 
-            move || Some(ClickAction::Event(UserEvent::CreateCharacter(slot, name.borrow().clone())))
+            move || vec![ClickAction::Event(UserEvent::CreateCharacter(slot, name.borrow().clone()))]
         };
 
-        let input_action = Box::new(move || Some(ClickAction::FocusNext(FocusMode::FocusNext)));
+        let input_action = Box::new(move || vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
 
         let elements = vec![
             InputField::<MAXIMUM_NAME_LENGTH>::new(name, "character name", input_action, dimension!(100%)).wrap(),
@@ -57,6 +57,7 @@ impl PrototypeWindow for CharacterCreationWindow {
             .with_size(constraint!(200 > 250 < 300, ? < 80%))
             .with_elements(elements)
             .closable()
+            .with_theme_kind(ThemeKind::Menu)
             .build(window_cache, interface_settings, available_space)
     }
 }

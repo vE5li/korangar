@@ -12,33 +12,33 @@ use crate::interface::{Element, *};
 pub struct InputField<const LENGTH: usize, const HIDDEN: bool = false> {
     display: Rc<RefCell<String>>,
     ghost_text: &'static str,
-    action: Box<dyn Fn() -> Option<ClickAction>>,
+    action: Box<dyn Fn() -> Vec<ClickAction>>,
     width_constraint: DimensionConstraint,
     #[new(default)]
     state: ElementState,
 }
 
 impl<const LENGTH: usize, const HIDDEN: bool> InputField<LENGTH, HIDDEN> {
-    fn remove_character(&mut self) -> Option<ClickAction> {
+    fn remove_character(&mut self) -> Vec<ClickAction> {
         let mut display = self.display.borrow_mut();
 
         if display.is_empty() {
-            return None;
+            return Vec::new();
         }
 
         display.pop();
-        Some(ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW))
+        vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)]
     }
 
-    fn add_character(&mut self, character: char) -> Option<ClickAction> {
+    fn add_character(&mut self, character: char) -> Vec<ClickAction> {
         let mut display = self.display.borrow_mut();
 
         if display.len() >= LENGTH {
-            return None;
+            return Vec::new();
         }
 
         display.push(character);
-        Some(ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW))
+        vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)]
     }
 }
 
@@ -51,7 +51,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = self.width_constraint.add_height(theme.input.height_constraint);
         self.state.resolve(placement_resolver, &size_constraint);
     }
@@ -63,11 +63,11 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         }
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::FocusElement)
+    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction> {
+        vec![ClickAction::FocusElement]
     }
 
-    fn input_character(&mut self, character: char) -> Option<ClickAction> {
+    fn input_character(&mut self, character: char) -> Vec<ClickAction> {
         match character {
             '\u{8}' | '\u{7f}' => self.remove_character(),
             '\r' => (self.action)(),
@@ -81,7 +81,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,
@@ -123,10 +123,10 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         };
 
         renderer.render_background(*theme.input.border_radius, background_color);
-        renderer.render_text(&text, Vector2::new(text_offset, 0.0), text_color, *theme.input.font_size);
+        renderer.render_text(&text, text_offset, text_color, *theme.input.font_size);
 
         if is_focused {
-            let cursor_offset = text_offset
+            let cursor_offset = text_offset.x
                 + *theme.input.cursor_offset * *interface_settings.scaling
                 + renderer.get_text_dimensions(&text, *theme.input.font_size, f32::MAX).x;
 

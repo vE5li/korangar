@@ -30,7 +30,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &theme.slider.size_constraint);
     }
 
@@ -53,8 +53,8 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::DragElement)
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
+        vec![ClickAction::DragElement]
     }
 
     fn drag(&mut self, mouse_delta: Position) -> Option<ChangeEvent> {
@@ -78,7 +78,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

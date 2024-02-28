@@ -44,18 +44,18 @@ pub struct ContainerState {
 
 impl ContainerState {
     pub fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
-        self.state.link_back(weak_parent);
         self.elements.iter().for_each(|element| {
             let weak_element = Rc::downgrade(element);
             element.borrow_mut().link_back(weak_element, Some(weak_self.clone()));
         });
+        self.state.link_back(weak_self, weak_parent);
     }
 
     pub fn resolve(
         &mut self,
         placement_resolver: &mut PlacementResolver,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         size_constraint: &SizeConstraint,
         border: Vector2<f32>,
     ) {
@@ -299,7 +299,7 @@ impl ContainerState {
         renderer: &mut ElementRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,

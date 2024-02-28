@@ -70,7 +70,7 @@ use self::picker::PickerSubrenderer;
 pub use self::picker::{PickerRenderer, PickerTarget};
 #[cfg(feature = "debug")]
 pub use self::settings::RenderSettings;
-pub use self::shadow::ShadowRenderer;
+pub use self::shadow::{ShadowDetail, ShadowRenderer};
 pub use self::swapchain::{PresentModeInfo, SwapchainHolder};
 use super::{Color, MemoryAllocator, ModelVertex};
 #[cfg(feature = "debug")]

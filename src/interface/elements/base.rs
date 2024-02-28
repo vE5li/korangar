@@ -36,6 +36,10 @@ pub struct ElementRenderer<'a> {
 }
 
 impl<'a> ElementRenderer<'a> {
+    pub fn get_position(&self) -> Position {
+        self.position
+    }
+
     pub fn get_text_dimensions(&self, text: &str, font_size: f32, available_width: f32) -> Vector2<f32> {
         self.renderer
             .get_text_dimensions(text, font_size * *self.interface_settings.scaling, available_width)
@@ -117,7 +121,7 @@ impl<'a> ElementRenderer<'a> {
         element: &dyn Element,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -142,7 +146,8 @@ impl<'a> ElementRenderer<'a> {
 pub struct ElementState {
     pub cached_size: Size,
     pub cached_position: Position,
-    pub parent_element: Option<Weak<RefCell<dyn Element>>>,
+    pub self_element: Option<WeakElementCell>,
+    pub parent_element: Option<WeakElementCell>,
     pub mouse_position: Cell<Position>,
 }
 
@@ -151,6 +156,7 @@ impl Default for ElementState {
         Self {
             cached_size: Size::zero(),
             cached_position: Position::zero(),
+            self_element: None,
             parent_element: None,
             mouse_position: Cell::new(Position::zero()),
         }
@@ -158,7 +164,8 @@ impl Default for ElementState {
 }
 
 impl ElementState {
-    pub fn link_back(&mut self, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
+    pub fn link_back(&mut self, weak_self: WeakElementCell, weak_parent: Option<WeakElementCell>) {
+        self.self_element = Some(weak_self);
         self.parent_element = weak_parent;
     }
 
@@ -255,8 +262,8 @@ pub trait Element {
 
     fn get_state_mut(&mut self) -> &mut ElementState;
 
-    fn link_back(&mut self, _weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
-        self.get_state_mut().link_back(weak_parent);
+    fn link_back(&mut self, weak_self: WeakElementCell, weak_parent: Option<WeakElementCell>) {
+        self.get_state_mut().link_back(weak_self, weak_parent);
     }
 
     fn is_focusable(&self) -> bool {
@@ -284,7 +291,7 @@ pub trait Element {
         self.is_focusable().then_some(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme);
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme);
 
     fn update(&mut self) -> Option<ChangeEvent> {
         None
@@ -298,20 +305,20 @@ pub trait Element {
         HoverInformation::Missed
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
-        None
+    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction> {
+        Vec::new()
     }
 
-    fn right_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
-        None
+    fn right_click(&mut self, _update: &mut bool) -> Vec<ClickAction> {
+        Vec::new()
     }
 
     fn drag(&mut self, _mouse_delta: Position) -> Option<ChangeEvent> {
         None
     }
 
-    fn input_character(&mut self, _character: char) -> Option<ClickAction> {
-        None
+    fn input_character(&mut self, _character: char) -> Vec<ClickAction> {
+        Vec::new()
     }
 
     fn drop_item(&mut self, _item_source: ItemSource, _item: Item) -> Option<ItemMove> {
@@ -338,7 +345,7 @@ pub trait Element {
         render: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

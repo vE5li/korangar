@@ -16,7 +16,7 @@ impl Element for CloseButton {
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let (size, position) = placement_resolver.allocate_right(&theme.close_button.size_constraint);
         self.state.cached_size = size.finalize();
         self.state.cached_position = position;
@@ -33,8 +33,8 @@ impl Element for CloseButton {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::CloseWindow)
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
+        vec![ClickAction::CloseWindow]
     }
 
     fn render(
@@ -43,7 +43,7 @@ impl Element for CloseButton {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

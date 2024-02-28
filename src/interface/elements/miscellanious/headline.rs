@@ -29,7 +29,7 @@ impl Element for Headline {
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &self.size_constraint);
     }
 
@@ -39,7 +39,7 @@ impl Element for Headline {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,

@@ -10,7 +10,7 @@ mod cursor;
 mod windows;
 
 use std::cell::RefCell;
-use std::marker::PhantomData;
+use std::marker::{ConstParamTy, PhantomData};
 use std::rc::Rc;
 
 use cgmath::Vector2;
@@ -25,7 +25,8 @@ pub use self::layout::*;
 pub use self::provider::StateProvider;
 pub use self::settings::InterfaceSettings;
 pub use self::state::{Remote, TrackedState};
-pub use self::theme::Theme;
+pub use self::theme::{GameTheme, InterfaceTheme};
+use self::theme::{Main, Menu, ThemeSelector, Themes};
 pub use self::windows::*;
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -36,25 +37,25 @@ use crate::network::{ClientTick, EntityId};
 
 // TODO: move this
 pub type Selector = Box<dyn Fn() -> bool>;
-pub type ColorSelector = Box<dyn Fn(&Theme) -> Color>;
-pub type FontSizeSelector = Box<dyn Fn(&Theme) -> f32>;
+pub type ColorSelector = Box<dyn Fn(&InterfaceTheme) -> Color>;
+pub type FontSizeSelector = Box<dyn Fn(&InterfaceTheme) -> f32>;
 
 pub trait ElementEvent {
-    fn trigger(&mut self) -> Option<ClickAction>;
+    fn trigger(&mut self) -> Vec<ClickAction>;
 }
 
 impl<F> ElementEvent for Box<F>
 where
-    F: FnMut() -> Option<ClickAction> + 'static,
+    F: FnMut() -> Vec<ClickAction> + 'static,
 {
-    fn trigger(&mut self) -> Option<ClickAction> {
+    fn trigger(&mut self) -> Vec<ClickAction> {
         self()
     }
 }
 
 impl ElementEvent for UserEvent {
-    fn trigger(&mut self) -> Option<ClickAction> {
-        Some(ClickAction::Event(self.clone()))
+    fn trigger(&mut self) -> Vec<ClickAction> {
+        vec![ClickAction::Event(self.clone())]
     }
 }
 
@@ -122,12 +123,24 @@ impl<T> PostUpdate<T> {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ThemeKind {
+    Menu,
+    #[default]
+    Main,
+    Game,
+}
+
+impl ConstParamTy for ThemeKind {}
+
+pub type Tracker<T> = Box<dyn Fn() -> Option<T>>;
+
 pub struct Interface {
     windows: Vec<(Window, PostUpdate<PerWindow>)>,
     window_cache: WindowCache,
     interface_settings: InterfaceSettings,
     available_space: Size,
-    theme: Theme,
+    themes: Themes,
     dialog_handle: Option<DialogHandle>,
     mouse_cursor: MouseCursor,
     mouse_cursor_hidden: bool,
@@ -143,7 +156,12 @@ impl Interface {
     ) -> Self {
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
-        let theme = Theme::new(&interface_settings.theme_file);
+        let themes = Themes {
+            theme_selector: ThemeSelector,
+            menu: InterfaceTheme::new::<Menu>(interface_settings.menu_theme.get_file()),
+            main: InterfaceTheme::new::<Main>(interface_settings.main_theme.get_file()),
+            game: GameTheme::new(interface_settings.game_theme.get_file()),
+        };
         let dialog_handle = None;
         let mouse_cursor = MouseCursor::new(game_file_loader, sprite_loader, action_loader);
         let mouse_cursor_hidden = false;
@@ -155,7 +173,7 @@ impl Interface {
             window_cache,
             interface_settings,
             available_space,
-            theme,
+            themes,
             dialog_handle,
             mouse_cursor,
             mouse_cursor_hidden,
@@ -163,24 +181,38 @@ impl Interface {
         }
     }
 
-    pub fn set_theme_file(&mut self, theme_file: String) {
-        self.interface_settings.theme_file = theme_file;
-    }
-
-    #[profile]
-    pub fn save_theme(&self) {
-        self.theme.save(&self.interface_settings.theme_file);
-    }
-
-    #[profile]
-    pub fn reload_theme(&mut self) {
-        if self.theme.reload(&self.interface_settings.theme_file) {
-            self.post_update.resolve();
+    pub fn set_theme_file(&mut self, theme_file: String, theme_kind: ThemeKind) {
+        match theme_kind {
+            ThemeKind::Menu => self.interface_settings.menu_theme.set_file(theme_file),
+            ThemeKind::Main => self.interface_settings.main_theme.set_file(theme_file),
+            ThemeKind::Game => self.interface_settings.game_theme.set_file(theme_file),
         }
     }
 
-    pub fn get_theme(&self) -> &Theme {
-        &self.theme
+    pub fn get_game_theme(&self) -> &GameTheme {
+        &self.themes.game
+    }
+
+    #[profile]
+    pub fn save_theme(&self, kind: ThemeKind) {
+        match kind {
+            ThemeKind::Menu => self.themes.menu.save(self.interface_settings.menu_theme.get_file()),
+            ThemeKind::Main => self.themes.main.save(self.interface_settings.main_theme.get_file()),
+            ThemeKind::Game => self.themes.game.save(self.interface_settings.game_theme.get_file()),
+        }
+    }
+
+    #[profile]
+    pub fn reload_theme(&mut self, kind: ThemeKind) {
+        let success = match kind {
+            ThemeKind::Menu => self.themes.menu.reload(self.interface_settings.menu_theme.get_file()),
+            ThemeKind::Main => self.themes.main.reload(self.interface_settings.main_theme.get_file()),
+            ThemeKind::Game => self.themes.game.reload(self.interface_settings.game_theme.get_file()),
+        };
+
+        if success {
+            self.post_update.resolve();
+        }
     }
 
     pub fn schedule_render(&mut self) {
@@ -243,8 +275,14 @@ impl Interface {
                 profile_block!("resolve window");
 
                 let (_position, previous_size) = window.get_area();
+                let theme = match window.get_theme_kind() {
+                    ThemeKind::Menu => &self.themes.menu,
+                    ThemeKind::Main => &self.themes.main,
+                    _ => panic!(),
+                };
+
                 let (window_class, new_position, new_size) =
-                    window.resolve(font_loader.clone(), &self.interface_settings, &self.theme, self.available_space);
+                    window.resolve(font_loader.clone(), &self.interface_settings, theme, self.available_space);
 
                 // should only ever be the last window
                 if let Some(focused_index) = focus_state.focused_window()
@@ -318,7 +356,7 @@ impl Interface {
     }
 
     #[profile]
-    pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
+    pub fn left_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Vec<ClickAction> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut resolve = false;
 
@@ -332,7 +370,7 @@ impl Interface {
     }
 
     #[profile]
-    pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Option<ClickAction> {
+    pub fn right_click_element(&mut self, hovered_element: &ElementCell, window_index: usize) -> Vec<ClickAction> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut resolve = false;
 
@@ -365,17 +403,18 @@ impl Interface {
     }
 
     #[profile]
-    pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) -> Option<ClickAction> {
+    pub fn input_character_element(&mut self, element: &ElementCell, window_index: usize, character: char) -> Vec<ClickAction> {
         let (_, post_update) = &mut self.windows[window_index];
+        let mut propagated_actions = Vec::new();
 
-        if let Some(click_event) = element.borrow_mut().input_character(character) {
-            match click_event {
+        for action in element.borrow_mut().input_character(character) {
+            match action {
                 ClickAction::ChangeEvent(change_event) => Self::handle_change_event(&mut self.post_update, post_update, change_event),
-                other => return Some(other),
+                other => propagated_actions.push(other),
             }
         }
 
-        None
+        propagated_actions
     }
 
     #[profile]
@@ -391,8 +430,14 @@ impl Interface {
     pub fn resize_window(&mut self, window_index: usize, growth: Size) {
         let (window, post_update) = &mut self.windows[window_index];
 
+        let theme = match window.get_theme_kind() {
+            ThemeKind::Menu => &self.themes.menu,
+            ThemeKind::Main => &self.themes.main,
+            _ => panic!(),
+        };
         let (_position, previous_size) = window.get_area();
-        let (window_class, new_size) = window.resize(&self.interface_settings, &self.theme, self.available_space, growth);
+
+        let (window_class, new_size) = window.resize(&self.interface_settings, theme, self.available_space, growth);
 
         if previous_size != new_size {
             if let Some(window_class) = window_class {
@@ -420,7 +465,7 @@ impl Interface {
                 let (position, scale) = {
                     let (window, post_update) = &mut self.windows[window_index];
 
-                    if window.has_transparency(&self.theme) {
+                    if window.has_transparency(&self.themes.main) {
                         self.post_update.render();
                         return;
                     }
@@ -448,16 +493,22 @@ impl Interface {
         let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
 
         for (window, post_update) in &mut self.windows {
-            if self.post_update.needs_render() || post_update.take_render() {
+            if post_update.take_render() || self.post_update.needs_render() {
                 #[cfg(feature = "debug")]
                 profile_block!("render window");
+
+                let theme = match window.get_theme_kind() {
+                    ThemeKind::Menu => &self.themes.menu,
+                    ThemeKind::Main => &self.themes.main,
+                    _ => panic!(),
+                };
 
                 window.render(
                     render_target,
                     renderer,
                     state_provider,
                     &self.interface_settings,
-                    &self.theme,
+                    theme,
                     hovered_element,
                     focused_element,
                     mouse_mode,
@@ -498,9 +549,9 @@ impl Interface {
         renderer.render_text(
             render_target,
             &frames_per_second.to_string(),
-            *self.theme.overlay.text_offset * *self.interface_settings.scaling,
-            *self.theme.overlay.foreground_color,
-            *self.theme.overlay.font_size * *self.interface_settings.scaling,
+            *self.themes.game.overlay.text_offset * *self.interface_settings.scaling,
+            *self.themes.game.overlay.foreground_color,
+            *self.themes.game.overlay.font_size * *self.interface_settings.scaling,
         );
     }
 
@@ -521,7 +572,7 @@ impl Interface {
                 renderer,
                 mouse_position,
                 grabbed,
-                *self.theme.cursor.color,
+                *self.themes.game.cursor.color,
                 &self.interface_settings,
             );
         }
@@ -551,6 +602,26 @@ impl Interface {
             let window = prototype_window.to_window(&self.window_cache, &self.interface_settings, self.available_space);
             self.open_new_window(focus_state, window);
         }
+    }
+
+    #[profile]
+    pub fn open_popup(
+        &mut self,
+        element: ElementCell,
+        position_tracker: Tracker<Position>,
+        size_tracker: Tracker<Size>,
+        window_index: usize,
+    ) {
+        let entry = &mut self.windows[window_index];
+        entry.0.open_popup(element, position_tracker, size_tracker);
+        entry.1.resolve();
+    }
+
+    #[profile]
+    pub fn close_popup(&mut self, window_index: usize) {
+        let entry = &mut self.windows[window_index];
+        entry.0.close_popup();
+        entry.1.render();
     }
 
     #[profile]
@@ -616,9 +687,9 @@ impl Interface {
     #[profile]
     #[cfg(feature = "debug")]
     pub fn open_theme_viewer_window(&mut self, focus_state: &mut FocusState) {
-        if !self.window_exists(self.theme.window_class()) {
+        if !self.window_exists(self.themes.window_class()) {
             let window = self
-                .theme
+                .themes
                 .to_window(&self.window_cache, &self.interface_settings, self.available_space);
 
             self.open_new_window(focus_state, window);
@@ -663,9 +734,16 @@ impl Interface {
     }
 
     #[profile]
-    pub fn close_all_windows(&mut self, focus_state: &mut FocusState) {
+    pub fn close_all_windows_except(&mut self, focus_state: &mut FocusState) {
         for index in (0..self.windows.len()).rev() {
-            self.close_window(focus_state, index);
+            if self.windows[index]
+                .0
+                .get_window_class()
+                .map(|class| class != "theme_viewer" && class != "profiler" && class != "network") // HACK: don't hardcode
+                .unwrap_or(true)
+            {
+                self.close_window(focus_state, index);
+            }
         }
     }
 

@@ -10,11 +10,16 @@ layout(push_constant) uniform Constants {
     vec4 clip_size;
     vec4 corner_radius;
     vec4 color;
+    float aspect_ratio;
 } constants;
 
 void main() {
 
     vec2 coords = fragment_position * constants.screen_size;
+    vec2 screen_size = constants.screen_size;
+
+    coords.x /= constants.aspect_ratio;
+    screen_size.x /= constants.aspect_ratio;
 
     // top-left
     if (length(coords - constants.corner_radius.x) > constants.corner_radius.x && coords.x < constants.corner_radius.x &&
@@ -23,20 +28,20 @@ void main() {
     }
 
     // top-right
-    if (length(coords - vec2(constants.screen_size.x - constants.corner_radius.y, constants.corner_radius.y)) > constants.corner_radius.y &&
-        constants.screen_size.x - coords.x < constants.corner_radius.y && coords.y < constants.corner_radius.y) {
+    if (length(coords - vec2(screen_size.x - constants.corner_radius.y, constants.corner_radius.y)) > constants.corner_radius.y &&
+        screen_size.x - coords.x < constants.corner_radius.y && coords.y < constants.corner_radius.y) {
         discard;
     }
 
     // bottom-right
-    if (length(coords - constants.screen_size + constants.corner_radius.z) > constants.corner_radius.z &&
-        constants.screen_size.x - coords.x < constants.corner_radius.z && constants.screen_size.y - coords.y < constants.corner_radius.z) {
+    if (length(coords - screen_size + constants.corner_radius.z) > constants.corner_radius.z &&
+        screen_size.x - coords.x < constants.corner_radius.z && screen_size.y - coords.y < constants.corner_radius.z) {
         discard;
     }
 
     // bottom_left
-    if (length(coords - vec2(constants.corner_radius.w, constants.screen_size.y - constants.corner_radius.w)) > constants.corner_radius.w &&
-        coords.x < constants.corner_radius.w && constants.screen_size.y - coords.y < constants.corner_radius.w) {
+    if (length(coords - vec2(constants.corner_radius.w, screen_size.y - constants.corner_radius.w)) > constants.corner_radius.w &&
+        coords.x < constants.corner_radius.w && screen_size.y - coords.y < constants.corner_radius.w) {
         discard;
     }
 

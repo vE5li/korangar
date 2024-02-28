@@ -30,7 +30,9 @@ impl PrototypeWindow for FriendsWindow {
                 let mut taken_string = String::new();
                 std::mem::swap(friend_name, &mut taken_string);
 
-                (!taken_string.is_empty()).then_some(ClickAction::Event(UserEvent::AddFriend(taken_string)))
+                (!taken_string.is_empty())
+                    .then_some(vec![ClickAction::Event(UserEvent::AddFriend(taken_string))])
+                    .unwrap_or_default()
             })
         };
 

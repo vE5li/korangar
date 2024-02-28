@@ -58,12 +58,12 @@ where
         self
     }
 
-    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&Theme) -> Color + 'static) -> Self {
+    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&InterfaceTheme) -> Color + 'static) -> Self {
         self.foreground_color = Some(Box::new(foreground_color));
         self
     }
 
-    pub fn with_background_color(mut self, background_color: impl Fn(&Theme) -> Color + 'static) -> Self {
+    pub fn with_background_color(mut self, background_color: impl Fn(&InterfaceTheme) -> Color + 'static) -> Self {
         self.background_color = Some(Box::new(background_color));
         self
     }
@@ -91,7 +91,7 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
         !self.is_disabled()
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = self
             .width_constraint
             .as_ref()
@@ -108,12 +108,12 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
         if self.is_disabled() {
-            return None;
+            return Vec::new();
         }
 
-        self.event.as_mut().and_then(ElementEvent::trigger)
+        self.event.as_mut().map(|event| event.trigger()).unwrap_or_default()
     }
 
     fn render(
@@ -122,7 +122,7 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::ops::Not;
 use std::rc::Rc;
 
 use derive_new::new;
@@ -39,7 +38,7 @@ impl PrototypeWindow for ChatWindow {
 
             move || {
                 let message: String = input_text.borrow_mut().drain(..).collect();
-                Some(ClickAction::Event(UserEvent::SendMessage(message)))
+                vec![ClickAction::Event(UserEvent::SendMessage(message))]
             }
         };
 
@@ -47,10 +46,9 @@ impl PrototypeWindow for ChatWindow {
             let input_text = input_text.clone();
             Box::new(move || {
                 let message: String = input_text.borrow_mut().drain(..).collect();
-                message
-                    .is_empty()
-                    .not()
-                    .then_some(ClickAction::Event(UserEvent::SendMessage(message)))
+                (!message.is_empty())
+                    .then_some(vec![ClickAction::Event(UserEvent::SendMessage(message))])
+                    .unwrap_or_default()
             })
         };
 

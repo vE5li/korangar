@@ -243,7 +243,7 @@ impl DeferredRenderer {
         }
     }
 
-    #[profile("recreate deferred pipeline")]
+    #[profile("re-create deferred pipeline")]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
         let device = self.memory_allocator.device().clone();
         let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();

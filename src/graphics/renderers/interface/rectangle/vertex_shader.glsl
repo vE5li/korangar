@@ -8,6 +8,7 @@ layout(push_constant) uniform Constants {
     vec4 clip_size;
     vec4 corner_radius;
     vec4 color;
+    float aspect_ratio;
 } constants;
 
 const vec2 data[6] = vec2[]

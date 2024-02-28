@@ -23,6 +23,7 @@ impl PrototypeWindow for ErrorWindow {
             .with_size(constraint!(300 > 400 < 500, ?))
             .with_elements(elements)
             .closable()
+            .with_theme_kind(ThemeKind::Menu)
             .build(window_cache, interface_settings, available_space)
     }
 }

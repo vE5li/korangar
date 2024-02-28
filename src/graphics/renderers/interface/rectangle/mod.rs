@@ -100,6 +100,7 @@ impl RectangleRenderer {
             clip_size: clip_size.into(),
             corner_radius: corner_radius.into(),
             color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+            aspect_ratio: window_size.y as f32 / window_size.x as f32,
         };
 
         render_target

@@ -4,6 +4,7 @@ use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
+// FIX: State button won't redraw just because the state changes
 pub struct StateButton<T, E>
 where
     T: AsRef<str> + 'static,
@@ -80,7 +81,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = self
             .width_constraint
             .as_ref()
@@ -97,8 +98,8 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        self.event.as_mut().and_then(ElementEvent::trigger)
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
+        self.event.as_mut().map(|event| event.trigger()).unwrap_or_default()
     }
 
     fn render(
@@ -107,7 +108,7 @@ where
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

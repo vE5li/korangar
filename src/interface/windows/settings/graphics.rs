@@ -1,12 +1,13 @@
 use procedural::*;
 
-use crate::graphics::PresentModeInfo;
+use crate::graphics::{PresentModeInfo, ShadowDetail};
 use crate::input::UserEvent;
 use crate::interface::*;
 
 #[derive(new)]
 pub struct GraphicsSettingsWindow {
     present_mode_info: PresentModeInfo,
+    shadow_detail: TrackedState<ShadowDetail>,
 }
 
 impl GraphicsSettingsWindow {
@@ -19,7 +20,21 @@ impl PrototypeWindow for GraphicsSettingsWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
-        let mut elements = vec![interface_settings.to_element("Interface settings".to_string())];
+        let mut elements = vec![
+            Text::default().with_text("Shadow detail").with_width(dimension!(50%)).wrap(),
+            PickList::default()
+                .with_options(vec![
+                    ("Low", ShadowDetail::Low),
+                    ("Medium", ShadowDetail::Medium),
+                    ("High", ShadowDetail::High),
+                    ("Ultra", ShadowDetail::Ultra),
+                ])
+                .with_selected(self.shadow_detail.clone())
+                .with_event(Box::new(|| Vec::new()))
+                .with_width(dimension!(!))
+                .wrap(),
+            interface_settings.to_element("Interface settings".to_string()),
+        ];
 
         // TODO: Instead of not showing this option, disable the checkbox and add a
         // tooltip

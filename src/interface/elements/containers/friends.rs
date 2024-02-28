@@ -11,13 +11,11 @@ use crate::network::Friend;
 
 pub struct FriendView {
     friends: Remote<Vec<(Friend, UnsafeCell<Option<WeakElementCell>>)>>,
-    weak_self: Option<WeakElementCell>,
     state: ContainerState,
 }
 
 impl FriendView {
     pub fn new(friends: Remote<Vec<(Friend, UnsafeCell<Option<WeakElementCell>>)>>) -> Self {
-        let weak_self = None;
         let elements = {
             let friends = friends.borrow();
 
@@ -33,7 +31,6 @@ impl FriendView {
 
         Self {
             friends,
-            weak_self,
             state: ContainerState::new(elements),
         }
     }
@@ -63,7 +60,6 @@ impl Element for FriendView {
     }
 
     fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element>>, weak_parent: Option<Weak<RefCell<dyn Element>>>) {
-        self.weak_self = Some(weak_self.clone());
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -79,7 +75,7 @@ impl Element for FriendView {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(
             placement_resolver,
             interface_settings,
@@ -107,7 +103,9 @@ impl Element for FriendView {
                     } else {
                         let element = Self::friend_to_element(friend);
                         unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
-                        element.borrow_mut().link_back(Rc::downgrade(&element), self.weak_self.clone());
+                        let weak_self = self.state.state.self_element.clone();
+
+                        element.borrow_mut().link_back(Rc::downgrade(&element), weak_self);
 
                         self.state.elements.insert(index, element);
                         resolve = true;
@@ -141,7 +139,7 @@ impl Element for FriendView {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

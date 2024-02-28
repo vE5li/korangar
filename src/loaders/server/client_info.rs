@@ -1,5 +1,9 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
+
+use super::ServiceId;
 
 /// The ClientInfo structure.
 ///
@@ -109,6 +113,21 @@ pub struct Service {
     /// Define each loading screen in the path `/data/texture/À¯ÀúÀÎÅÍÆäÀÌ½º/`
     #[serde(default, alias = "loading")]
     pub loading_images: Option<Vec<LoadingImage>>,
+}
+
+impl Service {
+    pub fn service_id(&self) -> ServiceId {
+        let mut hasher = DefaultHasher::new();
+
+        if let Some(display_name) = &self.display_name {
+            display_name.hash(&mut hasher);
+        }
+
+        self.address.hash(&mut hasher);
+        self.port.hash(&mut hasher);
+
+        ServiceId(hasher.finish() as usize)
+    }
 }
 
 /// The ClientInfo Service's Account ID structure

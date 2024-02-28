@@ -34,8 +34,10 @@ pub struct Window {
     size_constraint: SizeConstraint,
     size: Vector2<f32>,
     elements: Vec<ElementCell>,
+    popup_element: Option<(ElementCell, Tracker<Position>, Tracker<Size>)>,
     closable: bool,
     background_color: Option<ColorSelector>,
+    theme_kind: ThemeKind,
 }
 
 impl Window {
@@ -43,14 +45,14 @@ impl Window {
         self.window_class.as_deref()
     }
 
-    fn get_background_color(&self, theme: &Theme) -> Color {
+    fn get_background_color(&self, theme: &InterfaceTheme) -> Color {
         self.background_color
             .as_ref()
             .map(|closure| closure(theme))
             .unwrap_or(*theme.window.background_color)
     }
 
-    pub fn has_transparency(&self, theme: &Theme) -> bool {
+    pub fn has_transparency(&self, theme: &InterfaceTheme) -> bool {
         self.get_background_color(theme).alpha != 255
     }
 
@@ -58,11 +60,15 @@ impl Window {
         self.closable
     }
 
+    pub fn get_theme_kind(&self) -> ThemeKind {
+        self.theme_kind
+    }
+
     pub fn resolve(
         &mut self,
         font_loader: Rc<RefCell<FontLoader>>,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         available_space: Size,
     ) -> (Option<&str>, Vector2<f32>, Size) {
         let height = match self.size_constraint.height.is_flexible() {
@@ -71,9 +77,8 @@ impl Window {
         };
 
         let mut placement_resolver = PlacementResolver::new(
-            font_loader,
+            font_loader.clone(),
             PartialSize::new(self.size.x, height),
-            Vector2::new(0.0, 0.0),
             *theme.window.border_size,
             *theme.window.gaps,
             *interface_settings.scaling,
@@ -96,6 +101,20 @@ impl Window {
         }
 
         self.validate_position(available_space);
+
+        if let Some((popup, _, size_tracker)) = &self.popup_element {
+            let size = size_tracker().unwrap(); // FIX: Don't unwrap obviously
+
+            let mut placement_resolver = PlacementResolver::new(
+                font_loader,
+                PartialSize::new(size.x, Some(200.0)),
+                Vector2::new(0.0, 0.0), //*theme.window.border_size, // TODO: Popup
+                Vector2::new(0.0, 0.0), //*theme.window.gaps, // TODO: Popup
+                *interface_settings.scaling,
+            );
+
+            popup.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme);
+        };
 
         (self.window_class.as_deref(), self.position, self.size)
     }
@@ -120,6 +139,16 @@ impl Window {
 
     pub fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
         let absolute_position = mouse_position - self.position;
+
+        if let Some((popup, position_tracker, _)) = &self.popup_element {
+            let position = position_tracker().unwrap(); // FIX: Don't unwrap obviously
+
+            match popup.borrow().hovered_element(mouse_position - position, mouse_mode) {
+                HoverInformation::Hovered => return HoverInformation::Element(popup.clone()),
+                HoverInformation::Missed => {}
+                hover_information => return hover_information,
+            }
+        }
 
         if absolute_position.x >= 0.0
             && absolute_position.y >= 0.0
@@ -169,7 +198,7 @@ impl Window {
     pub fn resize(
         &mut self,
         interface_settings: &InterfaceSettings,
-        _theme: &Theme,
+        _theme: &InterfaceTheme,
         available_space: Size,
         growth: Size,
     ) -> (Option<&str>, Size) {
@@ -184,13 +213,25 @@ impl Window {
             .validated_size(self.size, available_space, *interface_settings.scaling);
     }
 
+    pub fn open_popup(&mut self, element: ElementCell, position_tracker: Tracker<Position>, size_tracker: Tracker<Size>) {
+        // NOTE: Very important to link back
+        let weak_element = Rc::downgrade(&element);
+        element.borrow_mut().link_back(weak_element, None);
+
+        self.popup_element = Some((element, position_tracker, size_tracker));
+    }
+
+    pub fn close_popup(&mut self) {
+        self.popup_element = None;
+    }
+
     pub fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -226,6 +267,24 @@ impl Window {
                 false,
             )
         });
+
+        if let Some((popup, position_tracker, _)) = &self.popup_element {
+            let position = position_tracker().unwrap(); // FIX: Don't unwrap obviously
+
+            popup.borrow().render(
+                render_target,
+                renderer,
+                state_provider,
+                interface_settings,
+                theme,
+                position,
+                clip_size,
+                hovered_element,
+                focused_element,
+                mouse_mode,
+                false,
+            );
+        };
     }
 }
 

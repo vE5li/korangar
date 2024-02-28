@@ -19,7 +19,7 @@ impl Element for StaticLabel {
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let mut size_constraint = theme.label.size_constraint;
 
         let size = placement_resolver.get_text_dimensions(
@@ -41,7 +41,7 @@ impl Element for StaticLabel {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,

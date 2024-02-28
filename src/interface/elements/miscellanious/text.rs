@@ -19,12 +19,12 @@ impl<T: AsRef<str> + 'static> Text<T> {
         self
     }
 
-    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&Theme) -> Color + 'static) -> Self {
+    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&InterfaceTheme) -> Color + 'static) -> Self {
         self.foreground_color = Some(Box::new(foreground_color));
         self
     }
 
-    pub fn with_font_size(mut self, font_size: impl Fn(&Theme) -> f32 + 'static) -> Self {
+    pub fn with_font_size(mut self, font_size: impl Fn(&InterfaceTheme) -> f32 + 'static) -> Self {
         self.font_size = Some(Box::new(font_size));
         self
     }
@@ -34,7 +34,7 @@ impl<T: AsRef<str> + 'static> Text<T> {
         self
     }
 
-    fn get_font_size(&self, theme: &Theme) -> f32 {
+    fn get_font_size(&self, theme: &InterfaceTheme) -> f32 {
         self.font_size
             .as_ref()
             .map(|closure| closure(theme))
@@ -51,7 +51,7 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let height_constraint = DimensionConstraint {
             size: Dimension::Absolute(self.get_font_size(theme)),
             minimum_size: None,
@@ -77,7 +77,7 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,

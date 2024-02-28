@@ -22,18 +22,11 @@ pub struct PlacementResolver {
 }
 
 impl PlacementResolver {
-    pub fn new(
-        font_loader: Rc<RefCell<FontLoader>>,
-        mut available_space: PartialSize,
-        base_position: Position,
-        border: Size,
-        gaps: Size,
-        scaling: f32,
-    ) -> Self {
+    pub fn new(font_loader: Rc<RefCell<FontLoader>>, mut available_space: PartialSize, border: Size, gaps: Size, scaling: f32) -> Self {
         available_space.x -= border.x * scaling * 2.0;
         available_space.y = available_space.y.map(|height| height - border.y * scaling * 2.0);
 
-        let base_position = base_position * scaling + border * scaling;
+        let base_position = border * scaling;
         let horizontal_accumulator = 0.0;
         let vertical_offset = 0.0;
         let total_height = 0.0;

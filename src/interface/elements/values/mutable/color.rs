@@ -40,7 +40,7 @@ impl Element for MutableColorValue {
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &theme.value.size_constraint);
     }
 
@@ -66,12 +66,12 @@ impl Element for MutableColorValue {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::OpenWindow(Box::new(ColorWindow::new(
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
+        vec![ClickAction::OpenWindow(Box::new(ColorWindow::new(
             self.name.clone(),
             self.color_pointer,
             self.change_event,
-        ))))
+        )))]
     }
 
     fn render(
@@ -80,7 +80,7 @@ impl Element for MutableColorValue {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

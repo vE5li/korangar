@@ -105,7 +105,7 @@ impl Element for CharacterPreview {
         self.state.focus_next::<true>(self_cell, caller_cell, focus)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = &constraint!(20%, 150);
         self.state.resolve(
             placement_resolver,
@@ -121,11 +121,8 @@ impl Element for CharacterPreview {
         let move_request_changed = self.move_request.consume_changed();
 
         if characters_changed || move_request_changed {
+            let weak_self = self.state.state.self_element.take().unwrap();
             let weak_parent = self.state.state.parent_element.clone();
-            // Since the character container will always have at least one linked child
-            // element, we can get a reference to self there instead of storing
-            // it in self.
-            let weak_self = self.state.elements[0].borrow().get_state().parent_element.clone().unwrap();
 
             *self = Self::new(self.characters.clone(), self.move_request.clone(), self.slot);
 
@@ -139,14 +136,14 @@ impl Element for CharacterPreview {
         None
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Option<ClickAction> {
+    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction> {
         if let Some(origin_slot) = *self.move_request.borrow() {
             let event = match origin_slot == self.slot {
                 true => UserEvent::CancelSwitchCharacterSlot,
                 false => UserEvent::SwitchCharacterSlot(self.slot),
             };
 
-            return Some(ClickAction::Event(event));
+            return vec![ClickAction::Event(event)];
         }
 
         let event = match self.has_character() {
@@ -154,7 +151,7 @@ impl Element for CharacterPreview {
             false => UserEvent::OpenCharacterCreationWindow(self.slot),
         };
 
-        Some(ClickAction::Event(event))
+        vec![ClickAction::Event(event)]
     }
 
     fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
@@ -170,7 +167,7 @@ impl Element for CharacterPreview {
         renderer: &InterfaceRenderer,
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

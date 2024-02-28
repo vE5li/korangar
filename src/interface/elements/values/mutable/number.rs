@@ -47,7 +47,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         self.state.resolve(placement_resolver, &theme.value.size_constraint);
     }
 
@@ -70,14 +70,14 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::OpenWindow(Box::new(NumberWindow::new(
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
+        vec![ClickAction::OpenWindow(Box::new(NumberWindow::new(
             self.name.clone(),
             self.inner_pointer,
             self.minimum_value,
             self.maximum_value,
             self.change_event,
-        ))))
+        )))]
     }
 
     fn render(
@@ -86,7 +86,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

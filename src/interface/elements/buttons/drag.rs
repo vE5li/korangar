@@ -21,7 +21,7 @@ impl Element for DragButton {
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = self.width_constraint.add_height(theme.window.title_height);
 
         self.state.resolve(placement_resolver, &size_constraint);
@@ -39,8 +39,8 @@ impl Element for DragButton {
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Option<ClickAction> {
-        Some(ClickAction::MoveInterface)
+    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
+        vec![ClickAction::MoveInterface]
     }
 
     fn render(
@@ -49,7 +49,7 @@ impl Element for DragButton {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         hovered_element: Option<&dyn Element>,

@@ -44,7 +44,7 @@ impl Element for Chat {
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let mut size_constraint = constraint!(100%, 0);
         // Not sure why but 0.0 cuts off the lower part of the text, so add some
         // padding.
@@ -83,7 +83,7 @@ impl Element for Chat {
         renderer: &InterfaceRenderer,
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
-        theme: &Theme,
+        theme: &InterfaceTheme,
         parent_position: Position,
         clip_size: ClipSize,
         _hovered_element: Option<&dyn Element>,

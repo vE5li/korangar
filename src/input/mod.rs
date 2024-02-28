@@ -256,12 +256,12 @@ impl InputSystem {
             self.mouse_input_mode = MouseInputMode::ClickInterface;
 
             if let Some(hovered_element) = &hovered_element {
-                let action = match self.left_mouse_button.pressed() {
+                let actions = match self.left_mouse_button.pressed() {
                     true => interface.left_click_element(hovered_element, *window_index),
                     false => interface.right_click_element(hovered_element, *window_index),
                 };
 
-                if let Some(action) = action {
+                for action in actions {
                     match action {
                         ClickAction::ChangeEvent(..) => {}
 
@@ -302,6 +302,14 @@ impl InputSystem {
                         ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
 
                         ClickAction::CloseWindow => interface.close_window(focus_state, *window_index),
+
+                        ClickAction::OpenPopup {
+                            element,
+                            position_tracker,
+                            size_tracker,
+                        } => interface.open_popup(element, position_tracker, size_tracker, *window_index),
+
+                        ClickAction::ClosePopup => interface.close_popup(*window_index),
                     }
                 }
             }
@@ -414,9 +422,9 @@ impl InputSystem {
             }
 
             if self.get_key(VirtualKeyCode::Return).pressed() {
-                let action = interface.left_click_element(focused_element, *focused_window);
+                let actions = interface.left_click_element(focused_element, *focused_window);
 
-                if let Some(action) = action {
+                for action in actions {
                     // TODO: remove and replace with proper event
                     match action {
                         ClickAction::Event(event) => events.push(event),
@@ -442,7 +450,9 @@ impl InputSystem {
                     '\t' => {}
                     '\x1b' => {}
                     valid => {
-                        if let Some(action) = interface.input_character_element(focused_element, *focused_window, valid) {
+                        let actions = interface.input_character_element(focused_element, *focused_window, valid);
+
+                        for action in actions {
                             match action {
                                 // is handled in the interface
                                 ClickAction::ChangeEvent(..) => {}
@@ -469,6 +479,12 @@ impl InputSystem {
                                 ClickAction::MoveSkill(..) => {}
                                 ClickAction::OpenWindow(prototype_window) => interface.open_window(focus_state, prototype_window.as_ref()),
                                 ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
+                                ClickAction::OpenPopup {
+                                    element,
+                                    position_tracker,
+                                    size_tracker,
+                                } => interface.open_popup(element, position_tracker, size_tracker, *focused_window),
+                                ClickAction::ClosePopup => interface.close_popup(*focused_window),
                             }
                         }
                     }

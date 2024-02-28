@@ -1,13 +1,16 @@
 mod client_info;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_xml_rs::de::Deserializer;
 use xml::reader::{EventReader, ParserConfig};
 
-pub use self::client_info::{ClientInfo, Service};
+pub use self::client_info::ClientInfo;
 use super::GameFileLoader;
 #[cfg(feature = "debug")]
 use crate::debug::*;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ServiceId(pub usize);
 
 pub fn load_client_info(game_file_loader: &mut GameFileLoader) -> ClientInfo {
     #[cfg(feature = "debug")]

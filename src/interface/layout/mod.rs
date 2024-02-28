@@ -6,4 +6,4 @@ mod size;
 pub use self::constraint::{DimensionConstraint, SizeConstraint};
 pub use self::dimension::Dimension;
 pub use self::resolver::PlacementResolver;
-pub use self::size::{ClipSize, PartialSize, Position, Size};
+pub use self::size::{CornerRadius, PartialScreenSize, ScreenClip, ScreenPosition, ScreenSize};

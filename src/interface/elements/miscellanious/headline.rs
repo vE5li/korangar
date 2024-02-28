@@ -40,8 +40,8 @@ impl Element for Headline {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -49,11 +49,16 @@ impl Element for Headline {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
+
+        let text_position = ScreenPosition {
+            left: theme.label.text_offset.x,
+            top: theme.label.text_offset.y,
+        };
 
         renderer.render_text(
             &self.display,
-            *theme.label.text_offset,
+            text_position,
             *theme.label.foreground_color,
             *theme.label.font_size,
         );

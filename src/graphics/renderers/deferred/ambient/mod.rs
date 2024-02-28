@@ -77,9 +77,7 @@ impl AmbientLightRenderer {
             WriteDescriptorSet::image_view(1, render_target.normal_image.clone()),
         ]);
 
-        let constants = Constants {
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
-        };
+        let constants = Constants { color: color.into() };
 
         render_target
             .state

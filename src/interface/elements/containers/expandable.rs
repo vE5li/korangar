@@ -1,6 +1,5 @@
 use std::rc::Weak;
 
-use num::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -12,7 +11,7 @@ pub struct Expandable {
     expanded: bool,
     open_size_constraint: SizeConstraint,
     closed_size_constraint: SizeConstraint,
-    cached_closed_size: Size,
+    cached_closed_size: ScreenSize,
     state: ContainerState,
 }
 
@@ -25,7 +24,7 @@ impl Expandable {
             expanded,
             open_size_constraint: constraint!(100%, ?),
             closed_size_constraint: constraint!(100%, 18),
-            cached_closed_size: Size::zero(),
+            cached_closed_size: ScreenSize::default(),
             state,
         }
     }
@@ -73,12 +72,22 @@ impl Element for Expandable {
         };
 
         if self.expanded && !self.state.elements.is_empty() {
-            let mut inner_placement_resolver = placement_resolver.derive(
-                size,
-                Position::new(0.0, closed_size.y) + *theme.expandable.element_offset * *interface_settings.scaling,
-                *theme.expandable.border_size,
-            );
-            inner_placement_resolver.set_gaps(*theme.expandable.gaps);
+            let screen_position = ScreenPosition::only_top(closed_size.height)
+                + ScreenPosition {
+                    left: theme.expandable.element_offset.x,
+                    top: theme.expandable.element_offset.y,
+                } * *interface_settings.scaling;
+
+            let screen_size = ScreenSize {
+                width: theme.expandable.border_size.x,
+                height: theme.expandable.border_size.y,
+            };
+
+            let mut inner_placement_resolver = placement_resolver.derive(size, screen_position, screen_size);
+            inner_placement_resolver.set_gaps(ScreenSize {
+                width: theme.expandable.gaps.x,
+                height: theme.expandable.gaps.y,
+            });
 
             self.state.elements.iter_mut().for_each(|element| {
                 element
@@ -88,16 +97,18 @@ impl Element for Expandable {
 
             if self.open_size_constraint.height.is_flexible() {
                 let final_height = inner_placement_resolver.final_height()
-                    + closed_size.y
+                    + closed_size.height
                     + theme.expandable.element_offset.y * *interface_settings.scaling
                     + theme.expandable.border_size.y * *interface_settings.scaling * 2.0;
+
                 let final_height = self.open_size_constraint.validated_height(
                     final_height,
-                    placement_resolver.get_available().y,
-                    placement_resolver.get_available().y,
+                    placement_resolver.get_available().height,
+                    placement_resolver.get_available().height,
                     *interface_settings.scaling,
                 );
-                size.y = Some(final_height);
+
+                size.height = Some(final_height);
                 placement_resolver.register_height(final_height);
             }
         }
@@ -115,13 +126,13 @@ impl Element for Expandable {
         self.state.update()
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
-        let absolute_position = mouse_position - self.state.state.cached_position;
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
+        let absolute_position = ScreenPosition::from_size(mouse_position - self.state.state.cached_position);
 
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.state.state.cached_size.x
-            && absolute_position.y <= self.state.state.cached_size.y
+        if absolute_position.left >= 0.0
+            && absolute_position.top >= 0.0
+            && absolute_position.left <= self.state.state.cached_size.width
+            && absolute_position.top <= self.state.state.cached_size.height
         {
             if self.expanded && !self.state.elements.is_empty() {
                 for element in &self.state.elements {
@@ -154,8 +165,8 @@ impl Element for Expandable {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -164,33 +175,38 @@ impl Element for Expandable {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match second_theme {
             true => *theme.expandable.second_background_color,
             false => *theme.expandable.background_color,
         };
 
-        renderer.render_background(*theme.button.border_radius, background_color);
+        renderer.render_background((*theme.button.corner_radius).into(), background_color);
 
-        renderer.render_expand_arrow(
-            *theme.expandable.icon_offset,
-            *theme.expandable.icon_size,
-            *theme.expandable.foreground_color,
-            self.expanded,
-        );
+        let arrow_position = ScreenPosition {
+            left: theme.expandable.icon_offset.x,
+            top: theme.expandable.icon_offset.y,
+        };
+
+        let arrow_size = ScreenSize {
+            width: theme.expandable.icon_size.x,
+            height: theme.expandable.icon_size.y,
+        };
+
+        renderer.render_expand_arrow(arrow_position, arrow_size, *theme.expandable.foreground_color, self.expanded);
 
         let foreground_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.expandable.hovered_foreground_color,
             false => *theme.expandable.foreground_color,
         };
 
-        renderer.render_text(
-            &self.display,
-            *theme.expandable.text_offset,
-            foreground_color,
-            *theme.expandable.font_size,
-        );
+        let text_position = ScreenPosition {
+            left: theme.expandable.text_offset.x,
+            top: theme.expandable.text_offset.y,
+        };
+
+        renderer.render_text(&self.display, text_position, foreground_color, *theme.expandable.font_size);
 
         if self.expanded && !self.state.elements.is_empty() {
             self.state.render(

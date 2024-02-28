@@ -101,7 +101,7 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
         self.state.resolve(placement_resolver, &size_constraint);
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -123,8 +123,8 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -132,7 +132,7 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let disabled = self.is_disabled();
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
@@ -142,7 +142,7 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
             false => *theme.button.background_color,
         };
 
-        renderer.render_background(*theme.button.border_radius, background_color);
+        renderer.render_background((*theme.button.corner_radius).into(), background_color);
 
         if let Some(text) = &self.text {
             let foreground_color = if disabled {
@@ -154,12 +154,12 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
                     .unwrap_or(*theme.button.foreground_color)
             };
 
-            renderer.render_text(
-                text.as_ref(),
-                *theme.button.text_offset,
-                foreground_color,
-                *theme.button.font_size,
-            );
+            let text_position = ScreenPosition {
+                left: theme.button.text_offset.x,
+                top: theme.button.text_offset.y,
+            };
+
+            renderer.render_text(text.as_ref(), text_position, foreground_color, *theme.button.font_size);
         }
     }
 }

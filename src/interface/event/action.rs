@@ -1,6 +1,6 @@
 use super::{ItemSource, SkillSource};
 use crate::input::UserEvent;
-use crate::interface::{ChangeEvent, ElementCell, FocusMode, Position, PrototypeWindow, Size, Tracker};
+use crate::interface::{ChangeEvent, ElementCell, FocusMode, PrototypeWindow, ScreenPosition, ScreenSize, Tracker};
 use crate::inventory::{Item, Skill};
 
 pub enum ClickAction {
@@ -16,8 +16,8 @@ pub enum ClickAction {
     CloseWindow,
     OpenPopup {
         element: ElementCell,
-        position_tracker: Tracker<Position>,
-        size_tracker: Tracker<Size>,
+        position_tracker: Tracker<ScreenPosition>,
+        size_tracker: Tracker<ScreenSize>,
     },
     ClosePopup,
 }

@@ -27,7 +27,7 @@ impl Element for StaticLabel {
             *theme.label.font_size,
             *theme.label.text_offset,
             *interface_settings.scaling,
-            placement_resolver.get_available().x / 2.0, // TODO: make better
+            placement_resolver.get_available().width / 2.0, // TODO: make better
         );
 
         size_constraint.height = Dimension::Absolute(f32::max(size.y / *interface_settings.scaling, 14.0)); // TODO: make better
@@ -42,8 +42,8 @@ impl Element for StaticLabel {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -51,15 +51,15 @@ impl Element for StaticLabel {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background(*theme.label.border_radius, *theme.label.background_color);
+        renderer.render_background((*theme.label.corner_radius).into(), *theme.label.background_color);
 
-        renderer.render_text(
-            &self.label,
-            *theme.label.text_offset,
-            *theme.label.foreground_color,
-            *theme.label.font_size,
-        );
+        let text_size = ScreenPosition {
+            left: theme.label.text_offset.x,
+            top: theme.label.text_offset.y,
+        };
+
+        renderer.render_text(&self.label, text_size, *theme.label.foreground_color, *theme.label.font_size);
     }
 }

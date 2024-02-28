@@ -91,7 +91,7 @@ where
         self.state.resolve(placement_resolver, &size_constraint);
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -109,8 +109,8 @@ where
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -118,7 +118,7 @@ where
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
 
@@ -128,7 +128,7 @@ where
                 false => *theme.button.background_color,
             };
 
-            renderer.render_background(*theme.button.border_radius, background_color);
+            renderer.render_background((*theme.button.corner_radius).into(), background_color);
         }
 
         let foreground_color = match self.transparent_background && highlighted {
@@ -136,20 +136,30 @@ where
             false => *theme.button.foreground_color,
         };
 
+        let box_position = ScreenPosition {
+            left: theme.button.icon_offset.x,
+            top: theme.button.icon_offset.y,
+        };
+
+        let box_size = ScreenSize {
+            width: theme.button.icon_size.x,
+            height: theme.button.icon_size.y,
+        };
+
         renderer.render_checkbox(
-            *theme.button.icon_offset,
-            *theme.button.icon_size,
+            box_position,
+            box_size,
             foreground_color,
             (self.selector.as_ref().unwrap())(state_provider),
         );
 
         if let Some(text) = &self.text {
-            renderer.render_text(
-                text.as_ref(),
-                *theme.button.icon_text_offset,
-                foreground_color,
-                *theme.button.font_size,
-            );
+            let text_position = ScreenPosition {
+                left: theme.button.icon_text_offset.x,
+                top: theme.button.icon_text_offset.y,
+            };
+
+            renderer.render_text(text.as_ref(), text_position, foreground_color, *theme.button.font_size);
         }
     }
 }

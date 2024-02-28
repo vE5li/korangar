@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
-use cgmath::{Matrix4, Vector2, Vector3, Vector4};
+use cgmath::{Matrix4, Vector2, Vector3};
 use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
@@ -49,6 +49,7 @@ use crate::graphics::{
     EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait,
     SpriteRenderer as SpriteRendererTrait, *,
 };
+use crate::interface::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
@@ -344,29 +345,38 @@ impl DeferredRenderer {
         self.overlay_renderer.render(render_target, interface_image);
     }
 
+    fn get_window_size(&self) -> ScreenSize {
+        ScreenSize {
+            width: self.dimensions[0] as f32,
+            height: self.dimensions[1] as f32,
+        }
+    }
+
     pub fn render_rectangle(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
         color: Color,
     ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-
-        self.rectangle_renderer.render(render_target, window_size, position, size, color);
+        self.rectangle_renderer
+            .render(render_target, self.get_window_size(), position, size, color);
     }
 
     pub fn render_bar(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
         color: Color,
         maximum: f32,
         current: f32,
     ) {
-        let bar_offset = Vector2::new(size.x / 2.0, 0.0);
-        let bar_size = Vector2::new((size.x / maximum) * current, size.y);
+        let bar_offset = ScreenSize::only_width(size.width / 2.0);
+        let bar_size = ScreenSize {
+            width: (size.width / maximum) * current,
+            height: size.height,
+        };
 
         self.render_rectangle(render_target, position - bar_offset, bar_size, color);
     }
@@ -375,11 +385,11 @@ impl DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         text: &str,
-        mut position: Vector2<f32>,
+        mut position: ScreenPosition,
         color: Color,
         font_size: f32,
     ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        let window_size = self.get_window_size();
 
         for character in text.as_bytes() {
             let index = (*character as usize).saturating_sub(31);
@@ -388,13 +398,13 @@ impl DeferredRenderer {
                 self.font_map.clone(),
                 window_size,
                 position,
-                Vector2::new(font_size, font_size),
+                ScreenSize::uniform(font_size),
                 color,
                 10,
                 index,
                 true,
             );
-            position.x += font_size / 2.0;
+            position.left += font_size / 2.0;
         }
     }
 
@@ -402,11 +412,11 @@ impl DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         text: &str,
-        mut position: Vector2<f32>,
+        mut position: ScreenPosition,
         color: Color,
         font_size: f32,
     ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        let window_size = self.get_window_size();
 
         for character in text.as_bytes() {
             let index = (*character as usize).saturating_sub(31);
@@ -415,13 +425,13 @@ impl DeferredRenderer {
                 self.font_map.clone(),
                 window_size,
                 position,
-                Vector2::new(font_size, font_size),
+                ScreenSize::uniform(font_size),
                 color,
                 10,
                 index,
                 true,
             );
-            position.x += font_size / 2.0;
+            position.left += font_size / 2.0;
         }
     }
 
@@ -436,7 +446,7 @@ impl DeferredRenderer {
         angle: f32,
         color: Color,
     ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
+        let window_size = self.get_window_size();
 
         self.effect_renderer.render(
             render_target,
@@ -552,18 +562,25 @@ impl SpriteRendererTrait for DeferredRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         texture: Arc<ImageView>,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        _clip_size: Vector4<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        _screen_clip: ScreenClip,
         color: Color,
         smooth: bool,
     ) where
         Self: Renderer,
     {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-
-        self.sprite_renderer
-            .render_indexed(render_target, texture, window_size, position, size, color, 1, 0, smooth);
+        self.sprite_renderer.render_indexed(
+            render_target,
+            texture,
+            self.get_window_size(),
+            position,
+            size,
+            color,
+            1,
+            0,
+            smooth,
+        );
     }
 }
 

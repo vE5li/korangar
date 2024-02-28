@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/interface/sprite/fragment_shader.glsl")
 
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector4};
 use procedural::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
@@ -19,6 +18,7 @@ use super::InterfaceSubrenderer;
 use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
+use crate::interface::{ScreenClip, ScreenPosition, ScreenSize};
 
 pub struct SpriteRenderer {
     memory_allocator: Arc<MemoryAllocator>,
@@ -81,10 +81,10 @@ impl SpriteRenderer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         texture: Arc<ImageView>,
-        window_size: Vector2<usize>,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        window_size: ScreenSize,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        screen_clip: ScreenClip,
         color: Color,
         smooth: bool,
     ) {
@@ -92,9 +92,9 @@ impl SpriteRenderer {
             self.bind_pipeline(render_target);
         }
 
-        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
-        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
-        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
+        let half_screen = window_size / 2.0;
+        let screen_position = screen_position / half_screen;
+        let screen_size = screen_size / half_screen;
 
         let sampler = match smooth {
             true => self.linear_sampler.clone(),
@@ -108,8 +108,8 @@ impl SpriteRenderer {
         let constants = Constants {
             screen_position: screen_position.into(),
             screen_size: screen_size.into(),
-            clip_size: clip_size.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+            screen_clip: screen_clip.into(),
+            color: color.into(),
         };
 
         render_target

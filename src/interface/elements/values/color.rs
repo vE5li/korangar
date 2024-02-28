@@ -36,8 +36,8 @@ impl Element for ColorValue {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -45,15 +45,15 @@ impl Element for ColorValue {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background(*theme.value.border_radius, self.color);
+        renderer.render_background((*theme.value.corner_radius).into(), self.color);
 
-        renderer.render_text(
-            &self.display,
-            *theme.value.text_offset,
-            self.color.invert(),
-            *theme.value.font_size,
-        );
+        let text_position = ScreenPosition {
+            left: theme.value.text_offset.x,
+            top: theme.value.text_offset.y,
+        };
+
+        renderer.render_text(&self.display, text_position, self.color.invert(), *theme.value.font_size);
     }
 }

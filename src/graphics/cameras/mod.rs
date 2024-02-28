@@ -12,6 +12,7 @@ pub use self::player::PlayerCamera;
 pub use self::shadow::ShadowCamera;
 pub use self::start::StartCamera;
 use crate::graphics::{SmoothedValue, Transform};
+use crate::interface::{ScreenPosition, ScreenSize};
 
 fn direction(vector: Vector2<f32>) -> usize {
     let inverted = false;
@@ -34,7 +35,7 @@ pub trait Camera {
 
     fn billboard_coordinates(&self, position: Vector3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>);
 
-    fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (Vector2<f32>, Vector2<f32>);
+    fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (ScreenPosition, ScreenSize);
 
     fn distance_to(&self, position: Vector3<f32>) -> f32;
 

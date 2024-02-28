@@ -118,8 +118,8 @@ impl EntityRenderer {
 
         let constants = Constants {
             world: world_matrix.into(),
-            texture_position: [texture_position.x, texture_position.y],
-            texture_size: [texture_size.x, texture_size.y],
+            texture_position: texture_position.into(),
+            texture_size: texture_size.into(),
             depth_offset,
             curvature,
             mirror: mirror as u32,

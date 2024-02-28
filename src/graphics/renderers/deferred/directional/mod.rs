@@ -104,7 +104,7 @@ impl DirectionalLightRenderer {
         ]);
 
         let constants = Constants {
-            direction: Padded([direction.x, direction.y, direction.z]),
+            direction: Padded(direction.into()),
             color: [
                 color.red_f32() * intensity,
                 color.green_f32() * intensity,

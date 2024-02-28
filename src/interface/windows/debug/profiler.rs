@@ -23,7 +23,7 @@ impl PrototypeWindow for ProfilerWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let toggle_halting = || {
             let is_profiler_halted = is_profiler_halted();
             set_profiler_halted(!is_profiler_halted);

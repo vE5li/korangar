@@ -10,8 +10,6 @@ mod mutable;
 mod prototype;
 mod settings;
 
-use cgmath::{Vector2, Vector4};
-
 pub use self::account::*;
 pub use self::builder::WindowBuilder;
 pub use self::cache::*;
@@ -30,11 +28,11 @@ use crate::loaders::FontLoader;
 
 pub struct Window {
     window_class: Option<String>,
-    position: Vector2<f32>,
+    position: ScreenPosition,
     size_constraint: SizeConstraint,
-    size: Vector2<f32>,
+    size: ScreenSize,
     elements: Vec<ElementCell>,
-    popup_element: Option<(ElementCell, Tracker<Position>, Tracker<Size>)>,
+    popup_element: Option<(ElementCell, Tracker<ScreenPosition>, Tracker<ScreenSize>)>,
     closable: bool,
     background_color: Option<ColorSelector>,
     theme_kind: ThemeKind,
@@ -69,18 +67,27 @@ impl Window {
         font_loader: Rc<RefCell<FontLoader>>,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        available_space: Size,
-    ) -> (Option<&str>, Vector2<f32>, Size) {
+        available_space: ScreenSize,
+    ) -> (Option<&str>, ScreenPosition, ScreenSize) {
         let height = match self.size_constraint.height.is_flexible() {
             true => None,
-            false => Some(self.size.y),
+            false => Some(self.size.height),
+        };
+
+        let border_size = ScreenSize {
+            width: theme.window.border_size.x,
+            height: theme.window.border_size.y,
+        };
+        let gaps = ScreenSize {
+            width: theme.window.gaps.x,
+            height: theme.window.gaps.y,
         };
 
         let mut placement_resolver = PlacementResolver::new(
             font_loader.clone(),
-            PartialSize::new(self.size.x, height),
-            *theme.window.border_size,
-            *theme.window.gaps,
+            PartialScreenSize::new(self.size.width, height),
+            border_size,
+            gaps,
             *interface_settings.scaling,
         );
 
@@ -92,11 +99,11 @@ impl Window {
             let final_height = theme.window.border_size.y + placement_resolver.final_height();
             let final_height = self.size_constraint.validated_height(
                 final_height,
-                available_space.y.into(),
-                available_space.y.into(),
+                available_space.height.into(),
+                available_space.height.into(),
                 *interface_settings.scaling,
             );
-            self.size.y = final_height;
+            self.size.height = final_height;
             self.validate_size(interface_settings, available_space);
         }
 
@@ -107,9 +114,9 @@ impl Window {
 
             let mut placement_resolver = PlacementResolver::new(
                 font_loader,
-                PartialSize::new(size.x, Some(200.0)),
-                Vector2::new(0.0, 0.0), //*theme.window.border_size, // TODO: Popup
-                Vector2::new(0.0, 0.0), //*theme.window.gaps, // TODO: Popup
+                PartialScreenSize::new(size.width, Some(200.0)),
+                ScreenSize::default(), //*theme.window.border_size, // TODO: Popup
+                ScreenSize::default(), //*theme.window.gaps, // TODO: Popup
                 *interface_settings.scaling,
             );
 
@@ -137,23 +144,24 @@ impl Window {
         self.elements[0].borrow().restore_focus(self.elements[0].clone())
     }
 
-    pub fn hovered_element(&self, mouse_position: Vector2<f32>, mouse_mode: &MouseInputMode) -> HoverInformation {
-        let absolute_position = mouse_position - self.position;
+    pub fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
+        let absolute_position = ScreenPosition::from_size(mouse_position - self.position);
 
         if let Some((popup, position_tracker, _)) = &self.popup_element {
             let position = position_tracker().unwrap(); // FIX: Don't unwrap obviously
+            let position = ScreenPosition::from_size(mouse_position - position);
 
-            match popup.borrow().hovered_element(mouse_position - position, mouse_mode) {
+            match popup.borrow().hovered_element(position, mouse_mode) {
                 HoverInformation::Hovered => return HoverInformation::Element(popup.clone()),
                 HoverInformation::Missed => {}
                 hover_information => return hover_information,
             }
         }
 
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.size.x
-            && absolute_position.y <= self.size.y
+        if absolute_position.left >= 0.0
+            && absolute_position.top >= 0.0
+            && absolute_position.left <= self.size.width
+            && absolute_position.top <= self.size.height
         {
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position, mouse_mode) {
@@ -169,21 +177,21 @@ impl Window {
         HoverInformation::Missed
     }
 
-    pub fn get_area(&self) -> (Position, Size) {
+    pub fn get_area(&self) -> (ScreenPosition, ScreenSize) {
         (self.position, self.size)
     }
 
-    pub fn hovers_area(&self, position: Position, size: Size) -> bool {
+    pub fn hovers_area(&self, position: ScreenPosition, size: ScreenSize) -> bool {
         let self_combined = self.position + self.size;
         let area_combined = position + size;
 
-        self_combined.x > position.x
-            && self.position.x < area_combined.x
-            && self_combined.y > position.y
-            && self.position.y < area_combined.y
+        self_combined.left > position.left
+            && self.position.left < area_combined.left
+            && self_combined.top > position.top
+            && self.position.top < area_combined.top
     }
 
-    pub fn offset(&mut self, available_space: Size, offset: Position) -> Option<(&str, Position)> {
+    pub fn offset(&mut self, available_space: ScreenSize, offset: ScreenPosition) -> Option<(&str, ScreenPosition)> {
         self.position += offset;
         self.validate_position(available_space);
         self.window_class
@@ -191,7 +199,7 @@ impl Window {
             .map(|window_class| (window_class.as_str(), self.position))
     }
 
-    fn validate_position(&mut self, available_space: Size) {
+    fn validate_position(&mut self, available_space: ScreenSize) {
         self.position = self.size_constraint.validated_position(self.position, self.size, available_space);
     }
 
@@ -199,21 +207,21 @@ impl Window {
         &mut self,
         interface_settings: &InterfaceSettings,
         _theme: &InterfaceTheme,
-        available_space: Size,
-        growth: Size,
-    ) -> (Option<&str>, Size) {
+        available_space: ScreenSize,
+        growth: ScreenSize,
+    ) -> (Option<&str>, ScreenSize) {
         self.size += growth;
         self.validate_size(interface_settings, available_space);
         (self.window_class.as_deref(), self.size)
     }
 
-    fn validate_size(&mut self, interface_settings: &InterfaceSettings, available_space: Size) {
+    fn validate_size(&mut self, interface_settings: &InterfaceSettings, available_space: ScreenSize) {
         self.size = self
             .size_constraint
             .validated_size(self.size, available_space, *interface_settings.scaling);
     }
 
-    pub fn open_popup(&mut self, element: ElementCell, position_tracker: Tracker<Position>, size_tracker: Tracker<Size>) {
+    pub fn open_popup(&mut self, element: ElementCell, position_tracker: Tracker<ScreenPosition>, size_tracker: Tracker<ScreenSize>) {
         // NOTE: Very important to link back
         let weak_element = Rc::downgrade(&element);
         element.borrow_mut().link_back(weak_element, None);
@@ -236,19 +244,19 @@ impl Window {
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
     ) {
-        let clip_size = Vector4::new(
-            self.position.x,
-            self.position.y,
-            self.position.x + self.size.x,
-            self.position.y + self.size.y,
-        );
+        let screen_clip = ScreenClip {
+            left: self.position.left,
+            top: self.position.top,
+            right: self.position.left + self.size.width,
+            bottom: self.position.top + self.size.height,
+        };
 
         renderer.render_rectangle(
             render_target,
             self.position,
             self.size,
-            clip_size,
-            *theme.window.border_radius,
+            screen_clip,
+            (*theme.window.corner_radius).into(),
             self.get_background_color(theme),
         );
 
@@ -260,7 +268,7 @@ impl Window {
                 interface_settings,
                 theme,
                 self.position,
-                clip_size,
+                screen_clip,
                 hovered_element,
                 focused_element,
                 mouse_mode,
@@ -278,7 +286,7 @@ impl Window {
                 interface_settings,
                 theme,
                 position,
-                clip_size,
+                screen_clip,
                 hovered_element,
                 focused_element,
                 mouse_mode,

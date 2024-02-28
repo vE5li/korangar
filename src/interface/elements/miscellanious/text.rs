@@ -1,4 +1,3 @@
-use num::Zero;
 use procedural::dimension;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -78,8 +77,8 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -87,7 +86,7 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let foreground_color = self
             .foreground_color
@@ -96,6 +95,11 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
             .unwrap_or(*theme.button.foreground_color);
 
         let text = self.text.as_ref().unwrap();
-        renderer.render_text(text.as_ref(), Vector2::zero(), foreground_color, self.get_font_size(theme));
+        renderer.render_text(
+            text.as_ref(),
+            ScreenPosition::default(),
+            foreground_color,
+            self.get_font_size(theme),
+        );
     }
 }

@@ -19,7 +19,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let mut elements = vec![
             Text::default().with_text("Shadow detail").with_width(dimension!(50%)).wrap(),
             PickList::default()

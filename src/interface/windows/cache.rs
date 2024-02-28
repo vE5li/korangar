@@ -1,18 +1,17 @@
 use std::collections::HashMap;
 
-use cgmath::Vector2;
 use derive_new::new;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
-use crate::interface::{Position, Size};
+use crate::interface::{ScreenPosition, ScreenSize};
 
 #[derive(Serialize, Deserialize, new)]
 pub struct WindowState {
-    pub position: Position,
-    pub size: Size,
+    pub position: ScreenPosition,
+    pub size: ScreenSize,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -52,7 +51,7 @@ impl WindowCache {
         std::fs::write("client/window_cache.ron", data).expect("unable to write file");
     }
 
-    pub fn register_window(&mut self, identifier: &str, position: Position, size: Size) {
+    pub fn register_window(&mut self, identifier: &str, position: ScreenPosition, size: ScreenSize) {
         if let Some(entry) = self.entries.get_mut(identifier) {
             entry.position = position;
             entry.size = size;
@@ -62,19 +61,19 @@ impl WindowCache {
         }
     }
 
-    pub fn update_position(&mut self, identifier: &str, position: Vector2<f32>) {
+    pub fn update_position(&mut self, identifier: &str, position: ScreenPosition) {
         if let Some(entry) = self.entries.get_mut(identifier) {
             entry.position = position;
         }
     }
 
-    pub fn update_size(&mut self, identifier: &str, size: Size) {
+    pub fn update_size(&mut self, identifier: &str, size: ScreenSize) {
         if let Some(entry) = self.entries.get_mut(identifier) {
             entry.size = size;
         }
     }
 
-    pub fn get_window_state(&self, identifier: &str) -> Option<(Position, Size)> {
+    pub fn get_window_state(&self, identifier: &str) -> Option<(ScreenPosition, ScreenSize)> {
         self.entries.get(identifier).map(|entry| (entry.position, entry.size))
     }
 }

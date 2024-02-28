@@ -1,7 +1,5 @@
 use std::rc::Weak;
 
-use cgmath::Zero;
-
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
@@ -66,7 +64,7 @@ impl Element for ScrollView {
             interface_settings,
             theme,
             &self.size_constraint,
-            Vector2::zero(),
+            ScreenSize::default(),
         );
     }
 
@@ -74,9 +72,9 @@ impl Element for ScrollView {
         self.state.update()
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         self.state.hovered_element(
-            mouse_position + Vector2::new(0.0, self.scroll),
+            mouse_position + ScreenPosition::only_top(self.scroll),
             mouse_mode,
             mouse_mode.is_none(),
         )
@@ -95,8 +93,8 @@ impl Element for ScrollView {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -105,7 +103,7 @@ impl Element for ScrollView {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         if let Some(color_selector) = &self.background_color {
             renderer.render_background((*theme.button.corner_radius).into(), color_selector(theme));

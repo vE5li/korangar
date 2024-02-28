@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector4, Zero};
+use cgmath::Vector2;
 use vulkano::image::view::ImageView;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer};
@@ -30,13 +30,13 @@ pub struct ElementRenderer<'a> {
     pub render_target: &'a mut <InterfaceRenderer as Renderer>::Target,
     pub renderer: &'a InterfaceRenderer,
     pub interface_settings: &'a InterfaceSettings,
-    pub position: Position,
-    pub size: Size,
-    pub clip_size: ClipSize,
+    pub position: ScreenPosition,
+    pub size: ScreenSize,
+    pub screen_clip: ScreenClip,
 }
 
 impl<'a> ElementRenderer<'a> {
-    pub fn get_position(&self) -> Position {
+    pub fn get_position(&self) -> ScreenPosition {
         self.position
     }
 
@@ -46,71 +46,71 @@ impl<'a> ElementRenderer<'a> {
     }
 
     pub fn set_scroll(&mut self, scroll: f32) {
-        self.position.y -= scroll;
+        self.position.top -= scroll;
     }
 
-    pub fn render_background(&mut self, border_radius: Vector4<f32>, color: Color) {
+    pub fn render_background(&mut self, corner_radius: CornerRadius, color: Color) {
         self.renderer.render_rectangle(
             self.render_target,
             self.position,
             self.size,
-            self.clip_size,
-            border_radius * *self.interface_settings.scaling,
+            self.screen_clip,
+            corner_radius * *self.interface_settings.scaling,
             color,
         );
     }
 
-    pub fn render_rectangle(&mut self, position: Position, size: Size, border_radius: Vector4<f32>, color: Color) {
+    pub fn render_rectangle(&mut self, position: ScreenPosition, size: ScreenSize, corner_radius: CornerRadius, color: Color) {
         self.renderer.render_rectangle(
             self.render_target,
             self.position + position,
             size,
-            self.clip_size,
-            border_radius * *self.interface_settings.scaling,
+            self.screen_clip,
+            corner_radius * *self.interface_settings.scaling,
             color,
         );
     }
 
-    pub fn render_text(&mut self, text: &str, offset: Position, foreground_color: Color, font_size: f32) -> f32 {
+    pub fn render_text(&mut self, text: &str, offset: ScreenPosition, foreground_color: Color, font_size: f32) -> f32 {
         self.renderer.render_text(
             self.render_target,
             text,
             self.position + offset * *self.interface_settings.scaling,
-            self.clip_size,
+            self.screen_clip,
             foreground_color,
             font_size * *self.interface_settings.scaling,
         )
     }
 
-    pub fn render_checkbox(&mut self, offset: Position, size: Size, color: Color, checked: bool) {
+    pub fn render_checkbox(&mut self, offset: ScreenPosition, size: ScreenSize, color: Color, checked: bool) {
         self.renderer.render_checkbox(
             self.render_target,
             self.position + offset * *self.interface_settings.scaling,
             size * *self.interface_settings.scaling,
-            self.clip_size,
+            self.screen_clip,
             color,
             checked,
         );
     }
 
-    pub fn render_expand_arrow(&mut self, offset: Position, size: Size, color: Color, expanded: bool) {
+    pub fn render_expand_arrow(&mut self, offset: ScreenPosition, size: ScreenSize, color: Color, expanded: bool) {
         self.renderer.render_expand_arrow(
             self.render_target,
             self.position + offset * *self.interface_settings.scaling,
             size * *self.interface_settings.scaling,
-            self.clip_size,
+            self.screen_clip,
             color,
             expanded,
         );
     }
 
-    pub fn render_sprite(&mut self, texture: Arc<ImageView>, offset: Position, size: Size, color: Color) {
+    pub fn render_sprite(&mut self, texture: Arc<ImageView>, offset: ScreenPosition, size: ScreenSize, color: Color) {
         self.renderer.render_sprite(
             self.render_target,
             texture,
             self.position + offset * *self.interface_settings.scaling,
             size * *self.interface_settings.scaling,
-            self.clip_size,
+            self.screen_clip,
             color,
             false,
         );
@@ -134,7 +134,7 @@ impl<'a> ElementRenderer<'a> {
             interface_settings,
             theme,
             self.position,
-            self.clip_size,
+            self.screen_clip,
             hovered_element,
             focused_element,
             mouse_mode,
@@ -143,24 +143,13 @@ impl<'a> ElementRenderer<'a> {
     }
 }
 
+#[derive(Default)]
 pub struct ElementState {
-    pub cached_size: Size,
-    pub cached_position: Position,
+    pub cached_size: ScreenSize,
+    pub cached_position: ScreenPosition,
     pub self_element: Option<WeakElementCell>,
     pub parent_element: Option<WeakElementCell>,
-    pub mouse_position: Cell<Position>,
-}
-
-impl Default for ElementState {
-    fn default() -> Self {
-        Self {
-            cached_size: Size::zero(),
-            cached_position: Position::zero(),
-            self_element: None,
-            parent_element: None,
-            mouse_position: Cell::new(Position::zero()),
-        }
-    }
+    pub mouse_position: Cell<ScreenPosition>,
 }
 
 impl ElementState {
@@ -175,13 +164,13 @@ impl ElementState {
         self.cached_position = position;
     }
 
-    pub fn hovered_element(&self, mouse_position: Position) -> HoverInformation {
-        let absolute_position = mouse_position - self.cached_position;
+    pub fn hovered_element(&self, mouse_position: ScreenPosition) -> HoverInformation {
+        let absolute_position = ScreenPosition::from_size(mouse_position - self.cached_position);
 
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.cached_size.x
-            && absolute_position.y <= self.cached_size.y
+        if absolute_position.left >= 0.0
+            && absolute_position.top >= 0.0
+            && absolute_position.left <= self.cached_size.width
+            && absolute_position.top <= self.cached_size.height
         {
             self.mouse_position.replace(absolute_position);
             return HoverInformation::Hovered;
@@ -195,18 +184,18 @@ impl ElementState {
         render_target: &'a mut <InterfaceRenderer as Renderer>::Target,
         renderer: &'a InterfaceRenderer,
         interface_settings: &'a InterfaceSettings,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
     ) -> ElementRenderer<'a> {
         let position = parent_position + self.cached_position;
         let size = self.cached_size;
 
-        let clip_size = Vector4::new(
-            clip_size.x.max(position.x),
-            clip_size.y.max(position.y),
-            clip_size.z.min(position.x + self.cached_size.x),
-            clip_size.w.min(position.y + self.cached_size.y),
-        );
+        let screen_clip = ScreenClip {
+            left: screen_clip.left.max(position.left),
+            top: screen_clip.top.max(position.top),
+            right: screen_clip.right.min(position.left + self.cached_size.width),
+            bottom: screen_clip.bottom.min(position.top + self.cached_size.height),
+        };
 
         ElementRenderer {
             render_target,
@@ -214,7 +203,7 @@ impl ElementState {
             interface_settings,
             position,
             size,
-            clip_size,
+            screen_clip,
         }
     }
 }
@@ -301,7 +290,7 @@ pub trait Element {
         matches!(element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
     }
 
-    fn hovered_element(&self, _mouse_position: Vector2<f32>, _mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, _mouse_position: ScreenPosition, _mouse_mode: &MouseInputMode) -> HoverInformation {
         HoverInformation::Missed
     }
 
@@ -313,7 +302,7 @@ pub trait Element {
         Vec::new()
     }
 
-    fn drag(&mut self, _mouse_delta: Position) -> Option<ChangeEvent> {
+    fn drag(&mut self, _mouse_delta: ScreenPosition) -> Option<ChangeEvent> {
         None
     }
 
@@ -346,8 +335,8 @@ pub trait Element {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,

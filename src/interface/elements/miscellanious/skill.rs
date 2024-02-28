@@ -1,4 +1,3 @@
-use cgmath::{Array, Vector4, Zero};
 use derive_new::new;
 use procedural::*;
 
@@ -33,7 +32,7 @@ impl Element for SkillBox {
         self.state.resolve(placement_resolver, &constraint!(30, 30));
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match self.skill.is_some() || matches!(mouse_mode, MouseInputMode::MoveSkill(..)) {
             true => self.state.hovered_element(mouse_position),
             false => HoverInformation::Missed,
@@ -63,8 +62,8 @@ impl Element for SkillBox {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -72,7 +71,7 @@ impl Element for SkillBox {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
@@ -82,7 +81,7 @@ impl Element for SkillBox {
             _ => *theme.button.background_color,
         };
 
-        renderer.render_background(Vector4::from_value(5.0), background_color);
+        renderer.render_background(CornerRadius::uniform(5.0), background_color);
 
         if let Some(skill) = &self.skill {
             skill.actions.render2(
@@ -90,7 +89,7 @@ impl Element for SkillBox {
                 renderer.renderer,
                 &skill.sprite,
                 &skill.animation_state,
-                renderer.position + Vector2::from_value(15.0 * *interface_settings.scaling),
+                renderer.position + ScreenPosition::uniform(15.0 * *interface_settings.scaling),
                 0,
                 Color::monochrome(255),
                 interface_settings,
@@ -98,13 +97,13 @@ impl Element for SkillBox {
 
             renderer.render_text(
                 &format!("{}", skill.skill_level.0),
-                Vector2::from_value(1.0),
+                ScreenPosition::uniform(1.0),
                 Color::monochrome(0),
                 15.0,
             );
             renderer.render_text(
                 &format!("{}", skill.skill_level.0),
-                Vector2::zero(),
+                ScreenPosition::default(),
                 Color::monochrome(255),
                 15.0,
             );

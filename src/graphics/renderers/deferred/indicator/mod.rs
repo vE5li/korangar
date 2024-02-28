@@ -109,7 +109,7 @@ impl IndicatorRenderer {
         ]);
 
         let constants = Constants {
-            color: Padded([color.red_f32(), color.green_f32(), color.blue_f32()]),
+            color: Padded(color.into()),
             upper_left: Padded(upper_left.into()),
             upper_right: Padded(upper_right.into()),
             lower_left: Padded(lower_left.into()),

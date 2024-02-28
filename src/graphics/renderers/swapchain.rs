@@ -14,6 +14,7 @@ use winit::window::Window;
 
 #[cfg(feature = "debug")]
 use crate::debug::*;
+use crate::interface::ScreenSize;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PresentModeInfo {
@@ -206,7 +207,10 @@ impl SwapchainHolder {
         self.window_size
     }
 
-    pub fn window_size_f32(&self) -> Vector2<f32> {
-        self.window_size.map(|component| component as f32).into()
+    pub fn window_screen_size(&self) -> ScreenSize {
+        ScreenSize {
+            width: self.window_size[0] as f32,
+            height: self.window_size[1] as f32,
+        }
     }
 }

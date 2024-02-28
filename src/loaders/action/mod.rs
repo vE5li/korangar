@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Mul;
 use std::sync::Arc;
 
-use cgmath::{Array, Vector2, Vector4};
+use cgmath::{Array, Vector2};
 use derive_new::new;
 use procedural::*;
 use vulkano::image::view::ImageView;
@@ -11,7 +11,7 @@ use super::Sprite;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
-use crate::interface::InterfaceSettings;
+use crate::interface::{InterfaceSettings, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version, FALLBACK_ACTIONS_FILE};
 use crate::network::ClientTick;
 
@@ -116,7 +116,7 @@ impl Actions {
         renderer: &T,
         sprite: &Sprite,
         animation_state: &AnimationState,
-        position: Vector2<f32>,
+        position: ScreenPosition,
         camera_direction: usize,
         color: Color,
         interface_settings: &InterfaceSettings,
@@ -160,14 +160,31 @@ impl Actions {
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;
-            let final_position = position + offset - final_size / 2.0;
+            let final_position = Vector2::new(position.left, position.top) + offset - final_size / 2.0;
+
+            let final_size = ScreenSize {
+                width: final_size.x,
+                height: final_size.y,
+            };
+
+            let final_position = ScreenPosition {
+                left: final_position.x,
+                top: final_position.y,
+            };
+
+            let screen_clip = ScreenClip {
+                left: 0.0,
+                top: 0.0,
+                right: f32::MAX,
+                bottom: f32::MAX,
+            };
 
             renderer.render_sprite(
                 render_target,
                 texture.clone(),
                 final_position,
                 final_size,
-                Vector4::new(0.0, 0.0, f32::MAX, f32::MAX),
+                screen_clip,
                 color,
                 false,
             );

@@ -24,7 +24,7 @@ impl PrototypeWindow for ChatWindow {
         ChatWindow::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let input_text = Rc::new(RefCell::new(String::new()));
 
         let button_selector = {

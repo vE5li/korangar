@@ -108,10 +108,10 @@ impl PointLightRenderer {
         let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
 
         let constants = Constants {
-            screen_position: [screen_position.x, screen_position.y],
-            screen_size: [screen_size.x, screen_size.y],
-            position: Padded([position.x, position.y, position.z]),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            screen_position: screen_position.into(),
+            screen_size: screen_size.into(),
+            position: Padded(position.into()),
+            color: color.into(),
             range,
         };
 

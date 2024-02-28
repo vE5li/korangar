@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector4};
+use cgmath::Vector2;
 use procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
@@ -20,6 +20,7 @@ use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
 use super::{IntoFormat, SubpassAttachments};
 use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait};
+use crate::interface::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
 #[derive(PartialEq, Eq)]
@@ -132,26 +133,39 @@ impl InterfaceRenderer {
         )
     }
 
+    fn get_window_size(&self) -> ScreenSize {
+        ScreenSize {
+            width: self.dimensions[0] as f32,
+            height: self.dimensions[1] as f32,
+        }
+    }
+
     pub fn render_rectangle(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
-        corner_radius: Vector4<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        screen_clip: ScreenClip,
+        corner_radius: CornerRadius,
         color: Color,
     ) {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-        self.rectangle_renderer
-            .render(render_target, window_size, position, size, clip_size, corner_radius, color);
+        self.rectangle_renderer.render(
+            render_target,
+            self.get_window_size(),
+            position,
+            size,
+            screen_clip,
+            corner_radius,
+            color,
+        );
     }
 
     pub fn render_checkbox(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        screen_clip: ScreenClip,
         color: Color,
         checked: bool,
     ) {
@@ -160,15 +174,15 @@ impl InterfaceRenderer {
             false => self.unchecked_box_texture.clone(),
         };
 
-        self.render_sprite(render_target, texture, position, size, clip_size, color, true);
+        self.render_sprite(render_target, texture, position, size, screen_clip, color, true);
     }
 
     pub fn render_expand_arrow(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        screen_clip: ScreenClip,
         color: Color,
         expanded: bool,
     ) {
@@ -177,21 +191,27 @@ impl InterfaceRenderer {
             false => self.collapsed_arrow_texture.clone(),
         };
 
-        self.render_sprite(render_target, texture, position, size, clip_size, color, true);
+        self.render_sprite(render_target, texture, position, size, screen_clip, color, true);
     }
 
     pub fn render_text(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         text: &str,
-        position: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        position: ScreenPosition,
+        screen_clip: ScreenClip,
         color: Color,
         font_size: f32,
     ) -> f32 {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-        self.text_renderer
-            .render(render_target, text, window_size, position, clip_size, color, font_size)
+        self.text_renderer.render(
+            render_target,
+            text,
+            self.get_window_size(),
+            position,
+            screen_clip,
+            color,
+            font_size,
+        )
     }
 }
 
@@ -212,17 +232,23 @@ impl SpriteRendererTrait for InterfaceRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         texture: Arc<ImageView>,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        screen_clip: ScreenClip,
         color: Color,
         smooth: bool,
     ) where
         Self: Renderer,
     {
-        let window_size = Vector2::new(self.dimensions[0] as usize, self.dimensions[1] as usize);
-
-        self.sprite_renderer
-            .render(render_target, texture, window_size, position, size, clip_size, color, smooth);
+        self.sprite_renderer.render(
+            render_target,
+            texture,
+            self.get_window_size(),
+            position,
+            size,
+            screen_clip,
+            color,
+            smooth,
+        );
     }
 }

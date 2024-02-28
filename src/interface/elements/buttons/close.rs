@@ -26,7 +26,7 @@ impl Element for CloseButton {
         false
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -44,8 +44,8 @@ impl Element for CloseButton {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -53,18 +53,23 @@ impl Element for CloseButton {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.close_button.hovered_background_color,
             false => *theme.close_button.background_color,
         };
 
-        renderer.render_background(*theme.close_button.border_radius, background_color);
+        renderer.render_background((*theme.close_button.corner_radius).into(), background_color);
+
+        let text_position = ScreenPosition {
+            left: theme.close_button.text_offset.x,
+            top: theme.close_button.text_offset.y,
+        };
 
         renderer.render_text(
             "X",
-            *theme.close_button.text_offset,
+            text_position,
             *theme.close_button.foreground_color,
             *theme.close_button.font_size,
         );

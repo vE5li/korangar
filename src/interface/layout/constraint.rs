@@ -2,7 +2,7 @@ use derive_new::new;
 use procedural::constraint;
 use serde::{Deserialize, Serialize};
 
-use crate::interface::{Dimension, PartialSize, Position, Size};
+use crate::interface::{Dimension, PartialScreenSize, ScreenPosition, ScreenSize};
 
 #[derive(Copy, Clone, Serialize, Deserialize, new)]
 pub struct DimensionConstraint {
@@ -35,28 +35,30 @@ pub struct SizeConstraint {
 }
 
 impl SizeConstraint {
-    pub fn resolve(&self, available: Size, remaining: Size, scaling: f32) -> PartialSize {
-        let width = self.width.resolve_width(available.x, remaining.x, scaling);
-        let width = self.validated_width(width, available.x, remaining.x, scaling);
+    pub fn resolve(&self, available: ScreenSize, remaining: ScreenSize, scaling: f32) -> PartialScreenSize {
+        let width = self.width.resolve_width(available.width, remaining.width, scaling);
+        let width = self.validated_width(width, available.width, remaining.width, scaling);
 
-        let mut height = self.height.resolve_height(available.y.into(), remaining.y.into(), scaling);
+        let mut height = self
+            .height
+            .resolve_height(available.height.into(), remaining.height.into(), scaling);
         if let Some(height) = &mut height {
-            *height = self.validated_height(*height, available.y.into(), remaining.y.into(), scaling);
+            *height = self.validated_height(*height, available.height.into(), remaining.height.into(), scaling);
         }
 
-        PartialSize::new(width, height)
+        PartialScreenSize::new(width, height)
     }
 
-    pub fn resolve_partial(&self, available: PartialSize, remaining: PartialSize, scaling: f32) -> PartialSize {
-        let width = self.width.resolve_width(available.x, remaining.x, scaling);
-        let width = self.validated_width(width, available.x, remaining.x, scaling);
+    pub fn resolve_partial(&self, available: PartialScreenSize, remaining: PartialScreenSize, scaling: f32) -> PartialScreenSize {
+        let width = self.width.resolve_width(available.width, remaining.width, scaling);
+        let width = self.validated_width(width, available.width, remaining.width, scaling);
 
-        let mut height = self.height.resolve_height(available.y, remaining.y, scaling);
+        let mut height = self.height.resolve_height(available.height, remaining.height, scaling);
         if let Some(height) = &mut height {
-            *height = self.validated_height(*height, available.y, remaining.y, scaling);
+            *height = self.validated_height(*height, available.height, remaining.height, scaling);
         }
 
-        PartialSize::new(width, height)
+        PartialScreenSize::new(width, height)
     }
 
     fn validated_width(&self, mut width: f32, available: f32, remaining: f32, scaling: f32) -> f32 {
@@ -87,17 +89,19 @@ impl SizeConstraint {
         height
     }
 
-    pub fn validated_size(&self, size: Size, available: Size, scaling: f32) -> Size {
-        let width = self.validated_width(size.x, available.x, available.x, scaling);
-        let height = self.validated_height(size.y, available.y.into(), available.y.into(), scaling);
-        Size::new(width, height)
+    pub fn validated_size(&self, size: ScreenSize, available: ScreenSize, scaling: f32) -> ScreenSize {
+        let width = self.validated_width(size.width, available.width, available.width, scaling);
+        let height = self.validated_height(size.height, available.height.into(), available.height.into(), scaling);
+
+        ScreenSize { width, height }
     }
 
-    pub fn validated_position(&self, position: Position, size: Size, available: Size) -> Position {
+    pub fn validated_position(&self, position: ScreenPosition, size: ScreenSize, available: ScreenSize) -> ScreenPosition {
         let half_size = size / 2.0;
-        let x = f32::clamp(position.x, -half_size.x, available.x - half_size.x);
-        let y = f32::clamp(position.y, 0.0, available.y - 30.0);
-        Position::new(x, y)
+        let left = f32::clamp(position.left, -half_size.width, available.width - half_size.width);
+        let top = f32::clamp(position.top, 0.0, available.height - 30.0);
+
+        ScreenPosition { left, top }
     }
 }
 

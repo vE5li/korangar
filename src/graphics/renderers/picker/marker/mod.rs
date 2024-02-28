@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/picker/marker/fragment_shader.glsl");
 
 use std::sync::Arc;
 
-use cgmath::Vector2;
 use procedural::profile;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -15,6 +14,7 @@ use self::vertex_shader::Constants;
 use super::PickerSubrenderer;
 use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::*;
+use crate::interface::{ScreenPosition, ScreenSize};
 use crate::world::MarkerIdentifier;
 
 pub struct MarkerRenderer {
@@ -67,8 +67,8 @@ impl MarkerRenderer {
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
         marker_identifier: MarkerIdentifier,
     ) {
         if render_target.bind_subrenderer(PickerSubrenderer::Marker) {

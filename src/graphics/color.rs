@@ -106,6 +106,18 @@ impl Color {
     }
 }
 
+impl From<Color> for [f32; 3] {
+    fn from(val: Color) -> Self {
+        [val.red_f32(), val.green_f32(), val.blue_f32()]
+    }
+}
+
+impl From<Color> for [f32; 4] {
+    fn from(val: Color) -> Self {
+        [val.red_f32(), val.green_f32(), val.blue_f32(), val.alpha_f32()]
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug, Named, ByteConvertable, PrototypeElement)]
 pub struct ColorBGRA {

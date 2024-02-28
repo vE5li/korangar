@@ -52,7 +52,7 @@ impl Element for FrameView {
         None
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -64,8 +64,8 @@ impl Element for FrameView {
         let mouse_position = self.state.mouse_position.get();
         let number_of_frames = get_number_of_saved_frames(visible_thread);
 
-        let bar_width = self.state.cached_size.x / number_of_frames as f32;
-        let clicked_frame = (mouse_position.x / bar_width) as usize;
+        let bar_width = self.state.cached_size.width / number_of_frames as f32;
+        let clicked_frame = (mouse_position.left / bar_width) as usize;
 
         let measurement = get_frame_by_index(visible_thread, clicked_frame);
         vec![ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement)))]
@@ -78,8 +78,8 @@ impl Element for FrameView {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         _theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -87,39 +87,46 @@ impl Element for FrameView {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let (entries, statistics_map, longest_frame) = get_statistics_data(*self.visible_thread.borrow());
 
-        let bar_width = (self.state.cached_size.x - 50.0) / entries.len() as f32;
+        let bar_width = (self.state.cached_size.width - 50.0) / entries.len() as f32;
         let gap_width = 50.0 / entries.len() as f32;
-        let height_unit = self.state.cached_size.y / longest_frame.as_secs_f32();
+        let height_unit = self.state.cached_size.height / longest_frame.as_secs_f32();
         let mut x_position = 0.0;
         let mut color_lookup = super::ColorLookup::default();
 
         for entry in entries {
-            let mut y_position = self.state.cached_size.y;
+            let mut y_position = self.state.cached_size.height;
 
             let bar_height = height_unit * entry.total_time.as_secs_f32();
+            let bar_position = ScreenPosition {
+                left: x_position,
+                top: y_position - bar_height,
+            };
+            let bar_size = ScreenSize {
+                width: bar_width,
+                height: bar_height,
+            };
 
-            renderer.render_rectangle(
-                Position::new(x_position, y_position - bar_height),
-                Size::new(bar_width, bar_height),
-                cgmath::Vector4::new(0.0, 0.0, 0.0, 0.0),
-                Color::monochrome(80),
-            );
+            renderer.render_rectangle(bar_position, bar_size, CornerRadius::default(), Color::monochrome(80));
 
             for (name, duration) in entry.frame_times {
                 let color = color_lookup.get_color(name);
                 let bar_height = height_unit * duration.as_secs_f32();
                 y_position -= bar_height;
 
-                renderer.render_rectangle(
-                    Position::new(x_position, y_position),
-                    Size::new(bar_width, bar_height),
-                    cgmath::Vector4::new(0.0, 0.0, 0.0, 0.0),
-                    color,
-                );
+                let bar_position = ScreenPosition {
+                    left: x_position,
+                    top: y_position,
+                };
+                let bar_size = ScreenSize {
+                    width: bar_width,
+                    height: bar_height,
+                };
+
+                renderer.render_rectangle(bar_position, bar_size, CornerRadius::default(), color);
             }
 
             x_position += bar_width + gap_width;
@@ -130,10 +137,16 @@ impl Element for FrameView {
             let statistics = statistics_map.get(name).unwrap();
             let text = format!("{} {:?} (SD {:.1})", name, statistics.mean, statistics.standard_deviation);
 
+            let text_position = ScreenPosition {
+                left: 3.0,
+                top: y_position,
+            };
+            let shadow_position = text_position + ScreenSize::uniform(1.0);
+
             // Drop shadow.
-            renderer.render_text(&text, Position::new(4.0, y_position + 1.0), Color::monochrome(0), 14.0);
+            renderer.render_text(&text, shadow_position, Color::monochrome(0), 14.0);
             // Colored text.
-            renderer.render_text(&text, Position::new(3.0, y_position), color, 14.0);
+            renderer.render_text(&text, text_position, color, 14.0);
 
             y_position += 14.0;
         }

@@ -18,6 +18,7 @@ use super::DeferredSubrenderer;
 use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
+use crate::interface::ScreenSize;
 
 pub struct EffectRenderer {
     memory_allocator: Arc<MemoryAllocator>,
@@ -76,7 +77,7 @@ impl EffectRenderer {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         texture: Arc<ImageView>,
-        window_size: Vector2<usize>,
+        window_size: ScreenSize,
         mut screen_positions: [Vector2<f32>; 4],
         texture_coordinates: [Vector2<f32>; 4],
         screen_space_position: Vector2<f32>,
@@ -90,7 +91,7 @@ impl EffectRenderer {
             self.bind_pipeline(render_target);
         }
 
-        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
+        let half_screen = Vector2::new(window_size.width / 2.0, window_size.height / 2.0);
 
         // TODO: move this calculation to the loading
         let rotation_matrix = Matrix2::from_angle(cgmath::Deg(angle / (1024.0 / 360.0)));
@@ -122,7 +123,7 @@ impl EffectRenderer {
             t_bottom_left: texture_coordinates[3],
             t_top_right: texture_coordinates[1],
             t_bottom_right: texture_coordinates[0],
-            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+            color: color.into(),
         };
 
         render_target

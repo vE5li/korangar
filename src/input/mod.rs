@@ -16,7 +16,7 @@ pub use self::mode::{Grabbed, MouseInputMode};
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
 use crate::graphics::{PickerRenderTarget, PickerTarget};
-use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, WeakElementCell};
+use crate::interface::{ClickAction, ElementCell, Focus, Interface, MouseCursorState, ScreenPosition, ScreenSize, WeakElementCell};
 use crate::network::ClientTick;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
@@ -102,9 +102,9 @@ impl FocusState {
 }
 
 pub struct InputSystem {
-    previous_mouse_position: Vector2<f32>,
-    new_mouse_position: Vector2<f32>,
-    mouse_delta: Vector2<f32>,
+    previous_mouse_position: ScreenPosition,
+    new_mouse_position: ScreenPosition,
+    mouse_delta: ScreenSize,
     previous_scroll_position: f32,
     new_scroll_position: f32,
     scroll_delta: f32,
@@ -117,9 +117,9 @@ pub struct InputSystem {
 
 impl InputSystem {
     pub fn new() -> Self {
-        let previous_mouse_position = Vector2::new(0.0, 0.0);
-        let new_mouse_position = Vector2::new(0.0, 0.0);
-        let mouse_delta = Vector2::new(0.0, 0.0);
+        let previous_mouse_position = ScreenPosition::default();
+        let new_mouse_position = ScreenPosition::default();
+        let mouse_delta = ScreenSize::default();
 
         let previous_scroll_position = 0.0;
         let new_scroll_position = 0.0;
@@ -155,7 +155,10 @@ impl InputSystem {
     }
 
     pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
-        self.new_mouse_position = Vector2::new(position.x as f32, position.y as f32);
+        self.new_mouse_position = ScreenPosition {
+            left: position.x as f32,
+            top: position.y as f32,
+        };
     }
 
     pub fn update_mouse_buttons(&mut self, button: MouseButton, state: ElementState) {
@@ -361,7 +364,7 @@ impl InputSystem {
         if self.right_mouse_button.down()
             && !self.right_mouse_button.pressed()
             && self.mouse_input_mode.is_none()
-            && self.mouse_delta.x != 0.0
+            && self.mouse_delta.width != 0.0
             && !lock_actions
         {
             self.mouse_input_mode = MouseInputMode::RotateCamera;
@@ -369,24 +372,24 @@ impl InputSystem {
 
         match &self.mouse_input_mode {
             MouseInputMode::DragElement((element, window_index)) => {
-                if self.mouse_delta != Vector2::new(0.0, 0.0) {
-                    interface.drag_element(element, *window_index, self.mouse_delta);
+                if self.mouse_delta != ScreenSize::default() {
+                    interface.drag_element(element, *window_index, ScreenPosition::from_size(self.mouse_delta));
                 }
                 interface.set_mouse_cursor_state(MouseCursorState::Grab, client_tick);
             }
             MouseInputMode::MoveInterface(identifier) => {
-                if self.mouse_delta != Vector2::new(0.0, 0.0) {
-                    interface.move_window(*identifier, self.mouse_delta);
+                if self.mouse_delta != ScreenSize::default() {
+                    interface.move_window(*identifier, ScreenPosition::from_size(self.mouse_delta));
                 }
                 interface.set_mouse_cursor_state(MouseCursorState::Grab, client_tick);
             }
             MouseInputMode::ResizeInterface(identifier) => {
-                if self.mouse_delta != Vector2::new(0.0, 0.0) {
+                if self.mouse_delta != ScreenSize::default() {
                     interface.resize_window(*identifier, self.mouse_delta);
                 }
             }
             MouseInputMode::RotateCamera => {
-                events.push(UserEvent::CameraRotate(self.mouse_delta.x));
+                events.push(UserEvent::CameraRotate(self.mouse_delta.width));
                 interface.set_mouse_cursor_state(MouseCursorState::RotateCamera, client_tick);
             }
             MouseInputMode::ClickInterface => interface.set_mouse_cursor_state(MouseCursorState::Click, client_tick),
@@ -573,7 +576,10 @@ impl InputSystem {
                 && self.mouse_input_mode.is_none()
                 && render_settings.use_debug_camera
             {
-                events.push(UserEvent::CameraLookAround(-self.mouse_delta));
+                events.push(UserEvent::CameraLookAround(-Vector2::new(
+                    self.mouse_delta.width,
+                    self.mouse_delta.height,
+                )));
             }
 
             #[cfg(feature = "debug")]
@@ -607,7 +613,7 @@ impl InputSystem {
                 fence.wait(None).unwrap();
             }
 
-            let sample_index = self.new_mouse_position.x as usize + self.new_mouse_position.y as usize * window_size.x;
+            let sample_index = self.new_mouse_position.left as usize + self.new_mouse_position.top as usize * window_size.x;
             let lock = picker_target.buffer.read().unwrap();
 
             if sample_index < lock.len() {
@@ -680,7 +686,7 @@ impl InputSystem {
         (events, hovered_element, focused_element, mouse_target)
     }
 
-    pub fn get_mouse_position(&self) -> Vector2<f32> {
+    pub fn get_mouse_position(&self) -> ScreenPosition {
         self.new_mouse_position
     }
 

@@ -15,8 +15,8 @@ where
     event: Option<E>,
     width_constraint: Option<DimensionConstraint>,
     state: ElementState,
-    latest_position: Rc<RefCell<Position>>,
-    latest_size: Rc<RefCell<Size>>,
+    latest_position: Rc<RefCell<ScreenPosition>>,
+    latest_size: Rc<RefCell<ScreenSize>>,
 }
 
 // HACK: Workaround for Rust incorrect trait bounds when deriving Option<T>
@@ -34,8 +34,8 @@ where
             event: Default::default(),
             width_constraint: Default::default(),
             state: Default::default(),
-            latest_position: Rc::new(RefCell::new(Position::new(0.0, 0.0))),
-            latest_size: Rc::new(RefCell::new(Size::new(0.0, 0.0))),
+            latest_position: Rc::new(RefCell::new(ScreenPosition::default())),
+            latest_size: Rc::new(RefCell::new(ScreenSize::default())),
         }
     }
 }
@@ -93,7 +93,7 @@ where
         *self.latest_size.borrow_mut() = self.state.cached_size;
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -154,8 +154,8 @@ where
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -163,7 +163,7 @@ where
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
         let background_color = match highlighted {
@@ -171,7 +171,7 @@ where
             false => *theme.button.background_color,
         };
 
-        renderer.render_background(*theme.button.border_radius, background_color);
+        renderer.render_background((*theme.button.corner_radius).into(), background_color);
 
         *self.latest_position.borrow_mut() = renderer.get_position();
 
@@ -184,12 +184,12 @@ where
         let current_state = self.selected.as_ref().map(|state| state.get()).unwrap();
 
         if let Some((text, _)) = self.options.iter().find(|(_, value)| *value == current_state) {
-            renderer.render_text(
-                text.as_ref(),
-                *theme.button.text_offset,
-                foreground_color,
-                *theme.button.font_size,
-            );
+            let text_position = ScreenPosition {
+                left: theme.button.text_offset.x,
+                top: theme.button.text_offset.y,
+            };
+
+            renderer.render_text(text.as_ref(), text_position, foreground_color, *theme.button.font_size);
         }
     }
 }

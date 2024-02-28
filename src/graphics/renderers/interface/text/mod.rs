@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector4};
 use procedural::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
@@ -21,6 +20,7 @@ use super::InterfaceSubrenderer;
 use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
+use crate::interface::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::FontLoader;
 
 pub struct TextRenderer {
@@ -83,9 +83,9 @@ impl TextRenderer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         text: &str,
-        window_size: Vector2<usize>,
-        screen_position: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        window_size: ScreenSize,
+        screen_position: ScreenPosition,
+        screen_clip: ScreenClip,
         color: Color,
         font_size: f32,
     ) -> f32 {
@@ -95,8 +95,8 @@ impl TextRenderer {
 
         let mut font_loader = self.font_loader.borrow_mut();
         let texture = font_loader.get_font_atlas();
-        let (character_layout, heigth) = font_loader.get(text, color, font_size, clip_size.z - screen_position.x);
-        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
+        let (character_layout, heigth) = font_loader.get(text, color, font_size, screen_clip.right - screen_position.left);
+        let half_screen = window_size / 2.0;
 
         let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
             WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone()),
@@ -109,15 +109,15 @@ impl TextRenderer {
             .unwrap();
 
         character_layout.iter().for_each(|(texture_coordinates, position, color)| {
-            let screen_position = Vector2::new(
-                (screen_position.x + position.min.x as f32) / half_screen.x,
-                (screen_position.y + position.min.y as f32) / half_screen.y,
-            );
+            let screen_position = ScreenPosition {
+                left: screen_position.left + position.min.x as f32,
+                top: screen_position.top + position.min.y as f32,
+            } / half_screen;
 
-            let screen_size = Vector2::new(
-                position.width() as f32 / half_screen.x,
-                position.height() as f32 / half_screen.y,
-            );
+            let screen_size = ScreenSize {
+                width: position.width() as f32,
+                height: position.height() as f32,
+            } / half_screen;
 
             let texture_position = texture_coordinates.min;
             let texture_size = texture_coordinates.max - texture_coordinates.min; // TODO: use absolute instead
@@ -125,10 +125,10 @@ impl TextRenderer {
             let constants = Constants {
                 screen_position: screen_position.into(),
                 screen_size: screen_size.into(),
-                clip_size: clip_size.into(),
+                screen_clip: screen_clip.into(),
                 texture_position: [texture_position.x, texture_position.y],
                 texture_size: [texture_size.x, texture_size.y],
-                color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+                color: (*color).into(),
             };
 
             render_target

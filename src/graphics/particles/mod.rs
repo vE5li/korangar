@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-use cgmath::{Array, Vector2, Vector3, Vector4, Zero};
+use cgmath::{Vector2, Vector3};
 use derive_new::new;
 use procedural::profile;
 use rand::{thread_rng, Rng};
 
 use crate::graphics::*;
+use crate::interface::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::network::{EntityId, QuestColor, QuestEffectPacket};
 use crate::world::*;
@@ -18,7 +19,7 @@ pub trait Particle {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     );
 }
 
@@ -53,7 +54,7 @@ impl Particle for DamageNumber {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
@@ -62,7 +63,10 @@ impl Particle for DamageNumber {
             clip_space_position.y / clip_space_position.w + 1.0,
         );
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height,
+        };
 
         renderer.render_damage_text(render_target, &self.damage_amount, final_position, Color::monochrome(255), 16.0);
     }
@@ -93,7 +97,7 @@ impl Particle for HealNumber {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
@@ -102,7 +106,10 @@ impl Particle for HealNumber {
             clip_space_position.y / clip_space_position.w + 1.0,
         );
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height,
+        };
 
         renderer.render_damage_text(render_target, &self.heal_amount, final_position, Color::rgb(30, 255, 30), 16.0);
     }
@@ -144,7 +151,7 @@ impl QuestIcon {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
@@ -153,14 +160,17 @@ impl QuestIcon {
             clip_space_position.y / clip_space_position.w + 1.0,
         );
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height,
+        };
 
         renderer.render_sprite(
             render_target,
             self.texture.clone(),
-            final_position - Vector2::from_value(15.0),
-            Vector2::from_value(30.0),
-            Vector4::zero(),
+            final_position - ScreenSize::uniform(15.0),
+            ScreenSize::uniform(30.0),
+            ScreenClip::default(),
             self.color,
             true,
         );
@@ -211,7 +221,7 @@ impl ParticleHolder {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
         entities: &[Entity],
     ) {
         self.particles

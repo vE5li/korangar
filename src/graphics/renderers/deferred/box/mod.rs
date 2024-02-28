@@ -139,7 +139,7 @@ impl BoxRenderer {
 
         let constants = Constants {
             world: world_matrix.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32()],
+            color: color.into(),
         };
 
         render_target

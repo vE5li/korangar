@@ -315,7 +315,7 @@ fn main() {
         &mut game_file_loader,
         &mut sprite_loader,
         &mut action_loader,
-        swapchain_holder.window_size_f32(),
+        swapchain_holder.window_screen_size(),
     );
     let mut focus_state = FocusState::default();
 
@@ -384,7 +384,10 @@ fn main() {
                     .downcast_ref::<winit::window::Window>()
                     .unwrap()
                     .inner_size();
-                interface.update_window_size(Size::new(window_size.width as f32, window_size.height as f32));
+                interface.update_window_size(ScreenSize {
+                    width: window_size.width as f32,
+                    height: window_size.height as f32,
+                });
                 swapchain_holder.update_window_size(window_size.into());
             }
             Event::WindowEvent {
@@ -1240,7 +1243,7 @@ fn main() {
                 let image_number = swapchain_holder.get_image_number();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
-                let window_size = swapchain_holder.window_size_f32();
+                let window_size = swapchain_holder.window_screen_size();
                 let window_size_u32 = swapchain_holder.window_size_u32();
                 let entities = &entities[..];
                 #[cfg(feature = "debug")]

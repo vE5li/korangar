@@ -1,6 +1,5 @@
 use std::rc::Weak;
 
-use cgmath::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -9,7 +8,7 @@ use crate::interface::{Element, *};
 
 pub struct Container {
     size_constraint: Option<SizeConstraint>,
-    border_size: Option<Vector2<f32>>,
+    border_size: Option<ScreenSize>,
     state: ContainerState,
 }
 
@@ -56,7 +55,7 @@ impl Element for Container {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let size_constraint = self.size_constraint.as_ref().unwrap_or(&constraint!(100%, ?));
-        let border = self.border_size.unwrap_or_else(Vector2::zero);
+        let border = self.border_size.unwrap_or_default();
 
         self.state
             .resolve(placement_resolver, interface_settings, theme, size_constraint, border);
@@ -66,7 +65,7 @@ impl Element for Container {
         self.state.update()
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         self.state.hovered_element(mouse_position, mouse_mode, false)
     }
 
@@ -77,8 +76,8 @@ impl Element for Container {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -87,7 +86,7 @@ impl Element for Container {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

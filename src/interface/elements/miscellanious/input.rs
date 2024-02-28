@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use cgmath::{Array, Vector2, Vector4};
 use derive_new::new;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -56,7 +55,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         self.state.resolve(placement_resolver, &size_constraint);
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -82,8 +81,8 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -91,7 +90,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let display: &String = &RefCell::borrow(&self.display);
         let is_hovererd = self.is_element_self(hovered_element);
@@ -122,18 +121,33 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
             *theme.input.text_color
         };
 
-        renderer.render_background(*theme.input.border_radius, background_color);
-        renderer.render_text(&text, text_offset, text_color, *theme.input.font_size);
+        let text_position = ScreenPosition {
+            left: text_offset.x,
+            top: text_offset.y,
+        };
+
+        renderer.render_background((*theme.input.corner_radius).into(), background_color);
+        renderer.render_text(&text, text_position, text_color, *theme.input.font_size);
 
         if is_focused {
             let cursor_offset = text_offset.x
                 + *theme.input.cursor_offset * *interface_settings.scaling
                 + renderer.get_text_dimensions(&text, *theme.input.font_size, f32::MAX).x;
 
+            let cursor_position = ScreenPosition {
+                left: cursor_offset,
+                top: 0.0,
+            };
+
+            let cursor_size = ScreenSize {
+                width: *theme.input.cursor_width,
+                height: self.state.cached_size.height,
+            };
+
             renderer.render_rectangle(
-                Vector2::new(cursor_offset, 0.0),
-                Vector2::new(*theme.input.cursor_width, self.state.cached_size.y),
-                Vector4::from_value(0.0),
+                cursor_position,
+                cursor_size,
+                CornerRadius::uniform(0.0),
                 *theme.input.text_color,
             );
         }

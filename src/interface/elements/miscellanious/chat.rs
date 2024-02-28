@@ -1,4 +1,3 @@
-use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -57,7 +56,7 @@ impl Element for Chat {
                 .get_text_dimensions(
                     message.stamped_text(self.stamp),
                     *theme.chat.font_size * *interface_settings.scaling,
-                    placement_resolver.get_available().x,
+                    placement_resolver.get_available().width,
                 )
                 .y;
         }
@@ -84,8 +83,8 @@ impl Element for Chat {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -93,7 +92,7 @@ impl Element for Chat {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let mut offset = 0.0;
 
@@ -102,12 +101,15 @@ impl Element for Chat {
 
             renderer.render_text(
                 text,
-                Vector2::new(0.0, offset) + Vector2::from_value(0.2),
+                ScreenPosition {
+                    left: 0.2,
+                    top: offset + 0.2,
+                },
                 Color::monochrome(0),
                 *theme.chat.font_size,
             );
 
-            offset += renderer.render_text(text, Vector2::new(0.0, offset), message.color, *theme.chat.font_size);
+            offset += renderer.render_text(text, ScreenPosition::only_top(offset), message.color, *theme.chat.font_size);
         }
     }
 }

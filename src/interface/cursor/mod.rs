@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Array, Vector2, Vector4, Zero};
-
-use super::InterfaceSettings;
+use super::{InterfaceSettings, ScreenClip, ScreenPosition, ScreenSize};
 use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
@@ -70,7 +68,7 @@ impl MouseCursor {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
-        mouse_position: Vector2<f32>,
+        mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
         color: Color,
         interface_settings: &InterfaceSettings,
@@ -80,9 +78,9 @@ impl MouseCursor {
                 Grabbed::Texture(texture) => renderer.render_sprite(
                     render_target,
                     texture,
-                    mouse_position - Vector2::from_value(15.0 * *interface_settings.scaling),
-                    Vector2::from_value(30.0 * *interface_settings.scaling),
-                    Vector4::zero(),
+                    mouse_position - ScreenSize::uniform(15.0 * *interface_settings.scaling),
+                    ScreenSize::uniform(30.0 * *interface_settings.scaling),
+                    ScreenClip::default(),
                     Color::monochrome(255),
                     false,
                 ),

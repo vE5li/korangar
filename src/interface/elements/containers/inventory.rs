@@ -1,4 +1,3 @@
-use cgmath::{Array, Vector4};
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -64,7 +63,7 @@ impl Element for InventoryContainer {
             interface_settings,
             theme,
             size_constraint,
-            Vector2::from_value(3.0),
+            ScreenSize::uniform(3.0),
         );
     }
 
@@ -84,7 +83,7 @@ impl Element for InventoryContainer {
         None
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::MoveItem(..) => self.state.state.hovered_element(mouse_position),
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
@@ -107,8 +106,8 @@ impl Element for InventoryContainer {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -117,7 +116,7 @@ impl Element for InventoryContainer {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,
@@ -132,8 +131,8 @@ impl Element for InventoryContainer {
 
         if matches!(mouse_mode, MouseInputMode::MoveItem(..)) {
             match self.is_element_self(hovered_element) {
-                true => renderer.render_background(Vector4::from_value(5.0), Color::rgba(60, 160, 160, 160)),
-                false => renderer.render_background(Vector4::from_value(5.0), Color::rgba(160, 160, 60, 160)),
+                true => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba(60, 160, 160, 160)),
+                false => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba(160, 160, 60, 160)),
             }
         }
     }

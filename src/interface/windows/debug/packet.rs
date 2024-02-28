@@ -29,7 +29,7 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let elements = vec![PacketView::new(self.packets.clone(), self.show_pings.new_remote()).wrap()];
 
         let clear_selector = {

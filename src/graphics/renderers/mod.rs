@@ -42,7 +42,7 @@ mod swapchain;
 use std::marker::{ConstParamTy, PhantomData};
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3, Vector4};
+use cgmath::{Matrix4, Vector2, Vector3};
 use option_ext::OptionExt;
 use procedural::profile;
 use vulkano::buffer::{Buffer, BufferUsage, Subbuffer};
@@ -76,6 +76,7 @@ use super::{Color, MemoryAllocator, ModelVertex};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::Camera;
+use crate::interface::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -177,9 +178,9 @@ pub trait SpriteRenderer {
         &self,
         render_target: &mut <Self as Renderer>::Target,
         texture: Arc<ImageView>,
-        position: Vector2<f32>,
-        size: Vector2<f32>,
-        clip_size: Vector4<f32>,
+        position: ScreenPosition,
+        size: ScreenSize,
+        screen_clip: ScreenClip,
         color: Color,
         smooth: bool,
     ) where

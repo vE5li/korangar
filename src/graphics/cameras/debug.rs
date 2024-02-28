@@ -4,6 +4,7 @@ use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Ra
 
 use super::Camera;
 use crate::graphics::Transform;
+use crate::interface::{ScreenPosition, ScreenSize};
 
 const LOOK_AROUND_SPEED: f32 = 0.005;
 const FLY_SPEED_FAST: f32 = 1000.0;
@@ -165,12 +166,18 @@ impl Camera for DebugCamera {
         (top_left_position, bottom_right_position)
     }
 
-    fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (Vector2<f32>, Vector2<f32>) {
+    fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (ScreenPosition, ScreenSize) {
         let top_left_position = self.clip_to_screen_space(top_left_position);
         let bottom_right_position = self.clip_to_screen_space(bottom_right_position);
 
-        let screen_position = top_left_position;
-        let screen_size = bottom_right_position - top_left_position;
+        let screen_position = ScreenPosition {
+            left: top_left_position.x,
+            top: top_left_position.y,
+        };
+        let screen_size = ScreenSize {
+            width: bottom_right_position.x - top_left_position.x,
+            height: bottom_right_position.y - top_left_position.y,
+        };
 
         (screen_position, screen_size)
     }

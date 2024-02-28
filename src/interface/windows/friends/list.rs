@@ -20,7 +20,7 @@ impl PrototypeWindow for FriendsWindow {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let friend_name = Rc::new(RefCell::new(String::new()));
 
         let add_action = {

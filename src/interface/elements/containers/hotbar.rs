@@ -1,4 +1,3 @@
-use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -71,7 +70,7 @@ impl Element for HotbarContainer {
             interface_settings,
             theme,
             size_constraint,
-            Vector2::from_value(3.0),
+            ScreenSize::uniform(3.0),
         );
     }
 
@@ -91,7 +90,7 @@ impl Element for HotbarContainer {
         None
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::MoveSkill(..) | MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
             _ => HoverInformation::Missed,
@@ -105,8 +104,8 @@ impl Element for HotbarContainer {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -115,7 +114,7 @@ impl Element for HotbarContainer {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

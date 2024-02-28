@@ -27,7 +27,7 @@ where
     T: Array,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
 {
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         const LABELS: [char; 4] = ['x', 'y', 'z', 'w'];
 
         let mut elements = Vec::new();

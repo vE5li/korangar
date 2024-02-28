@@ -30,8 +30,8 @@ impl Element for StringValue {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -39,13 +39,18 @@ impl Element for StringValue {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background(*theme.value.border_radius, *theme.value.hovered_background_color);
+        renderer.render_background((*theme.value.corner_radius).into(), *theme.value.hovered_background_color);
+
+        let text_position = ScreenPosition {
+            left: theme.value.text_offset.x,
+            top: theme.value.text_offset.y,
+        };
 
         renderer.render_text(
             &self.value,
-            *theme.value.text_offset,
+            text_position,
             *theme.value.foreground_color,
             *theme.value.font_size,
         );

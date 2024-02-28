@@ -7,7 +7,7 @@ layout(location = 0) out vec4 fragment_color;
 layout(push_constant) uniform Constants {
     vec2 screen_position;
     vec2 screen_size;
-    vec4 clip_size;
+    vec4 screen_clip;
     vec4 corner_radius;
     vec4 color;
     float aspect_ratio;
@@ -45,7 +45,7 @@ void main() {
         discard;
     }
 
-    if (gl_FragCoord.x < constants.clip_size.x || gl_FragCoord.y < constants.clip_size.y || gl_FragCoord.x > constants.clip_size.z || gl_FragCoord.y > constants.clip_size.w) {
+    if (gl_FragCoord.x < constants.screen_clip.x || gl_FragCoord.y < constants.screen_clip.y || gl_FragCoord.x > constants.screen_clip.z || gl_FragCoord.y > constants.screen_clip.w) {
         discard;
     }
 

@@ -31,7 +31,7 @@ impl Element for DragButton {
         false
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             MouseInputMode::DragElement((element, _)) if self.is_element_self(Some(&*element.borrow())) => HoverInformation::Hovered,
@@ -50,8 +50,8 @@ impl Element for DragButton {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -59,15 +59,20 @@ impl Element for DragButton {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         if self.is_element_self(hovered_element) {
-            renderer.render_background(*theme.window.title_border_radius, *theme.window.title_background_color);
+            renderer.render_background((*theme.window.title_corner_radius).into(), *theme.window.title_background_color);
         }
+
+        let text_position = ScreenPosition {
+            left: theme.window.text_offset.x,
+            top: theme.window.text_offset.y,
+        };
 
         renderer.render_text(
             &self.window_title,
-            *theme.window.text_offset,
+            text_position,
             *theme.window.foreground_color,
             *theme.window.font_size,
         );

@@ -15,7 +15,7 @@ impl FriendRequestWindow {
 }
 
 impl PrototypeWindow for FriendRequestWindow {
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let elements = vec![
             Text::default()
                 .with_text(format!("^ffaa00{}^000000 wants to be friends with you", self.friend.name))

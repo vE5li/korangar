@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/deferred/rectangle/fragment_shader.glsl
 
 use std::sync::Arc;
 
-use cgmath::Vector2;
 use procedural::profile;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -15,6 +14,7 @@ use self::vertex_shader::Constants;
 use super::DeferredSubrenderer;
 use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::*;
+use crate::interface::{ScreenPosition, ScreenSize};
 
 pub struct RectangleRenderer {
     vertex_shader: EntryPoint,
@@ -67,9 +67,9 @@ impl RectangleRenderer {
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        window_size: Vector2<usize>,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
+        window_size: ScreenSize,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
         color: Color,
     ) {
         if render_target.bind_subrenderer(DeferredSubrenderer::Rectangle) {
@@ -78,14 +78,14 @@ impl RectangleRenderer {
 
         let layout = self.pipeline.layout().clone();
 
-        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
-        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
-        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
+        let half_screen = window_size / 2.0;
+        let screen_position = screen_position / half_screen;
+        let screen_size = screen_size / half_screen;
 
         let constants = Constants {
             screen_position: screen_position.into(),
             screen_size: screen_size.into(),
-            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+            color: color.into(),
         };
 
         render_target

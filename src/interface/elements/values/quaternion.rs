@@ -47,7 +47,7 @@ impl<T: Display> Element for QuaternionValue<T> {
         interface_settings: &InterfaceSettings,
         theme: &Theme,
         parent_position: Position,
-        clip_size: ClipSize,
+        screen_clip: ClipSize,
         _hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _second_theme: bool,
@@ -55,9 +55,9 @@ impl<T: Display> Element for QuaternionValue<T> {
 
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background(*theme.value.border_radius, *theme.value.hovered_background_color);
+        renderer.render_background(*theme.value.corner_radius, *theme.value.hovered_background_color);
 
         renderer.render_text(
             &self.display,

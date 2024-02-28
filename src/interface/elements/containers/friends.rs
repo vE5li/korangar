@@ -1,7 +1,6 @@
 use std::cell::UnsafeCell;
 use std::rc::Weak;
 
-use cgmath::Zero;
 use procedural::*;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -81,7 +80,7 @@ impl Element for FriendView {
             interface_settings,
             theme,
             &constraint!(100%, ?),
-            Vector2::zero(),
+            ScreenSize::default(),
         );
     }
 
@@ -126,7 +125,7 @@ impl Element for FriendView {
         }
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
             _ => HoverInformation::Missed,
@@ -140,8 +139,8 @@ impl Element for FriendView {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -150,7 +149,7 @@ impl Element for FriendView {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

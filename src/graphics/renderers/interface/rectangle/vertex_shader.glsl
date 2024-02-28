@@ -5,7 +5,7 @@ layout(location = 0) out vec2 position_out;
 layout(push_constant) uniform Constants {
     vec2 screen_position;
     vec2 screen_size;
-    vec4 clip_size;
+    vec4 screen_clip;
     vec4 corner_radius;
     vec4 color;
     float aspect_ratio;

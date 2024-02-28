@@ -18,6 +18,7 @@ use super::DeferredSubrenderer;
 use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::*;
+use crate::interface::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::loaders::{GameFileLoader, TextureLoader};
 #[cfg(feature = "debug")]
@@ -120,8 +121,8 @@ impl SpriteRenderer {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         texture: Arc<ImageView>,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
         texture_position: Vector2<f32>,
         texture_size: Vector2<f32>,
         color: Color,
@@ -141,11 +142,11 @@ impl SpriteRenderer {
         ]);
 
         let constants = Constants {
-            screen_position: [screen_position.x, screen_position.y],
-            screen_size: [screen_size.x, screen_size.y],
-            texture_position: [texture_position.x, texture_position.y],
-            texture_size: [texture_size.x, texture_size.y],
-            color: [color.red_f32(), color.green_f32(), color.blue_f32(), color.alpha_f32()],
+            screen_position: screen_position.into(),
+            screen_size: screen_size.into(),
+            texture_position: texture_position.into(),
+            texture_size: texture_size.into(),
+            color: color.into(),
         };
 
         render_target
@@ -164,17 +165,26 @@ impl SpriteRenderer {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         texture: Arc<ImageView>,
-        window_size: Vector2<usize>,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
+        window_size: ScreenSize,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
         color: Color,
         column_count: usize,
         cell_index: usize,
         smooth: bool,
     ) {
-        let half_screen = Vector2::new(window_size.x as f32 / 2.0, window_size.y as f32 / 2.0);
-        let screen_position = Vector2::new(screen_position.x / half_screen.x, screen_position.y / half_screen.y);
-        let screen_size = Vector2::new(screen_size.x / half_screen.x, screen_size.y / half_screen.y);
+        let half_screen = ScreenSize {
+            width: window_size.width as f32 / 2.0,
+            height: window_size.height as f32 / 2.0,
+        };
+        let screen_position = ScreenPosition {
+            left: screen_position.left / half_screen.width,
+            top: screen_position.top / half_screen.height,
+        };
+        let screen_size = ScreenSize {
+            width: screen_size.width / half_screen.width,
+            height: screen_size.height / half_screen.height,
+        };
 
         let unit = 1.0 / column_count as f32;
         let offset_x = unit * (cell_index % column_count) as f32;
@@ -198,8 +208,8 @@ impl SpriteRenderer {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         marker_identifier: MarkerIdentifier,
-        screen_position: Vector2<f32>,
-        screen_size: Vector2<f32>,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
         hovered: bool,
     ) {
         let (texture, color) = match marker_identifier {

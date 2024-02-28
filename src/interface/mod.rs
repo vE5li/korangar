@@ -13,7 +13,6 @@ use std::cell::RefCell;
 use std::marker::{ConstParamTy, PhantomData};
 use std::rc::Rc;
 
-use cgmath::Vector2;
 use derive_new::new;
 use option_ext::OptionExt;
 use procedural::profile;
@@ -139,7 +138,7 @@ pub struct Interface {
     windows: Vec<(Window, PostUpdate<PerWindow>)>,
     window_cache: WindowCache,
     interface_settings: InterfaceSettings,
-    available_space: Size,
+    available_space: ScreenSize,
     themes: Themes,
     dialog_handle: Option<DialogHandle>,
     mouse_cursor: MouseCursor,
@@ -152,7 +151,7 @@ impl Interface {
         game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
-        available_space: Size,
+        available_space: ScreenSize,
     ) -> Self {
         let window_cache = WindowCache::new();
         let interface_settings = InterfaceSettings::new();
@@ -297,7 +296,7 @@ impl Interface {
 
                 // NOTE: If the window got smaller, we need to re-render the entire interface.
                 // If it got bigger, we can just draw over the previous frame.
-                match previous_size.x > new_size.x || previous_size.y > new_size.y {
+                match previous_size.width > new_size.width || previous_size.height > new_size.height {
                     true => self.post_update.render(),
                     false => post_update.render(),
                 }
@@ -327,13 +326,13 @@ impl Interface {
         (render_interface, render_window)
     }
 
-    pub fn update_window_size(&mut self, screen_size: Size) {
+    pub fn update_window_size(&mut self, screen_size: ScreenSize) {
         self.available_space = screen_size;
         self.post_update.resolve();
     }
 
     #[profile("get hovered element")]
-    pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> (Option<ElementCell>, Option<usize>) {
+    pub fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> (Option<ElementCell>, Option<usize>) {
         for (window_index, (window, _)) in self.windows.iter().enumerate().rev() {
             match window.hovered_element(mouse_position, mouse_mode) {
                 HoverInformation::Element(hovered_element) => return (Some(hovered_element), Some(window_index)),
@@ -384,7 +383,7 @@ impl Interface {
     }
 
     #[profile]
-    pub fn drag_element(&mut self, element: &ElementCell, _window_index: usize, mouse_delta: Position) {
+    pub fn drag_element(&mut self, element: &ElementCell, _window_index: usize, mouse_delta: ScreenPosition) {
         //let (_window, post_update) = &mut self.windows[window_index];
 
         if let Some(change_event) = element.borrow_mut().drag(mouse_delta) {
@@ -418,7 +417,7 @@ impl Interface {
     }
 
     #[profile]
-    pub fn move_window(&mut self, window_index: usize, offset: Position) {
+    pub fn move_window(&mut self, window_index: usize, offset: ScreenPosition) {
         if let Some((window_class, position)) = self.windows[window_index].0.offset(self.available_space, offset) {
             self.window_cache.update_position(window_class, position);
         }
@@ -427,7 +426,7 @@ impl Interface {
     }
 
     #[profile]
-    pub fn resize_window(&mut self, window_index: usize, growth: Size) {
+    pub fn resize_window(&mut self, window_index: usize, growth: ScreenSize) {
         let (window, post_update) = &mut self.windows[window_index];
 
         let theme = match window.get_theme_kind() {
@@ -446,7 +445,7 @@ impl Interface {
 
             post_update.resolve();
 
-            if previous_size.x > new_size.x || previous_size.y > new_size.y {
+            if previous_size.width > new_size.width || previous_size.height > new_size.height {
                 self.post_update.render();
             }
         }
@@ -456,7 +455,7 @@ impl Interface {
     /// re-render a window with transparency will result in re-rendering the
     /// entire interface. This serves as a single point of truth and simplifies
     /// the rest of the code.
-    fn flag_render_windows(&mut self, start_index: usize, area: Option<(Position, Size)>) {
+    fn flag_render_windows(&mut self, start_index: usize, area: Option<(ScreenPosition, ScreenSize)>) {
         for window_index in start_index..self.windows.len() {
             let needs_render = self.windows[window_index].1.needs_render();
             let is_hovering = |(position, scale)| self.windows[window_index].0.hovers_area(position, scale);
@@ -525,16 +524,21 @@ impl Interface {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
         text: &str,
-        mouse_position: Position,
+        mouse_position: ScreenPosition,
     ) {
-        let offset = Vector2::new(text.len() as f32 * -3.0, 20.0);
+        let offset = ScreenPosition {
+            left: text.len() as f32 * -3.0,
+            top: 20.0,
+        };
+
         renderer.render_text(
             render_target,
             text,
-            mouse_position + offset + Vector2::new(1.0, 1.0),
+            mouse_position + offset + ScreenPosition::uniform(1.0),
             Color::monochrome(0),
             12.0,
-        ); // move variables into theme
+        ); // TODO: move variables into theme
+
         renderer.render_text(render_target, text, mouse_position + offset, Color::monochrome(255), 12.0); // move variables into theme
     }
 
@@ -546,10 +550,15 @@ impl Interface {
         renderer: &DeferredRenderer,
         frames_per_second: usize,
     ) {
+        let text_position = ScreenPosition {
+            left: self.themes.game.overlay.text_offset.x * *self.interface_settings.scaling,
+            top: self.themes.game.overlay.text_offset.y * *self.interface_settings.scaling,
+        };
+
         renderer.render_text(
             render_target,
             &frames_per_second.to_string(),
-            *self.themes.game.overlay.text_offset * *self.interface_settings.scaling,
+            text_position,
             *self.themes.game.overlay.foreground_color,
             *self.themes.game.overlay.font_size * *self.interface_settings.scaling,
         );
@@ -560,7 +569,7 @@ impl Interface {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
-        mouse_position: Position,
+        mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
     ) {
         if !self.mouse_cursor_hidden {
@@ -608,8 +617,8 @@ impl Interface {
     pub fn open_popup(
         &mut self,
         element: ElementCell,
-        position_tracker: Tracker<Position>,
-        size_tracker: Tracker<Size>,
+        position_tracker: Tracker<ScreenPosition>,
+        size_tracker: Tracker<ScreenSize>,
         window_index: usize,
     ) {
         let entry = &mut self.windows[window_index];

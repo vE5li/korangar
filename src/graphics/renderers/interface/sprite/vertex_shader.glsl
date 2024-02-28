@@ -5,7 +5,7 @@ layout(location = 0) out vec2 texture_coordinates;
 layout(push_constant) uniform Constants {
     vec2 screen_position;
     vec2 screen_size;
-    vec4 clip_size;
+    vec4 screen_clip;
     vec4 color;
 } constants;
 

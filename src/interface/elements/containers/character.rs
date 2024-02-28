@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
-use cgmath::Array;
 use procedural::*;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -112,7 +111,7 @@ impl Element for CharacterPreview {
             interface_settings,
             theme,
             size_constraint,
-            Vector2::from_value(4.0),
+            ScreenSize::uniform(4.0),
         );
     }
 
@@ -154,7 +153,7 @@ impl Element for CharacterPreview {
         vec![ClickAction::Event(event)]
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, true),
             _ => HoverInformation::Missed,
@@ -168,8 +167,8 @@ impl Element for CharacterPreview {
         state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         focused_element: Option<&dyn Element>,
         mouse_mode: &MouseInputMode,
@@ -178,14 +177,14 @@ impl Element for CharacterPreview {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => *theme.button.hovered_background_color,
             false => *theme.button.background_color,
         };
 
-        renderer.render_background(*theme.button.border_radius, background_color);
+        renderer.render_background((*theme.button.corner_radius).into(), background_color);
 
         self.state.render(
             &mut renderer,

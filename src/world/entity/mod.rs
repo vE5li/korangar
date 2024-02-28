@@ -8,7 +8,7 @@ use vulkano::buffer::Subbuffer;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
 use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, ModelVertex, Renderer};
-use crate::interface::{GameTheme, InterfaceSettings, PrototypeWindow, Size, Window, WindowCache};
+use crate::interface::{GameTheme, InterfaceSettings, PrototypeWindow, ScreenPosition, ScreenSize, Window, WindowCache};
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, Sex, StatusType};
 use crate::world::Map;
@@ -821,7 +821,7 @@ impl Player {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         theme: &GameTheme,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
@@ -830,7 +830,10 @@ impl Player {
             clip_space_position.y / clip_space_position.w + 1.0,
         );
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y + 5.0);
+        let final_position = ScreenPosition {
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height + 5.0,
+        };
 
         let bar_width = *theme.status_bar.player_bar_width;
         let gap = *theme.status_bar.gap;
@@ -839,17 +842,35 @@ impl Player {
 
         let mut offset = 0.0;
 
+        let background_position = final_position
+            - ScreenSize {
+                width: theme.status_bar.border_size.x,
+                height: theme.status_bar.border_size.y,
+            }
+            - ScreenSize::only_width(bar_width / 2.0);
+
+        let background_size = ScreenSize {
+            width: bar_width,
+            height: total_height,
+        } + ScreenSize {
+            width: theme.status_bar.border_size.x,
+            height: theme.status_bar.border_size.y,
+        } * 2.0;
+
         renderer.render_rectangle(
             render_target,
-            final_position - *theme.status_bar.border_size - Vector2::new(bar_width / 2.0, 0.0),
-            Vector2::new(bar_width, total_height) + *theme.status_bar.border_size * 2.0,
+            background_position,
+            background_size,
             *theme.status_bar.background_color,
         );
 
         renderer.render_bar(
             render_target,
             final_position,
-            Vector2::new(bar_width, *theme.status_bar.health_height),
+            ScreenSize {
+                width: bar_width,
+                height: *theme.status_bar.health_height,
+            },
             *theme.status_bar.player_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
@@ -859,8 +880,11 @@ impl Player {
 
         renderer.render_bar(
             render_target,
-            final_position + Vector2::new(0.0, offset),
-            Vector2::new(bar_width, *theme.status_bar.spell_point_height),
+            final_position + ScreenPosition::only_top(offset),
+            ScreenSize {
+                width: bar_width,
+                height: *theme.status_bar.spell_point_height,
+            },
             *theme.status_bar.spell_point_color,
             self.maximum_spell_points as f32,
             self.spell_points as f32,
@@ -870,8 +894,11 @@ impl Player {
 
         renderer.render_bar(
             render_target,
-            final_position + Vector2::new(0.0, offset),
-            Vector2::new(bar_width, *theme.status_bar.activity_point_height),
+            final_position + ScreenPosition::only_top(offset),
+            ScreenSize {
+                width: bar_width,
+                height: *theme.status_bar.activity_point_height,
+            },
             *theme.status_bar.activity_point_color,
             self.maximum_activity_points as f32,
             self.activity_points as f32,
@@ -921,7 +948,7 @@ impl Npc {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         theme: &GameTheme,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     ) {
         if self.common.entity_type != EntityType::Monster {
             return;
@@ -929,26 +956,42 @@ impl Npc {
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
-        let screen_position = Vector2::new(
-            clip_space_position.x / clip_space_position.w + 1.0,
-            clip_space_position.y / clip_space_position.w + 1.0,
-        );
+        let screen_position = ScreenPosition {
+            left: clip_space_position.x / clip_space_position.w + 1.0,
+            top: clip_space_position.y / clip_space_position.w + 1.0,
+        };
         let screen_position = screen_position / 2.0;
-        let final_position = Vector2::new(screen_position.x * window_size.x, screen_position.y * window_size.y + 5.0);
+        let final_position = ScreenPosition {
+            left: screen_position.left * window_size.width,
+            top: screen_position.top * window_size.height + 5.0,
+        };
 
         let bar_width = *theme.status_bar.enemy_bar_width;
 
         renderer.render_rectangle(
             render_target,
-            final_position - Vector2::new(theme.status_bar.border_size.x + bar_width / 2.0, theme.status_bar.border_size.y),
-            Vector2::new(bar_width, *theme.status_bar.enemy_health_height) + *theme.status_bar.border_size * 2.0,
+            final_position
+                - ScreenSize {
+                    width: theme.status_bar.border_size.x + bar_width / 2.0,
+                    height: theme.status_bar.border_size.y,
+                },
+            ScreenSize {
+                width: bar_width,
+                height: *theme.status_bar.enemy_health_height,
+            } + ScreenSize {
+                width: theme.status_bar.border_size.x * 2.0,
+                height: theme.status_bar.border_size.y * 2.0,
+            },
             *theme.status_bar.background_color,
         );
 
         renderer.render_bar(
             render_target,
             final_position,
-            Vector2::new(bar_width, *theme.status_bar.enemy_health_height),
+            ScreenSize {
+                width: bar_width,
+                height: *theme.status_bar.enemy_health_height,
+            },
             *theme.status_bar.enemy_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
@@ -1079,7 +1122,7 @@ impl Entity {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         theme: &GameTheme,
-        window_size: Vector2<f32>,
+        window_size: ScreenSize,
     ) {
         match self {
             Self::Player(player) => player.render_status(render_target, renderer, camera, theme, window_size),
@@ -1089,7 +1132,7 @@ impl Entity {
 }
 
 impl PrototypeWindow for Entity {
-    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         match self {
             Entity::Player(player) => player.to_window(window_cache, interface_settings, available_space),
             Entity::Npc(npc) => npc.to_window(window_cache, interface_settings, available_space),

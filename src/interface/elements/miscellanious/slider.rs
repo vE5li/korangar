@@ -1,6 +1,5 @@
 use std::cmp::PartialOrd;
 
-use cgmath::{Array, Vector4};
 use derive_new::new;
 use num::traits::NumOps;
 use num::{clamp, NumCast, Zero};
@@ -45,7 +44,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         None
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             MouseInputMode::DragElement((element, _)) if self.is_element_self(Some(&*element.borrow())) => HoverInformation::Hovered,
@@ -57,9 +56,9 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         vec![ClickAction::DragElement]
     }
 
-    fn drag(&mut self, mouse_delta: Position) -> Option<ChangeEvent> {
+    fn drag(&mut self, mouse_delta: ScreenPosition) -> Option<ChangeEvent> {
         let total_range = self.maximum_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap();
-        let raw_value = self.cached_value.to_f32().unwrap() + (mouse_delta.x * total_range * 0.005);
+        let raw_value = self.cached_value.to_f32().unwrap() + (mouse_delta.left * total_range * 0.005);
         let new_value = clamp(
             raw_value,
             self.minimum_value.to_f32().unwrap(),
@@ -79,8 +78,8 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -88,25 +87,31 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         if self.is_element_self(hovered_element) {
-            renderer.render_background(*theme.button.border_radius, *theme.slider.background_color);
+            renderer.render_background((*theme.button.corner_radius).into(), *theme.slider.background_color);
         }
 
-        let bar_size = Size::new(self.state.cached_size.x * 0.9, self.state.cached_size.y / 4.0);
-        let offset = (self.state.cached_size - bar_size) / 2.0;
+        let bar_size = ScreenSize {
+            width: self.state.cached_size.width * 0.9,
+            height: self.state.cached_size.height / 4.0,
+        };
+        let offset = ScreenPosition::from_size((self.state.cached_size - bar_size) / 2.0);
 
-        renderer.render_rectangle(offset, bar_size, Vector4::from_value(0.5), *theme.slider.rail_color);
+        renderer.render_rectangle(offset, bar_size, CornerRadius::uniform(0.5), *theme.slider.rail_color);
 
-        let knob_size = Size::new(20.0 * *interface_settings.scaling, self.state.cached_size.y * 0.8);
+        let knob_size = ScreenSize {
+            width: 20.0 * *interface_settings.scaling,
+            height: self.state.cached_size.height * 0.8,
+        };
         let total_range = self.maximum_value - self.minimum_value;
-        let offset = Position::new(
-            (self.state.cached_size.x - knob_size.x) / total_range.to_f32().unwrap()
+        let offset = ScreenPosition {
+            left: (self.state.cached_size.width - knob_size.width) / total_range.to_f32().unwrap()
                 * (self.cached_value.to_f32().unwrap() - self.minimum_value.to_f32().unwrap()),
-            (self.state.cached_size.y - knob_size.y) / 2.0,
-        );
+            top: (self.state.cached_size.height - knob_size.height) / 2.0,
+        };
 
-        renderer.render_rectangle(offset, knob_size, Vector4::from_value(4.0), *theme.slider.knob_color);
+        renderer.render_rectangle(offset, knob_size, CornerRadius::uniform(4.0), *theme.slider.knob_color);
     }
 }

@@ -15,7 +15,6 @@ use std::cell::Cell;
 use std::ops::Add;
 use std::rc::Weak;
 
-use cgmath::Zero;
 use derive_new::new;
 
 pub use self::character::CharacterPreview;
@@ -57,10 +56,10 @@ impl ContainerState {
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
         size_constraint: &SizeConstraint,
-        border: Vector2<f32>,
+        border: ScreenSize,
     ) {
         let (mut size, position) = placement_resolver.allocate(size_constraint);
-        let mut inner_placement_resolver = placement_resolver.derive(size, Position::zero(), border);
+        let mut inner_placement_resolver = placement_resolver.derive(size, ScreenPosition::default(), border);
 
         // TODO: add ability to pass this in (by calling .with_gaps(..) on the
         // container) inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
@@ -75,11 +74,11 @@ impl ContainerState {
             let final_height = inner_placement_resolver.final_height();
             let final_height = size_constraint.validated_height(
                 final_height,
-                placement_resolver.get_available().y,
-                placement_resolver.get_available().y,
+                placement_resolver.get_available().height,
+                placement_resolver.get_available().height,
                 *interface_settings.scaling,
             );
-            size.y = Some(final_height);
+            size.height = Some(final_height);
             placement_resolver.register_height(final_height);
         }
 
@@ -270,13 +269,13 @@ impl ContainerState {
             })
     }
 
-    pub fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode, hoverable: bool) -> HoverInformation {
-        let absolute_position = mouse_position - self.state.cached_position;
+    pub fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode, hoverable: bool) -> HoverInformation {
+        let absolute_position = ScreenPosition::from_size(mouse_position - self.state.cached_position);
 
-        if absolute_position.x >= 0.0
-            && absolute_position.y >= 0.0
-            && absolute_position.x <= self.state.cached_size.x
-            && absolute_position.y <= self.state.cached_size.y
+        if absolute_position.left >= 0.0
+            && absolute_position.top >= 0.0
+            && absolute_position.left <= self.state.cached_size.width
+            && absolute_position.top <= self.state.cached_size.height
         {
             for element in &self.elements {
                 match element.borrow().hovered_element(absolute_position, mouse_mode) {

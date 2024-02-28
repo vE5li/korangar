@@ -52,7 +52,7 @@ impl WindowBuilder {
         self
     }
 
-    pub fn build(self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: Size) -> Window {
+    pub fn build(self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let WindowBuilder {
             window_title,
             window_class,
@@ -103,7 +103,7 @@ impl WindowBuilder {
 
         let position = cached_position
             .map(|position| size_constraint.validated_position(position, size, available_space))
-            .unwrap_or((available_space - size) / 2.0);
+            .unwrap_or(ScreenPosition::from_size((available_space - size) / 2.0));
 
         Window {
             window_class,

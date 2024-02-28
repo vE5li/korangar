@@ -63,7 +63,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         None
     }
 
-    fn hovered_element(&self, mouse_position: Position, mouse_mode: &MouseInputMode) -> HoverInformation {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -87,8 +87,8 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
         _state_provider: &StateProvider,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        parent_position: Position,
-        clip_size: ClipSize,
+        parent_position: ScreenPosition,
+        screen_clip: ScreenClip,
         hovered_element: Option<&dyn Element>,
         _focused_element: Option<&dyn Element>,
         _mouse_mode: &MouseInputMode,
@@ -96,18 +96,23 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, interface_settings, parent_position, clip_size);
+            .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) {
             true => *theme.value.hovered_background_color,
             false => *theme.value.background_color,
         };
 
-        renderer.render_background(*theme.value.border_radius, background_color);
+        renderer.render_background((*theme.value.corner_radius).into(), background_color);
+
+        let text_position = ScreenPosition {
+            left: theme.value.text_offset.x,
+            top: theme.value.text_offset.y,
+        };
 
         renderer.render_text(
             &self.cached_values,
-            *theme.value.text_offset,
+            text_position,
             *theme.value.foreground_color,
             *theme.value.font_size,
         );

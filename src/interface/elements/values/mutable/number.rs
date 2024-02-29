@@ -103,7 +103,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
             false => theme.value.background_color.get(),
         };
 
-        renderer.render_background((theme.value.corner_radius.get()).into(), background_color);
+        renderer.render_background(theme.value.corner_radius.get(), background_color);
 
         renderer.render_text(
             &self.cached_values,

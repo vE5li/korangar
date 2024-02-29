@@ -42,7 +42,7 @@ impl Element for StringValue {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         renderer.render_background(
-            (theme.value.corner_radius.get()).into(),
+            theme.value.corner_radius.get(),
             theme.value.hovered_background_color.get(),
         );
 

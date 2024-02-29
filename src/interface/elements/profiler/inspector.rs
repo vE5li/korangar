@@ -122,7 +122,7 @@ impl FrameInspectorView {
         renderer.render_rectangle(
             block_position,
             block_size,
-            (theme.profiler.bar_corner_radius.get()).into(),
+            theme.profiler.bar_corner_radius.get(),
             color.multiply_alpha_f32(alpha),
         );
 
@@ -242,7 +242,7 @@ impl Element for FrameInspectorView {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         renderer.render_background(
-            (theme.profiler.corner_radius.get()).into(),
+            theme.profiler.corner_radius.get(),
             theme.profiler.background_color.get(),
         );
 

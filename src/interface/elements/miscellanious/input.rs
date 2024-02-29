@@ -121,7 +121,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
             theme.input.text_color.get()
         };
 
-        renderer.render_background((theme.input.corner_radius.get()).into(), background_color);
+        renderer.render_background(theme.input.corner_radius.get(), background_color);
         renderer.render_text(&text, text_offset, text_color, theme.input.font_size.get());
 
         if is_focused {

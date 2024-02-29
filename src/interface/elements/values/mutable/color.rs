@@ -97,7 +97,7 @@ impl Element for MutableColorValue {
             false => self.cached_color,
         };
 
-        renderer.render_background((theme.value.corner_radius.get()).into(), background_color);
+        renderer.render_background(theme.value.corner_radius.get(), background_color);
 
         renderer.render_text(
             &self.cached_values,

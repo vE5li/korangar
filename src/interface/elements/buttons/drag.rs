@@ -63,7 +63,7 @@ impl Element for DragButton {
 
         if self.is_element_self(hovered_element) {
             renderer.render_background(
-                (theme.window.title_corner_radius.get()).into(),
+                theme.window.title_corner_radius.get(),
                 theme.window.title_background_color.get(),
             );
         }

@@ -53,7 +53,7 @@ impl Element for StaticLabel {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background((theme.label.corner_radius.get()).into(), theme.label.background_color.get());
+        renderer.render_background(theme.label.corner_radius.get(), theme.label.background_color.get());
 
         renderer.render_text(
             &self.label,

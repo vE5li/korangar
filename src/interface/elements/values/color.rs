@@ -47,7 +47,7 @@ impl Element for ColorValue {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background((theme.value.corner_radius.get()).into(), self.color);
+        renderer.render_background(theme.value.corner_radius.get(), self.color);
 
         renderer.render_text(
             &self.display,

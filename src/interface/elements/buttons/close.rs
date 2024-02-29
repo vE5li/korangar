@@ -60,7 +60,7 @@ impl Element for CloseButton {
             false => theme.close_button.background_color.get(),
         };
 
-        renderer.render_background((theme.close_button.corner_radius.get()).into(), background_color);
+        renderer.render_background(theme.close_button.corner_radius.get(), background_color);
 
         renderer.render_text(
             "X",

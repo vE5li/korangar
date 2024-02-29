@@ -9,8 +9,8 @@ use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 #[derive(new)]
-pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
-    value_pointer: *const T,
+pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> {
+    reference: &'static T,
     minimum_value: T,
     maximum_value: T,
     change_event: Option<ChangeEvent>,
@@ -20,7 +20,7 @@ pub struct Slider<T: Zero + NumOps + NumCast + Copy + PartialOrd> {
     state: ElementState,
 }
 
-impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
+impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> Element for Slider<T> {
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -34,7 +34,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let current_value = unsafe { *self.value_pointer };
+        let current_value = *self.reference;
 
         if self.cached_value != current_value {
             self.cached_value = current_value;
@@ -66,7 +66,8 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         );
 
         unsafe {
-            std::ptr::write(self.value_pointer as *mut T, T::from(new_value).unwrap());
+            #[allow(invalid_reference_casting)]
+            std::ptr::write(self.reference as *const T as *mut T, T::from(new_value).unwrap());
         }
         self.change_event
     }

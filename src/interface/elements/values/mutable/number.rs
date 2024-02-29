@@ -10,7 +10,7 @@ use crate::interface::{Element, NumberWindow, *};
 
 pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> {
     name: String,
-    inner_pointer: *const T,
+    reference: &'static T,
     minimum_value: T,
     maximum_value: T,
     change_event: Option<ChangeEvent>,
@@ -20,14 +20,14 @@ pub struct MutableNumberValue<T: Zero + NumOps + NumCast + Copy + PartialOrd + D
 }
 
 impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> MutableNumberValue<T> {
-    pub fn new(name: String, inner_pointer: *const T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
-        let cached_inner = unsafe { *inner_pointer };
+    pub fn new(name: String, reference: &'static T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
+        let cached_inner = *reference;
         let cached_values = format!("{cached_inner:.1}");
         let state = ElementState::default();
 
         Self {
             name,
-            inner_pointer,
+            reference,
             minimum_value,
             maximum_value,
             change_event,
@@ -52,7 +52,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let current_value = unsafe { *self.inner_pointer };
+        let current_value = *self.reference;
 
         if self.cached_inner != current_value {
             self.cached_inner = current_value;
@@ -73,7 +73,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
     fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
         vec![ClickAction::OpenWindow(Box::new(NumberWindow::new(
             self.name.clone(),
-            self.inner_pointer,
+            self.reference,
             self.minimum_value,
             self.maximum_value,
             self.change_event,

@@ -4,7 +4,7 @@ use crate::interface::{ColorWindow, Element, *};
 
 pub struct MutableColorValue {
     name: String,
-    color_pointer: *const Color,
+    reference: &'static Color,
     change_event: Option<ChangeEvent>,
     cached_color: Color,
     cached_values: String,
@@ -12,8 +12,8 @@ pub struct MutableColorValue {
 }
 
 impl MutableColorValue {
-    pub fn new(name: String, color_pointer: *const Color, change_event: Option<ChangeEvent>) -> Self {
-        let cached_color = unsafe { *color_pointer };
+    pub fn new(name: String, reference: &'static Color, change_event: Option<ChangeEvent>) -> Self {
+        let cached_color = *reference;
         let cached_values = format!(
             "{}, {}, {}, {}",
             cached_color.red_as_u8(),
@@ -25,7 +25,7 @@ impl MutableColorValue {
 
         Self {
             name,
-            color_pointer,
+            reference,
             change_event,
             cached_color,
             cached_values,
@@ -48,7 +48,7 @@ impl Element for MutableColorValue {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let current_color = unsafe { *self.color_pointer };
+        let current_color = *self.reference;
 
         if self.cached_color != current_color {
             self.cached_color = current_color;
@@ -75,7 +75,7 @@ impl Element for MutableColorValue {
     fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
         vec![ClickAction::OpenWindow(Box::new(ColorWindow::new(
             self.name.clone(),
-            self.color_pointer,
+            self.reference,
             self.change_event,
         )))]
     }

@@ -8,7 +8,7 @@ pub trait ArrayType {
 
     const ELEMENT_COUNT: usize;
 
-    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT];
+    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT];
 
     fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT];
 }
@@ -119,11 +119,8 @@ impl ArrayType for ScreenPosition {
 
     const ELEMENT_COUNT: usize = 2;
 
-    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT] {
-        [
-            ("left".to_owned(), &self.left as *const _),
-            ("top".to_owned(), &self.top as *const _),
-        ]
+    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
+        [("left".to_owned(), &self.left), ("top".to_owned(), &self.top)]
     }
 
     fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
@@ -179,11 +176,8 @@ impl ArrayType for ScreenSize {
 
     const ELEMENT_COUNT: usize = 2;
 
-    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT] {
-        [
-            ("width".to_owned(), &self.width as *const _),
-            ("height".to_owned(), &self.height as *const _),
-        ]
+    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
+        [("width".to_owned(), &self.width), ("height".to_owned(), &self.height)]
     }
 
     fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
@@ -329,12 +323,12 @@ impl ArrayType for CornerRadius {
 
     const ELEMENT_COUNT: usize = 4;
 
-    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT] {
+    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
         [
-            ("top left".to_owned(), &self.top_left as *const _),
-            ("top right".to_owned(), &self.top_right as *const _),
-            ("bottom right".to_owned(), &self.bottom_right as *const _),
-            ("bottom left".to_owned(), &self.bottom_left as *const _),
+            ("top left".to_owned(), &self.top_left),
+            ("top right".to_owned(), &self.top_right),
+            ("bottom right".to_owned(), &self.bottom_right),
+            ("bottom left".to_owned(), &self.bottom_left),
         ]
     }
 

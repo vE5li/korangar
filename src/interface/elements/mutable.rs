@@ -7,9 +7,11 @@ pub trait PrototypeMutableElement {
 
 impl PrototypeMutableElement for Color {
     fn to_mutable_element(&self, display: String, change_event: Option<ChangeEvent>) -> ElementCell {
+        let static_self = unsafe { std::mem::transmute::<_, &'static Self>(self) };
+
         let elements = vec![
             StaticLabel::new(display.clone()).wrap(),
-            MutableColorValue::new(display, self as *const Color, change_event).wrap(),
+            MutableColorValue::new(display, static_self, change_event).wrap(),
         ];
 
         Container::new(elements).wrap()

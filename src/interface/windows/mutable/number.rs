@@ -8,9 +8,9 @@ use procedural::*;
 use crate::interface::*;
 
 #[derive(new)]
-pub struct NumberWindow<T> {
+pub struct NumberWindow<T: 'static> {
     name: String,
-    inner_pointer: *const T,
+    reference: &'static T,
     minimum_value: T,
     maximum_value: T,
     change_event: Option<ChangeEvent>,
@@ -20,13 +20,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let elements = vec![
             Headline::new("value".to_string(), Headline::DEFAULT_SIZE).wrap(),
-            Slider::new(
-                unsafe { &(*self.inner_pointer) as *const T },
-                self.minimum_value,
-                self.maximum_value,
-                self.change_event,
-            )
-            .wrap(),
+            Slider::new(self.reference, self.minimum_value, self.maximum_value, self.change_event).wrap(),
         ];
 
         WindowBuilder::default()

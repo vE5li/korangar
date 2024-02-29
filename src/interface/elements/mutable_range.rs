@@ -19,9 +19,11 @@ impl IsVector for CornerRadius {}
 
 impl PrototypeMutableRangeElement<f32> for f32 {
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
+        let static_self = unsafe { std::mem::transmute::<_, &'static Self>(self) };
+
         let elements = vec![
             StaticLabel::new(display.clone()).wrap(),
-            MutableNumberValue::new(display, self as *const f32, minimum, maximum, change_event).wrap(),
+            MutableNumberValue::new(display, static_self, minimum, maximum, change_event).wrap(),
         ];
 
         Container::new(elements).wrap()

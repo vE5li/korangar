@@ -131,8 +131,8 @@ impl Element for InventoryContainer {
 
         if matches!(mouse_mode, MouseInputMode::MoveItem(..)) {
             match self.is_element_self(hovered_element) {
-                true => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba(60, 160, 160, 160)),
-                false => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba(160, 160, 60, 160)),
+                true => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba_u8(60, 160, 160, 160)),
+                false => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba_u8(160, 160, 60, 160)),
             }
         }
     }

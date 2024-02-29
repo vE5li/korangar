@@ -75,6 +75,12 @@ impl Model {
         camera: &dyn Camera,
         root_transform: &Transform,
     ) {
-        renderer.render_bounding_box(render_target, camera, root_transform, &self.bounding_box, Color::monochrome(0));
+        renderer.render_bounding_box(
+            render_target,
+            camera,
+            root_transform,
+            &self.bounding_box,
+            Color::monochrome_u8(0),
+        );
     }
 }

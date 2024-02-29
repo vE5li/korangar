@@ -14,7 +14,7 @@ impl PrototypeWindow for ErrorWindow {
         let elements = vec![
             Text::default()
                 .with_text(self.message.clone())
-                .with_foreground_color(|_| Color::rgb(220, 100, 100))
+                .with_foreground_color(|_| Color::rgb_u8(220, 100, 100))
                 .wrap(),
         ];
 

@@ -37,10 +37,10 @@ fn get_channels(day_timer: f32, offset: f32, ps: [f32; 3]) -> Vector3<f32> {
 }
 
 fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
-    Color::rgb(
-        (base_color.red_f32() * channels.x) as u8,
-        (base_color.green_f32() * channels.y) as u8,
-        (base_color.blue_f32() * channels.z) as u8,
+    Color::rgb_u8(
+        (base_color.red * channels.x) as u8,
+        (base_color.green * channels.y) as u8,
+        (base_color.blue * channels.z) as u8,
     )
 }
 
@@ -62,7 +62,7 @@ fn get_directional_light_color_intensity(directional_color: Color, intensity: f3
     }
 
     let directional_channels = get_channels(day_timer, moon_offset, [0.3; 3]) * 255.0;
-    let directional_color = color_from_channel(Color::rgb(150, 150, 255), directional_channels);
+    let directional_color = color_from_channel(Color::rgb_u8(150, 150, 255), directional_channels);
 
     (directional_color, f32::min(intensity * 1.2, 1.0))
 }
@@ -234,8 +234,8 @@ impl Map {
             let culled = matches!(frustum.contains(&collision_bounding_box), Relation::Out);
 
             let color = match !frustum_culling || !culled {
-                true => Color::rgb(255, 255, 0),
-                false => Color::rgb(255, 0, 255),
+                true => Color::rgb_u8(255, 255, 0),
+                false => Color::rgb_u8(255, 0, 255),
             };
 
             let offset = bounding_box.size().y / 2.0;

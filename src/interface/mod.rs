@@ -535,11 +535,11 @@ impl Interface {
             render_target,
             text,
             mouse_position + offset + ScreenPosition::uniform(1.0),
-            Color::monochrome(0),
+            Color::monochrome_u8(0),
             12.0,
         ); // TODO: move variables into theme
 
-        renderer.render_text(render_target, text, mouse_position + offset, Color::monochrome(255), 12.0); // move variables into theme
+        renderer.render_text(render_target, text, mouse_position + offset, Color::monochrome_u8(255), 12.0); // move variables into theme
     }
 
     #[profile]

@@ -3464,32 +3464,32 @@ impl NetworkingSystem {
         match header {
             BroadcastMessagePacket::HEADER => {
                 let packet = BroadcastMessagePacket::from_bytes(byte_stream)?;
-                let color = Color::rgb(220, 200, 30);
+                let color = Color::rgb_u8(220, 200, 30);
                 let chat_message = ChatMessage::new(packet.message, color);
                 events.push(NetworkEvent::ChatMessage(chat_message));
             }
             Broadcast2MessagePacket::HEADER => {
                 let packet = Broadcast2MessagePacket::from_bytes(byte_stream)?;
                 // NOTE: Drop the alpha channel because it might be 0.
-                let color = Color::rgb(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
+                let color = Color::rgb_u8(packet.font_color.red, packet.font_color.green, packet.font_color.blue);
                 let chat_message = ChatMessage::new(packet.message, color);
                 events.push(NetworkEvent::ChatMessage(chat_message));
             }
             OverheadMessagePacket::HEADER => {
                 let packet = OverheadMessagePacket::from_bytes(byte_stream)?;
-                let color = Color::monochrome(230);
+                let color = Color::monochrome_u8(230);
                 let chat_message = ChatMessage::new(packet.message, color);
                 events.push(NetworkEvent::ChatMessage(chat_message));
             }
             ServerMessagePacket::HEADER => {
                 let packet = ServerMessagePacket::from_bytes(byte_stream)?;
-                let chat_message = ChatMessage::new(packet.message, Color::monochrome(255));
+                let chat_message = ChatMessage::new(packet.message, Color::monochrome_u8(255));
                 events.push(NetworkEvent::ChatMessage(chat_message));
             }
             EntityMessagePacket::HEADER => {
                 let packet = EntityMessagePacket::from_bytes(byte_stream)?;
                 // NOTE: Drop the alpha channel because it might be 0.
-                let color = Color::rgb(packet.color.red, packet.color.green, packet.color.blue);
+                let color = Color::rgb_u8(packet.color.red, packet.color.green, packet.color.blue);
                 let chat_message = ChatMessage::new(packet.message, color);
                 events.push(NetworkEvent::ChatMessage(chat_message));
             }
@@ -3822,7 +3822,7 @@ impl NetworkingSystem {
                 match packet.result {
                     RestartResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
                     RestartResponseStatus::Nothing => {
-                        let color = Color::rgb(255, 100, 100);
+                        let color = Color::rgb_u8(255, 100, 100);
                         let chat_message = ChatMessage::new("Failed to log out.".to_string(), color);
                         events.push(NetworkEvent::ChatMessage(chat_message));
                     }
@@ -3833,7 +3833,7 @@ impl NetworkingSystem {
                 match packet.result {
                     DisconnectResponseStatus::Ok => events.push(NetworkEvent::Disconnect),
                     DisconnectResponseStatus::Wait10Seconds => {
-                        let color = Color::rgb(255, 100, 100);
+                        let color = Color::rgb_u8(255, 100, 100);
                         let chat_message = ChatMessage::new("Please wait 10 seconds before trying to log out.".to_string(), color);
                         events.push(NetworkEvent::ChatMessage(chat_message));
                     }
@@ -3880,7 +3880,7 @@ impl NetworkingSystem {
                     self.friend_list.push((packet.friend.clone(), UnsafeCell::new(None)));
                 }
 
-                let color = Color::rgb(220, 200, 30);
+                let color = Color::rgb_u8(220, 200, 30);
                 let chat_message = ChatMessage::new(packet.into_message(), color);
                 events.push(NetworkEvent::ChatMessage(chat_message));
             }

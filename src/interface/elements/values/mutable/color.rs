@@ -16,7 +16,10 @@ impl MutableColorValue {
         let cached_color = unsafe { *color_pointer };
         let cached_values = format!(
             "{}, {}, {}, {}",
-            cached_color.red, cached_color.green, cached_color.blue, cached_color.alpha
+            cached_color.red_as_u8(),
+            cached_color.green_as_u8(),
+            cached_color.blue_as_u8(),
+            cached_color.alpha_as_u8()
         );
         let state = ElementState::default();
 
@@ -51,7 +54,10 @@ impl Element for MutableColorValue {
             self.cached_color = current_color;
             self.cached_values = format!(
                 "{}, {}, {}, {}",
-                self.cached_color.red, self.cached_color.green, self.cached_color.blue, self.cached_color.alpha
+                self.cached_color.red_as_u8(),
+                self.cached_color.green_as_u8(),
+                self.cached_color.blue_as_u8(),
+                self.cached_color.alpha_as_u8()
             );
             return Some(ChangeEvent::RENDER_WINDOW);
         }

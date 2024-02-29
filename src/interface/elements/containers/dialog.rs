@@ -23,7 +23,7 @@ impl DialogContainer {
         match dialog_element {
             DialogElement::Text(text) => Text::default()
                 .with_text(text.clone())
-                .with_foreground_color(|_| Color::monochrome(255))
+                .with_foreground_color(|_| Color::monochrome_u8(255))
                 .wrap(),
             DialogElement::NextButton => Button::default().with_text("next").with_event(UserEvent::NextDialog(npc_id)).wrap(),
             DialogElement::CloseButton => Button::default()

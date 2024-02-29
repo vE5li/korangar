@@ -364,7 +364,7 @@ fn main() {
     let mut player_skill_tree = SkillTree::default();
     let mut hotbar = Hotbar::default();
 
-    let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb(220, 170, 220));
+    let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb_u8(220, 170, 220));
     let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
@@ -665,7 +665,7 @@ fn main() {
                                 EffectCenter::Entity(entity_id, cgmath::Vector3::new(0.0, 0.0, 0.0)),
                                 Vector3::new(0.0, 9.0, 0.0),
                                 Vector3::new(0.0, 12.0, 0.0),
-                                Color::monochrome(255),
+                                Color::monochrome_u8(255),
                                 50.0,
                                 false,
                             )));
@@ -685,7 +685,7 @@ fn main() {
                                         EffectCenter::Position(position),
                                         Vector3::new(0.0, 0.0, 0.0),
                                         Vector3::new(0.0, 3.0, 0.0),
-                                        Color::rgb(255, 30, 0),
+                                        Color::rgb_u8(255, 30, 0),
                                         20.0,
                                         true,
                                     )),
@@ -706,7 +706,7 @@ fn main() {
                                         EffectCenter::Position(position),
                                         Vector3::new(0.0, 0.0, 0.0),
                                         Vector3::new(0.0, 3.0, 0.0),
-                                        Color::rgb(83, 220, 108),
+                                        Color::rgb_u8(83, 220, 108),
                                         40.0,
                                         false,
                                     )),

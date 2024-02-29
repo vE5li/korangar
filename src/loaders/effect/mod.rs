@@ -228,7 +228,7 @@ impl Effect {
                 screen_space_position,
                 frame.offset,
                 frame.angle,
-                Color::rgba_f32(
+                Color::rgba(
                     frame.color[0] / 255.0,
                     frame.color[1] / 255.0,
                     frame.color[2] / 255.0,

@@ -213,16 +213,16 @@ impl SpriteRenderer {
         hovered: bool,
     ) {
         let (texture, color) = match marker_identifier {
-            MarkerIdentifier::Object(..) if hovered => (self.object_marker_texture.clone(), Color::rgb(235, 180, 52)),
-            MarkerIdentifier::Object(..) => (self.object_marker_texture.clone(), Color::rgb(235, 103, 52)),
-            MarkerIdentifier::LightSource(..) if hovered => (self.light_source_marker_texture.clone(), Color::rgb(150, 52, 235)),
-            MarkerIdentifier::LightSource(..) => (self.light_source_marker_texture.clone(), Color::rgb(52, 235, 217)),
-            MarkerIdentifier::SoundSource(..) if hovered => (self.sound_source_marker_texture.clone(), Color::rgb(128, 52, 235)),
-            MarkerIdentifier::SoundSource(..) => (self.sound_source_marker_texture.clone(), Color::rgb(235, 52, 140)),
-            MarkerIdentifier::EffectSource(..) if hovered => (self.effect_source_marker_texture.clone(), Color::rgb(235, 52, 52)),
-            MarkerIdentifier::EffectSource(..) => (self.effect_source_marker_texture.clone(), Color::rgb(52, 235, 156)),
-            MarkerIdentifier::Entity(..) if hovered => (self.entity_marker_texture.clone(), Color::rgb(235, 92, 52)),
-            MarkerIdentifier::Entity(..) => (self.entity_marker_texture.clone(), Color::rgb(189, 235, 52)),
+            MarkerIdentifier::Object(..) if hovered => (self.object_marker_texture.clone(), Color::rgb_u8(235, 180, 52)),
+            MarkerIdentifier::Object(..) => (self.object_marker_texture.clone(), Color::rgb_u8(235, 103, 52)),
+            MarkerIdentifier::LightSource(..) if hovered => (self.light_source_marker_texture.clone(), Color::rgb_u8(150, 52, 235)),
+            MarkerIdentifier::LightSource(..) => (self.light_source_marker_texture.clone(), Color::rgb_u8(52, 235, 217)),
+            MarkerIdentifier::SoundSource(..) if hovered => (self.sound_source_marker_texture.clone(), Color::rgb_u8(128, 52, 235)),
+            MarkerIdentifier::SoundSource(..) => (self.sound_source_marker_texture.clone(), Color::rgb_u8(235, 52, 140)),
+            MarkerIdentifier::EffectSource(..) if hovered => (self.effect_source_marker_texture.clone(), Color::rgb_u8(235, 52, 52)),
+            MarkerIdentifier::EffectSource(..) => (self.effect_source_marker_texture.clone(), Color::rgb_u8(52, 235, 156)),
+            MarkerIdentifier::Entity(..) if hovered => (self.entity_marker_texture.clone(), Color::rgb_u8(235, 92, 52)),
+            MarkerIdentifier::Entity(..) => (self.entity_marker_texture.clone(), Color::rgb_u8(189, 235, 52)),
             _ => panic!(),
         };
 

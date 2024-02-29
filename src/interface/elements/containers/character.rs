@@ -27,7 +27,7 @@ impl CharacterPreview {
             return vec![
                 Text::default()
                     .with_text(text.to_owned())
-                    .with_foreground_color(|_| Color::rgb(200, 140, 180))
+                    .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
                     .wrap(),
             ];
         }
@@ -39,13 +39,13 @@ impl CharacterPreview {
             return vec![
                 Text::default()
                     .with_text(character_information.name.clone())
-                    .with_foreground_color(|_| Color::rgb(220, 210, 210))
+                    .with_foreground_color(|_| Color::rgb_u8(220, 210, 210))
                     .with_font_size(|_| 18.0)
                     .wrap(),
                 Button::default()
                     .with_text("Switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
-                    .with_background_color(|_| Color::rgb(161, 141, 141))
+                    .with_background_color(|_| Color::rgb_u8(161, 141, 141))
                     .with_width(dimension!(50%))
                     .wrap(),
                 Button::default()
@@ -61,7 +61,7 @@ impl CharacterPreview {
         vec![
             Text::default()
                 .with_text("New character")
-                .with_foreground_color(|_| Color::rgb(200, 140, 180))
+                .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
                 .wrap(),
         ]
     }

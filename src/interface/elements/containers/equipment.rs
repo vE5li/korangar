@@ -35,7 +35,7 @@ impl EquipmentContainer {
 
                     let text = Text::default()
                         .with_text(slot.display_name().to_string())
-                        .with_foreground_color(|_| Color::monochrome(200))
+                        .with_foreground_color(|_| Color::monochrome_u8(200))
                         .with_width(dimension!(!))
                         .wrap();
 

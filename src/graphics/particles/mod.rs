@@ -68,7 +68,13 @@ impl Particle for DamageNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(render_target, &self.damage_amount, final_position, Color::monochrome(255), 16.0);
+        renderer.render_damage_text(
+            render_target,
+            &self.damage_amount,
+            final_position,
+            Color::monochrome_u8(255),
+            16.0,
+        );
     }
 }
 
@@ -111,7 +117,13 @@ impl Particle for HealNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(render_target, &self.heal_amount, final_position, Color::rgb(30, 255, 30), 16.0);
+        renderer.render_damage_text(
+            render_target,
+            &self.heal_amount,
+            final_position,
+            Color::rgb_u8(30, 255, 30),
+            16.0,
+        );
     }
 }
 
@@ -137,10 +149,10 @@ impl QuestIcon {
             )
             .unwrap();
         let color = match quest_effect.color {
-            QuestColor::Yellow => Color::rgb(200, 200, 30),
-            QuestColor::Orange => Color::rgb(200, 100, 30),
-            QuestColor::Green => Color::rgb(30, 200, 30),
-            QuestColor::Purple => Color::rgb(200, 30, 200),
+            QuestColor::Yellow => Color::rgb_u8(200, 200, 30),
+            QuestColor::Orange => Color::rgb_u8(200, 100, 30),
+            QuestColor::Green => Color::rgb_u8(30, 200, 30),
+            QuestColor::Purple => Color::rgb_u8(200, 30, 200),
         };
 
         Self { position, texture, color }

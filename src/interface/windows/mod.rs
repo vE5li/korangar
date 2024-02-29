@@ -51,7 +51,7 @@ impl Window {
     }
 
     pub fn has_transparency(&self, theme: &InterfaceTheme) -> bool {
-        self.get_background_color(theme).alpha != 255
+        self.get_background_color(theme).alpha_as_u8() != 255
     }
 
     pub fn is_closable(&self) -> bool {

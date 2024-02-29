@@ -9,7 +9,13 @@ pub struct ColorValue {
 
 impl ColorValue {
     pub fn new(color: Color) -> Self {
-        let display = format!("{}, {}, {}, {}", color.red, color.green, color.blue, color.alpha);
+        let display = format!(
+            "{}, {}, {}, {}",
+            color.red_as_u8(),
+            color.green_as_u8(),
+            color.blue_as_u8(),
+            color.alpha_as_u8()
+        );
         let state = ElementState::default();
 
         Self { color, display, state }

@@ -19,6 +19,10 @@ impl IsVector for CornerRadius {}
 
 impl PrototypeMutableRangeElement<f32> for f32 {
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
+        // SAFETY: This is obviously unsafe, so one needs to make sure that the element
+        // implementing `PrototypeMutableRangeElement` will be valid and pinned while
+        // this element exists. Additionally, it should only be used in a debug
+        // context.
         let static_self = unsafe { std::mem::transmute::<_, &'static Self>(self) };
 
         let elements = vec![
@@ -37,6 +41,10 @@ where
     [(); T::ELEMENT_COUNT]:,
 {
     fn to_mutable_range_element(&self, display: String, minimum: Self, maximum: Self, change_event: Option<ChangeEvent>) -> ElementCell {
+        // SAFETY: This is obviously unsafe, so one needs to make sure that the element
+        // implementing `PrototypeMutableRangeElement` will be valid and pinned while
+        // this element exists. Additionally, it should only be used in a debug
+        // context.
         let static_self = unsafe { std::mem::transmute::<_, &'static Self>(self) };
 
         let elements = vec![

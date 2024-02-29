@@ -65,6 +65,8 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> Element for Slide
             self.maximum_value.to_f32().unwrap(),
         );
 
+        // SAFETY: Obviously this is totally unsafe, but considering this is a debug
+        // tool I think it's acceptable.
         unsafe {
             #[allow(invalid_reference_casting)]
             std::ptr::write(self.reference as *const T as *mut T, T::from(new_value).unwrap());

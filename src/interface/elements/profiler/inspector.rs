@@ -241,10 +241,7 @@ impl Element for FrameInspectorView {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background(
-            theme.profiler.corner_radius.get(),
-            theme.profiler.background_color.get(),
-        );
+        renderer.render_background(theme.profiler.corner_radius.get(), theme.profiler.background_color.get());
 
         let mut colors = super::ColorLookup::default();
 

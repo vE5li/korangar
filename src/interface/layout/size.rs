@@ -99,6 +99,10 @@ impl ScreenPosition {
         Self { left: width, top: height }
     }
 
+    pub fn only_left(left: f32) -> Self {
+        Self { left, top: 0.0 }
+    }
+
     pub fn only_top(top: f32) -> Self {
         Self { left: 0.0, top }
     }

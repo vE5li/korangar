@@ -95,7 +95,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         let display: &String = &RefCell::borrow(&self.display);
         let is_hovererd = self.is_element_self(hovered_element);
         let is_focused = self.is_element_self(focused_element);
-        let text_offset = theme.input.text_offset.get() * interface_settings.scaling.get();
+        let text_offset = theme.input.text_offset.get();
 
         let text = if display.is_empty() && !is_focused {
             self.ghost_text.to_string()
@@ -125,15 +125,10 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         renderer.render_text(&text, text_offset, text_color, theme.input.font_size.get());
 
         if is_focused {
-            let cursor_offset = text_offset.left
-                + theme.input.cursor_offset.get() * interface_settings.scaling.get()
+            let cursor_offset = (text_offset.left + theme.input.cursor_offset.get()) * interface_settings.scaling.get()
                 + renderer.get_text_dimensions(&text, theme.input.font_size.get(), f32::MAX).x;
 
-            let cursor_position = ScreenPosition {
-                left: cursor_offset,
-                top: 0.0,
-            };
-
+            let cursor_position = ScreenPosition::only_left(cursor_offset);
             let cursor_size = ScreenSize {
                 width: theme.input.cursor_width.get(),
                 height: self.state.cached_size.height,
@@ -142,7 +137,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
             renderer.render_rectangle(
                 cursor_position,
                 cursor_size,
-                CornerRadius::uniform(0.0),
+                CornerRadius::default(),
                 theme.input.text_color.get(),
             );
         }

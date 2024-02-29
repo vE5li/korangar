@@ -69,7 +69,7 @@ pub struct InterfaceSettings {
 
 impl Default for InterfaceSettings {
     fn default() -> Self {
-        let scaling = MutableRange::new(1.0, 0.7, 1.7);
+        let scaling = MutableRange::new(1.0, 0.5, 2.5);
         let main_theme = ThemeSelector("client/themes/main.ron".to_string());
         let menu_theme = ThemeSelector("client/themes/menu.ron".to_string());
         let game_theme = ThemeSelector("client/themes/game.ron".to_string());

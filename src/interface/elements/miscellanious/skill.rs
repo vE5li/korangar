@@ -76,9 +76,9 @@ impl Element for SkillBox {
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true if highlight => Color::rgba(60, 160, 160, 255),
-            true if matches!(mouse_mode, MouseInputMode::None) => *theme.button.hovered_background_color,
+            true if matches!(mouse_mode, MouseInputMode::None) => theme.button.hovered_background_color.get(),
             false if highlight => Color::rgba(160, 160, 60, 255),
-            _ => *theme.button.background_color,
+            _ => theme.button.background_color.get(),
         };
 
         renderer.render_background(CornerRadius::uniform(5.0), background_color);
@@ -89,7 +89,7 @@ impl Element for SkillBox {
                 renderer.renderer,
                 &skill.sprite,
                 &skill.animation_state,
-                renderer.position + ScreenPosition::uniform(15.0 * *interface_settings.scaling),
+                renderer.position + ScreenPosition::uniform(15.0 * interface_settings.scaling.get()),
                 0,
                 Color::monochrome(255),
                 interface_settings,

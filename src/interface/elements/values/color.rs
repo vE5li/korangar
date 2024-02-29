@@ -47,13 +47,13 @@ impl Element for ColorValue {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background((*theme.value.corner_radius).into(), self.color);
+        renderer.render_background((theme.value.corner_radius.get()).into(), self.color);
 
-        let text_position = ScreenPosition {
-            left: theme.value.text_offset.x,
-            top: theme.value.text_offset.y,
-        };
-
-        renderer.render_text(&self.display, text_position, self.color.invert(), *theme.value.font_size);
+        renderer.render_text(
+            &self.display,
+            theme.value.text_offset.get(),
+            self.color.invert(),
+            theme.value.font_size.get(),
+        );
     }
 }

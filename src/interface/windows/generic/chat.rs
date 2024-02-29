@@ -70,7 +70,7 @@ impl PrototypeWindow for ChatWindow {
         WindowBuilder::default()
             .with_class(Self::WINDOW_CLASS.to_string())
             .with_size(constraint!(200 > 500 < 800, 100 > 100 < 600))
-            .with_background_color(Box::new(|theme| *theme.chat.background_color))
+            .with_background_color(Box::new(|theme| theme.chat.background_color.get()))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

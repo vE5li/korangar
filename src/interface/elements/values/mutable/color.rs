@@ -97,18 +97,13 @@ impl Element for MutableColorValue {
             false => self.cached_color,
         };
 
-        renderer.render_background((*theme.value.corner_radius).into(), background_color);
-
-        let text_position = ScreenPosition {
-            left: theme.value.text_offset.x,
-            top: theme.value.text_offset.y,
-        };
+        renderer.render_background((theme.value.corner_radius.get()).into(), background_color);
 
         renderer.render_text(
             &self.cached_values,
-            text_position,
+            theme.value.text_offset.get(),
             self.cached_color.invert(),
-            *theme.value.font_size,
+            theme.value.font_size.get(),
         );
     }
 }

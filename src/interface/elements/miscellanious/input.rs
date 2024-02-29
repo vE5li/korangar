@@ -95,7 +95,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         let display: &String = &RefCell::borrow(&self.display);
         let is_hovererd = self.is_element_self(hovered_element);
         let is_focused = self.is_element_self(focused_element);
-        let text_offset = *theme.input.text_offset * *interface_settings.scaling;
+        let text_offset = theme.input.text_offset.get() * interface_settings.scaling.get();
 
         let text = if display.is_empty() && !is_focused {
             self.ghost_text.to_string()
@@ -106,33 +106,28 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
         };
 
         let background_color = if is_hovererd {
-            *theme.input.hovered_background_color
+            theme.input.hovered_background_color.get()
         } else if is_focused {
-            *theme.input.focused_background_color
+            theme.input.focused_background_color.get()
         } else {
-            *theme.input.background_color
+            theme.input.background_color.get()
         };
 
         let text_color = if display.is_empty() && !is_focused {
-            *theme.input.ghost_text_color
+            theme.input.ghost_text_color.get()
         } else if is_focused {
-            *theme.input.focused_text_color
+            theme.input.focused_text_color.get()
         } else {
-            *theme.input.text_color
+            theme.input.text_color.get()
         };
 
-        let text_position = ScreenPosition {
-            left: text_offset.x,
-            top: text_offset.y,
-        };
-
-        renderer.render_background((*theme.input.corner_radius).into(), background_color);
-        renderer.render_text(&text, text_position, text_color, *theme.input.font_size);
+        renderer.render_background((theme.input.corner_radius.get()).into(), background_color);
+        renderer.render_text(&text, text_offset, text_color, theme.input.font_size.get());
 
         if is_focused {
-            let cursor_offset = text_offset.x
-                + *theme.input.cursor_offset * *interface_settings.scaling
-                + renderer.get_text_dimensions(&text, *theme.input.font_size, f32::MAX).x;
+            let cursor_offset = text_offset.left
+                + theme.input.cursor_offset.get() * interface_settings.scaling.get()
+                + renderer.get_text_dimensions(&text, theme.input.font_size.get(), f32::MAX).x;
 
             let cursor_position = ScreenPosition {
                 left: cursor_offset,
@@ -140,7 +135,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
             };
 
             let cursor_size = ScreenSize {
-                width: *theme.input.cursor_width,
+                width: theme.input.cursor_width.get(),
                 height: self.state.cached_size.height,
             };
 
@@ -148,7 +143,7 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
                 cursor_position,
                 cursor_size,
                 CornerRadius::uniform(0.0),
-                *theme.input.text_color,
+                theme.input.text_color.get(),
             );
         }
     }

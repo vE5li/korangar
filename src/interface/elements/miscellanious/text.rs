@@ -37,7 +37,7 @@ impl<T: AsRef<str> + 'static> Text<T> {
         self.font_size
             .as_ref()
             .map(|closure| closure(theme))
-            .unwrap_or(*theme.button.font_size)
+            .unwrap_or(theme.button.font_size.get())
     }
 }
 
@@ -92,7 +92,7 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
             .foreground_color
             .as_ref()
             .map(|closure| closure(theme))
-            .unwrap_or(*theme.button.foreground_color);
+            .unwrap_or(theme.button.foreground_color.get());
 
         let text = self.text.as_ref().unwrap();
         renderer.render_text(

@@ -156,7 +156,7 @@ impl Actions {
                     Vector2::new(image_size[0], image_size[1])
                 })
                 .map(|component| component as f32);
-            let zoom = sprite_clip.zoom.unwrap_or(1.0) * *interface_settings.scaling;
+            let zoom = sprite_clip.zoom.unwrap_or(1.0) * interface_settings.scaling.get();
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;

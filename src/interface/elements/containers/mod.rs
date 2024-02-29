@@ -76,7 +76,7 @@ impl ContainerState {
                 final_height,
                 placement_resolver.get_available().height,
                 placement_resolver.get_available().height,
-                *interface_settings.scaling,
+                interface_settings.scaling.get(),
             );
             size.height = Some(final_height);
             placement_resolver.register_height(final_height);

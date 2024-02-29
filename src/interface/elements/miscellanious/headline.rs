@@ -51,16 +51,11 @@ impl Element for Headline {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        let text_position = ScreenPosition {
-            left: theme.label.text_offset.x,
-            top: theme.label.text_offset.y,
-        };
-
         renderer.render_text(
             &self.display,
-            text_position,
-            *theme.label.foreground_color,
-            *theme.label.font_size,
+            theme.label.text_offset.get(),
+            theme.label.foreground_color.get(),
+            theme.label.font_size.get(),
         );
     }
 }

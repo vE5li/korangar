@@ -124,42 +124,32 @@ where
 
         if !self.transparent_background {
             let background_color = match highlighted {
-                true => *theme.button.hovered_background_color,
-                false => *theme.button.background_color,
+                true => theme.button.hovered_background_color.get(),
+                false => theme.button.background_color.get(),
             };
 
-            renderer.render_background((*theme.button.corner_radius).into(), background_color);
+            renderer.render_background(theme.button.corner_radius.get(), background_color);
         }
 
         let foreground_color = match self.transparent_background && highlighted {
-            true => *theme.button.hovered_foreground_color,
-            false => *theme.button.foreground_color,
-        };
-
-        let box_position = ScreenPosition {
-            left: theme.button.icon_offset.x,
-            top: theme.button.icon_offset.y,
-        };
-
-        let box_size = ScreenSize {
-            width: theme.button.icon_size.x,
-            height: theme.button.icon_size.y,
+            true => theme.button.hovered_foreground_color.get(),
+            false => theme.button.foreground_color.get(),
         };
 
         renderer.render_checkbox(
-            box_position,
-            box_size,
+            theme.button.icon_offset.get(),
+            theme.button.icon_size.get(),
             foreground_color,
             (self.selector.as_ref().unwrap())(state_provider),
         );
 
         if let Some(text) = &self.text {
-            let text_position = ScreenPosition {
-                left: theme.button.icon_text_offset.x,
-                top: theme.button.icon_text_offset.y,
-            };
-
-            renderer.render_text(text.as_ref(), text_position, foreground_color, *theme.button.font_size);
+            renderer.render_text(
+                text.as_ref(),
+                theme.button.icon_text_offset.get(),
+                foreground_color,
+                theme.button.font_size.get(),
+            );
         }
     }
 }

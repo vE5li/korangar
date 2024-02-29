@@ -136,30 +136,30 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
 
         let disabled = self.is_disabled();
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            _ if disabled => *theme.button.disabled_background_color,
-            true => *theme.button.hovered_background_color,
+            _ if disabled => theme.button.disabled_background_color.get(),
+            true => theme.button.hovered_background_color.get(),
             false if self.background_color.is_some() => (self.background_color.as_ref().unwrap())(theme),
-            false => *theme.button.background_color,
+            false => theme.button.background_color.get(),
         };
 
-        renderer.render_background((*theme.button.corner_radius).into(), background_color);
+        renderer.render_background(theme.button.corner_radius.get(), background_color);
 
         if let Some(text) = &self.text {
             let foreground_color = if disabled {
-                *theme.button.disabled_foreground_color
+                theme.button.disabled_foreground_color.get()
             } else {
                 self.foreground_color
                     .as_ref()
                     .map(|closure| closure(theme))
-                    .unwrap_or(*theme.button.foreground_color)
+                    .unwrap_or(theme.button.foreground_color.get())
             };
 
-            let text_position = ScreenPosition {
-                left: theme.button.text_offset.x,
-                top: theme.button.text_offset.y,
-            };
-
-            renderer.render_text(text.as_ref(), text_position, foreground_color, *theme.button.font_size);
+            renderer.render_text(
+                text.as_ref(),
+                theme.button.text_offset.get(),
+                foreground_color,
+                theme.button.font_size.get(),
+            );
         }
     }
 }

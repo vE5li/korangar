@@ -94,10 +94,10 @@ impl WindowBuilder {
             .unzip();
 
         let size = cached_size
-            .map(|size| size_constraint.validated_size(size, available_space, *interface_settings.scaling))
+            .map(|size| size_constraint.validated_size(size, available_space, interface_settings.scaling.get()))
             .unwrap_or_else(|| {
                 size_constraint
-                    .resolve(available_space, available_space, *interface_settings.scaling)
+                    .resolve(available_space, available_space, interface_settings.scaling.get())
                     .finalize_or(0.0)
             });
 

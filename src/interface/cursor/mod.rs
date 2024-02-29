@@ -78,8 +78,8 @@ impl MouseCursor {
                 Grabbed::Texture(texture) => renderer.render_sprite(
                     render_target,
                     texture,
-                    mouse_position - ScreenSize::uniform(15.0 * *interface_settings.scaling),
-                    ScreenSize::uniform(30.0 * *interface_settings.scaling),
+                    mouse_position - ScreenSize::uniform(15.0 * interface_settings.scaling.get()),
+                    ScreenSize::uniform(30.0 * interface_settings.scaling.get()),
                     ScreenClip::default(),
                     Color::monochrome(255),
                     false,

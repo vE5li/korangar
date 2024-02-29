@@ -41,18 +41,16 @@ impl Element for StringValue {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background((*theme.value.corner_radius).into(), *theme.value.hovered_background_color);
-
-        let text_position = ScreenPosition {
-            left: theme.value.text_offset.x,
-            top: theme.value.text_offset.y,
-        };
+        renderer.render_background(
+            (theme.value.corner_radius.get()).into(),
+            theme.value.hovered_background_color.get(),
+        );
 
         renderer.render_text(
             &self.value,
-            text_position,
-            *theme.value.foreground_color,
-            *theme.value.font_size,
+            theme.value.text_offset.get(),
+            theme.value.foreground_color.get(),
+            theme.value.font_size.get(),
         );
     }
 }

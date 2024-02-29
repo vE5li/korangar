@@ -51,8 +51,8 @@ impl CharacterPreview {
                 Button::default()
                     .with_text("Delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
-                    .with_background_color(|theme| *theme.close_button.background_color)
-                    .with_foreground_color(|theme| *theme.close_button.foreground_color)
+                    .with_background_color(|theme| theme.close_button.background_color.get())
+                    .with_foreground_color(|theme| theme.close_button.foreground_color.get())
                     .with_width(dimension!(50%))
                     .wrap(),
             ];
@@ -180,11 +180,11 @@ impl Element for CharacterPreview {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => *theme.button.hovered_background_color,
-            false => *theme.button.background_color,
+            true => theme.button.hovered_background_color.get(),
+            false => theme.button.background_color.get(),
         };
 
-        renderer.render_background((*theme.button.corner_radius).into(), background_color);
+        renderer.render_background(theme.button.corner_radius.get(), background_color);
 
         self.state.render(
             &mut renderer,

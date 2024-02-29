@@ -1,7 +1,6 @@
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use cgmath::Array;
 use derive_new::new;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
@@ -10,35 +9,34 @@ use procedural::*;
 use crate::interface::*;
 
 #[derive(new)]
-pub struct VectorWindow<T>
+pub struct ArrayWindow<T>
 where
-    T: Array,
+    T: ArrayType + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
+    [(); T::ELEMENT_COUNT]:,
 {
     name: String,
-    inner_pointer: *const T,
+    reference: &'static T,
     minimum_value: T,
     maximum_value: T,
     change_event: Option<ChangeEvent>,
 }
 
-impl<T> PrototypeWindow for VectorWindow<T>
+impl<T> PrototypeWindow for ArrayWindow<T>
 where
-    T: Array,
+    T: ArrayType + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
+    [(); T::ELEMENT_COUNT]:,
 {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
-        const LABELS: [char; 4] = ['x', 'y', 'z', 'w'];
-
         let mut elements = Vec::new();
-        let inner_value = unsafe { &*self.inner_pointer };
 
-        for index in 0..<T as Array>::len() {
-            let label = LABELS[index].to_string();
-            let pointer = &inner_value[index] as *const T::Element;
+        let minimum_value = self.minimum_value.get_inner();
+        let maximum_value = self.maximum_value.get_inner();
 
+        for (index, (label, pointer)) in self.reference.get_array_fields().into_iter().enumerate() {
             elements.push(Headline::new(label, Headline::DEFAULT_SIZE).wrap());
-            elements.push(Slider::new(pointer, self.minimum_value[index], self.maximum_value[index], self.change_event).wrap());
+            elements.push(Slider::new(pointer, minimum_value[index], maximum_value[index], self.change_event).wrap());
         }
 
         WindowBuilder::default()

@@ -79,13 +79,13 @@ impl PlacementResolver {
         &self,
         text: &str,
         font_size: f32,
-        text_offset: Vector2<f32>,
+        text_offset: ScreenPosition,
         scaling: f32,
         available_width: f32,
     ) -> Vector2<f32> {
         self.font_loader
             .borrow()
-            .get_text_dimensions(text, font_size * scaling, available_width - text_offset.x * scaling)
+            .get_text_dimensions(text, font_size * scaling, available_width - text_offset.left * scaling)
     }
 
     pub fn set_gaps(&mut self, gaps: ScreenSize) {

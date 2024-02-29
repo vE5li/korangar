@@ -12,7 +12,11 @@ use crate::interface::{
 // T);
 
 #[derive(Serialize, Deserialize, new)]
-pub struct MutableRange<T: Copy + PrototypeMutableRangeElement<T>, E: IntoChangeEvent> {
+pub struct MutableRange<T, E>
+where
+    T: Copy + PrototypeMutableRangeElement<T>,
+    E: IntoChangeEvent,
+{
     inner: T,
     minimum: T,
     maximum: T,
@@ -20,24 +24,34 @@ pub struct MutableRange<T: Copy + PrototypeMutableRangeElement<T>, E: IntoChange
     _phantom_data: PhantomData<E>,
 }
 
-impl<T: Copy + PrototypeMutableRangeElement<T>, E: IntoChangeEvent> PrototypeElement for MutableRange<T, E> {
+impl<T, E> MutableRange<T, E>
+where
+    T: Copy + PrototypeMutableRangeElement<T>,
+    E: IntoChangeEvent,
+{
+    pub fn get(&self) -> T {
+        self.inner
+    }
+}
+
+impl<T, E> PrototypeElement for MutableRange<T, E>
+where
+    T: Copy + PrototypeMutableRangeElement<T>,
+    E: IntoChangeEvent,
+{
     fn to_element(&self, display: String) -> ElementCell {
         self.inner
             .to_mutable_range_element(display, self.minimum, self.maximum, E::into_change_event())
     }
 }
 
-impl<T: Copy + PrototypeMutableRangeElement<T>, E: IntoChangeEvent> PrototypeMutableElement for MutableRange<T, E> {
+impl<T, E> PrototypeMutableElement for MutableRange<T, E>
+where
+    T: Copy + PrototypeMutableRangeElement<T>,
+    E: IntoChangeEvent,
+{
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
         self.inner
             .to_mutable_range_element(display, self.minimum, self.maximum, E::into_change_event())
-    }
-}
-
-impl<T: Copy + PrototypeMutableRangeElement<T>, E: IntoChangeEvent> std::ops::Deref for MutableRange<T, E> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
     }
 }

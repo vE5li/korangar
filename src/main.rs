@@ -9,6 +9,7 @@
 #![feature(let_chains)]
 #![feature(variant_count)]
 #![feature(const_trait_impl)]
+#![feature(generic_const_exprs)]
 #![feature(decl_macro)]
 #![feature(thread_local)]
 #![feature(lazy_cell)]
@@ -1239,7 +1240,7 @@ fn main() {
                 #[cfg(feature = "debug")]
                 let prepare_frame_measuremen = start_measurement("prepare frame");
 
-                let walk_indicator_color = *interface.get_game_theme().indicator.walking;
+                let walk_indicator_color = interface.get_game_theme().indicator.walking.get();
                 let image_number = swapchain_holder.get_image_number();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];

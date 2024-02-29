@@ -57,13 +57,13 @@ impl<T: Display> Element for QuaternionValue<T> {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background(*theme.value.corner_radius, *theme.value.hovered_background_color);
+        renderer.render_background(theme.value.corner_radius.get(), theme.value.hovered_background_color.get());
 
         renderer.render_text(
             &self.display,
-            *theme.value.text_offset,
-            *theme.value.foreground_color,
-            *theme.value.font_size,
+            theme.value.text_offset.get(),
+            theme.value.foreground_color.get(),
+            theme.value.font_size.get(),
         );
     }
 }

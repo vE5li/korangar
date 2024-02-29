@@ -1,4 +1,3 @@
-use cgmath::{Array, Vector2, Vector4, Zero};
 use procedural::*;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
@@ -29,11 +28,11 @@ pub struct ButtonTheme {
     pub hovered_foreground_color: Mutable<Color, Render>,
     pub disabled_foreground_color: Mutable<Color, Render>,
     pub debug_foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub icon_offset: MutableRange<Vector2<f32>, Render>,
-    pub icon_size: MutableRange<Vector2<f32>, Render>,
-    pub icon_text_offset: MutableRange<Vector2<f32>, Render>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
+    pub icon_offset: MutableRange<ScreenPosition, Render>,
+    pub icon_size: MutableRange<ScreenSize, Render>,
+    pub icon_text_offset: MutableRange<ScreenPosition, Render>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
     pub height_constraint: DimensionConstraint,
 }
@@ -48,11 +47,27 @@ impl ThemeDefault<Menu> for ButtonTheme {
             hovered_foreground_color: Mutable::new(Color::rgb(220, 170, 215)),
             disabled_foreground_color: Mutable::new(Color::monochrome(140)),
             debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
-            corner_radius: MutableRange::new(Vector4::from_value(26.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            icon_offset: MutableRange::new(Vector2::new(7.0, 2.5), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            icon_size: MutableRange::new(Vector2::new(16.0, 16.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            icon_text_offset: MutableRange::new(Vector2::new(40.0, 4.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
-            text_offset: MutableRange::new(Vector2::new(15.0, 6.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
+            corner_radius: MutableRange::new(
+                CornerRadius::uniform(26.0),
+                CornerRadius::default(),
+                CornerRadius::uniform(30.0),
+            ),
+            icon_offset: MutableRange::new(
+                ScreenPosition { left: 7.0, top: 2.5 },
+                ScreenPosition::default(),
+                ScreenPosition::uniform(20.0),
+            ),
+            icon_size: MutableRange::new(ScreenSize::uniform(16.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
+            icon_text_offset: MutableRange::new(
+                ScreenPosition { left: 40.0, top: 4.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 100.0, top: 20.0 },
+            ),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 15.0, top: 6.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 100.0, top: 20.0 },
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             height_constraint: dimension!(26),
         }
@@ -69,11 +84,23 @@ impl ThemeDefault<Main> for ButtonTheme {
             hovered_foreground_color: Mutable::new(Color::rgb(220, 170, 215)),
             disabled_foreground_color: Mutable::new(Color::monochrome(140)),
             debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            icon_offset: MutableRange::new(Vector2::new(7.0, 2.5), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            icon_size: MutableRange::new(Vector2::new(10.0, 10.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            icon_text_offset: MutableRange::new(Vector2::new(20.0, 1.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, 1.0), Vector2::zero(), Vector2::new(100.0, 20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            icon_offset: MutableRange::new(
+                ScreenPosition { left: 7.0, top: 2.5 },
+                ScreenPosition::default(),
+                ScreenPosition::uniform(20.0),
+            ),
+            icon_size: MutableRange::new(ScreenSize::uniform(10.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
+            icon_text_offset: MutableRange::new(
+                ScreenPosition { left: 20.0, top: 1.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 100.0, top: 20.0 },
+            ),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: 1.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 100.0, top: 20.0 },
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             height_constraint: dimension!(16),
         }
@@ -85,11 +112,11 @@ pub struct WindowTheme {
     pub background_color: Mutable<Color, Render>,
     pub title_background_color: Mutable<Color, Render>,
     pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub title_corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub border_size: MutableRange<Vector2<f32>, Resolve>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
-    pub gaps: MutableRange<Vector2<f32>, Resolve>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
+    pub title_corner_radius: MutableRange<CornerRadius, Render>,
+    pub border_size: MutableRange<ScreenSize, Resolve>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
+    pub gaps: MutableRange<ScreenSize, Resolve>,
     pub font_size: MutableRange<f32, Render>,
     pub title_height: DimensionConstraint,
 }
@@ -100,11 +127,23 @@ impl ThemeDefault<Menu> for WindowTheme {
             background_color: Mutable::new(Color::monochrome(30)),
             title_background_color: Mutable::new(Color::rgba(70, 60, 70, 0)),
             foreground_color: Mutable::new(Color::rgb(150, 70, 255)),
-            corner_radius: MutableRange::new(Vector4::from_value(30.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            title_corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            border_size: MutableRange::new(Vector2::new(30.0, 30.0), Vector2::zero(), Vector2::new(30.0, 30.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, -1.0), Vector2::zero(), Vector2::new(50.0, 30.0)),
-            gaps: MutableRange::new(Vector2::new(9.0, 19.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
+            corner_radius: MutableRange::new(
+                CornerRadius::uniform(30.0),
+                CornerRadius::default(),
+                CornerRadius::uniform(30.0),
+            ),
+            title_corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            border_size: MutableRange::new(ScreenSize::uniform(30.0), ScreenSize::default(), ScreenSize::uniform(30.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: -1.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 50.0, top: 30.0 },
+            ),
+            gaps: MutableRange::new(
+                ScreenSize { width: 9.0, height: 19.0 },
+                ScreenSize::default(),
+                ScreenSize::uniform(20.0),
+            ),
             font_size: MutableRange::new(20.0, 6.0, 30.0),
             title_height: dimension!(30),
         }
@@ -117,11 +156,23 @@ impl ThemeDefault<Main> for WindowTheme {
             background_color: Mutable::new(Color::monochrome(40)),
             title_background_color: Mutable::new(Color::rgb(170, 60, 70)),
             foreground_color: Mutable::new(Color::monochrome(160)),
-            corner_radius: MutableRange::new(Vector4::from_value(4.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            title_corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            border_size: MutableRange::new(Vector2::new(12.0, 6.0), Vector2::zero(), Vector2::new(30.0, 30.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, -1.0), Vector2::zero(), Vector2::new(50.0, 30.0)),
-            gaps: MutableRange::new(Vector2::new(4.0, 5.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(4.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            title_corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            border_size: MutableRange::new(
+                ScreenSize { width: 12.0, height: 6.0 },
+                ScreenSize::default(),
+                ScreenSize::uniform(30.0),
+            ),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: -1.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 50.0, top: 30.0 },
+            ),
+            gaps: MutableRange::new(
+                ScreenSize { width: 4.0, height: 5.0 },
+                ScreenSize::default(),
+                ScreenSize::uniform(20.0),
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             title_height: dimension!(12),
         }
@@ -134,13 +185,13 @@ pub struct ExpandableTheme {
     pub second_background_color: Mutable<Color, Render>,
     pub foreground_color: Mutable<Color, Render>,
     pub hovered_foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub border_size: MutableRange<Vector2<f32>, Resolve>,
-    pub element_offset: MutableRange<Vector2<f32>, Resolve>,
-    pub icon_offset: MutableRange<Vector2<f32>, Render>,
-    pub icon_size: MutableRange<Vector2<f32>, Render>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
-    pub gaps: MutableRange<Vector2<f32>, Resolve>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
+    pub border_size: MutableRange<ScreenSize, Resolve>,
+    pub element_offset: MutableRange<ScreenPosition, Resolve>,
+    pub icon_offset: MutableRange<ScreenPosition, Render>,
+    pub icon_size: MutableRange<ScreenSize, Render>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
+    pub gaps: MutableRange<ScreenSize, Resolve>,
     pub font_size: MutableRange<f32, Render>,
 }
 
@@ -151,13 +202,25 @@ impl ThemeDefault<Menu> for ExpandableTheme {
             second_background_color: Mutable::new(Color::monochrome(45)),
             foreground_color: Mutable::new(Color::monochrome(170)),
             hovered_foreground_color: Mutable::new(Color::rgb(190, 145, 185)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            border_size: MutableRange::new(Vector2::new(5.0, 5.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            element_offset: MutableRange::new(Vector2::new(7.0, -2.0), Vector2::new(-10.0, -10.0), Vector2::new(30.0, 30.0)),
-            icon_offset: MutableRange::new(Vector2::new(6.0, 5.0), Vector2::zero(), Vector2::new(30.0, 50.0)),
-            icon_size: MutableRange::new(Vector2::new(6.0, 6.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            text_offset: MutableRange::new(Vector2::new(14.0, 1.5), Vector2::zero(), Vector2::new(50.0, 20.0)),
-            gaps: MutableRange::new(Vector2::new(6.0, 6.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            border_size: MutableRange::new(ScreenSize::uniform(5.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
+            element_offset: MutableRange::new(
+                ScreenPosition { left: 7.0, top: -2.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 30.0, top: 30.0 },
+            ),
+            icon_offset: MutableRange::new(
+                ScreenPosition { left: 6.0, top: 5.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 30.0, top: 50.0 },
+            ),
+            icon_size: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 14.0, top: 1.5 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 50.0, top: 20.0 },
+            ),
+            gaps: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
         }
     }
@@ -170,13 +233,25 @@ impl ThemeDefault<Main> for ExpandableTheme {
             second_background_color: Mutable::new(Color::monochrome(45)),
             foreground_color: Mutable::new(Color::monochrome(170)),
             hovered_foreground_color: Mutable::new(Color::rgb(190, 145, 185)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            border_size: MutableRange::new(Vector2::new(5.0, 5.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            element_offset: MutableRange::new(Vector2::new(7.0, -2.0), Vector2::new(-10.0, -10.0), Vector2::new(30.0, 30.0)),
-            icon_offset: MutableRange::new(Vector2::new(6.0, 5.0), Vector2::zero(), Vector2::new(30.0, 50.0)),
-            icon_size: MutableRange::new(Vector2::new(6.0, 6.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
-            text_offset: MutableRange::new(Vector2::new(14.0, 1.5), Vector2::zero(), Vector2::new(50.0, 20.0)),
-            gaps: MutableRange::new(Vector2::new(6.0, 6.0), Vector2::zero(), Vector2::new(20.0, 20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            border_size: MutableRange::new(ScreenSize::uniform(5.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
+            element_offset: MutableRange::new(
+                ScreenPosition { left: 7.0, top: -2.0 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(30.0),
+            ),
+            icon_offset: MutableRange::new(
+                ScreenPosition { left: 6.0, top: 5.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 30.0, top: 50.0 },
+            ),
+            icon_size: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 14.0, top: 1.5 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 50.0, top: 20.0 },
+            ),
+            gaps: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
         }
     }
@@ -186,8 +261,8 @@ impl ThemeDefault<Main> for ExpandableTheme {
 pub struct LabelTheme {
     pub background_color: Mutable<Color, Render>,
     pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
     pub size_constraint: SizeConstraint,
 }
@@ -197,8 +272,12 @@ impl ThemeDefault<Menu> for LabelTheme {
         Self {
             background_color: Mutable::new(Color::monochrome(130)),
             foreground_color: Mutable::new(Color::monochrome(255)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: 0.0 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(20.0),
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             size_constraint: constraint!(120 > 50% < 300, 0),
         }
@@ -210,8 +289,12 @@ impl ThemeDefault<Main> for LabelTheme {
         Self {
             background_color: Mutable::new(Color::monochrome(130)),
             foreground_color: Mutable::new(Color::monochrome(255)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: 0.0 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(20.0),
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             size_constraint: constraint!(120 > 50% < 300, 0),
         }
@@ -223,8 +306,8 @@ pub struct ValueTheme {
     pub background_color: Mutable<Color, Render>,
     pub hovered_background_color: Mutable<Color, Render>,
     pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
     pub size_constraint: SizeConstraint,
 }
@@ -235,8 +318,12 @@ impl ThemeDefault<Menu> for ValueTheme {
             background_color: Mutable::new(Color::rgb(100, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(130, 100, 120)),
             foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: 0.0 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(20.0),
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             size_constraint: constraint!(60 > !, 14),
         }
@@ -249,8 +336,12 @@ impl ThemeDefault<Main> for ValueTheme {
             background_color: Mutable::new(Color::rgb(100, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(130, 100, 120)),
             foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(5.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 5.0, top: 0.0 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(20.0),
+            ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
             size_constraint: constraint!(60 > !, 14),
         }
@@ -262,8 +353,8 @@ pub struct CloseButtonTheme {
     pub background_color: Mutable<Color, Render>,
     pub hovered_background_color: Mutable<Color, Render>,
     pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
     pub size_constraint: SizeConstraint,
 }
@@ -274,8 +365,16 @@ impl ThemeDefault<Menu> for CloseButtonTheme {
             background_color: Mutable::new(Color::rgb(200, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(200, 140, 100)),
             foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
-            corner_radius: MutableRange::new(Vector4::from_value(26.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(8.35, 2.55), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            corner_radius: MutableRange::new(
+                CornerRadius::uniform(26.0),
+                CornerRadius::default(),
+                CornerRadius::uniform(30.0),
+            ),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 8.35, top: 2.55 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(20.0),
+            ),
             font_size: MutableRange::new(20.0, 6.0, 30.0),
             size_constraint: constraint!(26, 26),
         }
@@ -288,8 +387,12 @@ impl ThemeDefault<Main> for CloseButtonTheme {
             background_color: Mutable::new(Color::rgb(200, 100, 100)),
             hovered_background_color: Mutable::new(Color::rgb(200, 140, 100)),
             foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
-            corner_radius: MutableRange::new(Vector4::from_value(1.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
-            text_offset: MutableRange::new(Vector2::new(9.0, 0.0), Vector2::from_value(-10.0), Vector2::from_value(20.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(1.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 9.0, top: 0.0 },
+                ScreenPosition::uniform(-10.0),
+                ScreenPosition::uniform(20.0),
+            ),
             font_size: MutableRange::new(12.0, 6.0, 30.0),
             size_constraint: constraint!(25, 12),
         }
@@ -299,7 +402,7 @@ impl ThemeDefault<Main> for CloseButtonTheme {
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct OverlayTheme {
     pub foreground_color: Mutable<Color, Nothing>,
-    pub text_offset: MutableRange<Vector2<f32>, Nothing>,
+    pub text_offset: MutableRange<ScreenPosition, Nothing>,
     pub font_size: MutableRange<f32, Nothing>,
 }
 
@@ -307,7 +410,11 @@ impl Default for OverlayTheme {
     fn default() -> Self {
         Self {
             foreground_color: Mutable::new(Color::monochrome(220)),
-            text_offset: MutableRange::new(Vector2::new(20.0, 10.0), Vector2::zero(), Vector2::new(1000.0, 500.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 20.0, top: 10.0 },
+                ScreenPosition::default(),
+                ScreenPosition { left: 1000.0, top: 500.0 },
+            ),
             font_size: MutableRange::new(18.0, 6.0, 50.0),
         }
     }
@@ -351,9 +458,9 @@ pub struct InputTheme {
     pub text_color: Mutable<Color, Render>,
     pub ghost_text_color: Mutable<Color, Render>,
     pub focused_text_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
     pub font_size: MutableRange<f32, Render>,
-    pub text_offset: MutableRange<Vector2<f32>, Render>,
+    pub text_offset: MutableRange<ScreenPosition, Render>,
     pub cursor_offset: MutableRange<f32, Render>,
     pub cursor_width: MutableRange<f32, Render>,
     pub height_constraint: DimensionConstraint,
@@ -368,9 +475,17 @@ impl ThemeDefault<Menu> for InputTheme {
             text_color: Mutable::new(Color::monochrome(200)),
             ghost_text_color: Mutable::new(Color::monochrome(100)),
             focused_text_color: Mutable::new(Color::monochrome(200)),
-            corner_radius: MutableRange::new(Vector4::from_value(26.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
+            corner_radius: MutableRange::new(
+                CornerRadius::uniform(26.0),
+                CornerRadius::default(),
+                CornerRadius::uniform(30.0),
+            ),
             font_size: MutableRange::new(15.0, 6.0, 50.0),
-            text_offset: MutableRange::new(Vector2::new(15.0, 6.0), Vector2::from_value(0.0), Vector2::from_value(50.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 15.0, top: 6.0 },
+                ScreenPosition::default(),
+                ScreenPosition::uniform(50.0),
+            ),
             cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
             cursor_width: MutableRange::new(3.0, 2.0, 30.0),
             height_constraint: dimension!(26),
@@ -387,9 +502,13 @@ impl ThemeDefault<Main> for InputTheme {
             text_color: Mutable::new(Color::monochrome(200)),
             ghost_text_color: Mutable::new(Color::monochrome(100)),
             focused_text_color: Mutable::new(Color::monochrome(200)),
-            corner_radius: MutableRange::new(Vector4::from_value(6.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             font_size: MutableRange::new(14.0, 6.0, 50.0),
-            text_offset: MutableRange::new(Vector2::new(4.0, 0.0), Vector2::from_value(0.0), Vector2::from_value(50.0)),
+            text_offset: MutableRange::new(
+                ScreenPosition { left: 4.0, top: 0.0 },
+                ScreenPosition::default(),
+                ScreenPosition::uniform(50.0),
+            ),
             cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
             cursor_width: MutableRange::new(3.0, 2.0, 30.0),
             height_constraint: dimension!(15),
@@ -437,15 +556,15 @@ impl Default for CursorTheme {
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub struct ProfilerTheme {
     pub background_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<Vector4<f32>, Render>,
+    pub corner_radius: MutableRange<CornerRadius, Render>,
     pub line_color: Mutable<Color, Render>,
     pub line_width: MutableRange<f32, Render>,
     pub bar_height: MutableRange<f32, Render>,
-    pub bar_gap: MutableRange<Vector2<f32>, Render>,
-    pub bar_corner_radius: MutableRange<Vector4<f32>, Render>,
+    pub bar_gap: MutableRange<ScreenSize, Render>,
+    pub bar_corner_radius: MutableRange<CornerRadius, Render>,
     pub bar_text_color: Mutable<Color, Render>,
     pub bar_text_size: MutableRange<f32, Render>,
-    pub bar_text_offset: MutableRange<Vector2<f32>, Render>,
+    pub bar_text_offset: MutableRange<ScreenPosition, Render>,
     pub distance_text_size: MutableRange<f32, Render>,
     pub distance_text_offset: MutableRange<f32, Render>,
 }
@@ -454,15 +573,22 @@ impl ThemeDefault<Menu> for ProfilerTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome(55)),
-            corner_radius: MutableRange::new(Vector4::from_value(2.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(2.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             line_color: Mutable::new(Color::rgb(80, 90, 80)),
             line_width: MutableRange::new(2.0, 0.5, 4.0),
             bar_height: MutableRange::new(15.0, 5.0, 30.0),
-            bar_gap: MutableRange::new(Vector2::new(1.0, 5.0), Vector2::from_value(0.0), Vector2::new(10.0, 20.0)),
-            bar_corner_radius: MutableRange::new(Vector4::from_value(0.0), Vector4::from_value(0.0), Vector4::from_value(15.0)),
+            bar_gap: MutableRange::new(ScreenSize { width: 1.0, height: 5.0 }, ScreenSize::default(), ScreenSize {
+                width: 10.0,
+                height: 20.0,
+            }),
+            bar_corner_radius: MutableRange::new(CornerRadius::default(), CornerRadius::default(), CornerRadius::uniform(15.0)),
             bar_text_color: Mutable::new(Color::monochrome(0)),
             bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
-            bar_text_offset: MutableRange::new(Vector2::new(7.0, 0.0), Vector2::new(0.0, -10.0), Vector2::new(40.0, 10.0)),
+            bar_text_offset: MutableRange::new(
+                ScreenPosition { left: 7.0, top: 0.0 },
+                ScreenPosition { left: 0.0, top: -10.0 },
+                ScreenPosition { left: 40.0, top: 10.0 },
+            ),
             distance_text_size: MutableRange::new(12.0, 6.0, 50.0),
             distance_text_offset: MutableRange::new(20.0, 0.0, 200.0),
         }
@@ -473,15 +599,22 @@ impl ThemeDefault<Main> for ProfilerTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome(55)),
-            corner_radius: MutableRange::new(Vector4::from_value(2.0), Vector4::from_value(0.0), Vector4::from_value(30.0)),
+            corner_radius: MutableRange::new(CornerRadius::uniform(2.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             line_color: Mutable::new(Color::rgb(80, 90, 80)),
             line_width: MutableRange::new(2.0, 0.5, 4.0),
             bar_height: MutableRange::new(15.0, 5.0, 30.0),
-            bar_gap: MutableRange::new(Vector2::new(1.0, 5.0), Vector2::from_value(0.0), Vector2::new(10.0, 20.0)),
-            bar_corner_radius: MutableRange::new(Vector4::from_value(0.0), Vector4::from_value(0.0), Vector4::from_value(15.0)),
+            bar_gap: MutableRange::new(ScreenSize { width: 1.0, height: 5.0 }, ScreenSize::default(), ScreenSize {
+                width: 10.0,
+                height: 20.0,
+            }),
+            bar_corner_radius: MutableRange::new(CornerRadius::default(), CornerRadius::default(), CornerRadius::uniform(15.0)),
             bar_text_color: Mutable::new(Color::monochrome(0)),
             bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
-            bar_text_offset: MutableRange::new(Vector2::new(7.0, 0.0), Vector2::new(0.0, -10.0), Vector2::new(40.0, 10.0)),
+            bar_text_offset: MutableRange::new(
+                ScreenPosition { left: 7.0, top: 0.0 },
+                ScreenPosition { left: 0.0, top: -10.0 },
+                ScreenPosition { left: 40.0, top: 10.0 },
+            ),
             distance_text_size: MutableRange::new(12.0, 6.0, 50.0),
             distance_text_offset: MutableRange::new(20.0, 0.0, 200.0),
         }
@@ -501,7 +634,7 @@ pub struct StatusBarTheme {
     pub enemy_health_height: MutableRange<f32, Render>,
     pub spell_point_height: MutableRange<f32, Render>,
     pub activity_point_height: MutableRange<f32, Render>,
-    pub border_size: MutableRange<Vector2<f32>, Render>,
+    pub border_size: MutableRange<ScreenSize, Render>,
     pub gap: MutableRange<f32, Render>,
 }
 
@@ -519,7 +652,11 @@ impl Default for StatusBarTheme {
             enemy_health_height: MutableRange::new(6.0, 2.0, 30.0),
             spell_point_height: MutableRange::new(4.0, 2.0, 30.0),
             activity_point_height: MutableRange::new(4.0, 2.0, 30.0),
-            border_size: MutableRange::new(Vector2::new(2.0, 1.0), Vector2::from_value(0.0), Vector2::from_value(20.0)),
+            border_size: MutableRange::new(
+                ScreenSize { width: 2.0, height: 1.0 },
+                ScreenSize::default(),
+                ScreenSize::uniform(20.0),
+            ),
             gap: MutableRange::new(1.0, 0.0, 10.0),
         }
     }

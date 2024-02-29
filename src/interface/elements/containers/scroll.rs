@@ -106,7 +106,7 @@ impl Element for ScrollView {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         if let Some(color_selector) = &self.background_color {
-            renderer.render_background((*theme.button.corner_radius).into(), color_selector(theme));
+            renderer.render_background(theme.button.corner_radius.get(), color_selector(theme));
         }
 
         renderer.set_scroll(self.scroll);

@@ -48,7 +48,7 @@ impl FrameInspectorView {
         alpha: f32,
         render_numbers: bool,
     ) {
-        let color = theme.profiler.line_color.multiply_alpha_f32(alpha);
+        let color = theme.profiler.line_color.get().multiply_alpha_f32(alpha);
 
         while x_position < size.width {
             let line_position = ScreenPosition {
@@ -56,7 +56,7 @@ impl FrameInspectorView {
                 top: 0.0,
             };
             let line_size = ScreenSize {
-                width: *theme.profiler.line_width * *renderer.interface_settings.scaling,
+                width: theme.profiler.line_width.get() * renderer.interface_settings.scaling.get(),
                 height: size.height,
             };
 
@@ -65,7 +65,7 @@ impl FrameInspectorView {
             if render_numbers {
                 let offset = ScreenPosition {
                     left: x_position + (distance - text_width) / 2.0,
-                    top: size.height - *theme.profiler.distance_text_offset * *renderer.interface_settings.scaling,
+                    top: size.height - theme.profiler.distance_text_offset.get() * renderer.interface_settings.scaling.get(),
                 };
 
                 renderer.renderer.render_text(
@@ -73,8 +73,8 @@ impl FrameInspectorView {
                     text,
                     renderer.position + offset,
                     renderer.screen_clip,
-                    *theme.profiler.line_color,
-                    *theme.profiler.distance_text_size * *renderer.interface_settings.scaling,
+                    theme.profiler.line_color.get(),
+                    theme.profiler.distance_text_size.get() * renderer.interface_settings.scaling.get(),
                 );
             }
 
@@ -97,18 +97,15 @@ impl FrameInspectorView {
         // Size in scaled pixels at which the text starts fading in
         const TEXT_DISPLAY_SIZE: f32 = 50.0;
 
-        let scaled_bar_gap = theme.profiler.bar_gap.x * *renderer.interface_settings.scaling;
+        let scaled_bar_gap = theme.profiler.bar_gap.get().width * renderer.interface_settings.scaling.get();
         let color = color_lookup.get_color(measurement.name);
-        let text_offset = ScreenPosition {
-            left: theme.profiler.bar_text_offset.x * *renderer.interface_settings.scaling,
-            top: theme.profiler.bar_text_offset.y * *renderer.interface_settings.scaling,
-        };
+        let text_offset = theme.profiler.bar_text_offset.get() * renderer.interface_settings.scaling.get();
         let x_position = measurement.start_time.saturating_duration_since(start_time).as_secs_f32() * unit + scaled_bar_gap;
         let x_size = measurement.end_time.saturating_duration_since(start_time).as_secs_f32() * unit - x_position - scaled_bar_gap;
         let x_size = x_size.min(total_width - x_position - scaled_bar_gap);
-        let y_size = *theme.profiler.bar_height * *renderer.interface_settings.scaling;
+        let y_size = theme.profiler.bar_height.get() * renderer.interface_settings.scaling.get();
 
-        let alpha = Self::interpolate_alpha_linear(BAR_FADE_SPEED * *renderer.interface_settings.scaling, 0.0, x_size);
+        let alpha = Self::interpolate_alpha_linear(BAR_FADE_SPEED * renderer.interface_settings.scaling.get(), 0.0, x_size);
         if alpha < VISIBILITY_THRESHHOLD {
             return;
         }
@@ -125,13 +122,13 @@ impl FrameInspectorView {
         renderer.render_rectangle(
             block_position,
             block_size,
-            (*theme.profiler.bar_corner_radius).into(),
+            (theme.profiler.bar_corner_radius.get()).into(),
             color.multiply_alpha_f32(alpha),
         );
 
         let alpha = Self::interpolate_alpha_linear(
-            TEXT_FADE_SPEED * *renderer.interface_settings.scaling,
-            TEXT_DISPLAY_SIZE * *renderer.interface_settings.scaling,
+            TEXT_FADE_SPEED * renderer.interface_settings.scaling.get(),
+            TEXT_DISPLAY_SIZE * renderer.interface_settings.scaling.get(),
             x_size,
         );
 
@@ -156,12 +153,14 @@ impl FrameInspectorView {
                 &text,
                 text_position,
                 screen_clip,
-                theme.profiler.bar_text_color.multiply_alpha_f32(alpha),
-                *theme.profiler.bar_text_size * *renderer.interface_settings.scaling,
+                theme.profiler.bar_text_color.get().multiply_alpha_f32(alpha),
+                theme.profiler.bar_text_size.get() * renderer.interface_settings.scaling.get(),
             );
         }
 
-        let y_position = y_position + (theme.profiler.bar_gap.y + *theme.profiler.bar_height) * *renderer.interface_settings.scaling;
+        let y_position = y_position
+            + (theme.profiler.bar_gap.get().height + theme.profiler.bar_height.get()) * renderer.interface_settings.scaling.get();
+
         measurement.indices.iter().for_each(|measurement| {
             Self::render_measurement(
                 renderer,
@@ -242,7 +241,10 @@ impl Element for FrameInspectorView {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background((*theme.profiler.corner_radius).into(), *theme.profiler.background_color);
+        renderer.render_background(
+            (theme.profiler.corner_radius.get()).into(),
+            theme.profiler.background_color.get(),
+        );
 
         let mut colors = super::ColorLookup::default();
 
@@ -266,7 +268,7 @@ impl Element for FrameInspectorView {
                     let offset = ((self.start_offset.$div_function() as f32 / $divider) * -distance) % distance;
 
                     let text_width = renderer
-                        .get_text_dimensions($text, *theme.profiler.distance_text_size, f32::MAX)
+                        .get_text_dimensions($text, theme.profiler.distance_text_size.get(), f32::MAX)
                         .x;
                     let show_numbers = !numbers_shown && distance > text_width * DISTANCE_NUMBER_SIZE;
 
@@ -307,7 +309,7 @@ impl Element for FrameInspectorView {
             start_time,
             self.state.cached_size.width,
             self.state.cached_size.width / viewed_duration.as_secs_f32(),
-            theme.profiler.bar_gap.y * *interface_settings.scaling,
+            theme.profiler.bar_gap.get().height * interface_settings.scaling.get(),
         );
     }
 }

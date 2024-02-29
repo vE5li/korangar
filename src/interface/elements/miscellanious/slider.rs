@@ -90,7 +90,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         if self.is_element_self(hovered_element) {
-            renderer.render_background((*theme.button.corner_radius).into(), *theme.slider.background_color);
+            renderer.render_background(theme.button.corner_radius.get(), theme.slider.background_color.get());
         }
 
         let bar_size = ScreenSize {
@@ -99,10 +99,10 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
         };
         let offset = ScreenPosition::from_size((self.state.cached_size - bar_size) / 2.0);
 
-        renderer.render_rectangle(offset, bar_size, CornerRadius::uniform(0.5), *theme.slider.rail_color);
+        renderer.render_rectangle(offset, bar_size, CornerRadius::uniform(0.5), theme.slider.rail_color.get());
 
         let knob_size = ScreenSize {
-            width: 20.0 * *interface_settings.scaling,
+            width: 20.0 * interface_settings.scaling.get(),
             height: self.state.cached_size.height * 0.8,
         };
         let total_range = self.maximum_value - self.minimum_value;
@@ -112,6 +112,6 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd> Element for Slider<T> {
             top: (self.state.cached_size.height - knob_size.height) / 2.0,
         };
 
-        renderer.render_rectangle(offset, knob_size, CornerRadius::uniform(4.0), *theme.slider.knob_color);
+        renderer.render_rectangle(offset, knob_size, CornerRadius::uniform(4.0), theme.slider.knob_color.get());
     }
 }

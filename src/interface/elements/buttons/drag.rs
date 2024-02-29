@@ -62,19 +62,17 @@ impl Element for DragButton {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         if self.is_element_self(hovered_element) {
-            renderer.render_background((*theme.window.title_corner_radius).into(), *theme.window.title_background_color);
+            renderer.render_background(
+                (theme.window.title_corner_radius.get()).into(),
+                theme.window.title_background_color.get(),
+            );
         }
-
-        let text_position = ScreenPosition {
-            left: theme.window.text_offset.x,
-            top: theme.window.text_offset.y,
-        };
 
         renderer.render_text(
             &self.window_title,
-            text_position,
-            *theme.window.foreground_color,
-            *theme.window.font_size,
+            theme.window.text_offset.get(),
+            theme.window.foreground_color.get(),
+            theme.window.font_size.get(),
         );
     }
 }

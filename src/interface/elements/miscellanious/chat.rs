@@ -47,7 +47,7 @@ impl Element for Chat {
         let mut size_constraint = constraint!(100%, 0);
         // Not sure why but 0.0 cuts off the lower part of the text, so add some
         // padding.
-        let mut height = 5.0 * *interface_settings.scaling;
+        let mut height = 5.0 * interface_settings.scaling.get();
 
         for message in self.messages.borrow().iter() {
             height += self
@@ -55,7 +55,7 @@ impl Element for Chat {
                 .borrow()
                 .get_text_dimensions(
                     message.stamped_text(self.stamp),
-                    *theme.chat.font_size * *interface_settings.scaling,
+                    theme.chat.font_size.get() * interface_settings.scaling.get(),
                     placement_resolver.get_available().width,
                 )
                 .y;
@@ -106,10 +106,15 @@ impl Element for Chat {
                     top: offset + 0.2,
                 },
                 Color::monochrome(0),
-                *theme.chat.font_size,
+                theme.chat.font_size.get(),
             );
 
-            offset += renderer.render_text(text, ScreenPosition::only_top(offset), message.color, *theme.chat.font_size);
+            offset += renderer.render_text(
+                text,
+                ScreenPosition::only_top(offset),
+                message.color,
+                theme.chat.font_size.get(),
+            );
         }
     }
 }

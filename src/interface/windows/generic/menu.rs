@@ -29,49 +29,49 @@ impl PrototypeWindow for MenuWindow {
             Button::default()
                 .with_text("Render settings")
                 .with_event(UserEvent::OpenRenderSettingsWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Map viewer")
                 .with_event(UserEvent::OpenMapDataWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Maps")
                 .with_event(UserEvent::OpenMapsWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Commands")
                 .with_event(UserEvent::OpenCommandsWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Time")
                 .with_event(UserEvent::OpenTimeWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Theme viewer")
                 .with_event(UserEvent::OpenThemeViewerWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Profiler")
                 .with_event(UserEvent::OpenProfilerWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             #[cfg(feature = "debug")]
             Button::default()
                 .with_text("Packets")
                 .with_event(UserEvent::OpenPacketWindow)
-                .with_foreground_color(|theme| *theme.button.debug_foreground_color)
+                .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
                 .wrap(),
             Button::default().with_text("Log out").with_event(UserEvent::LogOut).wrap(),
             Button::default().with_text("Exit").with_event(UserEvent::Exit).wrap(),

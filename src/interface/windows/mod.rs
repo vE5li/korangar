@@ -47,7 +47,7 @@ impl Window {
         self.background_color
             .as_ref()
             .map(|closure| closure(theme))
-            .unwrap_or(*theme.window.background_color)
+            .unwrap_or(theme.window.background_color.get())
     }
 
     pub fn has_transparency(&self, theme: &InterfaceTheme) -> bool {
@@ -74,21 +74,12 @@ impl Window {
             false => Some(self.size.height),
         };
 
-        let border_size = ScreenSize {
-            width: theme.window.border_size.x,
-            height: theme.window.border_size.y,
-        };
-        let gaps = ScreenSize {
-            width: theme.window.gaps.x,
-            height: theme.window.gaps.y,
-        };
-
         let mut placement_resolver = PlacementResolver::new(
             font_loader.clone(),
             PartialScreenSize::new(self.size.width, height),
-            border_size,
-            gaps,
-            *interface_settings.scaling,
+            theme.window.border_size.get(),
+            theme.window.gaps.get(),
+            interface_settings.scaling.get(),
         );
 
         self.elements
@@ -96,12 +87,12 @@ impl Window {
             .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
 
         if self.size_constraint.height.is_flexible() {
-            let final_height = theme.window.border_size.y + placement_resolver.final_height();
+            let final_height = theme.window.border_size.get().height + placement_resolver.final_height();
             let final_height = self.size_constraint.validated_height(
                 final_height,
                 available_space.height.into(),
                 available_space.height.into(),
-                *interface_settings.scaling,
+                interface_settings.scaling.get(),
             );
             self.size.height = final_height;
             self.validate_size(interface_settings, available_space);
@@ -115,9 +106,9 @@ impl Window {
             let mut placement_resolver = PlacementResolver::new(
                 font_loader,
                 PartialScreenSize::new(size.width, Some(200.0)),
-                ScreenSize::default(), //*theme.window.border_size, // TODO: Popup
-                ScreenSize::default(), //*theme.window.gaps, // TODO: Popup
-                *interface_settings.scaling,
+                ScreenSize::default(), //theme.window.border_size.get(), // TODO: Popup
+                ScreenSize::default(), //theme.window.gaps.get(), // TODO: Popup
+                interface_settings.scaling.get(),
             );
 
             popup.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme);
@@ -218,7 +209,7 @@ impl Window {
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, available_space: ScreenSize) {
         self.size = self
             .size_constraint
-            .validated_size(self.size, available_space, *interface_settings.scaling);
+            .validated_size(self.size, available_space, interface_settings.scaling.get());
     }
 
     pub fn open_popup(&mut self, element: ElementCell, position_tracker: Tracker<ScreenPosition>, size_tracker: Tracker<ScreenSize>) {
@@ -256,7 +247,7 @@ impl Window {
             self.position,
             self.size,
             screen_clip,
-            (*theme.window.corner_radius).into(),
+            theme.window.corner_radius.get(),
             self.get_background_color(theme),
         );
 

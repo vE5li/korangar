@@ -76,9 +76,9 @@ impl Element for ItemBox {
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true if highlight => Color::rgba(60, 160, 160, 255),
-            true if matches!(mouse_mode, MouseInputMode::None) => *theme.button.hovered_background_color,
+            true if matches!(mouse_mode, MouseInputMode::None) => theme.button.hovered_background_color.get(),
             false if highlight => Color::rgba(160, 160, 60, 255),
-            _ => *theme.button.background_color,
+            _ => theme.button.background_color.get(),
         };
 
         renderer.render_background(CornerRadius::uniform(5.0), background_color);
@@ -95,7 +95,7 @@ impl Element for ItemBox {
                 //&format!("{}", self.item.amount),
                 "1",
                 ScreenPosition::default(),
-                *theme.button.foreground_color,
+                theme.button.foreground_color.get(),
                 8.0,
             );
         }

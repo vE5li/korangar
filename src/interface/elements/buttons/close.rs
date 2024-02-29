@@ -56,22 +56,17 @@ impl Element for CloseButton {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => *theme.close_button.hovered_background_color,
-            false => *theme.close_button.background_color,
+            true => theme.close_button.hovered_background_color.get(),
+            false => theme.close_button.background_color.get(),
         };
 
-        renderer.render_background((*theme.close_button.corner_radius).into(), background_color);
-
-        let text_position = ScreenPosition {
-            left: theme.close_button.text_offset.x,
-            top: theme.close_button.text_offset.y,
-        };
+        renderer.render_background((theme.close_button.corner_radius.get()).into(), background_color);
 
         renderer.render_text(
             "X",
-            text_position,
-            *theme.close_button.foreground_color,
-            *theme.close_button.font_size,
+            theme.close_button.text_offset.get(),
+            theme.close_button.foreground_color.get(),
+            theme.close_button.font_size.get(),
         );
     }
 }

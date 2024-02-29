@@ -99,22 +99,17 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) {
-            true => *theme.value.hovered_background_color,
-            false => *theme.value.background_color,
+            true => theme.value.hovered_background_color.get(),
+            false => theme.value.background_color.get(),
         };
 
-        renderer.render_background((*theme.value.corner_radius).into(), background_color);
-
-        let text_position = ScreenPosition {
-            left: theme.value.text_offset.x,
-            top: theme.value.text_offset.y,
-        };
+        renderer.render_background((theme.value.corner_radius.get()).into(), background_color);
 
         renderer.render_text(
             &self.cached_values,
-            text_position,
-            *theme.value.foreground_color,
-            *theme.value.font_size,
+            theme.value.text_offset.get(),
+            theme.value.foreground_color.get(),
+            theme.value.font_size.get(),
         );
     }
 }

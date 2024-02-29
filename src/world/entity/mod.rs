@@ -835,33 +835,27 @@ impl Player {
             top: screen_position.y * window_size.height + 5.0,
         };
 
-        let bar_width = *theme.status_bar.player_bar_width;
-        let gap = *theme.status_bar.gap;
-        let total_height =
-            *theme.status_bar.health_height + *theme.status_bar.spell_point_height + *theme.status_bar.activity_point_height + gap * 2.0;
+        let bar_width = theme.status_bar.player_bar_width.get();
+        let gap = theme.status_bar.gap.get();
+        let total_height = theme.status_bar.health_height.get()
+            + theme.status_bar.spell_point_height.get()
+            + theme.status_bar.activity_point_height.get()
+            + gap * 2.0;
 
         let mut offset = 0.0;
 
-        let background_position = final_position
-            - ScreenSize {
-                width: theme.status_bar.border_size.x,
-                height: theme.status_bar.border_size.y,
-            }
-            - ScreenSize::only_width(bar_width / 2.0);
+        let background_position = final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0);
 
         let background_size = ScreenSize {
             width: bar_width,
             height: total_height,
-        } + ScreenSize {
-            width: theme.status_bar.border_size.x,
-            height: theme.status_bar.border_size.y,
-        } * 2.0;
+        } + theme.status_bar.border_size.get() * 2.0;
 
         renderer.render_rectangle(
             render_target,
             background_position,
             background_size,
-            *theme.status_bar.background_color,
+            theme.status_bar.background_color.get(),
         );
 
         renderer.render_bar(
@@ -869,37 +863,37 @@ impl Player {
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: *theme.status_bar.health_height,
+                height: theme.status_bar.health_height.get(),
             },
-            *theme.status_bar.player_health_color,
+            theme.status_bar.player_health_color.get(),
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
 
-        offset += gap + *theme.status_bar.health_height;
+        offset += gap + theme.status_bar.health_height.get();
 
         renderer.render_bar(
             render_target,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: *theme.status_bar.spell_point_height,
+                height: theme.status_bar.spell_point_height.get(),
             },
-            *theme.status_bar.spell_point_color,
+            theme.status_bar.spell_point_color.get(),
             self.maximum_spell_points as f32,
             self.spell_points as f32,
         );
 
-        offset += gap + *theme.status_bar.spell_point_height;
+        offset += gap + theme.status_bar.spell_point_height.get();
 
         renderer.render_bar(
             render_target,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: *theme.status_bar.activity_point_height,
+                height: theme.status_bar.activity_point_height.get(),
             },
-            *theme.status_bar.activity_point_color,
+            theme.status_bar.activity_point_color.get(),
             self.maximum_activity_points as f32,
             self.activity_points as f32,
         );
@@ -966,23 +960,16 @@ impl Npc {
             top: screen_position.top * window_size.height + 5.0,
         };
 
-        let bar_width = *theme.status_bar.enemy_bar_width;
+        let bar_width = theme.status_bar.enemy_bar_width.get();
 
         renderer.render_rectangle(
             render_target,
-            final_position
-                - ScreenSize {
-                    width: theme.status_bar.border_size.x + bar_width / 2.0,
-                    height: theme.status_bar.border_size.y,
-                },
+            final_position - theme.status_bar.border_size.get() + ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
-                height: *theme.status_bar.enemy_health_height,
-            } + ScreenSize {
-                width: theme.status_bar.border_size.x * 2.0,
-                height: theme.status_bar.border_size.y * 2.0,
-            },
-            *theme.status_bar.background_color,
+                height: theme.status_bar.enemy_health_height.get(),
+            } + (theme.status_bar.border_size.get() * 2.0),
+            theme.status_bar.background_color.get(),
         );
 
         renderer.render_bar(
@@ -990,9 +977,9 @@ impl Npc {
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: *theme.status_bar.enemy_health_height,
+                height: theme.status_bar.enemy_health_height.get(),
             },
-            *theme.status_bar.enemy_health_color,
+            theme.status_bar.enemy_health_color.get(),
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );

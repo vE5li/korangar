@@ -1,6 +1,18 @@
 use derive_new::new;
 use serde::{Deserialize, Serialize};
 
+use crate::interface::ElementDisplay;
+
+pub trait ArrayType {
+    type Element;
+
+    const ELEMENT_COUNT: usize;
+
+    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT];
+
+    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT];
+}
+
 macro_rules! implement_ops {
     ($name:ident, $x:ident, $y:ident) => {
         impl $name {
@@ -92,6 +104,29 @@ impl ScreenPosition {
     }
 }
 
+impl ElementDisplay for ScreenPosition {
+    fn display(&self) -> String {
+        format!("^FFBB00↦^000000{} ^FFBB00↧^000000{}", self.left.display(), self.top.display(),)
+    }
+}
+
+impl ArrayType for ScreenPosition {
+    type Element = f32;
+
+    const ELEMENT_COUNT: usize = 2;
+
+    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT] {
+        [
+            ("left".to_owned(), &self.left as *const _),
+            ("top".to_owned(), &self.top as *const _),
+        ]
+    }
+
+    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
+        [self.left, self.top]
+    }
+}
+
 implement_ops!(ScreenPosition, left, top);
 
 impl std::ops::Sub<ScreenPosition> for ScreenPosition {
@@ -122,6 +157,33 @@ pub struct ScreenSize {
 impl ScreenSize {
     pub fn only_width(width: f32) -> Self {
         Self { width, height: 0.0 }
+    }
+}
+
+impl ElementDisplay for ScreenSize {
+    fn display(&self) -> String {
+        format!(
+            "^FFBB00↔^000000{} ^FFBB00↕^000000{}",
+            self.width.display(),
+            self.height.display(),
+        )
+    }
+}
+
+impl ArrayType for ScreenSize {
+    type Element = f32;
+
+    const ELEMENT_COUNT: usize = 2;
+
+    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT] {
+        [
+            ("width".to_owned(), &self.width as *const _),
+            ("height".to_owned(), &self.height as *const _),
+        ]
+    }
+
+    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
+        [self.width, self.height]
     }
 }
 
@@ -246,6 +308,37 @@ impl CornerRadius {
     }
 }
 
+impl ElementDisplay for CornerRadius {
+    fn display(&self) -> String {
+        format!(
+            "^FFBB00↖^000000{} ^FFBB00↗^000000{} ^FFBB00↘^000000{} ^FFBB00↙^000000{}",
+            self.top_left.display(),
+            self.top_right.display(),
+            self.bottom_right.display(),
+            self.bottom_left.display()
+        )
+    }
+}
+
+impl ArrayType for CornerRadius {
+    type Element = f32;
+
+    const ELEMENT_COUNT: usize = 4;
+
+    fn get_array_fields(&'static self) -> [(String, *const Self::Element); Self::ELEMENT_COUNT] {
+        [
+            ("top left".to_owned(), &self.top_left as *const _),
+            ("top right".to_owned(), &self.top_right as *const _),
+            ("bottom right".to_owned(), &self.bottom_right as *const _),
+            ("bottom left".to_owned(), &self.bottom_left as *const _),
+        ]
+    }
+
+    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
+        [self.top_left, self.top_right, self.bottom_right, self.bottom_left]
+    }
+}
+
 impl std::ops::Mul<f32> for CornerRadius {
     type Output = Self;
 
@@ -262,17 +355,5 @@ impl std::ops::Mul<f32> for CornerRadius {
 impl From<CornerRadius> for [f32; 4] {
     fn from(val: CornerRadius) -> Self {
         [val.top_left, val.top_right, val.bottom_right, val.bottom_left]
-    }
-}
-
-// TODO: Temorary, remove at some point
-impl From<cgmath::Vector4<f32>> for CornerRadius {
-    fn from(val: cgmath::Vector4<f32>) -> Self {
-        Self {
-            top_left: val.x,
-            top_right: val.y,
-            bottom_right: val.z,
-            bottom_left: val.w,
-        }
     }
 }

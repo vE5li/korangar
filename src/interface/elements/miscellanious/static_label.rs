@@ -24,13 +24,13 @@ impl Element for StaticLabel {
 
         let size = placement_resolver.get_text_dimensions(
             &self.label,
-            *theme.label.font_size,
-            *theme.label.text_offset,
-            *interface_settings.scaling,
+            theme.label.font_size.get(),
+            theme.label.text_offset.get(),
+            interface_settings.scaling.get(),
             placement_resolver.get_available().width / 2.0, // TODO: make better
         );
 
-        size_constraint.height = Dimension::Absolute(f32::max(size.y / *interface_settings.scaling, 14.0)); // TODO: make better
+        size_constraint.height = Dimension::Absolute(f32::max(size.y / interface_settings.scaling.get(), 14.0)); // TODO: make better
 
         self.state.resolve(placement_resolver, &size_constraint);
     }
@@ -53,13 +53,13 @@ impl Element for StaticLabel {
             .state
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
-        renderer.render_background((*theme.label.corner_radius).into(), *theme.label.background_color);
+        renderer.render_background((theme.label.corner_radius.get()).into(), theme.label.background_color.get());
 
-        let text_size = ScreenPosition {
-            left: theme.label.text_offset.x,
-            top: theme.label.text_offset.y,
-        };
-
-        renderer.render_text(&self.label, text_size, *theme.label.foreground_color, *theme.label.font_size);
+        renderer.render_text(
+            &self.label,
+            theme.label.text_offset.get(),
+            theme.label.foreground_color.get(),
+            theme.label.font_size.get(),
+        );
     }
 }

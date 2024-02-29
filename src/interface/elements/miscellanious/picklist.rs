@@ -137,7 +137,7 @@ where
             .collect();
 
         let element = ScrollView::new(options, constraint!(100%, ? < 500))
-            .with_background_color(|theme| *theme.button.background_color)
+            .with_background_color(|theme| theme.button.background_color.get())
             .wrap();
 
         vec![ClickAction::OpenPopup {
@@ -167,29 +167,29 @@ where
 
         let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
         let background_color = match highlighted {
-            true => *theme.button.hovered_background_color,
-            false => *theme.button.background_color,
+            true => theme.button.hovered_background_color.get(),
+            false => theme.button.background_color.get(),
         };
 
-        renderer.render_background((*theme.button.corner_radius).into(), background_color);
+        renderer.render_background(theme.button.corner_radius.get(), background_color);
 
         *self.latest_position.borrow_mut() = renderer.get_position();
 
         let foreground_color = match highlighted {
-            true => *theme.button.hovered_foreground_color,
-            false => *theme.button.foreground_color,
+            true => theme.button.hovered_foreground_color.get(),
+            false => theme.button.foreground_color.get(),
         };
 
         // FIX: Don't unwrap. Fix logic
         let current_state = self.selected.as_ref().map(|state| state.get()).unwrap();
 
         if let Some((text, _)) = self.options.iter().find(|(_, value)| *value == current_state) {
-            let text_position = ScreenPosition {
-                left: theme.button.text_offset.x,
-                top: theme.button.text_offset.y,
-            };
-
-            renderer.render_text(text.as_ref(), text_position, foreground_color, *theme.button.font_size);
+            renderer.render_text(
+                text.as_ref(),
+                theme.button.text_offset.get(),
+                foreground_color,
+                theme.button.font_size.get(),
+            );
         }
     }
 }

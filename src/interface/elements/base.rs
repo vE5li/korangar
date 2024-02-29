@@ -42,7 +42,7 @@ impl<'a> ElementRenderer<'a> {
 
     pub fn get_text_dimensions(&self, text: &str, font_size: f32, available_width: f32) -> Vector2<f32> {
         self.renderer
-            .get_text_dimensions(text, font_size * *self.interface_settings.scaling, available_width)
+            .get_text_dimensions(text, font_size * self.interface_settings.scaling.get(), available_width)
     }
 
     pub fn set_scroll(&mut self, scroll: f32) {
@@ -55,7 +55,7 @@ impl<'a> ElementRenderer<'a> {
             self.position,
             self.size,
             self.screen_clip,
-            corner_radius * *self.interface_settings.scaling,
+            corner_radius * self.interface_settings.scaling.get(),
             color,
         );
     }
@@ -66,7 +66,7 @@ impl<'a> ElementRenderer<'a> {
             self.position + position,
             size,
             self.screen_clip,
-            corner_radius * *self.interface_settings.scaling,
+            corner_radius * self.interface_settings.scaling.get(),
             color,
         );
     }
@@ -75,18 +75,18 @@ impl<'a> ElementRenderer<'a> {
         self.renderer.render_text(
             self.render_target,
             text,
-            self.position + offset * *self.interface_settings.scaling,
+            self.position + offset * self.interface_settings.scaling.get(),
             self.screen_clip,
             foreground_color,
-            font_size * *self.interface_settings.scaling,
+            font_size * self.interface_settings.scaling.get(),
         )
     }
 
     pub fn render_checkbox(&mut self, offset: ScreenPosition, size: ScreenSize, color: Color, checked: bool) {
         self.renderer.render_checkbox(
             self.render_target,
-            self.position + offset * *self.interface_settings.scaling,
-            size * *self.interface_settings.scaling,
+            self.position + offset * self.interface_settings.scaling.get(),
+            size * self.interface_settings.scaling.get(),
             self.screen_clip,
             color,
             checked,
@@ -96,8 +96,8 @@ impl<'a> ElementRenderer<'a> {
     pub fn render_expand_arrow(&mut self, offset: ScreenPosition, size: ScreenSize, color: Color, expanded: bool) {
         self.renderer.render_expand_arrow(
             self.render_target,
-            self.position + offset * *self.interface_settings.scaling,
-            size * *self.interface_settings.scaling,
+            self.position + offset * self.interface_settings.scaling.get(),
+            size * self.interface_settings.scaling.get(),
             self.screen_clip,
             color,
             expanded,
@@ -108,8 +108,8 @@ impl<'a> ElementRenderer<'a> {
         self.renderer.render_sprite(
             self.render_target,
             texture,
-            self.position + offset * *self.interface_settings.scaling,
-            size * *self.interface_settings.scaling,
+            self.position + offset * self.interface_settings.scaling.get(),
+            size * self.interface_settings.scaling.get(),
             self.screen_clip,
             color,
             false,

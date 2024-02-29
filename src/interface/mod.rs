@@ -550,17 +550,12 @@ impl Interface {
         renderer: &DeferredRenderer,
         frames_per_second: usize,
     ) {
-        let text_position = ScreenPosition {
-            left: self.themes.game.overlay.text_offset.x * *self.interface_settings.scaling,
-            top: self.themes.game.overlay.text_offset.y * *self.interface_settings.scaling,
-        };
-
         renderer.render_text(
             render_target,
             &frames_per_second.to_string(),
-            text_position,
-            *self.themes.game.overlay.foreground_color,
-            *self.themes.game.overlay.font_size * *self.interface_settings.scaling,
+            self.themes.game.overlay.text_offset.get() * self.interface_settings.scaling.get(),
+            self.themes.game.overlay.foreground_color.get(),
+            self.themes.game.overlay.font_size.get() * self.interface_settings.scaling.get(),
         );
     }
 
@@ -581,7 +576,7 @@ impl Interface {
                 renderer,
                 mouse_position,
                 grabbed,
-                *self.themes.game.cursor.color,
+                self.themes.game.cursor.color.get(),
                 &self.interface_settings,
             );
         }

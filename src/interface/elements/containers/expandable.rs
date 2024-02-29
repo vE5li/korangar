@@ -62,7 +62,7 @@ impl Element for Expandable {
             .resolve_partial(
                 placement_resolver.get_available(),
                 placement_resolver.get_remaining(),
-                *interface_settings.scaling,
+                interface_settings.scaling.get(),
             )
             .finalize();
 
@@ -72,22 +72,11 @@ impl Element for Expandable {
         };
 
         if self.expanded && !self.state.elements.is_empty() {
-            let screen_position = ScreenPosition::only_top(closed_size.height)
-                + ScreenPosition {
-                    left: theme.expandable.element_offset.x,
-                    top: theme.expandable.element_offset.y,
-                } * *interface_settings.scaling;
+            let screen_position =
+                ScreenPosition::only_top(closed_size.height) + theme.expandable.element_offset.get() * interface_settings.scaling.get();
 
-            let screen_size = ScreenSize {
-                width: theme.expandable.border_size.x,
-                height: theme.expandable.border_size.y,
-            };
-
-            let mut inner_placement_resolver = placement_resolver.derive(size, screen_position, screen_size);
-            inner_placement_resolver.set_gaps(ScreenSize {
-                width: theme.expandable.gaps.x,
-                height: theme.expandable.gaps.y,
-            });
+            let mut inner_placement_resolver = placement_resolver.derive(size, screen_position, theme.expandable.border_size.get());
+            inner_placement_resolver.set_gaps(theme.expandable.gaps.get());
 
             self.state.elements.iter_mut().for_each(|element| {
                 element
@@ -98,14 +87,14 @@ impl Element for Expandable {
             if self.open_size_constraint.height.is_flexible() {
                 let final_height = inner_placement_resolver.final_height()
                     + closed_size.height
-                    + theme.expandable.element_offset.y * *interface_settings.scaling
-                    + theme.expandable.border_size.y * *interface_settings.scaling * 2.0;
+                    + theme.expandable.element_offset.get().top * interface_settings.scaling.get()
+                    + theme.expandable.border_size.get().height * interface_settings.scaling.get() * 2.0;
 
                 let final_height = self.open_size_constraint.validated_height(
                     final_height,
                     placement_resolver.get_available().height,
                     placement_resolver.get_available().height,
-                    *interface_settings.scaling,
+                    interface_settings.scaling.get(),
                 );
 
                 size.height = Some(final_height);
@@ -178,35 +167,30 @@ impl Element for Expandable {
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match second_theme {
-            true => *theme.expandable.second_background_color,
-            false => *theme.expandable.background_color,
+            true => theme.expandable.second_background_color.get(),
+            false => theme.expandable.background_color.get(),
         };
 
-        renderer.render_background((*theme.button.corner_radius).into(), background_color);
+        renderer.render_background(theme.button.corner_radius.get(), background_color);
 
-        let arrow_position = ScreenPosition {
-            left: theme.expandable.icon_offset.x,
-            top: theme.expandable.icon_offset.y,
-        };
-
-        let arrow_size = ScreenSize {
-            width: theme.expandable.icon_size.x,
-            height: theme.expandable.icon_size.y,
-        };
-
-        renderer.render_expand_arrow(arrow_position, arrow_size, *theme.expandable.foreground_color, self.expanded);
+        renderer.render_expand_arrow(
+            theme.expandable.icon_offset.get(),
+            theme.expandable.icon_size.get(),
+            theme.expandable.foreground_color.get(),
+            self.expanded,
+        );
 
         let foreground_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => *theme.expandable.hovered_foreground_color,
-            false => *theme.expandable.foreground_color,
+            true => theme.expandable.hovered_foreground_color.get(),
+            false => theme.expandable.foreground_color.get(),
         };
 
-        let text_position = ScreenPosition {
-            left: theme.expandable.text_offset.x,
-            top: theme.expandable.text_offset.y,
-        };
-
-        renderer.render_text(&self.display, text_position, foreground_color, *theme.expandable.font_size);
+        renderer.render_text(
+            &self.display,
+            theme.expandable.text_offset.get(),
+            foreground_color,
+            theme.expandable.font_size.get(),
+        );
 
         if self.expanded && !self.state.elements.is_empty() {
             self.state.render(

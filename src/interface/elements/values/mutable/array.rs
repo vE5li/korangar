@@ -1,7 +1,6 @@
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use cgmath::Array;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
 
@@ -9,13 +8,14 @@ use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
-pub struct MutableVectorValue<T>
+pub struct MutableArrayValue<T>
 where
-    T: Array + ElementDisplay + Copy + PartialEq + 'static,
+    T: ArrayType + ElementDisplay + Copy + PartialEq + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
+    [(); T::ELEMENT_COUNT]:,
 {
     name: String,
-    inner_pointer: *const T,
+    reference: &'static T,
     minimum_value: T,
     maximum_value: T,
     change_event: Option<ChangeEvent>,
@@ -24,19 +24,20 @@ where
     state: ElementState,
 }
 
-impl<T> MutableVectorValue<T>
+impl<T> MutableArrayValue<T>
 where
-    T: Array + ElementDisplay + Copy + PartialEq + 'static,
+    T: ArrayType + ElementDisplay + Copy + PartialEq + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
+    [(); T::ELEMENT_COUNT]:,
 {
-    pub fn new(name: String, inner_pointer: *const T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
-        let cached_inner = unsafe { *inner_pointer };
+    pub fn new(name: String, reference: &'static T, minimum_value: T, maximum_value: T, change_event: Option<ChangeEvent>) -> Self {
+        let cached_inner = *reference;
         let cached_values = cached_inner.display();
         let state = ElementState::default();
 
         Self {
             name,
-            inner_pointer,
+            reference,
             minimum_value,
             maximum_value,
             change_event,
@@ -47,10 +48,11 @@ where
     }
 }
 
-impl<T> Element for MutableVectorValue<T>
+impl<T> Element for MutableArrayValue<T>
 where
-    T: Array + ElementDisplay + Copy + PartialEq + 'static,
+    T: ArrayType + ElementDisplay + Copy + PartialEq + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
+    [(); T::ELEMENT_COUNT]:,
 {
     fn get_state(&self) -> &ElementState {
         &self.state
@@ -65,7 +67,7 @@ where
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let current_value = unsafe { *self.inner_pointer };
+        let current_value = *self.reference;
 
         if self.cached_inner != current_value {
             self.cached_inner = current_value;
@@ -84,9 +86,9 @@ where
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
-        let prototype_window = VectorWindow::new(
+        let prototype_window = ArrayWindow::new(
             self.name.clone(),
-            self.inner_pointer,
+            self.reference,
             self.minimum_value,
             self.maximum_value,
             self.change_event,
@@ -114,22 +116,17 @@ where
             .element_renderer(render_target, renderer, interface_settings, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) {
-            true => *theme.value.hovered_background_color,
-            false => *theme.value.background_color,
+            true => theme.value.hovered_background_color.get(),
+            false => theme.value.background_color.get(),
         };
 
-        renderer.render_background((*theme.value.corner_radius).into(), background_color);
-
-        let text_position = ScreenPosition {
-            left: theme.value.text_offset.x,
-            top: theme.value.text_offset.y,
-        };
+        renderer.render_background((theme.value.corner_radius.get()).into(), background_color);
 
         renderer.render_text(
             &self.cached_values,
-            text_position,
-            *theme.value.foreground_color,
-            *theme.value.font_size,
+            theme.value.text_offset.get(),
+            theme.value.foreground_color.get(),
+            theme.value.font_size.get(),
         );
     }
 }

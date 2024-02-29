@@ -155,7 +155,7 @@ impl FontLoader {
             Scale::uniform(font_size),
             available_width,
             text,
-            Color::monochrome(0),
+            Color::monochrome_u8(0),
         );
 
         size

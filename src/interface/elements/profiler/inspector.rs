@@ -48,7 +48,7 @@ impl FrameInspectorView {
         alpha: f32,
         render_numbers: bool,
     ) {
-        let color = theme.profiler.line_color.get().multiply_alpha_f32(alpha);
+        let color = theme.profiler.line_color.get().multiply_alpha(alpha);
 
         while x_position < size.width {
             let line_position = ScreenPosition {
@@ -123,7 +123,7 @@ impl FrameInspectorView {
             block_position,
             block_size,
             theme.profiler.bar_corner_radius.get(),
-            color.multiply_alpha_f32(alpha),
+            color.multiply_alpha(alpha),
         );
 
         let alpha = Self::interpolate_alpha_linear(
@@ -153,7 +153,7 @@ impl FrameInspectorView {
                 &text,
                 text_position,
                 screen_clip,
-                theme.profiler.bar_text_color.get().multiply_alpha_f32(alpha),
+                theme.profiler.bar_text_color.get().multiply_alpha(alpha),
                 theme.profiler.bar_text_size.get() * renderer.interface_settings.scaling.get(),
             );
         }

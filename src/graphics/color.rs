@@ -1,46 +1,46 @@
 use procedural::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Color {
-    pub red: u8,
-    pub blue: u8,
-    pub green: u8,
-    pub alpha: u8,
+    pub red: f32,
+    pub blue: f32,
+    pub green: f32,
+    pub alpha: f32,
 }
 
 impl Color {
-    pub const fn rgb(red: u8, green: u8, blue: u8) -> Self {
+    pub const fn rgb(red: f32, green: f32, blue: f32) -> Self {
         Self {
             red,
             green,
             blue,
-            alpha: 255,
+            alpha: 1.0,
         }
     }
 
-    pub const fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+    pub const fn rgba(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
         Self { red, green, blue, alpha }
     }
 
-    pub fn rgb_f32(red: f32, green: f32, blue: f32) -> Self {
-        let red = (red * 255.0) as u8;
-        let green = (green * 255.0) as u8;
-        let blue = (blue * 255.0) as u8;
+    pub fn rgb_u8(red: u8, green: u8, blue: u8) -> Self {
+        let red = (red as f32) / 255.0;
+        let green = (green as f32) / 255.0;
+        let blue = (blue as f32) / 255.0;
 
         Self {
             red,
             green,
             blue,
-            alpha: 255,
+            alpha: 1.0,
         }
     }
 
-    pub fn rgba_f32(red: f32, green: f32, blue: f32, alpha: f32) -> Self {
-        let red = (red * 255.0) as u8;
-        let green = (green * 255.0) as u8;
-        let blue = (blue * 255.0) as u8;
-        let alpha = (alpha * 255.0) as u8;
+    pub fn rgba_u8(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        let red = (red as f32) / 255.0;
+        let green = (green as f32) / 255.0;
+        let blue = (blue as f32) / 255.0;
+        let alpha = (alpha as f32) / 255.0;
 
         Self { red, green, blue, alpha }
     }
@@ -49,58 +49,58 @@ impl Color {
         assert_eq!(hex.len(), 6);
 
         let channel = |range| u8::from_str_radix(&hex[range], 16).unwrap();
-        Color::rgb(channel(0..2), channel(2..4), channel(4..6))
+        Color::rgb_u8(channel(0..2), channel(2..4), channel(4..6))
     }
 
-    pub const fn monochrome(brightness: u8) -> Self {
+    pub fn monochrome_u8(brightness: u8) -> Self {
+        let brightness = (brightness as f32) / 255.0;
         Self {
             red: brightness,
             green: brightness,
             blue: brightness,
-            alpha: 255,
+            alpha: 1.0,
         }
     }
 
-    pub fn red_f32(&self) -> f32 {
-        self.red as f32 / 255.0
+    pub fn red_as_u8(&self) -> u8 {
+        (self.red * 255.0) as u8
     }
 
-    pub fn green_f32(&self) -> f32 {
-        self.green as f32 / 255.0
+    pub fn green_as_u8(&self) -> u8 {
+        (self.green * 255.0) as u8
     }
 
-    pub fn blue_f32(&self) -> f32 {
-        self.blue as f32 / 255.0
+    pub fn blue_as_u8(&self) -> u8 {
+        (self.blue * 255.0) as u8
     }
 
-    pub fn alpha_f32(&self) -> f32 {
-        self.alpha as f32 / 255.0
+    pub fn alpha_as_u8(&self) -> u8 {
+        (self.alpha * 255.0) as u8
     }
 
     #[cfg(feature = "debug")]
-    pub fn multiply_alpha_f32(mut self, alpha: f32) -> Self {
-        let new_alpha = alpha * self.alpha_f32();
-        self.alpha = (new_alpha * 255.0) as u8;
+    pub fn multiply_alpha(mut self, alpha: f32) -> Self {
+        self.alpha *= alpha;
         self
     }
 
     pub fn invert(&self) -> Self {
-        Self::rgba(255 - self.red, 255 - self.green, 255 - self.green, self.alpha)
+        Self::rgba(1.0 - self.red, 1.0 - self.blue, 1.0 - self.green, self.alpha)
     }
 
     pub fn shade(&self) -> Self {
-        match (self.red as usize) + (self.green as usize) + (self.blue as usize) > 382 {
-            true => Self::rgba(
-                self.red.saturating_sub(40),
-                self.green.saturating_sub(40),
-                self.blue.saturating_sub(40),
-                self.alpha,
+        match (self.red_as_u8() as usize) + (self.green_as_u8() as usize) + (self.blue_as_u8() as usize) > 382 {
+            true => Self::rgba_u8(
+                self.red_as_u8().saturating_sub(40),
+                self.green_as_u8().saturating_sub(40),
+                self.blue_as_u8().saturating_sub(40),
+                self.alpha_as_u8(),
             ),
-            false => Self::rgba(
-                self.red.saturating_add(40),
-                self.green.saturating_add(40),
-                self.blue.saturating_add(40),
-                self.alpha,
+            false => Self::rgba_u8(
+                self.red_as_u8().saturating_add(40),
+                self.green_as_u8().saturating_add(40),
+                self.blue_as_u8().saturating_add(40),
+                self.alpha_as_u8(),
             ),
         }
     }
@@ -108,13 +108,13 @@ impl Color {
 
 impl From<Color> for [f32; 3] {
     fn from(val: Color) -> Self {
-        [val.red_f32(), val.green_f32(), val.blue_f32()]
+        [val.red, val.green, val.blue]
     }
 }
 
 impl From<Color> for [f32; 4] {
     fn from(val: Color) -> Self {
-        [val.red_f32(), val.green_f32(), val.blue_f32(), val.alpha_f32()]
+        [val.red, val.green, val.blue, val.alpha]
     }
 }
 
@@ -129,7 +129,7 @@ pub struct ColorBGRA {
 
 impl From<ColorBGRA> for Color {
     fn from(color: ColorBGRA) -> Self {
-        Self::rgba(color.red, color.green, color.blue, color.alpha)
+        Self::rgba_u8(color.red, color.green, color.blue, color.alpha)
     }
 }
 
@@ -143,7 +143,7 @@ pub struct ColorRGB {
 
 impl From<ColorRGB> for Color {
     fn from(color: ColorRGB) -> Self {
-        Self::rgb_f32(color.red, color.green, color.blue)
+        Self::rgb(color.red, color.green, color.blue)
     }
 }
 
@@ -158,6 +158,6 @@ pub struct ColorRGBA {
 
 impl From<ColorRGBA> for Color {
     fn from(color: ColorRGBA) -> Self {
-        Self::rgba(color.red, color.green, color.blue, color.alpha)
+        Self::rgba_u8(color.red, color.green, color.blue, color.alpha)
     }
 }

@@ -11,7 +11,7 @@ impl ColorLookup {
     pub fn get_color(&mut self, string: &'static str) -> Color {
         *self.colors.entry(string).or_insert_with(|| {
             let [red, green, blue] = random_color::RandomColor::new().seed(string).to_rgb_array();
-            Color::rgb(red, green, blue)
+            Color::rgb_u8(red, green, blue)
         })
     }
 

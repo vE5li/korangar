@@ -105,7 +105,7 @@ impl Element for Chat {
                     left: 0.2,
                     top: offset + 0.2,
                 },
-                Color::monochrome(0),
+                Color::monochrome_u8(0),
                 theme.chat.font_size.get(),
             );
 

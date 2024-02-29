@@ -40,13 +40,13 @@ pub struct ButtonTheme {
 impl ThemeDefault<Menu> for ButtonTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(150, 70, 255)),
-            hovered_background_color: Mutable::new(Color::rgb(200, 70, 255)),
-            disabled_background_color: Mutable::new(Color::monochrome(70)),
-            foreground_color: Mutable::new(Color::monochrome(200)),
-            hovered_foreground_color: Mutable::new(Color::rgb(220, 170, 215)),
-            disabled_foreground_color: Mutable::new(Color::monochrome(140)),
-            debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
+            background_color: Mutable::new(Color::rgb_u8(150, 70, 255)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(200, 70, 255)),
+            disabled_background_color: Mutable::new(Color::monochrome_u8(70)),
+            foreground_color: Mutable::new(Color::monochrome_u8(200)),
+            hovered_foreground_color: Mutable::new(Color::rgb_u8(220, 170, 215)),
+            disabled_foreground_color: Mutable::new(Color::monochrome_u8(140)),
+            debug_foreground_color: Mutable::new(Color::rgb_u8(230, 140, 230)),
             corner_radius: MutableRange::new(
                 CornerRadius::uniform(26.0),
                 CornerRadius::default(),
@@ -77,13 +77,13 @@ impl ThemeDefault<Menu> for ButtonTheme {
 impl ThemeDefault<Main> for ButtonTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(100)),
-            hovered_background_color: Mutable::new(Color::rgb(140, 120, 140)),
-            disabled_background_color: Mutable::new(Color::monochrome(70)),
-            foreground_color: Mutable::new(Color::monochrome(200)),
-            hovered_foreground_color: Mutable::new(Color::rgb(220, 170, 215)),
-            disabled_foreground_color: Mutable::new(Color::monochrome(140)),
-            debug_foreground_color: Mutable::new(Color::rgb(230, 140, 230)),
+            background_color: Mutable::new(Color::monochrome_u8(100)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(140, 120, 140)),
+            disabled_background_color: Mutable::new(Color::monochrome_u8(70)),
+            foreground_color: Mutable::new(Color::monochrome_u8(200)),
+            hovered_foreground_color: Mutable::new(Color::rgb_u8(220, 170, 215)),
+            disabled_foreground_color: Mutable::new(Color::monochrome_u8(140)),
+            debug_foreground_color: Mutable::new(Color::rgb_u8(230, 140, 230)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             icon_offset: MutableRange::new(
                 ScreenPosition { left: 7.0, top: 2.5 },
@@ -124,9 +124,9 @@ pub struct WindowTheme {
 impl ThemeDefault<Menu> for WindowTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(30)),
-            title_background_color: Mutable::new(Color::rgba(70, 60, 70, 0)),
-            foreground_color: Mutable::new(Color::rgb(150, 70, 255)),
+            background_color: Mutable::new(Color::monochrome_u8(30)),
+            title_background_color: Mutable::new(Color::rgba_u8(70, 60, 70, 0)),
+            foreground_color: Mutable::new(Color::rgb_u8(150, 70, 255)),
             corner_radius: MutableRange::new(
                 CornerRadius::uniform(30.0),
                 CornerRadius::default(),
@@ -153,9 +153,9 @@ impl ThemeDefault<Menu> for WindowTheme {
 impl ThemeDefault<Main> for WindowTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(40)),
-            title_background_color: Mutable::new(Color::rgb(170, 60, 70)),
-            foreground_color: Mutable::new(Color::monochrome(160)),
+            background_color: Mutable::new(Color::monochrome_u8(40)),
+            title_background_color: Mutable::new(Color::rgb_u8(170, 60, 70)),
+            foreground_color: Mutable::new(Color::monochrome_u8(160)),
             corner_radius: MutableRange::new(CornerRadius::uniform(4.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             title_corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             border_size: MutableRange::new(
@@ -198,10 +198,10 @@ pub struct ExpandableTheme {
 impl ThemeDefault<Menu> for ExpandableTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(60)),
-            second_background_color: Mutable::new(Color::monochrome(45)),
-            foreground_color: Mutable::new(Color::monochrome(170)),
-            hovered_foreground_color: Mutable::new(Color::rgb(190, 145, 185)),
+            background_color: Mutable::new(Color::monochrome_u8(60)),
+            second_background_color: Mutable::new(Color::monochrome_u8(45)),
+            foreground_color: Mutable::new(Color::monochrome_u8(170)),
+            hovered_foreground_color: Mutable::new(Color::rgb_u8(190, 145, 185)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             border_size: MutableRange::new(ScreenSize::uniform(5.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
             element_offset: MutableRange::new(
@@ -229,10 +229,10 @@ impl ThemeDefault<Menu> for ExpandableTheme {
 impl ThemeDefault<Main> for ExpandableTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(60)),
-            second_background_color: Mutable::new(Color::monochrome(45)),
-            foreground_color: Mutable::new(Color::monochrome(170)),
-            hovered_foreground_color: Mutable::new(Color::rgb(190, 145, 185)),
+            background_color: Mutable::new(Color::monochrome_u8(60)),
+            second_background_color: Mutable::new(Color::monochrome_u8(45)),
+            foreground_color: Mutable::new(Color::monochrome_u8(170)),
+            hovered_foreground_color: Mutable::new(Color::rgb_u8(190, 145, 185)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             border_size: MutableRange::new(ScreenSize::uniform(5.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
             element_offset: MutableRange::new(
@@ -270,8 +270,8 @@ pub struct LabelTheme {
 impl ThemeDefault<Menu> for LabelTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(130)),
-            foreground_color: Mutable::new(Color::monochrome(255)),
+            background_color: Mutable::new(Color::monochrome_u8(130)),
+            foreground_color: Mutable::new(Color::monochrome_u8(255)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             text_offset: MutableRange::new(
                 ScreenPosition { left: 5.0, top: 0.0 },
@@ -287,8 +287,8 @@ impl ThemeDefault<Menu> for LabelTheme {
 impl ThemeDefault<Main> for LabelTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(130)),
-            foreground_color: Mutable::new(Color::monochrome(255)),
+            background_color: Mutable::new(Color::monochrome_u8(130)),
+            foreground_color: Mutable::new(Color::monochrome_u8(255)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             text_offset: MutableRange::new(
                 ScreenPosition { left: 5.0, top: 0.0 },
@@ -315,9 +315,9 @@ pub struct ValueTheme {
 impl ThemeDefault<Menu> for ValueTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(100, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb(130, 100, 120)),
-            foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
+            background_color: Mutable::new(Color::rgb_u8(100, 100, 100)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(130, 100, 120)),
+            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             text_offset: MutableRange::new(
                 ScreenPosition { left: 5.0, top: 0.0 },
@@ -333,9 +333,9 @@ impl ThemeDefault<Menu> for ValueTheme {
 impl ThemeDefault<Main> for ValueTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(100, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb(130, 100, 120)),
-            foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
+            background_color: Mutable::new(Color::rgb_u8(100, 100, 100)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(130, 100, 120)),
+            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             text_offset: MutableRange::new(
                 ScreenPosition { left: 5.0, top: 0.0 },
@@ -362,9 +362,9 @@ pub struct CloseButtonTheme {
 impl ThemeDefault<Menu> for CloseButtonTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(200, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb(200, 140, 100)),
-            foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
+            background_color: Mutable::new(Color::rgb_u8(200, 100, 100)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(200, 140, 100)),
+            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
             corner_radius: MutableRange::new(
                 CornerRadius::uniform(26.0),
                 CornerRadius::default(),
@@ -384,9 +384,9 @@ impl ThemeDefault<Menu> for CloseButtonTheme {
 impl ThemeDefault<Main> for CloseButtonTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(200, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb(200, 140, 100)),
-            foreground_color: Mutable::new(Color::rgb(220, 220, 220)),
+            background_color: Mutable::new(Color::rgb_u8(200, 100, 100)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(200, 140, 100)),
+            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
             corner_radius: MutableRange::new(CornerRadius::uniform(1.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             text_offset: MutableRange::new(
                 ScreenPosition { left: 9.0, top: 0.0 },
@@ -409,7 +409,7 @@ pub struct OverlayTheme {
 impl Default for OverlayTheme {
     fn default() -> Self {
         Self {
-            foreground_color: Mutable::new(Color::monochrome(220)),
+            foreground_color: Mutable::new(Color::monochrome_u8(220)),
             text_offset: MutableRange::new(
                 ScreenPosition { left: 20.0, top: 10.0 },
                 ScreenPosition::default(),
@@ -431,9 +431,9 @@ pub struct SliderTheme {
 impl ThemeDefault<Menu> for SliderTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(140, 80, 100)),
-            rail_color: Mutable::new(Color::rgb(150, 130, 150)),
-            knob_color: Mutable::new(Color::rgb(100, 180, 180)),
+            background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
+            rail_color: Mutable::new(Color::rgb_u8(150, 130, 150)),
+            knob_color: Mutable::new(Color::rgb_u8(100, 180, 180)),
             size_constraint: constraint!(100%, 18),
         }
     }
@@ -442,9 +442,9 @@ impl ThemeDefault<Menu> for SliderTheme {
 impl ThemeDefault<Main> for SliderTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb(140, 80, 100)),
-            rail_color: Mutable::new(Color::rgb(150, 130, 150)),
-            knob_color: Mutable::new(Color::rgb(100, 180, 180)),
+            background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
+            rail_color: Mutable::new(Color::rgb_u8(150, 130, 150)),
+            knob_color: Mutable::new(Color::rgb_u8(100, 180, 180)),
             size_constraint: constraint!(100%, 18),
         }
     }
@@ -469,12 +469,12 @@ pub struct InputTheme {
 impl ThemeDefault<Menu> for InputTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(45)),
-            hovered_background_color: Mutable::new(Color::rgb(70, 60, 80)),
-            focused_background_color: Mutable::new(Color::monochrome(100)),
-            text_color: Mutable::new(Color::monochrome(200)),
-            ghost_text_color: Mutable::new(Color::monochrome(100)),
-            focused_text_color: Mutable::new(Color::monochrome(200)),
+            background_color: Mutable::new(Color::monochrome_u8(45)),
+            hovered_background_color: Mutable::new(Color::rgb_u8(70, 60, 80)),
+            focused_background_color: Mutable::new(Color::monochrome_u8(100)),
+            text_color: Mutable::new(Color::monochrome_u8(200)),
+            ghost_text_color: Mutable::new(Color::monochrome_u8(100)),
+            focused_text_color: Mutable::new(Color::monochrome_u8(200)),
             corner_radius: MutableRange::new(
                 CornerRadius::uniform(26.0),
                 CornerRadius::default(),
@@ -496,12 +496,12 @@ impl ThemeDefault<Menu> for InputTheme {
 impl ThemeDefault<Main> for InputTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(60)),
-            hovered_background_color: Mutable::new(Color::monochrome(80)),
-            focused_background_color: Mutable::new(Color::monochrome(100)),
-            text_color: Mutable::new(Color::monochrome(200)),
-            ghost_text_color: Mutable::new(Color::monochrome(100)),
-            focused_text_color: Mutable::new(Color::monochrome(200)),
+            background_color: Mutable::new(Color::monochrome_u8(60)),
+            hovered_background_color: Mutable::new(Color::monochrome_u8(80)),
+            focused_background_color: Mutable::new(Color::monochrome_u8(100)),
+            text_color: Mutable::new(Color::monochrome_u8(200)),
+            ghost_text_color: Mutable::new(Color::monochrome_u8(100)),
+            focused_text_color: Mutable::new(Color::monochrome_u8(200)),
             corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
             font_size: MutableRange::new(14.0, 6.0, 50.0),
             text_offset: MutableRange::new(
@@ -525,7 +525,7 @@ pub struct ChatTheme {
 impl ThemeDefault<Menu> for ChatTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgba(0, 0, 0, 170)),
+            background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
             font_size: MutableRange::new(14.0, 6.0, 50.0),
         }
     }
@@ -534,7 +534,7 @@ impl ThemeDefault<Menu> for ChatTheme {
 impl ThemeDefault<Main> for ChatTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgba(0, 0, 0, 170)),
+            background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
             font_size: MutableRange::new(14.0, 6.0, 50.0),
         }
     }
@@ -548,7 +548,7 @@ pub struct CursorTheme {
 impl Default for CursorTheme {
     fn default() -> Self {
         Self {
-            color: Mutable::new(Color::monochrome(255)),
+            color: Mutable::new(Color::monochrome_u8(255)),
         }
     }
 }
@@ -572,9 +572,9 @@ pub struct ProfilerTheme {
 impl ThemeDefault<Menu> for ProfilerTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(55)),
+            background_color: Mutable::new(Color::monochrome_u8(55)),
             corner_radius: MutableRange::new(CornerRadius::uniform(2.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            line_color: Mutable::new(Color::rgb(80, 90, 80)),
+            line_color: Mutable::new(Color::rgb_u8(80, 90, 80)),
             line_width: MutableRange::new(2.0, 0.5, 4.0),
             bar_height: MutableRange::new(15.0, 5.0, 30.0),
             bar_gap: MutableRange::new(ScreenSize { width: 1.0, height: 5.0 }, ScreenSize::default(), ScreenSize {
@@ -582,7 +582,7 @@ impl ThemeDefault<Menu> for ProfilerTheme {
                 height: 20.0,
             }),
             bar_corner_radius: MutableRange::new(CornerRadius::default(), CornerRadius::default(), CornerRadius::uniform(15.0)),
-            bar_text_color: Mutable::new(Color::monochrome(0)),
+            bar_text_color: Mutable::new(Color::monochrome_u8(0)),
             bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
             bar_text_offset: MutableRange::new(
                 ScreenPosition { left: 7.0, top: 0.0 },
@@ -598,9 +598,9 @@ impl ThemeDefault<Menu> for ProfilerTheme {
 impl ThemeDefault<Main> for ProfilerTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(55)),
+            background_color: Mutable::new(Color::monochrome_u8(55)),
             corner_radius: MutableRange::new(CornerRadius::uniform(2.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            line_color: Mutable::new(Color::rgb(80, 90, 80)),
+            line_color: Mutable::new(Color::rgb_u8(80, 90, 80)),
             line_width: MutableRange::new(2.0, 0.5, 4.0),
             bar_height: MutableRange::new(15.0, 5.0, 30.0),
             bar_gap: MutableRange::new(ScreenSize { width: 1.0, height: 5.0 }, ScreenSize::default(), ScreenSize {
@@ -608,7 +608,7 @@ impl ThemeDefault<Main> for ProfilerTheme {
                 height: 20.0,
             }),
             bar_corner_radius: MutableRange::new(CornerRadius::default(), CornerRadius::default(), CornerRadius::uniform(15.0)),
-            bar_text_color: Mutable::new(Color::monochrome(0)),
+            bar_text_color: Mutable::new(Color::monochrome_u8(0)),
             bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
             bar_text_offset: MutableRange::new(
                 ScreenPosition { left: 7.0, top: 0.0 },
@@ -641,11 +641,11 @@ pub struct StatusBarTheme {
 impl Default for StatusBarTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome(40)),
-            player_health_color: Mutable::new(Color::rgb(67, 163, 83)),
-            enemy_health_color: Mutable::new(Color::rgb(206, 49, 116)),
-            spell_point_color: Mutable::new(Color::rgb(0, 129, 163)),
-            activity_point_color: Mutable::new(Color::rgb(218, 145, 81)),
+            background_color: Mutable::new(Color::monochrome_u8(40)),
+            player_health_color: Mutable::new(Color::rgb_u8(67, 163, 83)),
+            enemy_health_color: Mutable::new(Color::rgb_u8(206, 49, 116)),
+            spell_point_color: Mutable::new(Color::rgb_u8(0, 129, 163)),
+            activity_point_color: Mutable::new(Color::rgb_u8(218, 145, 81)),
             player_bar_width: MutableRange::new(85.0, 20.0, 300.0),
             enemy_bar_width: MutableRange::new(60.0, 20.0, 300.0),
             health_height: MutableRange::new(8.0, 2.0, 30.0),
@@ -670,7 +670,7 @@ pub struct IndicatorTheme {
 impl Default for IndicatorTheme {
     fn default() -> Self {
         Self {
-            walking: Mutable::new(Color::rgba(0, 255, 170, 170)),
+            walking: Mutable::new(Color::rgba_u8(0, 255, 170, 170)),
         }
     }
 }

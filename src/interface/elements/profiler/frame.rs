@@ -110,7 +110,7 @@ impl Element for FrameView {
                 height: bar_height,
             };
 
-            renderer.render_rectangle(bar_position, bar_size, CornerRadius::default(), Color::monochrome(80));
+            renderer.render_rectangle(bar_position, bar_size, CornerRadius::default(), Color::monochrome_u8(80));
 
             for (name, duration) in entry.frame_times {
                 let color = color_lookup.get_color(name);
@@ -133,7 +133,7 @@ impl Element for FrameView {
         }
 
         let mut y_position = 0.0;
-        for (name, color) in std::iter::once((ROOT_MEASUREMENT_NAME, Color::monochrome(150))).chain(color_lookup.into_iter()) {
+        for (name, color) in std::iter::once((ROOT_MEASUREMENT_NAME, Color::monochrome_u8(150))).chain(color_lookup.into_iter()) {
             let statistics = statistics_map.get(name).unwrap();
             let text = format!("{} {:?} (SD {:.1})", name, statistics.mean, statistics.standard_deviation);
 
@@ -144,7 +144,7 @@ impl Element for FrameView {
             let shadow_position = text_position + ScreenSize::uniform(1.0);
 
             // Drop shadow.
-            renderer.render_text(&text, shadow_position, Color::monochrome(0), 14.0);
+            renderer.render_text(&text, shadow_position, Color::monochrome_u8(0), 14.0);
             // Colored text.
             renderer.render_text(&text, text_position, color, 14.0);
 

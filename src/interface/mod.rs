@@ -203,15 +203,13 @@ impl Interface {
 
     #[profile]
     pub fn reload_theme(&mut self, kind: ThemeKind) {
-        let success = match kind {
-            ThemeKind::Menu => self.themes.menu.reload(self.interface_settings.menu_theme.get_file()),
-            ThemeKind::Main => self.themes.main.reload(self.interface_settings.main_theme.get_file()),
+        match kind {
+            ThemeKind::Menu => self.themes.menu.reload::<Menu>(self.interface_settings.menu_theme.get_file()),
+            ThemeKind::Main => self.themes.main.reload::<Main>(self.interface_settings.main_theme.get_file()),
             ThemeKind::Game => self.themes.game.reload(self.interface_settings.game_theme.get_file()),
-        };
-
-        if success {
-            self.post_update.resolve();
         }
+
+        self.post_update.resolve();
     }
 
     pub fn schedule_render(&mut self) {

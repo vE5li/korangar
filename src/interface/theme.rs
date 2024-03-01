@@ -840,16 +840,11 @@ impl InterfaceTheme {
         std::fs::read_to_string(theme_file).ok().and_then(|data| ron::from_str(&data).ok())
     }
 
-    pub fn reload(&mut self, theme_file: &str) -> bool {
-        let Some(theme) = Self::load(theme_file) else {
-            #[cfg(feature = "debug")]
-            print_debug!("failed to load theme from file {}{}{}", MAGENTA, theme_file, NONE);
-
-            return false;
-        };
-
-        *self = theme;
-        true
+    pub fn reload<T: ThemeType>(&mut self, theme_file: &str)
+    where
+        Self: ThemeDefault<T>,
+    {
+        *self = Self::new::<T>(theme_file);
     }
 
     pub fn save(&self, theme_file: &str) {
@@ -878,16 +873,8 @@ impl GameTheme {
         std::fs::read_to_string(theme_file).ok().and_then(|data| ron::from_str(&data).ok())
     }
 
-    pub fn reload(&mut self, theme_file: &str) -> bool {
-        let Some(theme) = Self::load(theme_file) else {
-            #[cfg(feature = "debug")]
-            print_debug!("failed to load theme from file {}{}{}", MAGENTA, theme_file, NONE);
-
-            return false;
-        };
-
-        *self = theme;
-        true
+    pub fn reload(&mut self, theme_file: &str) {
+        *self = Self::new(theme_file);
     }
 
     pub fn save(&self, theme_file: &str) {

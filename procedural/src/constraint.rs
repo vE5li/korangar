@@ -22,6 +22,11 @@ impl syn::parse::Parse for Dimension {
             input.parse::<Punct>()?;
 
             quote!(crate::interface::Dimension::Flexible)
+        } else if lookahead.peek(syn::Token![super]) {
+            // remove the 'super'
+            input.parse::<syn::Token![super]>()?;
+
+            quote!(crate::interface::Dimension::Super)
         } else {
             let literal: Lit = input.parse()?;
 

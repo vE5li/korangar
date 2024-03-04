@@ -57,9 +57,10 @@ impl ContainerState {
         theme: &InterfaceTheme,
         size_constraint: &SizeConstraint,
         border: ScreenSize,
-    ) {
-        let (mut size, position) = placement_resolver.allocate(size_constraint);
-        let mut inner_placement_resolver = placement_resolver.derive(size, ScreenPosition::default(), border);
+    ) -> f32 {
+        let (mut inner_placement_resolver, mut size, position) =
+            placement_resolver.derive(size_constraint, ScreenPosition::default(), border);
+        let parent_limits = inner_placement_resolver.get_parent_limits();
 
         // TODO: add ability to pass this in (by calling .with_gaps(..) on the
         // container) inner_placement_resolver.set_gaps(Size::new(5.0, 3.0));
@@ -70,12 +71,14 @@ impl ContainerState {
                 .resolve(&mut inner_placement_resolver, interface_settings, theme)
         });
 
+        let final_height = inner_placement_resolver.final_height();
+
         if size_constraint.height.is_flexible() {
-            let final_height = inner_placement_resolver.final_height();
             let final_height = size_constraint.validated_height(
                 final_height,
                 placement_resolver.get_available().height,
                 placement_resolver.get_available().height,
+                &parent_limits,
                 interface_settings.scaling.get(),
             );
             size.height = Some(final_height);
@@ -84,6 +87,8 @@ impl ContainerState {
 
         self.state.cached_size = size.finalize();
         self.state.cached_position = position;
+
+        final_height
     }
 
     fn get_next_element(&self, start_index: usize, focus_mode: FocusMode, wrapped_around: &mut bool) -> Option<ElementCell> {

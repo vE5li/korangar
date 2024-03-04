@@ -1,9 +1,7 @@
-use procedural::*;
-
-use crate::interface::{InterfaceSettings, PrototypeWindow, ScreenSize, Window, WindowBuilder, WindowCache};
+use crate::interface::{InterfaceSettings, PrototypeWindow, ScreenSize, SizeConstraint, Window, WindowBuilder, WindowCache};
 
 #[derive(Default)]
-pub struct AudioSettingsWindow {}
+pub struct AudioSettingsWindow;
 
 impl AudioSettingsWindow {
     pub const WINDOW_CLASS: &'static str = "audio_settings";
@@ -20,7 +18,7 @@ impl PrototypeWindow for AudioSettingsWindow {
         WindowBuilder::default()
             .with_title("Audio Settings".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

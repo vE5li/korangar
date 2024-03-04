@@ -6,7 +6,7 @@ use crate::interface::*;
 pub struct WindowBuilder {
     window_title: Option<String>,
     window_class: Option<String>,
-    size_constraint: SizeConstraint,
+    size_constraint: Option<SizeConstraint>,
     elements: Vec<ElementCell>,
     closable: bool,
     background_color: Option<ColorSelector>,
@@ -29,8 +29,9 @@ impl WindowBuilder {
         Self { window_class, ..self }
     }
 
-    pub fn with_size(self, size_constraint: SizeConstraint) -> Self {
-        Self { size_constraint, ..self }
+    pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
+        self.size_constraint = Some(size_constraint);
+        self
     }
 
     pub fn with_elements(self, elements: Vec<ElementCell>) -> Self {
@@ -63,6 +64,8 @@ impl WindowBuilder {
             theme_kind,
         } = self;
 
+        let size_constraint = size_constraint.expect("window must specify a size constraint");
+
         if closable {
             assert!(window_title.is_some(), "closable window must also have a title");
             let close_button = CloseButton::default().wrap();
@@ -79,7 +82,16 @@ impl WindowBuilder {
             elements.insert(0, drag_button);
         }
 
-        let elements = vec![Container::new(elements).wrap()];
+        let container_constraint = SizeConstraint {
+            width: Dimension::Relative(100.0),
+            minimum_width: size_constraint.minimum_width.map(|_| Dimension::Super),
+            maximum_width: size_constraint.maximum_width.map(|_| Dimension::Super),
+            height: Dimension::Flexible,
+            minimum_height: size_constraint.minimum_height.map(|_| Dimension::Super),
+            maximum_height: size_constraint.maximum_height.map(|_| Dimension::Super),
+        };
+
+        let elements = vec![Container::new(elements).with_size(container_constraint).wrap()];
 
         // very imporant: give every element a link to its parent to allow propagation
         // of events such as scrolling
@@ -94,10 +106,10 @@ impl WindowBuilder {
             .unzip();
 
         let size = cached_size
-            .map(|size| size_constraint.validated_size(size, available_space, interface_settings.scaling.get()))
+            .map(|size| size_constraint.validated_window_size(size, available_space, interface_settings.scaling.get()))
             .unwrap_or_else(|| {
                 size_constraint
-                    .resolve(available_space, available_space, interface_settings.scaling.get())
+                    .resolve_window(available_space, available_space, interface_settings.scaling.get())
                     .finalize_or(0.0)
             });
 

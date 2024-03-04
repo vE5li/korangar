@@ -58,7 +58,7 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
                 .with_event(self.update.toggle_action())
                 .with_width(dimension!(!))
                 .wrap(),
-            ScrollView::new(elements, constraint!(100%, ?)).wrap(),
+            ScrollView::new(elements, constraint!(100%, ? < super)).wrap(),
         ];
 
         WindowBuilder::default()

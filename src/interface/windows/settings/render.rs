@@ -1,5 +1,3 @@
-use procedural::*;
-
 use crate::input::UserEvent;
 use crate::interface::*;
 
@@ -97,7 +95,7 @@ fn buffers_expandable() -> ElementCell {
 }
 
 #[derive(Default)]
-pub struct RenderSettingsWindow {}
+pub struct RenderSettingsWindow;
 
 impl RenderSettingsWindow {
     pub const WINDOW_CLASS: &'static str = "render_settings";
@@ -122,7 +120,7 @@ impl PrototypeWindow for RenderSettingsWindow {
         WindowBuilder::default()
             .with_title("Render Settings".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

@@ -40,11 +40,11 @@ impl PrototypeWindow for FriendRequestWindow {
 
         WindowBuilder::default()
             .with_title("Friend request".to_string())
-            // NOTE: we give the builder a class but we don't implement the `window_class` method
+            // NOTE: We give the builder a class but we don't implement the `window_class` method
             // of the trait. This way we can open multiple windos of this type but we can still
             // close them with the class name.
             .with_class(Self::WINDOW_CLASS.to_owned())
-            .with_size(constraint!(250, ?))
+            .with_size(constraint!(250 > 250 < 250, ?))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

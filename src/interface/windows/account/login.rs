@@ -239,7 +239,7 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
         WindowBuilder::default()
             .with_title("Log In".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 250 < 300, ? < 80%))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .with_theme_kind(ThemeKind::Menu)
             .build(window_cache, interface_settings, available_space)

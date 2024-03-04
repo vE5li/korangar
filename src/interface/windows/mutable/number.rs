@@ -3,7 +3,6 @@ use std::cmp::PartialOrd;
 use derive_new::new;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
-use procedural::*;
 
 use crate::interface::*;
 
@@ -25,7 +24,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
 
         WindowBuilder::default()
             .with_title(self.name.clone())
-            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

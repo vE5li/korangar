@@ -59,23 +59,27 @@ impl Element for Expandable {
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let closed_size = self
             .closed_size_constraint
-            .resolve_partial(
+            .resolve_element(
                 placement_resolver.get_available(),
                 placement_resolver.get_remaining(),
+                &placement_resolver.get_parent_limits(),
                 interface_settings.scaling.get(),
             )
             .finalize();
 
-        let (mut size, position) = match self.expanded && !self.state.elements.is_empty() {
-            true => placement_resolver.allocate(&self.open_size_constraint),
-            false => placement_resolver.allocate(&self.closed_size_constraint),
+        let size_constraint = match self.expanded && !self.state.elements.is_empty() {
+            true => &self.open_size_constraint,
+            false => &self.closed_size_constraint,
         };
 
-        if self.expanded && !self.state.elements.is_empty() {
-            let screen_position =
-                ScreenPosition::only_top(closed_size.height) + theme.expandable.element_offset.get() * interface_settings.scaling.get();
+        let screen_position =
+            ScreenPosition::only_top(closed_size.height) + theme.expandable.element_offset.get() * interface_settings.scaling.get();
 
-            let mut inner_placement_resolver = placement_resolver.derive(size, screen_position, theme.expandable.border_size.get());
+        let (mut inner_placement_resolver, mut size, position) =
+            placement_resolver.derive(size_constraint, screen_position, theme.expandable.border_size.get());
+        let parent_limits = inner_placement_resolver.get_parent_limits();
+
+        if self.expanded && !self.state.elements.is_empty() {
             inner_placement_resolver.set_gaps(theme.expandable.gaps.get());
 
             self.state.elements.iter_mut().for_each(|element| {
@@ -94,6 +98,7 @@ impl Element for Expandable {
                     final_height,
                     placement_resolver.get_available().height,
                     placement_resolver.get_available().height,
+                    &parent_limits,
                     interface_settings.scaling.get(),
                 );
 

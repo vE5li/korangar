@@ -54,7 +54,7 @@ impl PrototypeWindow for CharacterCreationWindow {
         WindowBuilder::default()
             .with_title("Create Character".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 250 < 300, ? < 80%))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .with_theme_kind(ThemeKind::Menu)

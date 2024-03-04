@@ -1,5 +1,4 @@
 use derive_new::new;
-use procedural::*;
 
 use crate::graphics::Color;
 use crate::interface::*;
@@ -28,7 +27,7 @@ impl PrototypeWindow for ColorWindow {
 
         WindowBuilder::default()
             .with_title(self.name.to_string())
-            .with_size(constraint!(200 > 250 < 300, ?))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

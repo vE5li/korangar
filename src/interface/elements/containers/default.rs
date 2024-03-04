@@ -21,11 +21,10 @@ impl Container {
         }
     }
 
-    /*pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
-
+    pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
         self.size_constraint = Some(size_constraint);
         self
-    }*/
+    }
 }
 
 impl Element for Container {

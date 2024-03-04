@@ -256,7 +256,7 @@ impl From<ScreenClip> for [f32; 4] {
     }
 }
 
-#[derive(Copy, Clone, new)]
+#[derive(Debug, Copy, Clone, new)]
 pub struct PartialScreenSize {
     pub width: f32,
     pub height: Option<f32>,

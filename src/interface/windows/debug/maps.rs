@@ -1,5 +1,4 @@
 use cgmath::Vector2;
-use procedural::*;
 
 use crate::input::UserEvent;
 use crate::interface::*;
@@ -56,7 +55,7 @@ impl PrototypeWindow for MapsWindow {
         WindowBuilder::default()
             .with_title("Maps".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 250 < 300, ? < 80%))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

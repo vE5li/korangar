@@ -49,7 +49,7 @@ impl PrototypeWindow for FriendsWindow {
         WindowBuilder::default()
             .with_title("Friends".to_string())
             .with_class(Self::WINDOW_CLASS.to_owned())
-            .with_size(constraint!(200 > 300 < 400, ? < 80%))
+            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

@@ -136,7 +136,7 @@ where
             })
             .collect();
 
-        let element = ScrollView::new(options, constraint!(100%, ? < 500))
+        let element = ScrollView::new(options, constraint!(100%, super > ? < super))
             .with_background_color(|theme| theme.button.background_color.get())
             .wrap();
 

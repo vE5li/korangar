@@ -10,6 +10,8 @@ mod mutable;
 mod prototype;
 mod settings;
 
+use procedural::constraint;
+
 pub use self::account::*;
 pub use self::builder::WindowBuilder;
 pub use self::cache::*;
@@ -70,14 +72,13 @@ impl Window {
         theme: &InterfaceTheme,
         available_space: ScreenSize,
     ) -> (Option<&str>, ScreenPosition, ScreenSize) {
-        let height = match self.size_constraint.height.is_flexible() {
-            true => None,
-            false => Some(self.size.height),
-        };
-
         let mut placement_resolver = PlacementResolver::new(
             font_loader.clone(),
-            PartialScreenSize::new(self.size.width, height),
+            ScreenSize {
+                height: available_space.height,
+                width: self.size.width,
+            },
+            &self.size_constraint,
             theme.window.border_size.get(),
             theme.window.gaps.get(),
             interface_settings.scaling.get(),
@@ -88,13 +89,17 @@ impl Window {
             .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
 
         if self.size_constraint.height.is_flexible() {
+            let parent_limits = placement_resolver.get_parent_limits();
             let final_height = theme.window.border_size.get().height + placement_resolver.final_height();
+
             let final_height = self.size_constraint.validated_height(
                 final_height,
                 available_space.height.into(),
                 available_space.height.into(),
+                &parent_limits,
                 interface_settings.scaling.get(),
             );
+
             self.size.height = final_height;
             self.validate_size(interface_settings, available_space);
         }
@@ -106,7 +111,13 @@ impl Window {
 
             let mut placement_resolver = PlacementResolver::new(
                 font_loader,
-                PartialScreenSize::new(size.width, Some(200.0)),
+                // TODO: 250 is an arbitrary limitation. This should be replaced with a value based
+                // on some reasoning.
+                ScreenSize {
+                    width: size.width,
+                    height: 250.0,
+                },
+                &constraint!(100%, 0 > ? < 250),
                 ScreenSize::default(), //theme.window.border_size.get(), // TODO: Popup
                 ScreenSize::default(), //theme.window.gaps.get(), // TODO: Popup
                 interface_settings.scaling.get(),
@@ -210,7 +221,7 @@ impl Window {
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, available_space: ScreenSize) {
         self.size = self
             .size_constraint
-            .validated_size(self.size, available_space, interface_settings.scaling.get());
+            .validated_window_size(self.size, available_space, interface_settings.scaling.get());
     }
 
     pub fn open_popup(&mut self, element: ElementCell, position_tracker: Tracker<ScreenPosition>, size_tracker: Tracker<ScreenSize>) {

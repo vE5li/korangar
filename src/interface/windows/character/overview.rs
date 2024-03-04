@@ -23,23 +23,31 @@ impl PrototypeWindow for CharacterOverviewWindow {
             Text::default()
                 .with_text(|| format!("job level: {}", player.get_job_level()))
                 .wrap(),*/
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Inventory")
                 .with_event(UserEvent::OpenInventoryWindow)
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Equipment")
                 .with_event(UserEvent::OpenEquipmentWindow)
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Skill tree")
                 .with_event(UserEvent::OpenSkillTreeWindow)
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Friends")
                 .with_event(UserEvent::OpenFriendsWindow)
+                .build()
                 .wrap(),
-            Button::default().with_text("Menu").with_event(UserEvent::OpenMenuWindow).wrap(),
+            ButtonBuilder::new()
+                .with_text("Menu")
+                .with_event(UserEvent::OpenMenuWindow)
+                .build()
+                .wrap(),
         ];
 
         WindowBuilder::new()

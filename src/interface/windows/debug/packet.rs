@@ -40,11 +40,12 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
         let clear_action = { move || vec![ClickAction::Event(UserEvent::ClearPacketHistory)] };
 
         let elements = vec![
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Clear")
                 .with_disabled_selector(clear_selector)
                 .with_event(Box::new(clear_action))
-                .with_width(dimension_bound!(33.33%))
+                .with_width_bound(dimension_bound!(33.33%))
+                .build()
                 .wrap(),
             StateButton::default()
                 .with_text("Show pings")

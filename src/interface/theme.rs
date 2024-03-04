@@ -734,20 +734,23 @@ impl PrototypeElement for ThemeSelector {
                 .with_width(dimension_bound!(!))
                 .wrap(),
             InputField::<40>::new(theme_name, "Theme name", name_action, dimension_bound!(75%)).wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Load")
                 .with_event(load_action)
-                .with_width(dimension_bound!(!))
+                .with_width_bound(dimension_bound!(!))
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Save theme")
                 .with_event(save_action)
-                .with_width(dimension_bound!(50%))
+                .with_width_bound(dimension_bound!(50%))
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Reload theme")
                 .with_event(reload_action)
-                .with_width(dimension_bound!(!))
+                .with_width_bound(dimension_bound!(!))
+                .build()
                 .wrap(),
         ];
 

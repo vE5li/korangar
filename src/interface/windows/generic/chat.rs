@@ -54,11 +54,12 @@ impl PrototypeWindow for ChatWindow {
 
         let elements = vec![
             InputField::<30>::new(input_text, "write message or command", input_action, dimension_bound!(75%)).wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("send")
                 .with_disabled_selector(button_selector)
                 .with_event(Box::new(button_action))
-                .with_width(dimension_bound!(25%))
+                .with_width_bound(dimension_bound!(25%))
+                .build()
                 .wrap(),
             ScrollView::new(
                 vec![Chat::new(self.messages.clone(), self.font_loader.clone()).wrap()],

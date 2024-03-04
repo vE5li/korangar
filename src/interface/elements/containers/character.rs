@@ -42,18 +42,20 @@ impl CharacterPreview {
                     .with_foreground_color(|_| Color::rgb_u8(220, 210, 210))
                     .with_font_size(|_| 18.0)
                     .wrap(),
-                Button::default()
+                ButtonBuilder::new()
                     .with_text("Switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
                     .with_background_color(|_| Color::rgb_u8(161, 141, 141))
-                    .with_width(dimension_bound!(50%))
+                    .with_width_bound(dimension_bound!(50%))
+                    .build()
                     .wrap(),
-                Button::default()
+                ButtonBuilder::new()
                     .with_text("Delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
                     .with_background_color(|theme| theme.close_button.background_color.get())
                     .with_foreground_color(|theme| theme.close_button.foreground_color.get())
-                    .with_width(dimension_bound!(50%))
+                    .with_width_bound(dimension_bound!(50%))
+                    .build()
                     .wrap(),
             ];
         }

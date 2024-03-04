@@ -6,6 +6,7 @@ mod state;
 mod theme;
 #[macro_use]
 mod elements;
+pub mod builder;
 mod cursor;
 mod windows;
 

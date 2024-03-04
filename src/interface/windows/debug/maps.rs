@@ -45,9 +45,10 @@ impl PrototypeWindow for MapsWindow {
         let elements = map_warps
             .into_iter()
             .map(|(name, position)| {
-                Button::default()
+                ButtonBuilder::new()
                     .with_text(name.to_owned())
                     .with_event(UserEvent::RequestWarpToMap(format!("{name}.gat"), position))
+                    .build()
                     .wrap()
             })
             .collect();

@@ -25,14 +25,20 @@ impl DialogContainer {
                 .with_text(text.clone())
                 .with_foreground_color(|_| Color::monochrome_u8(255))
                 .wrap(),
-            DialogElement::NextButton => Button::default().with_text("next").with_event(UserEvent::NextDialog(npc_id)).wrap(),
-            DialogElement::CloseButton => Button::default()
+            DialogElement::NextButton => ButtonBuilder::new()
+                .with_text("next")
+                .with_event(UserEvent::NextDialog(npc_id))
+                .build()
+                .wrap(),
+            DialogElement::CloseButton => ButtonBuilder::new()
                 .with_text("close")
                 .with_event(UserEvent::CloseDialog(npc_id))
+                .build()
                 .wrap(),
-            DialogElement::ChoiceButton(text, index) => Button::default()
+            DialogElement::ChoiceButton(text, index) => ButtonBuilder::new()
                 .with_text(text.clone())
                 .with_event(UserEvent::ChooseDialogOption(npc_id, *index))
+                .build()
                 .wrap(),
         }
     }

@@ -20,21 +20,23 @@ impl PrototypeWindow for FriendRequestWindow {
             Text::default()
                 .with_text(format!("^ffaa00{}^000000 wants to be friends with you", self.friend.name))
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("reject")
                 .with_event(UserEvent::RejectFriendRequest {
                     account_id: self.friend.account_id,
                     character_id: self.friend.character_id,
                 })
-                .with_width(dimension_bound!(50%))
+                .with_width_bound(dimension_bound!(50%))
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("accept")
                 .with_event(UserEvent::AcceptFriendRequest {
                     account_id: self.friend.account_id,
                     character_id: self.friend.character_id,
                 })
-                .with_width(dimension_bound!(!))
+                .with_width_bound(dimension_bound!(!))
+                .build()
                 .wrap(),
         ];
 

@@ -36,12 +36,13 @@ impl FriendView {
 
     fn friend_to_element(friend: &Friend) -> ElementCell {
         let elements = vec![
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("remove")
                 .with_event(UserEvent::RemoveFriend {
                     account_id: friend.account_id,
                     character_id: friend.character_id,
                 })
+                .build()
                 .wrap(),
         ];
 

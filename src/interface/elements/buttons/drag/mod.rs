@@ -1,14 +1,13 @@
-use derive_new::new;
+mod builder;
 
+pub use self::builder::DragButtonBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::{Element, *};
+use crate::interface::*;
 
-#[derive(new)]
 pub struct DragButton {
-    window_title: String,
+    title: String,
     width_bound: DimensionBound,
-    #[new(default)]
     state: ElementState,
 }
 
@@ -69,7 +68,7 @@ impl Element for DragButton {
         }
 
         renderer.render_text(
-            &self.window_title,
+            &self.title,
             theme.window.text_offset.get(),
             theme.window.foreground_color.get(),
             theme.window.font_size.get(),

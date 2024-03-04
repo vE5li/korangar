@@ -120,7 +120,7 @@ where
                 let mut selected = self.selected.clone().unwrap();
                 let mut event = self.event.clone();
 
-                Button::default()
+                ButtonBuilder::new()
                     .with_text(text)
                     .with_event(Box::new(move || {
                         selected.set(option.clone());
@@ -132,6 +132,7 @@ where
 
                         actions
                     }))
+                    .build()
                     .wrap()
             })
             .collect();

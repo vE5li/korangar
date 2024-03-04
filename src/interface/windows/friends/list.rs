@@ -38,10 +38,11 @@ impl PrototypeWindow for FriendsWindow {
 
         let elements = vec![
             InputField::<24>::new(friend_name, "Name", add_action.clone(), dimension_bound!(80%)).wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Add")
                 .with_event(add_action)
-                .with_width(dimension_bound!(!))
+                .with_width_bound(dimension_bound!(!))
+                .build()
                 .wrap(),
             FriendView::new(self.friend_list.clone()).wrap(),
         ];

@@ -229,10 +229,11 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
                 ]
             })
             .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Log in")
                 .with_disabled_selector(selector)
                 .with_event(Box::new(login_action))
+                .build()
                 .wrap(),
         ];
 

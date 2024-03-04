@@ -15,64 +15,78 @@ impl PrototypeWindow for MenuWindow {
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let elements = vec![
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Graphics settings")
                 .with_event(UserEvent::OpenGraphicsSettingsWindow)
+                .build()
                 .wrap(),
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Audio settings")
                 .with_event(UserEvent::OpenAudioSettingsWindow)
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Render settings")
                 .with_event(UserEvent::OpenRenderSettingsWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Map viewer")
                 .with_event(UserEvent::OpenMapDataWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Maps")
                 .with_event(UserEvent::OpenMapsWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Commands")
                 .with_event(UserEvent::OpenCommandsWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Time")
                 .with_event(UserEvent::OpenTimeWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Theme viewer")
                 .with_event(UserEvent::OpenThemeViewerWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Profiler")
                 .with_event(UserEvent::OpenProfilerWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
             #[cfg(feature = "debug")]
-            Button::default()
+            ButtonBuilder::new()
                 .with_text("Packets")
                 .with_event(UserEvent::OpenPacketWindow)
                 .with_foreground_color(|theme| theme.button.debug_foreground_color.get())
+                .build()
                 .wrap(),
-            Button::default().with_text("Log out").with_event(UserEvent::LogOut).wrap(),
-            Button::default().with_text("Exit").with_event(UserEvent::Exit).wrap(),
+            ButtonBuilder::new()
+                .with_text("Log out")
+                .with_event(UserEvent::LogOut)
+                .build()
+                .wrap(),
+            ButtonBuilder::new().with_text("Exit").with_event(UserEvent::Exit).build().wrap(),
         ];
 
         WindowBuilder::new()

@@ -1,16 +1,14 @@
 use procedural::dimension_bound;
 
+use crate::interface::builder::{Set, Unset, With};
 use crate::interface::*;
 
-pub struct NotSet;
-pub struct Set;
-pub struct SetWith<T>(T);
-
-/// Type state window builder. This builder utilizes the type system to prevent
-/// calling the same method multiple times, calling `build` before the mandatory
-/// methods have been called, and to enforce some conditional logic. Namely, the
-/// `closable` method can only be called if the window has a title.
-#[must_use = "WindowBuilder must be finalized"]
+/// Type state [`Window`] builder. This builder utilizes the type system to
+/// prevent calling the same method multiple times, calling
+/// [`build`](Self::build) before the mandatory methods have been called, and to
+/// enforce some conditional logic. Namely, the `closable` method can only be
+/// called if the window has a title.
+#[must_use = "`build` needs to be called"]
 pub struct WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
     title: Option<String>,
     closable: bool,
@@ -22,14 +20,14 @@ pub struct WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, THE
     marker: PhantomData<(TITLE, CLOSABLE, CLASS, BACKGROUND, THEME)>,
 }
 
-impl WindowBuilder<NotSet, NotSet, NotSet, NotSet, NotSet, NotSet, NotSet> {
+impl WindowBuilder<Unset, Unset, Unset, Unset, Unset, Unset, Unset> {
     pub fn new() -> Self {
         Self {
             title: None,
             closable: false,
             class: None,
-            size_bound: NotSet,
-            elements: NotSet,
+            size_bound: Unset,
+            elements: Unset,
             background_color: None,
             theme_kind: ThemeKind::default(),
             marker: PhantomData,
@@ -37,7 +35,7 @@ impl WindowBuilder<NotSet, NotSet, NotSet, NotSet, NotSet, NotSet, NotSet> {
     }
 }
 
-impl<CLASS, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<NotSet, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
+impl<CLASS, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<Unset, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
     pub fn with_title(self, title: impl Into<String>) -> WindowBuilder<Set, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
         WindowBuilder {
             title: Some(title.into()),
@@ -47,7 +45,7 @@ impl<CLASS, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<NotSet, C
     }
 }
 
-impl<CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<Set, NotSet, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
+impl<CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<Set, Unset, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
     /// NOTE: This function is only available if `with_title` has been called on
     /// the builder.
     pub fn closable(self) -> WindowBuilder<Set, Set, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
@@ -59,7 +57,7 @@ impl<CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<Set, NotSet, CLASS,
     }
 }
 
-impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, NotSet, SIZE, ELEMENTS, BACKGROUND, THEME> {
+impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, Unset, SIZE, ELEMENTS, BACKGROUND, THEME> {
     pub fn with_class(self, class: impl Into<String>) -> WindowBuilder<TITLE, CLOSABLE, Set, SIZE, ELEMENTS, BACKGROUND, THEME> {
         WindowBuilder {
             class: Some(class.into()),
@@ -69,7 +67,7 @@ impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CL
     }
 }
 
-impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, NotSet, SIZE, ELEMENTS, BACKGROUND, THEME> {
+impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, Unset, SIZE, ELEMENTS, BACKGROUND, THEME> {
     pub fn with_class_option(self, class: Option<String>) -> WindowBuilder<TITLE, CLOSABLE, Set, SIZE, ELEMENTS, BACKGROUND, THEME> {
         WindowBuilder {
             class,
@@ -79,33 +77,31 @@ impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CL
     }
 }
 
-impl<TITLE, CLOSABLE, CLASS, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, NotSet, ELEMENTS, BACKGROUND, THEME> {
+impl<TITLE, CLOSABLE, CLASS, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, Unset, ELEMENTS, BACKGROUND, THEME> {
     pub fn with_size_bound(
         self,
         size_bound: SizeBound,
-    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SetWith<SizeBound>, ELEMENTS, BACKGROUND, THEME> {
+    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, With<SizeBound>, ELEMENTS, BACKGROUND, THEME> {
         WindowBuilder {
-            size_bound: SetWith(size_bound),
-            marker: PhantomData,
+            size_bound: With::new(size_bound),
             ..self
         }
     }
 }
 
-impl<TITLE, CLOSABLE, CLASS, SIZE, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, NotSet, BACKGROUND, THEME> {
+impl<TITLE, CLOSABLE, CLASS, SIZE, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, Unset, BACKGROUND, THEME> {
     pub fn with_elements(
         self,
         elements: Vec<ElementCell>,
-    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, SetWith<Vec<ElementCell>>, BACKGROUND, THEME> {
+    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, With<Vec<ElementCell>>, BACKGROUND, THEME> {
         WindowBuilder {
-            elements: SetWith(elements),
-            marker: PhantomData,
+            elements: With::new(elements),
             ..self
         }
     }
 }
 
-impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, NotSet, THEME> {
+impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, Unset, THEME> {
     pub fn with_background_color(
         self,
         background_color: ColorSelector,
@@ -118,7 +114,7 @@ impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, THEME> WindowBuilder<TITLE, CLOSABL
     }
 }
 
-impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, NotSet> {
+impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, Unset> {
     pub fn with_theme_kind(self, theme_kind: ThemeKind) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND, Set> {
         WindowBuilder {
             theme_kind,
@@ -129,11 +125,12 @@ impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND> WindowBuilder<TITLE, CL
 }
 
 impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
-    WindowBuilder<TITLE, CLOSABLE, CLASS, SetWith<SizeBound>, SetWith<Vec<ElementCell>>, BACKGROUND, THEME>
+    WindowBuilder<TITLE, CLOSABLE, CLASS, With<SizeBound>, With<Vec<ElementCell>>, BACKGROUND, THEME>
 {
     /// Take the builder and turn it into a [`Window`].
-    /// NOTE: This method is only available if `with_size_bound` and
-    /// `with_elements` has been called on the builder.
+    /// NOTE: This method is only available if
+    /// [`with_size_bound`](Self::with_size_bound) and
+    /// [`with_elements`](Self::with_elements) have been called on the builder.
     pub fn build(self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let Self {
             title,
@@ -146,8 +143,8 @@ impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
             ..
         } = self;
 
-        let size_bound = size_bound.0;
-        let mut elements = elements.0;
+        let size_bound = size_bound.take();
+        let mut elements = elements.take();
 
         if closable {
             let close_button = CloseButton::default().wrap();
@@ -160,7 +157,11 @@ impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
                 false => dimension_bound!(!),
             };
 
-            let drag_button = DragButton::new(title, width_bound).wrap();
+            let drag_button = DragButtonBuilder::new()
+                .with_title(title)
+                .with_width_bound(width_bound)
+                .build()
+                .wrap();
             elements.insert(0, drag_button);
         }
 

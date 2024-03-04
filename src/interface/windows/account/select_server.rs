@@ -23,9 +23,10 @@ impl PrototypeWindow for SelectServerWindow {
             .servers
             .iter()
             .map(|server| {
-                Button::default()
+                ButtonBuilder::new()
                     .with_text(server.server_name.clone())
                     .with_event(UserEvent::SelectServer(server.clone()))
+                    .build()
                     .wrap()
             })
             .collect();

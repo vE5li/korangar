@@ -1,16 +1,19 @@
+mod builder;
+
 use procedural::dimension_bound;
 
+pub use self::builder::ButtonBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
 
-pub struct Button<T, E>
+pub struct Button<TEXT, EVENT>
 where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
+    TEXT: AsRef<str> + 'static,
+    EVENT: ElementEvent + 'static,
 {
-    text: Option<T>,
-    event: Option<E>,
+    text: TEXT,
+    event: EVENT,
     disabled_selector: Option<Selector>,
     foreground_color: Option<ColorSelector>,
     background_color: Option<ColorSelector>,
@@ -18,67 +21,17 @@ where
     state: ElementState,
 }
 
-// HACK: Workaround for Rust incorrect trait bounds when deriving Option<T>
-// where T: !Default.
-impl<T, E> Default for Button<T, E>
+impl<TEXT, EVENT> Button<TEXT, EVENT>
 where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
+    TEXT: AsRef<str> + 'static,
+    EVENT: ElementEvent + 'static,
 {
-    fn default() -> Self {
-        Self {
-            text: Default::default(),
-            event: Default::default(),
-            disabled_selector: Default::default(),
-            foreground_color: Default::default(),
-            background_color: Default::default(),
-            width_bound: Default::default(),
-            state: Default::default(),
-        }
-    }
-}
-
-impl<T, E> Button<T, E>
-where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
-{
-    pub fn with_text(mut self, text: T) -> Self {
-        self.text = Some(text);
-        self
-    }
-
-    pub fn with_event(mut self, event: E) -> Self {
-        self.event = Some(event);
-        self
-    }
-
-    pub fn with_disabled_selector(mut self, disabled_selector: impl Fn() -> bool + 'static) -> Self {
-        self.disabled_selector = Some(Box::new(disabled_selector));
-        self
-    }
-
-    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&InterfaceTheme) -> Color + 'static) -> Self {
-        self.foreground_color = Some(Box::new(foreground_color));
-        self
-    }
-
-    pub fn with_background_color(mut self, background_color: impl Fn(&InterfaceTheme) -> Color + 'static) -> Self {
-        self.background_color = Some(Box::new(background_color));
-        self
-    }
-
-    pub fn with_width(mut self, width_bound: DimensionBound) -> Self {
-        self.width_bound = Some(width_bound);
-        self
-    }
-
     fn is_disabled(&self) -> bool {
         self.disabled_selector.as_ref().map(|selector| !selector()).unwrap_or(false)
     }
 }
 
-impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
+impl<TEXT: AsRef<str> + 'static, EVENT: ElementEvent> Element for Button<TEXT, EVENT> {
     fn get_state(&self) -> &ElementState {
         &self.state
     }
@@ -109,11 +62,10 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
-        if self.is_disabled() {
-            return Vec::new();
+        match self.is_disabled() {
+            true => Vec::new(),
+            false => self.event.trigger(),
         }
-
-        self.event.as_mut().map(|event| event.trigger()).unwrap_or_default()
     }
 
     fn render(
@@ -144,22 +96,20 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
 
         renderer.render_background(theme.button.corner_radius.get(), background_color);
 
-        if let Some(text) = &self.text {
-            let foreground_color = if disabled {
-                theme.button.disabled_foreground_color.get()
-            } else {
-                self.foreground_color
-                    .as_ref()
-                    .map(|closure| closure(theme))
-                    .unwrap_or(theme.button.foreground_color.get())
-            };
+        let foreground_color = if disabled {
+            theme.button.disabled_foreground_color.get()
+        } else {
+            self.foreground_color
+                .as_ref()
+                .map(|closure| closure(theme))
+                .unwrap_or(theme.button.foreground_color.get())
+        };
 
-            renderer.render_text(
-                text.as_ref(),
-                theme.button.text_offset.get(),
-                foreground_color,
-                theme.button.font_size.get(),
-            );
-        }
+        renderer.render_text(
+            self.text.as_ref(),
+            theme.button.text_offset.get(),
+            foreground_color,
+            theme.button.font_size.get(),
+        );
     }
 }

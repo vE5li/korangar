@@ -25,10 +25,10 @@ impl PrototypeWindow for CharacterSelectionWindow {
             .map(|slot| CharacterPreview::new(self.characters.clone(), self.move_request.clone(), slot).wrap())
             .collect();
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Character Selection".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(size_bound!(400 > 700 < 1000, ?))
+            .with_size_bound(size_bound!(400 > 700 < 1000, ?))
             .with_elements(elements)
             .with_theme_kind(ThemeKind::Menu)
             .build(window_cache, interface_settings, available_space)

@@ -30,10 +30,10 @@ impl PrototypeWindow for SelectServerWindow {
             })
             .collect();
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Select Server".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .with_theme_kind(ThemeKind::Menu)
             .build(window_cache, interface_settings, available_space)

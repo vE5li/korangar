@@ -20,10 +20,10 @@ impl PrototypeWindow for EquipmentWindow {
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let elements = vec![EquipmentContainer::new(self.items.clone()).wrap()];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Equipment".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(size_bound!(150 > 200 < 300, ?))
+            .with_size_bound(size_bound!(150 > 200 < 300, ?))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

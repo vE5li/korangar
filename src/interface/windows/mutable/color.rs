@@ -25,9 +25,9 @@ impl PrototypeWindow for ColorWindow {
 
         let elements = vec![Expandable::new("rgb".to_string(), rgb_elements, true).wrap()];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title(self.name.to_string())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

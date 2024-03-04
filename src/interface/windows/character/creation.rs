@@ -51,10 +51,10 @@ impl PrototypeWindow for CharacterCreationWindow {
                 .wrap(),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Create Character".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .with_theme_kind(ThemeKind::Menu)

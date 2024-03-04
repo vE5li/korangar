@@ -67,9 +67,9 @@ impl PrototypeWindow for ChatWindow {
             .wrap(),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(size_bound!(200 > 500 < 800, 100 > 100 < 600))
+            .with_size_bound(size_bound!(200 > 500 < 800, 100 > 100 < 600))
             .with_background_color(Box::new(|theme| theme.chat.background_color.get()))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)

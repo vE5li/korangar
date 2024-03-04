@@ -60,10 +60,10 @@ impl PrototypeWindow for ProfilerWindow {
             )),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Profiler".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(size_bound!(200 > 500 < 900, ?))
+            .with_size_bound(size_bound!(200 > 500 < 900, ?))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

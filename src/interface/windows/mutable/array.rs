@@ -38,9 +38,9 @@ where
             elements.push(Slider::new(pointer, minimum_value[index], maximum_value[index], self.change_event).wrap());
         }
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title(self.name.clone())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

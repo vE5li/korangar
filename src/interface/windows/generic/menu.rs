@@ -75,10 +75,10 @@ impl PrototypeWindow for MenuWindow {
             Button::default().with_text("Exit").with_event(UserEvent::Exit).wrap(),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Menu".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

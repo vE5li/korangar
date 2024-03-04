@@ -18,9 +18,9 @@ impl PrototypeWindow for ErrorWindow {
                 .wrap(),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Error".to_string())
-            .with_size(size_bound!(300 > 400 < 500, ?))
+            .with_size_bound(size_bound!(300 > 400 < 500, ?))
             .with_elements(elements)
             .closable()
             .with_theme_kind(ThemeKind::Menu)

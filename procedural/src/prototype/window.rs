@@ -28,10 +28,10 @@ pub fn derive_prototype_window_struct(
                 let scroll_view = crate::interface::ScrollView::new(vec![#(#initializers),*], size_bound!(100%, super > ? < super));
                 let elements: Vec<crate::interface::ElementCell> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
 
-                crate::interface::WindowBuilder::default()
+                crate::interface::WindowBuilder::new()
                     .with_title(#window_title.to_string())
                     .with_class_option(#window_class_option)
-                    .with_size(crate::interface::SizeBound::DEFAULT_FULLY_BOUNDED)
+                    .with_size_bound(crate::interface::SizeBound::DEFAULT_FULLY_BOUNDED)
                     .with_elements(elements)
                     .closable()
                     .build(window_cache, interface_settings, available_space)

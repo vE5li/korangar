@@ -61,10 +61,10 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
             ScrollView::new(elements, size_bound!(100%, ? < super)).wrap(),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Network".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(size_bound!(300 > 400 < 500, ? < 80%))
+            .with_size_bound(size_bound!(300 > 400 < 500, ? < 80%))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

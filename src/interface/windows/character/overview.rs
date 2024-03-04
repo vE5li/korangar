@@ -42,10 +42,10 @@ impl PrototypeWindow for CharacterOverviewWindow {
             Button::default().with_text("Menu").with_event(UserEvent::OpenMenuWindow).wrap(),
         ];
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Character Overview".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

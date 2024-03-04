@@ -52,10 +52,10 @@ impl PrototypeWindow for MapsWindow {
             })
             .collect();
 
-        WindowBuilder::default()
+        WindowBuilder::new()
             .with_title("Maps".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeBound::DEFAULT_UNBOUNDED)
+            .with_size_bound(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

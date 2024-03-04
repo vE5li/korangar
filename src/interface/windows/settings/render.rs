@@ -2,10 +2,11 @@ use crate::input::UserEvent;
 use crate::interface::*;
 
 macro render_state_button($display:expr, $event:expr, $selector:ident) {
-    StateButton::default()
+    StateButtonBuilder::new()
         .with_text($display)
         .with_selector(|state_provider| state_provider.render_settings.$selector)
         .with_event($event)
+        .build()
         .wrap()
 }
 

@@ -128,6 +128,7 @@ impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
     WindowBuilder<TITLE, CLOSABLE, CLASS, With<SizeBound>, With<Vec<ElementCell>>, BACKGROUND, THEME>
 {
     /// Take the builder and turn it into a [`Window`].
+    ///
     /// NOTE: This method is only available if
     /// [`with_size_bound`](Self::with_size_bound) and
     /// [`with_elements`](Self::with_elements) have been called on the builder.
@@ -147,7 +148,7 @@ impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
         let mut elements = elements.take();
 
         if closable {
-            let close_button = CloseButton::default().wrap();
+            let close_button = CloseButtonBuilder::new().build().wrap();
             elements.insert(0, close_button);
         }
 

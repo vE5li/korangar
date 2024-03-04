@@ -41,10 +41,11 @@ impl PrototypeWindow for GraphicsSettingsWindow {
         if self.present_mode_info.supports_immediate || self.present_mode_info.supports_mailbox {
             elements.insert(
                 0,
-                StateButton::default()
+                StateButtonBuilder::new()
                     .with_text("Framerate limit")
                     .with_selector(|state_provider| state_provider.graphics_settings.frame_limit)
                     .with_event(UserEvent::ToggleFrameLimit)
+                    .build()
                     .wrap(),
             );
         }

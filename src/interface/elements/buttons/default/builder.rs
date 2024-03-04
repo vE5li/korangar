@@ -108,6 +108,11 @@ where
     TEXT: AsRef<str> + 'static,
     EVENT: ElementEvent + 'static,
 {
+    /// Take the builder and turn it into a [`Button`].
+    ///
+    /// NOTE: This method is only available if [`with_text`](Self::with_text)
+    /// and [`with_event`](Self::with_event) have been called on
+    /// the builder.
     pub fn build(self) -> Button<TEXT, EVENT> {
         let Self {
             text,

@@ -1,77 +1,32 @@
+mod builder;
+
 use procedural::dimension_bound;
 
+pub use self::builder::StateButtonBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
+type StateSelector = Box<dyn Fn(&StateProvider) -> bool + 'static>;
+
 // FIX: State button won't redraw just because the state changes
-pub struct StateButton<T, E>
+pub struct StateButton<TEXT, EVENT>
 where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
+    TEXT: AsRef<str> + 'static,
+    EVENT: ElementEvent + 'static,
 {
-    text: Option<T>,
-    selector: Option<Box<dyn Fn(&StateProvider) -> bool>>,
-    event: Option<E>,
+    text: TEXT,
+    event: EVENT,
+    selector: StateSelector,
     width_bound: Option<DimensionBound>,
     transparent_background: bool,
     state: ElementState,
 }
 
-// HACK: Workaround for Rust incorrect trait bounds when deriving Option<T>
-// where T: !Default.
-impl<T, E> Default for StateButton<T, E>
+impl<TEXT, EVENT> Element for StateButton<TEXT, EVENT>
 where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
-{
-    fn default() -> Self {
-        Self {
-            text: Default::default(),
-            selector: Default::default(),
-            event: Default::default(),
-            width_bound: Default::default(),
-            transparent_background: Default::default(),
-            state: Default::default(),
-        }
-    }
-}
-
-impl<T, E> StateButton<T, E>
-where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
-{
-    pub fn with_text(mut self, text: T) -> Self {
-        self.text = Some(text);
-        self
-    }
-
-    pub fn with_selector(mut self, selector: impl Fn(&StateProvider) -> bool + 'static) -> Self {
-        self.selector = Some(Box::new(selector));
-        self
-    }
-
-    pub fn with_event(mut self, event: E) -> Self {
-        self.event = Some(event);
-        self
-    }
-
-    pub fn with_transparent_background(mut self) -> Self {
-        self.transparent_background = true;
-        self
-    }
-
-    pub fn with_width(mut self, width_bound: DimensionBound) -> Self {
-        self.width_bound = Some(width_bound);
-        self
-    }
-}
-
-impl<T, E> Element for StateButton<T, E>
-where
-    T: AsRef<str> + 'static,
-    E: ElementEvent + 'static,
+    TEXT: AsRef<str> + 'static,
+    EVENT: ElementEvent + 'static,
 {
     fn get_state(&self) -> &ElementState {
         &self.state
@@ -99,7 +54,7 @@ where
     }
 
     fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction> {
-        self.event.as_mut().map(|event| event.trigger()).unwrap_or_default()
+        self.event.trigger()
     }
 
     fn render(
@@ -140,16 +95,14 @@ where
             theme.button.icon_offset.get(),
             theme.button.icon_size.get(),
             foreground_color,
-            (self.selector.as_ref().unwrap())(state_provider),
+            (self.selector)(state_provider),
         );
 
-        if let Some(text) = &self.text {
-            renderer.render_text(
-                text.as_ref(),
-                theme.button.icon_text_offset.get(),
-                foreground_color,
-                theme.button.font_size.get(),
-            );
-        }
+        renderer.render_text(
+            self.text.as_ref(),
+            theme.button.icon_text_offset.get(),
+            foreground_color,
+            theme.button.font_size.get(),
+        );
     }
 }

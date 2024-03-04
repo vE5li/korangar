@@ -40,6 +40,7 @@ impl<TITLE> DragButtonBuilder<TITLE, Unset> {
 
 impl DragButtonBuilder<With<String>, With<DimensionBound>> {
     /// Take the builder and turn it into a [`DragButton`].
+    ///
     /// NOTE: This method is only available if [`with_title`](Self::with_title)
     /// and [`with_width_bound`](Self::with_width_bound) have been called on
     /// the builder.

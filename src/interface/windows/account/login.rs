@@ -214,17 +214,19 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
             InputField::<24, true>::new(password, "Password", password_action, dimension_bound!(100%)).wrap(),
             Container::new({
                 vec![
-                    StateButton::default()
+                    StateButtonBuilder::new()
                         .with_text("Remember username")
                         .with_selector(remember_username_selector)
                         .with_event(remember_username_action)
                         .with_transparent_background()
+                        .build()
                         .wrap(),
-                    StateButton::default()
+                    StateButtonBuilder::new()
                         .with_text("Remember password")
                         .with_selector(remember_password_selector)
                         .with_event(remember_password_action)
                         .with_transparent_background()
+                        .build()
                         .wrap(),
                 ]
             })

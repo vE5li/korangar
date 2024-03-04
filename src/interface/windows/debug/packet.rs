@@ -47,17 +47,19 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
                 .with_width_bound(dimension_bound!(33.33%))
                 .build()
                 .wrap(),
-            StateButton::default()
+            StateButtonBuilder::new()
                 .with_text("Show pings")
                 .with_selector(self.show_pings.selector())
                 .with_event(self.show_pings.toggle_action())
-                .with_width(dimension_bound!(33.33%))
+                .with_width_bound(dimension_bound!(33.33%))
+                .build()
                 .wrap(),
-            StateButton::default()
+            StateButtonBuilder::new()
                 .with_text("Update")
                 .with_selector(self.update.selector())
                 .with_event(self.update.toggle_action())
-                .with_width(dimension_bound!(!))
+                .with_width_bound(dimension_bound!(!))
+                .build()
                 .wrap(),
             ScrollView::new(elements, size_bound!(100%, ? < super)).wrap(),
         ];

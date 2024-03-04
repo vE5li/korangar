@@ -1,8 +1,10 @@
+mod builder;
+
+pub use self::builder::CloseButtonBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::*;
 
-#[derive(Default)]
 pub struct CloseButton {
     state: ElementState,
 }

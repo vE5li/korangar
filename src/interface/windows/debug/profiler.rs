@@ -42,17 +42,19 @@ impl PrototypeWindow for ProfilerWindow {
                 .with_width(dimension_bound!(150))
                 .with_event(Box::new(Vec::new))
                 .wrap(),
-            StateButton::default()
+            StateButtonBuilder::new()
                 .with_text("Always update")
                 .with_selector(self.always_update.selector())
                 .with_event(self.always_update.toggle_action())
-                .with_width(dimension_bound!(150))
+                .with_width_bound(dimension_bound!(150))
+                .build()
                 .wrap(),
-            StateButton::default()
+            StateButtonBuilder::new()
                 .with_text("Halt")
                 .with_selector(|_: &StateProvider| is_profiler_halted())
                 .with_event(Box::new(toggle_halting))
-                .with_width(dimension_bound!(150))
+                .with_width_bound(dimension_bound!(150))
+                .build()
                 .wrap(),
             ElementWrap::wrap(FrameView::new(
                 self.always_update.new_remote(),

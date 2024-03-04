@@ -19,11 +19,12 @@ enum MarkerEncoding {
 /// value of 16384 for the X channel, which for Ragnarok Online is plenty.
 ///
 /// If the `debug` feature is enabled, the most significant byte can contain a
-/// value matching that of a [`MarkerEncoding`]. If that is the case, the
-/// remaining 3 bytes are to be interpreted as the value of the marker.
+/// value matching that of a `MarkerEncoding` (private enum). If that is the
+/// case, the remaining 3 bytes are to be interpreted as the value of the
+/// marker.
 ///
 /// If the most significant bit is not set and the first byte does not match any
-/// [`MarkerEncoding`], an entity is encoded. This way we can use the full 32
+/// `MarkerEncoding`, an entity is encoded. This way we can use the full 32
 /// bits to store the 32 bit [`EntityId`].
 #[derive(Debug, PartialEq, Eq)]
 pub enum PickerTarget {

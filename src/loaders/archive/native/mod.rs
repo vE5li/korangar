@@ -21,9 +21,8 @@ use crate::loaders::archive::Archive;
 use crate::loaders::{ByteStream, FixedByteSize, FromBytes};
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
-/// Each GRF contains an [`ArchiveHeader`] with metadata (number of files, size,
-/// etc.) and a table [`AssetTable`] with information ([`AssetInformation`])
-/// about individual assets.
+/// Each GRF contains a [`Header`] with metadata (number of files, size,
+/// etc.) and a table [`AssetTable`] with information about individual assets.
 type FileTable = HashMap<String, FileTableRow>;
 
 pub struct NativeArchive {

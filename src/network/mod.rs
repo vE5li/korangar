@@ -110,22 +110,22 @@ where
 
 /// An event triggered by the map server.
 pub enum NetworkEvent {
-    /// Add an entity to the list of entities that the client is aware of
+    /// Add an entity to the list of entities that the client is aware of.
     AddEntity(EntityData),
     /// Remove an entity from the list of entities that the client is aware of
-    /// by its id
+    /// by its id.
     RemoveEntity(EntityId),
-    /// The player is pathing to a new position
+    /// The player is pathing to a new position.
     PlayerMove(Vector2<usize>, Vector2<usize>, ClientTick),
-    /// An Entity nearby is pathing to a new position
+    /// An Entity nearby is pathing to a new position.
     EntityMove(EntityId, Vector2<usize>, Vector2<usize>, ClientTick),
     /// Player was moved to a new position on a different map or the current map
     ChangeMap(String, Vector2<usize>),
-    /// Update the client side [tick
-    /// counter](crate::system::GameTimer::client_tick) to keep server and
-    /// client synchronized
+    /// Update the client side [`tick
+    /// counter`](crate::system::GameTimer::base_client_tick) to keep server and
+    /// client synchronized.
     UpdateClientTick(ClientTick),
-    /// New chat message for the client
+    /// New chat message for the client.
     ChatMessage(ChatMessage),
     /// Update entity details. Mostly received when the client sends
     /// [RequestDetailsPacket] after the player hovered an entity.

@@ -11,7 +11,7 @@ use super::ServiceId;
 /// Usually, it uses the *clientinfo.xml* file inside the data folder.
 /// But it can use *sclientinfo.xml* if this one exists.
 ///
-/// See more: https://github.com/rathena/rathena/wiki/Clientinfo.xml
+/// See more: <https://github.com/rathena/rathena/wiki/Clientinfo.xml>
 #[derive(Default, Debug, Deserialize)]
 pub struct ClientInfo {
     /// ClientInfo's description.
@@ -63,7 +63,7 @@ pub struct ClientInfo {
     #[serde(default, alias = "readfolder", deserialize_with = "bool_deserializer")]
     pub read_folder: bool,
 
-    /// Defines each available connection on the Service Select screen
+    /// Defines each available connection on the Service Select screen.
     #[serde(default, alias = "connection")]
     pub services: Vec<Service>,
 }
@@ -130,18 +130,18 @@ impl Service {
     }
 }
 
-/// The ClientInfo Service's Account ID structure
+/// The ClientInfo Service's Account ID structure.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct GameMasterAccount {
-    /// GM's Account ID
+    /// GM's Account ID.
     #[serde(alias = "admin")]
     pub account_id: Option<i32>,
 }
 
-/// The ClientInfo Service's Loading Image structure
+/// The ClientInfo Service's Loading Image structure.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct LoadingImage {
-    /// File name
+    /// File name.
     #[serde(alias = "image")]
     pub filename: Option<String>,
 }

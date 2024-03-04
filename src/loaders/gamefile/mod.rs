@@ -1,6 +1,6 @@
 //! Manages archives where game assets are stored and provides convenient
 //! methods to retrieve each of them individually. The archives implement the
-//! [`Archive`](crate::loaders::archive::Archive) trait.
+//! [`Archive`] trait.
 mod list;
 
 use core::panic;
@@ -29,11 +29,9 @@ pub const FALLBACK_ACTIONS_FILE: &str = "data\\sprite\\npc\\missing.act";
 /// Type implementing the game files loader.
 ///
 /// Currently, there are two types implementing
-/// [`Archive`](crate::loaders::archive::Archive):
-/// - [`NativeArchive`](crate::loaders::archive::native::NativeArchive) -
-///   Retrieve assets from GRF files.
-/// - [`FolderArchive`](crate::loaders::archive::folder::FolderArchive) -
-///   Retrieve assets from an OS folder.
+/// [`Archive`]:
+/// - [`NativeArchive`] - Retrieve assets from GRF files.
+/// - [`FolderArchive`] - Retrieve assets from an OS folder.
 #[derive(Default)]
 pub struct GameFileLoader {
     archives: Vec<Box<dyn Archive>>,

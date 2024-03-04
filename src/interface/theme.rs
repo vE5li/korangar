@@ -34,7 +34,7 @@ pub struct ButtonTheme {
     pub icon_text_offset: MutableRange<ScreenPosition, Render>,
     pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
-    pub height_constraint: DimensionConstraint,
+    pub height_bound: DimensionBound,
 }
 
 impl ThemeDefault<Menu> for ButtonTheme {
@@ -69,7 +69,7 @@ impl ThemeDefault<Menu> for ButtonTheme {
                 ScreenPosition { left: 100.0, top: 20.0 },
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            height_constraint: dimension!(26),
+            height_bound: dimension_bound!(26),
         }
     }
 }
@@ -102,7 +102,7 @@ impl ThemeDefault<Main> for ButtonTheme {
                 ScreenPosition { left: 100.0, top: 20.0 },
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            height_constraint: dimension!(16),
+            height_bound: dimension_bound!(16),
         }
     }
 }
@@ -118,7 +118,7 @@ pub struct WindowTheme {
     pub text_offset: MutableRange<ScreenPosition, Render>,
     pub gaps: MutableRange<ScreenSize, Resolve>,
     pub font_size: MutableRange<f32, Render>,
-    pub title_height: DimensionConstraint,
+    pub title_height: DimensionBound,
 }
 
 impl ThemeDefault<Menu> for WindowTheme {
@@ -145,7 +145,7 @@ impl ThemeDefault<Menu> for WindowTheme {
                 ScreenSize::uniform(20.0),
             ),
             font_size: MutableRange::new(20.0, 6.0, 30.0),
-            title_height: dimension!(30),
+            title_height: dimension_bound!(30),
         }
     }
 }
@@ -174,7 +174,7 @@ impl ThemeDefault<Main> for WindowTheme {
                 ScreenSize::uniform(20.0),
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            title_height: dimension!(12),
+            title_height: dimension_bound!(12),
         }
     }
 }
@@ -264,7 +264,7 @@ pub struct LabelTheme {
     pub corner_radius: MutableRange<CornerRadius, Render>,
     pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
-    pub size_constraint: SizeConstraint,
+    pub size_bound: SizeBound,
 }
 
 impl ThemeDefault<Menu> for LabelTheme {
@@ -279,7 +279,7 @@ impl ThemeDefault<Menu> for LabelTheme {
                 ScreenPosition::uniform(20.0),
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(120 > 50% < 300, 0),
+            size_bound: size_bound!(120 > 50% < 300, 0),
         }
     }
 }
@@ -296,7 +296,7 @@ impl ThemeDefault<Main> for LabelTheme {
                 ScreenPosition::uniform(20.0),
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(120 > 50% < 300, 0),
+            size_bound: size_bound!(120 > 50% < 300, 0),
         }
     }
 }
@@ -309,7 +309,7 @@ pub struct ValueTheme {
     pub corner_radius: MutableRange<CornerRadius, Render>,
     pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
-    pub size_constraint: SizeConstraint,
+    pub size_bound: SizeBound,
 }
 
 impl ThemeDefault<Menu> for ValueTheme {
@@ -325,7 +325,7 @@ impl ThemeDefault<Menu> for ValueTheme {
                 ScreenPosition::uniform(20.0),
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(60 > !, 14),
+            size_bound: size_bound!(60 > !, 14),
         }
     }
 }
@@ -343,7 +343,7 @@ impl ThemeDefault<Main> for ValueTheme {
                 ScreenPosition::uniform(20.0),
             ),
             font_size: MutableRange::new(14.0, 6.0, 30.0),
-            size_constraint: constraint!(60 > !, 14),
+            size_bound: size_bound!(60 > !, 14),
         }
     }
 }
@@ -356,7 +356,7 @@ pub struct CloseButtonTheme {
     pub corner_radius: MutableRange<CornerRadius, Render>,
     pub text_offset: MutableRange<ScreenPosition, Render>,
     pub font_size: MutableRange<f32, Render>,
-    pub size_constraint: SizeConstraint,
+    pub size_bound: SizeBound,
 }
 
 impl ThemeDefault<Menu> for CloseButtonTheme {
@@ -376,7 +376,7 @@ impl ThemeDefault<Menu> for CloseButtonTheme {
                 ScreenPosition::uniform(20.0),
             ),
             font_size: MutableRange::new(20.0, 6.0, 30.0),
-            size_constraint: constraint!(26, 26),
+            size_bound: size_bound!(26, 26),
         }
     }
 }
@@ -394,7 +394,7 @@ impl ThemeDefault<Main> for CloseButtonTheme {
                 ScreenPosition::uniform(20.0),
             ),
             font_size: MutableRange::new(12.0, 6.0, 30.0),
-            size_constraint: constraint!(25, 12),
+            size_bound: size_bound!(25, 12),
         }
     }
 }
@@ -425,7 +425,7 @@ pub struct SliderTheme {
     pub background_color: Mutable<Color, Render>,
     pub rail_color: Mutable<Color, Render>,
     pub knob_color: Mutable<Color, Render>,
-    pub size_constraint: SizeConstraint,
+    pub size_bound: SizeBound,
 }
 
 impl ThemeDefault<Menu> for SliderTheme {
@@ -434,7 +434,7 @@ impl ThemeDefault<Menu> for SliderTheme {
             background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
             rail_color: Mutable::new(Color::rgb_u8(150, 130, 150)),
             knob_color: Mutable::new(Color::rgb_u8(100, 180, 180)),
-            size_constraint: constraint!(100%, 18),
+            size_bound: size_bound!(100%, 18),
         }
     }
 }
@@ -445,7 +445,7 @@ impl ThemeDefault<Main> for SliderTheme {
             background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
             rail_color: Mutable::new(Color::rgb_u8(150, 130, 150)),
             knob_color: Mutable::new(Color::rgb_u8(100, 180, 180)),
-            size_constraint: constraint!(100%, 18),
+            size_bound: size_bound!(100%, 18),
         }
     }
 }
@@ -463,7 +463,7 @@ pub struct InputTheme {
     pub text_offset: MutableRange<ScreenPosition, Render>,
     pub cursor_offset: MutableRange<f32, Render>,
     pub cursor_width: MutableRange<f32, Render>,
-    pub height_constraint: DimensionConstraint,
+    pub height_bound: DimensionBound,
 }
 
 impl ThemeDefault<Menu> for InputTheme {
@@ -488,7 +488,7 @@ impl ThemeDefault<Menu> for InputTheme {
             ),
             cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
             cursor_width: MutableRange::new(3.0, 2.0, 30.0),
-            height_constraint: dimension!(26),
+            height_bound: dimension_bound!(26),
         }
     }
 }
@@ -511,7 +511,7 @@ impl ThemeDefault<Main> for InputTheme {
             ),
             cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
             cursor_width: MutableRange::new(3.0, 2.0, 30.0),
-            height_constraint: dimension!(15),
+            height_bound: dimension_bound!(15),
         }
     }
 }
@@ -731,23 +731,23 @@ impl PrototypeElement for ThemeSelector {
                 ])
                 .with_selected(theme_kind)
                 .with_event(Box::new(Vec::new))
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
-            InputField::<40>::new(theme_name, "Theme name", name_action, dimension!(75%)).wrap(),
+            InputField::<40>::new(theme_name, "Theme name", name_action, dimension_bound!(75%)).wrap(),
             Button::default()
                 .with_text("Load")
                 .with_event(load_action)
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
             Button::default()
                 .with_text("Save theme")
                 .with_event(save_action)
-                .with_width(dimension!(50%))
+                .with_width(dimension_bound!(50%))
                 .wrap(),
             Button::default()
                 .with_text("Reload theme")
                 .with_event(reload_action)
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
         ];
 

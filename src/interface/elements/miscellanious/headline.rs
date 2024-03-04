@@ -7,13 +7,13 @@ use crate::interface::{Element, *};
 #[derive(new)]
 pub struct Headline {
     display: String,
-    size_constraint: SizeConstraint,
+    size_bound: SizeBound,
     #[new(default)]
     state: ElementState,
 }
 
 impl Headline {
-    pub const DEFAULT_SIZE: SizeConstraint = constraint!(100%, 12);
+    pub const DEFAULT_SIZE: SizeBound = size_bound!(100%, 12);
 }
 
 impl Element for Headline {
@@ -30,7 +30,7 @@ impl Element for Headline {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
-        self.state.resolve(placement_resolver, &self.size_constraint);
+        self.state.resolve(placement_resolver, &self.size_bound);
     }
 
     fn render(

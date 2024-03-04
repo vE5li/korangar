@@ -1,4 +1,4 @@
-use crate::interface::{InterfaceSettings, PrototypeWindow, ScreenSize, SizeConstraint, Window, WindowBuilder, WindowCache};
+use crate::interface::{InterfaceSettings, PrototypeWindow, ScreenSize, SizeBound, Window, WindowBuilder, WindowCache};
 
 #[derive(Default)]
 pub struct AudioSettingsWindow;
@@ -18,7 +18,7 @@ impl PrototypeWindow for AudioSettingsWindow {
         WindowBuilder::default()
             .with_title("Audio Settings".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

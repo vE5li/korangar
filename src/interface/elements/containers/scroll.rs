@@ -10,12 +10,12 @@ pub struct ScrollView {
     scroll: f32,
     children_height: f32,
     state: ContainerState,
-    size_constraint: SizeConstraint,
+    size_bound: SizeBound,
     background_color: Option<ColorSelector>,
 }
 
 impl ScrollView {
-    pub fn new(elements: Vec<ElementCell>, size_constraint: SizeConstraint) -> Self {
+    pub fn new(elements: Vec<ElementCell>, size_bound: SizeBound) -> Self {
         let scroll = 0.0;
         let children_height = 0.0;
         let state = ContainerState::new(elements);
@@ -25,7 +25,7 @@ impl ScrollView {
             scroll,
             children_height,
             state,
-            size_constraint,
+            size_bound,
             background_color,
         }
     }
@@ -72,7 +72,7 @@ impl Element for ScrollView {
             placement_resolver,
             interface_settings,
             theme,
-            &self.size_constraint,
+            &self.size_bound,
             ScreenSize::default(),
         );
         self.clamp_scroll();

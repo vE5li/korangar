@@ -55,11 +55,10 @@ impl ContainerState {
         placement_resolver: &mut PlacementResolver,
         interface_settings: &InterfaceSettings,
         theme: &InterfaceTheme,
-        size_constraint: &SizeConstraint,
+        size_bound: &SizeBound,
         border: ScreenSize,
     ) -> f32 {
-        let (mut inner_placement_resolver, mut size, position) =
-            placement_resolver.derive(size_constraint, ScreenPosition::default(), border);
+        let (mut inner_placement_resolver, mut size, position) = placement_resolver.derive(size_bound, ScreenPosition::default(), border);
         let parent_limits = inner_placement_resolver.get_parent_limits();
 
         // TODO: add ability to pass this in (by calling .with_gaps(..) on the
@@ -73,8 +72,8 @@ impl ContainerState {
 
         let final_height = inner_placement_resolver.final_height();
 
-        if size_constraint.height.is_flexible() {
-            let final_height = size_constraint.validated_height(
+        if size_bound.height.is_flexible() {
+            let final_height = size_bound.validated_height(
                 final_height,
                 placement_resolver.get_available().height,
                 placement_resolver.get_available().height,

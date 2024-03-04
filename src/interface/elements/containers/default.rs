@@ -7,7 +7,7 @@ use crate::input::MouseInputMode;
 use crate::interface::{Element, *};
 
 pub struct Container {
-    size_constraint: Option<SizeConstraint>,
+    size_bound: Option<SizeBound>,
     border_size: Option<ScreenSize>,
     state: ContainerState,
 }
@@ -17,12 +17,12 @@ impl Container {
         Self {
             state: ContainerState::new(elements),
             border_size: None,
-            size_constraint: None,
+            size_bound: None,
         }
     }
 
-    pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
-        self.size_constraint = Some(size_constraint);
+    pub fn with_size(mut self, size_bound: SizeBound) -> Self {
+        self.size_bound = Some(size_bound);
         self
     }
 }
@@ -53,11 +53,11 @@ impl Element for Container {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = self.size_constraint.as_ref().unwrap_or(&constraint!(100%, ?));
+        let size_bound = self.size_bound.as_ref().unwrap_or(&size_bound!(100%, ?));
         let border = self.border_size.unwrap_or_default();
 
         self.state
-            .resolve(placement_resolver, interface_settings, theme, size_constraint, border);
+            .resolve(placement_resolver, interface_settings, theme, size_bound, border);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

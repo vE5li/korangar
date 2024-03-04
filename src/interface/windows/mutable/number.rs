@@ -24,7 +24,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow f
 
         WindowBuilder::default()
             .with_title(self.name.clone())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

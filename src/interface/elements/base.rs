@@ -158,8 +158,8 @@ impl ElementState {
         self.parent_element = weak_parent;
     }
 
-    pub fn resolve(&mut self, placement_resolver: &mut PlacementResolver, size_constraint: &SizeConstraint) {
-        let (size, position) = placement_resolver.allocate(size_constraint);
+    pub fn resolve(&mut self, placement_resolver: &mut PlacementResolver, size_bound: &SizeBound) {
+        let (size, position) = placement_resolver.allocate(size_bound);
         self.cached_size = size.finalize();
         self.cached_position = position;
     }

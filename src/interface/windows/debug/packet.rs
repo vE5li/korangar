@@ -44,27 +44,27 @@ impl<const N: usize> PrototypeWindow for PacketWindow<N> {
                 .with_text("Clear")
                 .with_disabled_selector(clear_selector)
                 .with_event(Box::new(clear_action))
-                .with_width(dimension!(33.33%))
+                .with_width(dimension_bound!(33.33%))
                 .wrap(),
             StateButton::default()
                 .with_text("Show pings")
                 .with_selector(self.show_pings.selector())
                 .with_event(self.show_pings.toggle_action())
-                .with_width(dimension!(33.33%))
+                .with_width(dimension_bound!(33.33%))
                 .wrap(),
             StateButton::default()
                 .with_text("Update")
                 .with_selector(self.update.selector())
                 .with_event(self.update.toggle_action())
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
-            ScrollView::new(elements, constraint!(100%, ? < super)).wrap(),
+            ScrollView::new(elements, size_bound!(100%, ? < super)).wrap(),
         ];
 
         WindowBuilder::default()
             .with_title("Network".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(300 > 400 < 500, ? < 80%))
+            .with_size(size_bound!(300 > 400 < 500, ? < 80%))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

@@ -21,7 +21,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
         let mut elements = vec![
-            Text::default().with_text("Shadow detail").with_width(dimension!(50%)).wrap(),
+            Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(vec![
                     ("Low", ShadowDetail::Low),
@@ -31,7 +31,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
                 ])
                 .with_selected(self.shadow_detail.clone())
                 .with_event(Box::new(Vec::new))
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
             interface_settings.to_element("Interface settings".to_string()),
         ];
@@ -52,7 +52,7 @@ impl PrototypeWindow for GraphicsSettingsWindow {
         WindowBuilder::default()
             .with_title("Graphics Settings".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

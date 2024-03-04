@@ -19,7 +19,7 @@ impl PrototypeWindow for FrameInspectorWindow {
 
         WindowBuilder::default()
             .with_title("Frame Inspector".to_string())
-            .with_size(constraint!(200 > 500 < 900, ?))
+            .with_size(size_bound!(200 > 500 < 900, ?))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

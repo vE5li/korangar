@@ -42,19 +42,19 @@ impl PrototypeWindow for CharacterCreationWindow {
         let input_action = Box::new(move || vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
 
         let elements = vec![
-            InputField::<MAXIMUM_NAME_LENGTH>::new(name, "character name", input_action, dimension!(100%)).wrap(),
+            InputField::<MAXIMUM_NAME_LENGTH>::new(name, "character name", input_action, dimension_bound!(100%)).wrap(),
             Button::default()
                 .with_text("done")
                 .with_disabled_selector(selector)
                 .with_event(Box::new(action))
-                .with_width(dimension!(50%))
+                .with_width(dimension_bound!(50%))
                 .wrap(),
         ];
 
         WindowBuilder::default()
             .with_title("Create Character".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .with_theme_kind(ThemeKind::Menu)

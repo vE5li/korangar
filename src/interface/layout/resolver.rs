@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use cgmath::Vector2;
 
-use super::constraint::ParentLimits;
-use crate::interface::{PartialScreenSize, ScreenPosition, ScreenSize, SizeConstraint};
+use super::bound::ParentLimits;
+use crate::interface::{PartialScreenSize, ScreenPosition, ScreenSize, SizeBound};
 use crate::loaders::FontLoader;
 
 const ELEMENT_THRESHHOLD: f32 = 1.0000;
@@ -27,7 +27,7 @@ impl PlacementResolver {
     pub fn new(
         font_loader: Rc<RefCell<FontLoader>>,
         mut available_space: ScreenSize,
-        size_constraint: &SizeConstraint,
+        size_bound: &SizeBound,
         border: ScreenSize,
         gaps: ScreenSize,
         scaling: f32,
@@ -35,13 +35,13 @@ impl PlacementResolver {
         available_space.width -= border.width * scaling * 2.0;
         available_space.height -= border.height * scaling * 2.0;
 
-        let parent_limits = ParentLimits::from_constraints(size_constraint, available_space, scaling);
+        let parent_limits = ParentLimits::from_bound(size_bound, available_space, scaling);
         let base_position = ScreenPosition::from_size(border * scaling);
         let horizontal_accumulator = 0.0;
         let vertical_offset = 0.0;
         let total_height = 0.0;
 
-        let height = (!size_constraint.height.is_flexible()).then_some(available_space.height);
+        let height = (!size_bound.height.is_flexible()).then_some(available_space.height);
         let available_space = PartialScreenSize::new(available_space.width, height);
 
         Self {
@@ -60,11 +60,11 @@ impl PlacementResolver {
 
     pub fn derive(
         &mut self,
-        size_constraint: &SizeConstraint,
+        size_bound: &SizeBound,
         offset: ScreenPosition,
         border: ScreenSize,
     ) -> (Self, PartialScreenSize, ScreenPosition) {
-        let (size, position) = self.allocate(size_constraint);
+        let (size, position) = self.allocate(size_bound);
 
         let border_with_offset = (offset + border * self.scaling * 2.0) - ScreenPosition::default();
         let available_space = PartialScreenSize {
@@ -74,9 +74,7 @@ impl PlacementResolver {
 
         let font_loader = self.font_loader.clone();
         let unusable_space = (position + border_with_offset) - ScreenPosition::default();
-        let parent_limits = self
-            .parent_limits
-            .derive(size_constraint, available_space, unusable_space, self.scaling);
+        let parent_limits = self.parent_limits.derive(size_bound, available_space, unusable_space, self.scaling);
         let base_position = offset + border * self.scaling;
         let horizontal_accumulator = 0.0;
         let vertical_offset = 0.0;
@@ -142,23 +140,23 @@ impl PlacementResolver {
         self.vertical_offset = f32::max(self.vertical_offset, height);
     }
 
-    pub fn allocate(&mut self, size_constraint: &SizeConstraint) -> (PartialScreenSize, ScreenPosition) {
-        let is_width_absolute = size_constraint.width.is_absolute();
+    pub fn allocate(&mut self, size_bound: &SizeBound) -> (PartialScreenSize, ScreenPosition) {
+        let is_width_absolute = size_bound.width.is_absolute();
         let gaps_add = match is_width_absolute {
             true => self.gaps.width * 2.0,
             false => 0.0,
         };
 
         let mut remaining = self.get_remaining();
-        let mut size = size_constraint.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
+        let mut size = size_bound.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
         let mut gaps_subtract = 0.0;
 
         if remaining.width < size.width - REMAINDER_THRESHHOLD {
             self.newline();
             remaining = self.get_remaining();
 
-            if size_constraint.width.is_remaining() || size_constraint.height.is_remaining() {
-                size = size_constraint.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
+            if size_bound.width.is_remaining() || size_bound.height.is_remaining() {
+                size = size_bound.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
             }
 
             size.width = f32::min(size.width, self.available_space.width);
@@ -193,16 +191,16 @@ impl PlacementResolver {
         (size, position)
     }
 
-    pub fn allocate_right(&mut self, size_constraint: &SizeConstraint) -> (PartialScreenSize, ScreenPosition) {
+    pub fn allocate_right(&mut self, size_bound: &SizeBound) -> (PartialScreenSize, ScreenPosition) {
         let mut remaining = self.get_remaining();
-        let mut size = size_constraint.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
+        let mut size = size_bound.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
 
         if remaining.width < size.width - REMAINDER_THRESHHOLD + self.gaps.width * self.scaling {
             self.newline();
             remaining = self.get_remaining();
 
-            if size_constraint.width.is_remaining() || size_constraint.height.is_remaining() {
-                size = size_constraint.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
+            if size_bound.width.is_remaining() || size_bound.height.is_remaining() {
+                size = size_bound.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
             }
         }
 

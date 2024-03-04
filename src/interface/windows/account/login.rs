@@ -210,8 +210,8 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
                 .with_event(service_changed)
                 .wrap(),
             Text::default().with_text("Account data").wrap(),
-            InputField::<24>::new(username, "Username", username_action, dimension!(100%)).wrap(),
-            InputField::<24, true>::new(password, "Password", password_action, dimension!(100%)).wrap(),
+            InputField::<24>::new(username, "Username", username_action, dimension_bound!(100%)).wrap(),
+            InputField::<24, true>::new(password, "Password", password_action, dimension_bound!(100%)).wrap(),
             Container::new({
                 vec![
                     StateButton::default()
@@ -239,7 +239,7 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
         WindowBuilder::default()
             .with_title("Log In".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .with_theme_kind(ThemeKind::Menu)
             .build(window_cache, interface_settings, available_space)

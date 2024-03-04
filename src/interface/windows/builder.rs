@@ -1,4 +1,4 @@
-use procedural::dimension;
+use procedural::dimension_bound;
 
 use crate::interface::*;
 
@@ -6,7 +6,7 @@ use crate::interface::*;
 pub struct WindowBuilder {
     window_title: Option<String>,
     window_class: Option<String>,
-    size_constraint: Option<SizeConstraint>,
+    size_bound: Option<SizeBound>,
     elements: Vec<ElementCell>,
     closable: bool,
     background_color: Option<ColorSelector>,
@@ -29,8 +29,8 @@ impl WindowBuilder {
         Self { window_class, ..self }
     }
 
-    pub fn with_size(mut self, size_constraint: SizeConstraint) -> Self {
-        self.size_constraint = Some(size_constraint);
+    pub fn with_size(mut self, size_bound: SizeBound) -> Self {
+        self.size_bound = Some(size_bound);
         self
     }
 
@@ -57,14 +57,14 @@ impl WindowBuilder {
         let WindowBuilder {
             window_title,
             window_class,
-            size_constraint,
+            size_bound,
             mut elements,
             closable,
             background_color,
             theme_kind,
         } = self;
 
-        let size_constraint = size_constraint.expect("window must specify a size constraint");
+        let size_bound = size_bound.expect("window must specify a size bound");
 
         if closable {
             assert!(window_title.is_some(), "closable window must also have a title");
@@ -72,26 +72,26 @@ impl WindowBuilder {
             elements.insert(0, close_button);
         }
 
-        let width_constraint = match closable {
-            true => dimension!(70%),
-            false => dimension!(!),
+        let width_bound = match closable {
+            true => dimension_bound!(70%),
+            false => dimension_bound!(!),
         };
 
         if let Some(title) = window_title {
-            let drag_button = DragButton::new(title, width_constraint).wrap();
+            let drag_button = DragButton::new(title, width_bound).wrap();
             elements.insert(0, drag_button);
         }
 
-        let container_constraint = SizeConstraint {
+        let container_size_bound = SizeBound {
             width: Dimension::Relative(100.0),
-            minimum_width: size_constraint.minimum_width.map(|_| Dimension::Super),
-            maximum_width: size_constraint.maximum_width.map(|_| Dimension::Super),
+            minimum_width: size_bound.minimum_width.map(|_| Dimension::Super),
+            maximum_width: size_bound.maximum_width.map(|_| Dimension::Super),
             height: Dimension::Flexible,
-            minimum_height: size_constraint.minimum_height.map(|_| Dimension::Super),
-            maximum_height: size_constraint.maximum_height.map(|_| Dimension::Super),
+            minimum_height: size_bound.minimum_height.map(|_| Dimension::Super),
+            maximum_height: size_bound.maximum_height.map(|_| Dimension::Super),
         };
 
-        let elements = vec![Container::new(elements).with_size(container_constraint).wrap()];
+        let elements = vec![Container::new(elements).with_size(container_size_bound).wrap()];
 
         // very imporant: give every element a link to its parent to allow propagation
         // of events such as scrolling
@@ -106,21 +106,21 @@ impl WindowBuilder {
             .unzip();
 
         let size = cached_size
-            .map(|size| size_constraint.validated_window_size(size, available_space, interface_settings.scaling.get()))
+            .map(|size| size_bound.validated_window_size(size, available_space, interface_settings.scaling.get()))
             .unwrap_or_else(|| {
-                size_constraint
+                size_bound
                     .resolve_window(available_space, available_space, interface_settings.scaling.get())
                     .finalize_or(0.0)
             });
 
         let position = cached_position
-            .map(|position| size_constraint.validated_position(position, size, available_space))
+            .map(|position| size_bound.validated_position(position, size, available_space))
             .unwrap_or(ScreenPosition::from_size((available_space - size) / 2.0));
 
         Window {
             window_class,
             position,
-            size_constraint,
+            size_bound,
             size,
             elements,
             popup_element: None,

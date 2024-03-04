@@ -37,8 +37,8 @@ impl Element for FrameView {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
-        let size_constraint = &constraint!(100%, 300);
-        self.state.resolve(placement_resolver, size_constraint);
+        let size_bound = &size_bound!(100%, 300);
+        self.state.resolve(placement_resolver, size_bound);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

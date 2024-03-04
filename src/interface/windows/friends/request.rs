@@ -26,7 +26,7 @@ impl PrototypeWindow for FriendRequestWindow {
                     account_id: self.friend.account_id,
                     character_id: self.friend.character_id,
                 })
-                .with_width(dimension!(50%))
+                .with_width(dimension_bound!(50%))
                 .wrap(),
             Button::default()
                 .with_text("accept")
@@ -34,7 +34,7 @@ impl PrototypeWindow for FriendRequestWindow {
                     account_id: self.friend.account_id,
                     character_id: self.friend.character_id,
                 })
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
         ];
 
@@ -44,7 +44,7 @@ impl PrototypeWindow for FriendRequestWindow {
             // of the trait. This way we can open multiple windos of this type but we can still
             // close them with the class name.
             .with_class(Self::WINDOW_CLASS.to_owned())
-            .with_size(constraint!(250 > 250 < 250, ?))
+            .with_size(size_bound!(250 > 250 < 250, ?))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

@@ -49,11 +49,11 @@ impl syn::parse::Parse for Dimension {
     }
 }
 
-pub struct SizeConstraint {
+pub struct SizeBound {
     pub stream: TokenStream,
 }
 
-impl syn::parse::Parse for SizeConstraint {
+impl syn::parse::Parse for SizeBound {
     fn parse(input: syn::parse::ParseStream) -> Result<Self, syn::Error> {
         let first_dimension: Dimension = input.parse().unwrap();
 
@@ -83,7 +83,7 @@ impl syn::parse::Parse for SizeConstraint {
 
         assert!(
             input.lookahead1().peek(syn::Token![,]),
-            "constraint expected comma after first dimension"
+            "bound expected comma after first dimension"
         );
         input.parse::<Punct>().unwrap();
 
@@ -114,7 +114,7 @@ impl syn::parse::Parse for SizeConstraint {
         };
 
         let expanded = quote! {
-            crate::interface::SizeConstraint {
+            crate::interface::SizeBound {
                 width: #width,
                 minimum_width: #minimum_width,
                 maximum_width: #maximum_width,
@@ -124,15 +124,15 @@ impl syn::parse::Parse for SizeConstraint {
             }
         };
 
-        Ok(SizeConstraint { stream: expanded })
+        Ok(SizeBound { stream: expanded })
     }
 }
 
-pub struct DimensionConstraint {
+pub struct DimensionBound {
     pub stream: TokenStream,
 }
 
-impl syn::parse::Parse for DimensionConstraint {
+impl syn::parse::Parse for DimensionBound {
     fn parse(input: syn::parse::ParseStream) -> Result<Self, syn::Error> {
         let first_dimension: Dimension = input.parse().unwrap();
 
@@ -161,13 +161,13 @@ impl syn::parse::Parse for DimensionConstraint {
         };
 
         let expanded = quote! {
-            crate::interface::DimensionConstraint {
+            crate::interface::DimensionBound {
                 size: #size,
                 minimum_size: #minimum_size,
                 maximum_size: #maximum_size,
             }
         };
 
-        Ok(DimensionConstraint { stream: expanded })
+        Ok(DimensionBound { stream: expanded })
     }
 }

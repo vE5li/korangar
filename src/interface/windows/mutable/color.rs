@@ -27,7 +27,7 @@ impl PrototypeWindow for ColorWindow {
 
         WindowBuilder::default()
             .with_title(self.name.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

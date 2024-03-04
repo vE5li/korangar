@@ -28,7 +28,7 @@ impl PrototypeWindow for TimeWindow {
         WindowBuilder::default()
             .with_title("Time".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

@@ -79,7 +79,7 @@ impl Element for FriendView {
             placement_resolver,
             interface_settings,
             theme,
-            &constraint!(100%, ?),
+            &size_bound!(100%, ?),
             ScreenSize::default(),
         );
     }

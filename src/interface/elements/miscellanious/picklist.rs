@@ -1,4 +1,4 @@
-use procedural::{constraint, dimension};
+use procedural::{dimension_bound, size_bound};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -13,7 +13,7 @@ where
     options: Vec<(K, T)>,
     selected: Option<TrackedState<T>>,
     event: Option<E>,
-    width_constraint: Option<DimensionConstraint>,
+    width_bound: Option<DimensionBound>,
     state: ElementState,
     latest_position: Rc<RefCell<ScreenPosition>>,
     latest_size: Rc<RefCell<ScreenSize>>,
@@ -32,7 +32,7 @@ where
             options: Default::default(),
             selected: Default::default(),
             event: Default::default(),
-            width_constraint: Default::default(),
+            width_bound: Default::default(),
             state: Default::default(),
             latest_position: Rc::new(RefCell::new(ScreenPosition::default())),
             latest_size: Rc::new(RefCell::new(ScreenSize::default())),
@@ -61,8 +61,8 @@ where
         self
     }
 
-    pub fn with_width(mut self, width_constraint: DimensionConstraint) -> Self {
-        self.width_constraint = Some(width_constraint);
+    pub fn with_width(mut self, width_bound: DimensionBound) -> Self {
+        self.width_bound = Some(width_bound);
         self
     }
 }
@@ -82,13 +82,13 @@ where
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = self
-            .width_constraint
+        let size_bound = self
+            .width_bound
             .as_ref()
-            .unwrap_or(&dimension!(100%))
-            .add_height(theme.button.height_constraint);
+            .unwrap_or(&dimension_bound!(100%))
+            .add_height(theme.button.height_bound);
 
-        self.state.resolve(placement_resolver, &size_constraint);
+        self.state.resolve(placement_resolver, &size_bound);
 
         *self.latest_size.borrow_mut() = self.state.cached_size;
     }
@@ -136,7 +136,7 @@ where
             })
             .collect();
 
-        let element = ScrollView::new(options, constraint!(100%, super > ? < super))
+        let element = ScrollView::new(options, size_bound!(100%, super > ? < super))
             .with_background_color(|theme| theme.button.background_color.get())
             .wrap();
 

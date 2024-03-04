@@ -12,7 +12,7 @@ pub struct InputField<const LENGTH: usize, const HIDDEN: bool = false> {
     display: Rc<RefCell<String>>,
     ghost_text: &'static str,
     action: Box<dyn Fn() -> Vec<ClickAction>>,
-    width_constraint: DimensionConstraint,
+    width_bound: DimensionBound,
     #[new(default)]
     state: ElementState,
 }
@@ -51,8 +51,8 @@ impl<const LENGTH: usize, const HIDDEN: bool> Element for InputField<LENGTH, HID
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = self.width_constraint.add_height(theme.input.height_constraint);
-        self.state.resolve(placement_resolver, &size_constraint);
+        let size_bound = self.width_bound.add_height(theme.input.height_bound);
+        self.state.resolve(placement_resolver, &size_bound);
     }
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {

@@ -29,7 +29,7 @@ impl Element for ItemBox {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, _theme: &InterfaceTheme) {
-        self.state.resolve(placement_resolver, &constraint!(30, 30));
+        self.state.resolve(placement_resolver, &size_bound!(30, 30));
     }
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {

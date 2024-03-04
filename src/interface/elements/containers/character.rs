@@ -46,14 +46,14 @@ impl CharacterPreview {
                     .with_text("Switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
                     .with_background_color(|_| Color::rgb_u8(161, 141, 141))
-                    .with_width(dimension!(50%))
+                    .with_width(dimension_bound!(50%))
                     .wrap(),
                 Button::default()
                     .with_text("Delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
                     .with_background_color(|theme| theme.close_button.background_color.get())
                     .with_foreground_color(|theme| theme.close_button.foreground_color.get())
-                    .with_width(dimension!(50%))
+                    .with_width(dimension_bound!(50%))
                     .wrap(),
             ];
         }
@@ -105,12 +105,12 @@ impl Element for CharacterPreview {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = &constraint!(20%, 150);
+        let size_bound = &size_bound!(20%, 150);
         self.state.resolve(
             placement_resolver,
             interface_settings,
             theme,
-            size_constraint,
+            size_bound,
             ScreenSize::uniform(4.0),
         );
     }

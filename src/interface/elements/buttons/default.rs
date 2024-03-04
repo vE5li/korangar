@@ -1,4 +1,4 @@
-use procedural::dimension;
+use procedural::dimension_bound;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -14,7 +14,7 @@ where
     disabled_selector: Option<Selector>,
     foreground_color: Option<ColorSelector>,
     background_color: Option<ColorSelector>,
-    width_constraint: Option<DimensionConstraint>,
+    width_bound: Option<DimensionBound>,
     state: ElementState,
 }
 
@@ -32,7 +32,7 @@ where
             disabled_selector: Default::default(),
             foreground_color: Default::default(),
             background_color: Default::default(),
-            width_constraint: Default::default(),
+            width_bound: Default::default(),
             state: Default::default(),
         }
     }
@@ -68,8 +68,8 @@ where
         self
     }
 
-    pub fn with_width(mut self, width_constraint: DimensionConstraint) -> Self {
-        self.width_constraint = Some(width_constraint);
+    pub fn with_width(mut self, width_bound: DimensionBound) -> Self {
+        self.width_bound = Some(width_bound);
         self
     }
 
@@ -92,13 +92,13 @@ impl<T: AsRef<str> + 'static, E: ElementEvent> Element for Button<T, E> {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = self
-            .width_constraint
+        let size_bound = self
+            .width_bound
             .as_ref()
-            .unwrap_or(&dimension!(100%))
-            .add_height(theme.button.height_constraint);
+            .unwrap_or(&dimension_bound!(100%))
+            .add_height(theme.button.height_bound);
 
-        self.state.resolve(placement_resolver, &size_constraint);
+        self.state.resolve(placement_resolver, &size_bound);
     }
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation {

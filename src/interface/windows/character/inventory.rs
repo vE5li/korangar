@@ -23,7 +23,7 @@ impl PrototypeWindow for InventoryWindow {
         WindowBuilder::default()
             .with_title("Inventory".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(300 > 400 < 500, ? < 80%))
+            .with_size(size_bound!(300 > 400 < 500, ? < 80%))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

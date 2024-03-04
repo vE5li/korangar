@@ -17,7 +17,7 @@ impl Element for CloseButton {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let (size, position) = placement_resolver.allocate_right(&theme.close_button.size_constraint);
+        let (size, position) = placement_resolver.allocate_right(&theme.close_button.size_bound);
         self.state.cached_size = size.finalize();
         self.state.cached_position = position;
     }

@@ -9,8 +9,8 @@ use crate::interface::{Element, *};
 pub struct Expandable {
     display: String,
     expanded: bool,
-    open_size_constraint: SizeConstraint,
-    closed_size_constraint: SizeConstraint,
+    open_size_bound: SizeBound,
+    closed_size_bound: SizeBound,
     cached_closed_size: ScreenSize,
     state: ContainerState,
 }
@@ -22,8 +22,8 @@ impl Expandable {
         Self {
             display,
             expanded,
-            open_size_constraint: constraint!(100%, ?),
-            closed_size_constraint: constraint!(100%, 18),
+            open_size_bound: size_bound!(100%, ?),
+            closed_size_bound: size_bound!(100%, 18),
             cached_closed_size: ScreenSize::default(),
             state,
         }
@@ -58,7 +58,7 @@ impl Element for Expandable {
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
         let closed_size = self
-            .closed_size_constraint
+            .closed_size_bound
             .resolve_element(
                 placement_resolver.get_available(),
                 placement_resolver.get_remaining(),
@@ -67,16 +67,16 @@ impl Element for Expandable {
             )
             .finalize();
 
-        let size_constraint = match self.expanded && !self.state.elements.is_empty() {
-            true => &self.open_size_constraint,
-            false => &self.closed_size_constraint,
+        let size_bound = match self.expanded && !self.state.elements.is_empty() {
+            true => &self.open_size_bound,
+            false => &self.closed_size_bound,
         };
 
         let screen_position =
             ScreenPosition::only_top(closed_size.height) + theme.expandable.element_offset.get() * interface_settings.scaling.get();
 
         let (mut inner_placement_resolver, mut size, position) =
-            placement_resolver.derive(size_constraint, screen_position, theme.expandable.border_size.get());
+            placement_resolver.derive(size_bound, screen_position, theme.expandable.border_size.get());
         let parent_limits = inner_placement_resolver.get_parent_limits();
 
         if self.expanded && !self.state.elements.is_empty() {
@@ -88,13 +88,13 @@ impl Element for Expandable {
                     .resolve(&mut inner_placement_resolver, interface_settings, theme)
             });
 
-            if self.open_size_constraint.height.is_flexible() {
+            if self.open_size_bound.height.is_flexible() {
                 let final_height = inner_placement_resolver.final_height()
                     + closed_size.height
                     + theme.expandable.element_offset.get().top * interface_settings.scaling.get()
                     + theme.expandable.border_size.get().height * interface_settings.scaling.get() * 2.0;
 
-                let final_height = self.open_size_constraint.validated_height(
+                let final_height = self.open_size_bound.validated_height(
                     final_height,
                     placement_resolver.get_available().height,
                     placement_resolver.get_available().height,

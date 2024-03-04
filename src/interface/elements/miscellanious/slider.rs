@@ -30,7 +30,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> Element for Slide
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        self.state.resolve(placement_resolver, &theme.slider.size_constraint);
+        self.state.resolve(placement_resolver, &theme.slider.size_bound);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

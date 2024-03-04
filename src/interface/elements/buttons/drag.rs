@@ -7,7 +7,7 @@ use crate::interface::{Element, *};
 #[derive(new)]
 pub struct DragButton {
     window_title: String,
-    width_constraint: DimensionConstraint,
+    width_bound: DimensionBound,
     #[new(default)]
     state: ElementState,
 }
@@ -22,9 +22,9 @@ impl Element for DragButton {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = self.width_constraint.add_height(theme.window.title_height);
+        let size_bound = self.width_bound.add_height(theme.window.title_height);
 
-        self.state.resolve(placement_resolver, &size_constraint);
+        self.state.resolve(placement_resolver, &size_bound);
     }
 
     fn is_focusable(&self) -> bool {

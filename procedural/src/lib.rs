@@ -1,8 +1,8 @@
 #![feature(extend_one)]
 #![feature(extract_if)]
 
+mod bound;
 mod byte;
-mod constraint;
 mod prototype;
 mod toggle;
 mod utils;
@@ -12,19 +12,19 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{parse, Data, DeriveInput, ItemFn, LitStr, Stmt};
 
+use self::bound::*;
 use self::byte::*;
-use self::constraint::*;
 use self::prototype::*;
 use self::toggle::*;
 
 #[proc_macro]
-pub fn dimension(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    parse::<DimensionConstraint>(token_stream).unwrap().stream.into()
+pub fn dimension_bound(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    parse::<DimensionBound>(token_stream).unwrap().stream.into()
 }
 
 #[proc_macro]
-pub fn constraint(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    parse::<SizeConstraint>(token_stream).unwrap().stream.into()
+pub fn size_bound(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    parse::<SizeBound>(token_stream).unwrap().stream.into()
 }
 
 #[proc_macro_attribute]

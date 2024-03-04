@@ -23,7 +23,7 @@ impl PrototypeWindow for EquipmentWindow {
         WindowBuilder::default()
             .with_title("Equipment".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(150 > 200 < 300, ?))
+            .with_size(size_bound!(150 > 200 < 300, ?))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

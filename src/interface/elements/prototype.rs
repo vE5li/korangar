@@ -135,7 +135,7 @@ where
     }
 }
 
-impl PrototypeElement for DimensionConstraint {
+impl PrototypeElement for DimensionBound {
     fn to_element(&self, display: String) -> ElementCell {
         let elements = vec![StaticLabel::new(display).wrap()];
 
@@ -143,7 +143,7 @@ impl PrototypeElement for DimensionConstraint {
     }
 }
 
-impl PrototypeElement for SizeConstraint {
+impl PrototypeElement for SizeBound {
     fn to_element(&self, display: String) -> ElementCell {
         let elements = vec![StaticLabel::new(display).wrap()];
 

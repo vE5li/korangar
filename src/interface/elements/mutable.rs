@@ -22,7 +22,7 @@ impl PrototypeMutableElement for Color {
     }
 }
 
-impl PrototypeMutableElement for DimensionConstraint {
+impl PrototypeMutableElement for DimensionBound {
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
         let elements = vec![StaticLabel::new(display).wrap()];
 
@@ -30,7 +30,7 @@ impl PrototypeMutableElement for DimensionConstraint {
     }
 }
 
-impl PrototypeMutableElement for SizeConstraint {
+impl PrototypeMutableElement for SizeBound {
     fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell {
         let elements = vec![StaticLabel::new(display).wrap()];
 

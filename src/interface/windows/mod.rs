@@ -10,7 +10,7 @@ mod mutable;
 mod prototype;
 mod settings;
 
-use procedural::constraint;
+use procedural::size_bound;
 
 pub use self::account::*;
 pub use self::builder::WindowBuilder;
@@ -31,7 +31,7 @@ use crate::loaders::FontLoader;
 pub struct Window {
     window_class: Option<String>,
     position: ScreenPosition,
-    size_constraint: SizeConstraint,
+    size_bound: SizeBound,
     size: ScreenSize,
     elements: Vec<ElementCell>,
     popup_element: Option<(ElementCell, Tracker<ScreenPosition>, Tracker<ScreenSize>)>,
@@ -78,7 +78,7 @@ impl Window {
                 height: available_space.height,
                 width: self.size.width,
             },
-            &self.size_constraint,
+            &self.size_bound,
             theme.window.border_size.get(),
             theme.window.gaps.get(),
             interface_settings.scaling.get(),
@@ -88,11 +88,11 @@ impl Window {
             .iter()
             .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, interface_settings, theme));
 
-        if self.size_constraint.height.is_flexible() {
+        if self.size_bound.height.is_flexible() {
             let parent_limits = placement_resolver.get_parent_limits();
             let final_height = theme.window.border_size.get().height + placement_resolver.final_height();
 
-            let final_height = self.size_constraint.validated_height(
+            let final_height = self.size_bound.validated_height(
                 final_height,
                 available_space.height.into(),
                 available_space.height.into(),
@@ -117,7 +117,7 @@ impl Window {
                     width: size.width,
                     height: 250.0,
                 },
-                &constraint!(100%, 0 > ? < 250),
+                &size_bound!(100%, 0 > ? < 250),
                 ScreenSize::default(), //theme.window.border_size.get(), // TODO: Popup
                 ScreenSize::default(), //theme.window.gaps.get(), // TODO: Popup
                 interface_settings.scaling.get(),
@@ -203,7 +203,7 @@ impl Window {
     }
 
     fn validate_position(&mut self, available_space: ScreenSize) {
-        self.position = self.size_constraint.validated_position(self.position, self.size, available_space);
+        self.position = self.size_bound.validated_position(self.position, self.size, available_space);
     }
 
     pub fn resize(
@@ -220,7 +220,7 @@ impl Window {
 
     fn validate_size(&mut self, interface_settings: &InterfaceSettings, available_space: ScreenSize) {
         self.size = self
-            .size_constraint
+            .size_bound
             .validated_window_size(self.size, available_space, interface_settings.scaling.get());
     }
 

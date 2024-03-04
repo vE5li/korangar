@@ -37,7 +37,7 @@ impl<const KIND: ThemeKind> PrototypeElement for ThemeSelector<KIND> {
             .collect();
 
         let elements = vec![
-            Text::default().with_text(display).with_width(dimension!(50%)).wrap(),
+            Text::default().with_text(display).with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(themes)
                 .with_selected(state.clone())
@@ -47,7 +47,7 @@ impl<const KIND: ThemeKind> PrototypeElement for ThemeSelector<KIND> {
                         theme_kind: KIND,
                     })]
                 }))
-                .with_width(dimension!(!))
+                .with_width(dimension_bound!(!))
                 .wrap(),
         ];
 

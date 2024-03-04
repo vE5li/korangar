@@ -36,7 +36,7 @@ impl EquipmentContainer {
                     let text = Text::default()
                         .with_text(slot.display_name().to_string())
                         .with_foreground_color(|_| Color::monochrome_u8(200))
-                        .with_width(dimension!(!))
+                        .with_width(dimension_bound!(!))
                         .wrap();
 
                     let item = items.iter().find(|item| item.equipped_position == slot).cloned();
@@ -86,12 +86,12 @@ impl Element for EquipmentContainer {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = &constraint!(100%, ?);
+        let size_bound = &size_bound!(100%, ?);
         self.state.resolve(
             placement_resolver,
             interface_settings,
             theme,
-            size_constraint,
+            size_bound,
             ScreenSize::uniform(3.0),
         );
     }

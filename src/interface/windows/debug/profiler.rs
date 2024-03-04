@@ -39,20 +39,20 @@ impl PrototypeWindow for ProfilerWindow {
                     ("Deferred thread", ProfilerThread::Deferred),
                 ])
                 .with_selected(self.visible_thread.clone())
-                .with_width(dimension!(150))
+                .with_width(dimension_bound!(150))
                 .with_event(Box::new(Vec::new))
                 .wrap(),
             StateButton::default()
                 .with_text("Always update")
                 .with_selector(self.always_update.selector())
                 .with_event(self.always_update.toggle_action())
-                .with_width(dimension!(150))
+                .with_width(dimension_bound!(150))
                 .wrap(),
             StateButton::default()
                 .with_text("Halt")
                 .with_selector(|_: &StateProvider| is_profiler_halted())
                 .with_event(Box::new(toggle_halting))
-                .with_width(dimension!(150))
+                .with_width(dimension_bound!(150))
                 .wrap(),
             ElementWrap::wrap(FrameView::new(
                 self.always_update.new_remote(),
@@ -63,7 +63,7 @@ impl PrototypeWindow for ProfilerWindow {
         WindowBuilder::default()
             .with_title("Profiler".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 500 < 900, ?))
+            .with_size(size_bound!(200 > 500 < 900, ?))
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

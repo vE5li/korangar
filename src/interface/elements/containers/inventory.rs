@@ -57,12 +57,12 @@ impl Element for InventoryContainer {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_constraint = &constraint!(100%, ?);
+        let size_bound = &size_bound!(100%, ?);
         self.state.resolve(
             placement_resolver,
             interface_settings,
             theme,
-            size_constraint,
+            size_bound,
             ScreenSize::uniform(3.0),
         );
     }

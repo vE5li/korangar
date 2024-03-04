@@ -1,31 +1,31 @@
 use derive_new::new;
-use procedural::constraint;
+use procedural::size_bound;
 use serde::{Deserialize, Serialize};
 
 use crate::interface::{Dimension, PartialScreenSize, ScreenPosition, ScreenSize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, new)]
-pub struct DimensionConstraint {
+pub struct DimensionBound {
     pub size: Dimension,
     pub minimum_size: Option<Dimension>,
     pub maximum_size: Option<Dimension>,
 }
 
-impl DimensionConstraint {
-    pub fn add_height(&self, height_constraint: DimensionConstraint) -> SizeConstraint {
-        SizeConstraint {
+impl DimensionBound {
+    pub fn add_height(&self, height_bound: DimensionBound) -> SizeBound {
+        SizeBound {
             width: self.size,
             minimum_width: self.minimum_size,
             maximum_width: self.maximum_size,
-            height: height_constraint.size,
-            minimum_height: height_constraint.minimum_size,
-            maximum_height: height_constraint.maximum_size,
+            height: height_bound.size,
+            minimum_height: height_bound.minimum_size,
+            maximum_height: height_bound.maximum_size,
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, new)]
-pub struct SizeConstraint {
+pub struct SizeBound {
     pub width: Dimension,
     pub minimum_width: Option<Dimension>,
     pub maximum_width: Option<Dimension>,
@@ -34,9 +34,9 @@ pub struct SizeConstraint {
     pub maximum_height: Option<Dimension>,
 }
 
-impl SizeConstraint {
-    pub const DEFAULT_FULLY_BOUNDED: Self = constraint!(200 > 300 < 400, 0 > ? < 80%);
-    pub const DEFAULT_UNBOUNDED: Self = constraint!(200 > 300 < 400, ?);
+impl SizeBound {
+    pub const DEFAULT_FULLY_BOUNDED: Self = size_bound!(200 > 300 < 400, 0 > ? < 80%);
+    pub const DEFAULT_UNBOUNDED: Self = size_bound!(200 > 300 < 400, ?);
 
     pub fn resolve_window(&self, available: ScreenSize, remaining: ScreenSize, scaling: f32) -> PartialScreenSize {
         let parent_limits = ParentLimits::default();
@@ -147,32 +147,26 @@ pub struct ParentLimits {
 }
 
 impl ParentLimits {
-    pub fn from_constraints(size_constraint: &SizeConstraint, available_space: ScreenSize, scaling: f32) -> Self {
+    pub fn from_bound(size_bound: &SizeBound, available_space: ScreenSize, scaling: f32) -> Self {
         Self {
-            minimum_width: size_constraint
+            minimum_width: size_bound
                 .minimum_width
                 .and_then(|dimension| dimension.try_resolve_width(available_space.width, available_space.width, None, scaling)),
-            maximum_width: size_constraint
+            maximum_width: size_bound
                 .maximum_width
                 .and_then(|dimension| dimension.try_resolve_width(available_space.width, available_space.width, None, scaling)),
-            minimum_height: size_constraint.minimum_height.and_then(|dimension| {
+            minimum_height: size_bound.minimum_height.and_then(|dimension| {
                 dimension.try_resolve_height(Some(available_space.height), Some(available_space.height), None, scaling)
             }),
-            maximum_height: size_constraint.maximum_height.and_then(|dimension| {
+            maximum_height: size_bound.maximum_height.and_then(|dimension| {
                 dimension.try_resolve_height(Some(available_space.height), Some(available_space.height), None, scaling)
             }),
         }
     }
 
-    pub fn derive(
-        &self,
-        size_constraint: &SizeConstraint,
-        available_space: PartialScreenSize,
-        unusable_space: ScreenSize,
-        scaling: f32,
-    ) -> Self {
+    pub fn derive(&self, size_bound: &SizeBound, available_space: PartialScreenSize, unusable_space: ScreenSize, scaling: f32) -> Self {
         Self {
-            minimum_width: size_constraint.minimum_width.and_then(|dimension| {
+            minimum_width: size_bound.minimum_width.and_then(|dimension| {
                 dimension.try_resolve_width(
                     available_space.width,
                     available_space.width,
@@ -180,7 +174,7 @@ impl ParentLimits {
                     scaling,
                 )
             }),
-            maximum_width: size_constraint.maximum_width.and_then(|dimension| {
+            maximum_width: size_bound.maximum_width.and_then(|dimension| {
                 dimension.try_resolve_width(
                     available_space.width,
                     available_space.width,
@@ -188,7 +182,7 @@ impl ParentLimits {
                     scaling,
                 )
             }),
-            minimum_height: size_constraint.minimum_height.and_then(|dimension| {
+            minimum_height: size_bound.minimum_height.and_then(|dimension| {
                 dimension.try_resolve_height(
                     available_space.height,
                     available_space.height,
@@ -196,7 +190,7 @@ impl ParentLimits {
                     scaling,
                 )
             }),
-            maximum_height: size_constraint.maximum_height.and_then(|dimension| {
+            maximum_height: size_bound.maximum_height.and_then(|dimension| {
                 dimension.try_resolve_height(
                     available_space.height,
                     available_space.height,

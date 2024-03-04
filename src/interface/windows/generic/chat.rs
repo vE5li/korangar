@@ -53,23 +53,23 @@ impl PrototypeWindow for ChatWindow {
         };
 
         let elements = vec![
-            InputField::<30>::new(input_text, "write message or command", input_action, dimension!(75%)).wrap(),
+            InputField::<30>::new(input_text, "write message or command", input_action, dimension_bound!(75%)).wrap(),
             Button::default()
                 .with_text("send")
                 .with_disabled_selector(button_selector)
                 .with_event(Box::new(button_action))
-                .with_width(dimension!(25%))
+                .with_width(dimension_bound!(25%))
                 .wrap(),
             ScrollView::new(
                 vec![Chat::new(self.messages.clone(), self.font_loader.clone()).wrap()],
-                constraint!(100%, ?),
+                size_bound!(100%, ?),
             )
             .wrap(),
         ];
 
         WindowBuilder::default()
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(200 > 500 < 800, 100 > 100 < 600))
+            .with_size(size_bound!(200 > 500 < 800, 100 > 100 < 600))
             .with_background_color(Box::new(|theme| theme.chat.background_color.get()))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)

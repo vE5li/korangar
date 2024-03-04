@@ -163,7 +163,7 @@ impl<const N: usize> Element for PacketView<N> {
             placement_resolver,
             interface_settings,
             theme,
-            &constraint!(100%, ?),
+            &size_bound!(100%, ?),
             ScreenSize::default(),
         );
     }

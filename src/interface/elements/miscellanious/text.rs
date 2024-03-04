@@ -1,4 +1,4 @@
-use procedural::dimension;
+use procedural::dimension_bound;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::interface::*;
@@ -7,7 +7,7 @@ use crate::interface::*;
 pub struct Text<T: AsRef<str> + 'static> {
     text: Option<T>,
     foreground_color: Option<ColorSelector>,
-    width_constraint: Option<DimensionConstraint>,
+    width_bound: Option<DimensionBound>,
     font_size: Option<FontSizeSelector>,
     state: ElementState,
 }
@@ -28,8 +28,8 @@ impl<T: AsRef<str> + 'static> Text<T> {
         self
     }
 
-    pub fn with_width(mut self, width_constraint: DimensionConstraint) -> Self {
-        self.width_constraint = Some(width_constraint);
+    pub fn with_width(mut self, width_bound: DimensionBound) -> Self {
+        self.width_bound = Some(width_bound);
         self
     }
 
@@ -51,19 +51,19 @@ impl<T: AsRef<str> + 'static> Element for Text<T> {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let height_constraint = DimensionConstraint {
+        let height_bound = DimensionBound {
             size: Dimension::Absolute(self.get_font_size(theme)),
             minimum_size: None,
             maximum_size: None,
         };
 
-        let size_constraint = self
-            .width_constraint
+        let size_bound = self
+            .width_bound
             .as_ref()
-            .unwrap_or(&dimension!(100%))
-            .add_height(height_constraint);
+            .unwrap_or(&dimension_bound!(100%))
+            .add_height(height_bound);
 
-        self.state.resolve(placement_resolver, &size_constraint);
+        self.state.resolve(placement_resolver, &size_bound);
     }
 
     fn is_focusable(&self) -> bool {

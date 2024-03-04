@@ -55,7 +55,7 @@ impl PrototypeWindow for MapsWindow {
         WindowBuilder::default()
             .with_title("Maps".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .closable()
             .build(window_cache, interface_settings, available_space)

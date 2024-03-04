@@ -31,7 +31,7 @@ impl PrototypeWindow for DialogWindow {
         WindowBuilder::default()
             .with_title("Dialog".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(SizeConstraint::DEFAULT_UNBOUNDED)
+            .with_size(SizeBound::DEFAULT_UNBOUNDED)
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

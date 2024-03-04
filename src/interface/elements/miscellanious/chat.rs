@@ -44,7 +44,7 @@ impl Element for Chat {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let mut size_constraint = constraint!(100%, 0);
+        let mut size_bound = size_bound!(100%, 0);
         // Not sure why but 0.0 cuts off the lower part of the text, so add some
         // padding.
         let mut height = 5.0 * interface_settings.scaling.get();
@@ -61,8 +61,8 @@ impl Element for Chat {
                 .y;
         }
 
-        size_constraint.height = Dimension::Absolute(height);
-        self.state.resolve(placement_resolver, &size_constraint);
+        size_bound.height = Dimension::Absolute(height);
+        self.state.resolve(placement_resolver, &size_bound);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {

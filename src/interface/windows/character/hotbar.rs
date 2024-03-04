@@ -23,7 +23,7 @@ impl PrototypeWindow for HotbarWindow {
         WindowBuilder::default()
             .with_title("Hotbar".to_string())
             .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size(constraint!(300 > 400 < 500, ?))
+            .with_size(size_bound!(300 > 400 < 500, ?))
             .with_elements(elements)
             .build(window_cache, interface_settings, available_space)
     }

@@ -17,8 +17,5 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install latest nightly
-        run: rustup update
-
       - name: Run unit tests
         run: cargo test --all-features

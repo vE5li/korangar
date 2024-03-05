@@ -17,9 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install latest nightly
-        run: rustup update
-
       - name: Add Rustfmt
         run: rustup component add rustfmt
 

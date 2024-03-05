@@ -366,7 +366,11 @@ fn main() {
     let mut player_skill_tree = SkillTree::default();
     let mut hotbar = Hotbar::default();
 
-    let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb_u8(220, 170, 220));
+    let welcome_string = format!(
+        "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
+        env!("CARGO_PKG_VERSION")
+    );
+    let welcome_message = ChatMessage::new(welcome_string, Color::monochrome_u8(255));
     let mut chat_messages = TrackedState::new(vec![welcome_message]);
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();

@@ -14,6 +14,7 @@
 #![feature(negative_impls)]
 #![feature(option_zip)]
 #![feature(proc_macro_hygiene)]
+#![feature(specialization)]
 #![feature(thread_local)]
 #![feature(type_changing_struct_update)]
 #![feature(variant_count)]
@@ -366,7 +367,7 @@ fn main() {
     let mut hotbar = Hotbar::default();
 
     let welcome_message = ChatMessage::new("Welcome to Korangar!".to_string(), Color::rgb_u8(220, 170, 220));
-    let chat_messages = Rc::new(RefCell::new(vec![welcome_message]));
+    let mut chat_messages = TrackedState::new(vec![welcome_message]);
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
@@ -558,7 +559,7 @@ fn main() {
                             game_timer.set_client_tick(client_tick);
                         }
                         NetworkEvent::ChatMessage(message) => {
-                            chat_messages.borrow_mut().push(message);
+                            chat_messages.push(message);
                         }
                         NetworkEvent::UpdateEntityDetails(entity_id, name) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -837,7 +838,10 @@ fn main() {
                                     // that will be problematic
                                     interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
                                     interface.open_window(&mut focus_state, &CharacterOverviewWindow::new());
-                                    interface.open_window(&mut focus_state, &ChatWindow::new(chat_messages.clone(), font_loader.clone()));
+                                    interface.open_window(
+                                        &mut focus_state,
+                                        &ChatWindow::new(chat_messages.new_remote(), font_loader.clone()),
+                                    );
                                     interface.open_window(&mut focus_state, &HotbarWindow::new(hotbar.get_skills()));
 
                                     particle_holder.clear();

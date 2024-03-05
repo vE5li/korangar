@@ -3,7 +3,6 @@ use std::ops::Not;
 use std::rc::Rc;
 
 use derive_new::new;
-use procedural::*;
 
 use crate::input::UserEvent;
 use crate::interface::*;
@@ -49,8 +48,8 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
 
         let saved_settings = login_settings.service_settings.entry(selected_service).or_default();
 
-        let username = Rc::new(RefCell::new(saved_settings.username.clone()));
-        let password = Rc::new(RefCell::new(saved_settings.password.clone()));
+        let username = TrackedState::new(saved_settings.username.clone());
+        let password = TrackedState::new(saved_settings.password.clone());
 
         let selected_service = TrackedState::new(selected_service);
         let login_settings = Rc::new(RefCell::new(login_settings));
@@ -62,8 +61,8 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
         };
 
         let service_changed = {
-            let username = username.clone();
-            let password = password.clone();
+            let mut username = username.clone();
+            let mut password = password.clone();
             let login_settings = login_settings.clone();
             let selected_service = selected_service.clone();
 
@@ -72,8 +71,14 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
                 let login_settings = login_settings.borrow_mut();
 
                 if let Some(saved_settings) = login_settings.service_settings.get(&service_id) {
-                    *username.borrow_mut() = saved_settings.username.clone();
-                    *password.borrow_mut() = saved_settings.password.clone();
+                    username.with_mut(|username, changed| {
+                        *username = saved_settings.username.clone();
+                        changed();
+                    });
+                    password.with_mut(|password, changed| {
+                        *password = saved_settings.password.clone();
+                        changed();
+                    });
                 }
 
                 Vec::new()
@@ -210,8 +215,21 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
                 .with_event(service_changed)
                 .wrap(),
             Text::default().with_text("Account data").wrap(),
-            InputField::<24>::new(username, "Username", username_action, dimension_bound!(100%)).wrap(),
-            InputField::<24, true>::new(password, "Password", password_action, dimension_bound!(100%)).wrap(),
+            InputFieldBuilder::new()
+                .with_state(username)
+                .with_ghost_text("Username")
+                .with_enter_action(username_action)
+                .with_length(24)
+                .build()
+                .wrap(),
+            InputFieldBuilder::new()
+                .with_state(password)
+                .with_ghost_text("Password")
+                .with_enter_action(password_action)
+                .with_length(24)
+                .with_hidden()
+                .build()
+                .wrap(),
             Container::new({
                 vec![
                     StateButtonBuilder::new()

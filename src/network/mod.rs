@@ -20,7 +20,8 @@ use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::PacketWindow;
 use crate::interface::{
-    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, WeakElementCell,
+    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, TrackedStateTake,
+    WeakElementCell,
 };
 use crate::loaders::{conversion_result, ByteStream, ClientInfo, ConversionError, FromBytes, Named, ServiceId, ToBytes};
 

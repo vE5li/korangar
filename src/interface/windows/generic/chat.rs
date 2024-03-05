@@ -11,7 +11,7 @@ use crate::network::ChatMessage;
 
 #[derive(new)]
 pub struct ChatWindow {
-    messages: Rc<RefCell<Vec<ChatMessage>>>,
+    messages: Remote<Vec<ChatMessage>>,
     font_loader: Rc<RefCell<FontLoader>>,
 }
 
@@ -25,7 +25,7 @@ impl PrototypeWindow for ChatWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
-        let input_text = Rc::new(RefCell::new(String::new()));
+        let input_text = TrackedState::<String>::default();
 
         let button_selector = {
             let input_text = input_text.clone();
@@ -34,18 +34,19 @@ impl PrototypeWindow for ChatWindow {
         };
 
         let button_action = {
-            let input_text = input_text.clone();
+            let mut input_text = input_text.clone();
 
             move || {
-                let message: String = input_text.borrow_mut().drain(..).collect();
+                let message = input_text.take();
                 vec![ClickAction::Event(UserEvent::SendMessage(message))]
             }
         };
 
         let input_action = {
-            let input_text = input_text.clone();
+            let mut input_text = input_text.clone();
             Box::new(move || {
-                let message: String = input_text.borrow_mut().drain(..).collect();
+                let message = input_text.take();
+
                 (!message.is_empty())
                     .then_some(vec![ClickAction::Event(UserEvent::SendMessage(message))])
                     .unwrap_or_default()
@@ -53,17 +54,30 @@ impl PrototypeWindow for ChatWindow {
         };
 
         let elements = vec![
-            InputField::<30>::new(input_text, "write message or command", input_action, dimension_bound!(75%)).wrap(),
+            InputFieldBuilder::new()
+                .with_state(input_text)
+                .with_ghost_text("Write message or command")
+                .with_enter_action(input_action)
+                .with_length(30)
+                .with_width_bound(dimension_bound!(75%))
+                .build()
+                .wrap(),
             ButtonBuilder::new()
-                .with_text("send")
+                .with_text("Send")
                 .with_disabled_selector(button_selector)
                 .with_event(Box::new(button_action))
                 .with_width_bound(dimension_bound!(25%))
                 .build()
                 .wrap(),
             ScrollView::new(
-                vec![Chat::new(self.messages.clone(), self.font_loader.clone()).wrap()],
-                size_bound!(100%, ?),
+                vec![
+                    ChatBuilder::new()
+                        .with_messages(self.messages.clone())
+                        .with_font_loader(self.font_loader.clone())
+                        .build()
+                        .wrap(),
+                ],
+                size_bound!(100%, !),
             )
             .wrap(),
         ];

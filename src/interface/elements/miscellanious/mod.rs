@@ -8,9 +8,9 @@ mod slider;
 mod static_label;
 mod text;
 
-pub use self::chat::Chat;
+pub use self::chat::ChatBuilder;
 pub use self::headline::Headline;
-pub use self::input::InputField;
+pub use self::input::InputFieldBuilder;
 pub use self::item::ItemBox;
 pub use self::picklist::PickList;
 pub use self::skill::SkillBox;

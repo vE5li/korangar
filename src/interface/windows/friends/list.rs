@@ -21,14 +21,13 @@ impl PrototypeWindow for FriendsWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
-        let friend_name = Rc::new(RefCell::new(String::new()));
+        let friend_name = TrackedState::<String>::default();
 
         let add_action = {
-            let friend_name = friend_name.clone();
+            let mut friend_name = friend_name.clone();
+
             Box::new(move || {
-                let friend_name: &mut String = &mut friend_name.borrow_mut();
-                let mut taken_string = String::new();
-                std::mem::swap(friend_name, &mut taken_string);
+                let taken_string = friend_name.take();
 
                 (!taken_string.is_empty())
                     .then_some(vec![ClickAction::Event(UserEvent::AddFriend(taken_string))])
@@ -37,7 +36,14 @@ impl PrototypeWindow for FriendsWindow {
         };
 
         let elements = vec![
-            InputField::<24>::new(friend_name, "Name", add_action.clone(), dimension_bound!(80%)).wrap(),
+            InputFieldBuilder::new()
+                .with_state(friend_name)
+                .with_ghost_text("Name")
+                .with_enter_action(add_action.clone())
+                .with_length(24)
+                .with_width_bound(dimension_bound!(80%))
+                .build()
+                .wrap(),
             ButtonBuilder::new()
                 .with_text("Add")
                 .with_event(add_action)

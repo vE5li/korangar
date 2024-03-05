@@ -14,7 +14,7 @@ impl<const N: usize> PacketWindow<N> {
     pub const WINDOW_CLASS: &'static str = "network";
 
     pub fn new(packets: Remote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>, update: TrackedState<bool>) -> Self {
-        let show_pings = TrackedState::new(false);
+        let show_pings = TrackedState::default();
 
         Self {
             packets,

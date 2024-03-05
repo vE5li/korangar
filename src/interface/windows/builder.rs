@@ -1,6 +1,6 @@
 use procedural::dimension_bound;
 
-use crate::interface::builder::{Set, Unset, With};
+use crate::interface::builder::{Set, Unset};
 use crate::interface::*;
 
 /// Type state [`Window`] builder. This builder utilizes the type system to
@@ -46,8 +46,8 @@ impl<CLASS, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<Unset, CL
 }
 
 impl<CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<Set, Unset, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
-    /// NOTE: This function is only available if `with_title` has been called on
-    /// the builder.
+    /// NOTE: This function is only available if
+    /// [`with_title`](Self::with_title) has been called on the builder.
     pub fn closable(self) -> WindowBuilder<Set, Set, CLASS, SIZE, ELEMENTS, BACKGROUND, THEME> {
         WindowBuilder {
             closable: true,
@@ -78,14 +78,8 @@ impl<TITLE, CLOSABLE, SIZE, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CL
 }
 
 impl<TITLE, CLOSABLE, CLASS, ELEMENTS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, Unset, ELEMENTS, BACKGROUND, THEME> {
-    pub fn with_size_bound(
-        self,
-        size_bound: SizeBound,
-    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, With<SizeBound>, ELEMENTS, BACKGROUND, THEME> {
-        WindowBuilder {
-            size_bound: With::new(size_bound),
-            ..self
-        }
+    pub fn with_size_bound(self, size_bound: SizeBound) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SizeBound, ELEMENTS, BACKGROUND, THEME> {
+        WindowBuilder { size_bound, ..self }
     }
 }
 
@@ -93,11 +87,8 @@ impl<TITLE, CLOSABLE, CLASS, SIZE, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSA
     pub fn with_elements(
         self,
         elements: Vec<ElementCell>,
-    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, With<Vec<ElementCell>>, BACKGROUND, THEME> {
-        WindowBuilder {
-            elements: With::new(elements),
-            ..self
-        }
+    ) -> WindowBuilder<TITLE, CLOSABLE, CLASS, SIZE, Vec<ElementCell>, BACKGROUND, THEME> {
+        WindowBuilder { elements, ..self }
     }
 }
 
@@ -124,9 +115,7 @@ impl<TITLE, CLOSABLE, CLASS, SIZE, ELEMENTS, BACKGROUND> WindowBuilder<TITLE, CL
     }
 }
 
-impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
-    WindowBuilder<TITLE, CLOSABLE, CLASS, With<SizeBound>, With<Vec<ElementCell>>, BACKGROUND, THEME>
-{
+impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME> WindowBuilder<TITLE, CLOSABLE, CLASS, SizeBound, Vec<ElementCell>, BACKGROUND, THEME> {
     /// Take the builder and turn it into a [`Window`].
     ///
     /// NOTE: This method is only available if
@@ -138,14 +127,11 @@ impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
             closable,
             class,
             size_bound,
-            elements,
+            mut elements,
             background_color,
             theme_kind,
             ..
         } = self;
-
-        let size_bound = size_bound.take();
-        let mut elements = elements.take();
 
         if closable {
             let close_button = CloseButtonBuilder::new().build().wrap();
@@ -170,7 +156,10 @@ impl<TITLE, CLOSABLE, CLASS, BACKGROUND, THEME>
             width: Dimension::Relative(100.0),
             minimum_width: size_bound.minimum_width.map(|_| Dimension::Super),
             maximum_width: size_bound.maximum_width.map(|_| Dimension::Super),
-            height: Dimension::Flexible,
+            height: match size_bound.height.is_flexible() {
+                true => Dimension::Flexible,
+                false => Dimension::Remaining,
+            },
             minimum_height: size_bound.minimum_height.map(|_| Dimension::Super),
             maximum_height: size_bound.maximum_height.map(|_| Dimension::Super),
         };

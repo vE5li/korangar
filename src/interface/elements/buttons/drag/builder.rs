@@ -1,5 +1,5 @@
 use super::DragButton;
-use crate::interface::builder::{Unset, With};
+use crate::interface::builder::Unset;
 use crate::interface::*;
 
 /// Type state [`DragButton`] builder. This builder utilizes the type system to
@@ -21,24 +21,21 @@ impl DragButtonBuilder<Unset, Unset> {
 }
 
 impl<WIDTH> DragButtonBuilder<Unset, WIDTH> {
-    pub fn with_title(self, title: impl Into<String>) -> DragButtonBuilder<With<String>, WIDTH> {
+    pub fn with_title(self, title: impl Into<String>) -> DragButtonBuilder<String, WIDTH> {
         DragButtonBuilder {
-            title: With::new(title.into()),
+            title: title.into(),
             ..self
         }
     }
 }
 
 impl<TITLE> DragButtonBuilder<TITLE, Unset> {
-    pub fn with_width_bound(self, width_bound: DimensionBound) -> DragButtonBuilder<TITLE, With<DimensionBound>> {
-        DragButtonBuilder {
-            width_bound: With::new(width_bound),
-            ..self
-        }
+    pub fn with_width_bound(self, width_bound: DimensionBound) -> DragButtonBuilder<TITLE, DimensionBound> {
+        DragButtonBuilder { width_bound, ..self }
     }
 }
 
-impl DragButtonBuilder<With<String>, With<DimensionBound>> {
+impl DragButtonBuilder<String, DimensionBound> {
     /// Take the builder and turn it into a [`DragButton`].
     ///
     /// NOTE: This method is only available if [`with_title`](Self::with_title)
@@ -46,9 +43,6 @@ impl DragButtonBuilder<With<String>, With<DimensionBound>> {
     /// the builder.
     pub fn build(self) -> DragButton {
         let Self { title, width_bound } = self;
-
-        let title = title.take();
-        let width_bound = width_bound.take();
 
         DragButton {
             title,

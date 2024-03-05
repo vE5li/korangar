@@ -24,7 +24,7 @@ pub use self::event::*;
 pub use self::layout::*;
 pub use self::provider::StateProvider;
 pub use self::settings::InterfaceSettings;
-pub use self::state::{Remote, TrackedState};
+pub use self::state::{Remote, TrackedState, TrackedStateTake};
 pub use self::theme::{GameTheme, InterfaceTheme};
 use self::theme::{Main, Menu, ThemeSelector, Themes};
 pub use self::windows::*;

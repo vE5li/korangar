@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use procedural::*;
 
 use crate::input::UserEvent;
@@ -18,38 +16,60 @@ impl PrototypeWindow for CommandsWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
-        let input_text = Rc::new(RefCell::new(String::new()));
+        let input_text = TrackedState::<String>::default();
 
         let class_action = {
-            let input_text = input_text.clone();
+            let mut input_text = input_text.clone();
+
             Box::new(move || {
-                let mut text = input_text.borrow_mut();
+                let message = input_text.with_mut(|text, changed| {
+                    if text.is_empty() {
+                        return None;
+                    }
 
-                if text.is_empty() {
+                    let message = format!("@jobchange {text}");
+
+                    text.clear();
+                    changed();
+
+                    Some(message)
+                });
+
+                let Some(message) = message else {
                     return Vec::new();
-                }
-
-                let message = format!("@jobchange {text}");
-                text.clear();
+                };
 
                 vec![ClickAction::Event(UserEvent::SendMessage(message))]
             })
         };
 
         let change_action = {
-            let input_text = input_text.clone();
+            let mut input_text = input_text.clone();
 
             move || {
-                let mut text = input_text.borrow_mut();
-                let message = format!("@jobchange {text}");
-                text.clear();
+                let message = input_text.with_mut(|text, changed| {
+                    let message = format!("@jobchange {text}");
+
+                    text.clear();
+                    changed();
+
+                    message
+                });
+
                 vec![ClickAction::Event(UserEvent::SendMessage(message))]
             }
         };
 
         let elements = vec![
             Text::default().with_text("change job").wrap(),
-            InputField::<30>::new(input_text, "job name or job ID", class_action, dimension_bound!(75%)).wrap(),
+            InputFieldBuilder::new()
+                .with_state(input_text)
+                .with_ghost_text("Job name or job ID")
+                .with_enter_action(class_action)
+                .with_length(30)
+                .with_width_bound(dimension_bound!(75%))
+                .build()
+                .wrap(),
             ButtonBuilder::new()
                 .with_text("Change")
                 .with_width_bound(dimension_bound!(25%))

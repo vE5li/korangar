@@ -26,9 +26,9 @@ impl<T> TrackedState<T> {
         self.0.borrow().1
     }
 
-    pub fn with_mut<F>(&mut self, f: F)
+    pub fn with_mut<F, R>(&mut self, f: F) -> R
     where
-        F: FnOnce(&mut T, &mut dyn FnMut()),
+        F: FnOnce(&mut T, &mut dyn FnMut()) -> R,
     {
         let (inner, version) = &mut *self.0.borrow_mut();
         let mut changed = || *version = version.wrapping_add(1);
@@ -92,13 +92,37 @@ impl<T> TrackedState<Vec<T>> {
     }
 }
 
-impl<T> TrackedState<Option<T>>
+pub trait TrackedStateTake<T> {
+    fn take(&mut self) -> T;
+}
+
+impl<T> TrackedStateTake<T> for TrackedState<T>
 where
     T: Default,
 {
-    pub fn take(&mut self) -> Option<T> {
-        self.update();
-        self.0.borrow_mut().0.take()
+    default fn take(&mut self) -> T {
+        let mut taken_value = T::default();
+        let inner_value = &mut self.0.borrow_mut().0;
+        std::mem::swap(&mut taken_value, inner_value);
+
+        taken_value
+    }
+}
+
+impl<T> TrackedStateTake<Option<T>> for TrackedState<Option<T>>
+where
+    T: Default,
+{
+    fn take(&mut self) -> Option<T> {
+        let option = self.0.borrow_mut().0.take();
+
+        // NOTE: Unnecessary updates might have huge impacts on performance, so we try
+        // to only update if we actually took a value.
+        if option.is_some() {
+            self.update();
+        }
+
+        option
     }
 }
 

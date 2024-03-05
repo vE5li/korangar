@@ -1,5 +1,5 @@
 use super::{StateButton, StateSelector};
-use crate::interface::builder::{Set, Unset, With};
+use crate::interface::builder::{Set, Unset};
 use crate::interface::*;
 
 /// Type state [`StateButton`] builder. This builder utilizes the type system to
@@ -29,23 +29,14 @@ impl StateButtonBuilder<Unset, Unset, Unset, Unset, Unset> {
 }
 
 impl<EVENT, SELECTOR, BACKGROUND, WIDTH> StateButtonBuilder<Unset, EVENT, SELECTOR, BACKGROUND, WIDTH> {
-    pub fn with_text<TEXT: AsRef<str> + 'static>(self, text: TEXT) -> StateButtonBuilder<With<TEXT>, EVENT, SELECTOR, BACKGROUND, WIDTH> {
-        StateButtonBuilder {
-            text: With::new(text),
-            ..self
-        }
+    pub fn with_text<TEXT: AsRef<str> + 'static>(self, text: TEXT) -> StateButtonBuilder<TEXT, EVENT, SELECTOR, BACKGROUND, WIDTH> {
+        StateButtonBuilder { text, ..self }
     }
 }
 
 impl<TEXT, SELECTOR, BACKGROUND, WIDTH> StateButtonBuilder<TEXT, Unset, SELECTOR, BACKGROUND, WIDTH> {
-    pub fn with_event<EVENT: ElementEvent + 'static>(
-        self,
-        event: EVENT,
-    ) -> StateButtonBuilder<TEXT, With<EVENT>, SELECTOR, BACKGROUND, WIDTH> {
-        StateButtonBuilder {
-            event: With::new(event),
-            ..self
-        }
+    pub fn with_event<EVENT: ElementEvent + 'static>(self, event: EVENT) -> StateButtonBuilder<TEXT, EVENT, SELECTOR, BACKGROUND, WIDTH> {
+        StateButtonBuilder { event, ..self }
     }
 }
 
@@ -53,9 +44,9 @@ impl<TEXT, EVENT, BACKGROUND, WIDTH> StateButtonBuilder<TEXT, EVENT, Unset, BACK
     pub fn with_selector(
         self,
         selector: impl Fn(&StateProvider) -> bool + 'static,
-    ) -> StateButtonBuilder<TEXT, EVENT, With<StateSelector>, BACKGROUND, WIDTH> {
+    ) -> StateButtonBuilder<TEXT, EVENT, StateSelector, BACKGROUND, WIDTH> {
         StateButtonBuilder {
-            selector: With::new(Box::new(selector)),
+            selector: Box::new(selector),
             marker: PhantomData,
             ..self
         }
@@ -82,7 +73,7 @@ impl<TEXT, EVENT, SELECTOR, BACKGROUND> StateButtonBuilder<TEXT, EVENT, SELECTOR
     }
 }
 
-impl<TEXT, EVENT, BACKGROUND, WIDTH> StateButtonBuilder<With<TEXT>, With<EVENT>, With<StateSelector>, BACKGROUND, WIDTH>
+impl<TEXT, EVENT, BACKGROUND, WIDTH> StateButtonBuilder<TEXT, EVENT, StateSelector, BACKGROUND, WIDTH>
 where
     TEXT: AsRef<str> + 'static,
     EVENT: ElementEvent + 'static,
@@ -102,10 +93,6 @@ where
             width_bound,
             ..
         } = self;
-
-        let text = text.take();
-        let event = event.take();
-        let selector = selector.take();
 
         StateButton {
             text,

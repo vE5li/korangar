@@ -1,33 +1,19 @@
+mod builder;
+
 use procedural::*;
 
+pub use self::builder::ChatBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};
 use crate::loaders::FontLoader;
 use crate::network::ChatMessage;
 
 pub struct Chat {
-    // TODO: make this Remote
-    messages: Rc<RefCell<Vec<ChatMessage>>>,
+    messages: Remote<Vec<ChatMessage>>,
     font_loader: Rc<RefCell<FontLoader>>,
     // TODO: make this Remote
     stamp: bool,
-    cached_message_count: usize,
     state: ElementState,
-}
-
-impl Chat {
-    pub fn new(messages: Rc<RefCell<Vec<ChatMessage>>>, font_loader: Rc<RefCell<FontLoader>>) -> Self {
-        let cached_message_count = messages.borrow().len();
-        let state = ElementState::default();
-
-        Self {
-            messages,
-            font_loader,
-            stamp: true,
-            cached_message_count,
-            state,
-        }
-    }
 }
 
 impl Element for Chat {
@@ -49,6 +35,8 @@ impl Element for Chat {
         // padding.
         let mut height = 5.0 * interface_settings.scaling.get();
 
+        // NOTE: Dividing by the scaling is done to counteract the scaling being applied
+        // twice per message. It's not the cleanest solution but it works.
         for message in self.messages.borrow().iter() {
             height += self
                 .font_loader
@@ -58,7 +46,8 @@ impl Element for Chat {
                     theme.chat.font_size.get() * interface_settings.scaling.get(),
                     placement_resolver.get_available().width,
                 )
-                .y;
+                .y
+                / interface_settings.scaling.get();
         }
 
         size_bound.height = Dimension::Absolute(height);
@@ -66,14 +55,7 @@ impl Element for Chat {
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
-        let messages = self.messages.borrow();
-
-        if messages.len() != self.cached_message_count {
-            self.cached_message_count = messages.len();
-            return Some(ChangeEvent::RESOLVE_WINDOW);
-        }
-
-        None
+        self.messages.consume_changed().then_some(ChangeEvent::RESOLVE_WINDOW)
     }
 
     fn render(
@@ -109,12 +91,14 @@ impl Element for Chat {
                 theme.chat.font_size.get(),
             );
 
+            // NOTE: Dividing by the scaling is done to counteract the scaling being applied
+            // twice per message. It's not the cleanest solution but it works.
             offset += renderer.render_text(
                 text,
                 ScreenPosition::only_top(offset),
                 message.color,
                 theme.chat.font_size.get(),
-            );
+            ) / interface_settings.scaling.get();
         }
     }
 }

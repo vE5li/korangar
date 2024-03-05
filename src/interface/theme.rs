@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::Color;
+use crate::interface::state::TrackedStateTake;
 use crate::interface::*;
 
 pub struct Menu;
@@ -680,19 +681,16 @@ pub struct ThemeSelector;
 
 impl PrototypeElement for ThemeSelector {
     fn to_element(&self, display: String) -> ElementCell {
-        let theme_name = Rc::new(RefCell::new("".to_owned()));
         let name_action = Box::new(move || vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
-        let theme_kind = TrackedState::new(ThemeKind::Main);
+        let theme_name = TrackedState::default();
+        let theme_kind = TrackedState::default();
 
         let load_action = {
-            let theme_name = theme_name.clone();
+            let mut theme_name = theme_name.clone();
             let theme_kind = theme_kind.clone();
 
             Box::new(move || {
-                let mut taken_name = String::new();
-                let mut theme_name = theme_name.borrow_mut();
-                std::mem::swap(&mut taken_name, &mut theme_name);
-
+                let taken_name = theme_name.take();
                 let file_name = format!("client/themes/{}.ron", taken_name);
 
                 vec![ClickAction::Event(UserEvent::SetThemeFile {
@@ -733,7 +731,14 @@ impl PrototypeElement for ThemeSelector {
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),
-            InputField::<40>::new(theme_name, "Theme name", name_action, dimension_bound!(75%)).wrap(),
+            InputFieldBuilder::new()
+                .with_state(theme_name)
+                .with_ghost_text("Theme name")
+                .with_enter_action(name_action)
+                .with_length(40)
+                .with_width_bound(dimension_bound!(75%))
+                .build()
+                .wrap(),
             ButtonBuilder::new()
                 .with_text("Load")
                 .with_event(load_action)

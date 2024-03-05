@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use derive_new::new;
 use procedural::*;
 
@@ -25,7 +22,7 @@ impl PrototypeWindow for CharacterCreationWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, interface_settings: &InterfaceSettings, available_space: ScreenSize) -> Window {
-        let name = Rc::new(RefCell::new(String::new()));
+        let name = TrackedState::<String>::default();
 
         let selector = {
             let name = name.clone();
@@ -42,7 +39,13 @@ impl PrototypeWindow for CharacterCreationWindow {
         let input_action = Box::new(move || vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
 
         let elements = vec![
-            InputField::<MAXIMUM_NAME_LENGTH>::new(name, "character name", input_action, dimension_bound!(100%)).wrap(),
+            InputFieldBuilder::new()
+                .with_state(name)
+                .with_ghost_text("Character name")
+                .with_enter_action(input_action)
+                .with_length(MAXIMUM_NAME_LENGTH)
+                .build()
+                .wrap(),
             ButtonBuilder::new()
                 .with_text("done")
                 .with_disabled_selector(selector)

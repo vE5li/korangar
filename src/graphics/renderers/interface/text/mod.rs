@@ -95,7 +95,7 @@ impl TextRenderer {
 
         let mut font_loader = self.font_loader.borrow_mut();
         let texture = font_loader.get_font_atlas();
-        let (character_layout, heigth) = font_loader.get(text, color, font_size, screen_clip.right - screen_position.left);
+        let (character_layout, height) = font_loader.get(text, color, font_size, screen_clip.right - screen_position.left);
         let half_screen = window_size / 2.0;
 
         let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [
@@ -140,6 +140,6 @@ impl TextRenderer {
                 .unwrap();
         });
 
-        heigth
+        height
     }
 }

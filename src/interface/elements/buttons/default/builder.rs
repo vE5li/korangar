@@ -1,5 +1,5 @@
 use super::Button;
-use crate::interface::builder::{Set, Unset, With};
+use crate::interface::builder::{Set, Unset};
 use crate::interface::*;
 
 /// Type state [`Button`] builder. This builder utilizes the type system to
@@ -31,14 +31,8 @@ impl ButtonBuilder<Unset, Unset, Unset, Unset, Unset, Unset> {
 }
 
 impl<EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> ButtonBuilder<Unset, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> {
-    pub fn with_text<TEXT: AsRef<str> + 'static>(
-        self,
-        text: TEXT,
-    ) -> ButtonBuilder<With<TEXT>, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> {
-        ButtonBuilder {
-            text: With::new(text),
-            ..self
-        }
+    pub fn with_text<TEXT: AsRef<str> + 'static>(self, text: TEXT) -> ButtonBuilder<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> {
+        ButtonBuilder { text, ..self }
     }
 }
 
@@ -46,11 +40,8 @@ impl<TEXT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> ButtonBuilder<TEXT, Unset, D
     pub fn with_event<EVENT: ElementEvent + 'static>(
         self,
         event: EVENT,
-    ) -> ButtonBuilder<TEXT, With<EVENT>, DISABLED, FOREGROUND, BACKGROUND, WIDTH> {
-        ButtonBuilder {
-            event: With::new(event),
-            ..self
-        }
+    ) -> ButtonBuilder<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> {
+        ButtonBuilder { event, ..self }
     }
 }
 
@@ -103,7 +94,7 @@ impl<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND> ButtonBuilder<TEXT, EVENT, D
     }
 }
 
-impl<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> ButtonBuilder<With<TEXT>, With<EVENT>, DISABLED, FOREGROUND, BACKGROUND, WIDTH>
+impl<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> ButtonBuilder<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH>
 where
     TEXT: AsRef<str> + 'static,
     EVENT: ElementEvent + 'static,
@@ -123,9 +114,6 @@ where
             width_bound,
             ..
         } = self;
-
-        let text = text.take();
-        let event = event.take();
 
         Button {
             text,

@@ -227,7 +227,7 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
                 .with_ghost_text("Password")
                 .with_enter_action(password_action)
                 .with_length(24)
-                .with_hidden()
+                .hidden()
                 .build()
                 .wrap(),
             Container::new({

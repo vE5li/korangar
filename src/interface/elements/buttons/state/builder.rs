@@ -1,3 +1,5 @@
+use procedural::dimension_bound;
+
 use super::{StateButton, StateSelector};
 use crate::interface::builder::{Set, Unset};
 use crate::interface::*;
@@ -11,7 +13,7 @@ pub struct StateButtonBuilder<TEXT, EVENT, SELECTOR, BACKGROUND, WIDTH> {
     event: EVENT,
     selector: SELECTOR,
     transparent_background: bool,
-    width_bound: Option<DimensionBound>,
+    width_bound: DimensionBound,
     marker: PhantomData<(SELECTOR, BACKGROUND, WIDTH)>,
 }
 
@@ -22,7 +24,7 @@ impl StateButtonBuilder<Unset, Unset, Unset, Unset, Unset> {
             event: Unset,
             selector: Unset,
             transparent_background: false,
-            width_bound: None,
+            width_bound: dimension_bound!(100%),
             marker: PhantomData,
         }
     }
@@ -66,7 +68,7 @@ impl<TEXT, EVENT, SELECTOR, WIDTH> StateButtonBuilder<TEXT, EVENT, SELECTOR, Uns
 impl<TEXT, EVENT, SELECTOR, BACKGROUND> StateButtonBuilder<TEXT, EVENT, SELECTOR, BACKGROUND, Unset> {
     pub fn with_width_bound(self, width_bound: DimensionBound) -> StateButtonBuilder<TEXT, EVENT, SELECTOR, BACKGROUND, Set> {
         StateButtonBuilder {
-            width_bound: Some(width_bound),
+            width_bound,
             marker: PhantomData,
             ..self
         }

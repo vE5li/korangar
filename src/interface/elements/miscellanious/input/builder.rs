@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use procedural::dimension_bound;
+
 use super::{EnterAction, InputField};
 use crate::interface::builder::{Set, Unset};
 use crate::interface::*;
@@ -14,7 +16,7 @@ pub struct InputFieldBuilder<STATE, TEXT, ACTION, LENGTH, HIDDEN, WIDTH> {
     enter_action: ACTION,
     length: usize,
     hidden: bool,
-    width_bound: Option<DimensionBound>,
+    width_bound: DimensionBound,
     marker: PhantomData<(LENGTH, HIDDEN, WIDTH)>,
 }
 
@@ -26,7 +28,7 @@ impl InputFieldBuilder<Unset, Unset, Unset, Unset, Unset, Unset> {
             enter_action: Unset,
             length: 0,
             hidden: false,
-            width_bound: None,
+            width_bound: dimension_bound!(100%),
             marker: PhantomData,
         }
     }
@@ -42,6 +44,7 @@ impl<TEXT, ACTION, LENGTH, HIDDEN, WIDTH> InputFieldBuilder<Unset, TEXT, ACTION,
 }
 
 impl<STATE, ACTION, LENGTH, HIDDEN, WIDTH> InputFieldBuilder<STATE, Unset, ACTION, LENGTH, HIDDEN, WIDTH> {
+    /// Set the text that will be displayed when the [`InputField`] is empty.
     pub fn with_ghost_text<TEXT: Display + 'static>(
         self,
         ghost_text: TEXT,
@@ -51,6 +54,7 @@ impl<STATE, ACTION, LENGTH, HIDDEN, WIDTH> InputFieldBuilder<STATE, Unset, ACTIO
 }
 
 impl<STATE, TEXT, LENGTH, HIDDEN, WIDTH> InputFieldBuilder<STATE, TEXT, Unset, LENGTH, HIDDEN, WIDTH> {
+    /// Set an action that will be executed when the user presses the enter key.
     pub fn with_enter_action(
         self,
         enter_action: impl FnMut() -> Vec<ClickAction> + 'static,
@@ -63,6 +67,7 @@ impl<STATE, TEXT, LENGTH, HIDDEN, WIDTH> InputFieldBuilder<STATE, TEXT, Unset, L
 }
 
 impl<STATE, TEXT, ACTION, HIDDEN, WIDTH> InputFieldBuilder<STATE, TEXT, ACTION, Unset, HIDDEN, WIDTH> {
+    /// Set the maximum number of allowed characters.
     pub fn with_length(self, length: usize) -> InputFieldBuilder<STATE, TEXT, ACTION, Set, HIDDEN, WIDTH> {
         InputFieldBuilder {
             length,
@@ -73,7 +78,8 @@ impl<STATE, TEXT, ACTION, HIDDEN, WIDTH> InputFieldBuilder<STATE, TEXT, ACTION, 
 }
 
 impl<STATE, TEXT, ACTION, LENGTH, WIDTH> InputFieldBuilder<STATE, TEXT, ACTION, LENGTH, Unset, WIDTH> {
-    pub fn with_hidden(self) -> InputFieldBuilder<STATE, TEXT, ACTION, LENGTH, Set, WIDTH> {
+    /// Only show text as `*` characters. Useful for password fields.
+    pub fn hidden(self) -> InputFieldBuilder<STATE, TEXT, ACTION, LENGTH, Set, WIDTH> {
         InputFieldBuilder {
             hidden: true,
             marker: PhantomData,
@@ -85,7 +91,7 @@ impl<STATE, TEXT, ACTION, LENGTH, WIDTH> InputFieldBuilder<STATE, TEXT, ACTION, 
 impl<STATE, TEXT, ACTION, LENGTH, HIDDEN> InputFieldBuilder<STATE, TEXT, ACTION, LENGTH, HIDDEN, Unset> {
     pub fn with_width_bound(self, width_bound: DimensionBound) -> InputFieldBuilder<STATE, TEXT, ACTION, LENGTH, HIDDEN, Set> {
         InputFieldBuilder {
-            width_bound: Some(width_bound),
+            width_bound,
             marker: PhantomData,
             ..self
         }

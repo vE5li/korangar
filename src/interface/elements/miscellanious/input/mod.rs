@@ -2,8 +2,6 @@ mod builder;
 
 use std::fmt::Display;
 
-use procedural::dimension_bound;
-
 pub use self::builder::InputFieldBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -18,7 +16,7 @@ pub struct InputField<TEXT: Display + 'static> {
     enter_action: EnterAction,
     length: usize,
     hidden: bool,
-    width_bound: Option<DimensionBound>,
+    width_bound: DimensionBound,
     state: ElementState,
 }
 
@@ -60,12 +58,7 @@ impl<TEXT: Display + 'static> Element for InputField<TEXT> {
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_bound = self
-            .width_bound
-            .as_ref()
-            .unwrap_or(&dimension_bound!(100%))
-            .add_height(theme.input.height_bound);
-
+        let size_bound = self.width_bound.add_height(theme.input.height_bound);
         self.state.resolve(placement_resolver, &size_bound);
     }
 

@@ -1,3 +1,5 @@
+use procedural::dimension_bound;
+
 use super::Button;
 use crate::interface::builder::{Set, Unset};
 use crate::interface::*;
@@ -12,7 +14,7 @@ pub struct ButtonBuilder<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, WIDTH> {
     disabled_selector: Option<Selector>,
     foreground_color: Option<ColorSelector>,
     background_color: Option<ColorSelector>,
-    width_bound: Option<DimensionBound>,
+    width_bound: DimensionBound,
     marker: PhantomData<(DISABLED, FOREGROUND, BACKGROUND, WIDTH)>,
 }
 
@@ -24,7 +26,7 @@ impl ButtonBuilder<Unset, Unset, Unset, Unset, Unset, Unset> {
             disabled_selector: None,
             foreground_color: None,
             background_color: None,
-            width_bound: None,
+            width_bound: dimension_bound!(100%),
             marker: PhantomData,
         }
     }
@@ -87,7 +89,7 @@ impl<TEXT, EVENT, DISABLED, FOREGROUND, WIDTH> ButtonBuilder<TEXT, EVENT, DISABL
 impl<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND> ButtonBuilder<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, Unset> {
     pub fn with_width_bound(self, width_bound: DimensionBound) -> ButtonBuilder<TEXT, EVENT, DISABLED, FOREGROUND, BACKGROUND, Set> {
         ButtonBuilder {
-            width_bound: Some(width_bound),
+            width_bound,
             marker: PhantomData,
             ..self
         }

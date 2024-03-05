@@ -1,7 +1,5 @@
 mod builder;
 
-use procedural::dimension_bound;
-
 pub use self::builder::ButtonBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -17,7 +15,7 @@ where
     disabled_selector: Option<Selector>,
     foreground_color: Option<ColorSelector>,
     background_color: Option<ColorSelector>,
-    width_bound: Option<DimensionBound>,
+    width_bound: DimensionBound,
     state: ElementState,
 }
 
@@ -45,12 +43,7 @@ impl<TEXT: AsRef<str> + 'static, EVENT: ElementEvent> Element for Button<TEXT, E
     }
 
     fn resolve(&mut self, placement_resolver: &mut PlacementResolver, _interface_settings: &InterfaceSettings, theme: &InterfaceTheme) {
-        let size_bound = self
-            .width_bound
-            .as_ref()
-            .unwrap_or(&dimension_bound!(100%))
-            .add_height(theme.button.height_bound);
-
+        let size_bound = self.width_bound.add_height(theme.button.height_bound);
         self.state.resolve(placement_resolver, &size_bound);
     }
 

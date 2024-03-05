@@ -26,23 +26,25 @@ pub struct PlacementResolver {
 impl PlacementResolver {
     pub fn new(
         font_loader: Rc<RefCell<FontLoader>>,
-        mut available_space: ScreenSize,
+        screen_size: ScreenSize,
+        mut window_size: ScreenSize,
         size_bound: &SizeBound,
         border: ScreenSize,
         gaps: ScreenSize,
         scaling: f32,
     ) -> Self {
-        available_space.width -= border.width * scaling * 2.0;
-        available_space.height -= border.height * scaling * 2.0;
+        window_size -= border * scaling * 2.0;
 
-        let parent_limits = ParentLimits::from_bound(size_bound, available_space, scaling);
+        // NOTE: I'm not enirely sure why we need to subtract one border here, but if we
+        // don't the `super` bound is too big.
+        let parent_limits = ParentLimits::from_bound(size_bound, screen_size - border * scaling, scaling);
         let base_position = ScreenPosition::from_size(border * scaling);
         let horizontal_accumulator = 0.0;
         let vertical_offset = 0.0;
         let total_height = 0.0;
 
-        let height = (!size_bound.height.is_flexible()).then_some(available_space.height);
-        let available_space = PartialScreenSize::new(available_space.width, height);
+        let height = (!size_bound.height.is_flexible()).then_some(window_size.height);
+        let available_space = PartialScreenSize::new(window_size.width, height);
 
         Self {
             font_loader,

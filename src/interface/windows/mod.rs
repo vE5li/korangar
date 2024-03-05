@@ -74,10 +74,8 @@ impl Window {
     ) -> (Option<&str>, ScreenPosition, ScreenSize) {
         let mut placement_resolver = PlacementResolver::new(
             font_loader.clone(),
-            ScreenSize {
-                height: available_space.height,
-                width: self.size.width,
-            },
+            available_space,
+            self.size,
             &self.size_bound,
             theme.window.border_size.get(),
             theme.window.gaps.get(),
@@ -111,6 +109,7 @@ impl Window {
 
             let mut placement_resolver = PlacementResolver::new(
                 font_loader,
+                available_space,
                 // TODO: 250 is an arbitrary limitation. This should be replaced with a value based
                 // on some reasoning.
                 ScreenSize {

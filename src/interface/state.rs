@@ -4,44 +4,79 @@ use std::rc::Rc;
 
 use super::{ClickAction, StateProvider};
 
+/// The state of a value borrowed by [`borrow_mut`](TrackedState::with_mut).
+pub enum ValueState<T> {
+    Mutated(T),
+    Unchanged(T),
+}
+
 #[derive(Default)]
-pub struct TrackedState<T>(Rc<RefCell<(T, usize)>>);
+struct InnerState<VALUE> {
+    value: VALUE,
+    version: usize,
+}
 
-impl<T> TrackedState<T> {
-    pub fn new(value: T) -> TrackedState<T> {
-        Self(Rc::new(RefCell::new((value, 0))))
+impl<VALUE> InnerState<VALUE> {
+    pub fn new(value: VALUE) -> Self {
+        Self { value, version: 0 }
     }
 
-    pub fn set(&mut self, data: T) {
+    pub fn bump_version(&mut self) {
+        self.version = self.version.wrapping_add(1);
+    }
+}
+
+#[derive(Default)]
+pub struct TrackedState<VALUE>(Rc<RefCell<InnerState<VALUE>>>);
+
+impl<VALUE> TrackedState<VALUE> {
+    pub fn new(value: VALUE) -> TrackedState<VALUE> {
+        Self(Rc::new(RefCell::new(InnerState::new(value))))
+    }
+
+    pub fn set(&mut self, data: VALUE) {
         let mut inner = self.0.borrow_mut();
-        inner.0 = data;
-        inner.1 = inner.1.wrapping_add(1);
+        inner.value = data;
+        inner.bump_version();
     }
 
-    pub fn borrow(&self) -> Ref<'_, T> {
-        Ref::map(self.0.borrow(), |inner| &inner.0)
+    pub fn borrow(&self) -> Ref<'_, VALUE> {
+        Ref::map(self.0.borrow(), |inner| &inner.value)
     }
 
     pub fn get_version(&self) -> usize {
-        self.0.borrow().1
+        self.0.borrow().version
     }
 
-    pub fn with_mut<F, R>(&mut self, f: F) -> R
+    /// Work on a mutable reference of the inner value. The provided closure has
+    /// to report back whether or not the value inside was mutated. If any state
+    /// change occurred, the closure *must* return [`ValueState::Mutated`].
+    ///
+    /// NOTE: It is imperative that the correct state is
+    /// returned. Returning [`ValueState::Mutated`] when no modification was
+    /// done might result in unnecessary updates. Similarly, returning
+    /// [`ValueState::Unchanged`] when the value was mutated will result in
+    /// no update at all.
+    pub fn with_mut<CLOSURE, RETURN>(&mut self, closure: CLOSURE) -> RETURN
     where
-        F: FnOnce(&mut T, &mut dyn FnMut()) -> R,
+        CLOSURE: FnOnce(&mut VALUE) -> ValueState<RETURN>,
     {
-        let (inner, version) = &mut *self.0.borrow_mut();
-        let mut changed = || *version = version.wrapping_add(1);
+        let mut inner = self.0.borrow_mut();
 
-        f(inner, &mut changed)
+        match closure(&mut inner.value) {
+            ValueState::Mutated(return_value) => {
+                inner.bump_version();
+                return_value
+            }
+            ValueState::Unchanged(return_value) => return_value,
+        }
     }
 
     pub fn update(&mut self) {
-        let mut inner = self.0.borrow_mut();
-        inner.1 = inner.1.wrapping_add(1);
+        self.0.borrow_mut().bump_version();
     }
 
-    pub fn new_remote(&self) -> Remote<T> {
+    pub fn new_remote(&self) -> Remote<VALUE> {
         let tracked_state = self.clone();
         let version = self.get_version();
 
@@ -49,42 +84,43 @@ impl<T> TrackedState<T> {
     }
 }
 
-impl<T> TrackedState<T>
+impl<VALUE> TrackedState<VALUE>
 where
-    T: Clone,
+    VALUE: Clone,
 {
-    pub fn get(&self) -> T {
-        self.0.borrow().0.clone()
+    pub fn get(&self) -> VALUE {
+        self.0.borrow().value.clone()
     }
 }
 
-impl<T> TrackedState<Vec<T>> {
+impl<VALUE> TrackedState<Vec<VALUE>> {
     pub fn clear(&mut self) {
         let mut inner = self.0.borrow_mut();
-        inner.0.clear();
-        inner.1 = inner.1.wrapping_add(1);
+        inner.value.clear();
+        inner.bump_version();
     }
 
-    pub fn push(&mut self, item: T) {
+    pub fn push(&mut self, item: VALUE) {
         let mut inner = self.0.borrow_mut();
-        inner.0.push(item);
-        inner.1 = inner.1.wrapping_add(1);
+        inner.value.push(item);
+        inner.bump_version();
     }
 
     pub fn retain<F>(&mut self, mut f: F)
     where
-        F: FnMut(&T) -> bool,
+        F: FnMut(&VALUE) -> bool,
     {
         let mut inner = self.0.borrow_mut();
-        let previous_length = inner.0.len();
+        let previous_length = inner.value.len();
 
-        inner.0.retain_mut(|element| f(element));
+        inner.value.retain_mut(|element| f(element));
 
-        let new_length = inner.0.len();
+        let new_length = inner.value.len();
         let has_updated = new_length < previous_length;
 
-        // Litte hack to save a branch.
-        inner.1 = inner.1.wrapping_add(has_updated as usize);
+        if has_updated {
+            inner.bump_version();
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -92,29 +128,29 @@ impl<T> TrackedState<Vec<T>> {
     }
 }
 
-pub trait TrackedStateTake<T> {
-    fn take(&mut self) -> T;
+pub trait TrackedStateTake<VALUE> {
+    fn take(&mut self) -> VALUE;
 }
 
-impl<T> TrackedStateTake<T> for TrackedState<T>
+impl<VALUE> TrackedStateTake<VALUE> for TrackedState<VALUE>
 where
-    T: Default,
+    VALUE: Default,
 {
-    default fn take(&mut self) -> T {
-        let mut taken_value = T::default();
-        let inner_value = &mut self.0.borrow_mut().0;
+    default fn take(&mut self) -> VALUE {
+        let mut taken_value = VALUE::default();
+        let inner_value = &mut self.0.borrow_mut().value;
         std::mem::swap(&mut taken_value, inner_value);
 
         taken_value
     }
 }
 
-impl<T> TrackedStateTake<Option<T>> for TrackedState<Option<T>>
+impl<VALUE> TrackedStateTake<Option<VALUE>> for TrackedState<Option<VALUE>>
 where
-    T: Default,
+    VALUE: Default,
 {
-    fn take(&mut self) -> Option<T> {
-        let option = self.0.borrow_mut().0.take();
+    fn take(&mut self) -> Option<VALUE> {
+        let option = self.0.borrow_mut().value.take();
 
         // NOTE: Unnecessary updates might have huge impacts on performance, so we try
         // to only update if we actually took a value.
@@ -126,14 +162,14 @@ where
     }
 }
 
-impl<T> TrackedState<T>
+impl<VALUE> TrackedState<VALUE>
 where
-    T: Not<Output = T> + Copy,
+    VALUE: Not<Output = VALUE> + Copy,
 {
     pub fn toggle(&mut self) {
         let mut inner = self.0.borrow_mut();
-        inner.0 = !inner.0;
-        inner.1 = inner.1.wrapping_add(1);
+        inner.value = !inner.value;
+        inner.bump_version();
     }
 
     pub fn toggle_action(&self) -> Box<impl FnMut() -> Vec<ClickAction>> {
@@ -152,27 +188,27 @@ impl TrackedState<bool> {
     }
 }
 
-impl<T> Clone for TrackedState<T> {
+impl<VALUE> Clone for TrackedState<VALUE> {
     fn clone(&self) -> Self {
         Self(Rc::clone(&self.0))
     }
 }
 
-pub struct Remote<T> {
-    tracked_state: TrackedState<T>,
+pub struct Remote<VALUE> {
+    tracked_state: TrackedState<VALUE>,
     version: usize,
 }
 
-impl<T> Remote<T> {
-    pub fn new(value: T) -> Remote<T> {
+impl<VALUE> Remote<VALUE> {
+    pub fn new(value: VALUE) -> Remote<VALUE> {
         TrackedState::new(value).new_remote()
     }
 
-    pub fn clone_state(&self) -> TrackedState<T> {
+    pub fn clone_state(&self) -> TrackedState<VALUE> {
         self.tracked_state.clone()
     }
 
-    pub fn borrow(&self) -> Ref<'_, T> {
+    pub fn borrow(&self) -> Ref<'_, VALUE> {
         self.tracked_state.borrow()
     }
 
@@ -185,16 +221,16 @@ impl<T> Remote<T> {
     }
 }
 
-impl<T> Remote<T>
+impl<VALUE> Remote<VALUE>
 where
-    T: Clone,
+    VALUE: Clone,
 {
-    pub fn get(&self) -> T {
+    pub fn get(&self) -> VALUE {
         self.tracked_state.get()
     }
 }
 
-impl<T> Clone for Remote<T> {
+impl<VALUE> Clone for Remote<VALUE> {
     fn clone(&self) -> Self {
         let tracked_state = self.tracked_state.clone();
         let version = self.version;

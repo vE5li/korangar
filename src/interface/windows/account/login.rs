@@ -5,6 +5,7 @@ use std::rc::Rc;
 use derive_new::new;
 
 use crate::input::UserEvent;
+use crate::interface::state::ValueState;
 use crate::interface::*;
 use crate::loaders::ClientInfo;
 use crate::network::LoginSettings;
@@ -71,13 +72,13 @@ impl<'a> PrototypeWindow for LoginWindow<'a> {
                 let login_settings = login_settings.borrow_mut();
 
                 if let Some(saved_settings) = login_settings.service_settings.get(&service_id) {
-                    username.with_mut(|username, changed| {
+                    username.with_mut(|username| {
                         *username = saved_settings.username.clone();
-                        changed();
+                        ValueState::Mutated(())
                     });
-                    password.with_mut(|password, changed| {
+                    password.with_mut(|password| {
                         *password = saved_settings.password.clone();
-                        changed();
+                        ValueState::Mutated(())
                     });
                 }
 

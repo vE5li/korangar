@@ -12,7 +12,7 @@ use crate::debug::*;
 use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::TrackedState;
-use crate::interface::WeakElementCell;
+use crate::interface::{ValueState, WeakElementCell};
 use crate::loaders::convertable::check_upper_bound;
 #[cfg(feature = "debug")]
 use crate::network::IncomingPacket;
@@ -84,11 +84,11 @@ impl<'b> ByteStream<'b> {
         packet_history: &mut TrackedState<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>,
     ) {
         if !self.packet_history.is_empty() {
-            packet_history.with_mut(|buffer, changed| {
+            packet_history.with_mut(|buffer| {
                 self.packet_history
                     .drain(..)
                     .for_each(|packet| buffer.push((packet, UnsafeCell::new(None))));
-                changed()
+                ValueState::Mutated(())
             });
         }
     }

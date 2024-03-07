@@ -2,7 +2,7 @@ use std::cell::Ref;
 
 use super::Skill;
 use crate::input::HotbarSlot;
-use crate::interface::{Remote, TrackedState};
+use crate::interface::{Remote, TrackedState, ValueState};
 
 #[derive(Default)]
 pub struct Hotbar {
@@ -11,22 +11,22 @@ pub struct Hotbar {
 
 impl Hotbar {
     pub fn set_slot(&mut self, skill: Skill, slot: HotbarSlot) {
-        self.skills.with_mut(|skills, changed| {
+        self.skills.with_mut(|skills| {
             skills[slot.0] = Some(skill);
-            changed();
+            ValueState::Mutated(())
         });
     }
 
     pub fn swap_slot(&mut self, source_slot: HotbarSlot, destination_slot: HotbarSlot) {
         if source_slot != destination_slot {
-            self.skills.with_mut(|skills, changed| {
+            self.skills.with_mut(|skills| {
                 let first = skills[source_slot.0].take();
                 let second = skills[destination_slot.0].take();
 
                 skills[source_slot.0] = second;
                 skills[destination_slot.0] = first;
 
-                changed();
+                ValueState::Mutated(())
             });
         }
     }

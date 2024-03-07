@@ -1,6 +1,7 @@
 use procedural::*;
 
 use crate::input::UserEvent;
+use crate::interface::state::ValueState;
 use crate::interface::*;
 
 #[derive(Default)]
@@ -22,17 +23,14 @@ impl PrototypeWindow for CommandsWindow {
             let mut input_text = input_text.clone();
 
             Box::new(move || {
-                let message = input_text.with_mut(|text, changed| {
+                let message = input_text.with_mut(|text| {
                     if text.is_empty() {
-                        return None;
+                        return ValueState::Unchanged(None);
                     }
 
                     let message = format!("@jobchange {text}");
-
                     text.clear();
-                    changed();
-
-                    Some(message)
+                    ValueState::Mutated(Some(message))
                 });
 
                 let Some(message) = message else {
@@ -47,13 +45,10 @@ impl PrototypeWindow for CommandsWindow {
             let mut input_text = input_text.clone();
 
             move || {
-                let message = input_text.with_mut(|text, changed| {
+                let message = input_text.with_mut(|text| {
                     let message = format!("@jobchange {text}");
-
                     text.clear();
-                    changed();
-
-                    message
+                    ValueState::Mutated(message)
                 });
 
                 vec![ClickAction::Event(UserEvent::SendMessage(message))]

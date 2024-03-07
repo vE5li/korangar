@@ -5,6 +5,7 @@ use std::fmt::Display;
 pub use self::builder::InputFieldBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
+use crate::interface::state::ValueState;
 use crate::interface::*;
 
 /// Local type alias to simplify the builder.
@@ -22,28 +23,26 @@ pub struct InputField<TEXT: Display + 'static> {
 
 impl<TEXT: Display + 'static> InputField<TEXT> {
     fn remove_character(&mut self) -> Vec<ClickAction> {
-        self.input_state.with_mut(|input_state, changed| {
+        self.input_state.with_mut(|input_state| {
             if input_state.is_empty() {
-                return Vec::new();
+                return ValueState::Unchanged(Vec::new());
             }
 
             input_state.pop();
-            changed();
 
-            vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)]
+            ValueState::Mutated(vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)])
         })
     }
 
     fn add_character(&mut self, character: char) -> Vec<ClickAction> {
-        self.input_state.with_mut(|input_state, changed| {
+        self.input_state.with_mut(|input_state| {
             if input_state.len() >= self.length {
-                return Vec::new();
+                return ValueState::Unchanged(Vec::new());
             }
 
             input_state.push(character);
-            changed();
 
-            vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)]
+            ValueState::Mutated(vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)])
         })
     }
 }

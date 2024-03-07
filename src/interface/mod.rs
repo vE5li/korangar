@@ -24,7 +24,7 @@ pub use self::event::*;
 pub use self::layout::*;
 pub use self::provider::StateProvider;
 pub use self::settings::InterfaceSettings;
-pub use self::state::{Remote, TrackedState, TrackedStateTake};
+pub use self::state::{ValueState, Remote, TrackedState, TrackedStateTake};
 pub use self::theme::{GameTheme, InterfaceTheme};
 use self::theme::{Main, Menu, ThemeSelector, Themes};
 pub use self::windows::*;
@@ -630,14 +630,14 @@ impl Interface {
     #[profile]
     pub fn open_dialog_window(&mut self, focus_state: &mut FocusState, text: String, npc_id: EntityId) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-            dialog_handle.elements.with_mut(|elements, changed| {
+            dialog_handle.elements.with_mut(|elements| {
                 if dialog_handle.clear {
                     elements.clear();
                     dialog_handle.clear = false;
                 }
 
                 elements.push(DialogElement::Text(text));
-                changed();
+                ValueState::Mutated(())
             });
         } else {
             let (window, elements) = DialogWindow::new(text, npc_id);
@@ -657,10 +657,10 @@ impl Interface {
     #[profile]
     pub fn add_close_button(&mut self) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-            dialog_handle.elements.with_mut(|elements, changed| {
+            dialog_handle.elements.with_mut(|elements| {
                 elements.retain(|element| *element != DialogElement::NextButton);
                 elements.push(DialogElement::CloseButton);
-                changed();
+                ValueState::Mutated(())
             });
         }
     }
@@ -668,7 +668,7 @@ impl Interface {
     #[profile]
     pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
-            dialog_handle.elements.with_mut(move |elements, changed| {
+            dialog_handle.elements.with_mut(move |elements| {
                 elements.retain(|element| *element != DialogElement::NextButton);
 
                 choices
@@ -676,7 +676,7 @@ impl Interface {
                     .enumerate()
                     .for_each(|(index, choice)| elements.push(DialogElement::ChoiceButton(choice, index as i8 + 1)));
 
-                changed();
+                ValueState::Mutated(())
             });
         }
     }

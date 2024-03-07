@@ -1,5 +1,4 @@
 mod login;
-
 use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::io::prelude::*;
@@ -20,8 +19,8 @@ use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::PacketWindow;
 use crate::interface::{
-    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, TrackedStateTake,
-    WeakElementCell,
+    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, ValueState, PrototypeElement, TrackedState,
+    TrackedStateTake, WeakElementCell,
 };
 use crate::loaders::{conversion_result, ByteStream, ClientInfo, ConversionError, FromBytes, Named, ServiceId, ToBytes};
 
@@ -2948,9 +2947,9 @@ impl NetworkingSystem {
         T: OutgoingPacket + 'static,
     {
         if self.update_packets.get() {
-            self.packet_history.with_mut(|buffer, changed| {
+            self.packet_history.with_mut(|buffer| {
                 buffer.push((PacketEntry::new_outgoing(packet, T::NAME, T::IS_PING), UnsafeCell::new(None)));
-                changed()
+                ValueState::Mutated(())
             });
         }
     }
@@ -3863,9 +3862,9 @@ impl NetworkingSystem {
             }
             FriendListPacket::HEADER => {
                 let packet = FriendListPacket::from_bytes(byte_stream)?;
-                self.friend_list.with_mut(|friends, chaged| {
+                self.friend_list.with_mut(|friends| {
                     *friends = packet.friends.into_iter().map(|friend| (friend, UnsafeCell::new(None))).collect();
-                    chaged();
+                    ValueState::Mutated(())
                 });
             }
             FriendOnlineStatusPacket::HEADER => {
@@ -3887,9 +3886,9 @@ impl NetworkingSystem {
             }
             NotifyFriendRemovedPacket::HEADER => {
                 let packet = NotifyFriendRemovedPacket::from_bytes(byte_stream)?;
-                self.friend_list.with_mut(|friends, changed| {
+                self.friend_list.with_mut(|friends| {
                     friends.retain(|(friend, _)| !(friend.account_id == packet.account_id && friend.character_id == packet.character_id));
-                    changed();
+                    ValueState::Mutated(())
                 });
             }
             PartyInvitePacket::HEADER => {
@@ -3918,9 +3917,9 @@ impl NetworkingSystem {
 
     #[cfg(feature = "debug")]
     pub fn clear_packet_history(&mut self) {
-        self.packet_history.with_mut(|buffer, changed| {
+        self.packet_history.with_mut(|buffer| {
             buffer.clear();
-            changed();
+            ValueState::Mutated(())
         });
     }
 

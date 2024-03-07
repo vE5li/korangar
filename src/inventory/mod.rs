@@ -7,7 +7,7 @@ use vulkano::image::view::ImageView;
 
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
-use crate::interface::{Remote, TrackedState};
+use crate::interface::{ValueState, Remote, TrackedState};
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
 use crate::network::{EquipPosition, ItemId, ItemIndex};
 
@@ -84,13 +84,10 @@ impl Inventory {
         equip_position: EquipPosition,
         equipped_position: EquipPosition,
     ) {
-        self.items.with_mut(|items, changed| {
-            // Set changed ahead of time since we might exit early.
-            changed();
-
+        self.items.with_mut(|items| {
             if let Some(_stack) = items.iter_mut().find(|item| item.item_id == item_id) {
                 //stack.amount += item_data.amount;
-                return;
+                return ValueState::Mutated(());
             }
 
             let resource_name = script_loader.get_item_resource_from_id(item_id);
@@ -105,13 +102,15 @@ impl Inventory {
             };
 
             items.push(item);
+
+            ValueState::Mutated(())
         });
     }
 
     pub fn update_equipped_position(&mut self, index: ItemIndex, equipped_position: EquipPosition) {
-        self.items.with_mut(|items, changed| {
+        self.items.with_mut(|items| {
             items.iter_mut().find(|item| item.index == index).unwrap().equipped_position = equipped_position;
-            changed();
+            ValueState::Mutated(())
         });
     }
 

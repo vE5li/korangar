@@ -4,7 +4,7 @@ pub use super::resource::MapResources;
 use crate::graphics::ColorBGRA;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
 use crate::loaders::version::InternalVersion;
-use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes, MajorFirst, Version};
+use crate::loaders::{conversion_result, ByteStream, ConversionError, ConversionResult, FromBytes, MajorFirst, Version};
 use crate::world::Tile;
 
 #[derive(Clone, Named, FromBytes, PrototypeElement, PrototypeWindow)]
@@ -108,7 +108,7 @@ impl GroundTile {
 }
 
 impl FromBytes for GroundTile {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let upper_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
         let upper_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
         let lower_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;

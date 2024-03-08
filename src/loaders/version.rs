@@ -1,9 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
-use derive_new::new;
-
-use super::{ConversionError, FromBytes, Named};
+use super::{ConversionResult, FromBytes, Named};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -25,7 +23,7 @@ impl Named for Version<MinorFirst> {
 }
 
 impl FromBytes for Version<MajorFirst> {
-    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> ConversionResult<Self> {
         let major = byte_stream.next::<Self>()?;
         let minor = byte_stream.next::<Self>()?;
 
@@ -38,7 +36,7 @@ impl FromBytes for Version<MajorFirst> {
 }
 
 impl FromBytes for Version<MinorFirst> {
-    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> ConversionResult<Self> {
         let minor = byte_stream.next::<Self>()?;
         let major = byte_stream.next::<Self>()?;
 
@@ -56,7 +54,7 @@ impl<T> Display for Version<T> {
     }
 }
 
-#[derive(Copy, Clone, Debug, new)]
+#[derive(Copy, Clone, Debug)]
 pub struct InternalVersion {
     pub major: u8,
     pub minor: u8,

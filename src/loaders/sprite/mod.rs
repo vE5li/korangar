@@ -16,7 +16,7 @@ use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
 use super::version::InternalVersion;
-use super::{conversion_result, ConversionError, FromBytesExt, FALLBACK_SPRITE_FILE};
+use super::{conversion_result, ConversionError, ConversionResult, FromBytesExt, FALLBACK_SPRITE_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::MemoryAllocator;
@@ -41,7 +41,7 @@ struct PaletteImageData {
 struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>>
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self>
     where
         Self: Sized,
     {

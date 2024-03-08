@@ -2,7 +2,7 @@ use cgmath::Vector3;
 use procedural::{FromBytes, Named, PrototypeElement};
 
 use crate::graphics::{ColorRGB, Transform};
-use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes};
+use crate::loaders::{conversion_result, ByteStream, ConversionError, ConversionResult, FromBytes};
 use crate::world::{EffectSource, LightSource, SoundSource};
 
 #[derive(Copy, Clone, Debug, Named)]
@@ -14,7 +14,7 @@ pub enum ResourceType {
 }
 
 impl FromBytes for ResourceType {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let index = conversion_result::<Self, _>(i32::from_bytes(byte_stream))?;
         match index {
             1 => Ok(ResourceType::Object),
@@ -64,7 +64,7 @@ pub struct MapResources {
 }
 
 impl FromBytes for MapResources {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let resources_amount = conversion_result::<Self, _>(i32::from_bytes(byte_stream))? as usize;
 
         let mut objects = Vec::new();

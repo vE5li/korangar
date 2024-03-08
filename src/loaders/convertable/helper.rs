@@ -1,4 +1,4 @@
-use super::{ConversionError, ConversionErrorType, Named};
+use super::{ConversionError, ConversionErrorType, ConversionResult, Named};
 
 #[inline(always)]
 pub fn check_upper_bound<S: Named>(offset: usize, length: usize) -> Result<(), Box<ConversionError>> {
@@ -11,7 +11,7 @@ pub fn check_upper_bound<S: Named>(offset: usize, length: usize) -> Result<(), B
 }
 
 #[inline(always)]
-pub fn conversion_result<S: Named, T>(result: Result<T, Box<ConversionError>>) -> Result<T, Box<ConversionError>> {
+pub fn conversion_result<S: Named, T>(result: ConversionResult<T>) -> ConversionResult<T> {
     result.map_err(|mut error| {
         error.add_to_stack(S::NAME);
         error

@@ -25,7 +25,7 @@ fn derive_for_struct(
     let from = implement_from.then(|| {
         quote! {
             impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> crate::loaders::ConversionResult<Self> {
                     let base_offset = byte_stream.get_offset();
                     #(#from_bytes_implementations)*
                     Ok(#instanciate)
@@ -39,7 +39,7 @@ fn derive_for_struct(
             impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
+                fn to_bytes(&self) -> crate::loaders::ConversionResult<Vec<u8>> {
                     Ok([#(#to_bytes_implementations),*].concat())
                 }
             }
@@ -88,7 +88,7 @@ fn derive_for_enum(
     let from = add_from.then(|| {
         quote! {
             impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> crate::loaders::ConversionResult<Self> {
                     match crate::loaders::conversion_result::<Self, _>(#numeric_type::from_bytes(byte_stream))? as usize {
                         #( #indices => Ok(Self::#values), )*
                         invalid => Err(crate::loaders::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
@@ -103,7 +103,7 @@ fn derive_for_enum(
             impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self) -> Result<Vec<u8>, Box<crate::loaders::ConversionError>> {
+                fn to_bytes(&self) -> crate::loaders::ConversionResult<Vec<u8>> {
                     match self {
                         #( #name::#values => crate::loaders::conversion_result::<Self, _>((#indices as #numeric_type).to_bytes()), )*
                     }

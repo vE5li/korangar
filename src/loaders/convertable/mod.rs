@@ -1,5 +1,3 @@
-use std::mem::MaybeUninit;
-
 use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 
 use crate::loaders::ByteStream;
@@ -12,10 +10,12 @@ pub use self::error::{ConversionError, ConversionErrorType};
 pub use self::helper::*;
 pub use self::named::Named;
 
+pub type ConversionResult<T> = Result<T, Box<ConversionError>>;
+
 /// Trait to deserialize from a [`ByteStream`].
 pub trait FromBytes: Named {
     /// Takes bytes from a [`ByteStream`] and deserializes them into a type `T`.
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>>
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self>
     where
         Self: Sized;
 }
@@ -24,7 +24,7 @@ pub trait FromBytes: Named {
 pub trait FromBytesExt: FromBytes {
     /// Takes a fixed number of bytes from the [`ByteStream`] and tries to
     /// deserialize them into a type `T`.
-    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> Result<Self, Box<ConversionError>>
+    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> ConversionResult<Self>
     where
         Self: Sized;
 }
@@ -34,7 +34,7 @@ where
     T: FromBytes,
 {
     #[allow(clippy::uninit_assumed_init)]
-    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> Result<Self, Box<ConversionError>>
+    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> ConversionResult<Self>
     where
         Self: Sized,
     {
@@ -68,14 +68,14 @@ where
 /// Trait to serialize into bytes.
 pub trait ToBytes: Named {
     /// Converts self to a [`Vec`] of bytes.
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>>;
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>>;
 }
 
 /// Extension trait for [`ToBytes`].
 pub trait ToBytesExt: ToBytes {
     /// Converts self to a [`Vec`] of bytes and pads it with zeros to match the
     /// size of `size`.
-    fn to_n_bytes(&self, size: usize) -> Result<Vec<u8>, Box<ConversionError>>
+    fn to_n_bytes(&self, size: usize) -> ConversionResult<Vec<u8>>
     where
         Self: Sized;
 }
@@ -84,7 +84,7 @@ impl<T> ToBytesExt for T
 where
     T: ToBytes,
 {
-    fn to_n_bytes(&self, size: usize) -> Result<Vec<u8>, Box<ConversionError>>
+    fn to_n_bytes(&self, size: usize) -> ConversionResult<Vec<u8>>
     where
         Self: Sized,
     {
@@ -106,13 +106,13 @@ impl Named for u8 {
 }
 
 impl FromBytes for u8 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         byte_stream.next::<Self>()
     }
 }
 
 impl ToBytes for u8 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(vec![*self])
     }
 }
@@ -122,13 +122,13 @@ impl Named for u16 {
 }
 
 impl FromBytes for u16 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([byte_stream.next::<Self>()?, byte_stream.next::<Self>()?]))
     }
 }
 
 impl ToBytes for u16 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -138,7 +138,7 @@ impl Named for u32 {
 }
 
 impl FromBytes for u32 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -149,7 +149,7 @@ impl FromBytes for u32 {
 }
 
 impl ToBytes for u32 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -159,7 +159,7 @@ impl Named for u64 {
 }
 
 impl FromBytes for u64 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -174,7 +174,7 @@ impl FromBytes for u64 {
 }
 
 impl ToBytes for u64 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -184,13 +184,13 @@ impl Named for i8 {
 }
 
 impl FromBytes for i8 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(byte_stream.next::<Self>()? as i8)
     }
 }
 
 impl ToBytes for i8 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(vec![*self as u8])
     }
 }
@@ -200,13 +200,13 @@ impl Named for i16 {
 }
 
 impl FromBytes for i16 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([byte_stream.next::<Self>()?, byte_stream.next::<Self>()?]))
     }
 }
 
 impl ToBytes for i16 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -216,7 +216,7 @@ impl Named for i32 {
 }
 
 impl FromBytes for i32 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -227,7 +227,7 @@ impl FromBytes for i32 {
 }
 
 impl ToBytes for i32 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -237,7 +237,7 @@ impl Named for i64 {
 }
 
 impl FromBytes for i64 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -252,7 +252,7 @@ impl FromBytes for i64 {
 }
 
 impl ToBytes for i64 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_le_bytes().to_vec())
     }
 }
@@ -262,7 +262,7 @@ impl Named for f32 {
 }
 
 impl FromBytes for f32 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -273,7 +273,7 @@ impl FromBytes for f32 {
 }
 
 impl ToBytes for f32 {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.to_ne_bytes().to_vec())
     }
 }
@@ -283,7 +283,7 @@ impl<T: Named, const SIZE: usize> Named for [T; SIZE] {
 }
 
 impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         use std::mem::MaybeUninit;
 
         let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -305,7 +305,7 @@ impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
 }
 
 impl<T: ToBytes, const SIZE: usize> ToBytes for [T; SIZE] {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         let mut bytes = Vec::new();
 
         for item in self.iter() {
@@ -322,7 +322,7 @@ impl Named for String {
 }
 
 impl FromBytes for String {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let mut value = String::new();
 
         loop {
@@ -337,7 +337,7 @@ impl FromBytes for String {
 }
 
 impl ToBytes for String {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         Ok(self.bytes().chain(std::iter::once(0)).collect())
     }
 }
@@ -347,7 +347,7 @@ impl<T: Named> Named for Vec<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vec<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let mut vector = Vec::new();
 
         while !byte_stream.is_empty() {
@@ -364,7 +364,7 @@ impl<T: Named> Named for Vector2<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector2<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
@@ -373,7 +373,7 @@ impl<T: FromBytes> FromBytes for Vector2<T> {
 }
 
 impl<T: ToBytes> ToBytes for Vector2<T> {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         let mut bytes = conversion_result::<Self, _>(self.x.to_bytes())?;
         bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes())?);
 
@@ -386,7 +386,7 @@ impl<T: Named> Named for Vector3<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector3<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -396,7 +396,7 @@ impl<T: FromBytes> FromBytes for Vector3<T> {
 }
 
 impl<T: ToBytes> ToBytes for Vector3<T> {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         let mut bytes = conversion_result::<Self, _>(self.x.to_bytes())?;
         bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes())?);
         bytes.append(&mut conversion_result::<Self, _>(self.z.to_bytes())?);
@@ -410,7 +410,7 @@ impl<T: Named> Named for Vector4<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector4<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -421,7 +421,7 @@ impl<T: FromBytes> FromBytes for Vector4<T> {
 }
 
 impl<T: ToBytes> ToBytes for Vector4<T> {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         let mut bytes = conversion_result::<Self, _>(self.x.to_bytes())?;
         bytes.append(&mut conversion_result::<Self, _>(self.y.to_bytes())?);
         bytes.append(&mut conversion_result::<Self, _>(self.z.to_bytes())?);
@@ -435,7 +435,7 @@ impl<T: Named> Named for Quaternion<T> {
 }
 
 impl<T: FromBytes> FromBytes for Quaternion<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -450,7 +450,7 @@ impl<T: Named> Named for Matrix3<T> {
 }
 
 impl<T: FromBytes> FromBytes for Matrix3<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let c0r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let c0r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let c0r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;

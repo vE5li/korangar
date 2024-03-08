@@ -22,7 +22,7 @@ use crate::interface::{
     CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, TrackedStateTake,
     ValueState, WeakElementCell,
 };
-use crate::loaders::{conversion_result, ByteStream, ClientInfo, ConversionError, FromBytes, Named, ServiceId, ToBytes};
+use crate::loaders::{conversion_result, ByteStream, ClientInfo, ConversionError, ConversionResult, FromBytes, Named, ServiceId, ToBytes};
 
 #[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement)]
 pub struct ClientTick(pub u32);
@@ -52,13 +52,13 @@ pub struct SkillLevel(pub u16);
 pub struct ItemIndex(u16);
 
 impl FromBytes for ItemIndex {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         u16::from_bytes(byte_stream).map(|raw| Self(raw - 2))
     }
 }
 
 impl ToBytes for ItemIndex {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         u16::to_bytes(&(self.0 + 2))
     }
 }
@@ -75,7 +75,7 @@ pub trait IncomingPacket: Named + PrototypeElement + Clone {
     const IS_PING: bool;
     const HEADER: u16;
 
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>>;
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self>;
 }
 
 /// Base trait that all outgoing packets implement.
@@ -86,18 +86,18 @@ pub trait IncomingPacket: Named + PrototypeElement + Clone {
 pub trait OutgoingPacket: Named + PrototypeElement + Clone {
     const IS_PING: bool;
 
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>>;
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>>;
 }
 
 trait IncomingPacketExt: IncomingPacket {
-    fn take_from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>>;
+    fn take_from_bytes(byte_stream: &mut ByteStream) -> ConversionResult<Self>;
 }
 
 impl<T> IncomingPacketExt for T
 where
     T: IncomingPacket,
 {
-    fn take_from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn take_from_bytes(byte_stream: &mut ByteStream) -> ConversionResult<Self> {
         let header = u16::from_bytes(byte_stream)?;
 
         if header != Self::HEADER {
@@ -278,7 +278,7 @@ impl WorldPosition {
 }
 
 impl FromBytes for WorldPosition {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let coordinates = byte_stream.slice::<Self>(3)?;
 
         let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -293,7 +293,7 @@ impl FromBytes for WorldPosition {
 }
 
 impl ToBytes for WorldPosition {
-    fn to_bytes(&self) -> Result<Vec<u8>, Box<ConversionError>> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         let mut coordinates = vec![0, 0, 0];
 
         coordinates[0] = (self.x >> 2) as u8;
@@ -319,7 +319,7 @@ impl WorldPosition2 {
 }
 
 impl FromBytes for WorldPosition2 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let coordinates: Vec<usize> = byte_stream.slice::<Self>(6)?.iter().map(|byte| *byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -445,7 +445,7 @@ impl Named for Ipv4Addr {
 }
 
 impl FromBytes for Ipv4Addr {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         Ok(Ipv4Addr::new(
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -1021,7 +1021,7 @@ pub enum StatusType {
 }
 
 impl FromBytes for StatusType {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let status = match conversion_result::<Self, _>(u16::from_bytes(byte_stream))? {
             0 => u32::from_bytes(byte_stream).map(Self::MovementSpeed),
             1 => u64::from_bytes(byte_stream).map(Self::BaseExperience),
@@ -2633,7 +2633,7 @@ impl IncomingPacket for UnknownPacket {
     const HEADER: u16 = 0;
     const IS_PING: bool = false;
 
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let _ = byte_stream;
         unimplemented!()
     }
@@ -3455,12 +3455,7 @@ impl NetworkingSystem {
     }
 
     #[profile]
-    fn handle_packet(
-        &mut self,
-        byte_stream: &mut ByteStream,
-        header: u16,
-        events: &mut Vec<NetworkEvent>,
-    ) -> Result<bool, Box<ConversionError>> {
+    fn handle_packet(&mut self, byte_stream: &mut ByteStream, header: u16, events: &mut Vec<NetworkEvent>) -> ConversionResult<bool> {
         match header {
             BroadcastMessagePacket::HEADER => {
                 let packet = BroadcastMessagePacket::from_bytes(byte_stream)?;

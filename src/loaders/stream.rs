@@ -3,7 +3,7 @@ use std::any::TypeId;
 use std::cell::UnsafeCell;
 
 use super::convertable::ConversionError;
-use super::{ConversionErrorType, Named};
+use super::{ConversionErrorType, ConversionResult, Named};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 #[cfg(feature = "debug")]
@@ -59,7 +59,7 @@ where
         self.offset >= self.data.len()
     }
 
-    pub fn get_metadata<CALLER, OUTER>(&self) -> Result<&OUTER, Box<ConversionError>>
+    pub fn get_metadata<CALLER, OUTER>(&self) -> ConversionResult<&OUTER>
     where
         OUTER: 'static,
         CALLER: Named,
@@ -72,7 +72,7 @@ where
         }
     }
 
-    pub fn get_metadata_mut<CALLER, OUTER>(&mut self) -> Result<&mut OUTER, Box<ConversionError>>
+    pub fn get_metadata_mut<CALLER, OUTER>(&mut self) -> ConversionResult<&mut OUTER>
     where
         OUTER: 'static,
         CALLER: Named,
@@ -93,14 +93,14 @@ where
         self.offset = offset
     }
 
-    pub fn next<S: Named>(&mut self) -> Result<u8, Box<ConversionError>> {
+    pub fn next<S: Named>(&mut self) -> ConversionResult<u8> {
         check_upper_bound::<S>(self.offset, self.data.len())?;
         let byte = self.data[self.offset];
         self.offset += 1;
         Ok(byte)
     }
 
-    pub fn slice<S: Named>(&mut self, count: usize) -> Result<&[u8], Box<ConversionError>> {
+    pub fn slice<S: Named>(&mut self, count: usize) -> ConversionResult<&[u8]> {
         check_upper_bound::<S>(self.offset + count, self.data.len() + 1)?;
 
         let start_index = self.offset;

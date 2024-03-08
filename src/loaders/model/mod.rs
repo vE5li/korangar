@@ -7,7 +7,7 @@ use procedural::{Named, *};
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
-use super::{conversion_result, ConversionError, FromBytesExt, FALLBACK_MODEL_FILE};
+use super::{conversion_result, ConversionError, ConversionResult, FromBytesExt, FALLBACK_MODEL_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
@@ -83,7 +83,7 @@ pub struct ModelString<const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         let inner = if byte_stream
             .get_metadata::<Self, Option<InternalVersion>>()?
             .ok_or(ConversionError::from_message("version not set"))?

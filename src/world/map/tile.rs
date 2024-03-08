@@ -1,6 +1,6 @@
 use procedural::{FromBytes, Named};
 
-use crate::loaders::{ByteStream, ConversionError, FromBytes};
+use crate::loaders::{ByteStream, ConversionResult, FromBytes};
 
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;
@@ -13,7 +13,7 @@ const CLIFF: u8 = 0b00001000;
 pub struct TileType(pub u8);
 
 impl FromBytes for TileType {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
         byte_stream.next::<Self>().map(Self::new)
     }
 }

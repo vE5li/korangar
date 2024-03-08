@@ -3,7 +3,7 @@ use std::ops::Add;
 use cgmath::{Deg, Rad, Vector3};
 use procedural::*;
 
-use crate::loaders::{conversion_result, ConversionError, FromBytes};
+use crate::loaders::{conversion_result, ConversionResult, FromBytes};
 
 #[derive(Copy, Clone, Debug, Named, PrototypeElement)]
 pub struct Transform {
@@ -14,7 +14,7 @@ pub struct Transform {
 }
 
 impl FromBytes for Transform {
-    fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> ConversionResult<Self> {
         let mut position = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
         let rotation = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
         let scale = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;

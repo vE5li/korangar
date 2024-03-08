@@ -2,10 +2,9 @@ use std::ops::Add;
 
 use cgmath::{Deg, Rad, Vector3};
 use procedural::*;
+use ragnarok_bytes::{ByteStream, ConversionResult, ConversionResultExt, FromBytes};
 
-use crate::loaders::{conversion_result, ConversionResult, FromBytes};
-
-#[derive(Copy, Clone, Debug, Named, PrototypeElement)]
+#[derive(Copy, Clone, Debug, PrototypeElement)]
 pub struct Transform {
     pub position: Vector3<f32>,
     #[hidden_element] // TODO: unhide
@@ -14,10 +13,10 @@ pub struct Transform {
 }
 
 impl FromBytes for Transform {
-    fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> ConversionResult<Self> {
-        let mut position = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
-        let rotation = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
-        let scale = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+        let mut position = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
+        let rotation = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
+        let scale = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
 
         // TODO: make this nicer
         position.y = -position.y;

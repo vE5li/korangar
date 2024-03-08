@@ -33,7 +33,7 @@ pub fn derive_incoming_packet_struct(
             const IS_PING: bool = #is_ping;
             const HEADER: u16 = #signature;
 
-            fn from_bytes(byte_stream: &mut crate::loaders::ByteStream<NetworkMetadata>) -> crate::loaders::ConversionResult<Self> {
+            fn from_bytes(byte_stream: &mut ragnarok_bytes::ByteStream<NetworkMetadata>) -> ragnarok_bytes::ConversionResult<Self> {
                 let base_offset = byte_stream.get_offset();
                 #(#from_bytes_implementations)*
                 let packet = #instanciate;
@@ -72,7 +72,7 @@ pub fn derive_outgoing_packet_struct(
 
             // Temporary until serialization is always possible
             #[allow(unreachable_code)]
-            fn to_bytes(&self) -> crate::loaders::ConversionResult<Vec<u8>> {
+            fn to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
                 Ok(#to_bytes)
             }
         }

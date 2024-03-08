@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
-use super::{ConversionResult, FromBytes, Named};
+use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -14,18 +14,10 @@ pub struct Version<T> {
     phantom_data: PhantomData<T>,
 }
 
-impl Named for Version<MajorFirst> {
-    const NAME: &'static str = "Version<MajorFirst>";
-}
-
-impl Named for Version<MinorFirst> {
-    const NAME: &'static str = "Version<MinorFirst>";
-}
-
 impl FromBytes for Version<MajorFirst> {
-    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> ConversionResult<Self> {
-        let major = byte_stream.next::<Self>()?;
-        let minor = byte_stream.next::<Self>()?;
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+        let major = byte_stream.byte::<Self>()?;
+        let minor = byte_stream.byte::<Self>()?;
 
         Ok(Self {
             major,
@@ -36,9 +28,9 @@ impl FromBytes for Version<MajorFirst> {
 }
 
 impl FromBytes for Version<MinorFirst> {
-    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> ConversionResult<Self> {
-        let minor = byte_stream.next::<Self>()?;
-        let major = byte_stream.next::<Self>()?;
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+        let minor = byte_stream.byte::<Self>()?;
+        let major = byte_stream.byte::<Self>()?;
 
         Ok(Self {
             minor,

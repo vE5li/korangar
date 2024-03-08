@@ -1,8 +1,6 @@
 use std::any::TypeId;
 
-use super::convertable::ConversionError;
-use super::{ConversionErrorType, ConversionResult, Named};
-use crate::loaders::convertable::check_upper_bound;
+use crate::{ConversionError, ConversionErrorType, ConversionResult};
 
 pub struct ByteStream<'a, META = ()>
 where
@@ -34,36 +32,6 @@ where
         Self { data, offset: 0, metadata }
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.offset >= self.data.len()
-    }
-
-    pub fn get_metadata<CALLER, OUTER>(&self) -> ConversionResult<&OUTER>
-    where
-        OUTER: 'static,
-        CALLER: Named,
-    {
-        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
-            true => unsafe { Ok(std::mem::transmute::<_, &OUTER>(&self.metadata)) },
-            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
-                type_name: CALLER::NAME,
-            })),
-        }
-    }
-
-    pub fn get_metadata_mut<CALLER, OUTER>(&mut self) -> ConversionResult<&mut OUTER>
-    where
-        OUTER: 'static,
-        CALLER: Named,
-    {
-        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
-            true => unsafe { Ok(std::mem::transmute::<_, &mut OUTER>(&mut self.metadata)) },
-            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
-                type_name: CALLER::NAME,
-            })),
-        }
-    }
-
     pub fn get_offset(&self) -> usize {
         self.offset
     }
@@ -72,15 +40,57 @@ where
         self.offset = offset
     }
 
-    pub fn next<S: Named>(&mut self) -> ConversionResult<u8> {
-        check_upper_bound::<S>(self.offset, self.data.len())?;
+    pub fn is_empty(&self) -> bool {
+        self.offset >= self.data.len()
+    }
+
+    pub fn get_metadata<CALLER, OUTER>(&self) -> ConversionResult<&OUTER>
+    where
+        OUTER: 'static,
+    {
+        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
+            true => unsafe { Ok(std::mem::transmute::<_, &OUTER>(&self.metadata)) },
+            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
+                type_name: std::any::type_name::<CALLER>(),
+            })),
+        }
+    }
+
+    pub fn get_metadata_mut<CALLER, OUTER>(&mut self) -> ConversionResult<&mut OUTER>
+    where
+        OUTER: 'static,
+    {
+        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
+            true => unsafe { Ok(std::mem::transmute::<_, &mut OUTER>(&mut self.metadata)) },
+            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
+                type_name: std::any::type_name::<CALLER>(),
+            })),
+        }
+    }
+
+    pub fn into_metadata(self) -> META {
+        self.metadata
+    }
+
+    fn check_upper_bound<CALLER>(offset: usize, length: usize) -> ConversionResult<()> {
+        match offset < length {
+            true => Ok(()),
+            false => Err(ConversionError::from_error_type(ConversionErrorType::ByteStreamTooShort {
+                type_name: std::any::type_name::<CALLER>(),
+            })),
+        }
+    }
+
+    pub fn byte<CALLER>(&mut self) -> ConversionResult<u8> {
+        Self::check_upper_bound::<CALLER>(self.offset, self.data.len())?;
+
         let byte = self.data[self.offset];
         self.offset += 1;
         Ok(byte)
     }
 
-    pub fn slice<S: Named>(&mut self, count: usize) -> ConversionResult<&[u8]> {
-        check_upper_bound::<S>(self.offset + count, self.data.len() + 1)?;
+    pub fn slice<CALLER>(&mut self, count: usize) -> ConversionResult<&[u8]> {
+        Self::check_upper_bound::<CALLER>(self.offset + count, self.data.len() + 1)?;
 
         let start_index = self.offset;
         self.offset += count;
@@ -93,9 +103,5 @@ where
         let data = self.data[self.offset..end_index].to_vec();
         self.offset = end_index;
         data
-    }
-
-    pub fn into_metadata(self) -> META {
-        self.metadata
     }
 }

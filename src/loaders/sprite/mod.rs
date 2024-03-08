@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use derive_new::new;
 use procedural::*;
+use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
@@ -16,11 +17,11 @@ use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
 use super::version::InternalVersion;
-use super::{conversion_result, ConversionError, ConversionResult, FromBytesExt, FALLBACK_SPRITE_FILE};
+use super::FALLBACK_SPRITE_FILE;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::MemoryAllocator;
-use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version};
+use crate::loaders::{GameFileLoader, MinorFirst, Version};
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
@@ -30,14 +31,14 @@ pub struct Sprite {
     sprite_data: SpriteData,
 }
 
-#[derive(Clone, Debug, Named, PrototypeElement)]
+#[derive(Clone, Debug, PrototypeElement)]
 struct PaletteImageData {
     pub width: u16,
     pub height: u16,
     pub data: EncodedData,
 }
 
-#[derive(Clone, Debug, Named, PrototypeElement)]
+#[derive(Clone, Debug, PrototypeElement)]
 struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
@@ -45,8 +46,8 @@ impl FromBytes for PaletteImageData {
     where
         Self: Sized,
     {
-        let width = conversion_result::<Self, _>(u16::from_bytes(byte_stream))?;
-        let height = conversion_result::<Self, _>(u16::from_bytes(byte_stream))?;
+        let width = u16::from_bytes(byte_stream).trace::<Self>()?;
+        let height = u16::from_bytes(byte_stream).trace::<Self>()?;
 
         let data = match width as usize * height as usize {
             0 => Vec::new(),
@@ -56,19 +57,19 @@ impl FromBytes for PaletteImageData {
                     .ok_or(ConversionError::from_message("version not set"))?
                     .smaller(2, 1) =>
             {
-                conversion_result::<Self, _>(Vec::from_n_bytes(byte_stream, image_size))?
+                Vec::from_n_bytes(byte_stream, image_size).trace::<Self>()?
             }
             image_size => {
                 let mut data = vec![0; image_size];
-                let mut encoded = conversion_result::<Self, _>(u16::from_bytes(byte_stream))?;
+                let mut encoded = u16::from_bytes(byte_stream).trace::<Self>()?;
                 let mut next = 0;
 
                 while next < image_size && encoded > 0 {
-                    let byte = byte_stream.next::<Self>()?;
+                    let byte = byte_stream.byte::<Self>()?;
                     encoded -= 1;
 
                     if byte == 0 {
-                        let length = usize::max(byte_stream.next::<Self>()? as usize, 1);
+                        let length = usize::max(byte_stream.byte::<Self>()? as usize, 1);
                         encoded -= 1;
 
                         if next + length > image_size {
@@ -98,7 +99,7 @@ impl FromBytes for PaletteImageData {
     }
 }
 
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, FromBytes, PrototypeElement)]
 struct RgbaImageData {
     pub width: u16,
     pub height: u16,
@@ -106,7 +107,7 @@ struct RgbaImageData {
     pub data: Vec<u8>,
 }
 
-#[derive(Copy, Clone, Debug, Default, Named, FromBytes, PrototypeElement)]
+#[derive(Copy, Clone, Debug, Default, FromBytes, PrototypeElement)]
 struct PaletteColor {
     pub red: u8,
     pub green: u8,
@@ -125,12 +126,12 @@ impl PaletteColor {
     }
 }
 
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, FromBytes, PrototypeElement)]
 struct Palette {
     pub colors: [PaletteColor; 256],
 }
 
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, FromBytes, PrototypeElement)]
 struct SpriteData {
     #[version]
     pub version: Version<MinorFirst>,

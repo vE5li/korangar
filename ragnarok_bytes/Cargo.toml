@@ -1,0 +1,10 @@
+[package]
+name = "ragnarok_bytes"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cgmath = { workspace = true, optional = true }
+
+[features]
+cgmath = [ "dep:cgmath" ]

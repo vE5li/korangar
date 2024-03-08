@@ -4,6 +4,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
 use procedural::*;
+use ragnarok_bytes::{ByteStream, FromBytes};
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
@@ -11,16 +12,16 @@ use super::{MajorFirst, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
-use crate::loaders::{ByteStream, FromBytes, GameFileLoader, Version};
+use crate::loaders::{GameFileLoader, Version};
 use crate::network::EntityId;
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 struct TextureName {
     #[length_hint(128)]
     pub name: String,
 }
 
-#[derive(Debug, Clone, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, Clone, FromBytes, PrototypeElement)]
 pub struct Frame {
     pub frame_index: i32,
     pub frame_type: i32,
@@ -99,7 +100,7 @@ impl Frame {
     }
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 struct LayerData {
     pub texture_count: i32,
     #[repeating(self.texture_count)]
@@ -109,7 +110,7 @@ struct LayerData {
     pub frames: Vec<Frame>,
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 struct EffectData {
     pub version: Version<MajorFirst>,
     pub _skip0: [u8; 2],

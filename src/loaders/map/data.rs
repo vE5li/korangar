@@ -1,13 +1,14 @@
 use procedural::*;
+use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
 
 pub use super::resource::MapResources;
 use crate::graphics::ColorBGRA;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
 use crate::loaders::version::InternalVersion;
-use crate::loaders::{conversion_result, ByteStream, ConversionError, ConversionResult, FromBytes, MajorFirst, Version};
+use crate::loaders::{MajorFirst, Version};
 use crate::world::Tile;
 
-#[derive(Clone, Named, FromBytes, PrototypeElement, PrototypeWindow)]
+#[derive(Clone, FromBytes, PrototypeElement, PrototypeWindow)]
 #[window_title("Map Viewer")]
 #[window_class("map_viewer")]
 pub struct MapData {
@@ -43,7 +44,7 @@ pub struct MapData {
     pub resources: MapResources,
 }
 
-#[derive(Named, FromBytes)]
+#[derive(FromBytes)]
 pub struct GatData {
     #[version]
     pub version: Version<MajorFirst>,
@@ -53,7 +54,7 @@ pub struct GatData {
     pub tiles: Vec<Tile>,
 }
 
-#[derive(Named, FromBytes)]
+#[derive(FromBytes)]
 pub struct GroundData {
     #[version]
     pub version: Version<MajorFirst>,
@@ -82,7 +83,6 @@ pub struct GroundData {
     pub ground_tiles: Vec<GroundTile>,
 }
 
-#[derive(Named)]
 pub struct GroundTile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,
@@ -109,28 +109,28 @@ impl GroundTile {
 
 impl FromBytes for GroundTile {
     fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
-        let upper_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
-        let upper_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
-        let lower_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
-        let lower_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
+        let upper_left_height = f32::from_bytes(byte_stream).trace::<Self>()?;
+        let upper_right_height = f32::from_bytes(byte_stream).trace::<Self>()?;
+        let lower_left_height = f32::from_bytes(byte_stream).trace::<Self>()?;
+        let lower_right_height = f32::from_bytes(byte_stream).trace::<Self>()?;
 
         let version = byte_stream
             .get_metadata::<Self, Option<InternalVersion>>()?
             .ok_or(ConversionError::from_message("version not set"))?;
 
         let top_surface_index = match version.equals_or_above(1, 7) {
-            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
-            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
+            true => i32::from_bytes(byte_stream).trace::<Self>()?,
+            false => i16::from_bytes(byte_stream).trace::<Self>()? as i32,
         };
 
         let front_surface_index = match version.equals_or_above(1, 7) {
-            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
-            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
+            true => i32::from_bytes(byte_stream).trace::<Self>()?,
+            false => i16::from_bytes(byte_stream).trace::<Self>()? as i32,
         };
 
         let right_surface_index = match version.equals_or_above(1, 7) {
-            true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
-            false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
+            true => i32::from_bytes(byte_stream).trace::<Self>()?,
+            false => i16::from_bytes(byte_stream).trace::<Self>()? as i32,
         };
 
         Ok(Self {
@@ -152,7 +152,7 @@ pub enum SurfaceType {
     Top,
 }
 
-#[derive(Named, FromBytes)]
+#[derive(FromBytes)]
 pub struct Surface {
     pub u: [f32; 4],
     pub v: [f32; 4],

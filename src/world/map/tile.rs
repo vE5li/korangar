@@ -1,6 +1,5 @@
-use procedural::{FromBytes, Named};
-
-use crate::loaders::{ByteStream, ConversionResult, FromBytes};
+use procedural::FromBytes;
+use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes};
 
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;
@@ -9,12 +8,12 @@ const SNIPABLE: u8 = 0b00000100;
 const CLIFF: u8 = 0b00001000;
 
 #[allow(dead_code)]
-#[derive(Debug, Named)]
+#[derive(Debug)]
 pub struct TileType(pub u8);
 
 impl FromBytes for TileType {
     fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
-        byte_stream.next::<Self>().map(Self::new)
+        byte_stream.byte::<Self>().map(Self::new)
     }
 }
 
@@ -42,7 +41,7 @@ impl TileType {
 }
 
 #[allow(dead_code)]
-#[derive(Named, FromBytes, Debug)]
+#[derive(FromBytes, Debug)]
 pub struct Tile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,

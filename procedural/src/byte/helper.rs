@@ -63,14 +63,14 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         let from_length_hint = match length_hint.clone() {
             Some(length_hint) => {
                 let length_hint = remove_self_from_stream(length_hint.clone());
-                quote!(crate::loaders::FromBytesExt::from_n_bytes(byte_stream, #length_hint))
+                quote!(ragnarok_bytes::FromBytesExt::from_n_bytes(byte_stream, #length_hint))
             }
-            None => quote!(crate::loaders::FromBytes::from_bytes(byte_stream)),
+            None => quote!(ragnarok_bytes::FromBytes::from_bytes(byte_stream)),
         };
 
         let to_length_hint = match length_hint {
-            Some(length_hint) => quote!(crate::loaders::ToBytesExt::to_n_bytes(&self.#field_identifier, #length_hint)),
-            None => quote!(crate::loaders::ToBytes::to_bytes(&self.#field_identifier)),
+            Some(length_hint) => quote!(ragnarok_bytes::ToBytesExt::to_n_bytes(&self.#field_identifier, #length_hint)),
+            None => quote!(ragnarok_bytes::ToBytes::to_bytes(&self.#field_identifier)),
         };
 
         let repeating: Option<TokenStream> = get_unique_attribute(&mut field.attrs, "repeating").map(|attribute| match attribute.meta {
@@ -104,7 +104,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         }
 
         // base from bytes implementation
-        let from_implementation = quote!(crate::loaders::conversion_result::<Self, _>(#from_length_hint)?);
+        let from_implementation = quote!(ragnarok_bytes::ConversionResultExt::trace::<Self>(#from_length_hint)?);
 
         // wrap base implementation in a loop if the element can appear multiple times
         let from_implementation = match repeating {
@@ -146,7 +146,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                 quote! {
                     let #field_variable = match byte_stream
                             .get_metadata::<Self, Option<crate::loaders::InternalVersion>>()?
-                            .ok_or(crate::loaders::ConversionError::from_message("version not set"))?
+                            .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?
                             .#function {
                         true => Some(#from_implementation),
                         false => None,
@@ -163,7 +163,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                 [0u8].as_slice()
             }),
             false => {
-                quote!(crate::loaders::conversion_result::<Self, _>(#to_length_hint)?.as_slice())
+                quote!(ragnarok_bytes::ConversionResultExt::trace::<Self>(#to_length_hint)?.as_slice())
             }
         };
 

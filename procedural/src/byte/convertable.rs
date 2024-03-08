@@ -24,8 +24,8 @@ fn derive_for_struct(
 
     let from = implement_from.then(|| {
         quote! {
-            impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> crate::loaders::ConversionResult<Self> {
+            impl #impl_generics ragnarok_bytes::FromBytes for #name #type_generics #where_clause {
+                fn from_bytes<META>(byte_stream: &mut ragnarok_bytes::ByteStream<META>) -> ragnarok_bytes::ConversionResult<Self> {
                     let base_offset = byte_stream.get_offset();
                     #(#from_bytes_implementations)*
                     Ok(#instanciate)
@@ -36,10 +36,10 @@ fn derive_for_struct(
 
     let to = implement_to.then(|| {
         quote! {
-            impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
+            impl #impl_generics ragnarok_bytes::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self) -> crate::loaders::ConversionResult<Vec<u8>> {
+                fn to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
                     Ok([#(#to_bytes_implementations),*].concat())
                 }
             }
@@ -87,11 +87,11 @@ fn derive_for_enum(
 
     let from = add_from.then(|| {
         quote! {
-            impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> crate::loaders::ConversionResult<Self> {
-                    match crate::loaders::conversion_result::<Self, _>(#numeric_type::from_bytes(byte_stream))? as usize {
+            impl #impl_generics ragnarok_bytes::FromBytes for #name #type_generics #where_clause {
+                fn from_bytes<META>(byte_stream: &mut ragnarok_bytes::ByteStream<META>) -> ragnarok_bytes::ConversionResult<Self> {
+                    match ragnarok_bytes::ConversionResultExt::trace::<Self>(#numeric_type::from_bytes(byte_stream))? as usize {
                         #( #indices => Ok(Self::#values), )*
-                        invalid => Err(crate::loaders::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
+                        invalid => Err(ragnarok_bytes::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
                     }
                 }
             }
@@ -100,12 +100,12 @@ fn derive_for_enum(
 
     let to = add_to.then(|| {
         quote! {
-            impl #impl_generics crate::loaders::ToBytes for #name #type_generics #where_clause {
+            impl #impl_generics ragnarok_bytes::ToBytes for #name #type_generics #where_clause {
                 // Temporary until serialization is always possible
                 #[allow(unreachable_code)]
-                fn to_bytes(&self) -> crate::loaders::ConversionResult<Vec<u8>> {
+                fn to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
                     match self {
-                        #( #name::#values => crate::loaders::conversion_result::<Self, _>((#indices as #numeric_type).to_bytes()), )*
+                        #( #name::#values => ragnarok_bytes::ConversionResultExt::trace::<Self>((#indices as #numeric_type).to_bytes()), )*
                     }
                 }
             }

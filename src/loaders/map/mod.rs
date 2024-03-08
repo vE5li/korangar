@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use cgmath::Vector3;
 use derive_new::new;
+use ragnarok_bytes::{ByteStream, FromBytes};
 
 #[cfg(feature = "debug")]
 pub use self::data::MapData;
@@ -17,7 +18,7 @@ use super::version::InternalVersion;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
-use crate::loaders::{ByteStream, FromBytes, GameFileLoader, ModelLoader, TextureLoader};
+use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
 use crate::world::*;
 
 const MAP_OFFSET: f32 = 5.0;

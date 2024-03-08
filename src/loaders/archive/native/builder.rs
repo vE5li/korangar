@@ -4,6 +4,7 @@
 //! [`NativeArchive`](super::NativeArchive) implementation
 use std::path::{Path, PathBuf};
 
+use ragnarok_bytes::ToBytes;
 use yazi::{compress, CompressionLevel, Format};
 
 use super::assettable::AssetTable;
@@ -11,7 +12,6 @@ use super::filetablerow::FileTableRow;
 use super::header::Header;
 use super::{FileTable, MAGIC_BYTES};
 use crate::loaders::archive::Writable;
-use crate::loaders::ToBytes;
 
 pub struct NativeArchiveBuilder {
     os_file_path: PathBuf,

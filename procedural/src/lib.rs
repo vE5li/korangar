@@ -94,19 +94,6 @@ pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTo
     }
 }
 
-#[proc_macro_derive(Named)]
-pub fn derive_named(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
-    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
-
-    quote! {
-        impl #impl_generics crate::loaders::Named for #ident #type_generics #where_clause {
-            const NAME: &'static str = stringify!(#ident);
-        }
-    }
-    .into()
-}
-
 #[proc_macro_derive(
     ByteConvertable,
     attributes(

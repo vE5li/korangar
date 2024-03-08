@@ -1,11 +1,11 @@
 use cgmath::Vector3;
-use procedural::{FromBytes, Named, PrototypeElement};
+use procedural::{FromBytes, PrototypeElement};
+use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
 
 use crate::graphics::{ColorRGB, Transform};
-use crate::loaders::{conversion_result, ByteStream, ConversionError, ConversionResult, FromBytes};
 use crate::world::{EffectSource, LightSource, SoundSource};
 
-#[derive(Copy, Clone, Debug, Named)]
+#[derive(Copy, Clone, Debug)]
 pub enum ResourceType {
     Object,
     LightSource,
@@ -15,7 +15,7 @@ pub enum ResourceType {
 
 impl FromBytes for ResourceType {
     fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
-        let index = conversion_result::<Self, _>(i32::from_bytes(byte_stream))?;
+        let index = i32::from_bytes(byte_stream).trace::<Self>()?;
         match index {
             1 => Ok(ResourceType::Object),
             2 => Ok(ResourceType::LightSource),
@@ -26,7 +26,7 @@ impl FromBytes for ResourceType {
     }
 }
 
-#[derive(Clone, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, FromBytes, PrototypeElement)]
 pub struct ObjectData {
     #[length_hint(40)]
     #[version_equals_or_above(1, 3)]
@@ -54,7 +54,7 @@ impl ObjectData {
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Named, PrototypeElement)]
+#[derive(Clone, PrototypeElement)]
 pub struct MapResources {
     resources_amount: usize,
     pub objects: Vec<ObjectData>,
@@ -65,7 +65,7 @@ pub struct MapResources {
 
 impl FromBytes for MapResources {
     fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
-        let resources_amount = conversion_result::<Self, _>(i32::from_bytes(byte_stream))? as usize;
+        let resources_amount = i32::from_bytes(byte_stream).trace::<Self>()? as usize;
 
         let mut objects = Vec::new();
         let mut light_sources = Vec::new();
@@ -73,22 +73,22 @@ impl FromBytes for MapResources {
         let mut effect_sources = Vec::new();
 
         for index in 0..resources_amount {
-            let resource_type = conversion_result::<Self, _>(ResourceType::from_bytes(byte_stream))?;
+            let resource_type = ResourceType::from_bytes(byte_stream).trace::<Self>()?;
 
             match resource_type {
                 ResourceType::Object => {
-                    let mut object = conversion_result::<Self, _>(ObjectData::from_bytes(byte_stream))?;
+                    let mut object = ObjectData::from_bytes(byte_stream).trace::<Self>()?;
                     // offset the objects slightly to avoid depth buffer fighting
                     object.transform.position += Vector3::new(0.0, 0.0005, 0.0) * index as f32;
                     objects.push(object);
                 }
                 ResourceType::LightSource => {
-                    let mut light_source = conversion_result::<Self, _>(LightSource::from_bytes(byte_stream))?;
+                    let mut light_source = LightSource::from_bytes(byte_stream).trace::<Self>()?;
                     light_source.position.y = -light_source.position.y;
                     light_sources.push(light_source);
                 }
                 ResourceType::SoundSource => {
-                    let mut sound_source = conversion_result::<Self, _>(SoundSource::from_bytes(byte_stream))?;
+                    let mut sound_source = SoundSource::from_bytes(byte_stream).trace::<Self>()?;
                     sound_source.position.y = -sound_source.position.y;
 
                     if sound_source.cycle.is_none() {
@@ -98,7 +98,7 @@ impl FromBytes for MapResources {
                     sound_sources.push(sound_source);
                 }
                 ResourceType::EffectSource => {
-                    let mut effect_source = conversion_result::<Self, _>(EffectSource::from_bytes(byte_stream))?;
+                    let mut effect_source = EffectSource::from_bytes(byte_stream).trace::<Self>()?;
                     effect_source.position.y = -effect_source.position.y;
                     effect_sources.push(effect_source);
                 }
@@ -115,7 +115,7 @@ impl FromBytes for MapResources {
     }
 }
 
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, FromBytes, PrototypeElement)]
 pub struct WaterSettings {
     #[version_equals_or_above(1, 3)]
     pub water_level: Option<f32>,
@@ -131,7 +131,7 @@ pub struct WaterSettings {
     pub water_animation_speed: Option<u32>,
 }
 
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, FromBytes, PrototypeElement)]
 pub struct LightSettings {
     #[version_equals_or_above(1, 5)]
     pub light_longitude: Option<i32>,

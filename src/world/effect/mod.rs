@@ -8,7 +8,7 @@ use crate::graphics::{Camera, MarkerRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
-#[derive(Clone, Named, ByteConvertable, PrototypeElement, PrototypeWindow)]
+#[derive(Clone, ByteConvertable, PrototypeElement, PrototypeWindow)]
 #[window_title("Effect Source")]
 pub struct EffectSource {
     #[length_hint(80)]

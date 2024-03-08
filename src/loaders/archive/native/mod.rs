@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+use ragnarok_bytes::{ByteStream, FromBytes};
 use yazi::{decompress, Format};
 
 use self::assettable::AssetTable;
@@ -18,7 +19,7 @@ use self::header::Header;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::loaders::archive::Archive;
-use crate::loaders::{ByteStream, FixedByteSize, FromBytes};
+use crate::loaders::FixedByteSize;
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
 /// Each GRF contains a [`Header`] with metadata (number of files, size,

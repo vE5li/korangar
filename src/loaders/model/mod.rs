@@ -3,32 +3,33 @@ use std::sync::Arc;
 
 use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
-use procedural::{Named, *};
+use procedural::*;
+use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
-use super::{conversion_result, ConversionError, ConversionResult, FromBytesExt, FALLBACK_MODEL_FILE};
+use super::FALLBACK_MODEL_FILE;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
-use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MajorFirst, TextureLoader, Version};
+use crate::loaders::{GameFileLoader, MajorFirst, TextureLoader, Version};
 use crate::system::multiply_matrix4_and_vector3;
 use crate::world::{BoundingBox, Model, Node};
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 pub struct PositionKeyframeData {
     pub frame: u32,
     pub position: Vector3<f32>,
 }
 
-#[derive(Clone, Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Clone, Debug, FromBytes, PrototypeElement)]
 pub struct RotationKeyframeData {
     pub frame: u32,
     pub quaternions: Quaternion<f32>,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 pub struct FaceData {
     pub vertex_position_indices: [u16; 3],
     pub texture_coordinate_indices: [u16; 3],
@@ -38,14 +39,14 @@ pub struct FaceData {
     pub smooth_group: i32,
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 pub struct TextureCoordinateData {
     #[version_equals_or_above(1, 2)]
     pub color: Option<u32>,
     pub coordinates: Vector2<f32>, // possibly wrong if version < 1.2
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 pub struct NodeData {
     pub node_name: ModelString<40>,
     pub parent_node_name: ModelString<40>, // This is where 2.2 starts failing
@@ -77,7 +78,7 @@ pub struct NodeData {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Named)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModelString<const LENGTH: usize> {
     pub inner: String,
 }
@@ -89,13 +90,13 @@ impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
             .ok_or(ConversionError::from_message("version not set"))?
             .equals_or_above(2, 2)
         {
-            let length = conversion_result::<Self, _>(u32::from_bytes(byte_stream))? as usize;
-            let mut inner = conversion_result::<Self, _>(String::from_n_bytes(byte_stream, length))?;
+            let length = u32::from_bytes(byte_stream).trace::<Self>()? as usize;
+            let mut inner = String::from_n_bytes(byte_stream, length).trace::<Self>()?;
             // need to remove the last character for some reason
             inner.pop();
             inner
         } else {
-            conversion_result::<Self, _>(String::from_n_bytes(byte_stream, LENGTH))?
+            String::from_n_bytes(byte_stream, LENGTH).trace::<Self>()?
         };
 
         Ok(Self { inner })
@@ -108,7 +109,7 @@ impl<const LENGTH: usize> crate::interface::PrototypeElement for ModelString<LEN
     }
 }
 
-#[derive(Debug, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, FromBytes, PrototypeElement)]
 pub struct ModelData {
     #[version]
     pub version: Version<MajorFirst>,

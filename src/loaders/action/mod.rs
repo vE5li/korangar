@@ -5,6 +5,7 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2};
 use derive_new::new;
 use procedural::*;
+use ragnarok_bytes::{ByteStream, FromBytes};
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
@@ -13,7 +14,7 @@ use super::Sprite;
 use crate::debug::*;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::{InterfaceSettings, ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{ByteStream, FromBytes, GameFileLoader, MinorFirst, Version, FALLBACK_ACTIONS_FILE};
+use crate::loaders::{GameFileLoader, MinorFirst, Version, FALLBACK_ACTIONS_FILE};
 use crate::network::ClientTick;
 
 #[derive(Clone, Debug, new)]
@@ -193,7 +194,7 @@ impl Actions {
     }
 }
 
-#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
 struct SpriteClip {
     pub position: Vector2<i32>,
     pub sprite_number: u32,
@@ -212,14 +213,14 @@ struct SpriteClip {
     pub size: Option<Vector2<u32>>,
 }
 
-#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
 struct AttachPoint {
     pub ignored: u32,
     pub position: Vector2<i32>,
     pub attribute: u32,
 }
 
-#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
 struct Motion {
     pub range1: [i32; 4], // maybe just skip this?
     pub range2: [i32; 4], // maybe just skip this?
@@ -235,20 +236,20 @@ struct Motion {
     pub attach_points: Vec<AttachPoint>,
 }
 
-#[derive(Debug, Clone, Named, ByteConvertable, PrototypeElement)]
+#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
 struct Action {
     pub motion_count: u32,
     #[repeating(self.motion_count)]
     pub motions: Vec<Motion>,
 }
 
-#[derive(Debug, Clone, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, Clone, FromBytes, PrototypeElement)]
 struct Event {
     #[length_hint(40)]
     pub name: String,
 }
 
-#[derive(Debug, Clone, Named, FromBytes, PrototypeElement)]
+#[derive(Debug, Clone, FromBytes, PrototypeElement)]
 struct ActionsData {
     #[version]
     pub version: Version<MinorFirst>,

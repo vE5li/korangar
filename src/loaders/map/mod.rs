@@ -22,6 +22,21 @@ use crate::world::*;
 
 const MAP_OFFSET: f32 = 5.0;
 
+#[cfg(feature = "debug")]
+fn assert_byte_stream_empty<META>(mut byte_stream: ByteStream<META>, file_name: &str) {
+    if byte_stream.is_empty() {
+        print_debug!(
+            "incomplete read on file {}{}{}; {}{}{} bytes remaining",
+            MAGENTA,
+            file_name,
+            NONE,
+            YELLOW,
+            byte_stream.remaining_bytes().len(),
+            NONE
+        );
+    }
+}
+
 #[derive(new)]
 pub struct MapLoader {
     #[new(default)]
@@ -166,7 +181,7 @@ fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) ->
     let map_data = MapData::from_bytes(&mut byte_stream).unwrap();
 
     #[cfg(feature = "debug")]
-    byte_stream.assert_empty(resource_file);
+    assert_byte_stream_empty(byte_stream, resource_file);
 
     Ok(map_data)
 }
@@ -182,7 +197,7 @@ fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -
     let ground_data = GroundData::from_bytes(&mut byte_stream).unwrap();
 
     #[cfg(feature = "debug")]
-    byte_stream.assert_empty(ground_file);
+    assert_byte_stream_empty(byte_stream, ground_file);
 
     Ok(ground_data)
 }
@@ -198,7 +213,7 @@ fn parse_gat_data(gat_file: &str, game_file_loader: &mut GameFileLoader) -> Resu
     let gat_data = GatData::from_bytes(&mut byte_stream).unwrap();
 
     #[cfg(feature = "debug")]
-    byte_stream.assert_empty(gat_file);
+    assert_byte_stream_empty(byte_stream, gat_file);
 
     Ok(gat_data)
 }

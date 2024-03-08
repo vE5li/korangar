@@ -33,7 +33,7 @@ pub fn derive_incoming_packet_struct(
             const IS_PING: bool = #is_ping;
             const HEADER: u16 = #signature;
 
-            fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> crate::loaders::ConversionResult<Self> {
+            fn from_bytes(byte_stream: &mut crate::loaders::ByteStream<NetworkMetadata>) -> crate::loaders::ConversionResult<Self> {
                 let base_offset = byte_stream.get_offset();
                 #(#from_bytes_implementations)*
                 let packet = #instanciate;

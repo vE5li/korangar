@@ -66,6 +66,32 @@ impl ToBytes for ItemIndex {
 #[derive(Clone, Copy, Debug, Named, ByteConvertable, FixedByteSize, PrototypeElement, PartialEq, Eq, Hash)]
 pub struct ItemId(pub u32);
 
+#[cfg(feature = "debug")]
+type NetworkMetadata = Vec<PacketEntry>;
+#[cfg(not(feature = "debug"))]
+type NetworkMetadata = ();
+
+/// Extension trait for for [`ByteStream`] for working with network packets.
+#[cfg(feature = "debug")]
+trait ByteStreamNetworkExt {
+    /// Push an [`IncomingPacket`] to the metadata.
+    fn incoming_packet<T>(&mut self, packet: &T)
+    where
+        T: IncomingPacket + Clone + 'static;
+}
+
+#[cfg(feature = "debug")]
+impl<'a> ByteStreamNetworkExt for ByteStream<'a, Vec<PacketEntry>> {
+    fn incoming_packet<T>(&mut self, packet: &T)
+    where
+        T: IncomingPacket + Clone + 'static,
+    {
+        self.get_metadata_mut::<T, NetworkMetadata>()
+            .expect("wrong metadata")
+            .push(PacketEntry::new_incoming(packet, T::NAME, T::IS_PING));
+    }
+}
+
 /// Base trait that all incoming packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size,
 /// followed by the packet data. If the packet does not have a fixed size,
@@ -75,7 +101,7 @@ pub trait IncomingPacket: Named + PrototypeElement + Clone {
     const IS_PING: bool;
     const HEADER: u16;
 
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self>;
+    fn from_bytes(byte_stream: &mut ByteStream<NetworkMetadata>) -> ConversionResult<Self>;
 }
 
 /// Base trait that all outgoing packets implement.
@@ -90,14 +116,14 @@ pub trait OutgoingPacket: Named + PrototypeElement + Clone {
 }
 
 trait IncomingPacketExt: IncomingPacket {
-    fn take_from_bytes(byte_stream: &mut ByteStream) -> ConversionResult<Self>;
+    fn take_from_bytes(byte_stream: &mut ByteStream<NetworkMetadata>) -> ConversionResult<Self>;
 }
 
 impl<T> IncomingPacketExt for T
 where
     T: IncomingPacket,
 {
-    fn take_from_bytes(byte_stream: &mut ByteStream) -> ConversionResult<Self> {
+    fn take_from_bytes(byte_stream: &mut ByteStream<NetworkMetadata>) -> ConversionResult<Self> {
         let header = u16::from_bytes(byte_stream)?;
 
         if header != Self::HEADER {
@@ -2633,7 +2659,7 @@ impl IncomingPacket for UnknownPacket {
     const HEADER: u16 = 0;
     const IS_PING: bool = false;
 
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes(byte_stream: &mut ByteStream<NetworkMetadata>) -> ConversionResult<Self> {
         let _ = byte_stream;
         unimplemented!()
     }
@@ -2791,7 +2817,7 @@ impl NetworkingSystem {
         self.send_packet_to_login_server(LoginServerLoginPacket::new(username.clone(), password.clone()));
 
         let response = self.get_data_from_login_server();
-        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let login_server_login_success_packet = match header {
@@ -2833,7 +2859,7 @@ impl NetworkingSystem {
         }
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -2867,16 +2893,16 @@ impl NetworkingSystem {
 
         let response = self.get_data_from_character_server();
 
-        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
         let account_id = AccountId::from_bytes(&mut byte_stream).unwrap();
 
         assert_eq!(account_id, login_data.account_id);
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let character_server_login_success_packet = match header {
@@ -2895,16 +2921,16 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(RequestCharacterListPacket::default());
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let request_character_list_success_packet = RequestCharacterListSuccessPacket::take_from_bytes(&mut byte_stream).unwrap();
         self.characters.set(request_character_list_success_packet.character_information);
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         self.slot_count = character_server_login_success_packet.normal_slot_count as usize;
 
@@ -2935,9 +2961,12 @@ impl NetworkingSystem {
     }
 
     #[cfg(feature = "debug")]
-    fn update_packet_history(&mut self, byte_stream: &mut ByteStream) {
-        if *self.update_packets.borrow() {
-            byte_stream.transfer_packet_history(&mut self.packet_history);
+    fn update_packet_history(&mut self, mut packets: Vec<PacketEntry>) {
+        if self.update_packets.get() {
+            self.packet_history.with_mut(|buffer| {
+                packets.drain(..).for_each(|packet| buffer.push((packet, UnsafeCell::new(None))));
+                ValueState::Mutated(())
+            });
         }
     }
 
@@ -3067,7 +3096,7 @@ impl NetworkingSystem {
         ));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let create_character_success_packet = match header {
@@ -3087,7 +3116,7 @@ impl NetworkingSystem {
         };
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         self.characters.push(create_character_success_packet.character_information);
 
@@ -3117,7 +3146,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id, email));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         match header {
@@ -3136,7 +3165,7 @@ impl NetworkingSystem {
         }
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         self.characters.retain(|character| character.character_id != character_id);
 
@@ -3156,7 +3185,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let character_selection_success_packet = match header {
@@ -3215,7 +3244,7 @@ impl NetworkingSystem {
         ));
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         let character_information = self
             .characters
@@ -3270,7 +3299,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::without_metadata(&response);
+        let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&response);
 
         let switch_character_slot_response_packet = SwitchCharacterSlotResponsePacket::take_from_bytes(&mut byte_stream).unwrap();
 
@@ -3294,7 +3323,7 @@ impl NetworkingSystem {
         }
 
         #[cfg(feature = "debug")]
-        self.update_packet_history(&mut byte_stream);
+        self.update_packet_history(byte_stream.into_metadata());
 
         self.move_request.take();
 
@@ -3412,7 +3441,7 @@ impl NetworkingSystem {
         let mut events = Vec::new();
 
         while let Some(data) = self.try_get_data_from_map_server() {
-            let mut byte_stream = ByteStream::without_metadata(&data);
+            let mut byte_stream: ByteStream<NetworkMetadata> = ByteStream::without_metadata(&data);
 
             while !byte_stream.is_empty() {
                 let saved_offset = byte_stream.get_offset();
@@ -3448,14 +3477,19 @@ impl NetworkingSystem {
             }
 
             #[cfg(feature = "debug")]
-            self.update_packet_history(&mut byte_stream);
+            self.update_packet_history(byte_stream.into_metadata());
         }
 
         events
     }
 
     #[profile]
-    fn handle_packet(&mut self, byte_stream: &mut ByteStream, header: u16, events: &mut Vec<NetworkEvent>) -> ConversionResult<bool> {
+    fn handle_packet(
+        &mut self,
+        byte_stream: &mut ByteStream<NetworkMetadata>,
+        header: u16,
+        events: &mut Vec<NetworkEvent>,
+    ) -> ConversionResult<bool> {
         match header {
             BroadcastMessagePacket::HEADER => {
                 let packet = BroadcastMessagePacket::from_bytes(byte_stream)?;

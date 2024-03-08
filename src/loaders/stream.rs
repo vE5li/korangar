@@ -1,19 +1,8 @@
 use std::any::TypeId;
-#[cfg(feature = "debug")]
-use std::cell::UnsafeCell;
 
 use super::convertable::ConversionError;
 use super::{ConversionErrorType, ConversionResult, Named};
-#[cfg(feature = "debug")]
-use crate::debug::*;
-#[cfg(feature = "debug")]
-use crate::interface::PacketEntry;
-#[cfg(feature = "debug")]
-use crate::interface::TrackedState;
-use crate::interface::{ValueState, WeakElementCell};
 use crate::loaders::convertable::check_upper_bound;
-#[cfg(feature = "debug")]
-use crate::network::IncomingPacket;
 
 pub struct ByteStream<'a, META = ()>
 where
@@ -22,8 +11,6 @@ where
     data: &'a [u8],
     offset: usize,
     metadata: META,
-    #[cfg(feature = "debug")]
-    packet_history: Vec<PacketEntry>,
 }
 
 impl<'a, META> ByteStream<'a, META>
@@ -35,8 +22,6 @@ where
             data,
             offset: 0,
             metadata: META::default(),
-            #[cfg(feature = "debug")]
-            packet_history: Vec::new(),
         }
     }
 }
@@ -46,13 +31,7 @@ where
     META: 'static,
 {
     pub fn with_metadata(data: &'a [u8], metadata: META) -> Self {
-        Self {
-            data,
-            offset: 0,
-            metadata,
-            #[cfg(feature = "debug")]
-            packet_history: Vec::new(),
-        }
+        Self { data, offset: 0, metadata }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -118,42 +97,5 @@ where
 
     pub fn into_metadata(self) -> META {
         self.metadata
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn incoming_packet<T: IncomingPacket + Clone + 'static>(&mut self, packet: &T) {
-        self.packet_history.push(PacketEntry::new_incoming(packet, T::NAME, T::IS_PING));
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn transfer_packet_history<const N: usize>(
-        &mut self,
-        packet_history: &mut TrackedState<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell>>), N>>,
-    ) {
-        if !self.packet_history.is_empty() {
-            packet_history.with_mut(|buffer| {
-                self.packet_history
-                    .drain(..)
-                    .for_each(|packet| buffer.push((packet, UnsafeCell::new(None))));
-                ValueState::Mutated(())
-            });
-        }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn assert_empty(&self, file_name: &str) {
-        let remaining = self.data.len() - self.offset;
-
-        if remaining != 0 {
-            print_debug!(
-                "incomplete read on file {}{}{}; {}{}{} bytes remaining",
-                MAGENTA,
-                file_name,
-                NONE,
-                YELLOW,
-                remaining,
-                NONE
-            );
-        }
     }
 }

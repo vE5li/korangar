@@ -25,7 +25,7 @@ fn derive_for_struct(
     let from = implement_from.then(|| {
         quote! {
             impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes(byte_stream: &mut crate::loaders::ByteStream) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> Result<Self, Box<crate::loaders::ConversionError>> {
                     let base_offset = byte_stream.get_offset();
                     #(#from_bytes_implementations)*
                     Ok(#instanciate)
@@ -88,7 +88,7 @@ fn derive_for_enum(
     let from = add_from.then(|| {
         quote! {
             impl #impl_generics crate::loaders::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<crate::loaders::ConversionError>> {
+                fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<crate::loaders::ConversionError>> {
                     match crate::loaders::conversion_result::<Self, _>(#numeric_type::from_bytes(byte_stream))? as usize {
                         #( #indices => Ok(Self::#values), )*
                         invalid => Err(crate::loaders::ConversionError::from_message(format!("invalid enum variant {}", invalid))),

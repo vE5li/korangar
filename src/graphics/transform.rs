@@ -14,7 +14,7 @@ pub struct Transform {
 }
 
 impl FromBytes for Transform {
-    fn from_bytes(byte_stream: &mut crate::loaders::ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut crate::loaders::ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let mut position = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
         let rotation = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;
         let scale = conversion_result::<Self, _>(<Vector3<f32>>::from_bytes(byte_stream))?;

@@ -144,7 +144,10 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         let from_implementation = match version_function {
             Some(function) => {
                 quote! {
-                    let #field_variable = match byte_stream.get_version().#function {
+                    let #field_variable = match byte_stream
+                            .get_metadata::<Self, Option<crate::loaders::InternalVersion>>()?
+                            .ok_or(crate::loaders::ConversionError::from_message("version not set"))?
+                            .#function {
                         true => Some(#from_implementation),
                         false => None,
                     };
@@ -169,7 +172,9 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
         to_bytes_implementations.push(to_implementation);
 
         if is_version {
-            from_bytes_implementations.push(quote!(byte_stream.set_version(#field_variable);));
+            from_bytes_implementations.push(
+                quote!(*byte_stream.get_metadata_mut::<Self, Option<crate::loaders::InternalVersion>>()? = Some(InternalVersion::from(#field_variable));),
+            );
         }
     }
 

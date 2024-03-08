@@ -25,7 +25,7 @@ impl Named for Version<MinorFirst> {
 }
 
 impl FromBytes for Version<MajorFirst> {
-    fn from_bytes(byte_stream: &mut super::ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let major = byte_stream.next::<Self>()?;
         let minor = byte_stream.next::<Self>()?;
 
@@ -38,7 +38,7 @@ impl FromBytes for Version<MajorFirst> {
 }
 
 impl FromBytes for Version<MinorFirst> {
-    fn from_bytes(byte_stream: &mut super::ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut super::ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let minor = byte_stream.next::<Self>()?;
         let major = byte_stream.next::<Self>()?;
 

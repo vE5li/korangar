@@ -7,6 +7,7 @@ use derive_new::new;
 use procedural::*;
 use vulkano::image::view::ImageView;
 
+use super::version::InternalVersion;
 use super::Sprite;
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -275,7 +276,7 @@ impl ActionLoader {
         let timer = Timer::new_dynamic(format!("load actions from {MAGENTA}{path}{NONE}"));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
-        let mut byte_stream = ByteStream::new(&bytes);
+        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         if <[u8; 2]>::from_bytes(&mut byte_stream).unwrap() != [b'A', b'C'] {
             return Err(format!("failed to read magic number from {path}"));

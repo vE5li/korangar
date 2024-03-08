@@ -13,7 +13,7 @@ const CLIFF: u8 = 0b00001000;
 pub struct TileType(pub u8);
 
 impl FromBytes for TileType {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         byte_stream.next::<Self>().map(Self::new)
     }
 }

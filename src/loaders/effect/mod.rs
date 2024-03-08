@@ -6,6 +6,7 @@ use derive_new::new;
 use procedural::*;
 use vulkano::image::view::ImageView;
 
+use super::version::InternalVersion;
 use super::{MajorFirst, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -250,7 +251,7 @@ impl EffectLoader {
         let timer = Timer::new_dynamic(format!("load effect from {MAGENTA}{path}{NONE}"));
 
         let bytes = game_file_loader.get(&format!("data\\texture\\effect\\{path}"))?;
-        let mut byte_stream = ByteStream::new(&bytes);
+        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'S', b'T', b'R', b'M'] {
             return Err(format!("failed to read magic number from {path}"));

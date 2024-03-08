@@ -29,4 +29,4 @@ pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::sprite::*;
 pub use self::stream::ByteStream;
 pub use self::texture::TextureLoader;
-pub use self::version::{MajorFirst, MinorFirst, Version};
+pub use self::version::{InternalVersion, MajorFirst, MinorFirst, Version};

@@ -1,3 +1,5 @@
+use std::mem::MaybeUninit;
+
 use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 
 use crate::loaders::ByteStream;
@@ -13,7 +15,7 @@ pub use self::named::Named;
 /// Trait to deserialize from a [`ByteStream`].
 pub trait FromBytes: Named {
     /// Takes bytes from a [`ByteStream`] and deserializes them into a type `T`.
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>>
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>>
     where
         Self: Sized;
 }
@@ -22,7 +24,7 @@ pub trait FromBytes: Named {
 pub trait FromBytesExt: FromBytes {
     /// Takes a fixed number of bytes from the [`ByteStream`] and tries to
     /// deserialize them into a type `T`.
-    fn from_n_bytes(byte_stream: &mut ByteStream, size: usize) -> Result<Self, Box<ConversionError>>
+    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> Result<Self, Box<ConversionError>>
     where
         Self: Sized;
 }
@@ -31,13 +33,35 @@ impl<T> FromBytesExt for T
 where
     T: FromBytes,
 {
-    fn from_n_bytes(byte_stream: &mut ByteStream, size: usize) -> Result<Self, Box<ConversionError>>
+    #[allow(clippy::uninit_assumed_init)]
+    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> Result<Self, Box<ConversionError>>
     where
         Self: Sized,
     {
-        let data = byte_stream.slice::<T>(size)?;
-        let mut byte_stream = ByteStream::new(data);
-        T::from_bytes(&mut byte_stream)
+        use std::mem::MaybeUninit;
+
+        // Move the metadata to a temporary memory slot.
+        //
+        // SAFETY: Obviously this not safe and will be removed in the future.
+        let mut swap_metadata = unsafe { MaybeUninit::uninit().assume_init() };
+        std::mem::swap(byte_stream.get_metadata_mut::<Self, META>()?, &mut swap_metadata);
+
+        let (result, mut metadata) = {
+            let data = byte_stream.slice::<T>(size)?;
+            let mut byte_stream = ByteStream::<META>::with_metadata(data, swap_metadata);
+
+            let result = T::from_bytes(&mut byte_stream);
+            let metadata = byte_stream.into_metadata();
+
+            (result, metadata)
+        };
+
+        // Move the metadata back to the original byte stream and forget the temporary
+        // memory slot.
+        std::mem::swap(byte_stream.get_metadata_mut::<Self, META>().unwrap(), &mut metadata);
+        std::mem::forget(metadata);
+
+        result
     }
 }
 
@@ -82,7 +106,7 @@ impl Named for u8 {
 }
 
 impl FromBytes for u8 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         byte_stream.next::<Self>()
     }
 }
@@ -98,7 +122,7 @@ impl Named for u16 {
 }
 
 impl FromBytes for u16 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([byte_stream.next::<Self>()?, byte_stream.next::<Self>()?]))
     }
 }
@@ -114,7 +138,7 @@ impl Named for u32 {
 }
 
 impl FromBytes for u32 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -135,7 +159,7 @@ impl Named for u64 {
 }
 
 impl FromBytes for u64 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -160,7 +184,7 @@ impl Named for i8 {
 }
 
 impl FromBytes for i8 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(byte_stream.next::<Self>()? as i8)
     }
 }
@@ -176,7 +200,7 @@ impl Named for i16 {
 }
 
 impl FromBytes for i16 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([byte_stream.next::<Self>()?, byte_stream.next::<Self>()?]))
     }
 }
@@ -192,7 +216,7 @@ impl Named for i32 {
 }
 
 impl FromBytes for i32 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -213,7 +237,7 @@ impl Named for i64 {
 }
 
 impl FromBytes for i64 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -238,7 +262,7 @@ impl Named for f32 {
 }
 
 impl FromBytes for f32 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Self::from_le_bytes([
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -259,7 +283,7 @@ impl<T: Named, const SIZE: usize> Named for [T; SIZE] {
 }
 
 impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         use std::mem::MaybeUninit;
 
         let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -298,7 +322,7 @@ impl Named for String {
 }
 
 impl FromBytes for String {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let mut value = String::new();
 
         loop {
@@ -323,7 +347,7 @@ impl<T: Named> Named for Vec<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vec<T> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let mut vector = Vec::new();
 
         while !byte_stream.is_empty() {
@@ -340,7 +364,7 @@ impl<T: Named> Named for Vector2<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector2<T> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
 
@@ -362,7 +386,7 @@ impl<T: Named> Named for Vector3<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector3<T> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -386,7 +410,7 @@ impl<T: Named> Named for Vector4<T> {
 }
 
 impl<T: FromBytes> FromBytes for Vector4<T> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -411,7 +435,7 @@ impl<T: Named> Named for Quaternion<T> {
 }
 
 impl<T: FromBytes> FromBytes for Quaternion<T> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let first = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let second = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let third = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -426,7 +450,7 @@ impl<T: Named> Named for Matrix3<T> {
 }
 
 impl<T: FromBytes> FromBytes for Matrix3<T> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let c0r0 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let c0r1 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
         let c0r2 = conversion_result::<Self, _>(T::from_bytes(byte_stream))?;
@@ -456,7 +480,7 @@ mod default_string {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[116, 101, 115, 116, 0]);
         let test_value = String::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.as_str(), "test");
         assert!(byte_stream.is_empty());
@@ -476,10 +500,10 @@ mod length_hint_string {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = String::from_n_bytes(&mut byte_stream, 8).unwrap();
         assert_eq!(test_value.as_str(), "test");
-        assert!(byte_stream.is_empty());
+        assert_eq!(byte_stream.get_offset(), 8);
     }
 }
 
@@ -507,7 +531,7 @@ mod const_length_hint_string {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[116, 101, 115, 116, 0, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.string.as_str(), "test");
         assert!(byte_stream.is_empty());
@@ -537,7 +561,7 @@ mod dynamic_length_hint_string {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[4, 116, 101, 115, 116, 0, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[4, 116, 101, 115, 116, 0, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value, TestStruct::new(4, "test".to_string()));
         assert!(byte_stream.is_empty());
@@ -567,7 +591,7 @@ mod default_struct {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[16, 184, 11, 255, 255, 255, 255]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[16, 184, 11, 255, 255, 255, 255]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value, TestStruct::new(16, 3000, -1));
         assert!(byte_stream.is_empty());
@@ -579,7 +603,7 @@ mod version_struct_smaller {
     use derive_new::new;
     use procedural::*;
 
-    use crate::loaders::{ByteStream, FromBytes, MajorFirst, Version};
+    use crate::loaders::{ByteStream, FromBytes, InternalVersion, MajorFirst, Version};
 
     #[derive(Named, FromBytes, new)]
     struct TestStruct {
@@ -591,7 +615,7 @@ mod version_struct_smaller {
 
     #[test]
     fn deserialize_smaller() {
-        let mut byte_stream = ByteStream::new(&[4, 0, 16, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<Option<InternalVersion>>::without_metadata(&[4, 0, 16, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, Some(16));
         assert!(byte_stream.is_empty());
@@ -599,14 +623,14 @@ mod version_struct_smaller {
 
     #[test]
     fn deserialize_equals() {
-        let mut byte_stream = ByteStream::new(&[4, 1, 16, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<Option<InternalVersion>>::without_metadata(&[4, 1, 16, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, None);
     }
 
     #[test]
     fn deserialize_bigger() {
-        let mut byte_stream = ByteStream::new(&[4, 6, 16, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<Option<InternalVersion>>::without_metadata(&[4, 6, 16, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, None);
     }
@@ -617,7 +641,7 @@ mod version_struct_equals_or_above {
     use derive_new::new;
     use procedural::*;
 
-    use crate::loaders::{ByteStream, FromBytes, MajorFirst, Version};
+    use crate::loaders::{ByteStream, FromBytes, InternalVersion, MajorFirst, Version};
 
     #[derive(Named, FromBytes, new)]
     struct TestStruct {
@@ -629,25 +653,25 @@ mod version_struct_equals_or_above {
 
     #[test]
     fn deserialize_smaller() {
-        let mut byte_stream = ByteStream::new(&[4, 0, 16, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<Option<InternalVersion>>::without_metadata(&[4, 0, 16, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, None);
     }
 
     #[test]
     fn deserialize_equals() {
-        let mut byte_stream = ByteStream::new(&[4, 1, 16, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<Option<InternalVersion>>::without_metadata(&[4, 1, 16, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, Some(16));
-        assert!(byte_stream.is_empty());
+        assert_eq!(byte_stream.get_offset(), 6);
     }
 
     #[test]
     fn deserialize_bigger() {
-        let mut byte_stream = ByteStream::new(&[4, 2, 16, 0, 0, 0]);
+        let mut byte_stream = ByteStream::<Option<InternalVersion>>::without_metadata(&[4, 2, 16, 0, 0, 0]);
         let test_value = TestStruct::from_bytes(&mut byte_stream).unwrap();
         assert_eq!(test_value.maybe_value, Some(16));
-        assert!(byte_stream.is_empty());
+        assert_eq!(byte_stream.get_offset(), 6);
     }
 }
 
@@ -673,10 +697,10 @@ mod default_enum {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[1]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[1]);
         let test_value = TestEnum::from_bytes(&mut byte_stream).unwrap();
         assert!(matches!(test_value, TestEnum::Second));
-        assert!(byte_stream.is_empty());
+        assert_eq!(byte_stream.get_offset(), 1);
     }
 }
 
@@ -705,10 +729,10 @@ mod numeric_value_enum {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[10]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[10]);
         let test_value = TestEnum::from_bytes(&mut byte_stream).unwrap();
         assert!(matches!(test_value, TestEnum::Second));
-        assert!(byte_stream.is_empty());
+        assert_eq!(byte_stream.get_offset(), 1);
     }
 }
 
@@ -735,9 +759,9 @@ mod numeric_type_enum {
 
     #[test]
     fn deserialization_test() {
-        let mut byte_stream = ByteStream::new(&[1, 0]);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[1, 0]);
         let test_value = TestEnum::from_bytes(&mut byte_stream).unwrap();
         assert!(matches!(test_value, TestEnum::Second));
-        assert!(byte_stream.is_empty());
+        assert_eq!(byte_stream.get_offset(), 2);
     }
 }

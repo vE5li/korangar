@@ -2,6 +2,7 @@
 pub enum ConversionErrorType {
     ByteStreamTooShort { type_name: &'static str },
     DataTooBig { type_name: &'static str },
+    IncorrectMetadata { type_name: &'static str },
     Specific { message: String },
 }
 
@@ -12,7 +13,7 @@ pub struct ConversionError {
 }
 
 impl ConversionError {
-    pub(super) fn from_error_type(error_type: ConversionErrorType) -> Box<Self> {
+    pub fn from_error_type(error_type: ConversionErrorType) -> Box<Self> {
         Box::new(Self {
             error_type,
             stack: Vec::new(),
@@ -43,7 +44,18 @@ impl std::fmt::Debug for ConversionError {
                 write!(formatter, "byte stream too short while parsing {} in {}", type_name, stack)
             }
             ConversionErrorType::DataTooBig { type_name } => {
-                write!(formatter, "data is too big for the available space {} in {}", type_name, stack)
+                write!(
+                    formatter,
+                    "data is too big for the available space for {} in {}",
+                    type_name, stack
+                )
+            }
+            ConversionErrorType::IncorrectMetadata { type_name } => {
+                write!(
+                    formatter,
+                    "the metadata associated to the byte stream is incorrect for {} in {}",
+                    type_name, stack
+                )
             }
             ConversionErrorType::Specific { message } => write!(formatter, "{} in {}", message, stack),
         }

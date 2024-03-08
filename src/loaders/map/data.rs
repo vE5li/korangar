@@ -3,6 +3,7 @@ use procedural::*;
 pub use super::resource::MapResources;
 use crate::graphics::ColorBGRA;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
+use crate::loaders::version::InternalVersion;
 use crate::loaders::{conversion_result, ByteStream, ConversionError, FromBytes, MajorFirst, Version};
 use crate::world::Tile;
 
@@ -107,23 +108,27 @@ impl GroundTile {
 }
 
 impl FromBytes for GroundTile {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let upper_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
         let upper_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
         let lower_left_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
         let lower_right_height = conversion_result::<Self, _>(f32::from_bytes(byte_stream))?;
 
-        let top_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
+        let version = byte_stream
+            .get_metadata::<Self, Option<InternalVersion>>()?
+            .ok_or(ConversionError::from_message("version not set"))?;
+
+        let top_surface_index = match version.equals_or_above(1, 7) {
             true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
             false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
         };
 
-        let front_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
+        let front_surface_index = match version.equals_or_above(1, 7) {
             true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
             false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
         };
 
-        let right_surface_index = match byte_stream.get_version().equals_or_above(1, 7) {
+        let right_surface_index = match version.equals_or_above(1, 7) {
             true => conversion_result::<Self, _>(i32::from_bytes(byte_stream))?,
             false => conversion_result::<Self, _>(i16::from_bytes(byte_stream))? as i32,
         };

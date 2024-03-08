@@ -7,7 +7,7 @@ use vulkano::image::view::ImageView;
 
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
-use crate::interface::{ValueState, Remote, TrackedState};
+use crate::interface::{Remote, TrackedState, ValueState};
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
 use crate::network::{EquipPosition, ItemId, ItemIndex};
 

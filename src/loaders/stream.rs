@@ -1,11 +1,9 @@
+use std::any::TypeId;
 #[cfg(feature = "debug")]
 use std::cell::UnsafeCell;
 
-use derive_new::new;
-
 use super::convertable::ConversionError;
-use super::version::InternalVersion;
-use super::{Named, Version};
+use super::{ConversionErrorType, Named};
 #[cfg(feature = "debug")]
 use crate::debug::*;
 #[cfg(feature = "debug")]
@@ -17,36 +15,89 @@ use crate::loaders::convertable::check_upper_bound;
 #[cfg(feature = "debug")]
 use crate::network::IncomingPacket;
 
-#[derive(new)]
-pub struct ByteStream<'b> {
-    data: &'b [u8],
-    #[new(default)]
+pub struct ByteStream<'a, META = ()>
+where
+    META: 'static,
+{
+    data: &'a [u8],
     offset: usize,
-    #[new(default)]
-    version: Option<InternalVersion>,
+    metadata: META,
     #[cfg(feature = "debug")]
-    #[new(default)]
     packet_history: Vec<PacketEntry>,
 }
 
-impl<'b> ByteStream<'b> {
-    pub fn next<S: Named>(&mut self) -> Result<u8, Box<ConversionError>> {
-        check_upper_bound::<S>(self.offset, self.data.len())?;
-        let byte = self.data[self.offset];
-        self.offset += 1;
-        Ok(byte)
+impl<'a, META> ByteStream<'a, META>
+where
+    META: Default + 'static,
+{
+    pub fn without_metadata(data: &'a [u8]) -> Self {
+        Self {
+            data,
+            offset: 0,
+            metadata: META::default(),
+            #[cfg(feature = "debug")]
+            packet_history: Vec::new(),
+        }
+    }
+}
+
+impl<'a, META> ByteStream<'a, META>
+where
+    META: 'static,
+{
+    pub fn with_metadata(data: &'a [u8], metadata: META) -> Self {
+        Self {
+            data,
+            offset: 0,
+            metadata,
+            #[cfg(feature = "debug")]
+            packet_history: Vec::new(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
         self.offset >= self.data.len()
     }
 
-    pub fn set_version<T>(&mut self, version: Version<T>) {
-        self.version = Some(version.into());
+    pub fn get_metadata<CALLER, OUTER>(&self) -> Result<&OUTER, Box<ConversionError>>
+    where
+        OUTER: 'static,
+        CALLER: Named,
+    {
+        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
+            true => unsafe { Ok(std::mem::transmute::<_, &OUTER>(&self.metadata)) },
+            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
+                type_name: CALLER::NAME,
+            })),
+        }
     }
 
-    pub fn get_version(&mut self) -> InternalVersion {
-        self.version.unwrap()
+    pub fn get_metadata_mut<CALLER, OUTER>(&mut self) -> Result<&mut OUTER, Box<ConversionError>>
+    where
+        OUTER: 'static,
+        CALLER: Named,
+    {
+        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
+            true => unsafe { Ok(std::mem::transmute::<_, &mut OUTER>(&mut self.metadata)) },
+            false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
+                type_name: CALLER::NAME,
+            })),
+        }
+    }
+
+    pub fn get_offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset
+    }
+
+    pub fn next<S: Named>(&mut self) -> Result<u8, Box<ConversionError>> {
+        check_upper_bound::<S>(self.offset, self.data.len())?;
+        let byte = self.data[self.offset];
+        self.offset += 1;
+        Ok(byte)
     }
 
     pub fn slice<S: Named>(&mut self, count: usize) -> Result<&[u8], Box<ConversionError>> {
@@ -58,19 +109,15 @@ impl<'b> ByteStream<'b> {
         Ok(&self.data[start_index..self.offset])
     }
 
-    pub fn get_offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn set_offset(&mut self, offset: usize) {
-        self.offset = offset
-    }
-
     pub fn remaining_bytes(&mut self) -> Vec<u8> {
         let end_index = self.data.len();
         let data = self.data[self.offset..end_index].to_vec();
         self.offset = end_index;
         data
+    }
+
+    pub fn into_metadata(self) -> META {
+        self.metadata
     }
 
     #[cfg(feature = "debug")]

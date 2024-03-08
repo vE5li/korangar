@@ -48,14 +48,14 @@ impl Archive for NativeArchive {
         // while being able to read without buffering the entire file.
         let mut file_header_buffer = [0u8; UNPACKED_SIZE_OF_ARCHIVEHEADER];
         file.read_exact(&mut file_header_buffer).unwrap();
-        let file_header = Header::from_bytes(&mut ByteStream::new(&file_header_buffer)).unwrap();
+        let file_header = Header::from_bytes(&mut ByteStream::<()>::without_metadata(&file_header_buffer)).unwrap();
         file_header.validate_version();
 
         let _ = file.seek(SeekFrom::Current(file_header.get_file_table_offset() as i64)).unwrap();
         let mut file_table_buffer = [0u8; UNPACKED_SIZE_OF_FILETABLE];
 
         file.read_exact(&mut file_table_buffer).unwrap();
-        let file_table = AssetTable::from_bytes(&mut ByteStream::new(&file_table_buffer)).unwrap();
+        let file_table = AssetTable::from_bytes(&mut ByteStream::<()>::without_metadata(&file_table_buffer)).unwrap();
 
         let mut compressed_file_table_buffer = vec![0u8; file_table.get_compressed_size()];
         file.read_exact(&mut compressed_file_table_buffer).unwrap();
@@ -63,7 +63,7 @@ impl Archive for NativeArchive {
 
         let file_count = file_header.get_file_count();
 
-        let mut file_table_byte_stream = ByteStream::new(&decompressed);
+        let mut file_table_byte_stream = ByteStream::<()>::without_metadata(&decompressed);
         let mut assets = HashMap::with_capacity(file_count);
 
         for _index in 0..file_count {

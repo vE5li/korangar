@@ -6,6 +6,7 @@ use derive_new::new;
 use procedural::{Named, *};
 use vulkano::image::view::ImageView;
 
+use super::version::InternalVersion;
 use super::{conversion_result, ConversionError, FromBytesExt, FALLBACK_MODEL_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -82,8 +83,12 @@ pub struct ModelString<const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
-        let inner = if byte_stream.get_version().equals_or_above(2, 2) {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
+        let inner = if byte_stream
+            .get_metadata::<Self, Option<InternalVersion>>()?
+            .ok_or(ConversionError::from_message("version not set"))?
+            .equals_or_above(2, 2)
+        {
             let length = conversion_result::<Self, _>(u32::from_bytes(byte_stream))? as usize;
             let mut inner = conversion_result::<Self, _>(String::from_n_bytes(byte_stream, length))?;
             // need to remove the last character for some reason
@@ -318,7 +323,7 @@ impl ModelLoader {
         let timer = Timer::new_dynamic(format!("load rsm model from {MAGENTA}{model_file}{NONE}"));
 
         let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
-        let mut byte_stream = ByteStream::new(&bytes);
+        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'S', b'M'] {
             return Err(format!("failed to read magic number from {model_file}"));

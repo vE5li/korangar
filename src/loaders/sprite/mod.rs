@@ -15,6 +15,7 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
+use super::version::InternalVersion;
 use super::{conversion_result, ConversionError, FromBytesExt, FALLBACK_SPRITE_FILE};
 #[cfg(feature = "debug")]
 use crate::debug::*;
@@ -40,7 +41,7 @@ struct PaletteImageData {
 struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>>
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>>
     where
         Self: Sized,
     {
@@ -49,7 +50,12 @@ impl FromBytes for PaletteImageData {
 
         let data = match width as usize * height as usize {
             0 => Vec::new(),
-            image_size if byte_stream.get_version().smaller(2, 1) => {
+            image_size
+                if byte_stream
+                    .get_metadata::<Self, Option<InternalVersion>>()?
+                    .ok_or(ConversionError::from_message("version not set"))?
+                    .smaller(2, 1) =>
+            {
                 conversion_result::<Self, _>(Vec::from_n_bytes(byte_stream, image_size))?
             }
             image_size => {
@@ -155,7 +161,7 @@ impl SpriteLoader {
         let timer = Timer::new_dynamic(format!("load sprite from {MAGENTA}{path}{NONE}"));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
-        let mut byte_stream = ByteStream::new(&bytes);
+        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         if <[u8; 2]>::from_bytes(&mut byte_stream).unwrap() != [b'S', b'P'] {
             return Err(format!("failed to read magic number from {path}"));

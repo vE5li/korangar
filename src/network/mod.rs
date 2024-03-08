@@ -19,8 +19,8 @@ use crate::interface::PacketEntry;
 #[cfg(feature = "debug")]
 use crate::interface::PacketWindow;
 use crate::interface::{
-    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, ValueState, PrototypeElement, TrackedState,
-    TrackedStateTake, WeakElementCell,
+    CharacterSelectionWindow, ElementCell, ElementWrap, Expandable, FriendsWindow, PrototypeElement, TrackedState, TrackedStateTake,
+    ValueState, WeakElementCell,
 };
 use crate::loaders::{conversion_result, ByteStream, ClientInfo, ConversionError, FromBytes, Named, ServiceId, ToBytes};
 
@@ -52,7 +52,7 @@ pub struct SkillLevel(pub u16);
 pub struct ItemIndex(u16);
 
 impl FromBytes for ItemIndex {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         u16::from_bytes(byte_stream).map(|raw| Self(raw - 2))
     }
 }
@@ -75,7 +75,7 @@ pub trait IncomingPacket: Named + PrototypeElement + Clone {
     const IS_PING: bool;
     const HEADER: u16;
 
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>>;
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>>;
 }
 
 /// Base trait that all outgoing packets implement.
@@ -278,7 +278,7 @@ impl WorldPosition {
 }
 
 impl FromBytes for WorldPosition {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let coordinates = byte_stream.slice::<Self>(3)?;
 
         let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -319,7 +319,7 @@ impl WorldPosition2 {
 }
 
 impl FromBytes for WorldPosition2 {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let coordinates: Vec<usize> = byte_stream.slice::<Self>(6)?.iter().map(|byte| *byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
@@ -445,7 +445,7 @@ impl Named for Ipv4Addr {
 }
 
 impl FromBytes for Ipv4Addr {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         Ok(Ipv4Addr::new(
             byte_stream.next::<Self>()?,
             byte_stream.next::<Self>()?,
@@ -1021,7 +1021,7 @@ pub enum StatusType {
 }
 
 impl FromBytes for StatusType {
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let status = match conversion_result::<Self, _>(u16::from_bytes(byte_stream))? {
             0 => u32::from_bytes(byte_stream).map(Self::MovementSpeed),
             1 => u64::from_bytes(byte_stream).map(Self::BaseExperience),
@@ -2633,7 +2633,7 @@ impl IncomingPacket for UnknownPacket {
     const HEADER: u16 = 0;
     const IS_PING: bool = false;
 
-    fn from_bytes(byte_stream: &mut ByteStream) -> Result<Self, Box<ConversionError>> {
+    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> Result<Self, Box<ConversionError>> {
         let _ = byte_stream;
         unimplemented!()
     }
@@ -2641,7 +2641,7 @@ impl IncomingPacket for UnknownPacket {
 
 impl PrototypeElement for UnknownPacket {
     fn to_element(&self, display: String) -> ElementCell {
-        let mut byte_stream = ByteStream::new(&self.bytes);
+        let mut byte_stream = ByteStream::<()>::without_metadata(&self.bytes);
 
         let elements = match self.bytes.len() >= 2 {
             true => {
@@ -2791,7 +2791,7 @@ impl NetworkingSystem {
         self.send_packet_to_login_server(LoginServerLoginPacket::new(username.clone(), password.clone()));
 
         let response = self.get_data_from_login_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let login_server_login_success_packet = match header {
@@ -2867,7 +2867,7 @@ impl NetworkingSystem {
 
         let response = self.get_data_from_character_server();
 
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
         let account_id = AccountId::from_bytes(&mut byte_stream).unwrap();
 
         assert_eq!(account_id, login_data.account_id);
@@ -2876,7 +2876,7 @@ impl NetworkingSystem {
         self.update_packet_history(&mut byte_stream);
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let character_server_login_success_packet = match header {
@@ -2898,7 +2898,7 @@ impl NetworkingSystem {
         self.update_packet_history(&mut byte_stream);
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream = ByteStream::without_metadata(&response);
 
         let request_character_list_success_packet = RequestCharacterListSuccessPacket::take_from_bytes(&mut byte_stream).unwrap();
         self.characters.set(request_character_list_success_packet.character_information);
@@ -3067,7 +3067,7 @@ impl NetworkingSystem {
         ));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let create_character_success_packet = match header {
@@ -3117,7 +3117,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id, email));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         match header {
@@ -3156,7 +3156,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream: ByteStream<()> = ByteStream::without_metadata(&response);
 
         let header = u16::from_bytes(&mut byte_stream).unwrap();
         let character_selection_success_packet = match header {
@@ -3270,7 +3270,7 @@ impl NetworkingSystem {
         self.send_packet_to_character_server(SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16));
 
         let response = self.get_data_from_character_server();
-        let mut byte_stream = ByteStream::new(&response);
+        let mut byte_stream = ByteStream::without_metadata(&response);
 
         let switch_character_slot_response_packet = SwitchCharacterSlotResponsePacket::take_from_bytes(&mut byte_stream).unwrap();
 
@@ -3412,7 +3412,7 @@ impl NetworkingSystem {
         let mut events = Vec::new();
 
         while let Some(data) = self.try_get_data_from_map_server() {
-            let mut byte_stream = ByteStream::new(&data);
+            let mut byte_stream = ByteStream::without_metadata(&data);
 
             while !byte_stream.is_empty() {
                 let saved_offset = byte_stream.get_offset();

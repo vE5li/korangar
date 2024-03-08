@@ -13,6 +13,7 @@ pub use self::data::MapData;
 use self::data::*;
 pub use self::resource::{LightSettings, WaterSettings};
 use self::vertices::{generate_tile_vertices, ground_water_vertices, load_textures};
+use super::version::InternalVersion;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
@@ -156,7 +157,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
 
 fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) -> Result<MapData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}.rsw", &resource_file))?;
-    let mut byte_stream = ByteStream::new(&bytes);
+    let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
     if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'S', b'W'] {
         return Err(format!("failed to read magic number from {}.rsw", &resource_file));
@@ -172,7 +173,7 @@ fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) ->
 
 fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GroundData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}", &ground_file))?;
-    let mut byte_stream = ByteStream::new(&bytes);
+    let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
     if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'G', b'N'] {
         return Err(format!("failed to read magic number from {}", &ground_file));
@@ -188,7 +189,7 @@ fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -
 
 fn parse_gat_data(gat_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GatData, String> {
     let bytes = game_file_loader.get(&format!("data\\{}", &gat_file))?;
-    let mut byte_stream = ByteStream::new(&bytes);
+    let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
     if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'A', b'T'] {
         return Err(format!("failed to read magic number from {}", &gat_file));

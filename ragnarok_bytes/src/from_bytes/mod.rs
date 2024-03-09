@@ -1,4 +1,4 @@
-use crate::{ByteStream, ConversionResult};
+use crate::{ByteStream, ConversionResult, ConversionResultExt};
 
 mod implement;
 
@@ -28,29 +28,12 @@ where
     where
         Self: Sized,
     {
-        use std::mem::MaybeUninit;
+        // HACK: This will *not* work in the long run. This breaks as soon as the
+        // metadata is written or read inside T::from_bytes.
 
-        // Move the metadata to a temporary memory slot.
-        //
-        // SAFETY: Obviously this not safe and will be removed in the future.
-        let mut swap_metadata = unsafe { MaybeUninit::uninit().assume_init() };
-        std::mem::swap(byte_stream.get_metadata_mut::<Self, META>()?, &mut swap_metadata);
+        let slice = byte_stream.slice::<Self>(size)?;
+        let mut hacked: ByteStream<()> = ByteStream::without_metadata(slice);
 
-        let (result, mut metadata) = {
-            let data = byte_stream.slice::<T>(size)?;
-            let mut byte_stream = ByteStream::<META>::with_metadata(data, swap_metadata);
-
-            let result = T::from_bytes(&mut byte_stream);
-            let metadata = byte_stream.into_metadata();
-
-            (result, metadata)
-        };
-
-        // Move the metadata back to the original byte stream and forget the temporary
-        // memory slot.
-        std::mem::swap(byte_stream.get_metadata_mut::<Self, META>().unwrap(), &mut metadata);
-        std::mem::forget(metadata);
-
-        result
+        T::from_bytes(&mut hacked).trace::<Self>()
     }
 }

@@ -1,16 +1,14 @@
 #![feature(const_trait_impl)]
 
 mod error;
-// FIX: Not moved for now since it makes the compiler crash :)
-// mod fixed;
+mod fixed;
 mod from_bytes;
 mod helper;
 mod stream;
 mod to_bytes;
 
 pub use self::error::{ConversionError, ConversionErrorType};
-// FIX: Not moved for now since it makes the compiler crash :)
-// pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
+pub use self::fixed::{FixedByteSize, FixedByteSizeCollection};
 pub use self::from_bytes::{FromBytes, FromBytesExt};
 pub use self::helper::{ConversionResult, ConversionResultExt};
 pub use self::stream::ByteStream;

@@ -22,11 +22,11 @@ pub fn derive_fixed_byte_size_struct(data_struct: DataStruct, generics: Generics
                 syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
             })
             .map(|length_hint| quote!((#length_hint) as usize))
-            .unwrap_or(quote!(<#field_type as crate::loaders::FixedByteSize>::size_in_bytes()))
+            .unwrap_or(quote!(<#field_type as ragnarok_bytes::FixedByteSize>::size_in_bytes()))
     });
 
     quote! {
-        impl #impl_generics const crate::loaders::FixedByteSize for #name #type_generics #where_clause {
+        impl #impl_generics ragnarok_bytes::FixedByteSize for #name #type_generics #where_clause {
             fn size_in_bytes() -> usize {
                 let mut total = 0;
                 #(total += #sizes;)*
@@ -45,9 +45,9 @@ pub fn derive_fixed_byte_size_enum(generics: Generics, mut attributes: Vec<Attri
         .unwrap_or_else(|| Ident::new("u8", Span::call_site()));
 
     quote! {
-        impl #impl_generics const crate::loaders::FixedByteSize for #name #type_generics #where_clause {
+        impl #impl_generics ragnarok_bytes::FixedByteSize for #name #type_generics #where_clause {
             fn size_in_bytes() -> usize {
-                <#numeric_type as crate::loaders::FixedByteSize>::size_in_bytes()
+                <#numeric_type as ragnarok_bytes::FixedByteSize>::size_in_bytes()
             }
         }
     }

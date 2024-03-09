@@ -9,7 +9,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteStream, FixedByteSize, FromBytes};
 use yazi::{decompress, Format};
 
 use self::assettable::AssetTable;
@@ -19,7 +19,6 @@ use self::header::Header;
 #[cfg(feature = "debug")]
 use crate::debug::*;
 use crate::loaders::archive::Archive;
-use crate::loaders::FixedByteSize;
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
 /// Each GRF contains a [`Header`] with metadata (number of files, size,
@@ -33,8 +32,6 @@ pub struct NativeArchive {
 
 const MAGIC_BYTES: &[u8] = b"Master of Magic\0";
 const UNPACKED_SIZE_OF_MAGIC_STRING: usize = MAGIC_BYTES.len();
-const UNPACKED_SIZE_OF_ARCHIVEHEADER: usize = Header::size_in_bytes();
-const UNPACKED_SIZE_OF_FILETABLE: usize = AssetTable::size_in_bytes();
 
 impl Archive for NativeArchive {
     fn from_path(path: &Path) -> Self {
@@ -47,13 +44,13 @@ impl Archive for NativeArchive {
 
         // Keeping the convenience of using [`loaders::stream::ByteStream`]
         // while being able to read without buffering the entire file.
-        let mut file_header_buffer = [0u8; UNPACKED_SIZE_OF_ARCHIVEHEADER];
+        let mut file_header_buffer = vec![0; Header::size_in_bytes()];
         file.read_exact(&mut file_header_buffer).unwrap();
         let file_header = Header::from_bytes(&mut ByteStream::<()>::without_metadata(&file_header_buffer)).unwrap();
         file_header.validate_version();
 
         let _ = file.seek(SeekFrom::Current(file_header.get_file_table_offset() as i64)).unwrap();
-        let mut file_table_buffer = [0u8; UNPACKED_SIZE_OF_FILETABLE];
+        let mut file_table_buffer = vec![0; AssetTable::size_in_bytes()];
 
         file.read_exact(&mut file_table_buffer).unwrap();
         let file_table = AssetTable::from_bytes(&mut ByteStream::<()>::without_metadata(&file_table_buffer)).unwrap();
@@ -95,7 +92,7 @@ impl Archive for NativeArchive {
                 return None;
             }
 
-            let position = file_information.offset as u64 + UNPACKED_SIZE_OF_MAGIC_STRING as u64 + UNPACKED_SIZE_OF_ARCHIVEHEADER as u64;
+            let position = file_information.offset as u64 + UNPACKED_SIZE_OF_MAGIC_STRING as u64 + Header::size_in_bytes() as u64;
             self.os_file_handler.seek(SeekFrom::Start(position)).unwrap();
             self.os_file_handler.read_exact(&mut compressed_file_buffer).unwrap();
 

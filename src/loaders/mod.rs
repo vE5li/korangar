@@ -1,8 +1,6 @@
 mod action;
 mod archive;
 mod effect;
-// FIX: Move this to ragnarok_bytes once it doesn't crash the compiler anymore
-mod fixed;
 mod font;
 mod gamefile;
 mod map;
@@ -15,8 +13,6 @@ mod version;
 
 pub use self::action::*;
 pub use self::effect::{EffectHolder, EffectLoader, *};
-// FIX: Move this to ragnarok_bytes once it doesn't crash the compiler anymore
-pub use self::fixed::{FixedByteSize, FixedByteSizeWrapper};
 pub use self::font::FontLoader;
 pub use self::gamefile::*;
 #[cfg(feature = "debug")]

@@ -125,7 +125,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
                     .expect("repeating_remaining is used but no packet_length attribute is set");
 
                 quote!({
-                    let repeat_count = (#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as crate::loaders::FixedByteSizeWrapper>::size_in_bytes() as u16);
+                    let repeat_count = (#packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2) / (<#field_type as ragnarok_bytes::FixedByteSizeCollection>::size_in_bytes() as u16);
                     // TODO: Add check to make sure this allocation is not too big.
                     let mut vector = Vec::with_capacity(repeat_count as usize);
 

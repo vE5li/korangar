@@ -1326,6 +1326,10 @@ dependencies = [
 [[package]]
 name = "ragnarok_types"
 version = "0.1.0"
+dependencies = [
+ "ragnarok_bytes",
+ "ragnarok_procedural",
+]
 
 [[package]]
 name = "rand"

@@ -4,6 +4,8 @@ members = ["ragnarok_*", "procedural"]
 
 [workspace.dependencies]
 cgmath = { version = "0.18", features = ["serde"] }
+ragnarok_bytes = { path = "ragnarok_bytes", features = ["cgmath"] }
+ragnarok_procedural = { path = "ragnarok_procedural" }
 
 [package]
 name = "korangar"
@@ -25,8 +27,8 @@ num = "*"
 option-ext = "0.2.0"
 pathfinding = "2.2.2"
 procedural = { path = "procedural" }
-ragnarok_bytes = { path = "ragnarok_bytes", features = ["cgmath"] }
-ragnarok_procedural = { path = "ragnarok_procedural" }
+ragnarok_bytes = { workspace = true, features = ["cgmath"] }
+ragnarok_procedural = { workspace = true }
 rand = "0.8.5"
 random_color = { version = "0.6.1", optional = true }
 rayon = "1.5.3"

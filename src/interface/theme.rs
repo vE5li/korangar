@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::{dimension_bound, size_bound, PrototypeElement, PrototypeWindow};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 

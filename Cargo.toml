@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["ragnarok_bytes"]
+members = ["ragnarok_*", "procedural"]
 
 [workspace.dependencies]
 cgmath = { version = "0.18", features = ["serde"] }
@@ -12,6 +12,7 @@ edition = "2021"
 
 [dependencies]
 procedural = { path = "procedural" }
+ragnarok_procedural = { path = "ragnarok_procedural" }
 ragnarok_bytes = { path = "ragnarok_bytes", features = ["cgmath"] }
 rayon = "1.5.3"
 rand = "0.8.5"

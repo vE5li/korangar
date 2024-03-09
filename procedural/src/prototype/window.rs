@@ -25,7 +25,7 @@ pub fn derive_prototype_window_struct(
             }
 
             fn to_window(&self, window_cache: &crate::interface::WindowCache, interface_settings: &crate::interface::InterfaceSettings, available_space: crate::interface::ScreenSize) -> crate::interface::Window {
-                let scroll_view = crate::interface::ScrollView::new(vec![#(#initializers),*], size_bound!(100%, super > ? < super));
+                let scroll_view = crate::interface::ScrollView::new(vec![#(#initializers),*], procedural::size_bound!(100%, super > ? < super));
                 let elements: Vec<crate::interface::ElementCell> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
 
                 crate::interface::WindowBuilder::new()

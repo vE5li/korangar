@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use procedural::*;
+use procedural::size_bound;
 
 use crate::debug::*;
 use crate::graphics::{InterfaceRenderer, Renderer};

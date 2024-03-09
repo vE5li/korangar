@@ -9,7 +9,7 @@ pub use self::profiling::*;
 #[cfg(test)]
 mod debug_condition {
 
-    use procedural::debug_condition;
+    use ragnarok_procedural::debug_condition;
 
     #[test]
     #[should_panic]

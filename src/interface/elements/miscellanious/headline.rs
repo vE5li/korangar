@@ -1,5 +1,5 @@
 use derive_new::new;
-use procedural::*;
+use procedural::size_bound;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::interface::{Element, *};

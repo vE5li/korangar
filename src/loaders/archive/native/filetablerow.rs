@@ -1,4 +1,4 @@
-use procedural::ByteConvertable;
+use ragnarok_procedural::ByteConvertable;
 
 /// Represents file information about each of the files stored in the GRF.
 #[derive(Clone, Debug, ByteConvertable)]

@@ -1,4 +1,5 @@
-use procedural::{ByteConvertable, PrototypeElement};
+use procedural::PrototypeElement;
+use ragnarok_procedural::ByteConvertable;
 
 #[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
 #[numeric_type(u32)]

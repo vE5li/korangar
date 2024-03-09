@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::PrototypeElement;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "debug")]

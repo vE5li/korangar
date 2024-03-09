@@ -1,7 +1,7 @@
 use std::cell::UnsafeCell;
 
 use derive_new::new;
-use procedural::*;
+use procedural::dimension_bound;
 
 use crate::interface::*;
 use crate::network::Friend;

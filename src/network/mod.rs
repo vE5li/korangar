@@ -8,8 +8,9 @@ use std::time::Duration;
 use cgmath::Vector2;
 use chrono::Local;
 use derive_new::new;
-use procedural::*;
+use procedural::{profile, PrototypeElement};
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
+use ragnarok_procedural::{ByteConvertable, FixedByteSize, FromBytes, IncomingPacket, OutgoingPacket};
 
 pub use self::login::LoginSettings;
 #[cfg(feature = "debug")]

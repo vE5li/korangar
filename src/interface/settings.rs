@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::{dimension_bound, PrototypeElement};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;

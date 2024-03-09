@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
 use derive_new::new;
-use procedural::*;
+use procedural::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_procedural::{ByteConvertable, FromBytes};
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;

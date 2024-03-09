@@ -2,7 +2,6 @@
 #![feature(extract_if)]
 
 mod bound;
-mod byte;
 mod prototype;
 mod toggle;
 mod utils;
@@ -13,7 +12,6 @@ use quote::quote;
 use syn::{parse, Data, DeriveInput, ItemFn, LitStr, Stmt};
 
 use self::bound::*;
-use self::byte::*;
 use self::prototype::*;
 use self::toggle::*;
 
@@ -72,153 +70,6 @@ pub fn derive_toggle(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
 
     match data {
         Data::Struct(data_struct) => derive_toggle_struct(data_struct, generics, ident),
-        Data::Enum(..) => panic!("enum types may not be derived"),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(FixedByteSize)]
-pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        generics,
-        data,
-        attrs,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_fixed_byte_size_struct(data_struct, generics, ident),
-        Data::Enum(..) => derive_fixed_byte_size_enum(generics, attrs, ident),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(
-    ByteConvertable,
-    attributes(
-        packet_length,
-        length_hint,
-        repeating,
-        repeating_remaining,
-        numeric_type,
-        numeric_value,
-        version,
-        version_smaller,
-        version_equals_or_above
-    )
-)]
-pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        attrs,
-        data,
-        generics,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_byte_convertable_struct(data_struct, generics, ident),
-        Data::Enum(data_enum) => derive_byte_convertable_enum(data_enum, generics, attrs, ident),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(
-    FromBytes,
-    attributes(
-        packet_length,
-        length_hint,
-        repeating,
-        repeating_remaining,
-        numeric_type,
-        numeric_value,
-        version,
-        version_smaller,
-        version_equals_or_above
-    )
-)]
-pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        attrs,
-        data,
-        generics,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_from_bytes_struct(data_struct, generics, ident),
-        Data::Enum(data_enum) => derive_from_bytes_enum(data_enum, generics, attrs, ident),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(
-    ToBytes,
-    attributes(
-        packet_length,
-        length_hint,
-        repeating,
-        repeating_remaining,
-        numeric_type,
-        numeric_value,
-        version,
-        version_smaller,
-        version_equals_or_above
-    )
-)]
-pub fn derive_to_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        attrs,
-        data,
-        generics,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_to_bytes_struct(data_struct, generics, ident),
-        Data::Enum(data_enum) => derive_to_bytes_enum(data_enum, generics, attrs, ident),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(
-    IncomingPacket,
-    attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining)
-)]
-pub fn derive_incoming_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        generics,
-        data,
-        attrs,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_incoming_packet_struct(data_struct, generics, attrs, ident),
-        Data::Enum(..) => panic!("enum types may not be derived"),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(
-    OutgoingPacket,
-    attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining)
-)]
-pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        generics,
-        data,
-        attrs,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_outgoing_packet_struct(data_struct, generics, attrs, ident),
         Data::Enum(..) => panic!("enum types may not be derived"),
         Data::Union(..) => panic!("union types may not be derived"),
     }

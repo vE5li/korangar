@@ -1,5 +1,5 @@
 use derive_new::new;
-use procedural::*;
+use procedural::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;
 use crate::interface::*;

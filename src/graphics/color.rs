@@ -1,4 +1,5 @@
-use procedural::*;
+use procedural::PrototypeElement;
+use ragnarok_procedural::ByteConvertable;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

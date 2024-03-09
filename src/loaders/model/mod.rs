@@ -3,8 +3,9 @@ use std::sync::Arc;
 
 use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
-use procedural::*;
+use procedural::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
+use ragnarok_procedural::FromBytes;
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;

@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::size_bound;
 
 use crate::debug::*;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};

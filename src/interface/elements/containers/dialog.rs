@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::size_bound;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};

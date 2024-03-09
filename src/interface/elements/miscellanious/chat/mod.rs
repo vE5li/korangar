@@ -1,6 +1,6 @@
 mod builder;
 
-use procedural::*;
+use procedural::size_bound;
 
 pub use self::builder::ChatBuilder;
 use crate::graphics::{InterfaceRenderer, Renderer};

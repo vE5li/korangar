@@ -1,5 +1,5 @@
 use derive_new::new;
-use procedural::{ByteConvertable, FixedByteSize};
+use ragnarok_procedural::{ByteConvertable, FixedByteSize};
 
 /// Represents the Header of the GRF file.
 #[derive(Clone, ByteConvertable, FixedByteSize, new)]

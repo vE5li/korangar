@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Weak;
 
-use procedural::*;
+use procedural::size_bound;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;

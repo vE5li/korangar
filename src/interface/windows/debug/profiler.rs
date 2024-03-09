@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::{dimension_bound, size_bound};
 
 use crate::interface::*;
 

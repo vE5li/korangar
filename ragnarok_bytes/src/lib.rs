@@ -59,7 +59,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 // #[cfg(test)]
 // mod const_length_hint_string {
 //     use derive_new::new;
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, ToBytes};
 //
@@ -90,7 +90,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 // #[cfg(test)]
 // mod dynamic_length_hint_string {
 //     use derive_new::new;
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, ToBytes};
 //
@@ -120,7 +120,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 // #[cfg(test)]
 // mod default_struct {
 //     use derive_new::new;
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, ToBytes};
 //
@@ -150,7 +150,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 // #[cfg(test)]
 // mod version_struct_smaller {
 //     use derive_new::new;
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, InternalVersion, MajorFirst, Version};
 //
@@ -191,7 +191,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 // #[cfg(test)]
 // mod version_struct_equals_or_above {
 //     use derive_new::new;
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, InternalVersion, MajorFirst, Version};
 //
@@ -232,7 +232,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 //
 // #[cfg(test)]
 // mod default_enum {
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, ToBytes};
 //
@@ -261,7 +261,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 //
 // #[cfg(test)]
 // mod numeric_value_enum {
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, ToBytes};
 //
@@ -293,7 +293,7 @@ pub use self::to_bytes::{ToBytes, ToBytesExt};
 //
 // #[cfg(test)]
 // mod numeric_type_enum {
-//     use procedural::*;
+//
 //
 //     use super::{ByteStream, FromBytes, ToBytes};
 //

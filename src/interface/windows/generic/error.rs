@@ -1,5 +1,5 @@
 use derive_new::new;
-use procedural::*;
+use procedural::size_bound;
 
 use crate::graphics::Color;
 use crate::interface::*;

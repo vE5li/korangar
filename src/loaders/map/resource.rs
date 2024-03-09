@@ -1,6 +1,7 @@
 use cgmath::Vector3;
-use procedural::{FromBytes, PrototypeElement};
+use procedural::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
+use ragnarok_procedural::FromBytes;
 
 use crate::graphics::{ColorRGB, Transform};
 use crate::world::{EffectSource, LightSource, SoundSource};

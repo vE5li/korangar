@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::Matrix4;
 use derive_new::new;
-use procedural::*;
+use procedural::{PrototypeElement, PrototypeWindow};
 
 use crate::graphics::*;
 use crate::network::ClientTick;

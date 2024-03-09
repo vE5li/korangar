@@ -1,5 +1,5 @@
 use derive_new::new;
-use procedural::{ByteConvertable, FixedByteSize};
+use ragnarok_procedural::{ByteConvertable, FixedByteSize};
 
 /// Stores the table of files the parent GRF is holding.
 #[derive(Clone, ByteConvertable, FixedByteSize, new)]

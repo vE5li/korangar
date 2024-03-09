@@ -744,6 +744,7 @@ dependencies = [
  "pathfinding",
  "procedural",
  "ragnarok_bytes",
+ "ragnarok_procedural",
  "rand 0.8.5",
  "random_color",
  "rayon",
@@ -1308,6 +1309,23 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
 ]
+
+[[package]]
+name = "ragnarok_packets"
+version = "0.1.0"
+
+[[package]]
+name = "ragnarok_procedural"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+]
+
+[[package]]
+name = "ragnarok_types"
+version = "0.1.0"
 
 [[package]]
 name = "rand"

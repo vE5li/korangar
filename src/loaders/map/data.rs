@@ -1,5 +1,6 @@
-use procedural::*;
+use procedural::{PrototypeElement, PrototypeWindow};
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
+use ragnarok_procedural::FromBytes;
 
 pub use super::resource::MapResources;
 use crate::graphics::ColorBGRA;

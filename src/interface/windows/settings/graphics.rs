@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::dimension_bound;
 
 use crate::graphics::{PresentModeInfo, ShadowDetail};
 use crate::input::UserEvent;

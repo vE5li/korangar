@@ -4,7 +4,7 @@ use std::ops::Mul;
 
 use cgmath::{Matrix4, Vector3};
 use derive_new::new;
-use procedural::*;
+use procedural::PrototypeElement;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};
 use crate::graphics::{Camera, GeometryRenderer, Renderer, Transform};

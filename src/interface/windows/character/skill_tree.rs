@@ -1,4 +1,4 @@
-use procedural::*;
+use procedural::size_bound;
 
 use crate::interface::*;
 use crate::inventory::Skill;

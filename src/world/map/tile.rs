@@ -1,5 +1,5 @@
-use procedural::FromBytes;
 use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes};
+use ragnarok_procedural::FromBytes;
 
 const NONE: u8 = 0b00000000;
 const WALKABLE: u8 = 0b00000001;

@@ -1,5 +1,6 @@
 use cgmath::Vector3;
-use procedural::*;
+use procedural::{PrototypeElement, PrototypeWindow};
+use ragnarok_procedural::ByteConvertable;
 
 #[cfg(feature = "debug")]
 use crate::graphics::{Camera, MarkerRenderer, Renderer};

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2, Vector3, VectorSpace};
 use derive_new::new;
-use procedural::*;
+use procedural::{profile, PrototypeElement, PrototypeWindow};
 use vulkano::buffer::Subbuffer;
 
 #[cfg(feature = "debug")]

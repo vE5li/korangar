@@ -112,7 +112,7 @@ fn main() {
     let timer = Timer::new("create window");
 
     // TODO: move this somewhere else
-    let file_data = include_bytes!("../icon.png");
+    let file_data = include_bytes!("../korangar/data/icon.png");
 
     let reader = ImageReader::with_format(Cursor::new(file_data), ImageFormat::Png);
     let image_buffer = reader.decode().unwrap().to_rgba8();

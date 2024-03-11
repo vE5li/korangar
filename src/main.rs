@@ -367,7 +367,7 @@ fn main() {
     let mut hotbar = Hotbar::default();
 
     let welcome_string = format!(
-        "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
+        "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
         env!("CARGO_PKG_VERSION")
     );
     let welcome_message = ChatMessage::new(welcome_string, Color::monochrome_u8(255));

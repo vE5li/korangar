@@ -1,51 +1,13 @@
 [workspace]
 resolver = "2"
-members = ["ragnarok_*", "procedural"]
+members = ["korangar", "ragnarok_*", "korangar_*"]
 
 [workspace.dependencies]
+bitflags = "2.4.2"
 cgmath = { version = "0.18", features = ["serde"] }
+korangar_interface = { path = "korangar_interface" }
+num = "0.4.1"
+korangar_procedural = { path = "korangar_procedural" }
 ragnarok_bytes = { path = "ragnarok_bytes", features = ["cgmath"] }
 ragnarok_procedural = { path = "ragnarok_procedural" }
-
-[package]
-name = "korangar"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-bitflags = "2.4.2"
-bytemuck = { version = "1.9", features = ["derive", "extern_crate_std", "min_const_generics"] }
-cgmath = { workspace = true, features = ["serde"] }
-chrono = "0.4"
-collision = { git = "https://github.com/rustgd/collision-rs.git" }
-derive-new = "0.5"
-image = "0.24.2"
-lazy_static = { version = "1.4.0", optional = true }
-lunify = "1.1.0"
-mlua = { version = "0.8", features = ["lua51", "vendored"] }
-num = "*"
-option-ext = "0.2.0"
-pathfinding = "2.2.2"
-procedural = { path = "procedural" }
-ragnarok_bytes = { workspace = true, features = ["cgmath"] }
-ragnarok_procedural = { workspace = true }
-rand = "0.8.5"
-random_color = { version = "0.6.1", optional = true }
-rayon = "1.5.3"
-ron = "0.8.0"
-rusttype = { version = "0.9.2", features = ["gpu_cache"] }
 serde = "1.0.137"
-serde-xml-rs = "0.6.0"
-vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
-vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
-vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
-walkdir = "2"
-winit = "0.28.7"
-xml-rs = "0.8.0"
-yazi = "0.1.4"
-
-[features]
-patched_as_folder = []
-debug = ["lazy_static", "random_color"]
-unicode = ["debug"]
-plain = ["debug"]

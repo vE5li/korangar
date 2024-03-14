@@ -1,10 +1,9 @@
 # Rust
 target/
-procedural/target
 
 # Korangar
-client/
-data.grf
-rdata.grf
-lua_files/
-lua_files.grf
+korangar/client/
+korangar/data.grf
+korangar/rdata.grf
+korangar/lua_files/
+korangar/lua_files.grf

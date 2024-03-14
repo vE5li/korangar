@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 cgmath = { workspace = true, optional = true }
+ragnarok_procedural = { workspace = true, optional = true }
 
 [features]
 cgmath = [ "dep:cgmath" ]
+derive = [ "ragnarok_procedural" ]

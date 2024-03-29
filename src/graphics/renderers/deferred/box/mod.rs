@@ -8,9 +8,8 @@ use procedural::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::input_assembly::PrimitiveTopology;
-use vulkano::pipeline::graphics::rasterization::RasterizationState;
 use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint, StateMode};
+use vulkano::pipeline::{GraphicsPipeline, Pipeline, PipelineBindPoint};
 use vulkano::render_pass::Subpass;
 use vulkano::shader::EntryPoint;
 

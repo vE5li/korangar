@@ -84,16 +84,10 @@ impl BoxRenderer {
         vertex_shader: &EntryPoint,
         fragment_shader: &EntryPoint,
     ) -> Arc<GraphicsPipeline> {
-        let rasterization_state = RasterizationState {
-            line_width: StateMode::Fixed(3.0),
-            ..Default::default()
-        };
-
         PipelineBuilder::<_, { DeferredRenderer::lighting_subpass() }>::new([vertex_shader, fragment_shader])
             .vertex_input_state::<WaterVertex>(vertex_shader)
             .topology(PrimitiveTopology::LineList)
             .fixed_viewport(viewport)
-            .rasterization_state(rasterization_state)
             .build(device, subpass)
     }
 

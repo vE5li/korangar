@@ -157,8 +157,6 @@ fn main() {
         enabled_features: vulkano::device::Features {
             sampler_anisotropy: true,
             #[cfg(feature = "debug")]
-            wide_lines: true,
-            #[cfg(feature = "debug")]
             fill_mode_non_solid: true,
             ..Default::default()
         },

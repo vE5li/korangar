@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
-use korangar_debug::profile;
 use ragnarok_networking::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 
@@ -223,12 +222,12 @@ impl ParticleHolder {
         self.quest_icons.clear();
     }
 
-    #[profile("update particles")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("update particles"))]
     pub fn update(&mut self, delta_time: f32) {
         self.particles.retain_mut(|particle| particle.update(delta_time));
     }
 
-    #[profile("render particles")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

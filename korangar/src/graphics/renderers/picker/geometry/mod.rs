@@ -4,7 +4,6 @@ fragment_shader!("src/graphics/renderers/picker/geometry/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::Matrix4;
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -47,7 +46,7 @@ impl GeometryRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport, wireframe: bool) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader, wireframe);
     }
@@ -67,7 +66,7 @@ impl GeometryRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {
@@ -87,7 +86,7 @@ impl GeometryRenderer {
             .unwrap();
     }
 
-    #[profile("render geometry")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render geometry"))]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,

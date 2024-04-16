@@ -9,13 +9,7 @@ pub fn debug_condition(condition: InterfaceTokenStream, conditional: InterfaceTo
     let conditional = TokenStream::from(conditional);
 
     quote! {
-
-        #[cfg(feature = "debug")]
-        let execute = #condition;
-        #[cfg(not(feature = "debug"))]
-        let execute = true;
-
-        if execute {
+        if #condition {
             #conditional
         }
     }
@@ -31,7 +25,6 @@ pub fn profile(name: InterfaceTokenStream, function: InterfaceTokenStream) -> In
     });
 
     let code = quote! {
-        #[cfg(feature = "debug")]
         let _measurement = korangar_debug::start_measurement(#name);
     }
     .into();

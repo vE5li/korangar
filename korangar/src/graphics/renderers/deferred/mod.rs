@@ -20,7 +20,6 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
-use korangar_debug::profile;
 use korangar_interface::application::FontSizeTrait;
 use ragnarok_networking::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
@@ -245,7 +244,7 @@ impl DeferredRenderer {
         }
     }
 
-    #[profile("re-create deferred pipeline")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("re-create deferred pipeline"))]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
         let device = self.memory_allocator.device().clone();
         let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
@@ -288,7 +287,7 @@ impl DeferredRenderer {
         self.dimensions = dimensions;
     }
 
-    #[profile("create deferred render target")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("create deferred render target"))]
     pub fn create_render_target(&self, swapchain_image: Arc<Image>) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),

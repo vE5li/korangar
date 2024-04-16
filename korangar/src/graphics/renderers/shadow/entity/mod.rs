@@ -4,7 +4,6 @@ fragment_shader!("src/graphics/renderers/shadow/entity/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -54,7 +53,7 @@ impl EntityRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {
@@ -84,7 +83,7 @@ impl EntityRenderer {
             .unwrap();
     }
 
-    #[profile("entity renderer")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("entity renderer"))]
     pub fn render(
         &self,
         render_target: &mut <ShadowRenderer as Renderer>::Target,

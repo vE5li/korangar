@@ -1284,10 +1284,10 @@ fn main() {
 
                         picker_target.start();
 
-                        #[korangar_debug::debug_condition(render_settings.show_map)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         map.render_tiles(picker_target, &picker_renderer, current_camera);
 
-                        #[korangar_debug::debug_condition(render_settings.show_entities)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                         map.render_entities(entities, picker_target, &picker_renderer, current_camera, false);
 
                         #[cfg(feature = "debug")]
@@ -1311,7 +1311,7 @@ fn main() {
 
                         directional_shadow_target.start();
 
-                        #[korangar_debug::debug_condition(render_settings.show_map)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         map.render_ground(
                             directional_shadow_target,
                             &shadow_renderer,
@@ -1319,7 +1319,7 @@ fn main() {
                             animation_timer,
                         );
 
-                        #[korangar_debug::debug_condition(render_settings.show_objects)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         map.render_objects(
                             directional_shadow_target,
                             &shadow_renderer,
@@ -1330,7 +1330,7 @@ fn main() {
                             render_settings.frustum_culling,
                         );
 
-                        #[korangar_debug::debug_condition(render_settings.show_entities)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                         map.render_entities(
                             entities,
                             directional_shadow_target,
@@ -1342,7 +1342,7 @@ fn main() {
                         if let Some(PickerTarget::Tile { x, y }) = mouse_target
                             && !entities.is_empty()
                         {
-                            #[korangar_debug::debug_condition(render_settings.show_indicators)]
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                             map.render_walk_indicator(
                                 directional_shadow_target,
                                 &shadow_renderer,
@@ -1361,7 +1361,7 @@ fn main() {
 
                         screen_target.start();
 
-                        #[korangar_debug::debug_condition(render_settings.show_map)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         map.render_ground(screen_target, &deferred_renderer, current_camera, animation_timer);
 
                         #[cfg(feature = "debug")]
@@ -1369,7 +1369,7 @@ fn main() {
                             map.render_overlay_tiles(screen_target, &deferred_renderer, current_camera);
                         }
 
-                        #[korangar_debug::debug_condition(render_settings.show_objects)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         map.render_objects(
                             screen_target,
                             &deferred_renderer,
@@ -1380,16 +1380,16 @@ fn main() {
                             render_settings.frustum_culling,
                         );
 
-                        #[korangar_debug::debug_condition(render_settings.show_entities)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                         map.render_entities(entities, screen_target, &deferred_renderer, current_camera, true);
 
-                        #[korangar_debug::debug_condition(render_settings.show_water)]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
                         map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
 
                         if let Some(PickerTarget::Tile { x, y }) = mouse_target
                             && !entities.is_empty()
                         {
-                            #[korangar_debug::debug_condition(render_settings.show_indicators)]
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                             map.render_walk_indicator(
                                 screen_target,
                                 &deferred_renderer,
@@ -1401,13 +1401,13 @@ fn main() {
 
                         screen_target.lighting_pass();
 
-                        #[korangar_debug::debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers())]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers()))]
                         map.ambient_light(screen_target, &deferred_renderer, day_timer);
 
                         let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
                         let light_matrix = projection_matrix * view_matrix;
 
-                        #[korangar_debug::debug_condition(render_settings.show_directional_light && !render_settings.show_buffers())]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light && !render_settings.show_buffers()))]
                         map.directional_light(
                             screen_target,
                             &deferred_renderer,
@@ -1417,10 +1417,10 @@ fn main() {
                             day_timer,
                         );
 
-                        #[korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers())]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
                         map.point_lights(screen_target, &deferred_renderer, current_camera);
 
-                        #[korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers())]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers()))]
                         map.water_light(screen_target, &deferred_renderer, current_camera);
 
                         #[cfg(feature = "debug")]

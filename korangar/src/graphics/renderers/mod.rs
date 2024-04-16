@@ -43,7 +43,6 @@ use std::marker::{ConstParamTy, PhantomData};
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use korangar_debug::profile;
 use option_ext::OptionExt;
 use ragnarok_networking::EntityId;
 use vulkano::buffer::{Buffer, BufferUsage, Subbuffer};
@@ -313,7 +312,7 @@ impl DeferredRenderTarget {
         }
     }
 
-    #[profile("start frame")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
             &*self.memory_allocator,
@@ -354,7 +353,7 @@ impl DeferredRenderTarget {
             .unwrap();
     }
 
-    #[profile("finish swapchain image")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("finish swapchain image"))]
     pub fn finish(&mut self, swapchain: Arc<Swapchain>, semaphore: Box<dyn GpuFuture>, image_number: usize) {
         let mut builder = self.state.take_builder();
 
@@ -459,7 +458,7 @@ impl PickerRenderTarget {
         }
     }
 
-    #[profile("start frame")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::<_, MemoryAllocator>::primary(
             &*self.memory_allocator,
@@ -481,14 +480,14 @@ impl PickerRenderTarget {
         self.bound_subrenderer = None;
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
         !already_bound
     }
 
-    #[profile("finish buffer")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("finish buffer"))]
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
 
@@ -573,7 +572,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
@@ -582,7 +581,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
 }
 
 impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
-    #[profile("start frame")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
     pub fn start(&mut self) {
         let mut builder = AutoCommandBufferBuilder::primary(
             &*self.memory_allocator,
@@ -604,7 +603,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
         self.bound_subrenderer = None;
     }
 
-    #[profile("finalize buffer")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("finalize buffer"))]
     pub fn finish(&mut self) {
         let mut builder = self.state.take_builder();
 
@@ -623,7 +622,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearValue> {
 }
 
 impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
-    #[profile("start frame")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
     pub fn start(&mut self, dimensions: [u32; 2], clear_interface: bool) {
         // TODO:
 
@@ -667,7 +666,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
         self.bound_subrenderer = None;
     }
 
-    #[profile("finish buffer")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("finish buffer"))]
     pub fn finish(&mut self, font_future: Option<FenceSignalFuture<Box<dyn GpuFuture>>>) {
         if let Some(mut future) = font_future {
             #[cfg(feature = "debug")]

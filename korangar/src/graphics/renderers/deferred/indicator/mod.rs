@@ -48,7 +48,7 @@ impl IndicatorRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -67,7 +67,7 @@ impl IndicatorRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {
@@ -87,7 +87,7 @@ impl IndicatorRenderer {
             .unwrap();
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_ground_indicator(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

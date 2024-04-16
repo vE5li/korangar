@@ -1005,7 +1005,7 @@ impl NetworkingSystem {
         ));
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
 
@@ -1052,7 +1052,7 @@ impl NetworkingSystem {
         events
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn handle_packet(
         &mut self,
         byte_stream: &mut ByteStream<PacketMetadata>,

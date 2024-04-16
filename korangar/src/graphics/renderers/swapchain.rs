@@ -103,7 +103,7 @@ impl SwapchainHolder {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
         let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None).map_err(Validated::unwrap) {
             Ok(image) => image,
@@ -133,7 +133,7 @@ impl SwapchainHolder {
         self.recreate
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_swapchain(&mut self) -> Viewport {
         let swapchain_create_info = SwapchainCreateInfo {
             image_extent: self.window_size,

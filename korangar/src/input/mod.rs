@@ -5,7 +5,6 @@ mod mode;
 use std::mem::variant_count;
 
 use cgmath::Vector2;
-use korangar_debug::profile;
 use korangar_interface::application::FocusState;
 use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
@@ -134,7 +133,7 @@ impl InputSystem {
         &self.keys[key_code as usize]
     }
 
-    #[profile("update user input")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("update user input"))]
     pub fn user_events(
         &mut self,
         interface: &mut Interface<InterfaceSettings>,

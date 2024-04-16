@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/picker/marker/fragment_shader.glsl");
 
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::pipeline::{GraphicsPipeline, Pipeline};
@@ -63,7 +62,7 @@ impl MarkerRenderer {
             .unwrap();
     }
 
-    #[profile("render marker")]
+    #[korangar_debug::profile("render marker")]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,

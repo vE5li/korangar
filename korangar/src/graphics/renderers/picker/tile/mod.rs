@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/picker/tile/fragment_shader.glsl");
 
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -41,7 +40,7 @@ impl TileRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -60,7 +59,7 @@ impl TileRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target) {
         render_target
             .state
@@ -69,7 +68,7 @@ impl TileRenderer {
             .unwrap();
     }
 
-    #[profile("render tiles")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render tiles"))]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,

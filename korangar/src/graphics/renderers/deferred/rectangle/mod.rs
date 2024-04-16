@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/deferred/rectangle/fragment_shader.glsl
 
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::pipeline::{GraphicsPipeline, Pipeline};
@@ -36,7 +35,7 @@ impl RectangleRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -54,7 +53,7 @@ impl RectangleRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
         render_target
             .state
@@ -63,7 +62,7 @@ impl RectangleRenderer {
             .unwrap();
     }
 
-    #[profile("render rectangle")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render rectangle"))]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

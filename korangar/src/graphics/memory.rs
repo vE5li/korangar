@@ -132,7 +132,7 @@ unsafe impl CommandBufferAllocator for MemoryAllocator {
     }
 }
 
-#[korangar_debug::profile]
+#[cfg_attr(feature = "debug", korangar_debug::profile)]
 pub(super) fn allocate_descriptor_set(
     pipeline: &Arc<GraphicsPipeline>,
     memory_allocator: &Arc<MemoryAllocator>,

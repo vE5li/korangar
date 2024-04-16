@@ -78,7 +78,7 @@ pub struct Common {
     animation_state: AnimationState,
 }
 
-#[korangar_debug::profile]
+#[cfg_attr(feature = "debug", korangar_debug::profile)]
 #[allow(clippy::invisible_characters)]
 fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     match job_id {

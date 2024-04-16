@@ -136,7 +136,7 @@ impl Node {
         current_rotation.into()
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
@@ -160,7 +160,7 @@ impl Node {
             * animation_rotation_matrix
     }
 
-    #[korangar_debug::profile("render node geometry")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render node geometry"))]
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,

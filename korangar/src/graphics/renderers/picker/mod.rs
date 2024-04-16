@@ -8,7 +8,6 @@ mod tile;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use korangar_debug::profile;
 use ragnarok_networking::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
@@ -102,7 +101,7 @@ impl PickerRenderer {
         }
     }
 
-    #[profile("recreate picker pipeline")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("recreate picker pipeline"))]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
         let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();
@@ -117,7 +116,7 @@ impl PickerRenderer {
         self.dimensions = dimensions;
     }
 
-    #[profile("create picker render target")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("create picker render target"))]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),

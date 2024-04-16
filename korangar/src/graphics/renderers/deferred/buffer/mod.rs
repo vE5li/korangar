@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/deferred/buffer/fragment_shader.glsl");
 
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -69,7 +68,7 @@ impl BufferRenderer {
             .unwrap();
     }
 
-    #[profile("render buffers")]
+    #[korangar_debug::profile("render buffers")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

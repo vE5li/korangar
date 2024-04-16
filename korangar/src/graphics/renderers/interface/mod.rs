@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use korangar_interface::application::Application;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
@@ -104,7 +103,7 @@ impl InterfaceRenderer {
         }
     }
 
-    #[profile("re-create interface pipeline")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("re-create interface pipeline"))]
     pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
         let device = self.memory_allocator.device().clone();
         let subpass = self.render_pass.clone().first_subpass();
@@ -117,7 +116,7 @@ impl InterfaceRenderer {
         self.dimensions = dimensions;
     }
 
-    #[profile("create interface render target")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("create interface render target"))]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
             self.memory_allocator.clone(),

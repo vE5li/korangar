@@ -290,7 +290,7 @@ impl InterfaceSettings {
 }
 
 impl InterfaceSettings {
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn set_theme_file(&mut self, theme_file: String, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.menu_theme.set_file(theme_file),
@@ -299,7 +299,7 @@ impl InterfaceSettings {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn save_theme(&self, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.themes.menu.save(self.menu_theme.get_file()),
@@ -308,7 +308,7 @@ impl InterfaceSettings {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn reload_theme(&mut self, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.themes.menu.reload::<DefaultMenu>(self.menu_theme.get_file()),

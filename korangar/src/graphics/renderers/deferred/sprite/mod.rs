@@ -4,7 +4,6 @@ fragment_shader!("src/graphics/renderers/deferred/sprite/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::Vector2;
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -90,7 +89,7 @@ impl SpriteRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -108,7 +107,7 @@ impl SpriteRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
         render_target
             .state
@@ -160,7 +159,7 @@ impl SpriteRenderer {
             .unwrap();
     }
 
-    #[profile("render sprite indexed")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render sprite indexed"))]
     pub fn render_indexed(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -203,7 +202,7 @@ impl SpriteRenderer {
     }
 
     #[cfg(feature = "debug")]
-    #[profile("render marker")]
+    #[korangar_debug::profile("render marker")]
     pub fn render_marker(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

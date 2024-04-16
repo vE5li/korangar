@@ -4,7 +4,6 @@ fragment_shader!("src/graphics/renderers/deferred/point/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::Vector3;
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::padded::Padded;
@@ -43,7 +42,7 @@ impl PointLightRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -61,7 +60,7 @@ impl PointLightRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let screen_to_world_matrix = camera.get_screen_to_world_matrix();
         let buffer = self.matrices_buffer.allocate(Matrices {
@@ -84,7 +83,7 @@ impl PointLightRenderer {
             .unwrap();
     }
 
-    #[profile("render point light")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render point light"))]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

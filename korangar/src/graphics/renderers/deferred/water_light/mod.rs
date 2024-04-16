@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/deferred/water_light/fragment_shader.gl
 
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -38,7 +37,7 @@ impl WaterLightRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -56,7 +55,7 @@ impl WaterLightRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
         render_target
             .state
@@ -65,7 +64,7 @@ impl WaterLightRenderer {
             .unwrap();
     }
 
-    #[profile("render water light")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render water light"))]
     pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
         if render_target.bind_subrenderer(DeferredSubrenderer::WaterLight) {
             self.bind_pipeline(render_target);

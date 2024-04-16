@@ -3,7 +3,6 @@ fragment_shader!("src/graphics/renderers/deferred/overlay/fragment_shader.glsl")
 
 use std::sync::Arc;
 
-use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -37,7 +36,7 @@ impl OverlayRenderer {
         }
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -55,7 +54,7 @@ impl OverlayRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_debug::profile]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
         render_target
             .state
@@ -64,7 +63,7 @@ impl OverlayRenderer {
             .unwrap();
     }
 
-    #[profile("render overlay")]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render overlay"))]
     pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, interface_buffer: Arc<ImageView>) {
         if render_target.bind_subrenderer(DeferredSubrenderer::Overlay) {
             self.bind_pipeline(render_target);

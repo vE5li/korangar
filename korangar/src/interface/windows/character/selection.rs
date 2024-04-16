@@ -3,13 +3,13 @@ use korangar_interface::elements::ElementWrap;
 use korangar_interface::state::PlainRemote;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_procedural::size_bound;
+use ragnarok_networking::CharacterInformation;
 
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::CharacterPreview;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
-use crate::network::CharacterInformation;
 
 #[derive(new)]
 pub struct CharacterSelectionWindow {

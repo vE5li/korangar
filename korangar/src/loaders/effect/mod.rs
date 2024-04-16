@@ -5,6 +5,7 @@ use cgmath::{Vector2, Vector3};
 use derive_new::new;
 use korangar_procedural::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_networking::EntityId;
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
@@ -13,7 +14,6 @@ use super::{MajorFirst, TextureLoader};
 use crate::debug::*;
 use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
 use crate::loaders::{GameFileLoader, Version};
-use crate::network::EntityId;
 
 #[derive(Debug, FromBytes, PrototypeElement)]
 struct TextureName {

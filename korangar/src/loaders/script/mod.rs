@@ -1,7 +1,7 @@
 use mlua::Lua;
+use ragnarok_networking::ItemId;
 
 use crate::loaders::GameFileLoader;
-use crate::network::ItemId;
 
 pub struct ScriptLoader {
     state: Lua,

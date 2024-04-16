@@ -5,9 +5,11 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 [workspace.dependencies]
 bitflags = "2.4.2"
 cgmath = { version = "0.18", features = ["serde"] }
+derive-new = "0.6.0"
 korangar_interface = { path = "korangar_interface" }
-num = "0.4.1"
 korangar_procedural = { path = "korangar_procedural" }
-ragnarok_bytes = { path = "ragnarok_bytes", features = ["cgmath"] }
+num = "0.4.1"
+ragnarok_bytes = { path = "ragnarok_bytes" }
+ragnarok_networking = { path = "ragnarok_networking" }
 ragnarok_procedural = { path = "ragnarok_procedural" }
 serde = "1.0.137"

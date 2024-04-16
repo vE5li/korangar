@@ -1,0 +1,16 @@
+[package]
+name = "ragnarok_networking"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+derive-new = { workspace = true }
+ragnarok_bytes = { workspace = true, features = ["derive"] }
+ragnarok_procedural = { workspace = true }
+korangar_interface = { workspace = true, optional = true }
+korangar_procedural = { workspace = true, optional = true }
+
+[features]
+debug = []
+derive = []
+interface = ["korangar_interface", "korangar_procedural"]

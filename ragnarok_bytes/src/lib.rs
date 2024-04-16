@@ -9,9 +9,6 @@ mod to_bytes;
 
 #[cfg(feature = "derive")]
 pub use ragnarok_procedural::{ByteConvertable, FixedByteSize, FromBytes, ToBytes};
-// TODO: Remove this re-export
-#[cfg(feature = "derive")]
-pub use ragnarok_procedural::{IncomingPacket, OutgoingPacket};
 
 pub use self::error::{ConversionError, ConversionErrorType};
 pub use self::fixed::{FixedByteSize, FixedByteSizeCollection};

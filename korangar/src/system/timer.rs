@@ -2,8 +2,7 @@ use std::time::Instant;
 
 use chrono::prelude::*;
 use korangar_procedural::profile;
-
-use crate::network::ClientTick;
+use ragnarok_networking::ClientTick;
 
 pub struct GameTimer {
     global_timer: Instant,

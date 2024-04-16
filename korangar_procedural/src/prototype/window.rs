@@ -54,7 +54,7 @@ pub fn derive_prototype_window_struct(
     }
 
     quote! {
-        impl<App: korangar_interface::settings::Application> #impl_generics korangar_interface::windows::PrototypeWindow<App> for #name #type_generics #where_clause {
+        impl<App: korangar_interface::application::Application> #impl_generics korangar_interface::windows::PrototypeWindow<App> for #name #type_generics #where_clause {
 
             fn window_class(&self) -> Option<&str> {
                 #window_class_ref_option

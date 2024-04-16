@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::net::Ipv4Addr;
 use std::rc::Rc;
 
 use super::{Container, ElementCell, ElementWrap, Expandable, StaticLabel, StringValue};
@@ -30,7 +29,6 @@ impl<T> !NoDisplay for cgmath::Vector4<T> {}
 impl<T> !NoDisplay for cgmath::Quaternion<T> {}
 #[cfg(feature = "cgmath")]
 impl<T> !NoDisplay for cgmath::Rad<T> {}
-impl !NoDisplay for Ipv4Addr {}
 
 impl<T> ElementDisplay for T
 where
@@ -94,13 +92,6 @@ impl<T: ElementDisplay> ElementDisplay for cgmath::Rad<T> {
     }
 }
 
-#[cfg(feature = "cgmath")]
-impl ElementDisplay for Ipv4Addr {
-    fn display(&self) -> String {
-        self.to_string()
-    }
-}
-
 /*impl ElementDisplay for ModelVertexBuffer {
 
     fn display(&self) -> String {
@@ -135,7 +126,6 @@ impl<T> !NoPrototype for Rc<T> {}
 
 impl NoPrototype for &str {}
 impl NoPrototype for String {}
-impl NoPrototype for Ipv4Addr {}
 
 impl<App, T> PrototypeElement<App> for T
 where

@@ -6,6 +6,7 @@ use cgmath::{Array, Vector2};
 use derive_new::new;
 use korangar_procedural::PrototypeElement;
 use ragnarok_bytes::{ByteConvertable, ByteStream, FromBytes};
+use ragnarok_networking::ClientTick;
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
@@ -16,7 +17,6 @@ use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, MinorFirst, Version, FALLBACK_ACTIONS_FILE};
-use crate::network::ClientTick;
 
 #[derive(Clone, Debug, new)]
 pub struct AnimationState {

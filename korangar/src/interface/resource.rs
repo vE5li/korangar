@@ -1,6 +1,7 @@
+use ragnarok_networking::EquipPosition;
+
 use crate::input::HotbarSlot;
 use crate::inventory::{Item, Skill};
-use crate::network::EquipPosition;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ItemSource {

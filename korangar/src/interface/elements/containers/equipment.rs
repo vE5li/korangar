@@ -5,6 +5,7 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_procedural::{dimension_bound, size_bound};
+use ragnarok_networking::EquipPosition;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -14,7 +15,6 @@ use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::ItemSource;
 use crate::interface::theme::InterfaceTheme;
 use crate::inventory::Item;
-use crate::network::EquipPosition;
 
 pub struct EquipmentContainer {
     items: PlainRemote<Vec<Item>>,

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
 use korangar_procedural::profile;
+use ragnarok_networking::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::pipeline::graphics::viewport::Viewport;
@@ -24,7 +25,6 @@ use super::SubpassAttachments;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
-use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

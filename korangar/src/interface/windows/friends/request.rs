@@ -2,12 +2,12 @@ use derive_new::new;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, Text};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_procedural::{dimension_bound, size_bound};
+use ragnarok_networking::Friend;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
-use crate::network::Friend;
 
 #[derive(new)]
 pub struct FriendRequestWindow {

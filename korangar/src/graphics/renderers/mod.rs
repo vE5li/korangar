@@ -45,6 +45,7 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Vector2, Vector3};
 use korangar_procedural::profile;
 use option_ext::OptionExt;
+use ragnarok_networking::EntityId;
 use vulkano::buffer::{Buffer, BufferUsage, Subbuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, ClearAttachment, ClearRect, CommandBufferUsage, CopyImageToBufferInfo, PrimaryAutoCommandBuffer,
@@ -77,7 +78,6 @@ use super::{Color, MemoryAllocator, ModelVertex};
 use crate::debug::*;
 use crate::graphics::Camera;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

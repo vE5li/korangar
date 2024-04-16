@@ -3,9 +3,9 @@ use std::sync::Arc;
 use cgmath::Matrix4;
 use derive_new::new;
 use korangar_procedural::{PrototypeElement, PrototypeWindow};
+use ragnarok_networking::ClientTick;
 
 use crate::graphics::*;
-use crate::network::ClientTick;
 use crate::world::*;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]

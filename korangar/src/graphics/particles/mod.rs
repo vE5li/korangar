@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
 use korangar_procedural::profile;
+use ragnarok_networking::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 
 use crate::graphics::*;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, TextureLoader};
-use crate::network::{EntityId, QuestColor, QuestEffectPacket};
 use crate::world::*;
 
 pub trait Particle {
@@ -140,7 +140,8 @@ impl QuestIcon {
         map: &Map,
         quest_effect: QuestEffectPacket,
     ) -> Self {
-        let position = map.get_world_position(quest_effect.position.map(usize::from)) + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
+        let position = map.get_world_position(Vector2::new(quest_effect.position.x as usize, quest_effect.position.y as usize))
+            + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
             .get(

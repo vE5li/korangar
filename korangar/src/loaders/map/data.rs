@@ -1,12 +1,19 @@
 use korangar_procedural::{PrototypeElement, PrototypeWindow};
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
+use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
 
 pub use super::resource::MapResources;
-use crate::graphics::ColorBGRA;
 use crate::loaders::map::resource::{LightSettings, WaterSettings};
 use crate::loaders::version::InternalVersion;
 use crate::loaders::{MajorFirst, Version};
 use crate::world::Tile;
+
+#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
+pub struct ColorBGRA {
+    pub blue: u8,
+    pub green: u8,
+    pub red: u8,
+    pub alpha: u8,
+}
 
 #[derive(Clone, FromBytes, PrototypeElement, PrototypeWindow)]
 #[window_title("Map Viewer")]

@@ -1,4 +1,5 @@
-use crate::network::EntityId;
+use ragnarok_networking::EntityId;
+
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

@@ -402,13 +402,13 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
 name = "derive-new"
-version = "0.5.9"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3418329ca0ad70234b9735dc4ceed10af4df60eff9c8e7b06cb5e520d92c3535"
+checksum = "d150dea618e920167e5973d70ae6ece4385b7164e0d799fe7c122dd0a5d912ad"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.55",
 ]
 
 [[package]]
@@ -745,6 +745,7 @@ dependencies = [
  "option-ext",
  "pathfinding",
  "ragnarok_bytes",
+ "ragnarok_networking",
  "rand 0.8.5",
  "random_color",
  "rayon",
@@ -1320,6 +1321,17 @@ name = "ragnarok_bytes"
 version = "0.1.0"
 dependencies = [
  "cgmath",
+ "ragnarok_procedural",
+]
+
+[[package]]
+name = "ragnarok_networking"
+version = "0.1.0"
+dependencies = [
+ "derive-new",
+ "korangar_interface",
+ "korangar_procedural",
+ "ragnarok_bytes",
  "ragnarok_procedural",
 ]
 

@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
 use korangar_procedural::profile;
+use ragnarok_networking::EntityId;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -19,7 +20,6 @@ use crate::graphics::renderers::pipeline::PipelineBuilder;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::renderers::PickerTarget;
 use crate::graphics::*;
-use crate::network::EntityId;
 
 pub struct EntityRenderer {
     memory_allocator: Arc<MemoryAllocator>,

@@ -4,6 +4,7 @@ use cgmath::{Array, Vector2, Vector3, VectorSpace};
 use derive_new::new;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_procedural::{profile, PrototypeElement, PrototypeWindow};
+use ragnarok_networking::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType};
 use vulkano::buffer::Subbuffer;
 
 #[cfg(feature = "debug")]
@@ -14,7 +15,7 @@ use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
-use crate::network::{AccountId, CharacterInformation, ClientTick, EntityData, EntityId, Sex, StatusType};
+use crate::network::EntityData;
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;

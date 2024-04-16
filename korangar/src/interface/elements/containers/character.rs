@@ -7,6 +7,7 @@ use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_procedural::{dimension_bound, size_bound};
+use ragnarok_networking::CharacterInformation;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
@@ -14,7 +15,6 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::FontSize;
-use crate::network::CharacterInformation;
 
 // TODO: rework all of this
 pub struct CharacterPreview {

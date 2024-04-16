@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState};
+use ragnarok_networking::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
 
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
-use crate::network::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
 
 #[derive(Clone, Debug)]
 pub struct Skill {

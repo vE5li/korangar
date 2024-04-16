@@ -1,9 +1,9 @@
 use derive_new::new;
 use korangar_interface::state::{PlainTrackedState, TrackedStateExt, TrackedStateVec};
+use ragnarok_networking::EntityId;
 
 use super::elements::DialogElement;
 use super::windows::DialogWindow;
-use crate::network::EntityId;
 
 #[derive(new)]
 struct DialogHandle {

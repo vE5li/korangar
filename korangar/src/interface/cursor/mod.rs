@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
+use ragnarok_networking::ClientTick;
+
 use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
-use crate::network::ClientTick;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]

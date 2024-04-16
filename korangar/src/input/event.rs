@@ -1,12 +1,12 @@
 use cgmath::Vector2;
 use korangar_interface::event::ClickAction;
 use korangar_interface::ElementEvent;
+use ragnarok_networking::{AccountId, CharacterId, CharacterServerInformation, EntityId};
 
 use super::HotbarSlot;
 use crate::interface::application::{InterfaceSettings, InternalThemeKind};
 use crate::interface::resource::Move;
 use crate::loaders::ServiceId;
-use crate::network::{AccountId, CharacterId, CharacterServerInformation, EntityId};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

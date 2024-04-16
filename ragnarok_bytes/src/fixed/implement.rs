@@ -1,5 +1,3 @@
-use std::net::Ipv4Addr;
-
 #[cfg(feature = "cgmath")]
 use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 
@@ -103,13 +101,6 @@ impl<T: FixedByteSize> FixedByteSize for Quaternion<T> {
 impl<T: FixedByteSize> FixedByteSize for Matrix3<T> {
     fn size_in_bytes() -> usize {
         T::size_in_bytes() * 9
-    }
-}
-
-#[cfg(feature = "cgmath")]
-impl FixedByteSize for Ipv4Addr {
-    fn size_in_bytes() -> usize {
-        4
     }
 }
 

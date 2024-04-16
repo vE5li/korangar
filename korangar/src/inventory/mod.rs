@@ -4,12 +4,12 @@ mod skills;
 use std::sync::Arc;
 
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
+use ragnarok_networking::{EquipPosition, ItemId, ItemIndex};
 use vulkano::image::view::ImageView;
 
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
 use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
-use crate::network::{EquipPosition, ItemId, ItemIndex};
 
 /*enum ItemDetails {
     Regular {

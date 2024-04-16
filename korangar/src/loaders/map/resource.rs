@@ -2,7 +2,8 @@ use cgmath::Vector3;
 use korangar_procedural::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
 
-use crate::graphics::{ColorRGB, Transform};
+use crate::graphics::Transform;
+use crate::loaders::color::ColorRGB;
 use crate::world::{EffectSource, LightSource, SoundSource};
 
 #[derive(Copy, Clone, Debug)]

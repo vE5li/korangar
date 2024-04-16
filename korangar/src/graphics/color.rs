@@ -1,5 +1,3 @@
-use korangar_procedural::PrototypeElement;
-use ragnarok_bytes::ByteConvertable;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -116,49 +114,5 @@ impl From<Color> for [f32; 3] {
 impl From<Color> for [f32; 4] {
     fn from(val: Color) -> Self {
         [val.red, val.green, val.blue, val.alpha]
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-pub struct ColorBGRA {
-    pub blue: u8,
-    pub green: u8,
-    pub red: u8,
-    pub alpha: u8,
-}
-
-impl From<ColorBGRA> for Color {
-    fn from(color: ColorBGRA) -> Self {
-        Self::rgba_u8(color.red, color.green, color.blue, color.alpha)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-pub struct ColorRGB {
-    pub red: f32,
-    pub green: f32,
-    pub blue: f32,
-}
-
-impl From<ColorRGB> for Color {
-    fn from(color: ColorRGB) -> Self {
-        Self::rgb(color.red, color.green, color.blue)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Clone, Debug, ByteConvertable, PrototypeElement)]
-pub struct ColorRGBA {
-    pub red: u8,
-    pub green: u8,
-    pub blue: u8,
-    pub alpha: u8,
-}
-
-impl From<ColorRGBA> for Color {
-    fn from(color: ColorRGBA) -> Self {
-        Self::rgba_u8(color.red, color.green, color.blue, color.alpha)
     }
 }

@@ -1,5 +1,3 @@
-use std::net::Ipv4Addr;
-
 #[cfg(feature = "cgmath")]
 use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 
@@ -141,17 +139,6 @@ impl<T: FromBytes> FromBytes for Vec<T> {
         }
 
         Ok(vector)
-    }
-}
-
-impl FromBytes for Ipv4Addr {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
-        Ok(Ipv4Addr::new(
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-        ))
     }
 }
 

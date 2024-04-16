@@ -38,7 +38,7 @@ pub fn derive_prototype_element_struct(
 
     if initializers.len() == 1 && is_unnamed {
         return quote! {
-            impl<App: korangar_interface::settings::Application> #impl_generics korangar_interface::elements::PrototypeElement<App> for #name #type_generics #where_clause {
+            impl<App: korangar_interface::application::Application> #impl_generics korangar_interface::elements::PrototypeElement<App> for #name #type_generics #where_clause {
                 fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
                     korangar_interface::elements::PrototypeElement::to_element(&self.0, display)
                 }
@@ -48,7 +48,7 @@ pub fn derive_prototype_element_struct(
     }
 
     quote! {
-        impl<App: korangar_interface::settings::Application> #impl_generics korangar_interface::elements::PrototypeElement<App> for #name #type_generics #where_clause {
+        impl<App: korangar_interface::application::Application> #impl_generics korangar_interface::elements::PrototypeElement<App> for #name #type_generics #where_clause {
             fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
                 let elements: Vec<korangar_interface::elements::ElementCell<App>> = vec![#(#initializers),*];
                 std::rc::Rc::new(std::cell::RefCell::new(korangar_interface::elements::Expandable::new(display, elements, false)))
@@ -83,7 +83,7 @@ pub fn derive_prototype_element_enum(data_enum: DataEnum, generics: Generics, na
     }
 
     quote! {
-        impl<App: korangar_interface::settings::Application> #impl_generics korangar_interface::elements::PrototypeElement<App> for #name #type_generics #where_clause {
+        impl<App: korangar_interface::application::Application> #impl_generics korangar_interface::elements::PrototypeElement<App> for #name #type_generics #where_clause {
             fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
                 match self {
                     #( Self::#variants => korangar_interface::elements::PrototypeElement::to_element(&#variant_strings, display), )*

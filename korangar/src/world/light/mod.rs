@@ -3,6 +3,7 @@ use korangar_procedural::{PrototypeElement, PrototypeWindow};
 use ragnarok_bytes::ByteConvertable;
 
 use crate::graphics::*;
+use crate::loaders::color::ColorRGB;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

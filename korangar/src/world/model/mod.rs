@@ -5,6 +5,7 @@ use std::ops::Mul;
 use cgmath::{Matrix4, Vector3};
 use derive_new::new;
 use korangar_procedural::PrototypeElement;
+use ragnarok_networking::ClientTick;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};
 use crate::graphics::{Camera, GeometryRenderer, Renderer, Transform};
@@ -12,7 +13,6 @@ use crate::graphics::{Camera, GeometryRenderer, Renderer, Transform};
 use crate::graphics::{Color, DeferredRenderer};
 #[cfg(feature = "debug")]
 use crate::loaders::ModelData;
-use crate::network::ClientTick;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {

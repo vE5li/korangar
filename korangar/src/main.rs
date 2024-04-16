@@ -43,7 +43,7 @@ use korangar_interface::application::{Application, FocusState, FontSizeTrait, Fo
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateVec};
 use korangar_interface::Interface;
 use korangar_procedural::debug_condition;
-use network::SkillType;
+use ragnarok_networking::{SkillId, SkillType, UnitId};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 use vulkano::instance::debug::DebugUtilsMessengerCallback;
 #[cfg(feature = "debug")]
@@ -74,7 +74,7 @@ use crate::interface::windows::{
 use crate::interface::windows::{CommandsWindow, MapsWindow, ProfilerWindow, RenderSettingsWindow, TimeWindow};
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
-use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem, SkillId, UnitId};
+use crate::network::{ChatMessage, NetworkEvent, NetworkingSystem};
 use crate::system::{choose_physical_device, get_device_extensions, get_layers, GameTimer};
 use crate::world::*;
 

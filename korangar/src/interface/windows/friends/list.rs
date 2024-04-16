@@ -6,13 +6,13 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedStateTake};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_procedural::{dimension_bound, size_bound};
+use ragnarok_networking::Friend;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FriendView;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
-use crate::network::Friend;
 
 #[derive(new)]
 pub struct FriendsWindow {

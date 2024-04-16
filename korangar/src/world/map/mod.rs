@@ -8,6 +8,7 @@ use korangar_interface::windows::PrototypeWindow;
 use korangar_procedural::profile;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
+use ragnarok_networking::ClientTick;
 use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
 
@@ -19,7 +20,6 @@ use crate::interface::application::InterfaceSettings;
 #[cfg(feature = "debug")]
 use crate::loaders::MapData;
 use crate::loaders::{LightSettings, WaterSettings};
-use crate::network::ClientTick;
 use crate::world::*;
 
 // MOVE

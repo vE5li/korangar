@@ -22,6 +22,7 @@ use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
 use korangar_interface::application::FontSizeTrait;
 use korangar_procedural::profile;
+use ragnarok_networking::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::image::Image;
@@ -52,7 +53,6 @@ use crate::graphics::{
 };
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontSize, GameFileLoader, TextureLoader};
-use crate::network::EntityId;
 #[cfg(feature = "debug")]
 use crate::world::{BoundingBox, MarkerIdentifier};
 

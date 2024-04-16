@@ -77,6 +77,7 @@ impl MouseCursor {
         self.animation_state.action = new_state;
     }
 
+    #[korangar_procedural::profile("render mouse cursor")]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

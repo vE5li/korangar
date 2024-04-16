@@ -16,8 +16,6 @@ use self::assettable::AssetTable;
 pub use self::builder::NativeArchiveBuilder;
 use self::filetablerow::FileTableRow;
 use self::header::Header;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::loaders::archive::Archive;
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
@@ -36,7 +34,12 @@ const UNPACKED_SIZE_OF_MAGIC_STRING: usize = MAGIC_BYTES.len();
 impl Archive for NativeArchive {
     fn from_path(path: &Path) -> Self {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load game data from {MAGENTA}{0}{NONE}", path.display()));
+        let timer = korangar_debug::Timer::new_dynamic(format!(
+            "load game data from {}{}{}",
+            korangar_debug::MAGENTA,
+            path.display(),
+            korangar_debug::NONE
+        ));
         let mut file = File::open(path).unwrap();
 
         let mut magic_number_buffer = [0u8; UNPACKED_SIZE_OF_MAGIC_STRING];

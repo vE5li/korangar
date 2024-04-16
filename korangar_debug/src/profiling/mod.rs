@@ -11,7 +11,7 @@ use self::measurement::ActiveMeasurement;
 pub use self::measurement::Measurement;
 pub use self::ring_buffer::RingBuffer;
 pub use self::statistics::{get_frame_by_index, get_number_of_saved_frames, get_statistics_data};
-use crate::debug::*;
+use crate::*;
 
 #[thread_local]
 static mut PROFILER: MaybeUninit<&'static Mutex<Profiler>> = MaybeUninit::uninit();
@@ -203,9 +203,10 @@ pub fn start_measurement(name: &'static str) -> ActiveMeasurement {
     unsafe { PROFILER.assume_init_ref().lock().unwrap().start_measurement(name) }
 }
 
+#[macro_export]
 macro_rules! profile_block {
     ($name:expr) => {
         #[cfg(feature = "debug")]
-        let _measurement = crate::debug::start_measurement($name);
+        let _measurement = $crate::start_measurement($name);
     };
 }

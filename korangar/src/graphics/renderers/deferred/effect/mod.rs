@@ -47,7 +47,7 @@ impl EffectRenderer {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -65,7 +65,7 @@ impl EffectRenderer {
             .build(device, subpass)
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target) {
         render_target
             .state

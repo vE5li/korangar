@@ -1,12 +1,16 @@
 use std::sync::Mutex;
 
-use derive_new::new;
 use lazy_static::lazy_static;
 
-#[derive(new)]
 struct StackItem {
     pub message_count: usize,
     pub size: usize,
+}
+
+impl StackItem {
+    pub fn new(message_count: usize, size: usize) -> Self {
+        Self { message_count, size }
+    }
 }
 
 lazy_static! {

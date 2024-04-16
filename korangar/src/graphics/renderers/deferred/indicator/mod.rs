@@ -4,7 +4,6 @@ fragment_shader!("src/graphics/renderers/deferred/indicator/fragment_shader.glsl
 use std::sync::Arc;
 
 use cgmath::Vector3;
-use korangar_procedural::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -49,7 +48,7 @@ impl IndicatorRenderer {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -68,7 +67,7 @@ impl IndicatorRenderer {
             .build(device, subpass)
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {
@@ -88,7 +87,7 @@ impl IndicatorRenderer {
             .unwrap();
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn render_ground_indicator(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

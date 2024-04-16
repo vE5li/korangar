@@ -136,7 +136,7 @@ impl Node {
         current_rotation.into()
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),

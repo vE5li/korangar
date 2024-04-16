@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use chrono::prelude::*;
-use korangar_procedural::profile;
 use ragnarok_networking::ClientTick;
 
 pub struct GameTimer {
@@ -41,7 +40,7 @@ impl GameTimer {
         self.base_client_tick = client_tick.0;
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn get_client_tick(&self) -> ClientTick {
         ClientTick(self.last_client_tick.elapsed().as_millis() as u32 + self.base_client_tick)
     }

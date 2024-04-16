@@ -13,8 +13,6 @@ use self::actions::ThemeActions;
 use super::application::InterfaceSettings;
 use super::elements::{Mutable, MutableRange};
 use super::layout::{CornerRadius, ScreenPosition, ScreenSize};
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::Color;
 use crate::loaders::FontSize;
 
@@ -1202,7 +1200,12 @@ impl InterfaceTheme {
     {
         Self::load(theme_file).unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            print_debug!("failed to load theme from file {}{}{}", MAGENTA, theme_file, NONE);
+            korangar_debug::print_debug!(
+                "failed to load theme from file {}{}{}",
+                korangar_debug::MAGENTA,
+                theme_file,
+                korangar_debug::NONE
+            );
 
             ThemeDefault::<T>::default()
         })
@@ -1210,7 +1213,12 @@ impl InterfaceTheme {
 
     fn load(theme_file: &str) -> Option<Self> {
         #[cfg(feature = "debug")]
-        print_debug!("loading theme from {}{}{}", MAGENTA, theme_file, NONE);
+        korangar_debug::print_debug!(
+            "loading theme from {}{}{}",
+            korangar_debug::MAGENTA,
+            theme_file,
+            korangar_debug::NONE
+        );
 
         std::fs::read_to_string(theme_file).ok().and_then(|data| ron::from_str(&data).ok())
     }
@@ -1224,7 +1232,12 @@ impl InterfaceTheme {
 
     pub fn save(&self, theme_file: &str) {
         #[cfg(feature = "debug")]
-        print_debug!("saving theme to {}{}{}", MAGENTA, theme_file, NONE);
+        korangar_debug::print_debug!(
+            "saving theme to {}{}{}",
+            korangar_debug::MAGENTA,
+            theme_file,
+            korangar_debug::NONE
+        );
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(theme_file, data).expect("unable to write file");
@@ -1235,7 +1248,12 @@ impl GameTheme {
     pub fn new(theme_file: &str) -> Self {
         Self::load(theme_file).unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            print_debug!("failed to load theme from file {}{}{}", MAGENTA, theme_file, NONE);
+            korangar_debug::print_debug!(
+                "failed to load theme from file {}{}{}",
+                korangar_debug::MAGENTA,
+                theme_file,
+                korangar_debug::NONE
+            );
 
             Default::default()
         })
@@ -1243,7 +1261,12 @@ impl GameTheme {
 
     fn load(theme_file: &str) -> Option<Self> {
         #[cfg(feature = "debug")]
-        print_debug!("loading theme from {}{}{}", MAGENTA, theme_file, NONE);
+        korangar_debug::print_debug!(
+            "loading theme from {}{}{}",
+            korangar_debug::MAGENTA,
+            theme_file,
+            korangar_debug::NONE
+        );
 
         std::fs::read_to_string(theme_file).ok().and_then(|data| ron::from_str(&data).ok())
     }
@@ -1254,7 +1277,12 @@ impl GameTheme {
 
     pub fn save(&self, theme_file: &str) {
         #[cfg(feature = "debug")]
-        print_debug!("saving theme to {}{}{}", MAGENTA, theme_file, NONE);
+        korangar_debug::print_debug!(
+            "saving theme to {}{}{}",
+            korangar_debug::MAGENTA,
+            theme_file,
+            korangar_debug::NONE
+        );
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(theme_file, data).expect("unable to write file");

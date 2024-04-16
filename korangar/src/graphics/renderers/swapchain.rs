@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use cgmath::Vector2;
-use korangar_procedural::profile;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
 use vulkano::format::{Format, NumericFormat};
@@ -12,8 +11,6 @@ use vulkano::sync::GpuFuture;
 use vulkano::{Validated, VulkanError};
 use winit::window::Window;
 
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::interface::layout::ScreenSize;
 
 #[derive(Debug, Clone, Copy)]
@@ -75,7 +72,12 @@ impl SwapchainHolder {
         let acquire_future = None;
 
         #[cfg(feature = "debug")]
-        print_debug!("Swapchain format is {MAGENTA}{:?}{NONE}", image_format);
+        korangar_debug::print_debug!(
+            "Swapchain format is {}{:?}{}",
+            korangar_debug::MAGENTA,
+            image_format,
+            korangar_debug::NONE
+        );
 
         let swapchain_create_info = SwapchainCreateInfo {
             min_image_count: capabilities.min_image_count,
@@ -101,7 +103,7 @@ impl SwapchainHolder {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn acquire_next_image(&mut self) -> Result<(), ()> {
         let (image_number, suboptimal, acquire_future) = match acquire_next_image(self.swapchain.clone(), None).map_err(Validated::unwrap) {
             Ok(image) => image,
@@ -131,7 +133,7 @@ impl SwapchainHolder {
         self.recreate
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn recreate_swapchain(&mut self) -> Viewport {
         let swapchain_create_info = SwapchainCreateInfo {
             image_extent: self.window_size,
@@ -185,9 +187,11 @@ impl SwapchainHolder {
         };
 
         #[cfg(feature = "debug")]
-        Timer::new_dynamic(format!(
+        korangar_debug::Timer::new_dynamic(format!(
             "set swapchain present mode to {}{:?}{}",
-            MAGENTA, self.present_mode, NONE
+            korangar_debug::MAGENTA,
+            self.present_mode,
+            korangar_debug::NONE
         ))
         .stop();
 

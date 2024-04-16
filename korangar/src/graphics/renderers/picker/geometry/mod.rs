@@ -47,7 +47,7 @@ impl GeometryRenderer {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport, wireframe: bool) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader, wireframe);
     }
@@ -67,7 +67,7 @@ impl GeometryRenderer {
             .build(device, subpass)
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {

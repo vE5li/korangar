@@ -1,12 +1,12 @@
 use std::cell::UnsafeCell;
 
+use korangar_debug::RingBuffer;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, ScrollView, StateButtonBuilder, WeakElementCell};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_procedural::{dimension_bound, size_bound};
 
-use crate::debug::RingBuffer;
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::{PacketEntry, PacketView};

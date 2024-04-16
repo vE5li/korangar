@@ -11,8 +11,6 @@ use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
 use super::FALLBACK_MODEL_FILE;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
 use crate::loaders::{GameFileLoader, MajorFirst, TextureLoader, Version};
 use crate::system::multiply_matrix4_and_vector3;
@@ -326,7 +324,11 @@ impl ModelLoader {
         reverse_order: bool,
     ) -> Result<Arc<Model>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load rsm model from {MAGENTA}{model_file}{NONE}"));
+        let timer = korangar_debug::Timer::new_dynamic(format!(
+            "load rsm model from {}{model_file}{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        ));
 
         let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -340,8 +342,8 @@ impl ModelLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    print_debug!("Failed to load model: {:?}", _error);
-                    print_debug!("Replacing with fallback");
+                    korangar_debug::print_debug!("Failed to load model: {:?}", _error);
+                    korangar_debug::print_debug!("Replacing with fallback");
                 }
 
                 return self.get(

@@ -8,17 +8,16 @@ use std::time::Duration;
 use cgmath::Vector2;
 use chrono::Local;
 use derive_new::new;
+#[cfg(feature = "debug")]
+use korangar_debug::RingBuffer;
 use korangar_interface::elements::{PrototypeElement, WeakElementCell};
 use korangar_interface::state::{
     PlainTrackedState, TrackedState, TrackedStateClone, TrackedStateExt, TrackedStateTake, TrackedStateVec, ValueState,
 };
-use korangar_procedural::profile;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
 use ragnarok_networking::*;
 
 pub use self::login::LoginSettings;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::Color;
 use crate::interface::application::InterfaceSettings;
 #[cfg(feature = "debug")]
@@ -354,7 +353,7 @@ impl NetworkingSystem {
         password: String,
     ) -> Result<Vec<CharacterServerInformation>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("log in");
+        let timer = korangar_debug::Timer::new("log in");
 
         let service = client_info
             .services
@@ -422,7 +421,7 @@ impl NetworkingSystem {
 
     pub fn select_server(&mut self, character_server_information: CharacterServerInformation) -> Result<(), String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("select server");
+        let timer = korangar_debug::Timer::new("select server");
 
         let server_ip = IpAddr::V4(character_server_information.server_ip.into());
         let socket_address = SocketAddr::new(server_ip, character_server_information.server_port);
@@ -506,7 +505,7 @@ impl NetworkingSystem {
 
     pub fn log_out(&mut self) -> Result<(), String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("log out");
+        let timer = korangar_debug::Timer::new("log out");
 
         self.send_packet_to_map_server(RestartPacket::new(RestartType::Disconnect));
 
@@ -630,17 +629,17 @@ impl NetworkingSystem {
 
     pub fn create_character(&mut self, slot: usize, name: String) -> Result<(), String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("create character");
+        let timer = korangar_debug::Timer::new("create character");
 
         #[cfg(feature = "debug")]
-        print_debug!(
+        korangar_debug::print_debug!(
             "character with name {}{}{} in slot {}{}{}",
-            MAGENTA,
+            korangar_debug::MAGENTA,
             name,
-            NONE,
-            MAGENTA,
+            korangar_debug::NONE,
+            korangar_debug::MAGENTA,
             slot,
-            NONE
+            korangar_debug::NONE
         );
 
         let hair_color = 0;
@@ -685,19 +684,19 @@ impl NetworkingSystem {
 
     pub fn delete_character(&mut self, character_id: CharacterId) -> Result<(), String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("delete character");
+        let timer = korangar_debug::Timer::new("delete character");
 
         let email = "a@a.com".to_string();
 
         #[cfg(feature = "debug")]
-        print_debug!(
+        korangar_debug::print_debug!(
             "character with id {}{}{} and email {}{}{}",
-            MAGENTA,
+            korangar_debug::MAGENTA,
             character_id.0,
-            NONE,
-            MAGENTA,
+            korangar_debug::NONE,
+            korangar_debug::MAGENTA,
             email,
-            NONE
+            korangar_debug::NONE
         );
 
         self.send_packet_to_character_server(DeleteCharacterPacket::new(character_id, email));
@@ -734,10 +733,10 @@ impl NetworkingSystem {
 
     pub fn select_character(&mut self, slot: usize) -> Result<(AccountId, CharacterInformation, String), String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("select character");
+        let timer = korangar_debug::Timer::new("select character");
 
         #[cfg(feature = "debug")]
-        print_debug!("character in slot {}{}{}", MAGENTA, slot, NONE,);
+        korangar_debug::print_debug!("character in slot {}{}{}", korangar_debug::MAGENTA, slot, korangar_debug::NONE,);
 
         self.send_packet_to_character_server(SelectCharacterPacket::new(slot as u8));
 
@@ -774,14 +773,14 @@ impl NetworkingSystem {
         let server_port = character_selection_success_packet.map_server_port;
 
         #[cfg(feature = "debug")]
-        print_debug!(
+        korangar_debug::print_debug!(
             "connecting to map server at {}{}{} on port {}{}{}",
-            MAGENTA,
+            korangar_debug::MAGENTA,
             server_ip,
-            NONE,
-            MAGENTA,
+            korangar_debug::NONE,
+            korangar_debug::MAGENTA,
             character_selection_success_packet.map_server_port,
-            NONE
+            korangar_debug::NONE
         );
 
         let socket_address = SocketAddr::new(server_ip, server_port);
@@ -840,19 +839,19 @@ impl NetworkingSystem {
 
     pub fn switch_character_slot(&mut self, destination_slot: usize) -> Result<(), String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("switch character slot");
+        let timer = korangar_debug::Timer::new("switch character slot");
 
         let origin_slot = self.move_request.take().unwrap();
 
         #[cfg(feature = "debug")]
-        print_debug!(
+        korangar_debug::print_debug!(
             "from slot {}{}{} to slot {}{}{}",
-            MAGENTA,
+            korangar_debug::MAGENTA,
             origin_slot,
-            NONE,
-            MAGENTA,
+            korangar_debug::NONE,
+            korangar_debug::MAGENTA,
             destination_slot,
-            NONE
+            korangar_debug::NONE
         );
 
         self.send_packet_to_character_server(SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16));
@@ -972,7 +971,13 @@ impl NetworkingSystem {
     pub fn add_friend(&mut self, name: String) {
         if name.len() > 24 {
             #[cfg(feature = "debug")]
-            print_debug!("[{RED}error{NONE}] friend name {MAGENTA}{name}{NONE} is too long",);
+            korangar_debug::print_debug!(
+                "[{}error{}] friend name {}{name}{} is too long",
+                korangar_debug::RED,
+                korangar_debug::NONE,
+                korangar_debug::MAGENTA,
+                korangar_debug::NONE
+            );
 
             return;
         }
@@ -1000,7 +1005,7 @@ impl NetworkingSystem {
         ));
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn network_events(&mut self) -> Vec<NetworkEvent> {
         let mut events = Vec::new();
 
@@ -1047,7 +1052,7 @@ impl NetworkingSystem {
         events
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     fn handle_packet(
         &mut self,
         byte_stream: &mut ByteStream<PacketMetadata>,

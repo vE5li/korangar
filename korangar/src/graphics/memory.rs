@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use derive_new::new;
-use korangar_procedural::profile;
 use vulkano::buffer::allocator::{SubbufferAllocator, SubbufferAllocatorCreateInfo};
 use vulkano::buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer};
 use vulkano::command_buffer::allocator::{CommandBufferAllocator, StandardCommandBufferAllocator};
@@ -133,7 +132,7 @@ unsafe impl CommandBufferAllocator for MemoryAllocator {
     }
 }
 
-#[profile]
+#[korangar_procedural::profile]
 pub(super) fn allocate_descriptor_set(
     pipeline: &Arc<GraphicsPipeline>,
     memory_allocator: &Arc<MemoryAllocator>,

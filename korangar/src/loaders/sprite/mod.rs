@@ -18,8 +18,6 @@ use vulkano::sync::GpuFuture;
 
 use super::version::InternalVersion;
 use super::FALLBACK_SPRITE_FILE;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::MemoryAllocator;
 use crate::loaders::{GameFileLoader, MinorFirst, Version};
 
@@ -159,7 +157,11 @@ pub struct SpriteLoader {
 impl SpriteLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load sprite from {MAGENTA}{path}{NONE}"));
+        let timer = korangar_debug::Timer::new_dynamic(format!(
+            "load sprite from {}{path}{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        ));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -173,8 +175,8 @@ impl SpriteLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    print_debug!("Failed to load sprite: {:?}", _error);
-                    print_debug!("Replacing with fallback");
+                    korangar_debug::print_debug!("Failed to load sprite: {:?}", _error);
+                    korangar_debug::print_debug!("Replacing with fallback");
                 }
 
                 return self.get(FALLBACK_SPRITE_FILE, game_file_loader);

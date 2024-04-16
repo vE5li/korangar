@@ -1,3 +1,4 @@
+use korangar_debug::{ProfilerThread, SAVED_FRAME_COUNT};
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
@@ -5,7 +6,6 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_procedural::size_bound;
 
-use crate::debug::*;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
@@ -76,12 +76,12 @@ impl Element<InterfaceSettings> for FrameView {
     fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<InterfaceSettings>> {
         let visible_thread = *self.visible_thread.get();
         let mouse_position = self.state.mouse_position.get();
-        let number_of_frames = get_number_of_saved_frames(visible_thread);
+        let number_of_frames = korangar_debug::get_number_of_saved_frames(visible_thread);
 
         let bar_width = self.state.cached_size.width / number_of_frames as f32;
         let clicked_frame = (mouse_position.left / bar_width) as usize;
 
-        let measurement = get_frame_by_index(visible_thread, clicked_frame);
+        let measurement = korangar_debug::get_frame_by_index(visible_thread, clicked_frame);
         vec![ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement)))]
     }
 
@@ -102,7 +102,7 @@ impl Element<InterfaceSettings> for FrameView {
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        let (entries, statistics_map, longest_frame) = get_statistics_data(*self.visible_thread.get());
+        let (entries, statistics_map, longest_frame) = korangar_debug::get_statistics_data(*self.visible_thread.get());
 
         let bar_width = (self.state.cached_size.width - 50.0) / entries.len() as f32;
         let gap_width = 50.0 / entries.len() as f32;
@@ -146,7 +146,9 @@ impl Element<InterfaceSettings> for FrameView {
         }
 
         let mut y_position = 0.0;
-        for (name, color) in std::iter::once((ROOT_MEASUREMENT_NAME, Color::monochrome_u8(150))).chain(color_lookup.into_iter()) {
+        for (name, color) in
+            std::iter::once((korangar_debug::ROOT_MEASUREMENT_NAME, Color::monochrome_u8(150))).chain(color_lookup.into_iter())
+        {
             let statistics = statistics_map.get(name).unwrap();
             let text = format!("{} {:?} (SD {:.1})", name, statistics.mean, statistics.standard_deviation);
 

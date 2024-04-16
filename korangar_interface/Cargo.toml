@@ -8,10 +8,11 @@ bitflags = { workspace = true }
 cgmath = { workspace = true, optional = true }
 num = { workspace = true }
 option-ext = "0.2.0"
+korangar_debug = { workspace = true, optional = true }
 korangar_procedural = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 
 [features]
 cgmath = ["dep:cgmath"]
-debug = ["korangar_procedural"]
+debug = ["korangar_debug", "korangar_procedural"]
 serde = ["dep:serde"]

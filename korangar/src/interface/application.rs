@@ -5,7 +5,7 @@ use korangar_interface::elements::{Container, ElementCell, ElementWrap, PickList
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedStateClone};
 use korangar_interface::windows::PrototypeWindow;
-use korangar_procedural::{dimension_bound, profile, PrototypeElement};
+use korangar_procedural::{dimension_bound, PrototypeElement};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
@@ -202,10 +202,10 @@ impl InterfaceSettingsStorage {
     pub fn load_or_default() -> Self {
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            crate::debug::print_debug!(
+            korangar_debug::print_debug!(
                 "failed to load interface settings from {}filename{}",
-                crate::debug::MAGENTA,
-                crate::debug::NONE
+                korangar_debug::MAGENTA,
+                korangar_debug::NONE
             );
 
             Default::default()
@@ -214,10 +214,10 @@ impl InterfaceSettingsStorage {
 
     pub fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
-        crate::debug::print_debug!(
+        korangar_debug::print_debug!(
             "loading interface settings from {}filename{}",
-            crate::debug::MAGENTA,
-            crate::debug::NONE
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
         );
 
         std::fs::read_to_string("client/interface_settings.ron")
@@ -227,10 +227,10 @@ impl InterfaceSettingsStorage {
 
     pub fn save(&self) {
         #[cfg(feature = "debug")]
-        crate::debug::print_debug!(
+        korangar_debug::print_debug!(
             "saving interface settings to {}filename{}",
-            crate::debug::MAGENTA,
-            crate::debug::NONE
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
         );
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
@@ -290,7 +290,7 @@ impl InterfaceSettings {
 }
 
 impl InterfaceSettings {
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn set_theme_file(&mut self, theme_file: String, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.menu_theme.set_file(theme_file),
@@ -299,7 +299,7 @@ impl InterfaceSettings {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn save_theme(&self, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.themes.menu.save(self.menu_theme.get_file()),
@@ -308,7 +308,7 @@ impl InterfaceSettings {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn reload_theme(&mut self, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.themes.menu.reload::<DefaultMenu>(self.menu_theme.get_file()),

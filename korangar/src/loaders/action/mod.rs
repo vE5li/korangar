@@ -11,8 +11,6 @@ use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
 use super::Sprite;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -275,7 +273,11 @@ pub struct ActionLoader {
 impl ActionLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load actions from {MAGENTA}{path}{NONE}"));
+        let timer = korangar_debug::Timer::new_dynamic(format!(
+            "load actions from {}{path}{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        ));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -289,8 +291,8 @@ impl ActionLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    print_debug!("Failed to load actions: {:?}", _error);
-                    print_debug!("Replacing with fallback");
+                    korangar_debug::print_debug!("Failed to load actions: {:?}", _error);
+                    korangar_debug::print_debug!("Replacing with fallback");
                 }
 
                 return self.get(FALLBACK_ACTIONS_FILE, game_file_loader);

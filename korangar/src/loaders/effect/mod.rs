@@ -10,8 +10,6 @@ use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
 use super::{MajorFirst, TextureLoader};
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
 use crate::loaders::{GameFileLoader, Version};
 
@@ -249,7 +247,11 @@ impl EffectLoader {
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Effect>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load effect from {MAGENTA}{path}{NONE}"));
+        let timer = korangar_debug::Timer::new_dynamic(format!(
+            "load effect from {}{path}{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        ));
 
         let bytes = game_file_loader.get(&format!("data\\texture\\effect\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);

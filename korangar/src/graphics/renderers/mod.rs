@@ -74,8 +74,6 @@ pub use self::settings::RenderSettings;
 pub use self::shadow::{ShadowDetail, ShadowRenderer};
 pub use self::swapchain::{PresentModeInfo, SwapchainHolder};
 use super::{Color, MemoryAllocator, ModelVertex};
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::Camera;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
@@ -361,7 +359,7 @@ impl DeferredRenderTarget {
         let mut builder = self.state.take_builder();
 
         #[cfg(feature = "debug")]
-        let end_render_pass_measurement = start_measurement("end render pass");
+        let end_render_pass_measurement = korangar_debug::start_measurement("end render pass");
 
         builder.end_render_pass(SubpassEndInfo::default()).unwrap();
 
@@ -371,7 +369,7 @@ impl DeferredRenderTarget {
         let command_buffer = builder.build().unwrap();
 
         #[cfg(feature = "debug")]
-        let swapchain_measurement = start_measurement("get next swapchain image");
+        let swapchain_measurement = korangar_debug::start_measurement("get next swapchain image");
 
         // TODO: make this type ImageNumber instead
         let present_info = SwapchainPresentInfo::swapchain_image_index(swapchain, image_number as u32);
@@ -380,7 +378,7 @@ impl DeferredRenderTarget {
         swapchain_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let execute_measurement = start_measurement("queue command buffer");
+        let execute_measurement = korangar_debug::start_measurement("queue command buffer");
 
         let future = semaphore.then_execute(self.queue.clone(), command_buffer).unwrap();
 
@@ -388,7 +386,7 @@ impl DeferredRenderTarget {
         execute_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let present_measurement = start_measurement("present swapchain");
+        let present_measurement = korangar_debug::start_measurement("present swapchain");
 
         let future = future.then_swapchain_present(self.queue.clone(), present_info).boxed();
 
@@ -396,7 +394,7 @@ impl DeferredRenderTarget {
         present_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let flush_measurement = start_measurement("flush");
+        let flush_measurement = korangar_debug::start_measurement("flush");
 
         self.state = future
             .then_signal_fence_and_flush()
@@ -483,7 +481,7 @@ impl PickerRenderTarget {
         self.bound_subrenderer = None;
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
@@ -575,7 +573,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
@@ -673,7 +671,7 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, ClearColorValue> {
     pub fn finish(&mut self, font_future: Option<FenceSignalFuture<Box<dyn GpuFuture>>>) {
         if let Some(mut future) = font_future {
             #[cfg(feature = "debug")]
-            profile_block!("wait for font future");
+            korangar_debug::profile_block!("wait for font future");
 
             future.wait(None).unwrap();
             future.cleanup_finished();

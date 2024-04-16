@@ -4,8 +4,6 @@ use ron::ser::PrettyConfig;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::loaders::ServiceId;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -49,7 +47,11 @@ impl LoginSettings {
     pub fn new() -> Self {
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            print_debug!("failed to load login settings from {}filename{}", MAGENTA, NONE);
+            korangar_debug::print_debug!(
+                "failed to load login settings from {}filename{}",
+                korangar_debug::MAGENTA,
+                korangar_debug::NONE
+            );
 
             Default::default()
         })
@@ -57,7 +59,11 @@ impl LoginSettings {
 
     pub fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
-        print_debug!("loading login settings from {}filename{}", MAGENTA, NONE);
+        korangar_debug::print_debug!(
+            "loading login settings from {}filename{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        );
 
         std::fs::read_to_string("client/login_settings.ron")
             .ok()
@@ -66,7 +72,11 @@ impl LoginSettings {
 
     pub fn save(&self) {
         #[cfg(feature = "debug")]
-        print_debug!("saving login settings to {}filename{}", MAGENTA, NONE);
+        korangar_debug::print_debug!(
+            "saving login settings to {}filename{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        );
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write("client/login_settings.ron", data).expect("unable to write file");

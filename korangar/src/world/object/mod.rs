@@ -25,7 +25,7 @@ impl Object {
             .render_geometry(render_target, renderer, camera, &self.transform, client_tick, time);
     }
 
-    //#[profile]
+    //#[korangar_procedural::profile]
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
         self.model.get_bounding_box_matrix(&self.transform)
     }

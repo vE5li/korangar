@@ -7,18 +7,18 @@ edition = "2021"
 bitflags = { workspace = true }
 bytemuck = { version = "1.9", features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["serde"] }
-chrono = "0.4"
+chrono = { workspace = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
 derive-new = { workspace = true }
 image = "0.24.2"
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
-lazy_static = { version = "1.4.0", optional = true }
 lunify = "1.1.0"
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
 num = { workspace = true }
 # TODO: Remove or move to workspace
 option-ext = "0.2.0"
 pathfinding = "2.2.2"
+korangar_debug = { workspace = true, optional = true }
 korangar_procedural = { workspace = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_networking = { workspace = true, features = ["derive", "interface"] }
@@ -39,6 +39,6 @@ yazi = "0.1.4"
 
 [features]
 patched_as_folder = []
-debug = ["lazy_static", "random_color", "ragnarok_networking/debug"]
+debug = ["korangar_debug", "ragnarok_networking/debug", "random_color"]
 unicode = ["debug"]
 plain = ["debug"]

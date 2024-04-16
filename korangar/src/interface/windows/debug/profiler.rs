@@ -1,9 +1,9 @@
+use korangar_debug::{get_profiler_halted_version, is_profiler_halted, set_profiler_halted, ProfilerThread};
 use korangar_interface::elements::{ElementWrap, PickList, StateButtonBuilder};
 use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, TrackedStateBinary, ValueState, Version};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_procedural::{dimension_bound, size_bound};
 
-use crate::debug::{get_profiler_halted_version, is_profiler_halted, set_profiler_halted, ProfilerThread};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FrameView;
 use crate::interface::layout::ScreenSize;

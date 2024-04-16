@@ -736,9 +736,9 @@ dependencies = [
  "collision",
  "derive-new",
  "image",
+ "korangar_debug",
  "korangar_interface",
  "korangar_procedural",
- "lazy_static",
  "lunify",
  "mlua",
  "num",
@@ -763,11 +763,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "korangar_debug"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "lazy_static",
+]
+
+[[package]]
 name = "korangar_interface"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.5.0",
  "cgmath",
+ "korangar_debug",
  "korangar_procedural",
  "num",
  "option-ext",

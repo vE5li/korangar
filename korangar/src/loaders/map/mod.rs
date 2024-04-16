@@ -15,8 +15,6 @@ use self::data::*;
 pub use self::resource::{LightSettings, WaterSettings};
 use self::vertices::{generate_tile_vertices, ground_water_vertices, load_textures};
 use super::version::InternalVersion;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
 use crate::world::*;
@@ -26,14 +24,14 @@ const MAP_OFFSET: f32 = 5.0;
 #[cfg(feature = "debug")]
 fn assert_byte_stream_empty<META>(mut byte_stream: ByteStream<META>, file_name: &str) {
     if byte_stream.is_empty() {
-        print_debug!(
+        korangar_debug::print_debug!(
             "incomplete read on file {}{}{}; {}{}{} bytes remaining",
-            MAGENTA,
+            korangar_debug::MAGENTA,
             file_name,
-            NONE,
-            YELLOW,
+            korangar_debug::NONE,
+            korangar_debug::YELLOW,
             byte_stream.remaining_bytes().len(),
-            NONE
+            korangar_debug::NONE
         );
     }
 }
@@ -68,7 +66,7 @@ impl MapLoader {
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
+        let timer = korangar_debug::Timer::new_dynamic(format!("load map from {}", &resource_file));
 
         let mut map_data = parse_map_data(&resource_file, game_file_loader)?;
 

@@ -43,7 +43,7 @@ impl PointLightRenderer {
         }
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -61,7 +61,7 @@ impl PointLightRenderer {
             .build(device, subpass)
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera) {
         let screen_to_world_matrix = camera.get_screen_to_world_matrix();
         let buffer = self.matrices_buffer.allocate(Matrices {

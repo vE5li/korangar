@@ -18,8 +18,6 @@ use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
 use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
-#[cfg(feature = "debug")]
-use crate::debug::*;
 use crate::graphics::MemoryAllocator;
 use crate::loaders::GameFileLoader;
 
@@ -36,7 +34,11 @@ pub struct TextureLoader {
 impl TextureLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load texture from {MAGENTA}{path}{NONE}"));
+        let timer = korangar_debug::Timer::new_dynamic(format!(
+            "load texture from {}{path}{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        ));
 
         let image_format = match &path[path.len() - 4..] {
             ".png" => ImageFormat::Png,
@@ -53,8 +55,8 @@ impl TextureLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    print_debug!("Failed to decode image: {:?}", _error);
-                    print_debug!("Replacing with fallback");
+                    korangar_debug::print_debug!("Failed to decode image: {:?}", _error);
+                    korangar_debug::print_debug!("Replacing with fallback");
                 }
 
                 let fallback_path = match image_format {

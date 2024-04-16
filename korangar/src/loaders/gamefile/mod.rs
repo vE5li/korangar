@@ -11,8 +11,6 @@ use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
 use super::archive::native::{NativeArchive, NativeArchiveBuilder};
 use super::archive::{Archive, ArchiveType, Writable};
-#[cfg(feature = "debug")]
-use crate::debug::*;
 
 #[cfg(feature = "patched_as_folder")]
 const LUA_GRF_FILE_NAME: &str = "lua_files/";
@@ -65,7 +63,7 @@ impl GameFileLoader {
 
     pub fn load_archives_from_settings(&mut self) {
         #[cfg(feature = "debug")]
-        let timer = Timer::new("load game archives");
+        let timer = korangar_debug::Timer::new("load game archives");
 
         let game_archive_list = GameArchiveList::load();
 
@@ -113,12 +111,12 @@ impl GameFileLoader {
                 Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
-                        print_debug!(
+                        korangar_debug::print_debug!(
                             "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {:?}",
-                            YELLOW,
-                            NONE,
-                            MAGENTA,
-                            NONE,
+                            korangar_debug::YELLOW,
+                            korangar_debug::NONE,
+                            korangar_debug::MAGENTA,
+                            korangar_debug::NONE,
                             _error
                         );
                         failed_count += 1;
@@ -138,12 +136,12 @@ impl GameFileLoader {
                 Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
-                        print_debug!(
+                        korangar_debug::print_debug!(
                             "[{}warning{}] error upcasting {}{file_name}{}: {:?}",
-                            YELLOW,
-                            NONE,
-                            MAGENTA,
-                            NONE,
+                            korangar_debug::YELLOW,
+                            korangar_debug::NONE,
+                            korangar_debug::MAGENTA,
+                            korangar_debug::NONE,
                             _error,
                         );
                         failed_count += 1;
@@ -153,12 +151,12 @@ impl GameFileLoader {
         }
 
         #[cfg(feature = "debug")]
-        print_debug!(
+        korangar_debug::print_debug!(
             "converted a total of {}{total_count}{} files of which {}{failed_count}{} failed.",
-            YELLOW,
-            NONE,
-            RED,
-            NONE
+            korangar_debug::YELLOW,
+            korangar_debug::NONE,
+            korangar_debug::RED,
+            korangar_debug::NONE
         );
 
         lua_archive.save();
@@ -175,7 +173,7 @@ impl GameFileLoader {
         // TODO: should this be removed in the future or left in for resilience?
         if result.is_err() {
             #[cfg(feature = "debug")]
-            print_debug!("failed to find file {}; tying to replace it with placeholder", path);
+            korangar_debug::print_debug!("failed to find file {}; tying to replace it with placeholder", path);
 
             let delimiter_position = path.len() - 4;
             let extension = path[delimiter_position..].to_ascii_lowercase();

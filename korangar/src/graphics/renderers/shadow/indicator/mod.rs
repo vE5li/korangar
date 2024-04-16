@@ -51,7 +51,7 @@ impl IndicatorRenderer {
             .build(device, subpass)
     }
 
-    #[profile]
+    #[korangar_procedural::profile]
     fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target) {
         render_target
             .state

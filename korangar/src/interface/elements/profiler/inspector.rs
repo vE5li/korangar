@@ -1,13 +1,13 @@
 use std::time::{Duration, Instant};
 
 use derive_new::new;
+use korangar_debug::Measurement;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_procedural::size_bound;
 
-use crate::debug::*;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;

@@ -1,9 +1,6 @@
 use korangar_procedural::PrototypeElement;
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "debug")]
-use crate::debug::*;
-
 const FILENAME: &str = "client/game_archives.ron";
 const DEFAULT_FILES: &[&str] = &["data.grf", "rdata.grf", "archive/"];
 
@@ -23,7 +20,11 @@ impl Default for GameArchiveList {
 impl GameArchiveList {
     pub(super) fn load() -> Self {
         #[cfg(feature = "debug")]
-        print_debug!("loading game archive list from {}{FILENAME}{}", MAGENTA, NONE);
+        korangar_debug::print_debug!(
+            "loading game archive list from {}{FILENAME}{}",
+            korangar_debug::MAGENTA,
+            korangar_debug::NONE
+        );
 
         std::fs::read_to_string(FILENAME)
             .ok()
@@ -31,12 +32,12 @@ impl GameArchiveList {
             .map(|archives| Self { archives })
             .unwrap_or_else(|| {
                 #[cfg(feature = "debug")]
-                print_debug!(
+                korangar_debug::print_debug!(
                     "[{}error{}] failed to load game archive list from {}{FILENAME}{}; trying with default",
-                    RED,
-                    NONE,
-                    MAGENTA,
-                    NONE
+                    korangar_debug::RED,
+                    korangar_debug::NONE,
+                    korangar_debug::MAGENTA,
+                    korangar_debug::NONE
                 );
 
                 GameArchiveList::default()

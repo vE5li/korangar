@@ -6,15 +6,13 @@ use xml::reader::{EventReader, ParserConfig};
 
 pub use self::client_info::ClientInfo;
 use super::GameFileLoader;
-#[cfg(feature = "debug")]
-use crate::debug::*;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ServiceId(pub usize);
 
 pub fn load_client_info(game_file_loader: &mut GameFileLoader) -> ClientInfo {
     #[cfg(feature = "debug")]
-    let timer = Timer::new("read clientinfo");
+    let timer = korangar_debug::Timer::new("read clientinfo");
 
     let clientinfo = game_file_loader
         .get("data\\sclientinfo.xml")

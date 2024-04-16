@@ -40,7 +40,7 @@ impl GameTimer {
         self.base_client_tick = client_tick.0;
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn get_client_tick(&self) -> ClientTick {
         ClientTick(self.last_client_tick.elapsed().as_millis() as u32 + self.base_client_tick)
     }

@@ -1,8 +1,8 @@
 use derive_new::new;
 use korangar_interface::elements::{ElementWrap, Expandable, Headline, Slider};
 use korangar_interface::event::ChangeEvent;
+use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use korangar_procedural::size_bound;
 
 use crate::graphics::Color;
 use crate::interface::application::InterfaceSettings;

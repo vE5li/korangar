@@ -1,11 +1,11 @@
 use std::marker::ConstParamTy;
 
 use korangar_interface::application::{Application, ScalingTrait};
+use korangar_interface::dimension_bound;
 use korangar_interface::elements::{Container, ElementCell, ElementWrap, PickList, PrototypeElement, Text};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedStateClone};
 use korangar_interface::windows::PrototypeWindow;
-use korangar_procedural::{dimension_bound, PrototypeElement};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
@@ -290,7 +290,7 @@ impl InterfaceSettings {
 }
 
 impl InterfaceSettings {
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn set_theme_file(&mut self, theme_file: String, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.menu_theme.set_file(theme_file),
@@ -299,7 +299,7 @@ impl InterfaceSettings {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn save_theme(&self, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.themes.menu.save(self.menu_theme.get_file()),
@@ -308,7 +308,7 @@ impl InterfaceSettings {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn reload_theme(&mut self, kind: InternalThemeKind) {
         match kind {
             InternalThemeKind::Menu => self.themes.menu.reload::<DefaultMenu>(self.menu_theme.get_file()),

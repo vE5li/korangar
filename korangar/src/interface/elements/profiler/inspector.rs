@@ -6,7 +6,7 @@ use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
-use korangar_procedural::size_bound;
+use korangar_interface::size_bound;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;

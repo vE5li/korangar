@@ -6,8 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use korangar_debug::profile;
 use korangar_interface::application::Application;
-use korangar_procedural::profile;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::{ClearColorValue, Format};
 use vulkano::image::view::ImageView;

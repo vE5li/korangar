@@ -1,5 +1,5 @@
 use korangar_interface::elements::{ButtonBuilder, Container, ElementCell, ElementWrap, Headline, PrototypeElement};
-use korangar_procedural::{dimension_bound, size_bound, PrototypeElement};
+use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;
 use crate::interface::application::{InterfaceSettings, InternalThemeKind};

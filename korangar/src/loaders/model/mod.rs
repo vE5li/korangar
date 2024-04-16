@@ -5,7 +5,6 @@ use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_interface::application::Application;
 use korangar_interface::elements::{ElementCell, PrototypeElement};
-use korangar_procedural::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
 use vulkano::image::view::ImageView;
 

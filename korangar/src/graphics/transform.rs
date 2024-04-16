@@ -1,7 +1,7 @@
 use std::ops::Add;
 
 use cgmath::{Deg, Rad, Vector3};
-use korangar_procedural::PrototypeElement;
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionResult, ConversionResultExt, FromBytes};
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]

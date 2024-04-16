@@ -1,7 +1,7 @@
 use korangar_interface::elements::{ElementWrap, PickList, PrototypeElement, StateButtonBuilder, Text};
 use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use korangar_procedural::{dimension_bound, size_bound};
+use korangar_interface::{dimension_bound, size_bound};
 
 use crate::graphics::{PresentModeInfo, ShadowDetail};
 use crate::interface::application::InterfaceSettings;

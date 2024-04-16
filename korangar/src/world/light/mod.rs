@@ -1,5 +1,6 @@
 use cgmath::Vector3;
-use korangar_procedural::{PrototypeElement, PrototypeWindow};
+use korangar_interface::elements::PrototypeElement;
+use korangar_interface::windows::PrototypeWindow;
 use ragnarok_bytes::ByteConvertable;
 
 use crate::graphics::*;

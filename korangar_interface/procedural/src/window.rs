@@ -34,7 +34,7 @@ pub fn derive_prototype_window_struct(
                     use korangar_interface::elements::ElementCell;
                     use korangar_interface::elements::ScrollView;
                     use korangar_interface::windows::WindowBuilder;
-                    use korangar_procedural::size_bound;
+                    use korangar_interface::size_bound;
                     use std::cell::RefCell;
                     use std::rc::Rc;
 
@@ -61,13 +61,13 @@ pub fn derive_prototype_window_struct(
             }
 
             fn to_window(&self, window_cache: &App::Cache, application: &App, available_space: App::Size) -> korangar_interface::windows::Window<App> {
-                let scroll_view = korangar_interface::elements::ScrollView::new(vec![#(#initializers),*], korangar_procedural::size_bound!(100%, super > ? < super));
+                let scroll_view = korangar_interface::elements::ScrollView::new(vec![#(#initializers),*], korangar_interface::size_bound!(100%, super > ? < super));
                 let elements: Vec<korangar_interface::elements::ElementCell<App>> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
 
                 korangar_interface::windows::WindowBuilder::new()
                     .with_title(#window_title.to_string())
                     .with_class_option(#window_class_option)
-                    .with_size_bound(korangar_procedural::size_bound!(200 > 300 < 400, 0 > ? < 80%))
+                    .with_size_bound(korangar_interface::size_bound!(200 > 300 < 400, 0 > ? < 80%))
                     .with_elements(elements)
                     .closable()
                     .build(window_cache, application, available_space)

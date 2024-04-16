@@ -2,7 +2,7 @@ use korangar_interface::elements::{ButtonBuilder, ElementWrap, InputFieldBuilder
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use korangar_procedural::{dimension_bound, size_bound};
+use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;

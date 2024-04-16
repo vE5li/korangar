@@ -1,3 +1,5 @@
+pub use interface_procedural::PrototypeWindow;
+
 use crate::application::Application;
 use crate::Window;
 

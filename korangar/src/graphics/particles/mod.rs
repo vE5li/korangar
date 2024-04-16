@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
-use korangar_procedural::profile;
+use korangar_debug::profile;
 use ragnarok_networking::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 

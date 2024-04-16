@@ -1,6 +1,8 @@
 use std::fmt::Display;
 use std::rc::Rc;
 
+pub use interface_procedural::PrototypeElement;
+
 use super::{Container, ElementCell, ElementWrap, Expandable, StaticLabel, StringValue};
 use crate::application::Application;
 use crate::layout::{DimensionBound, SizeBound};

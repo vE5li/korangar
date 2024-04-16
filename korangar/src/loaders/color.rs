@@ -1,4 +1,4 @@
-use korangar_procedural::PrototypeElement;
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::ByteConvertable;
 
 use crate::graphics::Color;

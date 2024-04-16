@@ -1,12 +1,10 @@
-use korangar_procedural::toggle;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 use super::ShadowDetail;
 
-#[derive(Serialize, Deserialize, toggle)]
+#[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
-    #[toggle]
     pub frame_limit: bool,
     pub shadow_detail: ShadowDetail,
 }

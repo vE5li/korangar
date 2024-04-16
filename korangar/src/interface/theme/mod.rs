@@ -1,7 +1,9 @@
 use korangar_interface::application::FontSizeTrait;
+use korangar_interface::elements::PrototypeElement;
 use korangar_interface::event::{Nothing, Render, Resolve};
 use korangar_interface::layout::{DimensionBound, SizeBound};
-use korangar_procedural::{dimension_bound, size_bound, PrototypeElement, PrototypeWindow};
+use korangar_interface::windows::PrototypeWindow;
+use korangar_interface::{dimension_bound, size_bound};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 

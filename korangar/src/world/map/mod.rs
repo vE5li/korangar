@@ -129,7 +129,7 @@ impl Map {
         &self.tiles[position.x + position.y * self.width]
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, time: f32)
     where
         T: Renderer + GeometryRenderer,
@@ -144,7 +144,7 @@ impl Map {
         );
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_objects<T>(
         &self,
         render_target: &mut T::Target,
@@ -188,7 +188,7 @@ impl Map {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_entities<T>(
         &self,
         entities: &[Entity],
@@ -206,7 +206,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_bounding(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -242,12 +242,12 @@ impl Map {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {
         renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_walk_indicator<T>(
         &self,
         render_target: &mut <T>::Target,
@@ -275,7 +275,7 @@ impl Map {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_water(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -288,13 +288,13 @@ impl Map {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
         let ambient_color = get_ambient_light_color(self.light_settings.ambient_color.to_owned().unwrap().into(), day_timer);
         renderer.ambient_light(render_target, ambient_color);
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn directional_light(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -322,7 +322,7 @@ impl Map {
         );
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn point_lights(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -334,7 +334,7 @@ impl Map {
             .for_each(|light_source| light_source.render_light(render_target, renderer, camera));
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn water_light(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -356,7 +356,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_overlay_tiles(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -384,7 +384,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_markers<T>(
         &self,
         render_target: &mut T::Target,
@@ -468,7 +468,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn render_marker_box(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

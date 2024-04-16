@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, SquareMatrix, Vector3, Vector4};
 use derive_new::new;
-use korangar_procedural::{profile, PrototypeElement};
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_networking::ClientTick;
 use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
@@ -136,7 +136,7 @@ impl Node {
         current_rotation.into()
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
@@ -160,7 +160,7 @@ impl Node {
             * animation_rotation_matrix
     }
 
-    #[profile("render node geometry")]
+    #[korangar_debug::profile("render node geometry")]
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,

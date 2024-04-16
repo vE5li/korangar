@@ -401,6 +401,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "debug_procedural"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.55",
+]
+
+[[package]]
 name = "derive-new"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -678,6 +687,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "interface_procedural"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.55",
+]
+
+[[package]]
 name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -738,7 +756,6 @@ dependencies = [
  "image",
  "korangar_debug",
  "korangar_interface",
- "korangar_procedural",
  "lunify",
  "mlua",
  "num",
@@ -767,6 +784,7 @@ name = "korangar_debug"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "debug_procedural",
  "lazy_static",
 ]
 
@@ -776,20 +794,11 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.5.0",
  "cgmath",
+ "interface_procedural",
  "korangar_debug",
- "korangar_procedural",
  "num",
  "option-ext",
  "serde",
-]
-
-[[package]]
-name = "korangar_procedural"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.55",
 ]
 
 [[package]]
@@ -1339,7 +1348,6 @@ version = "0.1.0"
 dependencies = [
  "derive-new",
  "korangar_interface",
- "korangar_procedural",
  "ragnarok_bytes",
  "ragnarok_procedural",
 ]

@@ -17,7 +17,7 @@ pub struct DialogSystem {
 }
 
 impl DialogSystem {
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn open_dialog_window(&mut self, text: String, npc_id: EntityId) -> Option<DialogWindow> {
         if let Some(dialog_handle) = &mut self.dialog_handle {
             dialog_handle.elements.mutate(|elements| {
@@ -38,7 +38,7 @@ impl DialogSystem {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn add_next_button(&mut self) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
             dialog_handle.elements.push(DialogElement::NextButton);
@@ -46,7 +46,7 @@ impl DialogSystem {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn add_close_button(&mut self) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
             dialog_handle.elements.mutate(|elements| {
@@ -56,7 +56,7 @@ impl DialogSystem {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn add_choice_buttons(&mut self, choices: Vec<String>) {
         if let Some(dialog_handle) = &mut self.dialog_handle {
             dialog_handle.elements.mutate(move |elements| {
@@ -70,7 +70,7 @@ impl DialogSystem {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn close_dialog(&mut self) {
         self.dialog_handle = None;
     }

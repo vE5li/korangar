@@ -20,8 +20,8 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
+use korangar_debug::profile;
 use korangar_interface::application::FontSizeTrait;
-use korangar_procedural::profile;
 use ragnarok_networking::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;

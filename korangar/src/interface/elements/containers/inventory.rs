@@ -1,8 +1,8 @@
 use korangar_interface::elements::{ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, WeakElementCell};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
+use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use korangar_procedural::size_bound;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;

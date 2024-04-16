@@ -4,7 +4,7 @@ fragment_shader!("src/graphics/renderers/deferred/geometry/fragment_shader.glsl"
 use std::sync::Arc;
 
 use cgmath::Matrix4;
-use korangar_procedural::profile;
+use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -61,7 +61,7 @@ impl GeometryRenderer {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn recreate_pipeline(
         &mut self,
         device: Arc<Device>,
@@ -116,7 +116,7 @@ impl GeometryRenderer {
             .build_with_specialization(device, subpass, specialization_constants)
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {

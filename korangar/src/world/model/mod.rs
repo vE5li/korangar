@@ -4,7 +4,7 @@ use std::ops::Mul;
 
 use cgmath::{Matrix4, Vector3};
 use derive_new::new;
-use korangar_procedural::PrototypeElement;
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_networking::ClientTick;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};

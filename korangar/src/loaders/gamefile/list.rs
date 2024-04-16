@@ -1,4 +1,4 @@
-use korangar_procedural::PrototypeElement;
+use korangar_interface::elements::PrototypeElement;
 use serde::{Deserialize, Serialize};
 
 const FILENAME: &str = "client/game_archives.ron";

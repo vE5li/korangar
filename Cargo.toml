@@ -8,7 +8,6 @@ cgmath = { version = "0.18", features = ["serde"] }
 chrono = "0.4"
 derive-new = "0.6.0"
 korangar_interface = { path = "korangar_interface" }
-korangar_procedural = { path = "korangar_procedural" }
 korangar_debug = { path = "korangar_debug" }
 num = "0.4.1"
 ragnarok_bytes = { path = "ragnarok_bytes" }

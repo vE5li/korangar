@@ -4,7 +4,7 @@ fragment_shader!("src/graphics/renderers/picker/entity/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
-use korangar_procedural::profile;
+use korangar_debug::profile;
 use ragnarok_networking::EntityId;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
@@ -49,7 +49,7 @@ impl EntityRenderer {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
         self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
     }
@@ -68,7 +68,7 @@ impl EntityRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {

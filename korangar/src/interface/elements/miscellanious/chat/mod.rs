@@ -7,8 +7,8 @@ use korangar_interface::application::{Application, FontSizeTraitExt};
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{Dimension, PlacementResolver};
+use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use korangar_procedural::size_bound;
 
 pub use self::builder::ChatBuilder;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};

@@ -1,7 +1,7 @@
 use derive_new::new;
 use korangar_interface::elements::{ElementWrap, Text};
+use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use korangar_procedural::size_bound;
 
 use crate::graphics::Color;
 use crate::interface::application::InterfaceSettings;

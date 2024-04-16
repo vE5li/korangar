@@ -1,7 +1,7 @@
 use korangar_debug::Measurement;
 use korangar_interface::elements::ElementWrap;
+use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use korangar_procedural::size_bound;
 
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FrameInspectorView;

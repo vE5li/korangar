@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2, Vector3, VectorSpace};
 use derive_new::new;
+use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
-use korangar_procedural::{PrototypeElement, PrototypeWindow};
 use ragnarok_networking::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType};
 use vulkano::buffer::Subbuffer;
 
@@ -78,7 +78,7 @@ pub struct Common {
     animation_state: AnimationState,
 }
 
-#[korangar_procedural::profile]
+#[korangar_debug::profile]
 #[allow(clippy::invisible_characters)]
 fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     match job_id {

@@ -19,7 +19,6 @@ num = { workspace = true }
 option-ext = "0.2.0"
 pathfinding = "2.2.2"
 korangar_debug = { workspace = true, optional = true }
-korangar_procedural = { workspace = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_networking = { workspace = true, features = ["derive", "interface"] }
 rand = "0.8.5"

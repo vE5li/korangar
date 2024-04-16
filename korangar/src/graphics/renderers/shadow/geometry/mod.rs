@@ -4,7 +4,7 @@ fragment_shader!("src/graphics/renderers/shadow/geometry/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::Matrix4;
-use korangar_procedural::profile;
+use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -55,7 +55,7 @@ impl GeometryRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
         #[cfg(feature = "debug")]
         let measurement = korangar_debug::start_measurement("update matrices buffer");

@@ -4,7 +4,7 @@ use korangar_interface::elements::{
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
-use korangar_procedural::{dimension_bound, size_bound};
+use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_networking::EquipPosition;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};

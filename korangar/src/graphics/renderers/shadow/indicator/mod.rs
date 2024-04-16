@@ -4,7 +4,7 @@ fragment_shader!("src/graphics/renderers/shadow/indicator/fragment_shader.glsl")
 use std::sync::Arc;
 
 use cgmath::Vector3;
-use korangar_procedural::profile;
+use korangar_debug::profile;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -51,7 +51,7 @@ impl IndicatorRenderer {
             .build(device, subpass)
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target) {
         render_target
             .state

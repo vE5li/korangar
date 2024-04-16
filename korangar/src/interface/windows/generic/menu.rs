@@ -1,6 +1,6 @@
 use korangar_interface::elements::{ButtonBuilder, ElementWrap};
+use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use korangar_procedural::size_bound;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;

@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use cgmath::Matrix4;
 use derive_new::new;
-use korangar_procedural::{PrototypeElement, PrototypeWindow};
+use korangar_interface::elements::PrototypeElement;
+use korangar_interface::windows::PrototypeWindow;
 use ragnarok_networking::ClientTick;
 
 use crate::graphics::*;
@@ -25,7 +26,7 @@ impl Object {
             .render_geometry(render_target, renderer, camera, &self.transform, client_tick, time);
     }
 
-    //#[korangar_procedural::profile]
+    //#[korangar_debug::profile]
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
         self.model.get_bounding_box_matrix(&self.transform)
     }

@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
 use derive_new::new;
-use korangar_procedural::PrototypeElement;
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteConvertable, ByteStream, FromBytes};
 use ragnarok_networking::ClientTick;
 use vulkano::image::view::ImageView;

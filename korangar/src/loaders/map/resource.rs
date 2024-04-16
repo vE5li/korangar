@@ -1,5 +1,5 @@
 use cgmath::Vector3;
-use korangar_procedural::PrototypeElement;
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
 
 use crate::graphics::Transform;

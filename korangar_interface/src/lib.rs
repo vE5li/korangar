@@ -22,6 +22,8 @@ use std::marker::PhantomData;
 use application::{Application, FocusState, InterfaceRenderer, SizeTrait, SizeTraitExt, WindowCache};
 use elements::ElementCell;
 use event::{ChangeEvent, ClickAction, HoverInformation};
+// Re-export proc macros.
+pub use interface_procedural::{dimension_bound, size_bound};
 use option_ext::OptionExt;
 use windows::{PrototypeWindow, Window};
 
@@ -170,7 +172,7 @@ where
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile("update user interface"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("update user interface"))]
     pub fn update(&mut self, application: &App, font_loader: App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
         for (window, post_update) in &mut self.windows {
             #[cfg(feature = "debug")]
@@ -242,7 +244,7 @@ where
         self.post_update.resolve();
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile("get hovered element"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("get hovered element"))]
     pub fn hovered_element(
         &self,
         mouse_position: App::Position,
@@ -259,7 +261,7 @@ where
         (None, None)
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn move_window_to_top(&mut self, window_index: usize) -> usize {
         let (window, post_update) = self.windows.remove(window_index);
         let new_window_index = self.windows.len();
@@ -269,7 +271,7 @@ where
         new_window_index
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn left_click_element(&mut self, hovered_element: &ElementCell<App>, window_index: usize) -> Vec<ClickAction<App>> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut resolve = false;
@@ -283,7 +285,7 @@ where
         action
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn right_click_element(&mut self, hovered_element: &ElementCell<App>, window_index: usize) -> Vec<ClickAction<App>> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut resolve = false;
@@ -297,7 +299,7 @@ where
         action
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn drag_element(&mut self, element: &ElementCell<App>, _window_index: usize, mouse_delta: App::Position) {
         //let (_window, post_update) = &mut self.windows[window_index];
 
@@ -307,7 +309,7 @@ where
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn scroll_element(&mut self, element: &ElementCell<App>, window_index: usize, scroll_delta: f32) {
         let (_, post_update) = &mut self.windows[window_index];
 
@@ -316,7 +318,7 @@ where
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn input_character_element(&mut self, element: &ElementCell<App>, window_index: usize, character: char) -> Vec<ClickAction<App>> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut propagated_actions = Vec::new();
@@ -331,7 +333,7 @@ where
         propagated_actions
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn move_window(&mut self, window_index: usize, offset: App::Position) {
         if let Some((window_class, position)) = self.windows[window_index].0.offset(self.available_space, offset) {
             self.window_cache.update_position(window_class, position);
@@ -340,7 +342,7 @@ where
         self.post_update.render();
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn resize_window(&mut self, application: &App, window_index: usize, growth: App::Size) {
         let (window, post_update) = &mut self.windows[window_index];
 
@@ -390,7 +392,7 @@ where
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile("render user interface"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render user interface"))]
     pub fn render(
         &mut self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
@@ -426,7 +428,7 @@ where
         self.post_update.take_render();
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile("check window exists"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("check window exists"))]
     fn window_exists(&self, window_class: Option<&str>) -> bool {
         match window_class {
             Some(window_class) => self.windows.iter().any(|window| {
@@ -444,7 +446,7 @@ where
         focus_state.set_focused_window(self.windows.len() - 1);
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn open_window(&mut self, application: &App, focus_state: &mut FocusState<App>, prototype_window: &dyn PrototypeWindow<App>) {
         if !self.window_exists(prototype_window.window_class()) {
             let window = prototype_window.to_window(&self.window_cache, application, self.available_space);
@@ -452,7 +454,7 @@ where
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn open_popup(
         &mut self,
         element: ElementCell<App>,
@@ -465,14 +467,14 @@ where
         entry.1.resolve();
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_popup(&mut self, window_index: usize) {
         let entry = &mut self.windows[window_index];
         entry.0.close_popup();
         entry.1.render();
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_window(&mut self, focus_state: &mut FocusState<App>, window_index: usize) {
         let (window, ..) = self.windows.remove(window_index);
         self.post_update.render();
@@ -489,7 +491,7 @@ where
         &self.windows[window_index].0
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState<App>, window_class: &str) {
         let index_from_back = self
             .windows
@@ -503,7 +505,7 @@ where
         self.close_window(focus_state, index);
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_all_windows_except(&mut self, focus_state: &mut FocusState<App>) {
         for index in (0..self.windows.len()).rev() {
             if self.windows[index]
@@ -517,7 +519,7 @@ where
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile("get first focused element"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("get first focused element"))]
     pub fn first_focused_element(&self, focus_state: &mut FocusState<App>) {
         if self.windows.is_empty() {
             return;
@@ -529,7 +531,7 @@ where
         focus_state.set_focused_element(element, window_index);
     }
 
-    #[cfg_attr(feature = "debug", korangar_procedural::profile)]
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn restore_focus(&self, focus_state: &mut FocusState<App>) {
         if self.windows.is_empty() {
             return;

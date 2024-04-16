@@ -43,7 +43,7 @@ use std::marker::{ConstParamTy, PhantomData};
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use korangar_procedural::profile;
+use korangar_debug::profile;
 use option_ext::OptionExt;
 use ragnarok_networking::EntityId;
 use vulkano::buffer::{Buffer, BufferUsage, Subbuffer};
@@ -481,7 +481,7 @@ impl PickerRenderTarget {
         self.bound_subrenderer = None;
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn bind_subrenderer(&mut self, subrenderer: PickerSubrenderer) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);
@@ -573,7 +573,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         }
     }
 
-    #[korangar_procedural::profile]
+    #[korangar_debug::profile]
     pub fn bind_subrenderer(&mut self, subrenderer: S) -> bool {
         let already_bound = self.bound_subrenderer.contains(&subrenderer);
         self.bound_subrenderer = Some(subrenderer);

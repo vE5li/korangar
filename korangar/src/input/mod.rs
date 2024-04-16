@@ -5,12 +5,12 @@ mod mode;
 use std::mem::variant_count;
 
 use cgmath::Vector2;
+use korangar_debug::profile;
 use korangar_interface::application::FocusState;
 use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
-use korangar_procedural::profile;
 use ragnarok_networking::ClientTick;
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};

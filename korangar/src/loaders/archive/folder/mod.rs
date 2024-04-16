@@ -63,11 +63,7 @@ impl Archive for FolderArchive {
     }
 
     fn get_lua_files(&self, lua_files: &mut Vec<String>) {
-        let files = self
-            .file_mapping
-            .keys()
-            .filter(|file_name| file_name.ends_with(".lub"))
-            .map(|file_name| file_name.clone());
+        let files = self.file_mapping.keys().filter(|file_name| file_name.ends_with(".lub")).cloned();
 
         lua_files.extend(files);
     }

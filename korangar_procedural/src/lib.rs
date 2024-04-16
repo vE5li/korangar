@@ -49,7 +49,7 @@ pub fn profile(name: InterfaceTokenStream, function: InterfaceTokenStream) -> In
     let mut function: ItemFn = parse(function).expect("failed to parse token stream");
     let name: LitStr = parse(name).unwrap_or_else(|_| {
         let function_name = &function.sig.ident;
-        LitStr::new(function_name.to_string().replace("_", " ").as_str(), function_name.span())
+        LitStr::new(function_name.to_string().replace('_', " ").as_str(), function_name.span())
     });
 
     let code = quote! {

@@ -28,11 +28,11 @@ where
     marker: PhantomData<(Title, Closable, Class, Background, Theme)>,
 }
 
-impl<App> WindowBuilder<App, Unset, Unset, Unset, Unset, Unset, Unset, Unset>
+impl<App> Default for WindowBuilder<App, Unset, Unset, Unset, Unset, Unset, Unset, Unset>
 where
     App: Application,
 {
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
             title: None,
             closable: false,
@@ -43,6 +43,15 @@ where
             theme_kind: App::ThemeKind::default(),
             marker: PhantomData,
         }
+    }
+}
+
+impl<App> WindowBuilder<App, Unset, Unset, Unset, Unset, Unset, Unset, Unset>
+where
+    App: Application,
+{
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

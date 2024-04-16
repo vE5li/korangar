@@ -252,7 +252,7 @@ pub struct InterfaceSettings {
 }
 
 impl InterfaceSettings {
-    pub fn new() -> Self {
+    pub fn load_or_default() -> Self {
         let InterfaceSettingsStorage {
             menu_theme,
             main_theme,

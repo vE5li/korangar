@@ -174,8 +174,8 @@ impl SpriteRenderer {
         smooth: bool,
     ) {
         let half_screen = ScreenSize {
-            width: window_size.width as f32 / 2.0,
-            height: window_size.height as f32 / 2.0,
+            width: window_size.width / 2.0,
+            height: window_size.height / 2.0,
         };
         let screen_position = ScreenPosition {
             left: screen_position.left / half_screen.width,

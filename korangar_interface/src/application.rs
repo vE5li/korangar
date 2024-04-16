@@ -422,7 +422,7 @@ where
     }
 
     pub fn get_focused_window(&self) -> Option<usize> {
-        self.focused_window.clone()
+        self.focused_window
     }
 
     pub fn update_focused_element(&mut self, element: Option<ElementCell<App>>, window_index: usize) {

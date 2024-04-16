@@ -338,7 +338,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let mut application = InterfaceSettings::new();
+    let mut application = InterfaceSettings::load_or_default();
     let mut interface = korangar_interface::Interface::new(swapchain_holder.window_screen_size());
     let mut focus_state = FocusState::default();
     let mut mouse_cursor = MouseCursor::new(&mut game_file_loader, &mut sprite_loader, &mut action_loader);
@@ -806,7 +806,7 @@ fn main() {
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::OpenMenuWindow => {
                             if !entities.is_empty() {
-                                interface.open_window(&application, &mut focus_state, &MenuWindow::default())
+                                interface.open_window(&application, &mut focus_state, &MenuWindow)
                             }
                         }
                         UserEvent::OpenInventoryWindow => {
@@ -841,9 +841,7 @@ fn main() {
                             &mut focus_state,
                             &GraphicsSettingsWindow::new(present_mode_info, shadow_detail.clone_state(), framerate_limit.clone_state()),
                         ),
-                        UserEvent::OpenAudioSettingsWindow => {
-                            interface.open_window(&application, &mut focus_state, &AudioSettingsWindow::default())
-                        }
+                        UserEvent::OpenAudioSettingsWindow => interface.open_window(&application, &mut focus_state, &AudioSettingsWindow),
                         UserEvent::OpenFriendsWindow => {
                             interface.open_window(&application, &mut focus_state, &networking_system.friends_window())
                         }
@@ -1054,11 +1052,11 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapDataWindow => interface.open_window(&application, &mut focus_state, map.to_prototype_window()),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapsWindow => interface.open_window(&application, &mut focus_state, &MapsWindow::default()),
+                        UserEvent::OpenMapsWindow => interface.open_window(&application, &mut focus_state, &MapsWindow),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenCommandsWindow => interface.open_window(&application, &mut focus_state, &CommandsWindow::default()),
+                        UserEvent::OpenCommandsWindow => interface.open_window(&application, &mut focus_state, &CommandsWindow),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenTimeWindow => interface.open_window(&application, &mut focus_state, &TimeWindow::default()),
+                        UserEvent::OpenTimeWindow => interface.open_window(&application, &mut focus_state, &TimeWindow),
                         #[cfg(feature = "debug")]
                         UserEvent::SetDawn => game_timer.set_day_timer(0.0),
                         #[cfg(feature = "debug")]
@@ -1293,7 +1291,7 @@ fn main() {
                             picker_target,
                             &picker_renderer,
                             current_camera,
-                            &render_settings,
+                            render_settings,
                             entities,
                             hovered_marker_identifier,
                         );
@@ -1426,7 +1424,7 @@ fn main() {
                             screen_target,
                             &deferred_renderer,
                             current_camera,
-                            &render_settings,
+                            render_settings,
                             entities,
                             hovered_marker_identifier,
                         );
@@ -1484,7 +1482,7 @@ fn main() {
                         picker_target.image.clone(),
                         directional_shadow_image,
                         font_loader.borrow().get_font_atlas(),
-                        &render_settings,
+                        render_settings,
                     );
                 }
 

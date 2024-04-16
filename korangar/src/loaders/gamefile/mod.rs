@@ -94,9 +94,9 @@ impl GameFileLoader {
         self.archives.iter().for_each(|archive| archive.get_lua_files(&mut lua_files));
 
         let path = Path::new(LUA_GRF_FILE_NAME);
-        let mut lua_archive: Box<dyn Writable> = match GameFileLoader::get_archive_type_by_path(&path) {
-            ArchiveType::Folder => Box::new(FolderArchive::from_path(&path)),
-            ArchiveType::Native => Box::new(NativeArchiveBuilder::from_path(&path)),
+        let mut lua_archive: Box<dyn Writable> = match GameFileLoader::get_archive_type_by_path(path) {
+            ArchiveType::Folder => Box::new(FolderArchive::from_path(path)),
+            ArchiveType::Native => Box::new(NativeArchiveBuilder::from_path(path)),
         };
 
         let bytecode_format = Format::default();

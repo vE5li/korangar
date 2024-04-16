@@ -318,6 +318,8 @@ pub trait TrackedStateVec<Value> {
         F: FnMut(&Value) -> bool;
 
     fn len(&self) -> usize;
+
+    fn is_empty(&self) -> bool;
 }
 
 impl<T, Value> TrackedStateVec<Value> for T
@@ -358,6 +360,10 @@ where
 
     fn len(&self) -> usize {
         self.get().len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.get().is_empty()
     }
 }
 

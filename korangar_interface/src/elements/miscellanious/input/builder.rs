@@ -25,11 +25,11 @@ where
     marker: PhantomData<(App, Length, Hidden, Width)>,
 }
 
-impl<App> InputFieldBuilder<App, Unset, Unset, Unset, Unset, Unset, Unset>
+impl<App> Default for InputFieldBuilder<App, Unset, Unset, Unset, Unset, Unset, Unset>
 where
     App: Application,
 {
-    pub fn new() -> Self {
+    fn default() -> Self {
         Self {
             input_state: Unset,
             ghost_text: Unset,
@@ -39,6 +39,15 @@ where
             width_bound: DimensionBound::RELATIVE_ONE_HUNDRED,
             marker: PhantomData,
         }
+    }
+}
+
+impl<App> InputFieldBuilder<App, Unset, Unset, Unset, Unset, Unset, Unset>
+where
+    App: Application,
+{
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

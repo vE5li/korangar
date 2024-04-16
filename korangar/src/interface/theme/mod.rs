@@ -185,7 +185,7 @@ impl korangar_interface::theme::ButtonTheme<InterfaceSettings> for ButtonTheme {
     }
 
     fn height_bound(&self) -> korangar_interface::layout::DimensionBound {
-        self.height_bound.clone()
+        self.height_bound
     }
 }
 
@@ -299,7 +299,7 @@ impl korangar_interface::theme::WindowTheme<InterfaceSettings> for WindowTheme {
     }
 
     fn title_height(&self) -> korangar_interface::layout::DimensionBound {
-        self.title_height.clone()
+        self.title_height
     }
 }
 
@@ -497,7 +497,7 @@ impl korangar_interface::theme::LabelTheme<InterfaceSettings> for LabelTheme {
     }
 
     fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound.clone()
+        self.size_bound
     }
 }
 
@@ -574,7 +574,7 @@ impl korangar_interface::theme::ValueTheme<InterfaceSettings> for ValueTheme {
     }
 
     fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound.clone()
+        self.size_bound
     }
 }
 
@@ -655,7 +655,7 @@ impl korangar_interface::theme::CloseButtonTheme<InterfaceSettings> for CloseBut
     }
 
     fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound.clone()
+        self.size_bound
     }
 }
 
@@ -840,7 +840,7 @@ impl korangar_interface::theme::InputTheme<InterfaceSettings> for InputTheme {
     }
 
     fn height_bound(&self) -> korangar_interface::layout::DimensionBound {
-        self.height_bound.clone()
+        self.height_bound
     }
 }
 

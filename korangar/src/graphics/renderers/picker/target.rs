@@ -100,8 +100,9 @@ impl From<PickerTarget> for u32 {
 #[cfg(test)]
 #[allow(clippy::unusual_byte_groupings)]
 mod test {
+    use ragnarok_networking::EntityId;
+
     use crate::graphics::PickerTarget;
-    use crate::network::EntityId;
     #[cfg(feature = "debug")]
     use crate::world::MarkerIdentifier;
 

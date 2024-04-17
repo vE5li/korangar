@@ -24,6 +24,8 @@ use elements::ElementCell;
 use event::{ChangeEvent, ClickAction, HoverInformation};
 // Re-export proc macros.
 pub use interface_procedural::{dimension_bound, size_bound};
+#[cfg(feature = "debug")]
+use korangar_debug::profile_block;
 use option_ext::OptionExt;
 use windows::{PrototypeWindow, Window};
 

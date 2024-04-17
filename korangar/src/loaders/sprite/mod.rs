@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use derive_new::new;
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
@@ -159,7 +159,7 @@ pub struct SpriteLoader {
 impl SpriteLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
+        let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -173,8 +173,8 @@ impl SpriteLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    korangar_debug::print_debug!("Failed to load sprite: {:?}", _error);
-                    korangar_debug::print_debug!("Replacing with fallback");
+                    print_debug!("Failed to load sprite: {:?}", _error);
+                    print_debug!("Replacing with fallback");
                 }
 
                 return self.get(FALLBACK_SPRITE_FILE, game_file_loader);

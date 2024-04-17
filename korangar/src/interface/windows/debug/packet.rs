@@ -1,6 +1,6 @@
 use std::cell::UnsafeCell;
 
-use korangar_debug::RingBuffer;
+use korangar_debug::profiling::RingBuffer;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, ScrollView, StateButtonBuilder, WeakElementCell};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedState, TrackedStateBinary};

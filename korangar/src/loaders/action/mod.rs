@@ -5,7 +5,7 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2};
 use derive_new::new;
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteConvertable, ByteStream, FromBytes};
 use ragnarok_networking::ClientTick;
@@ -275,7 +275,7 @@ pub struct ActionLoader {
 impl ActionLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!("load actions from {}", path.magenta()));
+        let timer = Timer::new_dynamic(format!("load actions from {}", path.magenta()));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -289,8 +289,8 @@ impl ActionLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    korangar_debug::print_debug!("Failed to load actions: {:?}", _error);
-                    korangar_debug::print_debug!("Replacing with fallback");
+                    print_debug!("Failed to load actions: {:?}", _error);
+                    print_debug!("Replacing with fallback");
                 }
 
                 return self.get(FALLBACK_ACTIONS_FILE, game_file_loader);

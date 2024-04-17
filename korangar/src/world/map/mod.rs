@@ -4,6 +4,8 @@ use std::sync::Arc;
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
+#[cfg(feature = "debug")]
+use korangar_debug::profiling::Profiler;
 use korangar_interface::windows::PrototypeWindow;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
@@ -168,7 +170,7 @@ impl Map {
             }
 
             #[cfg(feature = "debug")]
-            let culling_measurement = korangar_debug::start_measurement("frustum culling");
+            let culling_measurement = Profiler::start_measurement("frustum culling");
 
             let bounding_box_matrix = object.get_bounding_box_matrix();
             let oriented_bounding_box = standard_box.transform(bounding_box_matrix);

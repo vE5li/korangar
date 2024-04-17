@@ -6,7 +6,7 @@ use derive_new::new;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat, Rgba};
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
@@ -36,7 +36,7 @@ pub struct TextureLoader {
 impl TextureLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!("load texture from {}", path.magenta()));
+        let timer = Timer::new_dynamic(format!("load texture from {}", path.magenta()));
 
         let image_format = match &path[path.len() - 4..] {
             ".png" => ImageFormat::Png,
@@ -53,8 +53,8 @@ impl TextureLoader {
             Err(_error) => {
                 #[cfg(feature = "debug")]
                 {
-                    korangar_debug::print_debug!("Failed to decode image: {:?}", _error);
-                    korangar_debug::print_debug!("Replacing with fallback");
+                    print_debug!("Failed to decode image: {:?}", _error);
+                    print_debug!("Replacing with fallback");
                 }
 
                 let fallback_path = match image_format {

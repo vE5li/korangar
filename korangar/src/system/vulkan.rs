@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector3};
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{DeviceExtensions, QueueFlags};
 #[cfg(feature = "debug")]
@@ -16,11 +16,11 @@ pub fn get_layers(library: &VulkanLibrary) -> Vec<String> {
     let desired_layers: Vec<String> = vec![/*"VK_LAYER_KHRONOS_validation".to_owned()*/];
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("available layers");
+    let timer = Timer::new("available layers");
 
     #[cfg(feature = "debug")]
     for layer in &available_layers {
-        korangar_debug::print_debug!("{}", layer.name().magenta());
+        print_debug!("{}", layer.name().magenta());
     }
 
     #[cfg(feature = "debug")]
@@ -28,11 +28,11 @@ pub fn get_layers(library: &VulkanLibrary) -> Vec<String> {
 
     #[cfg(feature = "debug")]
     for layer in &desired_layers {
-        korangar_debug::print_debug!("{}", layer.magenta());
+        print_debug!("{}", layer.magenta());
     }
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("used layers");
+    let timer = Timer::new("used layers");
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -110,7 +110,7 @@ pub fn vulkan_message_callback(
         panic!("no-impl");
     };
 
-    korangar_debug::print_debug!(
+    print_debug!(
         "{} [{}] [{}]: {}",
         callback_data.message_id_name.unwrap_or("unknown").magenta(),
         message_type.yellow(),

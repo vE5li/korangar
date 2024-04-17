@@ -2,7 +2,7 @@ use std::cell::{RefCell, UnsafeCell};
 use std::fmt::{Display, Formatter, Result};
 use std::rc::{Rc, Weak};
 
-use korangar_debug::RingBuffer;
+use korangar_debug::profiling::RingBuffer;
 use korangar_interface::elements::{
     ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, PrototypeElement, WeakElementCell,
 };

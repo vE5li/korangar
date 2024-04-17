@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize};
 use ron::ser::PrettyConfig;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
@@ -51,7 +51,7 @@ impl LoginSettings {
     pub fn new() -> Self {
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            korangar_debug::print_debug!("failed to load login settings from {}", Self::FILE_NAME.magenta());
+            print_debug!("failed to load login settings from {}", Self::FILE_NAME.magenta());
 
             Default::default()
         })
@@ -59,7 +59,7 @@ impl LoginSettings {
 
     pub fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!("loading login settings from {}", Self::FILE_NAME.magenta());
+        print_debug!("loading login settings from {}", Self::FILE_NAME.magenta());
 
         std::fs::read_to_string(Self::FILE_NAME)
             .ok()
@@ -68,7 +68,7 @@ impl LoginSettings {
 
     pub fn save(&self) {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!("saving login settings to {}", Self::FILE_NAME.magenta());
+        print_debug!("saving login settings to {}", Self::FILE_NAME.magenta());
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(Self::FILE_NAME, data).expect("unable to write file");

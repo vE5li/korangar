@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use cgmath::Vector3;
 use derive_new::new;
+#[cfg(feature = "debug")]
+use korangar_debug::logging::Timer;
 use ragnarok_bytes::{ByteStream, FromBytes};
 
 #[cfg(feature = "debug")]
@@ -23,10 +25,10 @@ const MAP_OFFSET: f32 = 5.0;
 
 #[cfg(feature = "debug")]
 fn assert_byte_stream_empty<META>(mut byte_stream: ByteStream<META>, file_name: &str) {
-    use korangar_debug::Colorize;
+    use korangar_debug::logging::{print_debug, Colorize};
 
     if byte_stream.is_empty() {
-        korangar_debug::print_debug!(
+        print_debug!(
             "incomplete read on file {}; {} bytes remaining",
             file_name.magenta(),
             byte_stream.remaining_bytes().len().yellow(),
@@ -64,7 +66,7 @@ impl MapLoader {
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!("load map from {}", &resource_file));
+        let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
         let mut map_data = parse_map_data(&resource_file, game_file_loader)?;
 

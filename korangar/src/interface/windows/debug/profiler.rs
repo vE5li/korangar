@@ -1,6 +1,6 @@
-use korangar_debug::{get_profiler_halted_version, is_profiler_halted, set_profiler_halted, ProfilerThread};
+use korangar_debug::profiling::Profiler;
 use korangar_interface::elements::{ElementWrap, PickList, StateButtonBuilder};
-use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, TrackedStateBinary, ValueState, Version};
+use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, TrackedStateBinary, ValueState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
@@ -20,16 +20,12 @@ impl TrackedState<bool> for TrackedProfilerHaltedState {
     type RemoteType = ProfilerHaltedRemote;
 
     fn set(&mut self, value: bool) {
-        set_profiler_halted(value);
+        Profiler::set_halted(value);
     }
 
     fn get(&self) -> std::cell::Ref<'_, bool> {
-        *self.dummy_state.borrow_mut() = is_profiler_halted();
+        *self.dummy_state.borrow_mut() = Profiler::get_halted();
         self.dummy_state.borrow()
-    }
-
-    fn get_version(&self) -> korangar_interface::state::Version {
-        Version::from_raw(get_profiler_halted_version())
     }
 
     fn with_mut<Closure, Return>(&mut self, closure: Closure) -> Return
@@ -40,7 +36,7 @@ impl TrackedState<bool> for TrackedProfilerHaltedState {
 
         match closure(&mut temporary_state) {
             ValueState::Mutated(return_value) => {
-                set_profiler_halted(temporary_state);
+                Profiler::set_halted(temporary_state);
                 return_value
             }
             ValueState::Unchanged(return_value) => return_value,
@@ -48,14 +44,15 @@ impl TrackedState<bool> for TrackedProfilerHaltedState {
     }
 
     fn update(&mut self) {
-        let state = is_profiler_halted();
-        set_profiler_halted(state);
+        let state = Profiler::get_halted();
+        Profiler::set_halted(state);
     }
 
     fn new_remote(&self) -> Self::RemoteType {
+        let current_state = Profiler::get_halted();
         ProfilerHaltedRemote {
             state: self.clone(),
-            version: Version::from_raw(get_profiler_halted_version()),
+            current_state,
         }
     }
 }
@@ -64,7 +61,7 @@ impl TrackedState<bool> for TrackedProfilerHaltedState {
 /// state of the profiler.
 struct ProfilerHaltedRemote {
     state: TrackedProfilerHaltedState,
-    version: Version,
+    current_state: bool,
 }
 
 impl Remote<bool> for ProfilerHaltedRemote {
@@ -79,9 +76,9 @@ impl Remote<bool> for ProfilerHaltedRemote {
     }
 
     fn consume_changed(&mut self) -> bool {
-        let version = Version::from_raw(get_profiler_halted_version());
-        let changed = self.version != version;
-        self.version = version;
+        let new_state = Profiler::get_halted();
+        let changed = self.current_state != new_state;
+        self.current_state = new_state;
 
         changed
     }
@@ -89,7 +86,7 @@ impl Remote<bool> for ProfilerHaltedRemote {
 
 pub struct ProfilerWindow {
     always_update: PlainTrackedState<bool>,
-    visible_thread: PlainTrackedState<ProfilerThread>,
+    visible_thread: PlainTrackedState<crate::threads::Enum>,
 }
 
 impl ProfilerWindow {
@@ -98,7 +95,7 @@ impl ProfilerWindow {
     pub fn new() -> Self {
         Self {
             always_update: PlainTrackedState::new(true),
-            visible_thread: PlainTrackedState::new(ProfilerThread::Main),
+            visible_thread: PlainTrackedState::new(crate::threads::Enum::Main),
         }
     }
 }
@@ -119,10 +116,10 @@ impl PrototypeWindow<InterfaceSettings> for ProfilerWindow {
         let elements = vec![
             PickList::default()
                 .with_options(vec![
-                    ("Main thread", ProfilerThread::Main),
-                    ("Picker thread", ProfilerThread::Picker),
-                    ("Shadow thread", ProfilerThread::Shadow),
-                    ("Deferred thread", ProfilerThread::Deferred),
+                    ("Main thread", crate::threads::Enum::Main),
+                    ("Picker thread", crate::threads::Enum::Picker),
+                    ("Shadow thread", crate::threads::Enum::Shadow),
+                    ("Deferred thread", crate::threads::Enum::Deferred),
                 ])
                 .with_selected(self.visible_thread.clone())
                 .with_width(dimension_bound!(150))

@@ -1,5 +1,5 @@
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize};
 use korangar_interface::elements::PrototypeElement;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,7 @@ impl GameArchiveList {
 
     pub(super) fn load() -> Self {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!("loading game archive list from {}", Self::FILE_NAME.magenta());
+        print_debug!("loading game archive list from {}", Self::FILE_NAME.magenta());
 
         std::fs::read_to_string(Self::FILE_NAME)
             .ok()
@@ -30,7 +30,7 @@ impl GameArchiveList {
             .map(|archives| Self { archives })
             .unwrap_or_else(|| {
                 #[cfg(feature = "debug")]
-                korangar_debug::print_debug!(
+                print_debug!(
                     "[{}] failed to load game archive list from {}; trying with default",
                     "warning".yellow(),
                     Self::FILE_NAME.magenta(),

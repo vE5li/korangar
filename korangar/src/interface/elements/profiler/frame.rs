@@ -1,4 +1,5 @@
-use korangar_debug::{ProfilerThread, SAVED_FRAME_COUNT};
+#[cfg(feature = "debug")]
+use korangar_debug::profiling::Profiler;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
@@ -18,11 +19,11 @@ pub struct FrameView {
     state: ElementState<InterfaceSettings>,
     frame_counter: usize,
     always_update: PlainRemote<bool>,
-    visible_thread: PlainRemote<ProfilerThread>,
+    visible_thread: PlainRemote<crate::threads::Enum>,
 }
 
 impl FrameView {
-    pub fn new(always_update: PlainRemote<bool>, visible_thread: PlainRemote<ProfilerThread>) -> Self {
+    pub fn new(always_update: PlainRemote<bool>, visible_thread: PlainRemote<crate::threads::Enum>) -> Self {
         Self {
             state: ElementState::default(),
             frame_counter: 0,
@@ -58,7 +59,7 @@ impl Element<InterfaceSettings> for FrameView {
     fn update(&mut self) -> Option<ChangeEvent> {
         self.frame_counter += 1;
 
-        if *self.always_update.get() || self.frame_counter == SAVED_FRAME_COUNT {
+        if *self.always_update.get() || self.frame_counter == Profiler::SAVED_FRAME_COUNT {
             self.frame_counter = 0;
             return Some(ChangeEvent::RENDER_WINDOW);
         }
@@ -76,12 +77,12 @@ impl Element<InterfaceSettings> for FrameView {
     fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<InterfaceSettings>> {
         let visible_thread = *self.visible_thread.get();
         let mouse_position = self.state.mouse_position.get();
-        let number_of_frames = korangar_debug::get_number_of_saved_frames(visible_thread);
+        let number_of_frames = korangar_debug::profiling::get_number_of_saved_frames(visible_thread);
 
         let bar_width = self.state.cached_size.width / number_of_frames as f32;
         let clicked_frame = (mouse_position.left / bar_width) as usize;
 
-        let measurement = korangar_debug::get_frame_by_index(visible_thread, clicked_frame);
+        let measurement = korangar_debug::profiling::get_frame_by_index(visible_thread, clicked_frame);
         vec![ClickAction::OpenWindow(Box::new(FrameInspectorWindow::new(measurement)))]
     }
 
@@ -102,7 +103,7 @@ impl Element<InterfaceSettings> for FrameView {
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        let (entries, statistics_map, longest_frame) = korangar_debug::get_statistics_data(*self.visible_thread.get());
+        let (entries, statistics_map, longest_frame) = korangar_debug::profiling::get_statistics_data(*self.visible_thread.get());
 
         let bar_width = (self.state.cached_size.width - 50.0) / entries.len() as f32;
         let gap_width = 50.0 / entries.len() as f32;
@@ -146,9 +147,7 @@ impl Element<InterfaceSettings> for FrameView {
         }
 
         let mut y_position = 0.0;
-        for (name, color) in
-            std::iter::once((korangar_debug::ROOT_MEASUREMENT_NAME, Color::monochrome_u8(150))).chain(color_lookup.into_iter())
-        {
+        for (name, color) in std::iter::once((Profiler::ROOT_MEASUREMENT_NAME, Color::monochrome_u8(150))).chain(color_lookup.into_iter()) {
             let statistics = statistics_map.get(name).unwrap();
             let text = format!("{} {:?} (SD {:.1})", name, statistics.mean, statistics.standard_deviation);
 

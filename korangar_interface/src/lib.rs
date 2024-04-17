@@ -176,7 +176,7 @@ where
     pub fn update(&mut self, application: &App, font_loader: App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
         for (window, post_update) in &mut self.windows {
             #[cfg(feature = "debug")]
-            korangar_debug::profile_block!("update window");
+            profile_block!("update window");
 
             if let Some(change_event) = window.update() {
                 Self::handle_change_event(&mut self.post_update, post_update, change_event);
@@ -188,7 +188,7 @@ where
         for (window_index, (window, post_update)) in self.windows.iter_mut().enumerate() {
             if self.post_update.needs_resolve() || post_update.take_resolve() {
                 #[cfg(feature = "debug")]
-                korangar_debug::profile_block!("resolve window");
+                profile_block!("resolve window");
 
                 let (_position, previous_size) = window.get_area();
                 let kind = window.get_theme_kind();
@@ -228,7 +228,7 @@ where
             // We profile this block rather than the flag function itself because it calls
             // itself recursively
             #[cfg(feature = "debug")]
-            korangar_debug::profile_block!("flag render windows");
+            profile_block!("flag render windows");
 
             self.flag_render_windows(application, 0, None);
         }
@@ -408,7 +408,7 @@ where
         for (window, post_update) in &mut self.windows {
             if post_update.take_render() || self.post_update.needs_render() {
                 #[cfg(feature = "debug")]
-                korangar_debug::profile_block!("render window");
+                profile_block!("render window");
 
                 let kind = window.get_theme_kind();
                 let theme = application.get_theme(kind);

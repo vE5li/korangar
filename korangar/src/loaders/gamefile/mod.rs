@@ -8,7 +8,7 @@ use std::path::Path;
 use std::u8;
 
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
@@ -66,7 +66,7 @@ impl GameFileLoader {
 
     pub fn load_archives_from_settings(&mut self) {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new("load game archives");
+        let timer = Timer::new("load game archives");
 
         let game_archive_list = GameArchiveList::load();
 
@@ -114,7 +114,7 @@ impl GameFileLoader {
                 Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
-                        korangar_debug::print_debug!(
+                        print_debug!(
                             "[{}] failed to extract file {} from the grf: {:?}",
                             "warning".yellow(),
                             file_name.magenta(),
@@ -137,7 +137,7 @@ impl GameFileLoader {
                 Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
-                        korangar_debug::print_debug!("[{}] error upcasting {}: {:?}", "warning".yellow(), file_name.magenta(), _error,);
+                        print_debug!("[{}] error upcasting {}: {:?}", "warning".yellow(), file_name.magenta(), _error,);
                         failed_count += 1;
                     }
                 }
@@ -145,7 +145,7 @@ impl GameFileLoader {
         }
 
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
+        print_debug!(
             "converted a total of {} files of which {} failed.",
             total_count.yellow(),
             failed_count.red(),
@@ -165,7 +165,7 @@ impl GameFileLoader {
         // TODO: should this be removed in the future or left in for resilience?
         if result.is_err() {
             #[cfg(feature = "debug")]
-            korangar_debug::print_debug!("failed to find file {}; tying to replace it with placeholder", path);
+            print_debug!("failed to find file {}; tying to replace it with placeholder", path);
 
             let delimiter_position = path.len() - 4;
             let extension = path[delimiter_position..].to_ascii_lowercase();

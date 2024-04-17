@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
 use vulkano::format::{Format, NumericFormat};
@@ -74,7 +74,7 @@ impl SwapchainHolder {
         let acquire_future = None;
 
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!("Swapchain format is {:?}", image_format.magenta());
+        print_debug!("Swapchain format is {:?}", image_format.magenta());
 
         let swapchain_create_info = SwapchainCreateInfo {
             min_image_count: capabilities.min_image_count,
@@ -184,7 +184,7 @@ impl SwapchainHolder {
         };
 
         #[cfg(feature = "debug")]
-        korangar_debug::Timer::new_dynamic(format!("set swapchain present mode to {:?}", self.present_mode.magenta())).stop();
+        Timer::new_dynamic(format!("set swapchain present mode to {:?}", self.present_mode.magenta())).stop();
 
         self.invalidate_swapchain();
     }

@@ -25,7 +25,7 @@ pub fn profile(name: InterfaceTokenStream, function: InterfaceTokenStream) -> In
     });
 
     let code = quote! {
-        let _measurement = korangar_debug::start_measurement(#name);
+        let _measurement = korangar_debug::profiling::Profiler::start_measurement(#name);
     }
     .into();
 

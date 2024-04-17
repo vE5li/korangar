@@ -2,6 +2,7 @@
 #![allow(clippy::too_many_arguments)]
 #![feature(adt_const_params)]
 #![feature(auto_traits)]
+#![feature(lazy_cell)]
 #![feature(const_trait_impl)]
 #![feature(decl_macro)]
 #![feature(div_duration)]
@@ -35,7 +36,11 @@ use cgmath::{Vector2, Vector3, Zero};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{print_debug, Colorize, Timer};
+#[cfg(feature = "debug")]
+use korangar_debug::profile_block;
+#[cfg(feature = "debug")]
+use korangar_debug::profiling::Profiler;
 use korangar_interface::application::{Application, FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateVec};
 use korangar_interface::Interface;
@@ -77,15 +82,24 @@ use crate::world::*;
 
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
 
+// Create the `threads` module.
+#[cfg(feature = "debug")]
+korangar_debug::create_profiler_threads!(threads, {
+    Main,
+    Picker,
+    Shadow,
+    Deferred,
+});
+
 fn main() {
     const DEFAULT_MAP: &str = "geffen";
 
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
-    let _measurement = korangar_debug::profiler_start_main_thread();
+    let _measurement = threads::Main::start();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create device");
+    let timer = Timer::new("create device");
 
     let library = VulkanLibrary::new().unwrap();
     let event_loop = EventLoop::new();
@@ -113,13 +127,13 @@ fn main() {
     .ok();
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("created {}", "instance".magenta());
+    print_debug!("created {}", "instance".magenta());
 
     #[cfg(feature = "debug")]
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create window");
+    let timer = Timer::new("create window");
 
     // TODO: move this somewhere else
     let file_data = include_bytes!("../archive/data/icon.png");
@@ -143,13 +157,13 @@ fn main() {
     let surface = Surface::from_window(instance.clone(), window).unwrap();
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("created {}", "window".magenta());
+    print_debug!("created {}", "window".magenta());
 
     #[cfg(feature = "debug")]
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("choose physical device");
+    let timer = Timer::new("choose physical device");
 
     let desired_device_extensions = get_device_extensions();
     let (physical_device, queue_family_index) = choose_physical_device(&instance, &surface, &desired_device_extensions);
@@ -160,7 +174,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create device");
+    let timer = Timer::new("create device");
 
     let (device, mut queues) = Device::new(physical_device.clone(), DeviceCreateInfo {
         enabled_extensions: get_device_extensions(),
@@ -179,18 +193,18 @@ fn main() {
     .expect("failed to create device");
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("created {}", "vulkan device".magenta());
+    print_debug!("created {}", "vulkan device".magenta());
 
     let queue = queues.next().unwrap();
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("received {} from {}", "queue".magenta(), "device".magenta());
+    print_debug!("received {} from {}", "queue".magenta(), "device".magenta());
 
     #[cfg(feature = "debug")]
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create resource managers");
+    let timer = Timer::new("create resource managers");
 
     std::fs::create_dir_all("client/themes").unwrap();
 
@@ -220,7 +234,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("load resources");
+    let timer = Timer::new("load resources");
 
     let mut map = map_loader
         .get(
@@ -236,7 +250,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create swapchain");
+    let timer = Timer::new("create swapchain");
 
     let mut swapchain_holder = SwapchainHolder::new(&physical_device, device.clone(), queue.clone(), surface.clone());
     let viewport = swapchain_holder.viewport();
@@ -245,7 +259,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create renderers");
+    let timer = Timer::new("create renderers");
 
     let mut deferred_renderer = DeferredRenderer::new(
         memory_allocator.clone(),
@@ -292,7 +306,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("load settings");
+    let timer = Timer::new("load settings");
 
     let mut input_system = InputSystem::new();
     let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
@@ -307,7 +321,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("create render targets");
+    let timer = Timer::new("create render targets");
 
     let mut screen_targets = swapchain_holder
         .get_swapchain_images()
@@ -333,7 +347,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("initialize interface");
+    let timer = Timer::new("initialize interface");
 
     let mut application = InterfaceSettings::load_or_default();
     let mut interface = korangar_interface::Interface::new(swapchain_holder.window_screen_size());
@@ -346,7 +360,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("initialize timer");
+    let timer = Timer::new("initialize timer");
 
     let mut game_timer = GameTimer::new();
 
@@ -354,7 +368,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("initialize camera");
+    let timer = Timer::new("initialize camera");
 
     #[cfg(feature = "debug")]
     let mut debug_camera = DebugCamera::new();
@@ -369,7 +383,7 @@ fn main() {
     timer.stop();
 
     #[cfg(feature = "debug")]
-    let timer = korangar_debug::Timer::new("initialize networking");
+    let timer = Timer::new("initialize networking");
 
     let client_info = load_client_info(&mut game_file_loader);
     let mut networking_system = NetworkingSystem::new();
@@ -465,10 +479,10 @@ fn main() {
             } => input_system.buffer_character(character),
             Event::MainEventsCleared => {
                 #[cfg(feature = "debug")]
-                let _measurement = korangar_debug::profiler_start_main_thread();
+                let _measurement = threads::Main::start();
 
                 #[cfg(feature = "debug")]
-                let timer_measuremen = korangar_debug::start_measurement("update timers");
+                let timer_measurement = Profiler::start_measurement("update timers");
 
                 input_system.update_delta();
 
@@ -478,7 +492,7 @@ fn main() {
                 let client_tick = game_timer.get_client_tick();
 
                 #[cfg(feature = "debug")]
-                timer_measuremen.stop();
+                timer_measurement.stop();
 
                 networking_system.keep_alive(delta_time, client_tick);
                 let network_events = networking_system.network_events();
@@ -496,7 +510,7 @@ fn main() {
                 );
 
                 #[cfg(feature = "debug")]
-                let picker_measuremen = korangar_debug::start_measurement("update picker target");
+                let picker_measurement = Profiler::start_measurement("update picker target");
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
                     if let Some(entity) = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
@@ -515,10 +529,10 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                picker_measuremen.stop();
+                picker_measurement.stop();
 
                 #[cfg(feature = "debug")]
-                let network_event_measuremen = korangar_debug::start_measurement("process network events");
+                let network_event_measurement = Profiler::start_measurement("process network events");
 
                 for event in network_events {
                     match event {
@@ -761,10 +775,10 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                network_event_measuremen.stop();
+                network_event_measurement.stop();
 
                 #[cfg(feature = "debug")]
-                let user_event_measuremen = korangar_debug::start_measurement("process user events");
+                let user_event_measurement = Profiler::start_measurement("process user events");
 
                 for event in user_events {
                     match event {
@@ -1094,21 +1108,21 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                user_event_measuremen.stop();
+                user_event_measurement.stop();
 
                 let buffer_fence = buffer_allocator.submit_load_buffer();
                 let texture_fence = texture_loader.submit_load_buffer();
                 let sprite_fence = sprite_loader.submit_load_buffer();
 
                 #[cfg(feature = "debug")]
-                let update_entities_measuremen = korangar_debug::start_measurement("update entities");
+                let update_entities_measurement = Profiler::start_measurement("update entities");
 
                 entities
                     .iter_mut()
                     .for_each(|entity| entity.update(&map, delta_time as f32, client_tick));
 
                 #[cfg(feature = "debug")]
-                update_entities_measuremen.stop();
+                update_entities_measurement.stop();
 
                 if !entities.is_empty() {
                     let player_position = entities[0].get_position();
@@ -1117,14 +1131,14 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                let update_cameras_measuremen = korangar_debug::start_measurement("update cameras");
+                let update_cameras_measurement = Profiler::start_measurement("update cameras");
 
                 start_camera.update(delta_time);
                 player_camera.update(delta_time);
                 directional_shadow_camera.update(day_timer);
 
                 #[cfg(feature = "debug")]
-                update_cameras_measuremen.stop();
+                update_cameras_measurement.stop();
 
                 particle_holder.update(delta_time as f32);
                 effect_holder.update(&entities, delta_time as f32);
@@ -1134,7 +1148,7 @@ fn main() {
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("re-create buffers");
+                    profile_block!("re-create buffers");
 
                     let viewport = swapchain_holder.recreate_swapchain();
 
@@ -1169,10 +1183,10 @@ fn main() {
 
                 if shadow_detail.consume_changed() {
                     #[cfg(feature = "debug")]
-                    korangar_debug::print_debug!("re-creating {}", "directional shadow targets".magenta());
+                    print_debug!("re-creating {}", "directional shadow targets".magenta());
 
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("re-create shadow maps");
+                    profile_block!("re-create shadow maps");
 
                     let new_shadow_detail = shadow_detail.get();
 
@@ -1192,7 +1206,7 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                let matrices_measuremen = korangar_debug::start_measurement("generate view and projection matrices");
+                let matrices_measurement = Profiler::start_measurement("generate view and projection matrices");
 
                 if entities.is_empty() {
                     start_camera.generate_view_projection(swapchain_holder.window_size());
@@ -1206,7 +1220,7 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                matrices_measuremen.stop();
+                matrices_measurement.stop();
 
                 let current_camera: &(dyn Camera + Send + Sync) = match entities.is_empty() {
                     #[cfg(feature = "debug")]
@@ -1217,7 +1231,7 @@ fn main() {
 
                 if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("wait for frame in current slot");
+                    profile_block!("wait for frame in current slot");
 
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
@@ -1225,7 +1239,7 @@ fn main() {
 
                 if let Some(mut fence) = buffer_fence {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("wait for buffers");
+                    profile_block!("wait for buffers");
 
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
@@ -1233,7 +1247,7 @@ fn main() {
 
                 if let Some(mut fence) = texture_fence {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("wait for textures");
+                    profile_block!("wait for textures");
 
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
@@ -1241,14 +1255,14 @@ fn main() {
 
                 if let Some(mut fence) = sprite_fence {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("wait for sprites");
+                    profile_block!("wait for sprites");
 
                     fence.wait(None).unwrap();
                     fence.cleanup_finished();
                 }
 
                 #[cfg(feature = "debug")]
-                let prepare_frame_measuremen = korangar_debug::start_measurement("prepare frame");
+                let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
 
                 #[cfg(feature = "debug")]
                 let render_settings = &*render_settings.get();
@@ -1266,12 +1280,12 @@ fn main() {
                 };
 
                 #[cfg(feature = "debug")]
-                prepare_frame_measuremen.stop();
+                prepare_frame_measurement.stop();
 
                 thread_pool.in_place_scope(|scope| {
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
-                        let _measurement = korangar_debug::profiler_start_picker_thread();
+                        let _measurement = threads::Picker::start();
 
                         let picker_target = &mut picker_targets[image_number];
 
@@ -1298,7 +1312,7 @@ fn main() {
 
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
-                        let _measurement = korangar_debug::profiler_start_shadow_thread();
+                        let _measurement = threads::Shadow::start();
 
                         let directional_shadow_target = &mut directional_shadow_targets[image_number];
 
@@ -1350,7 +1364,7 @@ fn main() {
 
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
-                        let _measurement = korangar_debug::profiler_start_deferred_thread();
+                        let _measurement = threads::Deferred::start();
 
                         screen_target.start();
 
@@ -1448,7 +1462,7 @@ fn main() {
 
                     if render_interface {
                         #[cfg(feature = "debug")]
-                        korangar_debug::profile_block!("render user interface");
+                        profile_block!("render user interface");
 
                         interface_target.start(window_size_u32, clear_interface);
 
@@ -1485,7 +1499,7 @@ fn main() {
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("render hovered entity status");
+                    profile_block!("render hovered entity status");
 
                     let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
@@ -1527,7 +1541,7 @@ fn main() {
 
                 if !entities.is_empty() {
                     #[cfg(feature = "debug")]
-                    korangar_debug::profile_block!("render player status");
+                    profile_block!("render player status");
 
                     entities[0].render_status(
                         screen_target,
@@ -1565,7 +1579,7 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                let finalize_frame_measuremen = korangar_debug::start_measurement("finalize frame");
+                let finalize_frame_measurement = Profiler::start_measurement("finalize frame");
 
                 let interface_future = interface_target
                     .state
@@ -1582,7 +1596,7 @@ fn main() {
                 screen_target.finish(swapchain_holder.get_swapchain(), combined_future, image_number);
 
                 #[cfg(feature = "debug")]
-                finalize_frame_measuremen.stop();
+                finalize_frame_measurement.stop();
             }
             _ignored => (),
         }

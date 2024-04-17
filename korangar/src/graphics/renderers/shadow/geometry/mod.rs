@@ -4,6 +4,8 @@ fragment_shader!("src/graphics/renderers/shadow/geometry/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::Matrix4;
+#[cfg(feature = "debug")]
+use korangar_debug::profiling::Profiler;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;
@@ -57,7 +59,7 @@ impl GeometryRenderer {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn bind_pipeline(&self, render_target: &mut <ShadowRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("update matrices buffer");
+        let measurement = Profiler::start_measurement("update matrices buffer");
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let buffer = self.matrices_buffer.allocate(Matrices {
@@ -69,7 +71,7 @@ impl GeometryRenderer {
         measurement.stop();
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("create persistent descriptor set");
+        let measurement = Profiler::start_measurement("create persistent descriptor set");
 
         let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [WriteDescriptorSet::buffer(
             0, buffer,
@@ -79,7 +81,7 @@ impl GeometryRenderer {
         measurement.stop();
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("create viewport");
+        let measurement = Profiler::start_measurement("create viewport");
 
         let dimensions = render_target.image.image().extent().map(|component| component as f32);
 
@@ -95,7 +97,7 @@ impl GeometryRenderer {
         measurement.stop();
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("bind pipeline");
+        let measurement = Profiler::start_measurement("bind pipeline");
 
         builder.bind_pipeline_graphics(self.pipeline.clone()).unwrap();
 
@@ -103,7 +105,7 @@ impl GeometryRenderer {
         measurement.stop();
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("set viewport");
+        let measurement = Profiler::start_measurement("set viewport");
 
         builder.set_viewport(0, std::iter::once(viewport).collect()).unwrap();
 
@@ -111,7 +113,7 @@ impl GeometryRenderer {
         measurement.stop();
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("bind descriptor set");
+        let measurement = Profiler::start_measurement("bind descriptor set");
 
         builder
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, set_id, set)
@@ -142,7 +144,7 @@ impl GeometryRenderer {
         const TEXTURE_COUNT: usize = 30;
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("create samplers");
+        let measurement = Profiler::start_measurement("create samplers");
 
         let texture_count = textures.len();
         let mut samplers: Vec<(Arc<ImageView>, Arc<Sampler>)> = textures
@@ -159,7 +161,7 @@ impl GeometryRenderer {
         measurement.stop();
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("create persistent descriptor set");
+        let measurement = Profiler::start_measurement("create persistent descriptor set");
 
         let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 1, [
             WriteDescriptorSet::image_view_sampler_array(0, 0, samplers),
@@ -174,12 +176,12 @@ impl GeometryRenderer {
         };
 
         #[cfg(feature = "debug")]
-        let measurement = korangar_debug::start_measurement("append commands");
+        let measurement = Profiler::start_measurement("append commands");
 
         let builder = render_target.state.get_builder();
 
         #[cfg(feature = "debug")]
-        let inner_measurement = korangar_debug::start_measurement("append commands");
+        let inner_measurement = Profiler::start_measurement("append commands");
 
         builder
             .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
@@ -189,7 +191,7 @@ impl GeometryRenderer {
         inner_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let inner_measurement = korangar_debug::start_measurement("push constants");
+        let inner_measurement = Profiler::start_measurement("push constants");
 
         builder.push_constants(layout, 0, constants).unwrap();
 
@@ -197,7 +199,7 @@ impl GeometryRenderer {
         inner_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let inner_measurement = korangar_debug::start_measurement("bind vertex buffer");
+        let inner_measurement = Profiler::start_measurement("bind vertex buffer");
 
         builder.bind_vertex_buffers(0, vertex_buffer).unwrap();
 
@@ -205,7 +207,7 @@ impl GeometryRenderer {
         inner_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let inner_measurement = korangar_debug::start_measurement("draw call");
+        let inner_measurement = Profiler::start_measurement("draw call");
 
         builder.draw(vertex_count as u32, 1, 0, 0).unwrap();
 

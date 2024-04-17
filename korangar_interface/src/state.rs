@@ -14,15 +14,10 @@ pub enum ValueState<T> {
 
 /// The version of the current value inside a [`TrackedState`]. This is used to
 /// update [`Remote`]s when the value changes.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Version(usize);
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Version(usize);
 
 impl Version {
-    /// Get a [`Version`] from a [`usize`].
-    pub fn from_raw(version: usize) -> Self {
-        Self(version)
-    }
-
     /// Bump the version by 1.
     fn bump(&mut self) {
         self.0 = self.0.wrapping_add(1);
@@ -39,9 +34,6 @@ pub trait TrackedState<Value>: Clone {
 
     /// Get an immutable reference to the inner value.
     fn get(&self) -> Ref<'_, Value>;
-
-    /// Get the current [`Version`].
-    fn get_version(&self) -> Version;
 
     /// Work on a mutable reference of the inner value. The provided closure has
     /// to report back whether or not the value inside was mutated. If any state
@@ -105,6 +97,10 @@ impl<Value> PlainTrackedState<Value> {
         Self(Rc::new(RefCell::new(InnerState::new(value))))
     }
 
+    fn get_version(&self) -> Version {
+        self.0.borrow().version
+    }
+
     pub fn mapped<As, F>(&self, mapping: F) -> MappedTrackedState<Value, As, F>
     where
         F: Fn(&Value) -> &As,
@@ -156,10 +152,6 @@ where
         Ref::map(self.0.borrow(), |inner| &inner.value)
     }
 
-    fn get_version(&self) -> Version {
-        self.0.borrow().version
-    }
-
     fn with_mut<Closure, Return>(&mut self, closure: Closure) -> Return
     where
         Closure: FnOnce(&mut Value) -> ValueState<Return>,
@@ -198,6 +190,15 @@ where
     marker: PhantomData<As>,
 }
 
+impl<Value, As, F> MappedTrackedState<Value, As, F>
+where
+    F: Fn(&Value) -> &As,
+{
+    fn get_version(&self) -> Version {
+        self.state.get_version()
+    }
+}
+
 impl<Value, As, F> Clone for MappedTrackedState<Value, As, F>
 where
     F: Clone + Fn(&Value) -> &As,
@@ -234,10 +235,6 @@ where
 
     fn get(&self) -> Ref<'_, As> {
         Ref::map(self.state.get(), &self.mapping)
-    }
-
-    fn get_version(&self) -> Version {
-        self.state.get_version()
     }
 
     fn with_mut<Closure, Return>(&mut self, closure: Closure) -> Return

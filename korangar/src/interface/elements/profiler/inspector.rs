@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use derive_new::new;
-use korangar_debug::Measurement;
+use korangar_debug::profiling::Measurement;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};

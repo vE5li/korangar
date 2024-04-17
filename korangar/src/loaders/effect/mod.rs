@@ -4,7 +4,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
 #[cfg(feature = "debug")]
-use korangar_debug::Colorize;
+use korangar_debug::logging::{Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_networking::EntityId;
@@ -249,7 +249,7 @@ impl EffectLoader {
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Effect>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!("load effect from {}", path.magenta()));
+        let timer = Timer::new_dynamic(format!("load effect from {}", path.magenta()));
 
         let bytes = game_file_loader.get(&format!("data\\texture\\effect\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);

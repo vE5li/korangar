@@ -34,14 +34,17 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3, Zero};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use korangar_interface::application::{Application, FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateVec};
 use korangar_interface::Interface;
 use ragnarok_networking::{SkillId, SkillType, UnitId};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
-use vulkano::instance::debug::DebugUtilsMessengerCallback;
 #[cfg(feature = "debug")]
-use vulkano::instance::debug::{DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessenger, DebugUtilsMessengerCreateInfo};
+use vulkano::instance::debug::{
+    DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessenger, DebugUtilsMessengerCallback, DebugUtilsMessengerCreateInfo,
+};
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo, InstanceExtensions};
 use vulkano::swapchain::Surface;
 use vulkano::sync::{now, GpuFuture};
@@ -110,7 +113,7 @@ fn main() {
     .ok();
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("created {}instance{}", korangar_debug::MAGENTA, korangar_debug::NONE);
+    korangar_debug::print_debug!("created {}", "instance".magenta());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -140,7 +143,7 @@ fn main() {
     let surface = Surface::from_window(instance.clone(), window).unwrap();
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("created {}window{}", korangar_debug::MAGENTA, korangar_debug::NONE);
+    korangar_debug::print_debug!("created {}", "window".magenta());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -176,18 +179,12 @@ fn main() {
     .expect("failed to create device");
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!("created {}vulkan device{}", korangar_debug::MAGENTA, korangar_debug::NONE);
+    korangar_debug::print_debug!("created {}", "vulkan device".magenta());
 
     let queue = queues.next().unwrap();
 
     #[cfg(feature = "debug")]
-    korangar_debug::print_debug!(
-        "received {}queue{} from {}device{}",
-        korangar_debug::MAGENTA,
-        korangar_debug::NONE,
-        korangar_debug::MAGENTA,
-        korangar_debug::NONE
-    );
+    korangar_debug::print_debug!("received {} from {}", "queue".magenta(), "device".magenta());
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -1172,11 +1169,7 @@ fn main() {
 
                 if shadow_detail.consume_changed() {
                     #[cfg(feature = "debug")]
-                    korangar_debug::print_debug!(
-                        "re-creating {}directional shadow targets{}",
-                        korangar_debug::MAGENTA,
-                        korangar_debug::NONE
-                    );
+                    korangar_debug::print_debug!("re-creating {}", "directional shadow targets".magenta());
 
                     #[cfg(feature = "debug")]
                     korangar_debug::profile_block!("re-create shadow maps");

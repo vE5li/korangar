@@ -109,7 +109,7 @@ impl ScreenPosition {
 
 impl ElementDisplay for ScreenPosition {
     fn display(&self) -> String {
-        format!("^FFBB00↦^000000{} ^FFBB00↧^000000{}", self.left.display(), self.top.display(),)
+        format!("^FFBB00↦^000000{} ^FFBB00↧^000000{}", self.left.display(), self.top.display())
     }
 }
 

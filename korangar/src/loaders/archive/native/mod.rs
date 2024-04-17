@@ -9,6 +9,8 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use ragnarok_bytes::{ByteStream, FixedByteSize, FromBytes};
 use yazi::{decompress, Format};
 
@@ -34,12 +36,7 @@ const UNPACKED_SIZE_OF_MAGIC_STRING: usize = MAGIC_BYTES.len();
 impl Archive for NativeArchive {
     fn from_path(path: &Path) -> Self {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!(
-            "load game data from {}{}{}",
-            korangar_debug::MAGENTA,
-            path.display(),
-            korangar_debug::NONE
-        ));
+        let timer = korangar_debug::Timer::new_dynamic(format!("load game data from {}", path.display().magenta()));
         let mut file = File::open(path).unwrap();
 
         let mut magic_number_buffer = [0u8; UNPACKED_SIZE_OF_MAGIC_STRING];

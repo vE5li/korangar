@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
 use derive_new::new;
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
@@ -19,13 +21,11 @@ pub struct WindowCache {
 }
 
 impl WindowCache {
+    const FILE_NAME: &'static str = "client/window_cache.ron";
+
     fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "loading window cache from {}filename{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("loading window cache from {}", Self::FILE_NAME.magenta());
 
         std::fs::read_to_string("client/window_cache.ron")
             .ok()
@@ -35,14 +35,10 @@ impl WindowCache {
 
     fn save(&self) {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "saving window cache to {}filename{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("saving window cache to {}", Self::FILE_NAME.magenta());
 
         let data = ron::ser::to_string_pretty(&self.entries, PrettyConfig::new()).unwrap();
-        std::fs::write("client/window_cache.ron", data).expect("unable to write file");
+        std::fs::write(Self::FILE_NAME, data).expect("unable to write file");
     }
 }
 
@@ -51,9 +47,8 @@ impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowC
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
             korangar_debug::print_debug!(
-                "failed to load window cache from {}filename{}. creating empty cache",
-                korangar_debug::MAGENTA,
-                korangar_debug::NONE
+                "failed to load window cache from {}. creating empty cache",
+                Self::FILE_NAME.magenta()
             );
 
             Default::default()

@@ -1,8 +1,7 @@
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use korangar_interface::elements::PrototypeElement;
 use serde::{Deserialize, Serialize};
-
-const FILENAME: &str = "client/game_archives.ron";
-const DEFAULT_FILES: &[&str] = &["data.grf", "rdata.grf", "archive/"];
 
 #[derive(Serialize, Deserialize, PrototypeElement)]
 pub(super) struct GameArchiveList {
@@ -12,32 +11,29 @@ pub(super) struct GameArchiveList {
 impl Default for GameArchiveList {
     fn default() -> Self {
         Self {
-            archives: DEFAULT_FILES.iter().map(ToString::to_string).collect(),
+            archives: Self::DEFAULT_FILES.iter().map(ToString::to_string).collect(),
         }
     }
 }
 
 impl GameArchiveList {
+    const DEFAULT_FILES: &'static [&'static str] = &["data.grf", "rdata.grf", "archive/"];
+    const FILE_NAME: &'static str = "client/game_archives.ron";
+
     pub(super) fn load() -> Self {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "loading game archive list from {}{FILENAME}{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("loading game archive list from {}", Self::FILE_NAME.magenta());
 
-        std::fs::read_to_string(FILENAME)
+        std::fs::read_to_string(Self::FILE_NAME)
             .ok()
             .and_then(|data| ron::from_str(&data).ok())
             .map(|archives| Self { archives })
             .unwrap_or_else(|| {
                 #[cfg(feature = "debug")]
                 korangar_debug::print_debug!(
-                    "[{}error{}] failed to load game archive list from {}{FILENAME}{}; trying with default",
-                    korangar_debug::RED,
-                    korangar_debug::NONE,
-                    korangar_debug::MAGENTA,
-                    korangar_debug::NONE
+                    "[{}] failed to load game archive list from {}; trying with default",
+                    "warning".yellow(),
+                    Self::FILE_NAME.magenta(),
                 );
 
                 GameArchiveList::default()

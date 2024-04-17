@@ -7,6 +7,9 @@ use core::panic;
 use std::path::Path;
 use std::u8;
 
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
+
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
 use super::archive::native::{NativeArchive, NativeArchiveBuilder};
@@ -112,11 +115,9 @@ impl GameFileLoader {
                     #[cfg(feature = "debug")]
                     {
                         korangar_debug::print_debug!(
-                            "[{}warning{}] failed to extract file {}{file_name}{} from the grf: {:?}",
-                            korangar_debug::YELLOW,
-                            korangar_debug::NONE,
-                            korangar_debug::MAGENTA,
-                            korangar_debug::NONE,
+                            "[{}] failed to extract file {} from the grf: {:?}",
+                            "warning".yellow(),
+                            file_name.magenta(),
                             _error
                         );
                         failed_count += 1;
@@ -136,14 +137,7 @@ impl GameFileLoader {
                 Err(_error) => {
                     #[cfg(feature = "debug")]
                     {
-                        korangar_debug::print_debug!(
-                            "[{}warning{}] error upcasting {}{file_name}{}: {:?}",
-                            korangar_debug::YELLOW,
-                            korangar_debug::NONE,
-                            korangar_debug::MAGENTA,
-                            korangar_debug::NONE,
-                            _error,
-                        );
+                        korangar_debug::print_debug!("[{}] error upcasting {}: {:?}", "warning".yellow(), file_name.magenta(), _error,);
                         failed_count += 1;
                     }
                 }
@@ -152,11 +146,9 @@ impl GameFileLoader {
 
         #[cfg(feature = "debug")]
         korangar_debug::print_debug!(
-            "converted a total of {}{total_count}{} files of which {}{failed_count}{} failed.",
-            korangar_debug::YELLOW,
-            korangar_debug::NONE,
-            korangar_debug::RED,
-            korangar_debug::NONE
+            "converted a total of {} files of which {} failed.",
+            total_count.yellow(),
+            failed_count.red(),
         );
 
         lua_archive.save();

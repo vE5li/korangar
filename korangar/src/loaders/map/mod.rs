@@ -23,15 +23,13 @@ const MAP_OFFSET: f32 = 5.0;
 
 #[cfg(feature = "debug")]
 fn assert_byte_stream_empty<META>(mut byte_stream: ByteStream<META>, file_name: &str) {
+    use korangar_debug::Colorize;
+
     if byte_stream.is_empty() {
         korangar_debug::print_debug!(
-            "incomplete read on file {}{}{}; {}{}{} bytes remaining",
-            korangar_debug::MAGENTA,
-            file_name,
-            korangar_debug::NONE,
-            korangar_debug::YELLOW,
-            byte_stream.remaining_bytes().len(),
-            korangar_debug::NONE
+            "incomplete read on file {}; {} bytes remaining",
+            file_name.magenta(),
+            byte_stream.remaining_bytes().len().yellow(),
         );
     }
 }

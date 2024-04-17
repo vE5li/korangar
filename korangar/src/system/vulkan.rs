@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector3};
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{DeviceExtensions, QueueFlags};
 #[cfg(feature = "debug")]
@@ -11,14 +13,14 @@ use vulkano::VulkanLibrary;
 
 pub fn get_layers(library: &VulkanLibrary) -> Vec<String> {
     let available_layers: Vec<_> = library.layer_properties().unwrap().collect();
-    let desired_layers = vec![/*"VK_LAYER_KHRONOS_validation".to_owned()*/];
+    let desired_layers: Vec<String> = vec![/*"VK_LAYER_KHRONOS_validation".to_owned()*/];
 
     #[cfg(feature = "debug")]
     let timer = korangar_debug::Timer::new("available layers");
 
     #[cfg(feature = "debug")]
     for layer in &available_layers {
-        korangar_debug::print_debug!("{}{}{}", korangar_debug::MAGENTA, layer.name(), korangar_debug::NONE);
+        korangar_debug::print_debug!("{}", layer.name().magenta());
     }
 
     #[cfg(feature = "debug")]
@@ -26,7 +28,7 @@ pub fn get_layers(library: &VulkanLibrary) -> Vec<String> {
 
     #[cfg(feature = "debug")]
     for layer in &desired_layers {
-        korangar_debug::print_debug!("{}{}{}", korangar_debug::MAGENTA, layer, korangar_debug::NONE);
+        korangar_debug::print_debug!("{}", layer.magenta());
     }
 
     #[cfg(feature = "debug")]
@@ -87,13 +89,13 @@ pub fn vulkan_message_callback(
     callback_data: DebugUtilsMessengerCallbackData<'_>,
 ) {
     let severity = if message_severity.intersects(DebugUtilsMessageSeverity::ERROR) {
-        "error"
+        "error".red()
     } else if message_severity.intersects(DebugUtilsMessageSeverity::WARNING) {
-        "warning"
+        "warning".yellow()
     } else if message_severity.intersects(DebugUtilsMessageSeverity::INFO) {
-        "information"
+        "information".cyan()
     } else if message_severity.intersects(DebugUtilsMessageSeverity::VERBOSE) {
-        "verbose"
+        "verbose".magenta()
     } else {
         panic!("no-impl");
     };
@@ -109,16 +111,10 @@ pub fn vulkan_message_callback(
     };
 
     korangar_debug::print_debug!(
-        "{}{}{} [{}{}{}] [{}{}{}]: {}",
-        korangar_debug::MAGENTA,
-        callback_data.message_id_name.unwrap_or("unknown"),
-        korangar_debug::NONE,
-        korangar_debug::YELLOW,
-        message_type,
-        korangar_debug::NONE,
-        korangar_debug::RED,
+        "{} [{}] [{}]: {}",
+        callback_data.message_id_name.unwrap_or("unknown").magenta(),
+        message_type.yellow(),
         severity,
-        korangar_debug::NONE,
         callback_data.message
     );
 }

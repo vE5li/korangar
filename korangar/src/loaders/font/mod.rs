@@ -77,7 +77,7 @@ impl ArrayType for Scaling {
 
 impl ElementDisplay for Scaling {
     fn display(&self) -> String {
-        format!("^FFBB00a^000000{}", self.0.display(),)
+        format!("^FFBB00a^000000{}", self.0.display())
     }
 }
 

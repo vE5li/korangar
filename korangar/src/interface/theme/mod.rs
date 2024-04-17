@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::event::{Nothing, Render, Resolve};
@@ -1202,12 +1204,7 @@ impl InterfaceTheme {
     {
         Self::load(theme_file).unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            korangar_debug::print_debug!(
-                "failed to load theme from file {}{}{}",
-                korangar_debug::MAGENTA,
-                theme_file,
-                korangar_debug::NONE
-            );
+            korangar_debug::print_debug!("failed to load theme from file {}", theme_file.magenta());
 
             ThemeDefault::<T>::default()
         })
@@ -1215,12 +1212,7 @@ impl InterfaceTheme {
 
     fn load(theme_file: &str) -> Option<Self> {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "loading theme from {}{}{}",
-            korangar_debug::MAGENTA,
-            theme_file,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("loading theme from {}", theme_file.magenta());
 
         std::fs::read_to_string(theme_file).ok().and_then(|data| ron::from_str(&data).ok())
     }
@@ -1234,12 +1226,7 @@ impl InterfaceTheme {
 
     pub fn save(&self, theme_file: &str) {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "saving theme to {}{}{}",
-            korangar_debug::MAGENTA,
-            theme_file,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("saving theme to {}", theme_file.magenta());
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(theme_file, data).expect("unable to write file");
@@ -1250,12 +1237,7 @@ impl GameTheme {
     pub fn new(theme_file: &str) -> Self {
         Self::load(theme_file).unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            korangar_debug::print_debug!(
-                "failed to load theme from file {}{}{}",
-                korangar_debug::MAGENTA,
-                theme_file,
-                korangar_debug::NONE
-            );
+            korangar_debug::print_debug!("failed to load theme from file {}", theme_file.magenta());
 
             Default::default()
         })
@@ -1263,12 +1245,7 @@ impl GameTheme {
 
     fn load(theme_file: &str) -> Option<Self> {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "loading theme from {}{}{}",
-            korangar_debug::MAGENTA,
-            theme_file,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("loading theme from {}", theme_file.magenta());
 
         std::fs::read_to_string(theme_file).ok().and_then(|data| ron::from_str(&data).ok())
     }
@@ -1279,12 +1256,7 @@ impl GameTheme {
 
     pub fn save(&self, theme_file: &str) {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "saving theme to {}{}{}",
-            korangar_debug::MAGENTA,
-            theme_file,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("saving theme to {}", theme_file.magenta());
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(theme_file, data).expect("unable to write file");

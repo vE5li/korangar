@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use derive_new::new;
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
@@ -157,11 +159,7 @@ pub struct SpriteLoader {
 impl SpriteLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!(
-            "load sprite from {}{path}{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        ));
+        let timer = korangar_debug::Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
         let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);

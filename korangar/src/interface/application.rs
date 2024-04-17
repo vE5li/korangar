@@ -1,5 +1,7 @@
 use std::marker::ConstParamTy;
 
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use korangar_interface::application::{Application, ScalingTrait};
 use korangar_interface::dimension_bound;
 use korangar_interface::elements::{Container, ElementCell, ElementWrap, PickList, PrototypeElement, Text};
@@ -199,14 +201,12 @@ impl Default for InterfaceSettingsStorage {
 }
 
 impl InterfaceSettingsStorage {
+    const FILE_NAME: &'static str = "client/interface_settings.ron";
+
     pub fn load_or_default() -> Self {
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
-            korangar_debug::print_debug!(
-                "failed to load interface settings from {}filename{}",
-                korangar_debug::MAGENTA,
-                korangar_debug::NONE
-            );
+            korangar_debug::print_debug!("failed to load interface settings from {}", Self::FILE_NAME.magenta());
 
             Default::default()
         })
@@ -214,27 +214,19 @@ impl InterfaceSettingsStorage {
 
     pub fn load() -> Option<Self> {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "loading interface settings from {}filename{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("loading interface settings from {}", Self::FILE_NAME.magenta());
 
-        std::fs::read_to_string("client/interface_settings.ron")
+        std::fs::read_to_string(Self::FILE_NAME)
             .ok()
             .and_then(|data| ron::from_str(&data).ok())
     }
 
     pub fn save(&self) {
         #[cfg(feature = "debug")]
-        korangar_debug::print_debug!(
-            "saving interface settings to {}filename{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        );
+        korangar_debug::print_debug!("saving interface settings to {}", Self::FILE_NAME.magenta());
 
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
-        std::fs::write("client/interface_settings.ron", data).expect("unable to write file");
+        std::fs::write(Self::FILE_NAME, data).expect("unable to write file");
     }
 }
 

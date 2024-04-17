@@ -84,12 +84,9 @@ impl Profiler {
                 .join(", ");
 
             print_debug!(
-                "[{}warning{}] active measurements at the start of the frame; measurement names: {}{}{}",
-                YELLOW,
-                NONE,
-                MAGENTA,
-                measurement_names,
-                NONE,
+                "[{}] active measurements at the start of the frame; measurement names: {}",
+                "warning".yellow(),
+                measurement_names.magenta(),
             );
         }
 
@@ -136,12 +133,9 @@ impl Profiler {
     fn stop_measurement(&mut self, name: &'static str) {
         let Some(top_measurement) = self.active_measurements.last().copied() else {
             print_debug!(
-                "[{}warning{}] tried to stop measurement {}{}{} but no measurement is active",
-                YELLOW,
-                NONE,
-                MAGENTA,
-                name,
-                NONE,
+                "[{}] tried to stop measurement {} but no measurement is active",
+                "warning".yellow(),
+                name.magenta(),
             );
             return;
         };
@@ -151,15 +145,10 @@ impl Profiler {
         // Assert that the names match to emit a warning when something went wrong.
         if !std::ptr::addr_eq(name, measurement.name) {
             print_debug!(
-                "[{}warning{}] active measurement mismatch; exepcted {}{}{} but got {}{}{}",
-                YELLOW,
-                NONE,
-                MAGENTA,
-                measurement.name,
-                NONE,
-                MAGENTA,
-                name,
-                NONE
+                "[{}] active measurement mismatch; exepcted {} but got {}",
+                "warning".yellow(),
+                measurement.name.magenta(),
+                name.magenta(),
             );
         }
 

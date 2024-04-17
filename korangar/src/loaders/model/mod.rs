@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use cgmath::{Matrix3, Matrix4, Quaternion, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use korangar_interface::application::Application;
 use korangar_interface::elements::{ElementCell, PrototypeElement};
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
@@ -323,11 +325,7 @@ impl ModelLoader {
         reverse_order: bool,
     ) -> Result<Arc<Model>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!(
-            "load rsm model from {}{model_file}{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        ));
+        let timer = korangar_debug::Timer::new_dynamic(format!("load rsm model from {}", model_file.magenta()));
 
         let bytes = game_file_loader.get(&format!("data\\model\\{model_file}"))?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);

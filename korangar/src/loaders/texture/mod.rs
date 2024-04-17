@@ -5,6 +5,8 @@ use std::sync::Arc;
 use derive_new::new;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat, Rgba};
+#[cfg(feature = "debug")]
+use korangar_debug::Colorize;
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
@@ -34,11 +36,7 @@ pub struct TextureLoader {
 impl TextureLoader {
     fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
         #[cfg(feature = "debug")]
-        let timer = korangar_debug::Timer::new_dynamic(format!(
-            "load texture from {}{path}{}",
-            korangar_debug::MAGENTA,
-            korangar_debug::NONE
-        ));
+        let timer = korangar_debug::Timer::new_dynamic(format!("load texture from {}", path.magenta()));
 
         let image_format = match &path[path.len() - 4..] {
             ".png" => ImageFormat::Png,

@@ -24,3 +24,7 @@ I created a [Discord server](https://discord.gg/2CqRZsvKja) where I regularly po
 
 ### Contributing
 If you want to contribute to this project, please read [this page](https://github.com/vE5li/korangar/wiki/Contributing).
+
+### Project structure
+
+#### Note: All the `ragnarok-*` crates are meant to be independent from Korangar and have no dependencies to it, meaning they can be used for other Ragnarok Online related projects.

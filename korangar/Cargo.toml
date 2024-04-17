@@ -39,5 +39,5 @@ yazi = "0.1.4"
 [features]
 patched_as_folder = []
 debug = ["korangar_debug", "ragnarok_networking/debug", "random_color"]
-unicode = ["debug"]
+unicode = ["korangar_debug/unicode"]
 plain = ["debug"]

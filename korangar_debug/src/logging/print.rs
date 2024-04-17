@@ -1,11 +1,12 @@
-use super::*;
+use crate::logging::stack::{get_message_count, increment_message_count, message_offset, stack_size};
+use crate::logging::symbols::{ARROW, NEWLINE};
 
 pub macro print_debug {
     ($format:expr) => (print_indented(String::from($format), true)),
     ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), true)),
 }
 
-pub macro print_debug_prefix {
+pub(crate) macro print_debug_prefix {
     ($format:expr) => (print_indented(String::from($format), false)),
     ($format:expr, $($arguments:tt)*) => (print_indented(format!($format, $($arguments)*), false)),
 }

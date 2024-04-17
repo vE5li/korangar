@@ -1,9 +1,10 @@
 use std::time::SystemTime;
 
-use super::colors::*;
-use super::print::*;
-use super::stack::*;
-use super::symbols::*;
+use super::stack::{get_message_count, increment_stack, stack_size};
+use crate::logging::print::print_debug_prefix;
+use crate::logging::stack::decrement_stack;
+use crate::logging::symbols::ARROW;
+use crate::{print_debug, Colorize};
 
 pub struct Timer {
     start_time: SystemTime,

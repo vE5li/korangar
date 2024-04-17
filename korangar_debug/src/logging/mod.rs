@@ -5,8 +5,6 @@ mod symbols;
 mod print;
 mod timer;
 
-pub use self::colors::*;
-pub use self::print::*;
-pub use self::stack::*;
-pub use self::symbols::*;
-pub use self::timer::*;
+pub use self::colors::{Colorize, Colorized};
+pub use self::print::{print_debug, print_indented};
+pub use self::timer::Timer;

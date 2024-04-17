@@ -1559,7 +1559,7 @@ fn main() {
                         &deferred_renderer,
                         input_system.get_mouse_position(),
                         input_system.get_mouse_mode().grabbed(),
-                        Color::rgb_u8(200, 100, 50),
+                        application.get_game_theme().cursor.color.get(),
                         &application,
                     );
                 }

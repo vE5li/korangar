@@ -163,13 +163,11 @@ macro_rules! create_profiler_threads {
             use std::sync::MutexGuard;
 
             mod locks {
-                #![allow(non_upper_case_globals)]
-
                 use std::sync::{LazyLock, Mutex};
-
                 use $crate::profiling::Profiler;
 
                 $(
+                    #[allow(non_upper_case_globals)]
                     pub(super) static mut $thread: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
                 )*
             }
@@ -195,7 +193,7 @@ macro_rules! create_profiler_threads {
                     use $crate::profiling::Profiler;
 
                     /// Start the frame.
-                    pub fn start() -> ActiveMeasurement {
+                    pub fn start_frame() -> ActiveMeasurement {
                         let profiler = unsafe { &super::locks::$thread };
                         let measurement = profiler.lock().unwrap().start_frame();
                         Profiler::set_active(profiler);

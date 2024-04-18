@@ -96,7 +96,7 @@ fn main() {
 
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
-    let _measurement = threads::Main::start();
+    let _measurement = threads::Main::start_frame();
 
     #[cfg(feature = "debug")]
     let timer = Timer::new("create device");
@@ -479,7 +479,7 @@ fn main() {
             } => input_system.buffer_character(character),
             Event::MainEventsCleared => {
                 #[cfg(feature = "debug")]
-                let _measurement = threads::Main::start();
+                let _measurement = threads::Main::start_frame();
 
                 #[cfg(feature = "debug")]
                 let timer_measurement = Profiler::start_measurement("update timers");
@@ -1285,7 +1285,7 @@ fn main() {
                 thread_pool.in_place_scope(|scope| {
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
-                        let _measurement = threads::Picker::start();
+                        let _measurement = threads::Picker::start_frame();
 
                         let picker_target = &mut picker_targets[image_number];
 
@@ -1312,7 +1312,7 @@ fn main() {
 
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
-                        let _measurement = threads::Shadow::start();
+                        let _measurement = threads::Shadow::start_frame();
 
                         let directional_shadow_target = &mut directional_shadow_targets[image_number];
 
@@ -1364,7 +1364,7 @@ fn main() {
 
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
-                        let _measurement = threads::Deferred::start();
+                        let _measurement = threads::Deferred::start_frame();
 
                         screen_target.start();
 

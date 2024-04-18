@@ -99,7 +99,7 @@ impl From<PickerTarget> for u32 {
 
 #[cfg(test)]
 #[allow(clippy::unusual_byte_groupings)]
-mod test {
+mod encoding {
     use ragnarok_networking::EntityId;
 
     use crate::graphics::PickerTarget;

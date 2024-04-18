@@ -37,3 +37,45 @@ where
         Ok(data)
     }
 }
+
+#[cfg(test)]
+mod to_n_bytes {
+    use super::ToBytes;
+    use crate::ToBytesExt;
+
+    struct Test;
+
+    const TEST_BYTE_SIZE: usize = 4;
+
+    impl ToBytes for Test {
+        fn to_bytes(&self) -> crate::ConversionResult<Vec<u8>> {
+            Ok(vec![9; TEST_BYTE_SIZE])
+        }
+    }
+
+    #[test]
+    fn data_saturated() {
+        let result = Test.to_n_bytes(TEST_BYTE_SIZE);
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), vec![9; TEST_BYTE_SIZE]);
+    }
+
+    #[test]
+    fn data_smaller() {
+        let result = Test.to_n_bytes(TEST_BYTE_SIZE * 2);
+
+        assert!(result.is_ok());
+
+        let data = result.unwrap();
+        assert_eq!(&data[..TEST_BYTE_SIZE], vec![9; TEST_BYTE_SIZE]);
+        assert_eq!(&data[TEST_BYTE_SIZE..], vec![0; TEST_BYTE_SIZE]);
+    }
+
+    #[test]
+    fn data_bigger() {
+        let result = Test.to_n_bytes(TEST_BYTE_SIZE / 2);
+
+        assert!(result.is_err());
+    }
+}

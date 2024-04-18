@@ -2,11 +2,14 @@ use std::any::TypeId;
 
 use crate::{ConversionError, ConversionErrorType, ConversionResult};
 
+/// Saved state of a [`ByteStream`] that can be restored.
+#[derive(Debug, PartialEq, Eq)]
 pub struct SavePoint {
     offset: usize,
     limit: usize,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct TemporaryLimit {
     frame_limit: usize,
     old_limit: usize,
@@ -152,5 +155,178 @@ where
         let data = self.data[self.offset..self.limit].to_vec();
         self.offset = self.limit;
         data
+    }
+}
+
+#[cfg(test)]
+mod save_point {
+    use crate::ByteStream;
+
+    const TEST_BYTE_SIZE: usize = 10;
+
+    #[test]
+    fn restore() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+
+        let save_point = byte_stream.create_save_point();
+
+        assert_eq!(byte_stream.offset, 0);
+        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE);
+
+        byte_stream.offset = TEST_BYTE_SIZE / 2;
+        byte_stream.limit = TEST_BYTE_SIZE / 2;
+
+        assert_eq!(byte_stream.offset, TEST_BYTE_SIZE / 2);
+        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE / 2);
+
+        byte_stream.restore_save_point(save_point);
+
+        assert_eq!(byte_stream.offset, 0);
+        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE);
+    }
+}
+
+#[cfg(test)]
+mod temporary_limit {
+    use crate::stream::TemporaryLimit;
+    use crate::ByteStream;
+
+    const TEST_BASE_OFFSET: usize = 1;
+    const TEST_BYTE_SIZE: usize = 10;
+
+    #[test]
+    fn install() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        byte_stream.offset = TEST_BASE_OFFSET;
+        let result = byte_stream.install_limit::<()>(TEST_BYTE_SIZE / 2);
+
+        assert_eq!(byte_stream.limit, TEST_BASE_OFFSET + TEST_BYTE_SIZE / 2);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), TemporaryLimit {
+            frame_limit: TEST_BASE_OFFSET + TEST_BYTE_SIZE / 2,
+            old_limit: TEST_BYTE_SIZE
+        });
+    }
+
+    #[test]
+    fn install_too_big() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        byte_stream.offset = TEST_BASE_OFFSET;
+        let result = byte_stream.install_limit::<()>(TEST_BYTE_SIZE * 2);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn uninstall() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let temporary_limit = byte_stream.install_limit::<()>(TEST_BYTE_SIZE / 2).unwrap();
+        byte_stream.uninstall_limit(temporary_limit);
+
+        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE);
+        assert_eq!(byte_stream.offset, TEST_BYTE_SIZE / 2);
+    }
+}
+
+#[cfg(test)]
+mod metadata {
+    use crate::ByteStream;
+
+    #[test]
+    fn get_metadata() {
+        let byte_stream = ByteStream::<i32>::with_metadata(&[0; 1], 9);
+
+        assert!(byte_stream.get_metadata::<(), i32>().is_ok());
+        assert!(byte_stream.get_metadata::<(), u32>().is_err());
+    }
+
+    #[test]
+    fn get_metadata_mut() {
+        let mut byte_stream = ByteStream::<i32>::with_metadata(&[0; 1], 9);
+
+        assert!(byte_stream.get_metadata_mut::<(), i32>().is_ok());
+        assert!(byte_stream.get_metadata_mut::<(), u32>().is_err());
+    }
+
+    #[test]
+    fn into_metadata() {
+        let byte_stream = ByteStream::<i32>::with_metadata(&[0; 1], 9);
+
+        assert_eq!(byte_stream.into_metadata(), 9);
+    }
+}
+
+#[cfg(test)]
+mod byte {
+    use std::assert_matches::assert_matches;
+
+    use crate::ByteStream;
+
+    #[test]
+    fn under_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 1]);
+
+        assert_matches!(byte_stream.byte::<()>(), Ok(9));
+    }
+
+    #[test]
+    fn over_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 1]);
+
+        assert!(byte_stream.byte::<()>().is_ok());
+        assert!(byte_stream.byte::<()>().is_err());
+    }
+}
+
+#[cfg(test)]
+mod slice {
+    use std::assert_matches::assert_matches;
+
+    use crate::ByteStream;
+
+    #[test]
+    fn smaller_than_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+
+        assert_matches!(byte_stream.slice::<()>(3), Ok(&[9, 9, 9]));
+        assert_eq!(byte_stream.remaining_bytes().as_slice(), &[9]);
+    }
+
+    #[test]
+    fn exactly_on_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+
+        assert_matches!(byte_stream.slice::<()>(4), Ok(&[9, 9, 9, 9]));
+        assert!(byte_stream.is_empty());
+    }
+
+    #[test]
+    fn bigger_than_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+        let result = byte_stream.slice::<()>(5);
+
+        assert!(result.is_err());
+    }
+}
+
+#[cfg(test)]
+mod remaining_bytes {
+    use crate::ByteStream;
+
+    const TEST_BYTES: &[u8] = &[1, 2, 3];
+
+    #[test]
+    fn some_remaining() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(TEST_BYTES);
+
+        assert_eq!(byte_stream.remaining_bytes().as_slice(), TEST_BYTES);
+    }
+
+    #[test]
+    fn none_remaining() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(TEST_BYTES);
+
+        assert!(byte_stream.slice::<()>(TEST_BYTES.len()).is_ok());
+        assert!(byte_stream.remaining_bytes().is_empty());
     }
 }

@@ -84,7 +84,7 @@ impl GameTimer {
 }
 
 #[cfg(test)]
-mod test {
+mod increment {
     use super::*;
 
     #[test]

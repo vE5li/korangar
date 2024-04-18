@@ -62,73 +62,109 @@ impl std::fmt::Debug for ConversionError {
     }
 }
 
-// #[cfg(test)]
-// mod instanciate {
-//     use super::{ConversionError, ConversionErrorType};
-//
-//     #[test]
-//     fn from_error_type() {
-//         let error_type = ConversionErrorType::ByteStreamTooShort { type_name:
-// "test" };         let error =
-// ConversionError::from_error_type(error_type.clone());
-//
-//         assert_eq!(error.error_type, error_type);
-//         assert!(error.stack.is_empty());
-//     }
-//
-//     #[test]
-//     fn from_message() {
-//         let message = "test".to_owned();
-//         let error = ConversionError::from_message(message.clone());
-//
-//         assert_eq!(error.error_type, ConversionErrorType::Specific { message
-// });         assert!(error.stack.is_empty());
-//     }
-// }
-//
-// #[cfg(test)]
-// mod add_to_stack {
-//     use super::{ConversionError, ConversionErrorType};
-//
-//     const FIRST: &str = "first";
-//     const SECOND: &str = "second";
-//     const THIRD: &str = "third";
-//
-//     #[test]
-//     fn empty() {
-//         let error_type = ConversionErrorType::ByteStreamTooShort { type_name:
-// "test" };         let mut error =
-// ConversionError::from_error_type(error_type.clone());
-//
-//         error.add_to_stack(FIRST);
-//
-//         assert_eq!(error.stack, vec![FIRST]);
-//     }
-//
-//     #[test]
-//     fn multiple() {
-//         let error_type = ConversionErrorType::ByteStreamTooShort { type_name:
-// "test" };         let mut error =
-// ConversionError::from_error_type(error_type.clone());
-//
-//         error.add_to_stack(THIRD);
-//         error.add_to_stack(SECOND);
-//         error.add_to_stack(FIRST);
-//
-//         assert_eq!(error.stack, vec![FIRST, SECOND, THIRD]);
-//     }
-// }
-//
-// #[cfg(test)]
-// mod type_check {
-//     use super::{ConversionError, ConversionErrorType};
-//
-//     #[test]
-//     fn is_byte_stream_too_short() {
-//         let error_type = ConversionErrorType::ByteStreamTooShort { type_name:
-// "test" };         let error =
-// ConversionError::from_error_type(error_type.clone());
-//
-//         assert!(error.is_byte_stream_too_short());
-//     }
-// }
+/// Result type returned by any conversion operation.
+pub type ConversionResult<T> = Result<T, Box<ConversionError>>;
+
+/// Trait providing stack track helpers to [`ConversionResult`]
+pub trait ConversionResultExt {
+    /// Add a type name to the stack trace.
+    fn trace<CALLER>(self) -> Self;
+}
+
+impl<T> ConversionResultExt for ConversionResult<T> {
+    fn trace<CALLER>(self) -> Self {
+        self.map_err(|mut error| {
+            error.add_to_stack(std::any::type_name::<CALLER>());
+            error
+        })
+    }
+}
+
+#[cfg(test)]
+mod conversion_result {
+    use super::{ConversionError, ConversionResult, ConversionResultExt};
+
+    struct Dummy {}
+
+    #[test]
+    fn trace_ok() {
+        let result = Ok(()).trace::<Dummy>();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn trace_err() {
+        let result: ConversionResult<()> = Err(ConversionError::from_message("test"));
+        let result = result.trace::<Dummy>();
+
+        assert!(result.is_err());
+        assert!(format!("{:?}", result.unwrap_err()).contains(std::any::type_name::<Dummy>()));
+    }
+}
+
+#[cfg(test)]
+mod instanciate {
+    use super::{ConversionError, ConversionErrorType};
+
+    #[test]
+    fn from_error_type() {
+        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let error = ConversionError::from_error_type(error_type.clone());
+
+        assert_eq!(error.error_type, error_type);
+        assert!(error.stack.is_empty());
+    }
+
+    #[test]
+    fn from_message() {
+        let message = "test".to_owned();
+        let error = ConversionError::from_message(message.clone());
+
+        assert_eq!(error.error_type, ConversionErrorType::Specific { message });
+        assert!(error.stack.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod add_to_stack {
+    use super::{ConversionError, ConversionErrorType};
+
+    const FIRST: &str = "first";
+    const SECOND: &str = "second";
+    const THIRD: &str = "third";
+
+    #[test]
+    fn empty() {
+        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let mut error = ConversionError::from_error_type(error_type.clone());
+
+        error.add_to_stack(FIRST);
+
+        assert_eq!(error.stack, vec![FIRST]);
+    }
+
+    #[test]
+    fn multiple() {
+        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let mut error = ConversionError::from_error_type(error_type.clone());
+
+        error.add_to_stack(THIRD);
+        error.add_to_stack(SECOND);
+        error.add_to_stack(FIRST);
+
+        assert_eq!(error.stack, vec![FIRST, SECOND, THIRD]);
+    }
+}
+
+#[cfg(test)]
+mod type_check {
+    use super::{ConversionError, ConversionErrorType};
+
+    #[test]
+    fn is_byte_stream_too_short() {
+        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let error = ConversionError::from_error_type(error_type.clone());
+
+        assert!(error.is_byte_stream_too_short());
+    }
+}

@@ -2,7 +2,9 @@ mod measurement;
 mod ring_buffer;
 mod statistics;
 
+use std::marker::PhantomPinned;
 use std::mem::MaybeUninit;
+use std::pin::Pin;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::time::Instant;
@@ -12,8 +14,10 @@ pub use self::ring_buffer::RingBuffer;
 pub use self::statistics::{get_frame_by_index, get_number_of_saved_frames, get_statistics_data};
 use crate::logging::{print_debug, Colorize};
 
+// TODO: Ideally we could get rid of the `Box` type since we can also allocate
+// this on the stack.
 #[thread_local]
-static mut PROFILER: MaybeUninit<&'static Mutex<Profiler>> = MaybeUninit::uninit();
+static mut PROFILER: MaybeUninit<&'static Mutex<Pin<Box<Profiler>>>> = MaybeUninit::uninit();
 static mut PROFILER_HALTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
@@ -22,6 +26,9 @@ pub struct Profiler {
     /// Self referencing pointers
     active_measurements: Vec<*const Measurement>,
     saved_frames: RingBuffer<Measurement, { Self::SAVED_FRAME_COUNT }>,
+    /// Since the profiler has some self-referencing fields, we want it to be
+    /// !Unpin.
+    _pin: PhantomPinned,
 }
 
 impl Profiler {
@@ -29,12 +36,12 @@ impl Profiler {
     pub const SAVED_FRAME_COUNT: usize = 128;
 
     /// Set the active profiler.
-    pub fn set_active(profiler: &'static Mutex<Profiler>) {
+    pub fn set_active(profiler: &'static Mutex<Pin<Box<Profiler>>>) {
         unsafe { PROFILER.write(profiler) };
     }
 
     /// Start a new frame by creating a new root measurement.
-    pub fn start_frame(&mut self) -> ActiveMeasurement {
+    pub fn start_frame(self: Pin<&mut Self>) -> ActiveMeasurement {
         // Make sure that there are no active measurements.
         if self.active_measurements.len() > 1 {
             let measurement_names = self
@@ -53,9 +60,12 @@ impl Profiler {
             );
         }
 
+        // SAFETY: We do not move out of self.
+        let self_mut = unsafe { self.get_unchecked_mut() };
+
         // Start a new root measurement.
         let name = Self::ROOT_MEASUREMENT_NAME;
-        let previous_measurement = self.root_measurement.replace(Measurement {
+        let previous_measurement = self_mut.root_measurement.replace(Measurement {
             name,
             start_time: Instant::now(),
             end_time: Instant::now(),
@@ -63,21 +73,21 @@ impl Profiler {
         });
 
         // Set `active_measurements` to a well defined state.
-        self.active_measurements = vec![self.root_measurement.as_ref().unwrap() as *const _];
+        self_mut.active_measurements = vec![self_mut.root_measurement.as_ref().unwrap() as *const _];
 
         // Save the completed frame so we can inspect it in the profiler later on.
         let profiler_halted = unsafe { PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) };
         if let Some(previous_measurement) = previous_measurement
             && !profiler_halted
         {
-            self.saved_frames.push(previous_measurement);
+            self_mut.saved_frames.push(previous_measurement);
         }
 
         ActiveMeasurement::new(name)
     }
 
     /// Start a new measurement.
-    fn start_measurement_inner(&mut self, name: &'static str) -> ActiveMeasurement {
+    fn start_measurement_inner(self: Pin<&mut Self>, name: &'static str) -> ActiveMeasurement {
         // Get the most recent active measurement.
         let top_measurement = self.active_measurements.last().copied().unwrap();
         let measurement = unsafe { &mut *(top_measurement as *mut Measurement) };
@@ -87,18 +97,22 @@ impl Profiler {
 
         // Set the index as the new most recent active measurement.
         let index = measurement.indices.last().unwrap();
-        self.active_measurements.push(index as *const _);
+
+        // SAFETY: We do not move out of self.
+        let self_mut = unsafe { self.get_unchecked_mut() };
+        self_mut.active_measurements.push(index as *const _);
 
         ActiveMeasurement::new(name)
     }
 
     /// Start a new measurement.
     pub fn start_measurement(name: &'static str) -> ActiveMeasurement {
-        unsafe { PROFILER.assume_init_ref().lock().unwrap().start_measurement_inner(name) }
+        let mut guard = unsafe { PROFILER.assume_init_ref().lock().unwrap() };
+        guard.as_mut().start_measurement_inner(name)
     }
 
     /// Stop a running measurement.
-    fn stop_measurement(&mut self, name: &'static str) {
+    fn stop_measurement(self: Pin<&mut Self>, name: &'static str) {
         let Some(top_measurement) = self.active_measurements.last().copied() else {
             print_debug!(
                 "[{}] tried to stop measurement {} but no measurement is active",
@@ -123,8 +137,11 @@ impl Profiler {
         // Set the end time of the measurement.
         measurement.set_end_time();
 
+        // SAFETY: We do not move out of self.
+        let self_mut = unsafe { self.get_unchecked_mut() };
+
         // Remove the measurement from the list of active measurements.
-        self.active_measurements.pop();
+        self_mut.active_measurements.pop();
     }
 
     /// Set the profiler halted state.
@@ -141,7 +158,7 @@ impl Profiler {
 /// Implementation detail of the [`create_profiler_threads`] macro.
 pub trait LockThreadProfier {
     /// Lock the profiler corresponding to the variant.
-    fn lock_profiler(&self) -> std::sync::MutexGuard<'_, Profiler>;
+    fn lock_profiler(&self) -> std::sync::MutexGuard<'_, Pin<Box<Profiler>>>;
 }
 
 /// Profile the entire block.
@@ -158,17 +175,23 @@ macro_rules! profile_block {
 macro_rules! create_profiler_threads {
     ($name:ident, { $($thread:ident,)* $(,)? }) => {
         pub mod $name {
+            use std::boxed::Box;
+            use std::pin::Pin;
+            use std::sync::MutexGuard;
             use $crate::profiling::Profiler;
             use $crate::profiling::LockThreadProfier;
-            use std::sync::MutexGuard;
 
             mod locks {
+                use std::boxed::Box;
+                use std::pin::Pin;
                 use std::sync::{LazyLock, Mutex};
                 use $crate::profiling::Profiler;
 
                 $(
                     #[allow(non_upper_case_globals)]
-                    pub(super) static mut $thread: LazyLock<Mutex<Profiler>> = LazyLock::new(|| Mutex::new(Profiler::default()));
+                    pub(super) static mut $thread: LazyLock<Mutex<Pin<Box<Profiler>>>> = LazyLock::new(|| {
+                        Mutex::new(Box::pin(Profiler::default()))
+                    });
                 )*
             }
 
@@ -179,7 +202,7 @@ macro_rules! create_profiler_threads {
             }
 
             impl LockThreadProfier for Enum {
-                fn lock_profiler(&self) -> MutexGuard<'_, Profiler> {
+                fn lock_profiler(&self) -> MutexGuard<'_, Pin<Box<Profiler>>> {
                     match self {
                         $(Self::$thread => unsafe { locks::$thread.lock().unwrap() }),*
                     }
@@ -195,7 +218,7 @@ macro_rules! create_profiler_threads {
                     /// Start the frame.
                     pub fn start_frame() -> ActiveMeasurement {
                         let profiler = unsafe { &super::locks::$thread };
-                        let measurement = profiler.lock().unwrap().start_frame();
+                        let measurement = profiler.lock().unwrap().as_mut().start_frame();
                         Profiler::set_active(profiler);
                         measurement
                     }

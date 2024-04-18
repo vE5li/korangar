@@ -981,11 +981,11 @@ impl NetworkingSystem {
             let mut byte_stream: ByteStream<PacketMetadata> = ByteStream::without_metadata(&data);
 
             while !byte_stream.is_empty() {
-                let saved_offset = byte_stream.get_offset();
+                let save_point = byte_stream.create_save_point();
 
                 // Packet is cut-off at the header
                 let Ok(header) = u16::from_bytes(&mut byte_stream) else {
-                    byte_stream.set_offset(saved_offset);
+                    byte_stream.restore_save_point(save_point);
                     self.map_stream_buffer = byte_stream.remaining_bytes();
                     break;
                 };
@@ -996,16 +996,16 @@ impl NetworkingSystem {
                     Ok(false) => {
                         #[cfg(feature = "debug")]
                         {
-                            byte_stream.set_offset(saved_offset);
+                            byte_stream.restore_save_point(save_point);
                             let packet = UnknownPacket::new(byte_stream.remaining_bytes());
                             byte_stream.incoming_packet(&packet);
                         }
 
                         break;
                     }
-                    // Cut-off packet
+                    // Cut-off packet (probably).
                     Err(error) if error.is_byte_stream_too_short() => {
-                        byte_stream.set_offset(saved_offset);
+                        byte_stream.restore_save_point(save_point);
                         self.map_stream_buffer = byte_stream.remaining_bytes();
                         break;
                     }

@@ -26,12 +26,12 @@ impl ConversionError {
         })
     }
 
-    pub(super) fn add_to_stack(&mut self, type_name: &'static str) {
-        self.stack.insert(0, type_name);
-    }
-
     pub fn is_byte_stream_too_short(&self) -> bool {
         matches!(self.error_type, ConversionErrorType::ByteStreamTooShort { .. })
+    }
+
+    fn add_to_stack(&mut self, type_name: &'static str) {
+        self.stack.insert(0, type_name);
     }
 }
 

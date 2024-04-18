@@ -1,4 +1,4 @@
-use crate::{ByteStream, ConversionResult, ConversionResultExt};
+use crate::{ByteStream, ConversionResult};
 
 mod implement;
 
@@ -28,12 +28,12 @@ where
     where
         Self: Sized,
     {
-        // HACK: This will *not* work in the long run. This breaks as soon as the
-        // metadata is written or read inside T::from_bytes.
+        let stack_frame = byte_stream.install_limit::<Self>(size)?;
 
-        let slice = byte_stream.slice::<Self>(size)?;
-        let mut hacked: ByteStream<()> = ByteStream::without_metadata(slice);
+        let value = T::from_bytes(byte_stream)?;
 
-        T::from_bytes(&mut hacked).trace::<Self>()
+        byte_stream.uninstall_limit(stack_frame);
+
+        Ok(value)
     }
 }

@@ -15,6 +15,20 @@ pub(crate) struct TemporaryLimit {
     old_limit: usize,
 }
 
+/// A stream of bytes that iterates over borrowed data. It can produce single
+/// bytes or slices of memory and carries metadata about the read operation (for
+/// example a version).
+///
+/// The stream is intended for reading data without lookahead.
+///
+/// The state of the stream can be saved at any time with
+/// [`create_save_point`](ByteStream::create_save_point), and restored with
+/// [`restore_save_point`](ByteStream::restore_save_point).
+///
+/// NOTE: The save point *does not* restore the previous state of the metadata.
+/// It should therefore be avoided to modify the metadata while reading of
+/// composite structures data that might fail, for example multi-field structs
+/// that implement [`FromBytes`](crate::from_bytes::FromBytes).
 pub struct ByteStream<'a, META = ()>
 where
     META: 'static,
@@ -29,6 +43,7 @@ impl<'a, META> ByteStream<'a, META>
 where
     META: Default + 'static,
 {
+    /// Create a new [`ByteStream`] with default metadata.
     pub fn without_metadata(data: &'a [u8]) -> Self {
         Self::with_metadata(data, Default::default())
     }
@@ -38,6 +53,7 @@ impl<'a, META> ByteStream<'a, META>
 where
     META: 'static,
 {
+    /// Create a new [`ByteStream`] with specific metadata.
     pub fn with_metadata(data: &'a [u8], metadata: META) -> Self {
         let limit = data.len();
 

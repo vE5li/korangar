@@ -1,3 +1,5 @@
+#![allow(suspicious_auto_trait_impls)]
+
 use std::fmt::Display;
 use std::rc::Rc;
 

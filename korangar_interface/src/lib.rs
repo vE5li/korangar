@@ -36,9 +36,6 @@ pub type ColorSelector<App: Application> = Box<dyn Fn(&App::Theme) -> App::Color
 #[allow(type_alias_bounds)]
 pub type FontSizeSelector<App: Application> = Box<dyn Fn(&App::Theme) -> App::FontSize>;
 
-// NOTE: To make proc macro work.
-mod korangar_interface {}
-
 pub trait ElementEvent<App>
 where
     App: Application,

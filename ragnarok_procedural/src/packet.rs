@@ -28,26 +28,8 @@ pub fn derive_incoming_packet_struct(
         _ => panic!(),
     };
 
-    if std::env::var("CARGO_PKG_NAME").unwrap() == "ragnarok_networking" {
-        return quote! {
-            impl #impl_generics crate::IncomingPacket for #name #type_generics #where_clause {
-                const IS_PING: bool = #is_ping;
-                const HEADER: u16 = #signature;
-
-                fn payload_from_bytes<Meta>(byte_stream: &mut ragnarok_bytes::ByteStream<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
-                    let base_offset = byte_stream.get_offset();
-                    #(#from_bytes_implementations)*
-                    let packet = #instanciate;
-
-                    Ok(packet)
-                }
-            }
-        }
-        .into();
-    }
-
     quote! {
-        impl #impl_generics crate::network::IncomingPacket for #name #type_generics #where_clause {
+        impl #impl_generics ragnarok_networking::IncomingPacket for #name #type_generics #where_clause {
             const IS_PING: bool = #is_ping;
             const HEADER: u16 = #signature;
 
@@ -81,23 +63,8 @@ pub fn derive_outgoing_packet_struct(
     let (_from_bytes_implementations, _implemented_fields, to_bytes_implementations, _delimiter) = byte_convertable_helper(data_struct);
     let to_bytes = quote!([&#signature.to_le_bytes()[..], #(#to_bytes_implementations),*].concat());
 
-    if std::env::var("CARGO_PKG_NAME").unwrap() == "ragnarok_networking" {
-        return quote! {
-            impl #impl_generics crate::OutgoingPacket for #name #type_generics #where_clause {
-                const IS_PING: bool = #is_ping;
-
-                // Temporary until serialization is always possible
-                #[allow(unreachable_code)]
-                fn packet_to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
-                    Ok(#to_bytes)
-                }
-            }
-        }
-        .into();
-    }
-
     quote! {
-        impl #impl_generics crate::network::OutgoingPacket for #name #type_generics #where_clause {
+        impl #impl_generics ragnarok_networking::OutgoingPacket for #name #type_generics #where_clause {
             const IS_PING: bool = #is_ping;
 
             // Temporary until serialization is always possible

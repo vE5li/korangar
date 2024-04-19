@@ -9,6 +9,9 @@ pub use ragnarok_procedural::{IncomingPacket, OutgoingPacket};
 #[cfg(not(feature = "derive"))]
 use ragnarok_procedural::{IncomingPacket, OutgoingPacket};
 
+// To make proc macros work in korangar_interface.
+extern crate self as ragnarok_networking;
+
 /// Base trait that all incoming packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size,
 /// followed by the packet data. If the packet does not have a fixed size,

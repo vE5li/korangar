@@ -40,6 +40,22 @@ impl Profiler {
         unsafe { PROFILER.write(profiler) };
     }
 
+    /// Start a new measurement.
+    pub fn start_measurement(name: &'static str) -> ActiveMeasurement {
+        let mut guard = unsafe { PROFILER.assume_init_ref().lock().unwrap() };
+        guard.as_mut().start_measurement_inner(name)
+    }
+
+    /// Set the profiler halted state.
+    pub fn set_halted(running: bool) {
+        unsafe { PROFILER_HALTED.store(running, std::sync::atomic::Ordering::Relaxed) };
+    }
+
+    /// Get the profiler halted state.
+    pub fn get_halted() -> bool {
+        unsafe { PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) }
+    }
+
     /// Start a new frame by creating a new root measurement.
     pub fn start_frame(self: Pin<&mut Self>) -> ActiveMeasurement {
         // Make sure that there are no active measurements.
@@ -105,12 +121,6 @@ impl Profiler {
         ActiveMeasurement::new(name)
     }
 
-    /// Start a new measurement.
-    pub fn start_measurement(name: &'static str) -> ActiveMeasurement {
-        let mut guard = unsafe { PROFILER.assume_init_ref().lock().unwrap() };
-        guard.as_mut().start_measurement_inner(name)
-    }
-
     /// Stop a running measurement.
     fn stop_measurement(self: Pin<&mut Self>, name: &'static str) {
         let Some(top_measurement) = self.active_measurements.last().copied() else {
@@ -142,16 +152,6 @@ impl Profiler {
 
         // Remove the measurement from the list of active measurements.
         self_mut.active_measurements.pop();
-    }
-
-    /// Set the profiler halted state.
-    pub fn set_halted(running: bool) {
-        unsafe { PROFILER_HALTED.store(running, std::sync::atomic::Ordering::Relaxed) };
-    }
-
-    /// Get the profiler halted state.
-    pub fn get_halted() -> bool {
-        unsafe { PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) }
     }
 }
 

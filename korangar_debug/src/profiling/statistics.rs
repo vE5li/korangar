@@ -71,7 +71,7 @@ pub fn get_statistics_data(thread: impl LockThreadProfier) -> (Vec<FrameData>, H
     let mut longest_frame_time = Duration::default();
 
     let frame_data = profiler
-        .saved_frames
+        .get_saved_frames()
         .iter()
         .map(|measurement| {
             let total_time = measurement.total_time_taken();
@@ -89,7 +89,7 @@ pub fn get_statistics_data(thread: impl LockThreadProfier) -> (Vec<FrameData>, H
 
     let mut timing_map = HashMap::new();
 
-    profiler.saved_frames.iter().for_each(|measurement| {
+    profiler.get_saved_frames().iter().for_each(|measurement| {
         process_timing::<false>(measurement, &mut timing_map);
         measurement
             .indices
@@ -111,7 +111,7 @@ pub fn get_statistics_data(thread: impl LockThreadProfier) -> (Vec<FrameData>, H
 
 pub fn get_number_of_saved_frames(thread: impl LockThreadProfier) -> usize {
     let profiler = thread.lock_profiler();
-    profiler.saved_frames.iter().count()
+    profiler.get_saved_frames().iter().count()
 }
 
 pub fn get_frame_by_index(thread: impl LockThreadProfier, index: usize) -> Measurement {
@@ -119,7 +119,7 @@ pub fn get_frame_by_index(thread: impl LockThreadProfier, index: usize) -> Measu
 
     // TODO: maybe don't use the iterator to receive the frame? That would help
     // performance
-    let measurement = profiler.saved_frames.iter().nth(index).unwrap();
+    let measurement = profiler.get_saved_frames().iter().nth(index).unwrap();
 
     measurement.clone()
 }

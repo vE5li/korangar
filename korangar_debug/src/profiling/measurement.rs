@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use super::PROFILER;
+use super::Profiler;
 
 #[must_use = "ActiveMeasurement must be used, otherwise it will not measure anything"]
 pub struct ActiveMeasurement {
@@ -19,8 +19,7 @@ impl ActiveMeasurement {
 
 impl Drop for ActiveMeasurement {
     fn drop(&mut self) {
-        let mut guard = unsafe { PROFILER.assume_init_ref().lock().unwrap() };
-        guard.as_mut().stop_measurement(self.name);
+        Profiler::stop_measurement(self.name);
     }
 }
 

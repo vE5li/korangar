@@ -39,7 +39,7 @@ where
     ) -> Self {
         let window_size = window_size.shrink(border.scaled(scaling).doubled());
 
-        // NOTE: I'm not enirely sure why we need to subtract one border here, but if we
+        // I'm not enirely sure why we need to subtract one border here, but if we
         // don't the `super` bound is too big.
         let parent_limits = ParentLimits::from_bound(size_bound, screen_size.shrink(border.scaled(scaling)), scaling);
         let base_position = App::Position::from_size(border.scaled(scaling));

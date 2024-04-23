@@ -1,5 +1,5 @@
 use mlua::Lua;
-use ragnarok_networking::ItemId;
+use ragnarok_packets::ItemId;
 
 use crate::loaders::GameFileLoader;
 

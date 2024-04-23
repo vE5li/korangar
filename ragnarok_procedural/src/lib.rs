@@ -8,6 +8,7 @@ mod packet;
 mod utils;
 
 use proc_macro::TokenStream as InterfaceTokenStream;
+use quote::quote;
 use syn::{parse, Data, DeriveInput};
 
 use self::convertable::*;
@@ -159,4 +160,37 @@ pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
         Data::Enum(..) => panic!("enum types may not be derived"),
         Data::Union(..) => panic!("union types may not be derived"),
     }
+}
+
+#[proc_macro_derive(LoginServer)]
+pub fn derive_login_server_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics ragnarok_packets::LoginServerPacket for #ident #type_generics #where_clause {}
+    }
+    .into()
+}
+
+#[proc_macro_derive(CharacterServer)]
+pub fn derive_character_server_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics ragnarok_packets::CharacterServerPacket for #ident #type_generics #where_clause {}
+    }
+    .into()
+}
+
+#[proc_macro_derive(MapServer)]
+pub fn derive_map_server_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics ragnarok_packets::MapServerPacket for #ident #type_generics #where_clause {}
+    }
+    .into()
 }

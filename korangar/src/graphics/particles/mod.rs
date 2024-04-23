@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
-use ragnarok_networking::{EntityId, QuestColor, QuestEffectPacket};
+use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 
 use crate::graphics::*;

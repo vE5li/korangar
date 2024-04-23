@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState};
-use ragnarok_networking::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
+use ragnarok_packets::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
 
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
 

@@ -2,7 +2,7 @@ use derive_new::new;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, Text};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
-use ragnarok_networking::Friend;
+use ragnarok_packets::Friend;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
@@ -51,7 +51,7 @@ impl PrototypeWindow<InterfaceSettings> for FriendRequestWindow {
 
         WindowBuilder::new()
             .with_title("Friend request".to_string())
-            // NOTE: We give the builder a class but we don't implement the `window_class` method
+            // We give the builder a class but we don't implement the `window_class` method
             // of the trait. This way we can open multiple windos of this type but we can still
             // close them with the class name.
             .with_class(Self::WINDOW_CLASS.to_owned())

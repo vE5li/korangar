@@ -210,7 +210,7 @@ where
     }
 
     pub fn open_popup(&mut self, element: ElementCell<App>, position_tracker: Tracker<App::Position>, size_tracker: Tracker<App::Size>) {
-        // NOTE: Very important to link back
+        // Very important to link back
         let weak_element = Rc::downgrade(&element);
         element.borrow_mut().link_back(weak_element, None);
 

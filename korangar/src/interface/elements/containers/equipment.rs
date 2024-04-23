@@ -5,7 +5,7 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::{dimension_bound, size_bound};
-use ragnarok_networking::EquipPosition;
+use ragnarok_packets::EquipPosition;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -41,9 +41,36 @@ impl EquipmentContainer {
             (0..SLOT_POSITIONS.len())
                 .map(|index| {
                     let slot = SLOT_POSITIONS[index];
+                    let display_name = match slot {
+                        EquipPosition::None => panic!(),
+                        EquipPosition::HeadLower => "Head lower",
+                        EquipPosition::HeadMiddle => "Head middle",
+                        EquipPosition::HeadTop => "Head top",
+                        EquipPosition::RightHand => "Right hand",
+                        EquipPosition::LeftHand => "Left hand",
+                        EquipPosition::Armor => "Armor",
+                        EquipPosition::Shoes => "Shoes",
+                        EquipPosition::Garment => "Garment",
+                        EquipPosition::LeftAccessory => "Left accessory",
+                        EquipPosition::RigthAccessory => "Right accessory",
+                        EquipPosition::CostumeHeadTop => "Costume head top",
+                        EquipPosition::CostumeHeadMiddle => "Costume head middle",
+                        EquipPosition::CostumeHeadLower => "Costume head lower",
+                        EquipPosition::CostumeGarment => "Costume garment",
+                        EquipPosition::Ammo => "Ammo",
+                        EquipPosition::ShadowArmor => "Shadow ammo",
+                        EquipPosition::ShadowWeapon => "Shadow weapon",
+                        EquipPosition::ShadowShield => "Shadow shield",
+                        EquipPosition::ShadowShoes => "Shadow shoes",
+                        EquipPosition::ShadowRightAccessory => "Shadow right accessory",
+                        EquipPosition::ShadowLeftAccessory => "Shadow left accessory",
+                        EquipPosition::LeftRightAccessory => "Accessory",
+                        EquipPosition::LeftRightHand => "Two hand weapon",
+                        EquipPosition::ShadowLeftRightAccessory => "Shadow accessory",
+                    };
 
                     let text = Text::default()
-                        .with_text(slot.display_name().to_string())
+                        .with_text(display_name.to_string())
                         .with_foreground_color(|_| Color::monochrome_u8(200))
                         .with_width(dimension_bound!(!))
                         .wrap();

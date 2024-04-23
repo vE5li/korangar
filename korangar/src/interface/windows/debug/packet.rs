@@ -1,31 +1,25 @@
-use std::cell::UnsafeCell;
-
-use korangar_debug::profiling::RingBuffer;
-use korangar_interface::elements::{ButtonBuilder, ElementWrap, ScrollView, StateButtonBuilder, WeakElementCell};
+use korangar_interface::elements::{ButtonBuilder, ElementWrap, ScrollView, StateButtonBuilder};
 use korangar_interface::event::ClickAction;
-use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedState, TrackedStateBinary};
+use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::{PacketEntry, PacketView};
+use crate::interface::elements::{PacketHistoryRemote, PacketView};
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 
-pub struct PacketWindow<const N: usize> {
-    packets: PlainRemote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>), N>>,
+pub struct PacketWindow {
+    packets: PacketHistoryRemote,
     show_pings: PlainTrackedState<bool>,
     update: PlainTrackedState<bool>,
 }
 
-impl<const N: usize> PacketWindow<N> {
+impl PacketWindow {
     pub const WINDOW_CLASS: &'static str = "network";
 
-    pub fn new(
-        packets: PlainRemote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>), N>>,
-        update: PlainTrackedState<bool>,
-    ) -> Self {
+    pub fn new(packets: PacketHistoryRemote, update: PlainTrackedState<bool>) -> Self {
         let show_pings = PlainTrackedState::default();
 
         Self {
@@ -36,7 +30,7 @@ impl<const N: usize> PacketWindow<N> {
     }
 }
 
-impl<const N: usize> PrototypeWindow<InterfaceSettings> for PacketWindow<N> {
+impl PrototypeWindow<InterfaceSettings> for PacketWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
@@ -51,7 +45,7 @@ impl<const N: usize> PrototypeWindow<InterfaceSettings> for PacketWindow<N> {
 
         let clear_selector = {
             let packets = self.packets.clone();
-            move || !packets.get().is_empty()
+            move || !packets.is_empty()
         };
 
         let clear_action = { move || vec![ClickAction::Custom(UserEvent::ClearPacketHistory)] };

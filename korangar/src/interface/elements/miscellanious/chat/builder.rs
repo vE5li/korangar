@@ -5,8 +5,8 @@ use korangar_interface::builder::Unset;
 use korangar_interface::state::PlainRemote;
 
 use super::Chat;
+use crate::interface::windows::ChatMessage;
 use crate::loaders::FontLoader;
-use crate::network::ChatMessage;
 
 /// Type state [`Chat`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times and calling
@@ -51,7 +51,6 @@ impl ChatBuilder<PlainRemote<Vec<ChatMessage>>, Rc<RefCell<FontLoader>>> {
         Chat {
             messages,
             font_loader,
-            stamp: true,
             state: Default::default(),
         }
     }

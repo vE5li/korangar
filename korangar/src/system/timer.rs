@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use chrono::prelude::*;
-use ragnarok_networking::ClientTick;
+use ragnarok_packets::ClientTick;
 
 pub struct GameTimer {
     global_timer: Instant,

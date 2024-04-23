@@ -6,15 +6,13 @@ pub struct RingBuffer<T, const N: usize> {
 impl<T, const N: usize> Default for RingBuffer<T, N> {
     fn default() -> Self {
         Self {
-            buffer: [Self::DEFAULT_ITEM; N],
+            buffer: [const { None }; N],
             index: 0,
         }
     }
 }
 
 impl<T, const N: usize> RingBuffer<T, N> {
-    const DEFAULT_ITEM: Option<T> = None;
-
     pub fn push(&mut self, item: T) {
         let index = self.index;
         self.buffer[index] = Some(item);

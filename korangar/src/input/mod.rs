@@ -10,7 +10,7 @@ use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
-use ragnarok_networking::ClientTick;
+use ragnarok_packets::ClientTick;
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 

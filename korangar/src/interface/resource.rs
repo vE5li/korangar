@@ -1,4 +1,4 @@
-use ragnarok_networking::EquipPosition;
+use ragnarok_packets::EquipPosition;
 
 use crate::input::HotbarSlot;
 use crate::inventory::{Item, Skill};

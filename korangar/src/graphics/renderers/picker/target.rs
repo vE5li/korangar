@@ -1,4 +1,4 @@
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -100,7 +100,7 @@ impl From<PickerTarget> for u32 {
 #[cfg(test)]
 #[allow(clippy::unusual_byte_groupings)]
 mod encoding {
-    use ragnarok_networking::EntityId;
+    use ragnarok_packets::EntityId;
 
     use crate::graphics::PickerTarget;
     #[cfg(feature = "debug")]

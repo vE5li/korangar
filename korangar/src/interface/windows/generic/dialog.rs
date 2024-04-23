@@ -2,7 +2,7 @@ use korangar_interface::elements::ElementWrap;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::{DialogContainer, DialogElement};

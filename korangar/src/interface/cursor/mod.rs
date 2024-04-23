@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use ragnarok_networking::ClientTick;
+use ragnarok_packets::ClientTick;
 
 use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};

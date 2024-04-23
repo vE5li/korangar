@@ -2,7 +2,7 @@ use derive_new::new;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use ragnarok_networking::CharacterServerInformation;
+use ragnarok_packets::CharacterServerInformation;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;

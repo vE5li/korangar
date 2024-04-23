@@ -7,7 +7,7 @@ use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::{dimension_bound, size_bound};
-use ragnarok_networking::CharacterInformation;
+use ragnarok_packets::CharacterInformation;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};

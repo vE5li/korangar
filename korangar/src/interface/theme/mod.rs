@@ -850,6 +850,10 @@ impl korangar_interface::theme::InputTheme<InterfaceSettings> for InputTheme {
 pub struct ChatTheme {
     pub background_color: Mutable<Color, Render>,
     pub font_size: MutableRange<FontSize, Render>,
+    pub broadcast_color: Mutable<Color, Render>,
+    pub server_color: Mutable<Color, Render>,
+    pub error_color: Mutable<Color, Render>,
+    pub information_color: Mutable<Color, Render>,
 }
 
 impl ThemeDefault<DefaultMenu> for ChatTheme {
@@ -857,6 +861,10 @@ impl ThemeDefault<DefaultMenu> for ChatTheme {
         Self {
             background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
             font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(50.0)),
+            broadcast_color: Mutable::new(Color::rgb_u8(210, 210, 210)),
+            server_color: Mutable::new(Color::rgb_u8(255, 255, 210)),
+            error_color: Mutable::new(Color::rgb_u8(255, 150, 150)),
+            information_color: Mutable::new(Color::rgb_u8(200, 255, 200)),
         }
     }
 }
@@ -866,6 +874,10 @@ impl ThemeDefault<DefaultMain> for ChatTheme {
         Self {
             background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
             font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(50.0)),
+            broadcast_color: Mutable::new(Color::rgb_u8(210, 210, 210)),
+            server_color: Mutable::new(Color::rgb_u8(255, 255, 210)),
+            error_color: Mutable::new(Color::rgb_u8(255, 150, 150)),
+            information_color: Mutable::new(Color::rgb_u8(200, 255, 200)),
         }
     }
 }
@@ -877,6 +889,22 @@ impl korangar_interface::theme::ChatTheme<InterfaceSettings> for ChatTheme {
 
     fn font_size(&self) -> FontSize {
         self.font_size.get()
+    }
+
+    fn broadcast_color(&self) -> Color {
+        self.broadcast_color.get()
+    }
+
+    fn server_color(&self) -> Color {
+        self.server_color.get()
+    }
+
+    fn error_color(&self) -> Color {
+        self.error_color.get()
+    }
+
+    fn information_color(&self) -> Color {
+        self.information_color.get()
     }
 }
 

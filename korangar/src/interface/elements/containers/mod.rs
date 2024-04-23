@@ -15,5 +15,5 @@ pub use self::friends::FriendView;
 pub use self::hotbar::HotbarContainer;
 pub use self::inventory::InventoryContainer;
 #[cfg(feature = "debug")]
-pub use self::packet::{PacketEntry, PacketView};
+pub use self::packet::{PacketHistoryCallback, PacketHistoryRemote, PacketView};
 pub use self::skill_tree::SkillTreeContainer;

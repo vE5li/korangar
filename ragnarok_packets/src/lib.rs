@@ -1,3 +1,5 @@
+pub mod handler;
+
 use std::net::Ipv4Addr;
 
 use derive_new::new;
@@ -5,12 +7,16 @@ use ragnarok_bytes::{
     ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FixedByteSize, FromBytes, ToBytes,
 };
 #[cfg(feature = "derive")]
-pub use ragnarok_procedural::{IncomingPacket, OutgoingPacket};
+pub use ragnarok_procedural::{CharacterServer, IncomingPacket, LoginServer, MapServer, OutgoingPacket};
 #[cfg(not(feature = "derive"))]
-use ragnarok_procedural::{IncomingPacket, OutgoingPacket};
+use ragnarok_procedural::{CharacterServer, IncomingPacket, LoginServer, MapServer, OutgoingPacket};
 
 // To make proc macros work in korangar_interface.
-extern crate self as ragnarok_networking;
+extern crate self as ragnarok_packets;
+
+/// The header of a Ragnarok Online packet. It is always two bytes long.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ByteConvertable, PartialOrd, Ord, Hash)]
+pub struct PacketHeader(pub u16);
 
 /// Base trait that all incoming packets implement.
 /// All packets in Ragnarok online consist of a header, two bytes in size,
@@ -19,11 +25,16 @@ extern crate self as ragnarok_networking;
 /// header. Packets are sent in little endian.
 pub trait IncomingPacket: Clone {
     const IS_PING: bool;
-    const HEADER: u16;
+    const HEADER: PacketHeader;
 
     /// Read packet **without the header**. To read the packet with the header,
     /// use [`IncomingPacketExt::packet_from_bytes`].
     fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>;
+
+    #[cfg(feature = "packet-to-prototype-element")]
+    fn to_prototype_element<App: korangar_interface::application::Application>(
+        &self,
+    ) -> Box<dyn korangar_interface::elements::PrototypeElement<App> + Send>;
 }
 
 /// Base trait that all outgoing packets implement.
@@ -35,6 +46,11 @@ pub trait OutgoingPacket: Clone {
     const IS_PING: bool;
 
     fn packet_to_bytes(&self) -> ConversionResult<Vec<u8>>;
+
+    #[cfg(feature = "packet-to-prototype-element")]
+    fn to_prototype_element<App: korangar_interface::application::Application>(
+        &self,
+    ) -> Box<dyn korangar_interface::elements::PrototypeElement<App> + Send>;
 }
 
 /// Extension trait for reading incoming packets with the header.
@@ -49,7 +65,7 @@ where
     T: IncomingPacket,
 {
     fn packet_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let header = u16::from_bytes(byte_stream)?;
+        let header = PacketHeader::from_bytes(byte_stream)?;
 
         if header != Self::HEADER {
             return Err(ConversionError::from_message("mismatched header"));
@@ -58,6 +74,15 @@ where
         Self::payload_from_bytes(byte_stream)
     }
 }
+
+/// Marker trait for login server packets.
+pub trait LoginServerPacket /* : Packet */ {}
+
+/// Marker trait for character server packets.
+pub trait CharacterServerPacket /* : Packet */ {}
+
+/// Marker trait for map server packets.
+pub trait MapServerPacket /* : Packet */ {}
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
@@ -113,7 +138,7 @@ pub struct LargeTilePosition {
     pub y: u32,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ColorBGRA {
     pub blue: u8,
@@ -122,7 +147,7 @@ pub struct ColorBGRA {
     pub alpha: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ColorRGBA {
     pub red: u8,
@@ -152,7 +177,7 @@ impl ToBytes for ItemIndex {
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ItemId(pub u32);
 
-#[derive(Copy, Clone, Debug, ByteConvertable, FixedByteSize, PartialEq)]
+#[derive(Copy, Debug, Clone, ByteConvertable, FixedByteSize, PartialEq)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum Sex {
     Female,
@@ -164,7 +189,7 @@ pub enum Sex {
 /// Sent by the client to the login server.
 /// The very first packet sent when logging in, it is sent after the user has
 /// entered email and password.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, LoginServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0064)]
 pub struct LoginServerLoginPacket {
@@ -183,7 +208,7 @@ pub struct LoginServerLoginPacket {
 /// Sent by the login server as a response to [LoginServerLoginPacket]
 /// succeeding. After receiving this packet, the client will connect to one of
 /// the character servers provided by this packet.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, LoginServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0AC4)]
 pub struct LoginServerLoginSuccessPacket {
@@ -207,7 +232,7 @@ pub struct LoginServerLoginSuccessPacket {
 /// Sent by the character server as a response to [CharacterServerLoginPacket]
 /// succeeding. Provides basic information about the number of available
 /// character slots.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x082D)]
 pub struct CharacterServerLoginSuccessPacket {
@@ -221,10 +246,10 @@ pub struct CharacterServerLoginSuccessPacket {
     pub unused: [u8; 20],
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x006B)]
-pub struct Packet6b00 {
+pub struct Packet006b {
     pub unused: u16,
     pub maximum_slot_count: u8,
     pub available_slot_count: u8,
@@ -232,15 +257,15 @@ pub struct Packet6b00 {
     pub unknown: [u8; 20],
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B18)]
-pub struct Packet180b {
+pub struct Packet0b18 {
     /// Possibly inventory related
     pub unknown: u16,
 }
 
-#[derive(Clone, Debug, new)]
+#[derive(Debug, Clone, Copy, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct WorldPosition {
     pub x: usize,
@@ -274,13 +299,22 @@ impl ToBytes for WorldPosition {
     }
 }
 
-#[derive(Clone, Debug, new)]
+#[derive(Debug, Clone, Copy, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct WorldPosition2 {
     pub x1: usize,
     pub y1: usize,
     pub x2: usize,
     pub y2: usize,
+}
+
+impl WorldPosition2 {
+    pub fn to_origin_destination(self) -> (WorldPosition, WorldPosition) {
+        (WorldPosition { x: self.x1, y: self.y1 }, WorldPosition {
+            x: self.x2,
+            y: self.y2,
+        })
+    }
 }
 
 impl FromBytes for WorldPosition2 {
@@ -298,7 +332,7 @@ impl FromBytes for WorldPosition2 {
 }
 
 /// Sent by the map server as a response to [MapServerLoginPacket] succeeding.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02EB)]
 pub struct MapServerLoginSuccessPacket {
@@ -309,7 +343,7 @@ pub struct MapServerLoginSuccessPacket {
     pub font: u16,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum LoginFailedReason {
     #[numeric_value(1)]
@@ -320,14 +354,14 @@ pub enum LoginFailedReason {
     AlreadyOnline,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, LoginServer, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0081)]
 pub struct LoginFailedPacket {
     pub reason: LoginFailedReason,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0840)]
 pub struct MapServerUnavailablePacket {
@@ -336,7 +370,7 @@ pub struct MapServerUnavailablePacket {
     pub unknown: String,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum LoginFailedReason2 {
     UnregisteredId,
@@ -350,14 +384,14 @@ pub enum LoginFailedReason2 {
     CompanyAccountLimitReached,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, LoginServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x083E)]
 pub struct LoginFailedPacket2 {
     pub reason: LoginFailedReason2,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum CharacterSelectionFailedReason {
     RejectedFromServer,
@@ -365,7 +399,7 @@ pub enum CharacterSelectionFailedReason {
 
 /// Sent by the character server as a response to [SelectCharacterPacket]
 /// failing. Provides a reason for the character selection failing.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x006C)]
 pub struct CharacterSelectionFailedPacket {
@@ -375,7 +409,7 @@ pub struct CharacterSelectionFailedPacket {
 /// Sent by the character server as a response to [SelectCharacterPacket]
 /// succeeding. Provides a map server to connect to, along with the ID of our
 /// selected character.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0AC5)]
 pub struct CharacterSelectionSuccessPacket {
@@ -387,7 +421,7 @@ pub struct CharacterSelectionSuccessPacket {
     pub unknown: [u8; 128],
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum CharacterCreationFailedReason {
     CharacterNameAlreadyUsed,
@@ -400,7 +434,7 @@ pub enum CharacterCreationFailedReason {
 
 /// Sent by the character server as a response to [CreateCharacterPacket]
 /// failing. Provides a reason for the character creation failing.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x006E)]
 pub struct CharacterCreationFailedPacket {
@@ -409,7 +443,7 @@ pub struct CharacterCreationFailedPacket {
 
 /// Sent by the client to the login server every 60 seconds to keep the
 /// connection alive.
-#[derive(Clone, Debug, Default, OutgoingPacket)]
+#[derive(Debug, Clone, Default, OutgoingPacket, LoginServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0200)]
 #[ping]
@@ -417,7 +451,7 @@ pub struct LoginServerKeepalivePacket {
     pub user_id: [u8; 24],
 }
 
-#[derive(Clone, Debug, FromBytes, FixedByteSize)]
+#[derive(Debug, Clone, FromBytes, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct CharacterServerInformation {
     pub server_ip: ServerAddress,
@@ -433,7 +467,7 @@ pub struct CharacterServerInformation {
 /// Sent by the client to the character server after after successfully logging
 /// into the login server.
 /// Attempts to log into the character server using the provided information.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, CharacterServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0065)]
 pub struct CharacterServerLoginPacket {
@@ -448,7 +482,7 @@ pub struct CharacterServerLoginPacket {
 /// Sent by the client to the map server after after successfully selecting a
 /// character. Attempts to log into the map server using the provided
 /// information.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0436)]
 pub struct MapServerLoginPacket {
@@ -461,7 +495,7 @@ pub struct MapServerLoginPacket {
     pub unknown: [u8; 4],
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0283)]
 pub struct Packet8302 {
@@ -472,7 +506,7 @@ pub struct Packet8302 {
 /// a new character.
 /// Attempts to create a new character in an empty slot using the provided
 /// information.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, CharacterServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0A39)]
 pub struct CreateCharacterPacket {
@@ -487,7 +521,7 @@ pub struct CreateCharacterPacket {
     pub sex: Sex,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct CharacterInformation {
     pub character_id: CharacterId,
@@ -541,7 +575,7 @@ pub struct CharacterInformation {
 /// Sent by the character server as a response to [CreateCharacterPacket]
 /// succeeding. Provides all character information of the newly created
 /// character.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B6F)]
 pub struct CreateCharacterSuccessPacket {
@@ -550,14 +584,14 @@ pub struct CreateCharacterSuccessPacket {
 
 /// Sent by the client to the character server.
 /// Requests a list of every character associated with the account.
-#[derive(Clone, Debug, Default, OutgoingPacket)]
+#[derive(Debug, Clone, Default, OutgoingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09A1)]
 pub struct RequestCharacterListPacket {}
 
 /// Sent by the character server as a response to [RequestCharacterListPacket]
 /// succeeding. Provides the requested list of character information.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B72)]
 pub struct RequestCharacterListSuccessPacket {
@@ -567,9 +601,16 @@ pub struct RequestCharacterListSuccessPacket {
     pub character_information: Vec<CharacterInformation>,
 }
 
+/// Sent by the map server to the client.
+#[derive(Debug, Clone, Default, IncomingPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0B1D)]
+#[ping]
+pub struct MapServerPingPacket {}
+
 /// Sent by the client to the map server when the player wants to move.
 /// Attempts to path the player towards the provided position.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0881)]
 pub struct RequestPlayerMovePacket {
@@ -579,7 +620,7 @@ pub struct RequestPlayerMovePacket {
 /// Sent by the client to the map server when the player wants to warp.
 /// Attempts to warp the player to a specific position on a specific map using
 /// the provided information.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0140)]
 pub struct RequestWarpToMapPacket {
@@ -592,7 +633,7 @@ pub struct RequestWarpToMapPacket {
 /// Informs the client that an entity is pathing towards a new position.
 /// Provides the initial position and destination of the movement, as well as a
 /// timestamp of when it started (for synchronization).
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0086)]
 pub struct EntityMovePacket {
@@ -601,7 +642,7 @@ pub struct EntityMovePacket {
     pub timestamp: ClientTick,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0088)]
 pub struct EntityStopMovePacket {
@@ -613,7 +654,7 @@ pub struct EntityStopMovePacket {
 /// Informs the client that the player is pathing towards a new position.
 /// Provides the initial position and destination of the movement, as well as a
 /// timestamp of when it started (for synchronization).
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0087)]
 pub struct PlayerMovePacket {
@@ -625,7 +666,7 @@ pub struct PlayerMovePacket {
 /// character.
 /// Attempts to delete a character from the user account using the provided
 /// information.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, CharacterServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01FB)]
 pub struct DeleteCharacterPacket {
@@ -639,7 +680,7 @@ pub struct DeleteCharacterPacket {
     pub unknown: [u8; 10],
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum CharacterDeletionFailedReason {
     NotAllowed,
@@ -649,7 +690,7 @@ pub enum CharacterDeletionFailedReason {
 
 /// Sent by the character server as a response to [DeleteCharacterPacket]
 /// failing. Provides a reason for the character deletion failing.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0070)]
 pub struct CharacterDeletionFailedPacket {
@@ -658,14 +699,14 @@ pub struct CharacterDeletionFailedPacket {
 
 /// Sent by the character server as a response to [DeleteCharacterPacket]
 /// succeeding.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x006F)]
 pub struct CharacterDeletionSuccessPacket {}
 
 /// Sent by the client to the character server when the user selects a
 /// character. Attempts to select the character in the specified slot.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, CharacterServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0066)]
 pub struct SelectCharacterPacket {
@@ -674,7 +715,7 @@ pub struct SelectCharacterPacket {
 
 /// Sent by the map server to the client when there is a new chat message from
 /// the server. Provides the message to be displayed in the chat window.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x008E)]
 pub struct ServerMessagePacket {
@@ -686,7 +727,7 @@ pub struct ServerMessagePacket {
 /// Sent by the client to the map server when the user hovers over an entity.
 /// Attempts to fetch additional information about the entity, such as the
 /// display name.
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0368)]
 pub struct RequestDetailsPacket {
@@ -695,7 +736,7 @@ pub struct RequestDetailsPacket {
 
 /// Sent by the map server to the client as a response to
 /// [RequestDetailsPacket]. Provides additional information about the player.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0A30)]
 pub struct RequestPlayerDetailsSuccessPacket {
@@ -713,7 +754,7 @@ pub struct RequestPlayerDetailsSuccessPacket {
 
 /// Sent by the map server to the client as a response to
 /// [RequestDetailsPacket]. Provides additional information about the entity.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0ADF)]
 pub struct RequestEntityDetailsSuccessPacket {
@@ -725,14 +766,14 @@ pub struct RequestEntityDetailsSuccessPacket {
     pub title: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09E7)]
 pub struct NewMailStatusPacket {
     pub new_available: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct AchievementData {
     pub acheivement_id: u32,
@@ -742,7 +783,7 @@ pub struct AchievementData {
     pub got_rewarded: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0A24)]
 pub struct AchievementUpdatePacket {
@@ -753,7 +794,7 @@ pub struct AchievementUpdatePacket {
     pub acheivement_data: AchievementData,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0A23)]
 pub struct AchievementListPacket {
@@ -768,14 +809,14 @@ pub struct AchievementListPacket {
     pub acheivement_data: Vec<AchievementData>,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0ADE)]
 pub struct CriticalWeightUpdatePacket {
     pub packet_length: u32,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01D7)]
 pub struct SpriteChangePacket {
@@ -785,7 +826,7 @@ pub struct SpriteChangePacket {
     pub value2: u32,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B08)]
 pub struct InventoyStartPacket {
@@ -795,7 +836,7 @@ pub struct InventoyStartPacket {
     pub inventory_name: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B0B)]
 pub struct InventoyEndPacket {
@@ -803,7 +844,7 @@ pub struct InventoyEndPacket {
     pub flag: u8, // maybe char ?
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ItemOptions {
     pub index: u16,
@@ -811,7 +852,7 @@ pub struct ItemOptions {
     pub parameter: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct RegularItemInformation {
     pub index: ItemIndex,
@@ -824,7 +865,7 @@ pub struct RegularItemInformation {
     pub fags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B09)]
 pub struct RegularItemListPacket {
@@ -835,7 +876,7 @@ pub struct RegularItemListPacket {
     pub item_information: Vec<RegularItemInformation>,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct EquippableItemInformation {
     pub index: ItemIndex,
@@ -854,7 +895,7 @@ pub struct EquippableItemInformation {
     pub fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B39)]
 pub struct EquippableItemListPacket {
@@ -865,14 +906,14 @@ pub struct EquippableItemListPacket {
     pub item_information: Vec<EquippableItemInformation>,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct EquippableSwitchItemInformation {
     pub index: ItemIndex,
     pub position: u32,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0A9B)]
 pub struct EquippableSwitchItemListPacket {
@@ -882,7 +923,7 @@ pub struct EquippableSwitchItemListPacket {
     pub item_information: Vec<EquippableSwitchItemInformation>,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x099B)]
 pub struct MapTypePacket {
@@ -893,7 +934,7 @@ pub struct MapTypePacket {
 /// Sent by the map server to the client when there is a new chat message from
 /// ??. Provides the message to be displayed in the chat window, as well as
 /// information on how the message should be displayed.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01C3)]
 pub struct Broadcast2MessagePacket {
@@ -909,7 +950,7 @@ pub struct Broadcast2MessagePacket {
 
 /// Sent by the map server to the client when when someone uses the @broadcast
 /// command. Provides the message to be displayed in the chat window.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x009A)]
 pub struct BroadcastMessagePacket {
@@ -921,20 +962,20 @@ pub struct BroadcastMessagePacket {
 /// Sent by the map server to the client when when someone writes in proximity
 /// chat. Provides the source player and message to be displayed in the chat
 /// window and the speach bubble.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x008D)]
 pub struct OverheadMessagePacket {
     pub packet_length: u16,
     pub entity_id: EntityId,
-    #[length_hint(self.packet_length - 6)]
+    #[length_hint(self.packet_length - 8)]
     pub message: String,
 }
 
 /// Sent by the map server to the client when there is a new chat message from
 /// an entity. Provides the message to be displayed in the chat window, the
 /// color of the message, and the ID of the entity it originated from.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02C1)]
 pub struct EntityMessagePacket {
@@ -945,7 +986,7 @@ pub struct EntityMessagePacket {
     pub message: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00C0)]
 pub struct DisplayEmotionPacket {
@@ -957,7 +998,7 @@ pub struct DisplayEmotionPacket {
 /// [UpdateStatusPacket1], [UpdateStatusPacket2], and [UpdateStatusPacket3].
 /// All UpdateStatusPackets do the same, they just have different sizes
 /// correlating to the space the updated value requires.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum StatusType {
     Weight(u32),
     MaximumWeight(u32),
@@ -1110,7 +1151,7 @@ impl<App: korangar_interface::application::Application> korangar_interface::elem
     }
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B0)]
 pub struct UpdateStatusPacket {
@@ -1118,7 +1159,7 @@ pub struct UpdateStatusPacket {
     pub status_type: StatusType,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0196)]
 pub struct StatusChangeSequencePacket {
@@ -1130,7 +1171,7 @@ pub struct StatusChangeSequencePacket {
 /// Sent by the character server to the client when loading onto a new map.
 /// This packet is ignored by Korangar since all of the provided values are set
 /// again individually using the UpdateStatusPackets.
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00BD)]
 pub struct InitialStatusPacket {
@@ -1164,7 +1205,7 @@ pub struct InitialStatusPacket {
     pub bonus_attack_speed: u16,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0141)]
 pub struct UpdateStatusPacket1 {
@@ -1172,7 +1213,7 @@ pub struct UpdateStatusPacket1 {
     pub status_type: StatusType,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0ACB)]
 pub struct UpdateStatusPacket2 {
@@ -1180,7 +1221,7 @@ pub struct UpdateStatusPacket2 {
     pub status_type: StatusType,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00BE)]
 pub struct UpdateStatusPacket3 {
@@ -1188,14 +1229,14 @@ pub struct UpdateStatusPacket3 {
     pub status_type: StatusType,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x013A)]
 pub struct UpdateAttackRangePacket {
     pub attack_range: u16,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, CharacterServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x08D4)]
 pub struct SwitchCharacterSlotPacket {
@@ -1207,7 +1248,7 @@ pub struct SwitchCharacterSlotPacket {
     pub remaining_moves: u16,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum Action {
     Attack,
@@ -1221,7 +1262,7 @@ pub enum Action {
     TouchSkill,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0437)]
 pub struct RequestActionPacket {
@@ -1229,7 +1270,7 @@ pub struct RequestActionPacket {
     pub action: Action,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00F3)]
 pub struct GlobalMessagePacket {
@@ -1237,7 +1278,7 @@ pub struct GlobalMessagePacket {
     pub message: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0139)]
 pub struct RequestPlayerAttackFailedPacket {
@@ -1247,7 +1288,7 @@ pub struct RequestPlayerAttackFailedPacket {
     pub attack_range: u16,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0977)]
 pub struct UpdateEntityHealthPointsPacket {
@@ -1256,11 +1297,11 @@ pub struct UpdateEntityHealthPointsPacket {
     pub maximum_health_points: u32,
 }
 
-/*#[derive(Clone, Debug, ByteConvertable)]
+/*#[derive(Debug, Clone, ByteConvertable)]
 pub enum DamageType {
 }*/
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x08C8)]
 pub struct DamagePacket {
@@ -1277,7 +1318,7 @@ pub struct DamagePacket {
     pub damage_amount2: u32,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x007F)]
 #[ping]
@@ -1285,7 +1326,7 @@ pub struct ServerTickPacket {
     pub client_tick: ClientTick,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0360)]
 #[ping]
@@ -1293,7 +1334,7 @@ pub struct RequestServerTickPacket {
     pub client_tick: ClientTick,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, ByteConvertable)]
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum SwitchCharacterSlotResponseStatus {
@@ -1301,7 +1342,7 @@ pub enum SwitchCharacterSlotResponseStatus {
     Error,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B70)]
 pub struct SwitchCharacterSlotResponsePacket {
@@ -1310,7 +1351,7 @@ pub struct SwitchCharacterSlotResponsePacket {
     pub remaining_moves: u16,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0091)]
 pub struct ChangeMapPacket {
@@ -1319,7 +1360,7 @@ pub struct ChangeMapPacket {
     pub position: TilePosition,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum DissapearanceReason {
     OutOfSight,
@@ -1329,7 +1370,7 @@ pub enum DissapearanceReason {
     TrickDead,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0080)]
 pub struct EntityDisappearedPacket {
@@ -1337,7 +1378,7 @@ pub struct EntityDisappearedPacket {
     pub reason: DissapearanceReason,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09FD)]
 pub struct MovingEntityAppearedPacket {
@@ -1380,7 +1421,7 @@ pub struct MovingEntityAppearedPacket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09FE)]
 pub struct EntityAppearedPacket {
@@ -1422,7 +1463,7 @@ pub struct EntityAppearedPacket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09FF)]
 pub struct EntityAppeared2Packet {
@@ -1483,7 +1524,7 @@ pub enum SkillType {
     Trap,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct SkillInformation {
     pub skill_id: SkillId,
@@ -1496,7 +1537,7 @@ pub struct SkillInformation {
     pub upgraded: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x010F)]
 pub struct UpdateSkillTreePacket {
@@ -1506,7 +1547,7 @@ pub struct UpdateSkillTreePacket {
     pub skill_information: Vec<SkillInformation>,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct HotkeyData {
     pub is_skill: u8,
@@ -1514,7 +1555,7 @@ pub struct HotkeyData {
     pub quantity_or_skill_level: SkillLevel,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B20)]
 pub struct UpdateHotkeysPacket {
@@ -1523,21 +1564,21 @@ pub struct UpdateHotkeysPacket {
     pub hotkeys: [HotkeyData; 38],
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02C9)]
 pub struct UpdatePartyInvitationStatePacket {
     pub allowed: u8, // always 0 on rAthena
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02DA)]
 pub struct UpdateShowEquipPacket {
     pub open_equip_window: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02D9)]
 pub struct UpdateConfigurationPacket {
@@ -1545,7 +1586,7 @@ pub struct UpdateConfigurationPacket {
     pub value: u32, // only enabled and disabled ?
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x08E2)]
 pub struct NavigateToMonsterPacket {
@@ -1558,7 +1599,7 @@ pub struct NavigateToMonsterPacket {
     pub target_monster_id: u16,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u32)]
 pub enum MarkerType {
@@ -1567,7 +1608,7 @@ pub enum MarkerType {
     RemoveMark,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0144)]
 pub struct MarkMinimapPositionPacket {
@@ -1578,21 +1619,21 @@ pub struct MarkMinimapPositionPacket {
     pub color: ColorRGBA,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B5)]
 pub struct NextButtonPacket {
     pub entity_id: EntityId,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B6)]
 pub struct CloseButtonPacket {
     pub entity_id: EntityId,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B7)]
 pub struct DialogMenuPacket {
@@ -1602,7 +1643,7 @@ pub struct DialogMenuPacket {
     pub message: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01F3)]
 pub struct DisplaySpecialEffectPacket {
@@ -1610,7 +1651,7 @@ pub struct DisplaySpecialEffectPacket {
     pub effect_id: u32,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x043D)]
 pub struct DisplaySkillCooldownPacket {
@@ -1618,7 +1659,7 @@ pub struct DisplaySkillCooldownPacket {
     pub until: ClientTick,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01DE)]
 pub struct DisplaySkillEffectAndDamagePacket {
@@ -1634,7 +1675,7 @@ pub struct DisplaySkillEffectAndDamagePacket {
     pub skill_type: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum HealType {
@@ -1644,7 +1685,7 @@ pub enum HealType {
     SpellPoints,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0A27)]
 pub struct DisplayPlayerHealEffect {
@@ -1652,7 +1693,7 @@ pub struct DisplayPlayerHealEffect {
     pub heal_amount: u32,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09CB)]
 pub struct DisplaySkillEffectNoDamagePacket {
@@ -1663,7 +1704,7 @@ pub struct DisplaySkillEffectNoDamagePacket {
     pub result: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0983)]
 pub struct StatusChangePacket {
@@ -1675,7 +1716,7 @@ pub struct StatusChangePacket {
     pub value: [u32; 3],
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ObjectiveDetails1 {
     pub hunt_identification: u32,
@@ -1688,7 +1729,7 @@ pub struct ObjectiveDetails1 {
     pub mob_name: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09F9)]
 pub struct QuestNotificationPacket1 {
@@ -1702,7 +1743,7 @@ pub struct QuestNotificationPacket1 {
     pub objective_details: [ObjectiveDetails1; 3],
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct HuntingObjective {
     pub quest_id: u32,
@@ -1711,7 +1752,7 @@ pub struct HuntingObjective {
     pub current_count: u16,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x08FE)]
 pub struct HuntingQuestNotificationPacket {
@@ -1721,7 +1762,7 @@ pub struct HuntingQuestNotificationPacket {
     pub objective_details: Vec<HuntingObjective>,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09FA)]
 pub struct HuntingQuestUpdateObjectivePacket {
@@ -1732,14 +1773,14 @@ pub struct HuntingQuestUpdateObjectivePacket {
     pub objective_details: Vec<HuntingObjective>,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02B4)]
 pub struct QuestRemovedPacket {
     pub quest_id: u32,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct QuestDetails {
     pub hunt_identification: u32,
@@ -1753,7 +1794,7 @@ pub struct QuestDetails {
     pub mob_name: String,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Quest {
     #[packet_length]
@@ -1766,7 +1807,7 @@ pub struct Quest {
     pub objective_details: Vec<QuestDetails>,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09F8)]
 pub struct QuestListPacket {
@@ -1777,7 +1818,7 @@ pub struct QuestListPacket {
     pub quests: Vec<Quest>,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u32)]
 pub enum VisualEffect {
@@ -1793,7 +1834,7 @@ pub enum VisualEffect {
     BaseLevelUpTaekwon,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x019B)]
 pub struct VisualEffectPacket {
@@ -1801,7 +1842,7 @@ pub struct VisualEffectPacket {
     pub effect: VisualEffect,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum ExperienceType {
@@ -1810,7 +1851,7 @@ pub enum ExperienceType {
     JobExperience,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum ExperienceSource {
@@ -1818,7 +1859,7 @@ pub enum ExperienceSource {
     Quest,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0ACC)]
 pub struct DisplayGainedExperiencePacket {
@@ -1828,7 +1869,7 @@ pub struct DisplayGainedExperiencePacket {
     pub experience_source: ExperienceSource,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum ImageLocation {
     BottomLeft,
@@ -1840,7 +1881,7 @@ pub enum ImageLocation {
     ClearAll,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01B3)]
 pub struct DisplayImagePacket {
@@ -1849,7 +1890,7 @@ pub struct DisplayImagePacket {
     pub location: ImageLocation,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0229)]
 pub struct StateChangePacket {
@@ -1860,7 +1901,7 @@ pub struct StateChangePacket {
     pub is_pk_mode_on: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B41)]
 pub struct ItemPickupPacket {
@@ -1882,7 +1923,7 @@ pub struct ItemPickupPacket {
     pub enchantment_level: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum RemoveItemReason {
@@ -1896,7 +1937,7 @@ pub enum RemoveItemReason {
     ConsumedByFourSpiritAnalysis,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x07FA)]
 pub struct RemoveItemFromInventoryPacket {
@@ -1906,7 +1947,7 @@ pub struct RemoveItemFromInventoryPacket {
 }
 
 // TODO: improve names
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum QuestEffect {
@@ -1925,7 +1966,7 @@ pub enum QuestEffect {
     None,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum QuestColor {
@@ -1935,7 +1976,7 @@ pub enum QuestColor {
     Purple,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0446)]
 pub struct QuestEffectPacket {
@@ -1945,7 +1986,7 @@ pub struct QuestEffectPacket {
     pub color: QuestColor,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B4)]
 pub struct NpcDialogPacket {
@@ -1955,12 +1996,12 @@ pub struct NpcDialogPacket {
     pub text: String,
 }
 
-#[derive(Clone, Debug, Default, OutgoingPacket)]
+#[derive(Debug, Clone, Default, OutgoingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x007D)]
 pub struct MapLoadedPacket {}
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, CharacterServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0187)]
 #[ping]
@@ -1970,7 +2011,7 @@ pub struct CharacterServerKeepalivePacket {
     pub account_id: AccountId,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0090)]
 pub struct StartDialogPacket {
@@ -1979,21 +2020,21 @@ pub struct StartDialogPacket {
     pub dialog_type: u8,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B9)]
 pub struct NextDialogPacket {
     pub npc_id: EntityId,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0146)]
 pub struct CloseDialogPacket {
     pub npc_id: EntityId,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B8)]
 pub struct ChooseDialogOptionPacket {
@@ -2057,39 +2098,7 @@ pub enum EquipPosition {
     ShadowLeftRightAccessory,
 }
 
-impl EquipPosition {
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            EquipPosition::None => panic!(),
-            EquipPosition::HeadLower => "Head lower",
-            EquipPosition::HeadMiddle => "Head middle",
-            EquipPosition::HeadTop => "Head top",
-            EquipPosition::RightHand => "Right hand",
-            EquipPosition::LeftHand => "Left hand",
-            EquipPosition::Armor => "Armor",
-            EquipPosition::Shoes => "Shoes",
-            EquipPosition::Garment => "Garment",
-            EquipPosition::LeftAccessory => "Left accessory",
-            EquipPosition::RigthAccessory => "Right accessory",
-            EquipPosition::CostumeHeadTop => "Costume head top",
-            EquipPosition::CostumeHeadMiddle => "Costume head middle",
-            EquipPosition::CostumeHeadLower => "Costume head lower",
-            EquipPosition::CostumeGarment => "Costume garment",
-            EquipPosition::Ammo => "Ammo",
-            EquipPosition::ShadowArmor => "Shadow ammo",
-            EquipPosition::ShadowWeapon => "Shadow weapon",
-            EquipPosition::ShadowShield => "Shadow shield",
-            EquipPosition::ShadowShoes => "Shadow shoes",
-            EquipPosition::ShadowRightAccessory => "Shadow right accessory",
-            EquipPosition::ShadowLeftAccessory => "Shadow left accessory",
-            EquipPosition::LeftRightAccessory => "Accessory",
-            EquipPosition::LeftRightHand => "Two hand weapon",
-            EquipPosition::ShadowLeftRightAccessory => "Shadow accessory",
-        }
-    }
-}
-
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0998)]
 pub struct RequestEquipItemPacket {
@@ -2097,7 +2106,7 @@ pub struct RequestEquipItemPacket {
     pub equip_position: EquipPosition,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum RequestEquipItemStatus {
     Success,
@@ -2105,7 +2114,7 @@ pub enum RequestEquipItemStatus {
     FailedDueToLevelRequirement,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0999)]
 pub struct RequestEquipItemStatusPacket {
@@ -2115,21 +2124,21 @@ pub struct RequestEquipItemStatusPacket {
     pub result: RequestEquipItemStatus,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00AB)]
 pub struct RequestUnequipItemPacket {
     pub inventory_index: ItemIndex,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum RequestUnequipItemStatus {
     Success,
     Failed,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x099A)]
 pub struct RequestUnequipItemStatusPacket {
@@ -2138,14 +2147,14 @@ pub struct RequestUnequipItemStatusPacket {
     pub result: RequestUnequipItemStatus,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum RestartType {
     Respawn,
     Disconnect,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B2)]
 pub struct RestartPacket {
@@ -2154,14 +2163,14 @@ pub struct RestartPacket {
 
 // TODO: check that this can be only 1 and 0, if not ByteConvertable
 // should be implemented manually
-#[derive(Clone, Debug, ByteConvertable, PartialEq, Eq)]
+#[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum RestartResponseStatus {
     Nothing,
     Ok,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00B3)]
 pub struct RestartResponsePacket {
@@ -2170,7 +2179,7 @@ pub struct RestartResponsePacket {
 
 // TODO: check that this can be only 1 and 0, if not Named, ByteConvertable
 // should be implemented manually
-#[derive(Clone, Debug, ByteConvertable, PartialEq, Eq)]
+#[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum DisconnectResponseStatus {
@@ -2178,14 +2187,14 @@ pub enum DisconnectResponseStatus {
     Wait10Seconds,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x018B)]
 pub struct DisconnectResponsePacket {
     pub result: DisconnectResponseStatus,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0438)]
 pub struct UseSkillAtIdPacket {
@@ -2194,7 +2203,7 @@ pub struct UseSkillAtIdPacket {
     pub target_id: EntityId,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0AF4)]
 pub struct UseSkillOnGroundPacket {
@@ -2205,7 +2214,7 @@ pub struct UseSkillOnGroundPacket {
     pub unused: u8,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B10)]
 pub struct StartUseSkillPacket {
@@ -2214,14 +2223,14 @@ pub struct StartUseSkillPacket {
     pub target_id: EntityId,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B11)]
 pub struct EndUseSkillPacket {
     pub skill_id: SkillId,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x07FB)]
 pub struct UseSkillSuccessPacket {
@@ -2234,7 +2243,7 @@ pub struct UseSkillSuccessPacket {
     pub disposable: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0110)]
 pub struct ToUseSkillSuccessPacket {
@@ -2245,7 +2254,7 @@ pub struct ToUseSkillSuccessPacket {
     pub cause: u8,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u32)]
 pub enum UnitId {
@@ -2440,7 +2449,7 @@ pub enum UnitId {
     Max,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09CA)]
 pub struct NotifySkillUnitPacket {
@@ -2454,7 +2463,7 @@ pub struct NotifySkillUnitPacket {
     pub skill_level: u8,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0117)]
 pub struct NotifyGroundSkillPacket {
@@ -2465,14 +2474,14 @@ pub struct NotifyGroundSkillPacket {
     pub start_time: ClientTick,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0120)]
 pub struct SkillUnitDisappearPacket {
     pub entity_id: EntityId,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Friend {
     pub account_id: AccountId,
@@ -2481,7 +2490,7 @@ pub struct Friend {
     pub name: String,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0202)]
 pub struct AddFriendPacket {
@@ -2489,7 +2498,7 @@ pub struct AddFriendPacket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0203)]
 pub struct RemoveFriendPacket {
@@ -2497,7 +2506,7 @@ pub struct RemoveFriendPacket {
     pub character_id: CharacterId,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x020A)]
 pub struct NotifyFriendRemovedPacket {
@@ -2505,7 +2514,7 @@ pub struct NotifyFriendRemovedPacket {
     pub character_id: CharacterId,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0201)]
 pub struct FriendListPacket {
@@ -2515,14 +2524,14 @@ pub struct FriendListPacket {
     pub friends: Vec<Friend>,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub enum OnlineState {
     Online,
     Offline,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0206)]
 pub struct FriendOnlineStatusPacket {
@@ -2533,14 +2542,14 @@ pub struct FriendOnlineStatusPacket {
     pub name: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0207)]
 pub struct FriendRequestPacket {
-    pub friend: Friend,
+    pub requestee: Friend,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u32)]
 pub enum FriendRequestResponse {
@@ -2548,7 +2557,7 @@ pub enum FriendRequestResponse {
     Accept,
 }
 
-#[derive(Clone, Debug, OutgoingPacket, new)]
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0208)]
 pub struct FriendRequestResponsePacket {
@@ -2557,7 +2566,7 @@ pub struct FriendRequestResponsePacket {
     pub response: FriendRequestResponse,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, ByteConvertable)]
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[numeric_type(u16)]
 pub enum FriendRequestResult {
@@ -2567,7 +2576,7 @@ pub enum FriendRequestResult {
     OtherFriendListFull,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0209)]
 pub struct FriendRequestResultPacket {
@@ -2575,19 +2584,7 @@ pub struct FriendRequestResultPacket {
     pub friend: Friend,
 }
 
-impl FriendRequestResultPacket {
-    pub fn into_message(self) -> String {
-        // Messages taken from rAthena
-        match self.result {
-            FriendRequestResult::Accepted => format!("You have become friends with {}.", self.friend.name),
-            FriendRequestResult::Rejected => format!("{} does not want to be friends with you.", self.friend.name),
-            FriendRequestResult::OwnFriendListFull => "Your Friend List is full.".to_owned(),
-            FriendRequestResult::OtherFriendListFull => format!("{}'s Friend List is full.", self.friend.name),
-        }
-    }
-}
-
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x02C6)]
 pub struct PartyInvitePacket {
@@ -2596,14 +2593,14 @@ pub struct PartyInvitePacket {
     pub party_name: String,
 }
 
-#[derive(Clone, Debug, ByteConvertable, FixedByteSize)]
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ReputationEntry {
     pub reputation_type: u64,
     pub points: i64,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B8D)]
 pub struct ReputationPacket {
@@ -2614,21 +2611,21 @@ pub struct ReputationPacket {
     pub entries: Vec<ReputationEntry>,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Aliance {
     #[length_hint(24)]
     pub name: String,
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Antagonist {
     #[length_hint(24)]
     pub name: String,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x098A)]
 pub struct ClanInfoPacket {
@@ -2649,7 +2646,7 @@ pub struct ClanInfoPacket {
     pub antagonists: Vec<Antagonist>,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0988)]
 pub struct ClanOnlineCountPacket {
@@ -2657,52 +2654,12 @@ pub struct ClanOnlineCountPacket {
     pub maximum_members: u16,
 }
 
-#[derive(Clone, Debug, IncomingPacket)]
+#[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0192)]
 pub struct ChangeMapCellPacket {
-    position: TilePosition,
-    cell_type: u16,
+    pub position: TilePosition,
+    pub cell_type: u16,
     #[length_hint(16)]
-    map_name: String,
-}
-
-/// Helper struct for working with unknown incoming packets.
-#[derive(Clone, new)]
-pub struct UnknownPacket {
-    bytes: Vec<u8>,
-}
-
-impl IncomingPacket for UnknownPacket {
-    const HEADER: u16 = 0;
-    const IS_PING: bool = false;
-
-    fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let _ = byte_stream;
-        unimplemented!()
-    }
-}
-
-#[cfg(feature = "interface")]
-impl<App: korangar_interface::application::Application> korangar_interface::elements::PrototypeElement<App> for UnknownPacket {
-    fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
-        use korangar_interface::elements::{ElementWrap, Expandable};
-
-        let mut byte_stream = ByteStream::<()>::without_metadata(&self.bytes);
-
-        let elements = match self.bytes.len() >= 2 {
-            true => {
-                let signature = u16::from_bytes(&mut byte_stream).unwrap();
-                let header = format!("0x{:0>4x}", signature);
-                let data = &self.bytes[byte_stream.get_offset()..];
-
-                vec![header.to_element("header".to_owned()), data.to_element("data".to_owned())]
-            }
-            false => {
-                vec![self.bytes.to_element("data".to_owned())]
-            }
-        };
-
-        Expandable::new(display, elements, false).wrap()
-    }
+    pub map_name: String,
 }

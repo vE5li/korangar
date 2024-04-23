@@ -1,22 +1,21 @@
-use std::cell::UnsafeCell;
-
 use derive_new::new;
-use korangar_interface::elements::{ButtonBuilder, ElementWrap, InputFieldBuilder, WeakElementCell};
+use korangar_interface::elements::{ButtonBuilder, ElementWrap, InputFieldBuilder};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedStateTake};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
-use ragnarok_networking::Friend;
+use ragnarok_packets::Friend;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FriendView;
 use crate::interface::layout::ScreenSize;
+use crate::interface::linked::LinkedElement;
 use crate::interface::windows::WindowCache;
 
 #[derive(new)]
 pub struct FriendsWindow {
-    friend_list: PlainRemote<Vec<(Friend, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>)>>,
+    friend_list: PlainRemote<Vec<(Friend, LinkedElement)>>,
 }
 
 impl FriendsWindow {

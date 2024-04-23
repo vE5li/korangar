@@ -29,7 +29,7 @@ impl Version {
 pub trait TrackedState<Value>: Clone {
     type RemoteType: Remote<Value> + 'static;
 
-    /// Set the inner value.
+    /// Set the inner value, advancing the version.
     fn set(&mut self, value: Value);
 
     /// Get an immutable reference to the inner value.
@@ -122,11 +122,6 @@ impl<Value> PlainTrackedState<Value> {
             tracked_state,
             version: self.get_version(),
         }
-    }
-
-    pub fn foo_test(&self) {
-        println!("Weak count: {}", Rc::weak_count(&self.0));
-        println!("Strong count: {}", Rc::strong_count(&self.0));
     }
 }
 

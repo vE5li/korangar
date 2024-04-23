@@ -1,0 +1,17 @@
+[package]
+name = "korangar_networking"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ragnarok_bytes = { workspace = true }
+ragnarok_packets = { workspace = true }
+tokio = { version = "1.37", features = ["full"] }
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+korangar_debug = { workspace = true }
+
+[features]
+debug = []

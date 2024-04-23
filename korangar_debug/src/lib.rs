@@ -1,6 +1,7 @@
-#![feature(thread_local)]
 #![feature(decl_macro)]
+#![feature(inline_const)]
 #![feature(let_chains)]
+#![feature(thread_local)]
 
 #[macro_use]
 pub mod logging;

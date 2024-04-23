@@ -48,7 +48,7 @@ use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use option_ext::OptionExt;
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 use vulkano::buffer::{Buffer, BufferUsage, Subbuffer};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, ClearAttachment, ClearRect, CommandBufferUsage, CopyImageToBufferInfo, PrimaryAutoCommandBuffer,

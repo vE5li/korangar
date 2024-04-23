@@ -4,7 +4,7 @@ use cgmath::Matrix4;
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::PrototypeWindow;
-use ragnarok_networking::ClientTick;
+use ragnarok_packets::ClientTick;
 
 use crate::graphics::*;
 use crate::world::*;

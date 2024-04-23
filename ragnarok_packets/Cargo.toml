@@ -1,5 +1,5 @@
 [package]
-name = "ragnarok_networking"
+name = "ragnarok_packets"
 version = "0.1.0"
 edition = "2021"
 
@@ -13,3 +13,4 @@ korangar_interface = { workspace = true, optional = true }
 debug = []
 derive = []
 interface = ["korangar_interface"]
+packet-to-prototype-element = ["interface"]

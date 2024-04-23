@@ -1,5 +1,6 @@
 mod action;
 mod archive;
+pub mod client;
 pub mod color;
 mod effect;
 mod font;

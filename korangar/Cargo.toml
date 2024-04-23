@@ -12,6 +12,7 @@ collision = { git = "https://github.com/rustgd/collision-rs.git" }
 derive-new = { workspace = true }
 image = "0.24.2"
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
+korangar_networking = { workspace = true, features = ["debug"] }
 lunify = "1.1.0"
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
 num = { workspace = true }
@@ -20,7 +21,7 @@ option-ext = "0.2.0"
 pathfinding = "2.2.2"
 korangar_debug = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
-ragnarok_networking = { workspace = true, features = ["derive", "interface"] }
+ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
 rand = "0.8.5"
 random_color = { version = "0.6.1", optional = true }
 rayon = "1.5.3"
@@ -28,6 +29,7 @@ ron = "0.8.0"
 rusttype = { version = "0.9.2", features = ["gpu_cache"] }
 serde = { workspace = true }
 serde-xml-rs = "0.6.0"
+tokio = { version = "1.37.0", features = ["full"] }
 vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
 vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
 vulkano-win = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
@@ -38,6 +40,6 @@ yazi = "0.1.4"
 
 [features]
 patched_as_folder = []
-debug = ["korangar_debug", "ragnarok_networking/debug", "random_color"]
+debug = ["korangar_debug", "ragnarok_packets/debug", "random_color"]
 unicode = ["korangar_debug/unicode"]
 plain = ["debug"]

@@ -8,7 +8,7 @@ mod tile;
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;
 use vulkano::pipeline::graphics::viewport::Viewport;

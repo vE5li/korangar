@@ -16,14 +16,12 @@ use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition};
 use crate::interface::theme::InterfaceTheme;
+use crate::interface::windows::ChatMessage;
 use crate::loaders::FontLoader;
-use crate::network::ChatMessage;
 
 pub struct Chat {
     messages: PlainRemote<Vec<ChatMessage>>,
     font_loader: Rc<RefCell<FontLoader>>,
-    // TODO: make this Remote
-    stamp: bool,
     state: ElementState<InterfaceSettings>,
 }
 
@@ -51,14 +49,14 @@ impl Element<InterfaceSettings> for Chat {
         // padding.
         let mut height = 5.0 * application.get_scaling_factor();
 
-        // NOTE: Dividing by the scaling is done to counteract the scaling being applied
+        // Dividing by the scaling is done to counteract the scaling being applied
         // twice per message. It's not the cleanest solution but it works.
         for message in self.messages.get().iter() {
             height += self
                 .font_loader
                 .borrow()
                 .get_text_dimensions(
-                    message.stamped_text(self.stamp),
+                    &message.text,
                     theme.chat.font_size.get().scaled(application.get_scaling()),
                     placement_resolver.get_available().width,
                 )
@@ -94,7 +92,7 @@ impl Element<InterfaceSettings> for Chat {
         let mut offset = 0.0;
 
         for message in self.messages.get().iter() {
-            let text = message.stamped_text(self.stamp);
+            let text = &message.text;
 
             renderer.render_text(
                 text,
@@ -106,12 +104,20 @@ impl Element<InterfaceSettings> for Chat {
                 theme.chat.font_size.get(),
             );
 
-            // NOTE: Dividing by the scaling is done to counteract the scaling being applied
+            let message_color = match message.color {
+                korangar_networking::MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
+                korangar_networking::MessageColor::Broadcast => theme.chat.broadcast_color.get(),
+                korangar_networking::MessageColor::Server => theme.chat.server_color.get(),
+                korangar_networking::MessageColor::Error => theme.chat.broadcast_color.get(),
+                korangar_networking::MessageColor::Information => theme.chat.information_color.get(),
+            };
+
+            // Dividing by the scaling is done to counteract the scaling being applied
             // twice per message. It's not the cleanest solution but it works.
             offset += renderer.render_text(
                 text,
                 ScreenPosition::only_top(offset),
-                message.color,
+                message_color,
                 theme.chat.font_size.get(),
             ) / application.get_scaling_factor();
         }

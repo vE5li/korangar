@@ -136,6 +136,10 @@ where
 {
     fn background_color(&self) -> App::Color;
     fn font_size(&self) -> App::FontSize;
+    fn broadcast_color(&self) -> App::Color;
+    fn server_color(&self) -> App::Color;
+    fn error_color(&self) -> App::Color;
+    fn information_color(&self) -> App::Color;
 }
 
 pub trait CursorTheme<App>

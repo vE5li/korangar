@@ -4,7 +4,8 @@ mod skills;
 use std::sync::Arc;
 
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
-use ragnarok_networking::{EquipPosition, ItemId, ItemIndex};
+use korangar_networking::InventoryItem;
+use ragnarok_packets::{EquipPosition, ItemId, ItemIndex};
 use vulkano::image::view::ImageView;
 
 pub use self::hotbar::Hotbar;
@@ -53,19 +54,20 @@ impl Inventory {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         script_loader: &ScriptLoader,
-        item_data: Vec<(ItemIndex, ItemId, EquipPosition, EquipPosition)>,
+        item_data: Vec<InventoryItem>,
     ) {
         let items = item_data
             .into_iter()
             .map(|item_data| {
-                let resource_name = script_loader.get_item_resource_from_id(item_data.1);
+                let resource_name = script_loader.get_item_resource_from_id(item_data.id);
                 let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
                 let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
+
                 Item {
-                    index: item_data.0,
-                    item_id: item_data.1,
-                    equip_position: item_data.2,
-                    equipped_position: item_data.3,
+                    index: item_data.index,
+                    item_id: item_data.id,
+                    equip_position: item_data.equip_position,
+                    equipped_position: item_data.equipped_position,
                     texture,
                 }
             })

@@ -4,7 +4,8 @@ use cgmath::{Array, Vector2, Vector3, VectorSpace};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
-use ragnarok_networking::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType};
+use korangar_networking::EntityData;
+use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
 use vulkano::buffer::Subbuffer;
 
 #[cfg(feature = "debug")]
@@ -15,7 +16,6 @@ use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
-use crate::network::EntityData;
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -274,6 +274,7 @@ impl Common {
         let entity_id = entity_data.entity_id;
         let job_id = entity_data.job as usize;
         let grid_position = entity_data.position;
+        let grid_position = Vector2::new(grid_position.x, grid_position.y);
         let position = map.get_world_position(grid_position);
         let head_direction = entity_data.head_direction;
 
@@ -325,7 +326,9 @@ impl Common {
         };
 
         if let Some(destination) = entity_data.destination {
-            common.move_from_to(map, entity_data.position, destination, client_tick);
+            let position_from = Vector2::new(entity_data.position.x, entity_data.position.y);
+            let position_to = Vector2::new(destination.x, destination.y);
+            common.move_from_to(map, position_from, position_to, client_tick);
         }
 
         common
@@ -774,7 +777,7 @@ impl Player {
         map: &Map,
         account_id: AccountId,
         character_information: CharacterInformation,
-        player_position: Vector2<usize>,
+        player_position: WorldPosition,
         client_tick: ClientTick,
     ) -> Self {
         let spell_points = character_information.spell_points as usize;

@@ -29,9 +29,9 @@ pub fn derive_incoming_packet_struct(
     };
 
     quote! {
-        impl #impl_generics ragnarok_networking::IncomingPacket for #name #type_generics #where_clause {
+        impl #impl_generics ragnarok_packets::IncomingPacket for #name #type_generics #where_clause {
             const IS_PING: bool = #is_ping;
-            const HEADER: u16 = #signature;
+            const HEADER: ragnarok_packets::PacketHeader = ragnarok_packets::PacketHeader(#signature);
 
             fn payload_from_bytes<Meta>(byte_stream: &mut ragnarok_bytes::ByteStream<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
                 let base_offset = byte_stream.get_offset();
@@ -39,6 +39,13 @@ pub fn derive_incoming_packet_struct(
                 let packet = #instanciate;
 
                 Ok(packet)
+            }
+
+            #[cfg(feature = "packet-to-prototype-element")]
+            fn to_prototype_element<App: korangar_interface::application::Application>(
+                &self,
+            ) -> Box<dyn korangar_interface::elements::PrototypeElement<App> + Send> {
+                Box::new(self.clone())
             }
         }
     }
@@ -64,13 +71,20 @@ pub fn derive_outgoing_packet_struct(
     let to_bytes = quote!([&#signature.to_le_bytes()[..], #(#to_bytes_implementations),*].concat());
 
     quote! {
-        impl #impl_generics ragnarok_networking::OutgoingPacket for #name #type_generics #where_clause {
+        impl #impl_generics ragnarok_packets::OutgoingPacket for #name #type_generics #where_clause {
             const IS_PING: bool = #is_ping;
 
             // Temporary until serialization is always possible
             #[allow(unreachable_code)]
             fn packet_to_bytes(&self) -> ragnarok_bytes::ConversionResult<Vec<u8>> {
                 Ok(#to_bytes)
+            }
+
+            #[cfg(feature = "packet-to-prototype-element")]
+            fn to_prototype_element<App: korangar_interface::application::Application>(
+                &self,
+            ) -> Box<dyn korangar_interface::elements::PrototypeElement<App> + Send> {
+                Box::new(self.clone())
             }
         }
     }

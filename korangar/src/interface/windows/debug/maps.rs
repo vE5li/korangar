@@ -1,7 +1,7 @@
-use cgmath::Vector2;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use ragnarok_packets::TilePosition;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
@@ -27,29 +27,29 @@ impl PrototypeWindow<InterfaceSettings> for MapsWindow {
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let map_warps = [
-            ("geffen", Vector2::new(119, 59)),
-            ("alberta", Vector2::new(28, 234)),
-            ("aldebaran", Vector2::new(140, 131)),
-            ("amatsu", Vector2::new(198, 84)),
-            ("ayothaya", Vector2::new(208, 166)),
-            ("prontera", Vector2::new(155, 183)),
-            ("brasilis", Vector2::new(196, 217)),
-            ("einbech", Vector2::new(63, 35)),
-            ("einbroch", Vector2::new(64, 200)),
-            ("dicastes01", Vector2::new(198, 187)),
-            ("gonryun", Vector2::new(160, 120)),
-            ("hugel", Vector2::new(96, 145)),
-            ("izlude", Vector2::new(128, 146)),
-            ("jawaii", Vector2::new(251, 132)),
-            ("lasagna", Vector2::new(193, 182)),
-            ("lighthalzen", Vector2::new(158, 92)),
-            ("louyang", Vector2::new(217, 100)),
-            ("xmas", Vector2::new(147, 134)),
-            ("c_tower1", Vector2::new(235, 218)),
-            ("ama_dun01", Vector2::new(54, 107)),
-            ("umbala", Vector2::new(97, 153)),
-            ("rachel", Vector2::new(120, 120)),
-            ("mid_camp", Vector2::new(180, 240)),
+            ("geffen", TilePosition { x: 119, y: 59 }),
+            ("alberta", TilePosition { x: 28, y: 234 }),
+            ("aldebaran", TilePosition { x: 140, y: 131 }),
+            ("amatsu", TilePosition { x: 198, y: 84 }),
+            ("ayothaya", TilePosition { x: 208, y: 166 }),
+            ("prontera", TilePosition { x: 155, y: 183 }),
+            ("brasilis", TilePosition { x: 196, y: 217 }),
+            ("einbech", TilePosition { x: 63, y: 35 }),
+            ("einbroch", TilePosition { x: 64, y: 200 }),
+            ("dicastes01", TilePosition { x: 198, y: 187 }),
+            ("gonryun", TilePosition { x: 160, y: 120 }),
+            ("hugel", TilePosition { x: 96, y: 145 }),
+            ("izlude", TilePosition { x: 128, y: 146 }),
+            ("jawaii", TilePosition { x: 251, y: 132 }),
+            ("lasagna", TilePosition { x: 193, y: 182 }),
+            ("lighthalzen", TilePosition { x: 158, y: 92 }),
+            ("louyang", TilePosition { x: 217, y: 100 }),
+            ("xmas", TilePosition { x: 147, y: 134 }),
+            ("c_tower1", TilePosition { x: 235, y: 218 }),
+            ("ama_dun01", TilePosition { x: 54, y: 107 }),
+            ("umbala", TilePosition { x: 97, y: 153 }),
+            ("rachel", TilePosition { x: 120, y: 120 }),
+            ("mid_camp", TilePosition { x: 180, y: 240 }),
         ];
 
         let elements = map_warps

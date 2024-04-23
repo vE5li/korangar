@@ -1,7 +1,7 @@
 use cgmath::Vector2;
 use korangar_interface::event::ClickAction;
 use korangar_interface::ElementEvent;
-use ragnarok_networking::{AccountId, CharacterId, CharacterServerInformation, EntityId};
+use ragnarok_packets::{AccountId, CharacterId, CharacterServerInformation, EntityId, TilePosition};
 
 use super::HotbarSlot;
 use crate::interface::application::{InterfaceSettings, InternalThemeKind};
@@ -50,7 +50,7 @@ pub enum UserEvent {
     SwitchCharacterSlot(usize),
     RequestPlayerMove(Vector2<usize>),
     RequestPlayerInteract(EntityId),
-    RequestWarpToMap(String, Vector2<usize>),
+    RequestWarpToMap(String, TilePosition),
     SendMessage(String),
     NextDialog(EntityId),
     CloseDialog(EntityId),

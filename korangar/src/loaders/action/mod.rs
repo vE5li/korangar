@@ -8,7 +8,7 @@ use derive_new::new;
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteConvertable, ByteStream, FromBytes};
-use ragnarok_networking::ClientTick;
+use ragnarok_packets::ClientTick;
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;
@@ -146,7 +146,7 @@ impl Actions {
         let fs = &a.motions[frame as usize % a.motions.len()];
 
         for sprite_clip in &fs.sprite_clips {
-            // NOTE: `get` instead of a direct index in case a fallback was loaded
+            // `get` instead of a direct index in case a fallback was loaded
             let Some(texture) = sprite.textures.get(sprite_clip.sprite_number as usize) else {
                 return;
             };

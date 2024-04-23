@@ -129,7 +129,7 @@ where
 {
     pub fn new(available_space: App::Size) -> Self {
         let window_cache = App::Cache::create();
-        // NOTE: We need to initially clear the interface buffer
+        // We need to initially clear the interface buffer
         let post_update = PostUpdate::new().with_render();
 
         Self {
@@ -206,7 +206,7 @@ where
                     self.window_cache.register_window(window_class, new_position, new_size);
                 }
 
-                // NOTE: If the window got smaller, we need to re-render the entire interface.
+                // If the window got smaller, we need to re-render the entire interface.
                 // If it got bigger, we can just draw over the previous frame.
                 match previous_size.width() > new_size.width() || previous_size.height() > new_size.height() {
                     true => self.post_update.render(),

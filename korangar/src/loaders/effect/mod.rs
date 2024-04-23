@@ -7,7 +7,7 @@ use derive_new::new;
 use korangar_debug::logging::{Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 use vulkano::image::view::ImageView;
 
 use super::version::InternalVersion;

@@ -3,7 +3,7 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};

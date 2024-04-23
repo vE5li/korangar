@@ -4,7 +4,7 @@ fragment_shader!("src/graphics/renderers/picker/entity/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
-use ragnarok_networking::EntityId;
+use ragnarok_packets::EntityId;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::image::sampler::Sampler;

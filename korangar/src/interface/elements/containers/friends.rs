@@ -1,28 +1,27 @@
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-use korangar_interface::elements::{
-    ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus, WeakElementCell,
-};
+use korangar_interface::elements::{ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use ragnarok_networking::Friend;
+use ragnarok_packets::Friend;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::interface::linked::LinkedElement;
 use crate::interface::theme::InterfaceTheme;
 
 pub struct FriendView {
-    friends: PlainRemote<Vec<(Friend, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>)>>,
+    friends: PlainRemote<Vec<(Friend, LinkedElement)>>,
     state: ContainerState<InterfaceSettings>,
 }
 
 impl FriendView {
-    pub fn new(friends: PlainRemote<Vec<(Friend, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>)>>) -> Self {
+    pub fn new(friends: PlainRemote<Vec<(Friend, LinkedElement)>>) -> Self {
         let elements = {
             let friends = friends.get();
 
@@ -30,7 +29,7 @@ impl FriendView {
                 .iter()
                 .map(|(friend, linked_element)| {
                     let element = Self::friend_to_element(friend);
-                    unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
+                    linked_element.link(&element);
                     element
                 })
                 .collect()
@@ -114,14 +113,15 @@ impl Element<InterfaceSettings> for FriendView {
             // Remove elements of old friends from the start of the list and add new friends
             // to the list.
             self.friends.get().iter().enumerate().for_each(|(index, (friend, linked_element))| {
-                if let Some(linked_element) = unsafe { &(*linked_element.get()) } {
-                    while !std::ptr::addr_eq(linked_element.as_ptr(), Rc::downgrade(&self.state.elements[index]).as_ptr()) {
+                if linked_element.is_linked() {
+                    while !linked_element.is_linked_to(&self.state.elements[index]) {
                         self.state.elements.remove(index);
                     }
                 } else {
                     let element = Self::friend_to_element(friend);
-                    unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
                     let weak_self = self.state.state.self_element.clone();
+
+                    linked_element.link(&element);
 
                     element.borrow_mut().link_back(Rc::downgrade(&element), weak_self);
 

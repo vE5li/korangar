@@ -9,7 +9,7 @@ use korangar_debug::profiling::Profiler;
 use korangar_interface::windows::PrototypeWindow;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
-use ragnarok_networking::ClientTick;
+use ragnarok_packets::ClientTick;
 use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
 

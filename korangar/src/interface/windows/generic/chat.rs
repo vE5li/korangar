@@ -7,6 +7,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, TrackedStateTake};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
+use korangar_networking::MessageColor;
 
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
@@ -15,7 +16,12 @@ use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::WindowCache;
 use crate::loaders::FontLoader;
-use crate::network::ChatMessage;
+
+#[derive(Debug, Clone)]
+pub struct ChatMessage {
+    pub text: String,
+    pub color: MessageColor,
+}
 
 #[derive(new)]
 pub struct ChatWindow {
@@ -71,7 +77,7 @@ impl PrototypeWindow<InterfaceSettings> for ChatWindow {
                 .with_state(input_text)
                 .with_ghost_text("Write message or command")
                 .with_enter_action(input_action)
-                .with_length(30)
+                .with_length(80)
                 .with_width_bound(dimension_bound!(75%))
                 .build()
                 .wrap(),

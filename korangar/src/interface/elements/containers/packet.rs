@@ -1,56 +1,109 @@
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::{Rc, Weak};
+use std::sync::{Mutex, MutexGuard};
 
 use korangar_debug::profiling::RingBuffer;
-use korangar_interface::elements::{
-    ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, PrototypeElement, WeakElementCell,
-};
+use korangar_interface::application::Application;
+use korangar_interface::elements::{ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus, PrototypeElement};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote, RemoteClone};
+use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
+use ragnarok_packets::handler::PacketCallback;
+use ragnarok_packets::{IncomingPacket, OutgoingPacket, PacketHeader};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::interface::linked::LinkedElement;
 use crate::interface::theme::InterfaceTheme;
 
-struct HiddenElement;
+#[derive(Clone)]
+struct UnknownPacket {
+    pub bytes: Vec<u8>,
+}
 
-impl Element<InterfaceSettings> for HiddenElement {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl IncomingPacket for UnknownPacket {
+    const HEADER: PacketHeader = PacketHeader(0);
+    const IS_PING: bool = false;
+
+    fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        let _ = byte_stream;
         unimplemented!()
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn to_prototype_element<App: Application>(&self) -> Box<dyn PrototypeElement<App> + Send> {
+        Box::new(self.clone())
+    }
+}
+
+impl<App: Application> PrototypeElement<App> for UnknownPacket {
+    fn to_element(&self, display: String) -> ElementCell<App> {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&self.bytes);
+
+        let elements = match self.bytes.len() >= 2 {
+            true => {
+                let signature = PacketHeader::from_bytes(&mut byte_stream).unwrap();
+                let header = format!("0x{:0>4x}", signature.0);
+                let data = &self.bytes[byte_stream.get_offset()..];
+
+                vec![header.to_element("header".to_owned()), data.to_element("data".to_owned())]
+            }
+            false => {
+                vec![self.bytes.to_element("data".to_owned())]
+            }
+        };
+
+        Expandable::new(display, elements, false).wrap()
+    }
+}
+
+#[derive(Clone)]
+struct ErrorPacket {
+    pub bytes: Vec<u8>,
+    pub error: Box<ConversionError>,
+}
+
+impl IncomingPacket for ErrorPacket {
+    const HEADER: PacketHeader = PacketHeader(0);
+    const IS_PING: bool = false;
+
+    fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        let _ = byte_stream;
         unimplemented!()
     }
 
-    fn resolve(
-        &mut self,
-        _placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        _application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
-    ) {
-        unimplemented!()
+    fn to_prototype_element<App: Application>(&self) -> Box<dyn PrototypeElement<App> + Send> {
+        Box::new(self.clone())
     }
+}
 
-    fn render(
-        &self,
-        _render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        _render: &InterfaceRenderer,
-        _application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
-        _parent_position: ScreenPosition,
-        _screen_clip: ScreenClip,
-        _hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        _focused_element: Option<&dyn Element<InterfaceSettings>>,
-        _mouse_mode: &MouseInputMode,
-        _second_theme: bool,
-    ) {
-        unimplemented!()
+impl<App: Application> PrototypeElement<App> for ErrorPacket {
+    fn to_element(&self, display: String) -> ElementCell<App> {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&self.bytes);
+        let error = format!("{:?}", self.error);
+
+        let elements = match self.bytes.len() >= 2 {
+            true => {
+                let signature = PacketHeader::from_bytes(&mut byte_stream).unwrap();
+                let header = format!("0x{:0>4x}", signature.0);
+                let data = &self.bytes[byte_stream.get_offset()..];
+
+                vec![
+                    header.to_element("header".to_owned()),
+                    error.to_element("error".to_owned()),
+                    data.to_element("data".to_owned()),
+                ]
+            }
+            false => {
+                vec![error.to_element("error".to_owned()), self.bytes.to_element("data".to_owned())]
+            }
+        };
+
+        Expandable::new(display, elements, false).wrap()
     }
 }
 
@@ -68,26 +121,26 @@ impl Display for Direction {
     }
 }
 
-pub struct PacketEntry {
-    element: Box<dyn PrototypeElement<InterfaceSettings>>,
+struct PacketEntry {
+    element: Box<dyn PrototypeElement<InterfaceSettings> + Send>,
     name: &'static str,
     is_ping: bool,
     direction: Direction,
 }
 
 impl PacketEntry {
-    pub fn new_incoming(element: &(impl PrototypeElement<InterfaceSettings> + Clone + 'static), name: &'static str, is_ping: bool) -> Self {
+    pub fn new_incoming(element: Box<dyn PrototypeElement<InterfaceSettings> + Send>, name: &'static str, is_ping: bool) -> Self {
         Self {
-            element: Box::new(element.clone()),
+            element,
             name,
             is_ping,
             direction: Direction::Incoming,
         }
     }
 
-    pub fn new_outgoing(element: &(impl PrototypeElement<InterfaceSettings> + Clone + 'static), name: &'static str, is_ping: bool) -> Self {
+    pub fn new_outgoing(element: Box<dyn PrototypeElement<InterfaceSettings> + Send>, name: &'static str, is_ping: bool) -> Self {
         Self {
-            element: Box::new(element.clone()),
+            element,
             name,
             is_ping,
             direction: Direction::Outgoing,
@@ -103,24 +156,118 @@ impl PacketEntry {
     }
 }
 
-pub struct PacketView<const N: usize> {
-    packets: PlainRemote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>), N>>,
+#[derive(Clone)]
+pub struct PacketHistoryCallback {
+    buffer_pointer: &'static Mutex<(RingBuffer<(PacketEntry, LinkedElement), 256>, usize)>,
+}
+
+impl PacketHistoryCallback {
+    /// SAFETY: This function is unsafe because it leaks memory. It should
+    /// only be called once during the lifetime of the program.
+    pub unsafe fn new() -> Self {
+        let buffer_pointer = Box::leak(Box::new(Mutex::new((RingBuffer::default(), 0))));
+
+        Self { buffer_pointer }
+    }
+
+    pub fn remote(&self) -> PacketHistoryRemote {
+        PacketHistoryRemote {
+            buffer_pointer: self.buffer_pointer,
+            version: 0,
+        }
+    }
+}
+
+impl PacketCallback for PacketHistoryCallback {
+    fn incoming_packet<Packet>(&self, packet: &Packet)
+    where
+        Packet: IncomingPacket,
+    {
+        let mut lock = self.buffer_pointer.lock().unwrap();
+
+        let prototype_element = packet.to_prototype_element();
+        let entry = PacketEntry::new_incoming(prototype_element, std::any::type_name::<Packet>(), Packet::IS_PING);
+
+        lock.0.push((entry, LinkedElement::new()));
+        lock.1 += 1;
+    }
+
+    fn outgoing_packet<Packet>(&self, packet: &Packet)
+    where
+        Packet: OutgoingPacket,
+    {
+        let mut lock = self.buffer_pointer.lock().unwrap();
+
+        let prototype_element = packet.to_prototype_element();
+        let entry = PacketEntry::new_outgoing(prototype_element, std::any::type_name::<Packet>(), Packet::IS_PING);
+
+        lock.0.push((entry, LinkedElement::new()));
+        lock.1 += 1;
+    }
+
+    fn unknown_packet(&self, bytes: Vec<u8>) {
+        let mut lock = self.buffer_pointer.lock().unwrap();
+
+        let packet = UnknownPacket { bytes };
+        let prototype_element = packet.to_prototype_element();
+        let entry = PacketEntry::new_incoming(prototype_element, "^FF8810� Unknown �^000000", false);
+
+        lock.0.push((entry, LinkedElement::new()));
+        lock.1 += 1;
+    }
+
+    fn failed_packet(&self, bytes: Vec<u8>, error: Box<ConversionError>) {
+        let mut lock = self.buffer_pointer.lock().unwrap();
+
+        let packet = ErrorPacket { bytes, error };
+        let prototype_element = packet.to_prototype_element();
+        let entry = PacketEntry::new_incoming(prototype_element, "^FF4444✖ Error ✖^000000", false);
+
+        lock.0.push((entry, LinkedElement::new()));
+        lock.1 += 1;
+    }
+}
+
+#[derive(Clone)]
+pub struct PacketHistoryRemote {
+    buffer_pointer: &'static Mutex<(RingBuffer<(PacketEntry, LinkedElement), 256>, usize)>,
+    version: usize,
+}
+
+impl PacketHistoryRemote {
+    pub fn consume_changed(&mut self) -> bool {
+        let lock = self.buffer_pointer.lock().unwrap();
+
+        let version = lock.1;
+        let changed = version != self.version;
+        self.version = version;
+
+        changed
+    }
+
+    fn get(&self) -> MutexGuard<'_, (RingBuffer<(PacketEntry, LinkedElement), 256>, usize)> {
+        self.buffer_pointer.lock().unwrap()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buffer_pointer.lock().unwrap().0.is_empty()
+    }
+}
+
+pub struct PacketView {
+    packets: PacketHistoryRemote,
     show_pings: PlainRemote<bool>,
-    hidden_element: ElementCell<InterfaceSettings>,
     state: ContainerState<InterfaceSettings>,
 }
 
-impl<const N: usize> PacketView<N> {
-    pub fn new(
-        packets: PlainRemote<RingBuffer<(PacketEntry, UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>), N>>,
-        show_pings: PlainRemote<bool>,
-    ) -> Self {
-        let hidden_element = HiddenElement.wrap();
+impl PacketView {
+    pub fn new(packets: PacketHistoryRemote, show_pings: PlainRemote<bool>) -> Self {
         let elements = {
             let packets = packets.get();
             let show_pings = show_pings.cloned();
 
             packets
+                .0
                 .iter()
                 .filter_map(|(packet, linked_element)| {
                     let show_packet = show_pings || !packet.is_ping();
@@ -128,11 +275,11 @@ impl<const N: usize> PacketView<N> {
                     match show_packet {
                         true => {
                             let element = PacketEntry::to_element(packet);
-                            unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
+                            linked_element.link(&element);
                             Some(element)
                         }
                         false => {
-                            unsafe { *linked_element.get() = Some(Rc::downgrade(&hidden_element)) };
+                            linked_element.link_hidden();
                             None
                         }
                     }
@@ -143,13 +290,12 @@ impl<const N: usize> PacketView<N> {
         Self {
             packets,
             show_pings,
-            hidden_element,
             state: ContainerState::new(elements),
         }
     }
 }
 
-impl<const N: usize> Element<InterfaceSettings> for PacketView<N> {
+impl Element<InterfaceSettings> for PacketView {
     fn get_state(&self) -> &ElementState<InterfaceSettings> {
         &self.state.state
     }
@@ -202,27 +348,10 @@ impl<const N: usize> Element<InterfaceSettings> for PacketView<N> {
         let mut resolve = false;
 
         if self.show_pings.consume_changed() | self.packets.consume_changed() {
-            fn compare(
-                linked_element: &UnsafeCell<Option<WeakElementCell<InterfaceSettings>>>,
-                element: &ElementCell<InterfaceSettings>,
-            ) -> bool {
-                let linked_element = unsafe { &*linked_element.get() };
-                let linked_element = linked_element.as_ref().map(|weak| weak.as_ptr());
-                linked_element.is_some_and(|pointer| !std::ptr::addr_eq(pointer, Rc::downgrade(element).as_ptr()))
-            }
-
             // Remove elements of packets that are no longer in the list.
-            if let Some(first_visible_packet) = self
-                .packets
-                .get()
-                .iter()
-                .find(|(_, linked_element)| compare(linked_element, &self.hidden_element))
-            {
-                let first_visible_element = unsafe { &*first_visible_packet.1.get() };
-                let first_visible_element = first_visible_element.as_ref().unwrap().as_ptr();
-
+            if let Some(first_visible_packet) = self.packets.get().0.iter().find(|(_, linked_element)| !linked_element.is_hidden()) {
                 for _index in 0..self.state.elements.len() {
-                    if !std::ptr::addr_eq(first_visible_element, Rc::downgrade(&self.state.elements[0]).as_ptr()) {
+                    if !first_visible_packet.1.is_linked_to(&self.state.elements[0]) {
                         self.state.elements.remove(0);
                         resolve = true;
                     } else {
@@ -240,17 +369,17 @@ impl<const N: usize> Element<InterfaceSettings> for PacketView<N> {
 
             // Add or remove elements that need to be shown/hidden based on filtering. Also
             // append new elements for packets that are new.
-            self.packets.get().iter().for_each(|(packet, linked_element)| {
+            self.packets.get().0.iter().for_each(|(packet, linked_element)| {
                 // Getting here means thatt the packet was already processed once.
                 let show_packet = show_pings || !packet.is_ping();
 
-                if let Some(linked_element) = unsafe { &mut (*linked_element.get()) } {
-                    let was_hidden = std::ptr::addr_eq(linked_element.as_ptr(), Rc::downgrade(&self.hidden_element).as_ptr());
+                if linked_element.is_linked() {
+                    let was_hidden = linked_element.is_hidden();
 
                     // Packet was previously hidden but should be visible now.
                     if show_packet && was_hidden {
                         let element = PacketEntry::to_element(packet);
-                        *linked_element = Rc::downgrade(&element);
+                        linked_element.link(&element);
                         element
                             .borrow_mut()
                             .link_back(Rc::downgrade(&element), self.state.state.self_element.clone());
@@ -261,7 +390,7 @@ impl<const N: usize> Element<InterfaceSettings> for PacketView<N> {
 
                     // Packet was previously visible but now should be hidden.
                     if !show_packet && !was_hidden {
-                        *linked_element = Rc::downgrade(&self.hidden_element);
+                        linked_element.link_hidden();
 
                         self.state.elements.remove(index);
                         resolve = true;
@@ -271,7 +400,7 @@ impl<const N: usize> Element<InterfaceSettings> for PacketView<N> {
                     match show_packet {
                         true => {
                             let element = PacketEntry::to_element(packet);
-                            unsafe { *linked_element.get() = Some(Rc::downgrade(&element)) };
+                            linked_element.link(&element);
                             element
                                 .borrow_mut()
                                 .link_back(Rc::downgrade(&element), self.state.state.self_element.clone());
@@ -280,7 +409,7 @@ impl<const N: usize> Element<InterfaceSettings> for PacketView<N> {
                             resolve = true;
                         }
                         false => {
-                            unsafe { *linked_element.get() = Some(Rc::downgrade(&self.hidden_element)) };
+                            linked_element.link_hidden();
                         }
                     }
                 }

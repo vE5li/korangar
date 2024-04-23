@@ -15,7 +15,7 @@ pub struct Version<T> {
 }
 
 impl FromBytes for Version<MajorFirst> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let major = byte_stream.byte::<Self>()?;
         let minor = byte_stream.byte::<Self>()?;
 
@@ -28,7 +28,7 @@ impl FromBytes for Version<MajorFirst> {
 }
 
 impl FromBytes for Version<MinorFirst> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let minor = byte_stream.byte::<Self>()?;
         let major = byte_stream.byte::<Self>()?;
 

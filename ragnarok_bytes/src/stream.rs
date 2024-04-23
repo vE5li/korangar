@@ -29,19 +29,19 @@ pub(crate) struct TemporaryLimit {
 /// It should therefore be avoided to modify the metadata while reading of
 /// composite structures data that might fail, for example multi-field structs
 /// that implement [`FromBytes`](crate::from_bytes::FromBytes).
-pub struct ByteStream<'a, META = ()>
+pub struct ByteStream<'a, Meta = ()>
 where
-    META: 'static,
+    Meta: 'static,
 {
     data: &'a [u8],
     offset: usize,
     limit: usize,
-    metadata: META,
+    metadata: Meta,
 }
 
-impl<'a, META> ByteStream<'a, META>
+impl<'a, Meta> ByteStream<'a, Meta>
 where
-    META: Default + 'static,
+    Meta: Default + 'static,
 {
     /// Create a new [`ByteStream`] with default metadata.
     pub fn without_metadata(data: &'a [u8]) -> Self {
@@ -49,12 +49,12 @@ where
     }
 }
 
-impl<'a, META> ByteStream<'a, META>
+impl<'a, Meta> ByteStream<'a, Meta>
 where
-    META: 'static,
+    Meta: 'static,
 {
     /// Create a new [`ByteStream`] with specific metadata.
-    pub fn with_metadata(data: &'a [u8], metadata: META) -> Self {
+    pub fn with_metadata(data: &'a [u8], metadata: Meta) -> Self {
         let limit = data.len();
 
         Self {
@@ -89,13 +89,13 @@ where
         self.limit = save_point.limit;
     }
 
-    pub(crate) fn install_limit<CALLER>(&mut self, size: usize) -> ConversionResult<TemporaryLimit> {
+    pub(crate) fn install_limit<Caller>(&mut self, size: usize) -> ConversionResult<TemporaryLimit> {
         let frame_limit = self.offset + size;
         let old_limit = self.limit;
 
         if frame_limit > old_limit {
             return Err(ConversionError::from_error_type(ConversionErrorType::ByteStreamTooShort {
-                type_name: std::any::type_name::<CALLER>(),
+                type_name: std::any::type_name::<Caller>(),
             }));
         }
 
@@ -113,53 +113,53 @@ where
         self.offset >= self.limit
     }
 
-    pub fn get_metadata<CALLER, OUTER>(&self) -> ConversionResult<&OUTER>
+    pub fn get_metadata<Caller, As>(&self) -> ConversionResult<&As>
     where
-        OUTER: 'static,
+        As: 'static,
     {
-        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
-            true => unsafe { Ok(std::mem::transmute::<_, &OUTER>(&self.metadata)) },
+        match TypeId::of::<Meta>() == TypeId::of::<As>() {
+            true => unsafe { Ok(std::mem::transmute::<_, &As>(&self.metadata)) },
             false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
-                type_name: std::any::type_name::<CALLER>(),
+                type_name: std::any::type_name::<Caller>(),
             })),
         }
     }
 
-    pub fn get_metadata_mut<CALLER, OUTER>(&mut self) -> ConversionResult<&mut OUTER>
+    pub fn get_metadata_mut<Caller, As>(&mut self) -> ConversionResult<&mut As>
     where
-        OUTER: 'static,
+        As: 'static,
     {
-        match TypeId::of::<META>() == TypeId::of::<OUTER>() {
-            true => unsafe { Ok(std::mem::transmute::<_, &mut OUTER>(&mut self.metadata)) },
+        match TypeId::of::<Meta>() == TypeId::of::<As>() {
+            true => unsafe { Ok(std::mem::transmute::<_, &mut As>(&mut self.metadata)) },
             false => Err(ConversionError::from_error_type(ConversionErrorType::IncorrectMetadata {
-                type_name: std::any::type_name::<CALLER>(),
+                type_name: std::any::type_name::<Caller>(),
             })),
         }
     }
 
-    pub fn into_metadata(self) -> META {
+    pub fn into_metadata(self) -> Meta {
         self.metadata
     }
 
-    fn check_upper_bound<CALLER>(offset: usize, length: usize) -> ConversionResult<()> {
+    fn check_upper_bound<Caller>(offset: usize, length: usize) -> ConversionResult<()> {
         match offset < length {
             true => Ok(()),
             false => Err(ConversionError::from_error_type(ConversionErrorType::ByteStreamTooShort {
-                type_name: std::any::type_name::<CALLER>(),
+                type_name: std::any::type_name::<Caller>(),
             })),
         }
     }
 
-    pub fn byte<CALLER>(&mut self) -> ConversionResult<u8> {
-        Self::check_upper_bound::<CALLER>(self.offset, self.limit)?;
+    pub fn byte<Caller>(&mut self) -> ConversionResult<u8> {
+        Self::check_upper_bound::<Caller>(self.offset, self.limit)?;
 
         let byte = self.data[self.offset];
         self.offset += 1;
         Ok(byte)
     }
 
-    pub fn slice<CALLER>(&mut self, count: usize) -> ConversionResult<&[u8]> {
-        Self::check_upper_bound::<CALLER>(self.offset + count, self.limit + 1)?;
+    pub fn slice<Caller>(&mut self, count: usize) -> ConversionResult<&[u8]> {
+        Self::check_upper_bound::<Caller>(self.offset + count, self.limit + 1)?;
 
         let start_index = self.offset;
         self.offset += count;

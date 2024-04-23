@@ -13,7 +13,7 @@ pub struct Transform {
 }
 
 impl FromBytes for Transform {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let mut position = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
         let rotation = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
         let scale = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;

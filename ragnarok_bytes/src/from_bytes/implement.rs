@@ -4,19 +4,19 @@ use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
 use crate::{ByteStream, ConversionResult, ConversionResultExt, FromBytes};
 
 impl FromBytes for u8 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         byte_stream.byte::<Self>()
     }
 }
 
 impl FromBytes for u16 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([byte_stream.byte::<Self>()?, byte_stream.byte::<Self>()?]))
     }
 }
 
 impl FromBytes for u32 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.byte::<Self>()?,
             byte_stream.byte::<Self>()?,
@@ -27,7 +27,7 @@ impl FromBytes for u32 {
 }
 
 impl FromBytes for u64 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.byte::<Self>()?,
             byte_stream.byte::<Self>()?,
@@ -42,19 +42,19 @@ impl FromBytes for u64 {
 }
 
 impl FromBytes for i8 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(byte_stream.byte::<Self>()? as i8)
     }
 }
 
 impl FromBytes for i16 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([byte_stream.byte::<Self>()?, byte_stream.byte::<Self>()?]))
     }
 }
 
 impl FromBytes for i32 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.byte::<Self>()?,
             byte_stream.byte::<Self>()?,
@@ -65,7 +65,7 @@ impl FromBytes for i32 {
 }
 
 impl FromBytes for i64 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.byte::<Self>()?,
             byte_stream.byte::<Self>()?,
@@ -80,7 +80,7 @@ impl FromBytes for i64 {
 }
 
 impl FromBytes for f32 {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         Ok(Self::from_le_bytes([
             byte_stream.byte::<Self>()?,
             byte_stream.byte::<Self>()?,
@@ -91,7 +91,7 @@ impl FromBytes for f32 {
 }
 
 impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         use std::mem::MaybeUninit;
 
         let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -115,7 +115,7 @@ impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
 }
 
 impl FromBytes for String {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let mut value = String::new();
 
         loop {
@@ -130,7 +130,7 @@ impl FromBytes for String {
 }
 
 impl<T: FromBytes> FromBytes for Vec<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let mut vector = Vec::new();
 
         while !byte_stream.is_empty() {
@@ -144,7 +144,7 @@ impl<T: FromBytes> FromBytes for Vec<T> {
 
 #[cfg(feature = "cgmath")]
 impl<T: FromBytes> FromBytes for Vector2<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let first = T::from_bytes(byte_stream).trace::<Self>()?;
         let second = T::from_bytes(byte_stream).trace::<Self>()?;
 
@@ -154,7 +154,7 @@ impl<T: FromBytes> FromBytes for Vector2<T> {
 
 #[cfg(feature = "cgmath")]
 impl<T: FromBytes> FromBytes for Vector3<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let first = T::from_bytes(byte_stream).trace::<Self>()?;
         let second = T::from_bytes(byte_stream).trace::<Self>()?;
         let third = T::from_bytes(byte_stream).trace::<Self>()?;
@@ -165,7 +165,7 @@ impl<T: FromBytes> FromBytes for Vector3<T> {
 
 #[cfg(feature = "cgmath")]
 impl<T: FromBytes> FromBytes for Vector4<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let first = T::from_bytes(byte_stream).trace::<Self>()?;
         let second = T::from_bytes(byte_stream).trace::<Self>()?;
         let third = T::from_bytes(byte_stream).trace::<Self>()?;
@@ -177,7 +177,7 @@ impl<T: FromBytes> FromBytes for Vector4<T> {
 
 #[cfg(feature = "cgmath")]
 impl<T: FromBytes> FromBytes for Quaternion<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let first = T::from_bytes(byte_stream).trace::<Self>()?;
         let second = T::from_bytes(byte_stream).trace::<Self>()?;
         let third = T::from_bytes(byte_stream).trace::<Self>()?;
@@ -189,7 +189,7 @@ impl<T: FromBytes> FromBytes for Quaternion<T> {
 
 #[cfg(feature = "cgmath")]
 impl<T: FromBytes> FromBytes for Matrix3<T> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let c0r0 = T::from_bytes(byte_stream).trace::<Self>()?;
         let c0r1 = T::from_bytes(byte_stream).trace::<Self>()?;
         let c0r2 = T::from_bytes(byte_stream).trace::<Self>()?;

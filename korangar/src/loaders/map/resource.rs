@@ -15,7 +15,7 @@ pub enum ResourceType {
 }
 
 impl FromBytes for ResourceType {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let index = i32::from_bytes(byte_stream).trace::<Self>()?;
         match index {
             1 => Ok(ResourceType::Object),
@@ -65,7 +65,7 @@ pub struct MapResources {
 }
 
 impl FromBytes for MapResources {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let resources_amount = i32::from_bytes(byte_stream).trace::<Self>()? as usize;
 
         let mut objects = Vec::new();

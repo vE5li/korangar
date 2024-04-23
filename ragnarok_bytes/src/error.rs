@@ -68,13 +68,13 @@ pub type ConversionResult<T> = Result<T, Box<ConversionError>>;
 /// Trait providing stack track helpers to [`ConversionResult`]
 pub trait ConversionResultExt {
     /// Add a type name to the stack trace.
-    fn trace<CALLER>(self) -> Self;
+    fn trace<Caller>(self) -> Self;
 }
 
 impl<T> ConversionResultExt for ConversionResult<T> {
-    fn trace<CALLER>(self) -> Self {
+    fn trace<Caller>(self) -> Self {
         self.map_err(|mut error| {
-            error.add_to_stack(std::any::type_name::<CALLER>());
+            error.add_to_stack(std::any::type_name::<Caller>());
             error
         })
     }

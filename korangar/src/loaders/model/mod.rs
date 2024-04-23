@@ -85,7 +85,7 @@ pub struct ModelString<const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let inner = if byte_stream
             .get_metadata::<Self, Option<InternalVersion>>()?
             .ok_or(ConversionError::from_message("version not set"))?

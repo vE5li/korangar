@@ -12,9 +12,9 @@ use crate::network::ChatMessage;
 /// prevent calling the same method multiple times and calling
 /// [`build`](Self::build) before the mandatory methods have been called.
 #[must_use = "`build` needs to be called"]
-pub struct ChatBuilder<MESSAGES, FONT> {
-    messages: MESSAGES,
-    font_loader: FONT,
+pub struct ChatBuilder<Messages, Font> {
+    messages: Messages,
+    font_loader: Font,
 }
 
 impl ChatBuilder<Unset, Unset> {
@@ -26,14 +26,14 @@ impl ChatBuilder<Unset, Unset> {
     }
 }
 
-impl<FONT> ChatBuilder<Unset, FONT> {
-    pub fn with_messages(self, messages: PlainRemote<Vec<ChatMessage>>) -> ChatBuilder<PlainRemote<Vec<ChatMessage>>, FONT> {
+impl<Font> ChatBuilder<Unset, Font> {
+    pub fn with_messages(self, messages: PlainRemote<Vec<ChatMessage>>) -> ChatBuilder<PlainRemote<Vec<ChatMessage>>, Font> {
         ChatBuilder { messages, ..self }
     }
 }
 
-impl<MESSAGES> ChatBuilder<MESSAGES, Unset> {
-    pub fn with_font_loader(self, font_loader: Rc<RefCell<FontLoader>>) -> ChatBuilder<MESSAGES, Rc<RefCell<FontLoader>>> {
+impl<Messages> ChatBuilder<Messages, Unset> {
+    pub fn with_font_loader(self, font_loader: Rc<RefCell<FontLoader>>) -> ChatBuilder<Messages, Rc<RefCell<FontLoader>>> {
         ChatBuilder { font_loader, ..self }
     }
 }

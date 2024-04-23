@@ -5,7 +5,7 @@ mod implement;
 /// Trait to deserialize from a [`ByteStream`].
 pub trait FromBytes {
     /// Takes bytes from a [`ByteStream`] and deserializes them into a type `T`.
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self>
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>
     where
         Self: Sized;
 }
@@ -14,7 +14,7 @@ pub trait FromBytes {
 pub trait FromBytesExt: FromBytes {
     /// Takes a fixed number of bytes from the [`ByteStream`] and tries to
     /// deserialize them into a type `T`.
-    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> ConversionResult<Self>
+    fn from_n_bytes<Meta>(byte_stream: &mut ByteStream<Meta>, size: usize) -> ConversionResult<Self>
     where
         Self: Sized;
 }
@@ -24,7 +24,7 @@ where
     T: FromBytes,
 {
     #[allow(clippy::uninit_assumed_init)]
-    fn from_n_bytes<META>(byte_stream: &mut ByteStream<META>, size: usize) -> ConversionResult<Self>
+    fn from_n_bytes<Meta>(byte_stream: &mut ByteStream<Meta>, size: usize) -> ConversionResult<Self>
     where
         Self: Sized,
     {
@@ -48,7 +48,7 @@ mod from_n_bytes {
     const TEST_BYTE_SIZE: usize = 4;
 
     impl FromBytes for Test {
-        fn from_bytes<META>(byte_stream: &mut crate::ByteStream<META>) -> crate::ConversionResult<Self>
+        fn from_bytes<Meta>(byte_stream: &mut crate::ByteStream<Meta>) -> crate::ConversionResult<Self>
         where
             Self: Sized,
         {

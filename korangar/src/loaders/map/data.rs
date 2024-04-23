@@ -116,7 +116,7 @@ impl GroundTile {
 }
 
 impl FromBytes for GroundTile {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let upper_left_height = f32::from_bytes(byte_stream).trace::<Self>()?;
         let upper_right_height = f32::from_bytes(byte_stream).trace::<Self>()?;
         let lower_left_height = f32::from_bytes(byte_stream).trace::<Self>()?;

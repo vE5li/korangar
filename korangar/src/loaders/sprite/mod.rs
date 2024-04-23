@@ -42,7 +42,7 @@ struct PaletteImageData {
 struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
-    fn from_bytes<META>(byte_stream: &mut ByteStream<META>) -> ConversionResult<Self>
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>
     where
         Self: Sized,
     {

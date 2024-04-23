@@ -24,7 +24,7 @@ use crate::world::*;
 const MAP_OFFSET: f32 = 5.0;
 
 #[cfg(feature = "debug")]
-fn assert_byte_stream_empty<META>(mut byte_stream: ByteStream<META>, file_name: &str) {
+fn assert_byte_stream_empty<Meta>(mut byte_stream: ByteStream<Meta>, file_name: &str) {
     use korangar_debug::logging::{print_debug, Colorize};
 
     if byte_stream.is_empty() {

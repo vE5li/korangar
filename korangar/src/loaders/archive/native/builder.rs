@@ -5,12 +5,10 @@
 use std::path::{Path, PathBuf};
 
 use ragnarok_bytes::ToBytes;
+use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 use yazi::{compress, CompressionLevel, Format};
 
-use super::assettable::AssetTable;
-use super::filetablerow::FileTableRow;
-use super::header::Header;
-use super::{FileTable, MAGIC_BYTES};
+use super::FileTable;
 use crate::loaders::archive::Writable;
 
 pub struct NativeArchiveBuilder {
@@ -61,7 +59,6 @@ impl Writable for NativeArchiveBuilder {
 
         let mut bytes = Vec::new();
 
-        bytes.extend_from_slice(MAGIC_BYTES);
         bytes.extend_from_slice(&file_header.to_bytes().unwrap());
         bytes.extend_from_slice(&self.data);
 
@@ -72,7 +69,10 @@ impl Writable for NativeArchiveBuilder {
         }
 
         let compressed_file_information_data = compress(&file_table_data, Format::Zlib, CompressionLevel::Default).unwrap();
-        let file_table = AssetTable::new(compressed_file_information_data.len() as u32, file_table_data.len() as u32);
+        let file_table = AssetTable {
+            compressed_size: compressed_file_information_data.len() as u32,
+            uncompressed_size: file_table_data.len() as u32,
+        };
 
         bytes.extend_from_slice(&file_table.to_bytes().unwrap());
         bytes.extend_from_slice(&compressed_file_information_data);

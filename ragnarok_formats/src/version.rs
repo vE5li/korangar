@@ -5,8 +5,10 @@ use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
+
 #[derive(Copy, Clone, Debug)]
 pub struct MinorFirst;
+
 #[derive(Copy, Clone, Debug)]
 pub struct Version<T> {
     pub major: u8,

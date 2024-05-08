@@ -3,12 +3,13 @@ use std::sync::Arc;
 use cgmath::{Array, Matrix4, SquareMatrix, Vector3, Vector4};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
+use ragnarok_formats::model::RotationKeyframeData;
+use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
 
-use crate::graphics::{Camera, GeometryRenderer, ModelVertex, Renderer, Transform};
-use crate::loaders::RotationKeyframeData;
+use crate::graphics::{Camera, GeometryRenderer, ModelVertex, Renderer};
 use crate::system::multiply_matrix4_and_vector3;
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]

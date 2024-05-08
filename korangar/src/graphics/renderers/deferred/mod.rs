@@ -21,6 +21,8 @@ use std::sync::Arc;
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
 use korangar_interface::application::FontSizeTrait;
+#[cfg(feature = "debug")]
+use ragnarok_formats::transform::Transform;
 use ragnarok_packets::EntityId;
 use vulkano::device::{DeviceOwned, Queue};
 use vulkano::format::Format;

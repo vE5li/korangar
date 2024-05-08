@@ -5,6 +5,7 @@ use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
+use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
 use vulkano::buffer::Subbuffer;
 
@@ -436,39 +437,39 @@ impl Common {
 
                 if map.x_in_bounds(x + 1)
                     && map.y_in_bounds(y + 1)
-                    && map.get_tile(Vector2::new(x + 1, y)).is_walkable()
-                    && map.get_tile(Vector2::new(x, y + 1)).is_walkable()
+                    && map.get_tile(Vector2::new(x + 1, y)).flags.contains(TileFlags::WALKABLE)
+                    && map.get_tile(Vector2::new(x, y + 1)).flags.contains(TileFlags::WALKABLE)
                 {
                     successors.push(Pos(x + 1, y + 1));
                 }
 
                 if x > 0
                     && map.y_in_bounds(y + 1)
-                    && map.get_tile(Vector2::new(x - 1, y)).is_walkable()
-                    && map.get_tile(Vector2::new(x, y + 1)).is_walkable()
+                    && map.get_tile(Vector2::new(x - 1, y)).flags.contains(TileFlags::WALKABLE)
+                    && map.get_tile(Vector2::new(x, y + 1)).flags.contains(TileFlags::WALKABLE)
                 {
                     successors.push(Pos(x - 1, y + 1));
                 }
 
                 if map.x_in_bounds(x + 1)
                     && y > 0
-                    && map.get_tile(Vector2::new(x + 1, y)).is_walkable()
-                    && map.get_tile(Vector2::new(x, y - 1)).is_walkable()
+                    && map.get_tile(Vector2::new(x + 1, y)).flags.contains(TileFlags::WALKABLE)
+                    && map.get_tile(Vector2::new(x, y - 1)).flags.contains(TileFlags::WALKABLE)
                 {
                     successors.push(Pos(x + 1, y - 1));
                 }
 
                 if x > 0
                     && y > 0
-                    && map.get_tile(Vector2::new(x - 1, y)).is_walkable()
-                    && map.get_tile(Vector2::new(x, y - 1)).is_walkable()
+                    && map.get_tile(Vector2::new(x - 1, y)).flags.contains(TileFlags::WALKABLE)
+                    && map.get_tile(Vector2::new(x, y - 1)).flags.contains(TileFlags::WALKABLE)
                 {
                     successors.push(Pos(x - 1, y - 1));
                 }
 
                 let successors = successors
                     .drain(..)
-                    .filter(|Pos(x, y)| map.get_tile(Vector2::new(*x, *y)).is_walkable())
+                    .filter(|Pos(x, y)| map.get_tile(Vector2::new(*x, *y)).flags.contains(TileFlags::WALKABLE))
                     .collect::<Vec<Pos>>();
 
                 successors

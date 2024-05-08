@@ -5,14 +5,15 @@ use std::ops::Mul;
 use cgmath::{Matrix4, Vector3};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
+#[cfg(feature = "debug")]
+use ragnarok_formats::model::ModelData;
+use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};
-use crate::graphics::{Camera, GeometryRenderer, Renderer, Transform};
+use crate::graphics::{Camera, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{Color, DeferredRenderer};
-#[cfg(feature = "debug")]
-use crate::loaders::ModelData;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {

@@ -1,4 +1,3 @@
-mod tile;
 use std::sync::Arc;
 
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
@@ -9,17 +8,20 @@ use korangar_debug::profiling::Profiler;
 use korangar_interface::windows::PrototypeWindow;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
+use ragnarok_formats::map::{EffectSource, LightSettings, LightSource, MapData, SoundSource, Tile, TileFlags, WaterSettings};
+#[cfg(feature = "debug")]
+use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
 
-pub use self::tile::Tile;
 use crate::graphics::*;
 use crate::interface::application::InterfaceSettings;
-#[cfg(feature = "debug")]
-use crate::loaders::MapData;
-use crate::loaders::{LightSettings, WaterSettings};
 use crate::world::*;
+
+fn average_tile_height(tile: &Tile) -> f32 {
+    (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
+}
 
 // MOVE
 fn get_value(day_timer: f32, offset: f32, p: f32) -> f32 {
@@ -122,7 +124,7 @@ impl Map {
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Vector3<f32> {
-        let height = self.get_tile(position).average_height();
+        let height = average_tile_height(self.get_tile(position));
         Vector3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
 
@@ -264,7 +266,7 @@ impl Map {
 
         let tile = self.get_tile(position);
 
-        if tile.is_walkable() {
+        if tile.flags.contains(TileFlags::WALKABLE) {
             let base_x = position.x as f32 * 5.0;
             let base_y = position.y as f32 * 5.0;
 

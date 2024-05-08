@@ -4,6 +4,7 @@ fragment_shader!("src/graphics/renderers/deferred/box/fragment_shader.glsl");
 use std::sync::Arc;
 
 use cgmath::Vector3;
+use ragnarok_formats::transform::Transform;
 use vulkano::descriptor_set::WriteDescriptorSet;
 use vulkano::device::{Device, DeviceOwned};
 use vulkano::pipeline::graphics::input_assembly::PrimitiveTopology;

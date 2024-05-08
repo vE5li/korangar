@@ -145,7 +145,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
             Some(function) => {
                 quote! {
                     let #field_variable = match byte_stream
-                            .get_metadata::<Self, Option<crate::loaders::InternalVersion>>()?
+                            .get_metadata::<Self, Option<ragnarok_formats::version::InternalVersion>>()?
                             .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?
                             .#function {
                         true => Some(#from_implementation),
@@ -173,7 +173,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (Vec<TokenStream>, Ve
 
         if is_version {
             from_bytes_implementations.push(
-                quote!(*byte_stream.get_metadata_mut::<Self, Option<crate::loaders::InternalVersion>>()? = Some(InternalVersion::from(#field_variable));),
+                quote!(*byte_stream.get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()? = Some(ragnarok_formats::version::InternalVersion::from(#field_variable));),
             );
         }
     }

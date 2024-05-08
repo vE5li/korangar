@@ -7,16 +7,18 @@ use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
-use ragnarok_bytes::{ByteConvertable, ByteStream, FromBytes};
+use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_formats::action::{Action, ActionsData};
+use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
 use vulkano::image::view::ImageView;
 
-use super::version::InternalVersion;
+use super::error::LoadError;
 use super::Sprite;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{GameFileLoader, MinorFirst, Version, FALLBACK_ACTIONS_FILE};
+use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
 
 #[derive(Clone, Debug, new)]
 pub struct AnimationState {
@@ -195,94 +197,18 @@ impl Actions {
     }
 }
 
-#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
-struct SpriteClip {
-    pub position: Vector2<i32>,
-    pub sprite_number: u32,
-    pub mirror_on: u32,
-    #[version_equals_or_above(2, 0)]
-    pub color: Option<u32>,
-    #[version_smaller(2, 4)]
-    pub zoom: Option<f32>,
-    #[version_equals_or_above(2, 4)]
-    pub zoom2: Option<Vector2<f32>>,
-    #[version_equals_or_above(2, 0)]
-    pub angle: Option<i32>,
-    #[version_equals_or_above(2, 0)]
-    pub sprite_type: Option<u32>,
-    #[version_equals_or_above(2, 5)]
-    pub size: Option<Vector2<u32>>,
-}
-
-#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
-struct AttachPoint {
-    pub ignored: u32,
-    pub position: Vector2<i32>,
-    pub attribute: u32,
-}
-
-#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
-struct Motion {
-    pub range1: [i32; 4], // maybe just skip this?
-    pub range2: [i32; 4], // maybe just skip this?
-    pub sprite_clip_count: u32,
-    #[repeating(self.sprite_clip_count)]
-    pub sprite_clips: Vec<SpriteClip>,
-    #[version_equals_or_above(2, 0)]
-    pub event_id: Option<i32>, // if version == 2.0 this maybe needs to be set to None ?
-    // (after it is parsed)
-    #[version_equals_or_above(2, 3)]
-    pub attach_point_count: Option<u32>,
-    #[repeating(self.attach_point_count.unwrap_or_default())]
-    pub attach_points: Vec<AttachPoint>,
-}
-
-#[derive(Debug, Clone, ByteConvertable, PrototypeElement)]
-struct Action {
-    pub motion_count: u32,
-    #[repeating(self.motion_count)]
-    pub motions: Vec<Motion>,
-}
-
-#[derive(Debug, Clone, FromBytes, PrototypeElement)]
-struct Event {
-    #[length_hint(40)]
-    pub name: String,
-}
-
-#[derive(Debug, Clone, FromBytes, PrototypeElement)]
-struct ActionsData {
-    #[version]
-    pub version: Version<MinorFirst>,
-    pub action_count: u16,
-    pub reserved: [u8; 10],
-    #[repeating(self.action_count)]
-    pub actions: Vec<Action>,
-    #[version_equals_or_above(2, 1)]
-    pub event_count: Option<u32>,
-    #[repeating(self.event_count.unwrap_or_default())]
-    pub events: Vec<Event>,
-    #[version_equals_or_above(2, 2)]
-    #[repeating(self.action_count)]
-    pub delays: Option<Vec<f32>>,
-}
-
 #[derive(Default)]
 pub struct ActionLoader {
     cache: HashMap<String, Arc<Actions>>,
 }
 
 impl ActionLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}", path.magenta()));
 
-        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
+        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}")).map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
-
-        if <[u8; 2]>::from_bytes(&mut byte_stream).unwrap() != [b'A', b'C'] {
-            return Err(format!("failed to read magic number from {path}"));
-        }
 
         let actions_data = match ActionsData::from_bytes(&mut byte_stream) {
             Ok(actions_data) => actions_data,
@@ -319,7 +245,7 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, LoadError> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path, game_file_loader),

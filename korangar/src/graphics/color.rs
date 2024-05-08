@@ -1,3 +1,4 @@
+use ragnarok_formats::color::ColorRGB;
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -114,5 +115,17 @@ impl From<Color> for [f32; 3] {
 impl From<Color> for [f32; 4] {
     fn from(val: Color) -> Self {
         [val.red, val.green, val.blue, val.alpha]
+    }
+}
+
+impl From<ColorRGB> for Color {
+    fn from(value: ColorRGB) -> Self {
+        let ColorRGB { red, blue, green } = value;
+        Color {
+            red,
+            green,
+            blue,
+            alpha: 1.0,
+        }
     }
 }

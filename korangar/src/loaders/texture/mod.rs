@@ -19,6 +19,7 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
+use super::error::LoadError;
 use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
 use crate::graphics::MemoryAllocator;
 use crate::loaders::GameFileLoader;
@@ -34,7 +35,7 @@ pub struct TextureLoader {
 }
 
 impl TextureLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}", path.magenta()));
 
@@ -42,10 +43,10 @@ impl TextureLoader {
             ".png" => ImageFormat::Png,
             ".bmp" | ".BMP" => ImageFormat::Bmp,
             ".tga" | ".TGA" => ImageFormat::Tga,
-            extension => return Err(format!("unsupported file format {extension}")),
+            extension => return Err(LoadError::UnsupportedFormat(extension.to_owned())),
         };
 
-        let file_data = game_file_loader.get(&format!("data\\texture\\{path}"))?;
+        let file_data = game_file_loader.get(&format!("data\\texture\\{path}")).map_err(LoadError::File)?;
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
 
         let mut image_buffer = match reader.decode() {
@@ -124,7 +125,7 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, LoadError> {
         match self.cache.get(path) {
             Some(texture) => Ok(texture.clone()),
             None => self.load(path, game_file_loader),

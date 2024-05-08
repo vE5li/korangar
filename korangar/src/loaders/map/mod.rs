@@ -1,5 +1,3 @@
-mod data;
-mod resource;
 mod vertices;
 
 use std::collections::HashMap;
@@ -10,13 +8,11 @@ use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
 use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResources};
+use ragnarok_formats::version::InternalVersion;
 
-#[cfg(feature = "debug")]
-pub use self::data::MapData;
-use self::data::*;
-pub use self::resource::{LightSettings, WaterSettings};
 use self::vertices::{generate_tile_vertices, ground_water_vertices, load_textures};
-use super::version::InternalVersion;
+use super::error::LoadError;
 use crate::graphics::{BufferAllocator, NativeModelVertex};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
 use crate::world::*;
@@ -50,7 +46,7 @@ impl MapLoader {
         buffer_allocator: &mut BufferAllocator,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Map>, String> {
+    ) -> Result<Arc<Map>, LoadError> {
         match self.cache.get(&resource_file) {
             Some(map) => Ok(map.clone()),
             None => self.load(resource_file, game_file_loader, buffer_allocator, model_loader, texture_loader),
@@ -64,17 +60,21 @@ impl MapLoader {
         buffer_allocator: &mut BufferAllocator,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Map>, String> {
+    ) -> Result<Arc<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut map_data = parse_map_data(&resource_file, game_file_loader)?;
+        let map_file = format!("data\\{}.rsw", resource_file);
+        let mut map_data: MapData = parse_generic_data(&map_file, game_file_loader)?;
+
+        let ground_file = format!("data\\{}", map_data.ground_file);
+        let ground_data: GroundData = parse_generic_data(&ground_file, game_file_loader)?;
+
+        let gat_file = format!("data\\{}", map_data.gat_file);
+        let mut gat_data: GatData = parse_generic_data(&gat_file, game_file_loader)?;
 
         #[cfg(feature = "debug")]
         let map_data_clone = map_data.clone();
-
-        let ground_data = parse_ground_data(map_data.ground_file.as_str(), game_file_loader)?;
-        let mut gat_data = parse_gat_data(map_data.gat_file.as_str(), game_file_loader)?;
 
         let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
         let water_level = -map_data
@@ -154,7 +154,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
         ground_data.height as f32 * MAP_OFFSET,
     );
 
-    resources.objects.iter_mut().for_each(|object| object.offset(offset));
+    resources.objects.iter_mut().for_each(|object| object.transform.position += offset);
     resources
         .sound_sources
         .iter_mut()
@@ -169,50 +169,32 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
         .for_each(|effect_source| effect_source.offset(offset));
 }
 
-fn parse_map_data(resource_file: &str, game_file_loader: &mut GameFileLoader) -> Result<MapData, String> {
-    let bytes = game_file_loader.get(&format!("data\\{}.rsw", &resource_file))?;
+fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &mut GameFileLoader) -> Result<Data, LoadError> {
+    let bytes = game_file_loader.get(resource_file).map_err(LoadError::File)?;
     let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
-    if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'S', b'W'] {
-        return Err(format!("failed to read magic number from {}.rsw", &resource_file));
-    }
-
-    let map_data = MapData::from_bytes(&mut byte_stream).unwrap();
+    let data = Data::from_bytes(&mut byte_stream).map_err(LoadError::Conversion)?;
 
     #[cfg(feature = "debug")]
     assert_byte_stream_empty(byte_stream, resource_file);
 
-    Ok(map_data)
+    Ok(data)
 }
 
-fn parse_ground_data(ground_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GroundData, String> {
-    let bytes = game_file_loader.get(&format!("data\\{}", &ground_file))?;
-    let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
-
-    if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'G', b'N'] {
-        return Err(format!("failed to read magic number from {}", &ground_file));
-    }
-
-    let ground_data = GroundData::from_bytes(&mut byte_stream).unwrap();
-
-    #[cfg(feature = "debug")]
-    assert_byte_stream_empty(byte_stream, ground_file);
-
-    Ok(ground_data)
+pub trait GroundTileExt {
+    fn get_lowest_point(&self) -> f32;
 }
 
-fn parse_gat_data(gat_file: &str, game_file_loader: &mut GameFileLoader) -> Result<GatData, String> {
-    let bytes = game_file_loader.get(&format!("data\\{}", &gat_file))?;
-    let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
-
-    if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'G', b'R', b'A', b'T'] {
-        return Err(format!("failed to read magic number from {}", &gat_file));
+impl GroundTileExt for GroundTile {
+    fn get_lowest_point(&self) -> f32 {
+        [
+            self.lower_right_height,
+            self.lower_left_height,
+            self.upper_left_height,
+            self.lower_right_height,
+        ]
+        .into_iter()
+        .reduce(f32::max)
+        .unwrap()
     }
-
-    let gat_data = GatData::from_bytes(&mut byte_stream).unwrap();
-
-    #[cfg(feature = "debug")]
-    assert_byte_stream_empty(byte_stream, gat_file);
-
-    Ok(gat_data)
 }

@@ -35,7 +35,6 @@ pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTo
 #[proc_macro_derive(
     ByteConvertable,
     attributes(
-        packet_length,
         length_hint,
         repeating,
         repeating_remaining,
@@ -65,7 +64,6 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
 #[proc_macro_derive(
     FromBytes,
     attributes(
-        packet_length,
         length_hint,
         repeating,
         repeating_remaining,
@@ -95,7 +93,6 @@ pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenSt
 #[proc_macro_derive(
     ToBytes,
     attributes(
-        packet_length,
         length_hint,
         repeating,
         repeating_remaining,

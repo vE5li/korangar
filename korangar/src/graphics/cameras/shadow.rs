@@ -1,7 +1,7 @@
 use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, SquareMatrix, Vector2, Vector3, Vector4};
+use ragnarok_formats::transform::Transform;
 
 use super::Camera;
-use crate::graphics::Transform;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
 pub struct ShadowCamera {

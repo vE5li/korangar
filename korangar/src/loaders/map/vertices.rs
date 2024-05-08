@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
+use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 use vulkano::image::view::ImageView;
 
-use super::data::{GatData, GroundData, GroundTile, SurfaceType};
+use super::GroundTileExt;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
 use crate::loaders::{GameFileLoader, TextureLoader};
 
@@ -174,7 +175,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             tile.lower_right_height = -tile.lower_right_height;
             count += 1;
 
-            if tile.tile_type.is_none() {
+            if tile.flags.is_empty() {
                 continue;
             }
 
@@ -193,7 +194,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             let third_texture_coordinates = Vector2::new(1.0, 1.0);
             let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
 
-            let tile_type_index = tile.tile_type.0 as i32;
+            let tile_type_index = tile.flags.bits() as i32;
 
             tile_vertices.push(ModelVertex::new(
                 first_position,

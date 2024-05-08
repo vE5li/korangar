@@ -1006,6 +1006,7 @@ dependencies = [
  "option-ext",
  "pathfinding",
  "ragnarok_bytes",
+ "ragnarok_formats",
  "ragnarok_packets",
  "rand 0.8.5",
  "random_color",
@@ -1017,7 +1018,6 @@ dependencies = [
  "tokio",
  "vulkano",
  "vulkano-shaders",
- "vulkano-win",
  "walkdir",
  "winit",
  "xml-rs",
@@ -1706,6 +1706,16 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "ragnarok_procedural",
+]
+
+[[package]]
+name = "ragnarok_formats"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.5.0",
+ "cgmath",
+ "korangar_interface",
+ "ragnarok_bytes",
 ]
 
 [[package]]
@@ -2638,18 +2648,6 @@ dependencies = [
  "shaderc",
  "syn 2.0.60",
  "vulkano",
-]
-
-[[package]]
-name = "vulkano-win"
-version = "0.33.0"
-source = "git+https://github.com/vulkano-rs/vulkano.git?rev=db3df4e55f80c137ea6187250957eb92c2291627#db3df4e55f80c137ea6187250957eb92c2291627"
-dependencies = [
- "core-graphics-types",
- "objc",
- "raw-window-handle",
- "vulkano",
- "winit",
 ]
 
 [[package]]

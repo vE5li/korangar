@@ -1797,7 +1797,6 @@ pub struct QuestDetails {
 #[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Quest {
-    #[packet_length]
     pub quest_id: u32,
     pub active: u8,
     pub remaining_time: u32, // TODO: double check these

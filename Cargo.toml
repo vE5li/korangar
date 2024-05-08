@@ -12,6 +12,7 @@ korangar_interface = { path = "korangar_interface" }
 korangar_networking = { path = "korangar_networking" }
 num = "0.4.1"
 ragnarok_bytes = { path = "ragnarok_bytes" }
+ragnarok_formats = { path = "ragnarok_formats" }
 ragnarok_packets = { path = "ragnarok_packets" }
 ragnarok_procedural = { path = "ragnarok_procedural" }
 serde = "1.0.137"

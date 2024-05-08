@@ -1,8 +1,5 @@
 //! A GRF file containing game assets.
-mod assettable;
 mod builder;
-mod filetablerow;
-mod header;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -12,12 +9,10 @@ use std::path::Path;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer};
 use ragnarok_bytes::{ByteStream, FixedByteSize, FromBytes};
+use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 use yazi::{decompress, Format};
 
-use self::assettable::AssetTable;
 pub use self::builder::NativeArchiveBuilder;
-use self::filetablerow::FileTableRow;
-use self::header::Header;
 use crate::loaders::archive::Archive;
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
@@ -30,32 +25,25 @@ pub struct NativeArchive {
     os_file_handler: File,
 }
 
-const MAGIC_BYTES: &[u8] = b"Master of Magic\0";
-const UNPACKED_SIZE_OF_MAGIC_STRING: usize = MAGIC_BYTES.len();
-
 impl Archive for NativeArchive {
     fn from_path(path: &Path) -> Self {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load game data from {}", path.display().magenta()));
         let mut file = File::open(path).unwrap();
 
-        let mut magic_number_buffer = [0u8; UNPACKED_SIZE_OF_MAGIC_STRING];
-        file.read_exact(&mut magic_number_buffer).unwrap();
-
-        // Keeping the convenience of using [`loaders::stream::ByteStream`]
-        // while being able to read without buffering the entire file.
-        let mut file_header_buffer = vec![0; Header::size_in_bytes()];
+        let mut file_header_buffer = vec![0u8; Header::size_in_bytes()];
         file.read_exact(&mut file_header_buffer).unwrap();
         let file_header = Header::from_bytes(&mut ByteStream::<()>::without_metadata(&file_header_buffer)).unwrap();
-        file_header.validate_version();
 
-        let _ = file.seek(SeekFrom::Current(file_header.get_file_table_offset() as i64)).unwrap();
+        assert_eq!(file_header.version, 0x200, "invalid grf version");
+
+        let _ = file.seek(SeekFrom::Current(file_header.file_table_offset as i64)).unwrap();
         let mut file_table_buffer = vec![0; AssetTable::size_in_bytes()];
 
         file.read_exact(&mut file_table_buffer).unwrap();
         let file_table = AssetTable::from_bytes(&mut ByteStream::<()>::without_metadata(&file_table_buffer)).unwrap();
 
-        let mut compressed_file_table_buffer = vec![0u8; file_table.get_compressed_size()];
+        let mut compressed_file_table_buffer = vec![0u8; file_table.compressed_size as usize];
         file.read_exact(&mut compressed_file_table_buffer).unwrap();
         let (decompressed, _checksum) = decompress(&compressed_file_table_buffer, Format::Zlib).unwrap();
 
@@ -92,7 +80,7 @@ impl Archive for NativeArchive {
                 return None;
             }
 
-            let position = file_information.offset as u64 + UNPACKED_SIZE_OF_MAGIC_STRING as u64 + Header::size_in_bytes() as u64;
+            let position = file_information.offset as u64 + Header::size_in_bytes() as u64;
             self.os_file_handler.seek(SeekFrom::Start(position)).unwrap();
             self.os_file_handler.read_exact(&mut compressed_file_buffer).unwrap();
 

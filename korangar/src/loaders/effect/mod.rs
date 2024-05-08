@@ -5,121 +5,73 @@ use cgmath::{Vector2, Vector3};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer};
-use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_formats::effect::{EffectData, Frame};
+use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::EntityId;
 use vulkano::image::view::ImageView;
 
-use super::version::InternalVersion;
-use super::{MajorFirst, TextureLoader};
+use super::error::LoadError;
+use super::TextureLoader;
 use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
-use crate::loaders::{GameFileLoader, Version};
+use crate::loaders::GameFileLoader;
 
-#[derive(Debug, FromBytes, PrototypeElement)]
-struct TextureName {
-    #[length_hint(128)]
-    pub name: String,
-}
-
-#[derive(Debug, Clone, FromBytes, PrototypeElement)]
-pub struct Frame {
-    pub frame_index: i32,
-    pub frame_type: i32,
-    pub offset: Vector2<f32>,
-    pub uv: [f32; 8],
-    pub xy: [f32; 8],
-    pub texture_index: f32,
-    pub animation_type: i32,
-    pub delay: f32,
-    pub angle: f32,
-    pub color: [f32; 4],
-    // Needs to actually set the attachment blend mode of the source alpha
-    pub source_alpha: i32,
-    // Needs to actually set the attachment blend mode of the destination alpha
-    pub destination_alpha: i32,
-    pub mt_present: i32,
-}
-
-impl Frame {
-    fn ease_interpolate(start_value: f32, end_value: f32, time: f32, bias: f32, sub_multiplier: f32) -> f32 {
-        if bias > 0.0 {
-            (end_value - start_value) * time.powf(1.0 + bias / 5.0) + start_value * sub_multiplier
-        } else if bias < 0.0 {
-            (end_value - start_value) * (1.0 - (1.0 - time).powf(-bias / 5.0 + 1.0)) + start_value * sub_multiplier
-        } else {
-            (end_value - start_value) * time + start_value * sub_multiplier
-        }
-    }
-
-    pub fn interpolate(&self, other: &Frame, frame_index: usize) -> Frame {
-        let time = 1.0 / (other.frame_index as f32 - self.frame_index as f32) * (frame_index as f32 - self.frame_index as f32);
-        let sub_mult = 1.0;
-
-        // TODO: angle bias
-        let angle = Self::ease_interpolate(self.angle, other.angle, time, 0.0, sub_mult);
-        let color = [
-            (other.color[0] - self.color[0]) * time + self.color[0] * sub_mult,
-            (other.color[1] - self.color[1]) * time + self.color[1] * sub_mult,
-            (other.color[2] - self.color[2]) * time + self.color[2] * sub_mult,
-            (other.color[3] - self.color[3]) * time + self.color[3] * sub_mult,
-        ];
-
-        let uv = (0..8)
-            .map(|index| (other.uv[index] - self.uv[index]) * time + self.uv[index] * sub_mult)
-            .next_chunk()
-            .unwrap();
-
-        // TODO: scale bias
-        let xy = (0..8)
-            .map(|index| Self::ease_interpolate(self.xy[index], other.xy[index], time, 0.0, sub_mult))
-            .next_chunk()
-            .unwrap();
-
-        // TODO: additional logic for animation type 2 and 3
-        let texture_index = self.texture_index;
-
-        // TODO: bezier curves
-        let offset_x = (other.offset.x - self.offset.x) * time + self.offset.x * sub_mult;
-        let offset_y = (other.offset.y - self.offset.y) * time + self.offset.y * sub_mult;
-
-        Frame {
-            frame_index: frame_index as i32,
-            frame_type: self.frame_type,
-            offset: Vector2::new(offset_x, offset_y),
-            uv,
-            xy,
-            texture_index,
-            animation_type: self.animation_type,
-            delay: self.delay,
-            angle,
-            color,
-            source_alpha: self.source_alpha,
-            destination_alpha: self.destination_alpha,
-            mt_present: self.mt_present,
-        }
+fn ease_interpolate(start_value: f32, end_value: f32, time: f32, bias: f32, sub_multiplier: f32) -> f32 {
+    if bias > 0.0 {
+        (end_value - start_value) * time.powf(1.0 + bias / 5.0) + start_value * sub_multiplier
+    } else if bias < 0.0 {
+        (end_value - start_value) * (1.0 - (1.0 - time).powf(-bias / 5.0 + 1.0)) + start_value * sub_multiplier
+    } else {
+        (end_value - start_value) * time + start_value * sub_multiplier
     }
 }
 
-#[derive(Debug, FromBytes, PrototypeElement)]
-struct LayerData {
-    pub texture_count: i32,
-    #[repeating(self.texture_count)]
-    pub texture_names: Vec<TextureName>,
-    pub frame_count: i32,
-    #[repeating(self.frame_count)]
-    pub frames: Vec<Frame>,
-}
+pub fn interpolate(first: &Frame, second: &Frame, frame_index: usize) -> Frame {
+    let time = 1.0 / (second.frame_index as f32 - first.frame_index as f32) * (frame_index as f32 - first.frame_index as f32);
+    let sub_mult = 1.0;
 
-#[derive(Debug, FromBytes, PrototypeElement)]
-struct EffectData {
-    pub version: Version<MajorFirst>,
-    pub _skip0: [u8; 2],
-    pub frames_per_second: u32,
-    pub max_key: u32,
-    pub layer_count: u32,
-    pub _skip1: [u8; 16],
-    #[repeating(self.layer_count)]
-    pub layers: Vec<LayerData>,
+    // TODO: angle bias
+    let angle = ease_interpolate(first.angle, second.angle, time, 0.0, sub_mult);
+    let color = [
+        (second.color[0] - first.color[0]) * time + first.color[0] * sub_mult,
+        (second.color[1] - first.color[1]) * time + first.color[1] * sub_mult,
+        (second.color[2] - first.color[2]) * time + first.color[2] * sub_mult,
+        (second.color[3] - first.color[3]) * time + first.color[3] * sub_mult,
+    ];
+
+    let uv = (0..8)
+        .map(|index| (second.uv[index] - first.uv[index]) * time + first.uv[index] * sub_mult)
+        .next_chunk()
+        .unwrap();
+
+    // TODO: scale bias
+    let xy = (0..8)
+        .map(|index| ease_interpolate(first.xy[index], second.xy[index], time, 0.0, sub_mult))
+        .next_chunk()
+        .unwrap();
+
+    // TODO: additional logic for animation type 2 and 3
+    let texture_index = first.texture_index;
+
+    // TODO: bezier curves
+    let offset_x = (second.offset.x - first.offset.x) * time + first.offset.x * sub_mult;
+    let offset_y = (second.offset.y - first.offset.y) * time + first.offset.y * sub_mult;
+
+    Frame {
+        frame_index: frame_index as i32,
+        frame_type: first.frame_type,
+        offset: Vector2::new(offset_x, offset_y),
+        uv,
+        xy,
+        texture_index,
+        animation_type: first.animation_type,
+        delay: first.delay,
+        angle,
+        color,
+        source_alpha: first.source_alpha,
+        destination_alpha: first.destination_alpha,
+        mt_present: first.mt_present,
+    }
 }
 
 #[derive(Default)]
@@ -137,7 +89,7 @@ impl Layer {
     fn interpolate(&self, frame_timer: &FrameTimer) -> Option<Frame> {
         if let Some(frame_index) = self.indices[frame_timer.current_frame] {
             if let Some(next_frame) = self.frames.get(frame_index + 2) {
-                return Some(self.frames[frame_index].interpolate(next_frame, frame_timer.current_frame));
+                return Some(interpolate(&self.frames[frame_index], next_frame, frame_timer.current_frame));
             } else {
                 return Some(self.frames[frame_index].clone());
             }
@@ -247,19 +199,17 @@ impl EffectLoader {
         path: &str,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Effect>, String> {
+    ) -> Result<Arc<Effect>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load effect from {}", path.magenta()));
 
-        let bytes = game_file_loader.get(&format!("data\\texture\\effect\\{path}"))?;
+        let bytes = game_file_loader
+            .get(&format!("data\\texture\\effect\\{path}"))
+            .map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
-        if <[u8; 4]>::from_bytes(&mut byte_stream).unwrap() != [b'S', b'T', b'R', b'M'] {
-            return Err(format!("failed to read magic number from {path}"));
-        }
-
         // TODO: Add fallback
-        let effect_data = EffectData::from_bytes(&mut byte_stream).unwrap();
+        let effect_data = EffectData::from_bytes(&mut byte_stream).map_err(LoadError::Conversion)?;
 
         let prefix = match path.chars().rev().position(|character| character == '\\') {
             Some(offset) => path.split_at(path.len() - offset).0,
@@ -332,7 +282,7 @@ impl EffectLoader {
         path: &str,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Effect>, String> {
+    ) -> Result<Arc<Effect>, LoadError> {
         match self.cache.get(path) {
             Some(effect) => Ok(effect.clone()),
             None => self.load(path, game_file_loader, texture_loader),

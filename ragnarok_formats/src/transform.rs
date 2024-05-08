@@ -1,10 +1,10 @@
 use std::ops::Add;
 
 use cgmath::{Deg, Rad, Vector3};
-use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, ConversionResult, ConversionResultExt, FromBytes};
 
-#[derive(Copy, Clone, Debug, PrototypeElement)]
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Transform {
     pub position: Vector3<f32>,
     #[hidden_element] // TODO: unhide
@@ -18,10 +18,15 @@ impl FromBytes for Transform {
         let rotation = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
         let scale = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
 
+        // Convert from a standard Rust float (which is in degrees) to a stronger cgmath
+        // type that also represents degrees. We can then easily convert it to
+        // radiants.
+        let rotation = rotation.map(|degrees| Deg(degrees).into());
+
         // TODO: make this nicer
         position.y = -position.y;
 
-        Ok(Transform::from(position, rotation.map(Deg), scale))
+        Ok(Transform { position, rotation, scale })
     }
 }
 

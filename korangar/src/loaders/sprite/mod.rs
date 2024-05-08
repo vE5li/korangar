@@ -5,7 +5,9 @@ use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
+use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
+use ragnarok_formats::version::InternalVersion;
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
 use vulkano::command_buffer::{
     AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
@@ -18,10 +20,10 @@ use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
 use vulkano::sync::future::FenceSignalFuture;
 use vulkano::sync::GpuFuture;
 
-use super::version::InternalVersion;
 use super::FALLBACK_SPRITE_FILE;
 use crate::graphics::MemoryAllocator;
-use crate::loaders::{GameFileLoader, MinorFirst, Version};
+use crate::loaders::error::LoadError;
+use crate::loaders::GameFileLoader;
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
@@ -29,121 +31,6 @@ pub struct Sprite {
     pub textures: Vec<Arc<ImageView>>,
     #[cfg(feature = "debug")]
     sprite_data: SpriteData,
-}
-
-#[derive(Clone, Debug, PrototypeElement)]
-struct PaletteImageData {
-    pub width: u16,
-    pub height: u16,
-    pub data: EncodedData,
-}
-
-#[derive(Clone, Debug, PrototypeElement)]
-struct EncodedData(pub Vec<u8>);
-
-impl FromBytes for PaletteImageData {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>
-    where
-        Self: Sized,
-    {
-        let width = u16::from_bytes(byte_stream).trace::<Self>()?;
-        let height = u16::from_bytes(byte_stream).trace::<Self>()?;
-
-        let data = match width as usize * height as usize {
-            0 => Vec::new(),
-            image_size
-                if byte_stream
-                    .get_metadata::<Self, Option<InternalVersion>>()?
-                    .ok_or(ConversionError::from_message("version not set"))?
-                    .smaller(2, 1) =>
-            {
-                Vec::from_n_bytes(byte_stream, image_size).trace::<Self>()?
-            }
-            image_size => {
-                let mut data = vec![0; image_size];
-                let mut encoded = u16::from_bytes(byte_stream).trace::<Self>()?;
-                let mut next = 0;
-
-                while next < image_size && encoded > 0 {
-                    let byte = byte_stream.byte::<Self>()?;
-                    encoded -= 1;
-
-                    if byte == 0 {
-                        let length = usize::max(byte_stream.byte::<Self>()? as usize, 1);
-                        encoded -= 1;
-
-                        if next + length > image_size {
-                            return Err(ConversionError::from_message("too much data encoded in palette image"));
-                        }
-
-                        next += length;
-                    } else {
-                        data[next] = byte;
-                        next += 1;
-                    }
-                }
-
-                if next != image_size || encoded > 0 {
-                    return Err(ConversionError::from_message("badly encoded palette image"));
-                }
-
-                data
-            }
-        };
-
-        Ok(Self {
-            width,
-            height,
-            data: EncodedData(data),
-        })
-    }
-}
-
-#[derive(Clone, Debug, FromBytes, PrototypeElement)]
-struct RgbaImageData {
-    pub width: u16,
-    pub height: u16,
-    #[length_hint(self.width as usize * self.height as usize * 4)]
-    pub data: Vec<u8>,
-}
-
-#[derive(Copy, Clone, Debug, Default, FromBytes, PrototypeElement)]
-struct PaletteColor {
-    pub red: u8,
-    pub green: u8,
-    pub blue: u8,
-    pub reserved: u8,
-}
-
-impl PaletteColor {
-    pub fn color_bytes(&self, index: u8) -> [u8; 4] {
-        let alpha = match index {
-            0 => 0,
-            _ => 255,
-        };
-
-        [self.red, self.green, self.blue, alpha]
-    }
-}
-
-#[derive(Clone, Debug, FromBytes, PrototypeElement)]
-struct Palette {
-    pub colors: [PaletteColor; 256],
-}
-
-#[derive(Clone, Debug, FromBytes, PrototypeElement)]
-struct SpriteData {
-    #[version]
-    pub version: Version<MinorFirst>,
-    pub palette_image_count: u16,
-    #[version_equals_or_above(1, 2)]
-    pub rgba_image_count: Option<u16>,
-    #[repeating(self.palette_image_count)]
-    pub palette_image_data: Vec<PaletteImageData>,
-    #[repeating(self.rgba_image_count.unwrap_or_default())]
-    pub rgba_image_data: Vec<RgbaImageData>,
-    #[version_equals_or_above(1, 1)]
-    pub palette: Option<Palette>,
 }
 
 #[derive(new)]
@@ -157,16 +44,12 @@ pub struct SpriteLoader {
 }
 
 impl SpriteLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
-        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}"))?;
+        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}")).map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
-
-        if <[u8; 2]>::from_bytes(&mut byte_stream).unwrap() != [b'S', b'P'] {
-            return Err(format!("failed to read magic number from {path}"));
-        }
 
         let sprite_data = match SpriteData::from_bytes(&mut byte_stream) {
             Ok(sprite_data) => sprite_data,
@@ -191,13 +74,23 @@ impl SpriteLoader {
             .rgba_image_data
             .into_iter();
 
+        // TODO: Move this to an extension trait in `korangar_loaders`.
+        pub fn color_bytes(palette: &PaletteColor, index: u8) -> [u8; 4] {
+            let alpha = match index {
+                0 => 0,
+                _ => 255,
+            };
+
+            [palette.red, palette.green, palette.blue, alpha]
+        }
+
         let palette_images = sprite_data.palette_image_data.into_iter().map(|image_data| {
             // decode palette image data if necessary
             let data: Vec<u8> = image_data
                 .data
                 .0
                 .iter()
-                .flat_map(|palette_index| palette.colors[*palette_index as usize].color_bytes(*palette_index))
+                .flat_map(|palette_index| color_bytes(&palette.colors[*palette_index as usize], *palette_index))
                 .collect();
 
             RgbaImageData {
@@ -267,7 +160,7 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, String> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, LoadError> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path, game_file_loader),

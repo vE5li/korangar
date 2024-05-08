@@ -1,0 +1,13 @@
+[package]
+name = "ragnarok_formats"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cgmath = { workspace = true }
+ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
+korangar_interface = { workspace = true, optional = true }
+bitflags = { workspace = true }
+
+[features]
+interface = ["korangar_interface"]

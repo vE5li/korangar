@@ -27,6 +27,9 @@ pub const FALLBACK_MODEL_FILE: &str = "data\\model\\missing.rsm";
 pub const FALLBACK_SPRITE_FILE: &str = "data\\sprite\\npc\\missing.spr";
 pub const FALLBACK_ACTIONS_FILE: &str = "data\\sprite\\npc\\missing.act";
 
+#[derive(Debug)]
+pub struct FileNotFoundError(String);
+
 /// Type implementing the game files loader.
 ///
 /// Currently, there are two types implementing
@@ -154,13 +157,13 @@ impl GameFileLoader {
         lua_archive.save();
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Vec<u8>, String> {
+    pub fn get(&mut self, path: &str) -> Result<Vec<u8>, FileNotFoundError> {
         let lowercase_path = path.to_lowercase();
         let result = self
             .archives
             .iter_mut()
             .find_map(|archive| archive.get_file_by_path(&lowercase_path))
-            .ok_or(format!("failed to find file {path}"));
+            .ok_or(FileNotFoundError(path.to_owned()));
 
         // TODO: should this be removed in the future or left in for resilience?
         if result.is_err() {

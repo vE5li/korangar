@@ -5,7 +5,6 @@ mod particles;
 mod renderers;
 mod settings;
 mod smoothed;
-mod transform;
 mod vertices;
 
 use std::sync::Arc;
@@ -22,7 +21,6 @@ pub use self::particles::*;
 pub use self::renderers::*;
 pub use self::settings::GraphicsSettings;
 pub use self::smoothed::SmoothedValue;
-pub use self::transform::Transform;
 pub use self::vertices::*;
 
 pub type CommandBuilder = AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator>;

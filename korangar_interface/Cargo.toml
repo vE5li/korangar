@@ -6,10 +6,10 @@ edition = "2021"
 [dependencies]
 bitflags = { workspace = true }
 cgmath = { workspace = true, optional = true }
+interface_procedural = { path = "procedural" }
+korangar_debug = { workspace = true, optional = true }
 num = { workspace = true }
 option-ext = "0.2.0"
-korangar_debug = { workspace = true, optional = true }
-interface_procedural = { path = "procedural" }
 serde = { workspace = true, optional = true }
 
 [features]

@@ -5,9 +5,9 @@ edition = "2021"
 
 [dependencies]
 derive-new = { workspace = true }
+korangar_interface = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive"] }
 ragnarok_procedural = { workspace = true }
-korangar_interface = { workspace = true, optional = true }
 
 [features]
 debug = []

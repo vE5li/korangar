@@ -9,9 +9,9 @@ ragnarok_packets = { workspace = true }
 tokio = { version = "1.37", features = ["full"] }
 
 [dev-dependencies]
+korangar_debug = { workspace = true }
 reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
-korangar_debug = { workspace = true }
 
 [features]
 debug = []

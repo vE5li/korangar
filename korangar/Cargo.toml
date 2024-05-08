@@ -11,15 +11,14 @@ chrono = { workspace = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
 derive-new = { workspace = true }
 image = "0.24.2"
+korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
 korangar_networking = { workspace = true, features = ["debug"] }
 lunify = "1.1.0"
 mlua = { version = "0.8", features = ["lua51", "vendored"] }
 num = { workspace = true }
-# TODO: Remove or move to workspace
 option-ext = "0.2.0"
 pathfinding = "2.2.2"
-korangar_debug = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }
 ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
@@ -39,7 +38,7 @@ xml-rs = "0.8.0"
 yazi = "0.1.4"
 
 [features]
-patched_as_folder = []
 debug = ["korangar_debug", "ragnarok_packets/debug", "random_color"]
-unicode = ["korangar_debug/unicode"]
+patched_as_folder = []
 plain = ["debug"]
+unicode = ["korangar_debug/unicode"]

@@ -843,13 +843,20 @@ fn main() {
                         NetworkEvent::SetInventory { items } => {
                             player_inventory.fill(&mut game_file_loader, &mut texture_loader, &script_loader, items);
                         }
-                        NetworkEvent::AddIventoryItem(item_index, item_data, equip_position, equipped_position) => {
+                        NetworkEvent::AddIventoryItem {
+                            item_index,
+                            item_id,
+                            is_identified,
+                            equip_position,
+                            equipped_position,
+                        }=> {
                             player_inventory.add_item(
                                 &mut game_file_loader,
                                 &mut texture_loader,
                                 &script_loader,
                                 item_index,
-                                item_data,
+                                item_id,
+                                is_identified,
                                 equip_position,
                                 equipped_position,
                             );
@@ -862,6 +869,10 @@ fn main() {
                         }
                         NetworkEvent::ChangeJob(account_id, job_id) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id().0 == account_id.0).unwrap();
+
+                            // FIX: A job change does not automatically send packets for the
+                            // inventory and for unequipping items. We should probably manually
+                            // request a full list of items and the hotbar.
 
                             entity.set_job(job_id as usize);
                             entity.reload_sprite(&mut game_file_loader, &mut sprite_loader, &mut action_loader, &script_loader);
@@ -959,13 +970,14 @@ fn main() {
                                 match hotkey {
                                     HotkeyState::Bound(hotkey) => {
                                         let Some(mut skill) = player_skill_tree.find_skill(SkillId(hotkey.skill_id as u16)) else {
-                                            panic!("Skill in hotbar is not learned by the player");
+                                            hotbar.clear_slot(&mut networking_system, HotbarSlot(index as u16));
+                                            continue;
                                         };
 
                                         skill.skill_level = hotkey.quantity_or_skill_level;
                                         hotbar.set_slot(HotbarSlot(index as u16), skill);
                                     },
-                                    HotkeyState::Unbound => hotbar.clear_slot(HotbarSlot(index as u16)),
+                                    HotkeyState::Unbound => hotbar.unset_slot(HotbarSlot(index as u16)),
                                 }
                             }
                         }
@@ -1247,7 +1259,7 @@ fn main() {
                             interface.open_window(&application, &mut focus_state, &PacketWindow::new(packet_callback.remote(), PlainTrackedState::default()))
                         }
                         #[cfg(feature = "debug")]
-                        UserEvent::ClearPacketHistory => /*networking_system.clear_packet_history()*/ {},
+                        UserEvent::ClearPacketHistory => packet_callback.clear_all(),
                         #[cfg(feature = "debug")]
                         UserEvent::CameraLookAround(offset) => debug_camera.look_around(offset),
                         #[cfg(feature = "debug")]

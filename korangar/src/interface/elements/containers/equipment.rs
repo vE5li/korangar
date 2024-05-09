@@ -24,15 +24,15 @@ pub struct EquipmentContainer {
 impl EquipmentContainer {
     pub fn new(items: PlainRemote<Vec<Item>>) -> Self {
         const SLOT_POSITIONS: [EquipPosition; 9] = [
-            EquipPosition::HeadTop,
-            EquipPosition::HeadMiddle,
-            EquipPosition::HeadLower,
-            EquipPosition::Armor,
-            EquipPosition::Garment,
-            EquipPosition::Shoes,
-            EquipPosition::LeftHand,
-            EquipPosition::RightHand,
-            EquipPosition::Ammo,
+            EquipPosition::HEAD_TOP,
+            EquipPosition::HEAD_MIDDLE,
+            EquipPosition::HEAD_LOWER,
+            EquipPosition::ARMOR,
+            EquipPosition::GARMENT,
+            EquipPosition::SHOES,
+            EquipPosition::LEFT_HAND,
+            EquipPosition::RIGHT_HAND,
+            EquipPosition::AMMO,
         ];
 
         let elements = {
@@ -42,31 +42,31 @@ impl EquipmentContainer {
                 .map(|index| {
                     let slot = SLOT_POSITIONS[index];
                     let display_name = match slot {
-                        EquipPosition::None => panic!(),
-                        EquipPosition::HeadLower => "Head lower",
-                        EquipPosition::HeadMiddle => "Head middle",
-                        EquipPosition::HeadTop => "Head top",
-                        EquipPosition::RightHand => "Right hand",
-                        EquipPosition::LeftHand => "Left hand",
-                        EquipPosition::Armor => "Armor",
-                        EquipPosition::Shoes => "Shoes",
-                        EquipPosition::Garment => "Garment",
-                        EquipPosition::LeftAccessory => "Left accessory",
-                        EquipPosition::RigthAccessory => "Right accessory",
-                        EquipPosition::CostumeHeadTop => "Costume head top",
-                        EquipPosition::CostumeHeadMiddle => "Costume head middle",
-                        EquipPosition::CostumeHeadLower => "Costume head lower",
-                        EquipPosition::CostumeGarment => "Costume garment",
-                        EquipPosition::Ammo => "Ammo",
-                        EquipPosition::ShadowArmor => "Shadow ammo",
-                        EquipPosition::ShadowWeapon => "Shadow weapon",
-                        EquipPosition::ShadowShield => "Shadow shield",
-                        EquipPosition::ShadowShoes => "Shadow shoes",
-                        EquipPosition::ShadowRightAccessory => "Shadow right accessory",
-                        EquipPosition::ShadowLeftAccessory => "Shadow left accessory",
-                        EquipPosition::LeftRightAccessory => "Accessory",
-                        EquipPosition::LeftRightHand => "Two hand weapon",
-                        EquipPosition::ShadowLeftRightAccessory => "Shadow accessory",
+                        _ if slot.contains(EquipPosition::HEAD_LOWER) => "Head lower",
+                        _ if slot.contains(EquipPosition::HEAD_MIDDLE) => "Head middle",
+                        _ if slot.contains(EquipPosition::HEAD_TOP) => "Head top",
+                        _ if slot.contains(EquipPosition::RIGHT_HAND) => "Right hand",
+                        _ if slot.contains(EquipPosition::LEFT_HAND) => "Left hand",
+                        _ if slot.contains(EquipPosition::ARMOR) => "Armor",
+                        _ if slot.contains(EquipPosition::SHOES) => "Shoes",
+                        _ if slot.contains(EquipPosition::GARMENT) => "Garment",
+                        _ if slot.contains(EquipPosition::LEFT_ACCESSORY) => "Left accessory",
+                        _ if slot.contains(EquipPosition::RIGTH_ACCESSORY) => "Right accessory",
+                        _ if slot.contains(EquipPosition::COSTUME_HEAD_TOP) => "Costume head top",
+                        _ if slot.contains(EquipPosition::COSTUME_HEAD_MIDDLE) => "Costume head middle",
+                        _ if slot.contains(EquipPosition::COSTUME_HEAD_LOWER) => "Costume head lower",
+                        _ if slot.contains(EquipPosition::COSTUME_GARMENT) => "Costume garment",
+                        _ if slot.contains(EquipPosition::AMMO) => "Ammo",
+                        _ if slot.contains(EquipPosition::SHADOW_ARMOR) => "Shadow ammo",
+                        _ if slot.contains(EquipPosition::SHADOW_WEAPON) => "Shadow weapon",
+                        _ if slot.contains(EquipPosition::SHADOW_SHIELD) => "Shadow shield",
+                        _ if slot.contains(EquipPosition::SHADOW_SHOES) => "Shadow shoes",
+                        _ if slot.contains(EquipPosition::SHADOW_RIGHT_ACCESSORY) => "Shadow right accessory",
+                        _ if slot.contains(EquipPosition::SHADOW_LEFT_ACCESSORY) => "Shadow left accessory",
+                        _ if slot.contains(EquipPosition::LEFT_RIGHT_ACCESSORY) => "Accessory",
+                        _ if slot.contains(EquipPosition::LEFT_RIGHT_HAND) => "Two hand weapon",
+                        _ if slot.contains(EquipPosition::SHADOW_LEFT_RIGHT_ACCESSORY) => "Shadow accessory",
+                        _ => panic!("no display name for equip position"),
                     };
 
                     let text = Text::default()
@@ -75,12 +75,15 @@ impl EquipmentContainer {
                         .with_width(dimension_bound!(!))
                         .wrap();
 
-                    let item = items.iter().find(|item| item.equipped_position == slot).cloned();
+                    let item = items.iter().find(|item| item.equipped_position.contains(slot)).cloned();
 
                     let item_box = ItemBox::new(
                         item,
                         ItemSource::Equipment { position: slot },
-                        Box::new(move |mouse_mode| matches!(mouse_mode, MouseInputMode::MoveItem(_, item) if item.equip_position == slot)),
+                        // ItemSource::Equipment { position: EquipPosition::HEAD_TOP | EquipPosition::HEAD_MIDDLE },
+                        Box::new(
+                            move |mouse_mode| matches!(mouse_mode, MouseInputMode::MoveItem(_, item) if item.equip_position.contains(slot)),
+                        ),
                     );
 
                     Container::new(vec![item_box.wrap(), text]).wrap()

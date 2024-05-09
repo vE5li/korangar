@@ -95,7 +95,13 @@ pub enum NetworkEvent {
     SetInventory {
         items: Vec<InventoryItem>,
     },
-    AddIventoryItem(ItemIndex, ItemId, EquipPosition, EquipPosition),
+    AddIventoryItem {
+        item_index: ItemIndex,
+        item_id: ItemId,
+        is_identified: bool,
+        equip_position: EquipPosition,
+        equipped_position: EquipPosition,
+    },
     SkillTree(Vec<SkillInformation>),
     UpdateEquippedPosition {
         index: ItemIndex,

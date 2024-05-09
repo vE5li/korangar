@@ -860,6 +860,33 @@ pub struct ItemOptions {
     pub parameter: u8,
 }
 
+bitflags::bitflags! {
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+    pub struct RegularItemFlags: u8 {
+        const IDENTIFIED = 0b01;
+        const IN_ETC_TAB = 0b10;
+    }
+}
+
+impl FixedByteSize for RegularItemFlags {
+    fn size_in_bytes() -> usize {
+        <<Self as bitflags::Flags>::Bits as FixedByteSize>::size_in_bytes()
+    }
+}
+
+impl FromBytes for RegularItemFlags {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+    }
+}
+
+impl ToBytes for RegularItemFlags {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        self.bits().to_bytes()
+    }
+}
+
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct RegularItemInformation {
@@ -870,7 +897,7 @@ pub struct RegularItemInformation {
     pub wear_state: u32,
     pub slot: [u32; 4], // card ?
     pub hire_expiration_date: i32,
-    pub fags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
+    pub flags: RegularItemFlags,
 }
 
 #[derive(Debug, Clone, IncomingPacket, MapServer)]
@@ -882,6 +909,34 @@ pub struct RegularItemListPacket {
     pub inventory_type: u8,
     #[repeating_remaining]
     pub item_information: Vec<RegularItemInformation>,
+}
+
+bitflags::bitflags! {
+    #[derive(Debug, Clone)]
+    #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+    pub struct EquippableItemFlags: u8 {
+        const IDENTIFIED = 0b001;
+        const IS_DAMAGED = 0b010;
+        const IN_ETC_TAB = 0b110;
+    }
+}
+
+impl FixedByteSize for EquippableItemFlags {
+    fn size_in_bytes() -> usize {
+        <<Self as bitflags::Flags>::Bits as FixedByteSize>::size_in_bytes()
+    }
+}
+
+impl FromBytes for EquippableItemFlags {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+    }
+}
+
+impl ToBytes for EquippableItemFlags {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        self.bits().to_bytes()
+    }
 }
 
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
@@ -900,7 +955,7 @@ pub struct EquippableItemInformation {
     pub option_data: [ItemOptions; 5], // fix count
     pub refinement_level: u8,
     pub enchantment_level: u8,
-    pub fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
+    pub flags: EquippableItemFlags,
 }
 
 #[derive(Debug, Clone, IncomingPacket, MapServer)]
@@ -2074,60 +2129,54 @@ pub struct ChooseDialogOptionPacket {
     pub option: i8,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, ByteConvertable, FixedByteSize)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[numeric_type(u32)]
-pub enum EquipPosition {
-    #[numeric_value(0)]
-    None,
-    #[numeric_value(1)]
-    HeadLower,
-    #[numeric_value(512)]
-    HeadMiddle,
-    #[numeric_value(256)]
-    HeadTop,
-    #[numeric_value(2)]
-    RightHand,
-    #[numeric_value(32)]
-    LeftHand,
-    #[numeric_value(16)]
-    Armor,
-    #[numeric_value(64)]
-    Shoes,
-    #[numeric_value(4)]
-    Garment,
-    #[numeric_value(8)]
-    LeftAccessory,
-    #[numeric_value(128)]
-    RigthAccessory,
-    #[numeric_value(1024)]
-    CostumeHeadTop,
-    #[numeric_value(2048)]
-    CostumeHeadMiddle,
-    #[numeric_value(4196)]
-    CostumeHeadLower,
-    #[numeric_value(8192)]
-    CostumeGarment,
-    #[numeric_value(32768)]
-    Ammo,
-    #[numeric_value(65536)]
-    ShadowArmor,
-    #[numeric_value(131072)]
-    ShadowWeapon,
-    #[numeric_value(262144)]
-    ShadowShield,
-    #[numeric_value(524288)]
-    ShadowShoes,
-    #[numeric_value(1048576)]
-    ShadowRightAccessory,
-    #[numeric_value(2097152)]
-    ShadowLeftAccessory,
-    #[numeric_value(136)]
-    LeftRightAccessory,
-    #[numeric_value(34)]
-    LeftRightHand,
-    #[numeric_value(3145728)]
-    ShadowLeftRightAccessory,
+bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+    pub struct EquipPosition: u32 {
+        const NONE = 0;
+        const HEAD_LOWER = 1;
+        const HEAD_MIDDLE = 512;
+        const HEAD_TOP = 256;
+        const RIGHT_HAND = 2;
+        const LEFT_HAND = 32;
+        const ARMOR = 16;
+        const SHOES = 64;
+        const GARMENT = 4;
+        const LEFT_ACCESSORY = 8;
+        const RIGTH_ACCESSORY = 128;
+        const COSTUME_HEAD_TOP = 1024;
+        const COSTUME_HEAD_MIDDLE = 2048;
+        const COSTUME_HEAD_LOWER = 4196;
+        const COSTUME_GARMENT = 8192;
+        const AMMO = 32768;
+        const SHADOW_ARMOR = 65536;
+        const SHADOW_WEAPON = 131072;
+        const SHADOW_SHIELD = 262144;
+        const SHADOW_SHOES = 524288;
+        const SHADOW_RIGHT_ACCESSORY = 1048576;
+        const SHADOW_LEFT_ACCESSORY = 2097152;
+        const LEFT_RIGHT_ACCESSORY = 136;
+        const LEFT_RIGHT_HAND = 34;
+        const SHADOW_LEFT_RIGHT_ACCESSORY = 3145728;
+    }
+}
+
+impl FixedByteSize for EquipPosition {
+    fn size_in_bytes() -> usize {
+        <<Self as bitflags::Flags>::Bits as FixedByteSize>::size_in_bytes()
+    }
+}
+
+impl FromBytes for EquipPosition {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+    }
+}
+
+impl ToBytes for EquipPosition {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        self.bits().to_bytes()
+    }
 }
 
 #[derive(Debug, Clone, OutgoingPacket, MapServer, new)]

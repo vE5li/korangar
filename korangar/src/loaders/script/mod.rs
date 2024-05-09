@@ -87,23 +87,20 @@ end
     }*/
 
     // TODO: move this to a different class that utilizes the script loader
-    pub fn get_item_resource_from_id(&self, item_id: ItemId) -> String {
+    pub fn get_item_resource_from_id(&self, item_id: ItemId, is_identified: bool) -> String {
         use mlua::prelude::*;
 
         let globals = self.state.globals();
+        let lookup_name = match is_identified {
+            true => "identifiedResourceName",
+            false => "undidentifiedResourceName",
+        };
 
         globals
             .get::<_, LuaTable>("tbl")
             .unwrap()
             .get::<_, LuaTable>(item_id.0)
-            .map(|table| {
-                table
-                    .get::<_, LuaString>("unidentifiedResourceName")
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_owned()
-            })
+            .map(|table| table.get::<_, LuaString>(lookup_name).unwrap().to_str().unwrap().to_owned())
             .unwrap_or_else(|_| "»ç°ú".to_owned())
     }
 }

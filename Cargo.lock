@@ -1722,6 +1722,7 @@ dependencies = [
 name = "ragnarok_packets"
 version = "0.1.0"
 dependencies = [
+ "bitflags 2.5.0",
  "derive-new",
  "korangar_interface",
  "ragnarok_bytes",

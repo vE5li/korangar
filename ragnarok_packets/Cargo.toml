@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bitflags = { workspace = true }
 derive-new = { workspace = true }
 korangar_interface = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive"] }

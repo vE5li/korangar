@@ -78,7 +78,19 @@ impl Hotbar {
     }
 
     /// Clear the slot without notifying the map server.
-    pub fn clear_slot(&mut self, slot: HotbarSlot) {
+    pub fn unset_slot(&mut self, slot: HotbarSlot) {
+        self.skills.mutate(|skills| {
+            skills[slot.0 as usize] = None;
+        });
+    }
+
+    /// Clear the slot and notify the map server.
+    pub fn clear_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot)
+    where
+        Callback: PacketCallback,
+    {
+        let _ = networking_system.set_hotkey_data(HotbarTab(0), slot, HotkeyData::UNBOUND);
+
         self.skills.mutate(|skills| {
             skills[slot.0 as usize] = None;
         });

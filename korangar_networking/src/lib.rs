@@ -688,8 +688,9 @@ where
                     packet.item_information.into_iter().map(|item| InventoryItem {
                         index: item.index,
                         id: item.item_id,
-                        equip_position: EquipPosition::None,
-                        equipped_position: EquipPosition::None,
+                        is_identified: item.flags.contains(RegularItemFlags::IDENTIFIED),
+                        equip_position: EquipPosition::NONE,
+                        equipped_position: EquipPosition::NONE,
                     }),
                 );
                 NoNetworkEvents
@@ -703,6 +704,7 @@ where
                     packet.item_information.into_iter().map(|item| InventoryItem {
                         index: item.index,
                         id: item.item_id,
+                        is_identified: item.flags.contains(EquippableItemFlags::IDENTIFIED),
                         equip_position: item.equip_position,
                         equipped_position: item.equipped_position,
                     }),
@@ -787,8 +789,12 @@ where
             QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
             _ => NetworkEvent::AddQuestEffect(packet),
         })?;
-        packet_handler.register(|packet: ItemPickupPacket| {
-            NetworkEvent::AddIventoryItem(packet.index, packet.item_id, packet.equip_position, EquipPosition::None)
+        packet_handler.register(|packet: ItemPickupPacket| NetworkEvent::AddIventoryItem {
+            item_index: packet.index,
+            item_id: packet.item_id,
+            is_identified: packet.is_identified != 0,
+            equip_position: packet.equip_position,
+            equipped_position: EquipPosition::NONE,
         })?;
         packet_handler.register_noop::<RemoveItemFromInventoryPacket>()?;
         packet_handler.register(|packet: ServerTickPacket| NetworkEvent::UpdateClientTick(packet.client_tick))?;
@@ -818,7 +824,7 @@ where
         packet_handler.register(|packet: RequestUnequipItemStatusPacket| match packet.result {
             RequestUnequipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
                 index: packet.inventory_index,
-                equipped_position: EquipPosition::None,
+                equipped_position: EquipPosition::NONE,
             }),
             _ => None,
         })?;

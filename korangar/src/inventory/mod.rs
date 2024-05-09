@@ -15,7 +15,7 @@ use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
 /*enum ItemDetails {
     Regular {
         amount: u16,
-        fags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
+        flags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
     },
 
     Equippable {
@@ -26,7 +26,7 @@ use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
         option_data: [ItemOptions; 5], // fix count
         refinement_level: u8,
         enchantment_level: u8,
-        fags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
+        flags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
     },
 }*/
 
@@ -59,7 +59,7 @@ impl Inventory {
         let items = item_data
             .into_iter()
             .map(|item_data| {
-                let resource_name = script_loader.get_item_resource_from_id(item_data.id);
+                let resource_name = script_loader.get_item_resource_from_id(item_data.id, item_data.is_identified);
                 let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
                 let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
 
@@ -83,6 +83,7 @@ impl Inventory {
         script_loader: &ScriptLoader,
         item_index: ItemIndex,
         item_id: ItemId,
+        is_identified: bool,
         equip_position: EquipPosition,
         equipped_position: EquipPosition,
     ) {
@@ -92,7 +93,7 @@ impl Inventory {
                 return ValueState::Mutated(());
             }
 
-            let resource_name = script_loader.get_item_resource_from_id(item_id);
+            let resource_name = script_loader.get_item_resource_from_id(item_id, is_identified);
             let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
             let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
             let item = Item {

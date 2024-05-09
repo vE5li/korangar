@@ -176,6 +176,13 @@ impl PacketHistoryCallback {
             version: 0,
         }
     }
+
+    pub fn clear_all(&self) {
+        let mut lock = self.buffer_pointer.lock().unwrap();
+
+        lock.0.clear();
+        lock.1 += 1;
+    }
 }
 
 impl PacketCallback for PacketHistoryCallback {

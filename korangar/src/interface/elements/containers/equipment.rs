@@ -80,7 +80,6 @@ impl EquipmentContainer {
                     let item_box = ItemBox::new(
                         item,
                         ItemSource::Equipment { position: slot },
-                        // ItemSource::Equipment { position: EquipPosition::HEAD_TOP | EquipPosition::HEAD_MIDDLE },
                         Box::new(
                             move |mouse_mode| matches!(mouse_mode, MouseInputMode::MoveItem(_, item) if item.equip_position.contains(slot)),
                         ),

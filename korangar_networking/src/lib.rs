@@ -1,5 +1,6 @@
 mod entity;
 mod event;
+mod hotkey;
 mod inventory;
 mod message;
 mod server;
@@ -25,6 +26,7 @@ use tokio::task::JoinHandle;
 
 pub use self::entity::EntityData;
 pub use self::event::{DisconnectReason, NetworkEvent};
+pub use self::hotkey::HotkeyState;
 pub use self::inventory::InventoryItem;
 pub use self::message::MessageColor;
 pub use self::server::{
@@ -719,7 +721,17 @@ where
         packet_handler.register_noop::<EquippableSwitchItemListPacket>()?;
         packet_handler.register_noop::<MapTypePacket>()?;
         packet_handler.register(|packet: UpdateSkillTreePacket| NetworkEvent::SkillTree(packet.skill_information))?;
-        packet_handler.register_noop::<UpdateHotkeysPacket>()?;
+        packet_handler.register(|packet: UpdateHotkeysPacket| NetworkEvent::SetHotkeyData {
+            tab: packet.tab,
+            hotkeys: packet
+                .hotkeys
+                .into_iter()
+                .map(|hotkey_data| match hotkey_data == HotkeyData::UNBOUND {
+                    true => HotkeyState::Unbound,
+                    false => HotkeyState::Bound(hotkey_data),
+                })
+                .collect(),
+        })?;
         packet_handler.register_noop::<InitialStatusPacket>()?;
         packet_handler.register_noop::<UpdatePartyInvitationStatePacket>()?;
         packet_handler.register_noop::<UpdateShowEquipPacket>()?;
@@ -1010,6 +1022,10 @@ where
 
     pub fn switch_character_slot(&mut self, origin_slot: usize, destination_slot: usize) -> Result<(), NotConnectedError> {
         self.send_character_server_packet(&SwitchCharacterSlotPacket::new(origin_slot as u16, destination_slot as u16))
+    }
+
+    pub fn set_hotkey_data(&mut self, tab: HotbarTab, index: HotbarSlot, hotkey_data: HotkeyData) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&SetHotkeyData2Packet::new(tab, index, hotkey_data))
     }
 }
 

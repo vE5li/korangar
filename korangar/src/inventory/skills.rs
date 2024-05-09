@@ -55,4 +55,8 @@ impl SkillTree {
     pub fn get_skills(&self) -> PlainRemote<Vec<Skill>> {
         self.skills.new_remote()
     }
+
+    pub fn find_skill(&self, skill_id: SkillId) -> Option<Skill> {
+        self.skills.get().iter().find(|skill| skill.skill_id == skill_id).cloned()
+    }
 }

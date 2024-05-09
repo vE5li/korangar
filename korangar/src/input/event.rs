@@ -1,9 +1,8 @@
 use cgmath::Vector2;
 use korangar_interface::event::ClickAction;
 use korangar_interface::ElementEvent;
-use ragnarok_packets::{AccountId, CharacterId, CharacterServerInformation, EntityId, TilePosition};
+use ragnarok_packets::{AccountId, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, TilePosition};
 
-use super::HotbarSlot;
 use crate::interface::application::{InterfaceSettings, InternalThemeKind};
 use crate::interface::resource::Move;
 use crate::loaders::ServiceId;

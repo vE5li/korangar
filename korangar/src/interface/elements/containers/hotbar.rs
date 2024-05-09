@@ -3,9 +3,10 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
+use ragnarok_packets::HotbarSlot;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
-use crate::input::{HotbarSlot, MouseInputMode};
+use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::SkillBox;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -28,7 +29,9 @@ impl HotbarContainer {
                 .cloned()
                 .enumerate()
                 .map(|(slot, skill)| {
-                    let skill_source = SkillSource::Hotbar { slot: HotbarSlot(slot) };
+                    let skill_source = SkillSource::Hotbar {
+                        slot: HotbarSlot(slot as u16),
+                    };
                     let skill_box = SkillBox::new(
                         skill,
                         skill_source,

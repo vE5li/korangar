@@ -1,6 +1,5 @@
-use ragnarok_packets::EquipPosition;
+use ragnarok_packets::{EquipPosition, HotbarSlot};
 
-use crate::input::HotbarSlot;
 use crate::inventory::{Item, Skill};
 
 #[derive(Clone, Copy, Debug, PartialEq)]

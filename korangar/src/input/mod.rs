@@ -10,7 +10,7 @@ use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
-use ragnarok_packets::ClientTick;
+use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
@@ -27,9 +27,6 @@ use crate::interface::resource::PartialMove;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct HotbarSlot(pub usize);
 
 pub struct InputSystem {
     previous_mouse_position: ScreenPosition,

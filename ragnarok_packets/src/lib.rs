@@ -114,6 +114,14 @@ pub struct SkillId(pub u16);
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct SkillLevel(pub u16);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct HotbarTab(pub u16);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct HotbarSlot(pub u16);
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ServerAddress(pub [u8; 4]);
@@ -1547,7 +1555,7 @@ pub struct UpdateSkillTreePacket {
     pub skill_information: Vec<SkillInformation>,
 }
 
-#[derive(Debug, Clone, ByteConvertable, MapServer)]
+#[derive(Debug, Clone, PartialEq, Eq, ByteConvertable, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct HotkeyData {
     pub is_skill: u8,
@@ -1555,13 +1563,38 @@ pub struct HotkeyData {
     pub quantity_or_skill_level: SkillLevel,
 }
 
+impl HotkeyData {
+    pub const UNBOUND: Self = Self {
+        is_skill: 0,
+        skill_id: 0,
+        quantity_or_skill_level: SkillLevel(0),
+    };
+}
+
 #[derive(Debug, Clone, IncomingPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B20)]
 pub struct UpdateHotkeysPacket {
     pub rotate: u8,
-    pub tab: u16,
+    pub tab: HotbarTab,
     pub hotkeys: [HotkeyData; 38],
+}
+
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x02BA)]
+pub struct SetHotkeyData1Packet {
+    pub slot: HotbarSlot,
+    pub hotkey_data: HotkeyData,
+}
+
+#[derive(Debug, Clone, OutgoingPacket, MapServer, new)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0B21)]
+pub struct SetHotkeyData2Packet {
+    pub tab: HotbarTab,
+    pub slot: HotbarSlot,
+    pub hotkey_data: HotkeyData,
 }
 
 #[derive(Debug, Clone, IncomingPacket, MapServer)]

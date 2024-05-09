@@ -45,8 +45,10 @@ use korangar_debug::profiling::Profiler;
 use korangar_interface::application::{Application, FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec};
 use korangar_interface::Interface;
-use korangar_networking::{DisconnectReason, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem};
-use ragnarok_packets::{CharacterId, CharacterServerInformation, Friend, SkillId, SkillType, TilePosition, UnitId, WorldPosition};
+use korangar_networking::{DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem};
+use ragnarok_packets::{
+    CharacterId, CharacterServerInformation, Friend, HotbarSlot, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
+};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{
@@ -946,6 +948,27 @@ fn main() {
                                 *friend_list = friends.into_iter().map(|friend| (friend, LinkedElement::new())).collect();
                             });
                         }
+                        NetworkEvent::SetHotkeyData { tab, hotkeys } => {
+                            // FIX: Since we only have one hotbar at the moment, we ignore
+                            // everything but 0.
+                            if tab.0 != 0 {
+                                continue;
+                            }
+
+                            for (index, hotkey) in hotkeys.into_iter().take(10).enumerate() {
+                                match hotkey {
+                                    HotkeyState::Bound(hotkey) => {
+                                        let Some(mut skill) = player_skill_tree.find_skill(SkillId(hotkey.skill_id as u16)) else {
+                                            panic!("Skill in hotbar is not learned by the player");
+                                        };
+
+                                        skill.skill_level = hotkey.quantity_or_skill_level;
+                                        hotbar.set_slot(HotbarSlot(index as u16), skill);
+                                    },
+                                    HotkeyState::Unbound => hotbar.clear_slot(HotbarSlot(index as u16)),
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -1116,10 +1139,10 @@ fn main() {
                                     skill,
                                 } => match (source, destination) {
                                     (SkillSource::SkillTree, SkillSource::Hotbar { slot }) => {
-                                        hotbar.set_slot(skill, slot);
+                                        hotbar.update_slot(&mut networking_system, slot, skill);
                                     }
                                     (SkillSource::Hotbar { slot: source_slot }, SkillSource::Hotbar { slot: destination_slot }) => {
-                                        hotbar.swap_slot(source_slot, destination_slot);
+                                        hotbar.swap_slot(&mut networking_system, source_slot, destination_slot);
                                     }
                                     _ => {}
                                 },

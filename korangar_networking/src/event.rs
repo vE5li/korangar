@@ -1,5 +1,6 @@
 use ragnarok_packets::*;
 
+use crate::hotkey::HotkeyState;
 use crate::{
     CharacterServerLoginData, EntityData, InventoryItem, LoginServerLoginData, MessageColor, UnifiedCharacterSelectionFailedReason,
     UnifiedLoginFailedReason,
@@ -118,6 +119,10 @@ pub enum NetworkEvent {
     FriendRemoved {
         account_id: AccountId,
         character_id: CharacterId,
+    },
+    SetHotkeyData {
+        tab: HotbarTab,
+        hotkeys: Vec<HotkeyState>,
     },
 }
 

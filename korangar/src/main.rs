@@ -675,7 +675,7 @@ fn main() {
                                 &map,
                                 saved_login_data.account_id,
                                 character_information,
-                                WorldPosition::new(0, 0),
+                                WorldPosition { x: 0, y: 0 },
                                 client_tick,
                             );
                             let player = Entity::Player(player);
@@ -1094,7 +1094,7 @@ fn main() {
                         },
                         UserEvent::RequestPlayerMove(destination) => {
                             if !entities.is_empty() {
-                                let _ = networking_system.player_move(WorldPosition::new(destination.x, destination.y));
+                                let _ = networking_system.player_move(WorldPosition { x: destination.x, y: destination.y });
                             }
                         }
                         UserEvent::RequestPlayerInteract(entity_id) => {

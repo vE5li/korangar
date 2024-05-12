@@ -1,4 +1,6 @@
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
+use ragnarok_bytes::{
+    ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
+};
 
 use crate::signature::Signature;
 use crate::version::{InternalVersion, MinorFirst, Version};
@@ -73,16 +75,22 @@ impl FromBytes for PaletteImageData {
     }
 }
 
-#[derive(Clone, Debug, FromBytes)]
+impl ToBytes for PaletteImageData {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        panic!("PalletteImageData can not be serialized currently because it depends on a version requirement");
+    }
+}
+
+#[derive(Clone, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct RgbaImageData {
     pub width: u16,
     pub height: u16,
-    #[length_hint(self.width as usize * self.height as usize * 4)]
+    #[repeating_expr(width as usize * height as usize * 4)]
     pub data: Vec<u8>,
 }
 
-#[derive(Copy, Clone, Debug, Default, FromBytes)]
+#[derive(Copy, Clone, Debug, Default, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct PaletteColor {
     pub red: u8,
@@ -91,24 +99,27 @@ pub struct PaletteColor {
     pub reserved: u8,
 }
 
-#[derive(Clone, Debug, FromBytes)]
+#[derive(Clone, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Palette {
     pub colors: [PaletteColor; 256],
 }
 
-#[derive(Clone, Debug, FromBytes)]
+#[derive(Clone, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct SpriteData {
+    #[new_default]
     pub signature: Signature<b"SP">,
     #[version]
     pub version: Version<MinorFirst>,
+    #[new_derive]
     pub palette_image_count: u16,
     #[version_equals_or_above(1, 2)]
+    #[new_derive]
     pub rgba_image_count: Option<u16>,
-    #[repeating(self.palette_image_count)]
+    #[repeating(palette_image_count)]
     pub palette_image_data: Vec<PaletteImageData>,
-    #[repeating(self.rgba_image_count.unwrap_or_default())]
+    #[repeating_option(rgba_image_count)]
     pub rgba_image_data: Vec<RgbaImageData>,
     #[version_equals_or_above(1, 1)]
     pub palette: Option<Palette>,

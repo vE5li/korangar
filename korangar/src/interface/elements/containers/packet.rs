@@ -12,7 +12,7 @@ use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote, RemoteClone};
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
 use ragnarok_packets::handler::PacketCallback;
-use ragnarok_packets::{IncomingPacket, OutgoingPacket, PacketHeader};
+use ragnarok_packets::{Packet, PacketHeader};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -26,12 +26,16 @@ struct UnknownPacket {
     pub bytes: Vec<u8>,
 }
 
-impl IncomingPacket for UnknownPacket {
+impl Packet for UnknownPacket {
     const HEADER: PacketHeader = PacketHeader(0);
     const IS_PING: bool = false;
 
     fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let _ = byte_stream;
+        unimplemented!()
+    }
+
+    fn payload_to_bytes(&self) -> ConversionResult<Vec<u8>> {
         unimplemented!()
     }
 
@@ -67,12 +71,16 @@ struct ErrorPacket {
     pub error: Box<ConversionError>,
 }
 
-impl IncomingPacket for ErrorPacket {
+impl Packet for ErrorPacket {
     const HEADER: PacketHeader = PacketHeader(0);
     const IS_PING: bool = false;
 
     fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let _ = byte_stream;
+        unimplemented!()
+    }
+
+    fn payload_to_bytes(&self) -> ConversionResult<Vec<u8>> {
         unimplemented!()
     }
 
@@ -188,7 +196,7 @@ impl PacketHistoryCallback {
 impl PacketCallback for PacketHistoryCallback {
     fn incoming_packet<Packet>(&self, packet: &Packet)
     where
-        Packet: IncomingPacket,
+        Packet: ragnarok_packets::Packet,
     {
         let mut lock = self.buffer_pointer.lock().unwrap();
 
@@ -201,7 +209,7 @@ impl PacketCallback for PacketHistoryCallback {
 
     fn outgoing_packet<Packet>(&self, packet: &Packet)
     where
-        Packet: OutgoingPacket,
+        Packet: ragnarok_packets::Packet,
     {
         let mut lock = self.buffer_pointer.lock().unwrap();
 

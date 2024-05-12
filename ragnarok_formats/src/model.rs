@@ -1,5 +1,7 @@
 use cgmath::{Matrix3, Quaternion, Vector2, Vector3};
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt};
+use ragnarok_bytes::{
+    ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
+};
 
 use crate::signature::Signature;
 use crate::version::{InternalVersion, MajorFirst, Version};
@@ -31,6 +33,12 @@ impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
     }
 }
 
+impl<const LENGTH: usize> ToBytes for ModelString<LENGTH> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        panic!("ModelString can not be serialized currently because it depends on a version requirement");
+    }
+}
+
 #[cfg(feature = "interface")]
 impl<App, const LENGTH: usize> korangar_interface::elements::PrototypeElement<App> for ModelString<LENGTH>
 where
@@ -41,21 +49,21 @@ where
     }
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct PositionKeyframeData {
     pub frame: u32,
     pub position: Vector3<f32>,
 }
 
-#[derive(Clone, Debug, FromBytes)]
+#[derive(Clone, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct RotationKeyframeData {
     pub frame: u32,
     pub quaternions: Quaternion<f32>,
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct FaceData {
     pub vertex_position_indices: [u16; 3],
@@ -66,7 +74,7 @@ pub struct FaceData {
     pub smooth_group: i32,
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct TextureCoordinateData {
     #[version_equals_or_above(1, 2)]
@@ -74,42 +82,48 @@ pub struct TextureCoordinateData {
     pub coordinates: Vector2<f32>, // possibly wrong if version < 1.2
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct NodeData {
     pub node_name: ModelString<40>,
     pub parent_node_name: ModelString<40>, // This is where 2.2 starts failing
     pub texture_count: u32,
-    #[repeating(self.texture_count)]
+    #[repeating(texture_count)]
     pub texture_indices: Vec<u32>,
-    #[hidden_element]
+    #[cfg_attr(feature = "interface", hidden_element)]
     pub offset_matrix: Matrix3<f32>,
     pub translation1: Vector3<f32>,
     pub translation2: Vector3<f32>,
     pub rotation_angle: f32,
     pub rotation_axis: Vector3<f32>,
     pub scale: Vector3<f32>,
+    #[new_derive]
     pub vertex_position_count: u32,
-    #[repeating(self.vertex_position_count)]
+    #[repeating(vertex_position_count)]
     pub vertex_positions: Vec<Vector3<f32>>,
+    #[new_derive]
     pub texture_coordinate_count: u32,
-    #[repeating(self.texture_coordinate_count)]
+    #[repeating(texture_coordinate_count)]
     pub texture_coordinates: Vec<TextureCoordinateData>,
+    #[new_derive]
     pub face_count: u32,
-    #[repeating(self.face_count)]
+    #[repeating(face_count)]
     pub faces: Vec<FaceData>,
     #[version_equals_or_above(2, 5)] // unsure what vesion this is supposed to be (must be > 1.5)
+    #[new_derive]
     pub position_keyframe_count: Option<u32>,
-    #[repeating(self.position_keyframe_count.unwrap_or_default())]
+    #[repeating_option(position_keyframe_count)]
     pub position_keyframes: Vec<PositionKeyframeData>,
+    #[new_derive]
     pub rotation_keyframe_count: u32,
-    #[repeating(self.rotation_keyframe_count)]
+    #[repeating(rotation_keyframe_count)]
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ModelData {
+    #[new_default]
     pub signature: Signature<b"GRSM">,
     #[version]
     pub version: Version<MajorFirst>,
@@ -118,16 +132,21 @@ pub struct ModelData {
     #[version_equals_or_above(1, 4)]
     pub alpha: Option<u8>,
     #[version_smaller(2, 2)]
+    #[new_default]
     pub reserved0: Option<[u8; 16]>,
     #[version_equals_or_above(2, 2)]
+    #[new_default]
     pub reserved1: Option<[u8; 4]>,
+    #[new_derive]
     pub texture_count: u32,
-    #[repeating(self.texture_count)]
+    #[repeating(texture_count)]
     pub texture_names: Vec<ModelString<40>>,
     #[version_equals_or_above(2, 2)]
+    #[new_default]
     pub skip: Option<u32>,
     pub root_node_name: ModelString<40>,
+    #[new_derive]
     pub node_count: u32,
-    #[repeating(self.node_count)]
+    #[repeating(node_count)]
     pub nodes: Vec<NodeData>,
 }

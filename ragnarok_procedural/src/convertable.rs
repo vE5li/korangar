@@ -3,7 +3,7 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::{Attribute, DataEnum, DataStruct, Generics, Ident};
 
-use super::helper::byte_convertable_helper;
+use crate::helper::byte_convertable_helper;
 use crate::utils::*;
 
 fn derive_for_struct(
@@ -13,7 +13,8 @@ fn derive_for_struct(
     implement_from: bool,
     implement_to: bool,
 ) -> InterfaceTokenStream {
-    let (from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) = byte_convertable_helper(data_struct);
+    let (new_implementation, from_bytes_implementations, implemented_fields, to_bytes_implementations, delimiter) =
+        byte_convertable_helper(data_struct);
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
 
     let instanciate = match delimiter {
@@ -21,6 +22,14 @@ fn derive_for_struct(
         proc_macro2::Delimiter::Parenthesis => quote!(Self ( #(#implemented_fields),* )),
         _ => panic!(),
     };
+
+    let new = implement_to.then(|| {
+        quote! {
+            impl #impl_generics #name #type_generics #where_clause {
+                #new_implementation
+            }
+        }
+    });
 
     let from = implement_from.then(|| {
         quote! {
@@ -47,6 +56,7 @@ fn derive_for_struct(
     });
 
     quote! {
+        #new
         #from
         #to
     }

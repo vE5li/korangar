@@ -210,12 +210,12 @@ where
         events
     }
 
-    async fn handle_server_thing<Ping>(
+    async fn handle_server_thing<PingPacket>(
         address: SocketAddr,
         mut action_receiver: UnboundedReceiver<Vec<u8>>,
         event_sender: UnboundedSender<NetworkEvent>,
         mut packet_handler: PacketHandler<NetworkEventList, (), Callback>,
-        ping_factory: impl Fn() -> Ping,
+        ping_factory: impl Fn() -> PingPacket,
         ping_frequency: Duration,
         // After logging in to the character server, it sends the account id without any packet.
         // Since our packet handler has no way of working with this, we need to add some special
@@ -223,7 +223,7 @@ where
         mut read_account_id: bool,
     ) -> Result<(), NetworkTaskError>
     where
-        Ping: OutgoingPacket,
+        PingPacket: Packet + ClientPacket,
         Callback: PacketCallback,
     {
         let mut stream = TcpStream::connect(address).await.map_err(|_| NetworkTaskError::FailedToConnect)?;
@@ -415,10 +415,7 @@ where
         self.map_server_connection = ServerConnection::ClosingManually;
     }
 
-    pub fn send_login_server_packet<Packet>(&mut self, packet: &Packet) -> Result<(), NotConnectedError>
-    where
-        Packet: OutgoingPacket + LoginServerPacket,
-    {
+    pub fn send_login_server_packet(&mut self, packet: &(impl Packet + LoginServerPacket)) -> Result<(), NotConnectedError> {
         match &mut self.login_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -430,10 +427,7 @@ where
         }
     }
 
-    pub fn send_character_server_packet<Packet>(&mut self, packet: &Packet) -> Result<(), NotConnectedError>
-    where
-        Packet: OutgoingPacket + CharacterServerPacket,
-    {
+    pub fn send_character_server_packet(&mut self, packet: &(impl Packet + CharacterServerPacket)) -> Result<(), NotConnectedError> {
         match &mut self.character_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -445,10 +439,7 @@ where
         }
     }
 
-    pub fn send_map_server_packet<Packet>(&mut self, packet: &Packet) -> Result<(), NotConnectedError>
-    where
-        Packet: OutgoingPacket + MapServerPacket,
-    {
+    pub fn send_map_server_packet(&mut self, packet: &(impl Packet + MapServerPacket)) -> Result<(), NotConnectedError> {
         match &mut self.map_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -929,10 +920,7 @@ where
     pub fn send_chat_message(&mut self, player_name: &str, message: &str) -> Result<(), NotConnectedError> {
         let complete_message = format!("{} : {}", player_name, message);
 
-        self.send_map_server_packet(&GlobalMessagePacket::new(
-            complete_message.bytes().len() as u16 + 5,
-            complete_message,
-        ))
+        self.send_map_server_packet(&GlobalMessagePacket::new(complete_message))
     }
 
     pub fn start_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {

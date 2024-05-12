@@ -492,16 +492,17 @@ where
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn close_window_with_class(&mut self, focus_state: &mut FocusState<App>, window_class: &str) {
-        let index_from_back = self
+        if let Some(index_from_back) = self
             .windows
             .iter()
             .rev()
             .map(|(window, ..)| window.get_window_class())
             .position(|class_option| class_option.contains(&window_class))
-            .unwrap();
-        let index = self.windows.len() - 1 - index_from_back;
+        {
+            let index = self.windows.len() - 1 - index_from_back;
 
-        self.close_window(focus_state, index);
+            self.close_window(focus_state, index);
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

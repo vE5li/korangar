@@ -1,17 +1,18 @@
 use cgmath::Vector3;
-use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes};
+use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
 use crate::signature::Signature;
 use crate::transform::Transform;
 use crate::version::{InternalVersion, MajorFirst, Version};
 
-#[derive(Clone, FromBytes)]
+#[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
-#[window_title("Map Viewer")]
-#[window_class("map_viewer")]
+#[cfg_attr(feature = "interface", window_title("Map Viewer"))]
+#[cfg_attr(feature = "interface", window_class("map_viewer"))]
 pub struct MapData {
+    #[new_default]
     pub signature: Signature<b"GRSW">,
     #[version]
     pub version: Version<MajorFirst>,
@@ -19,14 +20,14 @@ pub struct MapData {
     pub build_number: Option<i32>,
     #[version_equals_or_above(2, 2)]
     pub _unknown: Option<u8>,
-    #[length_hint(40)]
+    #[length(40)]
     pub _ini_file: String,
-    #[length_hint(40)]
+    #[length(40)]
     pub ground_file: String,
-    #[length_hint(40)]
+    #[length(40)]
     pub gat_file: String,
     #[version_equals_or_above(1, 4)]
-    #[length_hint(40)]
+    #[length(40)]
     pub _source_file: Option<String>,
     #[version_smaller(2, 6)]
     pub water_settings: Option<WaterSettings>,
@@ -46,7 +47,7 @@ pub struct MapData {
 }
 
 bitflags::bitflags! {
-    #[derive(Debug)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct TileFlags: u8 {
         const WALKABLE = 0b00000001;
         const WATER = 0b00000010;
@@ -57,7 +58,7 @@ bitflags::bitflags! {
 
 impl FromBytes for TileFlags {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        match byte_stream.byte::<Self>()? {
+        match <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).trace::<Self>()? {
             0 => Ok(Self::WALKABLE),
             1 => Ok(Self::empty()),
             2 => Ok(Self::WATER),
@@ -70,54 +71,83 @@ impl FromBytes for TileFlags {
     }
 }
 
-#[derive(Debug, FromBytes)]
+impl ToBytes for TileFlags {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        if *self == Self::WALKABLE {
+            Ok((0 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else if *self == Self::empty() {
+            Ok((1 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else if *self == Self::WATER {
+            Ok((2 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else if *self == Self::WATER | Self::WALKABLE {
+            Ok((3 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else if *self == Self::WATER | Self::SNIPABLE {
+            Ok((4 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else if *self == Self::CLIFF | Self::SNIPABLE {
+            Ok((5 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else if *self == Self::CLIFF {
+            Ok((6 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+        } else {
+            Err(ConversionError::from_message(format!("invalid tile encoding {:?}", self)))
+        }
+    }
+}
+
+#[derive(Debug, ByteConvertable)]
 pub struct Tile {
     pub upper_left_height: f32,
     pub upper_right_height: f32,
     pub lower_left_height: f32,
     pub lower_right_height: f32,
     pub flags: TileFlags,
+    #[new_default]
     pub unused: [u8; 3],
 }
 
-#[derive(FromBytes)]
+#[derive(ByteConvertable)]
 pub struct GatData {
+    #[new_default]
     pub signature: Signature<b"GRAT">,
     #[version]
     pub version: Version<MajorFirst>,
     pub map_width: i32,
     pub map_height: i32,
-    #[repeating(self.map_width * self.map_height)]
+    #[repeating_expr(map_width as usize * map_height as usize)]
     pub tiles: Vec<Tile>,
 }
 
-#[derive(FromBytes)]
+#[derive(ByteConvertable)]
 pub struct GroundData {
+    #[new_default]
     pub signature: Signature<b"GRGN">,
     #[version]
     pub version: Version<MajorFirst>,
     pub width: i32,
     pub height: i32,
     pub zoom: f32,
+    #[new_derive]
     pub texture_count: i32,
     pub texture_name_length: i32,
-    #[repeating(self.texture_count)]
-    #[length_hint(self.texture_name_length)]
+    #[repeating(texture_count)]
+    #[length(texture_name_length)]
     pub textures: Vec<String>,
     pub light_map_count: i32,
     pub light_map_width: i32,
     pub light_map_height: i32,
     pub light_map_cells_per_grid: i32,
     #[version_equals_or_above(1, 7)]
-    #[length_hint(self.light_map_count * self.light_map_width * self.light_map_height * 4)]
+    #[repeating_expr(light_map_count as usize * light_map_width as usize * light_map_height as usize * 4)]
+    #[new_default]
     pub _skip: Option<Vec<u8>>,
     #[version_smaller(1, 7)]
-    #[length_hint(self.light_map_count * 16)]
+    #[repeating_expr(light_map_count * 16)]
+    #[new_default]
     pub _skip2: Option<Vec<u8>>,
+    #[new_derive]
     pub surface_count: i32,
-    #[repeating(self.surface_count)]
+    #[repeating(surface_count)]
     pub surfaces: Vec<Surface>,
-    #[repeating(self.width as usize * self.height as usize)]
+    #[repeating_expr(width as usize * height as usize)]
     pub ground_tiles: Vec<GroundTile>,
 }
 
@@ -169,6 +199,12 @@ impl FromBytes for GroundTile {
     }
 }
 
+impl ToBytes for GroundTile {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        panic!("GroundTile can not be serialized currently because it depends on a version requirement");
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum SurfaceType {
     Front,
@@ -176,7 +212,7 @@ pub enum SurfaceType {
     Top,
 }
 
-#[derive(FromBytes)]
+#[derive(ByteConvertable)]
 pub struct Surface {
     pub u: [f32; 4],
     pub v: [f32; 4],
@@ -206,10 +242,10 @@ impl FromBytes for ResourceType {
     }
 }
 
-#[derive(Clone, FromBytes)]
+#[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ObjectData {
-    #[length_hint(40)]
+    #[length(40)]
     #[version_equals_or_above(1, 3)]
     pub name: Option<String>,
     #[version_equals_or_above(1, 3)]
@@ -220,10 +256,11 @@ pub struct ObjectData {
     pub _block_type: Option<i32>,
     // FIX: only if build_version >= 186
     #[version_equals_or_above(2, 6)]
+    #[new_default]
     pub _unknown: Option<u8>,
-    #[length_hint(80)]
+    #[length(80)]
     pub model_name: String,
-    #[length_hint(80)]
+    #[length(80)]
     pub _node_name: String,
     pub transform: Transform,
 }
@@ -231,16 +268,37 @@ pub struct ObjectData {
 #[derive(Clone)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct MapResources {
-    resources_amount: usize,
+    pub resources_amount: u32,
     pub objects: Vec<ObjectData>,
     pub light_sources: Vec<LightSource>,
     pub sound_sources: Vec<SoundSource>,
     pub effect_sources: Vec<EffectSource>,
 }
 
+impl MapResources {
+    pub fn new(
+        objects: Vec<ObjectData>,
+        light_sources: Vec<LightSource>,
+        sound_sources: Vec<SoundSource>,
+        effect_sources: Vec<EffectSource>,
+    ) -> Self {
+        let resources_amount = (objects.len() + light_sources.len() + sound_sources.len() + effect_sources.len())
+            .try_into()
+            .expect("too many resources");
+
+        Self {
+            resources_amount,
+            objects,
+            light_sources,
+            sound_sources,
+            effect_sources,
+        }
+    }
+}
+
 impl FromBytes for MapResources {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let resources_amount = i32::from_bytes(byte_stream).trace::<Self>()? as usize;
+        let resources_amount = u32::from_bytes(byte_stream).trace::<Self>()?;
 
         let mut objects = Vec::new();
         let mut light_sources = Vec::new();
@@ -290,7 +348,33 @@ impl FromBytes for MapResources {
     }
 }
 
-#[derive(Clone, Debug, FromBytes)]
+impl ToBytes for MapResources {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        let mut data = Vec::new();
+
+        data.extend(self.resources_amount.to_bytes()?);
+
+        for object in &self.objects {
+            data.extend(object.to_bytes()?);
+        }
+
+        for light_source in &self.light_sources {
+            data.extend(light_source.to_bytes()?);
+        }
+
+        for sound_source in &self.sound_sources {
+            data.extend(sound_source.to_bytes()?);
+        }
+
+        for effect_source in &self.effect_sources {
+            data.extend(effect_source.to_bytes()?);
+        }
+
+        Ok(data)
+    }
+}
+
+#[derive(Clone, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct WaterSettings {
     #[version_equals_or_above(1, 3)]
@@ -307,7 +391,7 @@ pub struct WaterSettings {
     pub water_animation_speed: Option<u32>,
 }
 
-#[derive(Clone, Debug, FromBytes)]
+#[derive(Clone, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct LightSettings {
     #[version_equals_or_above(1, 5)]
@@ -325,9 +409,9 @@ pub struct LightSettings {
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
-#[window_title("Light Source")]
+#[cfg_attr(feature = "interface", window_title("Light Source"))]
 pub struct LightSource {
-    #[length_hint(80)]
+    #[length(80)]
     pub name: String,
     pub position: Vector3<f32>,
     pub color: ColorRGB,
@@ -337,9 +421,9 @@ pub struct LightSource {
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
-#[window_title("Effect Source")]
+#[cfg_attr(feature = "interface", window_title("Effect Source"))]
 pub struct EffectSource {
-    #[length_hint(80)]
+    #[length(80)]
     pub name: String,
     pub position: Vector3<f32>,
     pub effect_type: u32, // TODO: fix this
@@ -353,11 +437,11 @@ pub struct EffectSource {
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
-#[window_title("Sound Source")]
+#[cfg_attr(feature = "interface", window_title("Sound Source"))]
 pub struct SoundSource {
-    #[length_hint(80)]
+    #[length(80)]
     pub name: String,
-    #[length_hint(80)]
+    #[length(80)]
     pub sound_file: String,
     pub position: Vector3<f32>,
     pub volume: f32,
@@ -366,4 +450,114 @@ pub struct SoundSource {
     pub range: f32,
     #[version_equals_or_above(2, 0)]
     pub cycle: Option<f32>,
+}
+
+#[cfg(test)]
+mod conversion {
+    // The way these tests are written might seem a bit strange, but it's to allow
+    // changes to the `TileFlags` type without completely breaking the tests.
+    //
+    // The goal here is to verify the logic behind encoding and decoding, without
+    // checking for specific values. This way, you can add more permutations to
+    // `TileFlags` or even change the underlying data type without breaking the
+    // tests.
+    //
+    // When adding new permutations `ENCODED_TILE_COUNT` needs to be adjusted.
+    mod tile_flags {
+        use bitflags::Flags;
+        use ragnarok_bytes::{ByteStream, FromBytes, ToBytes};
+
+        use crate::map::TileFlags;
+
+        type EncodedType = <TileFlags as Flags>::Bits;
+
+        const ENCODED_TILE_COUNT: usize = 7;
+
+        #[derive(Default)]
+        struct HitCounter {
+            slots: [bool; ENCODED_TILE_COUNT],
+        }
+
+        impl HitCounter {
+            fn register(&mut self, index: EncodedType) {
+                assert!((index as usize) < ENCODED_TILE_COUNT, "index {index} is out of bounds");
+
+                let slot = &mut self.slots[index as usize];
+
+                assert!(!*slot, "index {index} was hit multiple times");
+
+                *slot = true;
+            }
+
+            fn assert_all_slots_hit(self) {
+                for (index, hit) in self.slots.into_iter().enumerate() {
+                    if !hit {
+                        panic!("index {index} was never hit");
+                    }
+                }
+            }
+        }
+
+        // This test ensures that no more than one combination of flags is encoded
+        // to a set of bytes. It also ensures that all possible bytes can be encoded.
+        #[test]
+        fn encode() {
+            let mut hit_counter = HitCounter::default();
+
+            let mut test = |flags: TileFlags| {
+                if let Ok(bytes) = flags.to_bytes() {
+                    let mut byte_stream = ByteStream::<()>::without_metadata(&bytes);
+                    let index = EncodedType::from_bytes(&mut byte_stream).unwrap();
+                    hit_counter.register(index);
+                }
+            };
+
+            // Test with no bits set.
+            test(TileFlags::empty());
+
+            // All other possible premutations (but only once).
+            for left in TileFlags::all().iter() {
+                for right in TileFlags::all().iter() {
+                    if left.bits() <= right.bits() {
+                        test(left | right);
+                    }
+                }
+            }
+
+            hit_counter.assert_all_slots_hit();
+        }
+
+        // This test ensures that no more than one set of bytes is decoded
+        // to the combination of flags. It also ensures that all possible flags can be
+        // decoded.
+        #[test]
+        fn decode() {
+            let mut hit_counter = HitCounter::default();
+
+            for input in 0..EncodedType::MAX {
+                let bytes = input.to_bytes().unwrap();
+                let mut byte_stream = ByteStream::<()>::without_metadata(&bytes);
+
+                if TileFlags::from_bytes(&mut byte_stream).is_ok() {
+                    hit_counter.register(input)
+                }
+            }
+
+            hit_counter.assert_all_slots_hit();
+        }
+
+        // Make sure that encoding and decoding agree.
+        #[test]
+        fn decode_encode() {
+            for input in 0..EncodedType::MAX {
+                let bytes = input.to_bytes().unwrap();
+                let mut byte_stream = ByteStream::<()>::without_metadata(&bytes);
+
+                if let Ok(decoded) = TileFlags::from_bytes(&mut byte_stream) {
+                    let encoded = decoded.to_bytes().unwrap();
+                    assert_eq!(encoded.as_slice(), bytes);
+                }
+            }
+        }
+    }
 }

@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
-use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes};
+use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes, ToBytes};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -42,6 +42,18 @@ impl FromBytes for Version<MinorFirst> {
     }
 }
 
+impl ToBytes for Version<MajorFirst> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        Ok(vec![self.major, self.minor])
+    }
+}
+
+impl ToBytes for Version<MinorFirst> {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        Ok(vec![self.minor, self.major])
+    }
+}
+
 impl<T> Display for Version<T> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "{}.{}", self.major, self.minor)
@@ -74,5 +86,35 @@ impl InternalVersion {
 impl Display for InternalVersion {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
         write!(formatter, "{}.{}", self.major, self.minor)
+    }
+}
+
+#[cfg(test)]
+mod conversion {
+    use ragnarok_bytes::{ByteStream, FromBytes, ToBytes};
+
+    use super::{MajorFirst, Version};
+    use crate::version::MinorFirst;
+
+    #[test]
+    fn version_major_first() {
+        let input = &[4, 7];
+        let mut byte_stream = ByteStream::<()>::without_metadata(input);
+
+        let version = Version::<MajorFirst>::from_bytes(&mut byte_stream).unwrap();
+        let output = version.to_bytes().unwrap();
+
+        assert_eq!(input, output.as_slice());
+    }
+
+    #[test]
+    fn version_minor_first() {
+        let input = &[7, 4];
+        let mut byte_stream = ByteStream::<()>::without_metadata(input);
+
+        let version = Version::<MinorFirst>::from_bytes(&mut byte_stream).unwrap();
+        let output = version.to_bytes().unwrap();
+
+        assert_eq!(input, output.as_slice());
     }
 }

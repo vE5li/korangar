@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
 
-use crate::{IncomingPacket, OutgoingPacket, PacketHeader};
+use crate::PacketHeader;
 
 /// Possible results of [`PacketHandler::process_one`].
 pub enum HandlerResult<Output> {
@@ -28,42 +28,36 @@ pub trait PacketCallback: Clone + Send + 'static {
     /// Called by the [`PacketHandler`] when a packet is received.
     fn incoming_packet<Packet>(&self, packet: &Packet)
     where
-        Packet: IncomingPacket;
+        Packet: ragnarok_packets::Packet,
+    {
+        let _ = packet;
+    }
 
     /// Called by the [`NetworkingSystem`](super::NetworkingSystem) when a
     /// packet is sent.
     fn outgoing_packet<Packet>(&self, packet: &Packet)
     where
-        Packet: OutgoingPacket;
+        Packet: ragnarok_packets::Packet,
+    {
+        let _ = packet;
+    }
 
     /// Called by the [`PacketHandler`] when a packet arrives that doesn't have
     /// a handler registered.
-    fn unknown_packet(&self, bytes: Vec<u8>);
+    fn unknown_packet(&self, bytes: Vec<u8>) {
+        let _ = bytes;
+    }
 
     /// Called by the [`PacketHandler`] when a packet handler returned an error.
-    fn failed_packet(&self, bytes: Vec<u8>, error: Box<ConversionError>);
+    fn failed_packet(&self, bytes: Vec<u8>, error: Box<ConversionError>) {
+        let _ = (bytes, error);
+    }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct NoPacketCallback;
 
-impl PacketCallback for NoPacketCallback {
-    fn incoming_packet<Packet>(&self, _packet: &Packet)
-    where
-        Packet: IncomingPacket,
-    {
-    }
-
-    fn outgoing_packet<Packet>(&self, _packet: &Packet)
-    where
-        Packet: OutgoingPacket,
-    {
-    }
-
-    fn unknown_packet(&self, _bytes: Vec<u8>) {}
-
-    fn failed_packet(&self, _bytes: Vec<u8>, _error: Box<ConversionError>) {}
-}
+impl PacketCallback for NoPacketCallback {}
 
 pub type HandlerFunction<Output, Meta> = Box<dyn Fn(&mut ByteStream<Meta>) -> ConversionResult<Output>>;
 
@@ -109,7 +103,7 @@ where
     /// Register a new packet handler.
     pub fn register<Packet, Return>(&mut self, handler: impl Fn(Packet) -> Return + 'static) -> Result<(), DuplicateHandlerError>
     where
-        Packet: IncomingPacket,
+        Packet: ragnarok_packets::Packet,
         Return: Into<Output>,
     {
         let packet_callback = self.packet_callback.clone();
@@ -135,7 +129,7 @@ where
     /// Register a noop packet handler.
     pub fn register_noop<Packet>(&mut self) -> Result<(), DuplicateHandlerError>
     where
-        Packet: IncomingPacket,
+        Packet: ragnarok_packets::Packet,
     {
         let packet_callback = self.packet_callback.clone();
         let old_handler = self.handlers.insert(

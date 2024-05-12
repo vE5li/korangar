@@ -5,27 +5,14 @@ use crate::signature::Signature;
 /// Represents the Header of the GRF file.
 #[derive(Clone, ByteConvertable, FixedByteSize)]
 pub struct Header {
+    #[new_default]
     pub signature: Signature<b"Master of Magic\0">,
+    #[new_default]
     pub encryption: [u8; 14],
     pub file_table_offset: u32,
     pub reserved_files: u32,
     pub file_count: u32,
     pub version: u32,
-}
-
-impl Header {
-    // TODO: This is temporary and can be removed after improving the
-    // ByteConvertable trait.
-    pub fn new(file_table_offset: u32, reserved_files: u32, file_count: u32, version: u32) -> Self {
-        Self {
-            signature: Signature,
-            encryption: Default::default(),
-            file_table_offset,
-            reserved_files,
-            file_count,
-            version,
-        }
-    }
 }
 
 impl Header {

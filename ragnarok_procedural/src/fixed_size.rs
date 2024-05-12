@@ -16,12 +16,12 @@ pub fn derive_fixed_byte_size_struct(data_struct: DataStruct, generics: Generics
     };
 
     let sizes = fields.into_iter().zip(types.iter()).map(|(mut field, field_type)| {
-        get_unique_attribute(&mut field.attrs, "length_hint")
+        get_unique_attribute(&mut field.attrs, "length")
             .map(|attribute| match attribute.meta {
                 syn::Meta::List(list) => list.tokens,
                 syn::Meta::Path(_) | syn::Meta::NameValue(_) => panic!("expected token stream in attribute"),
             })
-            .map(|length_hint| quote!((#length_hint) as usize))
+            .map(|length| quote!((#length) as usize))
             .unwrap_or(quote!(<#field_type as ragnarok_bytes::FixedByteSize>::size_in_bytes()))
     });
 

@@ -1,17 +1,17 @@
 use cgmath::Vector2;
-use ragnarok_bytes::FromBytes;
+use ragnarok_bytes::ByteConvertable;
 
 use crate::signature::Signature;
 use crate::version::{MajorFirst, Version};
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct TextureName {
-    #[length_hint(128)]
+    #[length(128)]
     pub name: String,
 }
 
-#[derive(Debug, Clone, FromBytes)]
+#[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Frame {
     pub frame_index: i32,
@@ -31,28 +31,34 @@ pub struct Frame {
     pub mt_present: i32,
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct LayerData {
+    #[new_derive]
     pub texture_count: i32,
-    #[repeating(self.texture_count)]
+    #[repeating(texture_count)]
     pub texture_names: Vec<TextureName>,
+    #[new_derive]
     pub frame_count: i32,
-    #[repeating(self.frame_count)]
+    #[repeating(frame_count)]
     pub frames: Vec<Frame>,
 }
 
-#[derive(Debug, FromBytes)]
+#[derive(Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct EffectData {
+    #[new_default]
     pub signature: Signature<b"STRM">,
     #[version]
     pub version: Version<MajorFirst>,
+    #[new_default]
     pub _skip0: [u8; 2],
     pub frames_per_second: u32,
     pub max_key: u32,
+    #[new_derive]
     pub layer_count: u32,
+    #[new_default]
     pub _skip1: [u8; 16],
-    #[repeating(self.layer_count)]
+    #[repeating(layer_count)]
     pub layers: Vec<LayerData>,
 }

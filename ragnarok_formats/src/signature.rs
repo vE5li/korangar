@@ -1,6 +1,6 @@
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FixedByteSize, FromBytes, ToBytes};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Signature<const MAGIC: &'static [u8]>;
 
 impl<const MAGIC: &'static [u8]> FixedByteSize for Signature<MAGIC> {

@@ -57,15 +57,13 @@ impl Writable for NativeArchiveBuilder {
         let version = 0x200;
         let file_header = Header::new(file_table_offset, reserved_files, raw_file_count, version);
 
-        let mut bytes = Vec::new();
-
-        bytes.extend_from_slice(&file_header.to_bytes().unwrap());
+        let mut bytes = file_header.to_bytes().unwrap();
         bytes.extend_from_slice(&self.data);
 
         let mut file_table_data = Vec::new();
 
         for file_information in self.file_table.values() {
-            file_table_data.extend_from_slice(&file_information.to_bytes().unwrap());
+            file_table_data.extend(file_information.to_bytes().unwrap());
         }
 
         let compressed_file_information_data = compress(&file_table_data, Format::Zlib, CompressionLevel::Default).unwrap();
@@ -74,8 +72,8 @@ impl Writable for NativeArchiveBuilder {
             uncompressed_size: file_table_data.len() as u32,
         };
 
-        bytes.extend_from_slice(&file_table.to_bytes().unwrap());
-        bytes.extend_from_slice(&compressed_file_information_data);
+        bytes.extend(file_table.to_bytes().unwrap());
+        bytes.extend(compressed_file_information_data);
 
         std::fs::write(&self.os_file_path, bytes).expect("unable to write file");
     }

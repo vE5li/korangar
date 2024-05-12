@@ -15,7 +15,7 @@ use self::convertable::*;
 use self::fixed_size::{derive_fixed_byte_size_enum, derive_fixed_byte_size_struct};
 use self::packet::*;
 
-#[proc_macro_derive(FixedByteSize)]
+#[proc_macro_derive(FixedByteSize, attributes(length))]
 pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     let DeriveInput {
         ident,
@@ -35,14 +35,18 @@ pub fn derive_fixed_byte_size(token_stream: InterfaceTokenStream) -> InterfaceTo
 #[proc_macro_derive(
     ByteConvertable,
     attributes(
-        length_hint,
-        repeating,
-        repeating_remaining,
+        length,
+        new_default,
+        new_derive,
+        new_value,
         numeric_type,
         numeric_value,
+        repeating,
+        repeating_expr,
+        repeating_option,
         version,
+        version_equals_or_above,
         version_smaller,
-        version_equals_or_above
     )
 )]
 pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
@@ -64,14 +68,15 @@ pub fn derive_byte_convertable(token_stream: InterfaceTokenStream) -> InterfaceT
 #[proc_macro_derive(
     FromBytes,
     attributes(
-        length_hint,
-        repeating,
-        repeating_remaining,
+        length,
         numeric_type,
         numeric_value,
+        repeating,
+        repeating_expr,
+        repeating_option,
         version,
+        version_equals_or_above,
         version_smaller,
-        version_equals_or_above
     )
 )]
 pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
@@ -93,14 +98,15 @@ pub fn derive_from_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenSt
 #[proc_macro_derive(
     ToBytes,
     attributes(
-        length_hint,
-        repeating,
-        repeating_remaining,
+        length,
+        new_default,
+        new_derive,
+        new_value,
         numeric_type,
         numeric_value,
         version,
+        version_equals_or_above,
         version_smaller,
-        version_equals_or_above
     )
 )]
 pub fn derive_to_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
@@ -120,28 +126,21 @@ pub fn derive_to_bytes(token_stream: InterfaceTokenStream) -> InterfaceTokenStre
 }
 
 #[proc_macro_derive(
-    IncomingPacket,
-    attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining)
-)]
-pub fn derive_incoming_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    let DeriveInput {
-        ident,
-        generics,
-        data,
-        attrs,
-        ..
-    } = parse(token_stream).expect("failed to parse token stream");
-
-    match data {
-        Data::Struct(data_struct) => derive_incoming_packet_struct(data_struct, generics, attrs, ident),
-        Data::Enum(..) => panic!("enum types may not be derived"),
-        Data::Union(..) => panic!("union types may not be derived"),
-    }
-}
-
-#[proc_macro_derive(
-    OutgoingPacket,
-    attributes(packet_length, header, ping, length_hint, repeating, repeating_remaining)
+    Packet,
+    attributes(
+        header,
+        length,
+        length_remaining,
+        length_remaining_off_by_one,
+        new_default,
+        new_derive,
+        new_value,
+        ping,
+        repeating,
+        repeating_option,
+        repeating_remaining,
+        variable_length,
+    )
 )]
 pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
     let DeriveInput {
@@ -153,10 +152,32 @@ pub fn derive_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream
     } = parse(token_stream).expect("failed to parse token stream");
 
     match data {
-        Data::Struct(data_struct) => derive_outgoing_packet_struct(data_struct, generics, attrs, ident),
+        Data::Struct(data_struct) => derive_packet_struct(data_struct, generics, attrs, ident),
         Data::Enum(..) => panic!("enum types may not be derived"),
         Data::Union(..) => panic!("union types may not be derived"),
     }
+}
+
+#[proc_macro_derive(ServerPacket)]
+pub fn derive_server_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics ragnarok_packets::ServerPacket for #ident #type_generics #where_clause {}
+    }
+    .into()
+}
+
+#[proc_macro_derive(ClientPacket)]
+pub fn derive_client_packet(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    let DeriveInput { ident, generics, .. } = parse(token_stream).expect("failed to parse token stream");
+    let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics ragnarok_packets::ClientPacket for #ident #type_generics #where_clause {}
+    }
+    .into()
 }
 
 #[proc_macro_derive(LoginServer)]

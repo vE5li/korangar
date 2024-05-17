@@ -179,7 +179,7 @@ pub struct ColorRGBA {
 /// Item index is always actual index + 2.
 #[derive(Clone, Copy, Debug, FixedByteSize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-pub struct ItemIndex(u16);
+pub struct ItemIndex(pub u16);
 
 impl FromBytes for ItemIndex {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
@@ -632,7 +632,7 @@ pub struct PlayerMovePacket {
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x01FB)]
 pub struct DeleteCharacterPacket {
-    character_id: CharacterId,
+    pub character_id: CharacterId,
     /// This field can be used for email or date of birth, depending on the
     /// configuration of the character server.
     #[length(40)]
@@ -1846,6 +1846,7 @@ pub struct Quest {
     pub active: u8,
     pub remaining_time: u32, // TODO: double check these
     pub expire_time: u32,    // TODO: double check these
+    #[new_derive]
     pub objective_count: u16,
     #[repeating(objective_count)]
     pub objective_details: Vec<QuestDetails>,

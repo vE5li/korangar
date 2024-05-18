@@ -87,7 +87,7 @@ pub struct Service {
     pub address: String,
 
     /// Connection server port (default 6900).
-    pub port: i16,
+    pub port: u16,
 
     /// Must be equal to **client_version_to_connect** defined in server's
     /// login_athena.conf.

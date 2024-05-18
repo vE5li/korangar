@@ -28,9 +28,8 @@ mod world;
 
 use std::cell::RefCell;
 use std::io::Cursor;
-use std::net::{IpAddr, SocketAddr};
+use std::net::ToSocketAddrs;
 use std::rc::Rc;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
@@ -1002,7 +1001,8 @@ fn main() {
                                 .iter()
                                 .find(|service| service.service_id() == service_id)
                                 .unwrap();
-                            let socket_address = SocketAddr::new(IpAddr::from_str(&service.address).expect("ill formatted service IP"), service.port as u16);
+                            let address = format!("{}:{}", service.address, service.port);
+                            let socket_address = address.to_socket_addrs().expect("Failed to resolve IP").next().expect("ill formatted service IP");
 
                             saved_login_server_address = Some(socket_address);
                             saved_username = username.clone();

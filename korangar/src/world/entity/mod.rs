@@ -973,7 +973,7 @@ impl Npc {
 
         renderer.render_rectangle(
             render_target,
-            final_position - theme.status_bar.border_size.get() + ScreenSize::only_width(bar_width / 2.0),
+            final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
                 height: theme.status_bar.enemy_health_height.get(),

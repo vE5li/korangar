@@ -7,6 +7,12 @@ pub struct WorldPosition {
     pub y: usize,
 }
 
+impl WorldPosition {
+    pub fn new(x: usize, y: usize) -> Self {
+        Self { x, y }
+    }
+}
+
 impl FromBytes for WorldPosition {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let coordinates: Vec<usize> = byte_stream.slice::<Self>(3)?.iter().map(|byte| *byte as usize).collect();
@@ -41,6 +47,10 @@ pub struct WorldPosition2 {
 }
 
 impl WorldPosition2 {
+    pub fn new(x1: usize, y1: usize, x2: usize, y2: usize) -> Self {
+        Self { x1, y1, x2, y2 }
+    }
+
     pub fn to_origin_destination(self) -> (WorldPosition, WorldPosition) {
         (WorldPosition { x: self.x1, y: self.y1 }, WorldPosition {
             x: self.x2,

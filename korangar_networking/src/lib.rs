@@ -102,7 +102,7 @@ where
                                 action_receiver,
                                 event_sender,
                                 packet_handler,
-                                LoginServerKeepalivePacket::default,
+                                LoginServerKeepalivePacket::new,
                                 Duration::from_secs(58),
                                 false,
                             ));

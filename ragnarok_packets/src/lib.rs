@@ -138,6 +138,14 @@ pub struct HotbarSlot(pub u16);
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ServerAddress(pub [u8; 4]);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct UserId(pub [u8; 24]);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct AuthToken(pub [u8; 17]);
+
 impl From<ServerAddress> for Ipv4Addr {
     fn from(value: ServerAddress) -> Self {
         value.0.into()
@@ -246,7 +254,7 @@ pub struct LoginServerLoginSuccessPacket {
     #[new_default]
     pub unknown: u16,
     pub sex: Sex,
-    pub auth_token: [u8; 17],
+    pub auth_token: AuthToken,
     #[repeating_remaining]
     pub character_server_information: Vec<CharacterServerInformation>,
 }
@@ -405,12 +413,13 @@ pub struct CharacterCreationFailedPacket {
 
 /// Sent by the client to the login server every 60 seconds to keep the
 /// connection alive.
-#[derive(Debug, Clone, Default, Packet, ClientPacket, LoginServer)]
+#[derive(Debug, Clone, Packet, ClientPacket, LoginServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0200)]
 #[ping]
 pub struct LoginServerKeepalivePacket {
-    pub user_id: [u8; 24],
+    #[new_value(UserId([0; 24]))]
+    pub user_id: UserId,
 }
 
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]

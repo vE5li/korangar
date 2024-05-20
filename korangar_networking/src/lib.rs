@@ -305,6 +305,10 @@ where
     }
 
     pub fn connect_to_login_server(&mut self, address: SocketAddr, username: impl Into<String>, password: impl Into<String>) {
+        if !matches!(self.login_server_connection, ServerConnection::Disconnected) {
+            return;
+        }
+
         let (action_sender, action_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -331,6 +335,10 @@ where
     }
 
     pub fn connect_to_character_server(&mut self, login_data: &LoginServerLoginData, server: CharacterServerInformation) {
+        if !matches!(self.character_server_connection, ServerConnection::Disconnected) {
+            return;
+        }
+
         let (action_sender, action_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
 
@@ -368,6 +376,10 @@ where
         login_server_login_data: &LoginServerLoginData,
         character_server_login_data: CharacterServerLoginData,
     ) {
+        if !matches!(self.map_server_connection, ServerConnection::Disconnected) {
+            return;
+        }
+
         let (action_sender, action_receiver) = tokio::sync::mpsc::unbounded_channel();
         let (event_sender, event_receiver) = tokio::sync::mpsc::unbounded_channel();
 

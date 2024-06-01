@@ -9,6 +9,11 @@ korangar_interface = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive"] }
 ragnarok_procedural = { workspace = true }
 
+[dev-dependencies]
+etherparse = "0.15"
+korangar_debug = { workspace = true }
+pcap = "2.0.0"
+
 [features]
 debug = []
 derive = []

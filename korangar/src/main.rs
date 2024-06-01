@@ -556,7 +556,8 @@ fn main() {
                             interface.open_window(&application, &mut focus_state, &SelectServerWindow::new(character_servers));
                         }
                         NetworkEvent::LoginServerConnectionFailed { message, .. } => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()))
+                            networking_system.disconnect_from_login_server();
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
                         }
                         NetworkEvent::LoginServerDisconnected { reason } => {
                             if reason != DisconnectReason::ClosedByClient {
@@ -573,7 +574,8 @@ fn main() {
                             let _ = networking_system.request_character_list();
                         },
                         NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()))
+                            networking_system.disconnect_from_character_server();
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
                         },
                         NetworkEvent::CharacterServerDisconnected { reason } => {
                             if reason != DisconnectReason::ClosedByClient {

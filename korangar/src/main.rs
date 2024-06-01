@@ -644,6 +644,7 @@ fn main() {
                         }
                         NetworkEvent::CharacterSelected { login_data, map_name } => {
                             let saved_login_data = saved_login_data.as_ref().unwrap();
+                            networking_system.disconnect_from_character_server();
                             networking_system.connect_to_map_server(saved_login_data, login_data);
 
                             let character_information = saved_characters

@@ -1,51 +1,19 @@
 mod hotbar;
 mod skills;
 
-use std::sync::Arc;
+use std::cell::Ref;
 
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
-use korangar_networking::InventoryItem;
-use ragnarok_packets::{EquipPosition, ItemId, ItemIndex};
-use vulkano::image::view::ImageView;
+use korangar_networking::{InventoryItem, InventoryItemDetails, NoMetadata};
+use ragnarok_packets::{EquipPosition, InventoryIndex};
 
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
-use crate::loaders::{GameFileLoader, ScriptLoader, TextureLoader};
-
-/*enum ItemDetails {
-    Regular {
-        amount: u16,
-        flags: u8, // bit 1 - is_identified; bit 2 - place_in_etc_tab;
-    },
-
-    Equippable {
-        location: u32,
-        bind_on_equip_type: u16,
-        w_item_sprite_number: u16,
-        option_count: u8,
-        option_data: [ItemOptions; 5], // fix count
-        refinement_level: u8,
-        enchantment_level: u8,
-        flags: u8, // bit 1 - is_identified; bit 2 - is_damaged; bit 3 - place_in_etc_tab
-    },
-}*/
-
-#[derive(Clone, Debug)]
-pub struct Item {
-    pub index: ItemIndex,
-    pub item_id: ItemId,
-    pub equip_position: EquipPosition,
-    pub equipped_position: EquipPosition,
-    //pub item_type: u8,
-    //pub wear_state: u32,
-    //pub slot: [u32; 4], // card ?
-    //pub hire_expiration_date: i32,
-    pub texture: Arc<ImageView>,
-}
+use crate::loaders::{GameFileLoader, ResourceMetadata, ScriptLoader, TextureLoader};
 
 #[derive(Default)]
 pub struct Inventory {
-    items: PlainTrackedState<Vec<Item>>,
+    items: PlainTrackedState<Vec<InventoryItem<ResourceMetadata>>>,
 }
 
 impl Inventory {
@@ -54,23 +22,11 @@ impl Inventory {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         script_loader: &ScriptLoader,
-        item_data: Vec<InventoryItem>,
+        items: Vec<InventoryItem<NoMetadata>>,
     ) {
-        let items = item_data
+        let items = items
             .into_iter()
-            .map(|item_data| {
-                let resource_name = script_loader.get_item_resource_from_id(item_data.id, item_data.is_identified);
-                let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
-                let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
-
-                Item {
-                    index: item_data.index,
-                    item_id: item_data.id,
-                    equip_position: item_data.equip_position,
-                    equipped_position: item_data.equipped_position,
-                    texture,
-                }
-            })
+            .map(|item| script_loader.load_inventory_item_metadata(game_file_loader, texture_loader, item))
             .collect();
 
         self.items.set(items);
@@ -81,42 +37,62 @@ impl Inventory {
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         script_loader: &ScriptLoader,
-        item_index: ItemIndex,
-        item_id: ItemId,
-        is_identified: bool,
-        equip_position: EquipPosition,
-        equipped_position: EquipPosition,
+        item: InventoryItem<NoMetadata>,
     ) {
         self.items.with_mut(|items| {
-            if let Some(_stack) = items.iter_mut().find(|item| item.item_id == item_id) {
-                //stack.amount += item_data.amount;
-                return ValueState::Mutated(());
+            if let Some(found_item) = items.iter_mut().find(|inventory_item| inventory_item.index == item.index) {
+                let InventoryItemDetails::Regular { amount, .. } = &mut found_item.details else {
+                    panic!();
+                };
+
+                let InventoryItemDetails::Regular { amount: added_amount, .. } = item.details else {
+                    panic!();
+                };
+
+                *amount += added_amount;
+            } else {
+                let item = script_loader.load_inventory_item_metadata(game_file_loader, texture_loader, item);
+
+                items.push(item);
             }
-
-            let resource_name = script_loader.get_item_resource_from_id(item_id, is_identified);
-            let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
-            let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
-            let item = Item {
-                index: item_index,
-                item_id,
-                equip_position,
-                equipped_position,
-                texture,
-            };
-
-            items.push(item);
 
             ValueState::Mutated(())
         });
     }
 
-    pub fn update_equipped_position(&mut self, index: ItemIndex, equipped_position: EquipPosition) {
-        self.items.mutate(|items| {
-            items.iter_mut().find(|item| item.index == index).unwrap().equipped_position = equipped_position;
+    pub fn remove_item(&mut self, index: InventoryIndex, remove_amount: u16) {
+        self.items.with_mut(|items| {
+            let position = items.iter().position(|item| item.index == index).expect("item not in inventory");
+
+            if let InventoryItemDetails::Regular { amount, .. } = &mut items[position].details {
+                if *amount > remove_amount {
+                    *amount -= remove_amount;
+                    return ValueState::Mutated(());
+                }
+            }
+
+            items.remove(position);
+
+            ValueState::Mutated(())
         });
     }
 
-    pub fn get_items(&self) -> PlainRemote<Vec<Item>> {
+    pub fn update_equipped_position(&mut self, index: InventoryIndex, new_equipped_position: EquipPosition) {
+        self.items.mutate(|items| {
+            let item = items.iter_mut().find(|item| item.index == index).unwrap();
+            let InventoryItemDetails::Equippable { equipped_position, .. } = &mut item.details else {
+                panic!();
+            };
+
+            *equipped_position = new_equipped_position;
+        });
+    }
+
+    pub fn get_items(&self) -> Ref<'_, Vec<InventoryItem<ResourceMetadata>>> {
+        self.items.get()
+    }
+
+    pub fn item_remote(&self) -> PlainRemote<Vec<InventoryItem<ResourceMetadata>>> {
         self.items.new_remote()
     }
 }

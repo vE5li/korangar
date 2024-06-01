@@ -1,6 +1,8 @@
+use korangar_networking::InventoryItem;
 use ragnarok_packets::{EquipPosition, HotbarSlot};
 
-use crate::inventory::{Item, Skill};
+use crate::inventory::Skill;
+use crate::loaders::ResourceMetadata;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ItemSource {
@@ -12,7 +14,7 @@ pub enum ItemSource {
 pub struct ItemMove {
     pub source: ItemSource,
     pub destination: ItemSource,
-    pub item: Item,
+    pub item: InventoryItem<ResourceMetadata>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -30,8 +32,14 @@ pub struct SkillMove {
 
 #[derive(Clone, Debug)]
 pub enum PartialMove {
-    Item { source: ItemSource, item: Item },
-    Skill { source: SkillSource, skill: Skill },
+    Item {
+        source: ItemSource,
+        item: InventoryItem<ResourceMetadata>,
+    },
+    Skill {
+        source: SkillSource,
+        skill: Skill,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -39,7 +47,7 @@ pub enum Move {
     Item {
         source: ItemSource,
         destination: ItemSource,
-        item: Item,
+        item: InventoryItem<ResourceMetadata>,
     },
     Skill {
         source: SkillSource,

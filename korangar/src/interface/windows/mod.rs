@@ -7,6 +7,7 @@ mod friends;
 mod generic;
 mod mutable;
 mod settings;
+mod shop;
 
 pub use self::account::*;
 pub use self::cache::WindowCache;
@@ -17,3 +18,4 @@ pub use self::friends::*;
 pub use self::generic::*;
 pub use self::mutable::*;
 pub use self::settings::*;
+pub use self::shop::*;

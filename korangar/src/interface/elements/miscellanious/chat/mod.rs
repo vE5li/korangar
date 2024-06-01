@@ -108,7 +108,7 @@ impl Element<InterfaceSettings> for Chat {
                 korangar_networking::MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
                 korangar_networking::MessageColor::Broadcast => theme.chat.broadcast_color.get(),
                 korangar_networking::MessageColor::Server => theme.chat.server_color.get(),
-                korangar_networking::MessageColor::Error => theme.chat.broadcast_color.get(),
+                korangar_networking::MessageColor::Error => theme.chat.error_color.get(),
                 korangar_networking::MessageColor::Information => theme.chat.information_color.get(),
             };
 

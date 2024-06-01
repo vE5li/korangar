@@ -44,9 +44,12 @@ use korangar_debug::profiling::Profiler;
 use korangar_interface::application::{Application, FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec};
 use korangar_interface::Interface;
-use korangar_networking::{DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem};
+use korangar_networking::{
+    DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem, SellItem, ShopItem,
+};
 use ragnarok_packets::{
-    CharacterId, CharacterServerInformation, Friend, HotbarSlot, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
+    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
+    SkillType, TilePosition, UnitId, WorldPosition,
 };
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
@@ -69,13 +72,7 @@ use crate::interface::dialog::DialogSystem;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::linked::LinkedElement;
 use crate::interface::resource::{ItemSource, Move, SkillSource};
-use crate::interface::windows::{
-    AudioSettingsWindow, CharacterCreationWindow, CharacterOverviewWindow, CharacterSelectionWindow, ChatMessage, ChatWindow, DialogWindow,
-    EquipmentWindow, ErrorWindow, FriendRequestWindow, FriendsWindow, GraphicsSettingsWindow, HotbarWindow, InventoryWindow, LoginWindow,
-    MenuWindow, SelectServerWindow, SkillTreeWindow,
-};
-#[cfg(feature = "debug")]
-use crate::interface::windows::{CommandsWindow, MapsWindow, PacketWindow, ProfilerWindow, RenderSettingsWindow, TimeWindow};
+use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
 #[cfg(feature = "debug")]
@@ -393,7 +390,9 @@ fn main() {
     let mut friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>> = PlainTrackedState::default();
     let mut saved_login_data: Option<LoginServerLoginData> = None;
     let mut saved_character_server: Option<CharacterServerInformation> = None;
-    let mut saved_characters: PlainTrackedState<Vec<ragnarok_packets::CharacterInformation>> = PlainTrackedState::default();
+    let mut saved_characters: PlainTrackedState<Vec<CharacterInformation>> = PlainTrackedState::default();
+    let mut shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>> = PlainTrackedState::default();
+    let mut sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>> = PlainTrackedState::default();
     let mut currently_deleting: Option<CharacterId> = None;
     let mut saved_player_name = String::new();
     let mut move_request: PlainTrackedState<Option<usize>> = PlainTrackedState::default();
@@ -693,6 +692,9 @@ fn main() {
                             );
                             interface.open_window(&application, &mut focus_state, &HotbarWindow::new(hotbar.get_skills()));
 
+                            // Put the dialog system in a well-defined state.
+                            dialog_system.close_dialog();
+
                             particle_holder.clear();
                             let _ = networking_system.map_loaded();
                             // TODO: This is just a workaround until I find a better solution to make the
@@ -842,22 +844,23 @@ fn main() {
                         NetworkEvent::SetInventory { items } => {
                             player_inventory.fill(&mut game_file_loader, &mut texture_loader, &script_loader, items);
                         }
-                        NetworkEvent::AddIventoryItem {
-                            item_index,
-                            item_id,
-                            is_identified,
-                            equip_position,
-                            equipped_position,
+                        NetworkEvent::IventoryItemAdded {
+                            item
                         }=> {
                             player_inventory.add_item(
                                 &mut game_file_loader,
                                 &mut texture_loader,
                                 &script_loader,
-                                item_index,
-                                item_id,
-                                is_identified,
-                                equip_position,
-                                equipped_position,
+                                item,
+                            );
+
+                            // TODO: Update the selling items. If you pick up an item that you
+                            // already have the sell window should allow you to sell the new amount
+                            // of items.
+                        }
+                        NetworkEvent::InventoryItemRemoved { reason: _reason, index, amount } => {
+                            player_inventory.remove_item(
+                                index, amount,
                             );
                         }
                         NetworkEvent::SkillTree(skill_information) => {
@@ -980,6 +983,75 @@ fn main() {
                                 }
                             }
                         }
+                        NetworkEvent::OpenShop { items } => {
+                            shop_items.mutate(|shop_items| *shop_items = items.into_iter().map(|item| {
+                                script_loader.load_market_item_metadata(&mut game_file_loader, &mut texture_loader, item)
+                            }).collect());
+
+                            let cart = PlainTrackedState::default();
+
+                            interface.open_window(&application, &mut focus_state, &BuyWindow::new(shop_items.new_remote(), cart.clone()));
+                            interface.open_window(&application, &mut focus_state, &BuyCartWindow::new(cart));
+                        }
+                        NetworkEvent::AskBuyOrSell { shop_id } => {
+                            interface.open_window(&application, &mut focus_state, &BuyOrSellWindow::new(shop_id));
+                        }
+                        NetworkEvent::BuyingCompleted { result } => {
+                            match result {
+                                BuyShopItemsResult::Success => {
+                                    let _ = networking_system.close_shop();
+
+                                    interface.close_window_with_class(&mut focus_state, BuyWindow::WINDOW_CLASS);
+                                    interface.close_window_with_class(&mut focus_state, BuyCartWindow::WINDOW_CLASS);
+                                }
+                                BuyShopItemsResult::Error => {
+                                    chat_messages.push(ChatMessage {
+                                        text: "Failed to buy items".to_owned(),
+                                        color: MessageColor::Error,
+                                    });
+                                },
+                            }
+                        },
+                        NetworkEvent::SellItemList { items } => {
+                            let inventory_items = player_inventory.get_items();
+
+                            sell_items.mutate(|sell_items| *sell_items = items.into_iter().map(|item| {
+                                let inventory_item = &inventory_items.iter().find(|inventory_item| inventory_item.index == item.inventory_index).expect("item not in inventory");
+
+                                let name = inventory_item.metadata.name.clone();
+                                let texture = inventory_item.metadata.texture.clone();
+                                let quantity = match &inventory_item.details {
+                                    korangar_networking::InventoryItemDetails::Regular { amount, .. } => *amount,
+                                    korangar_networking::InventoryItemDetails::Equippable { .. } => 1,
+                                };
+
+                                SellItem {
+                                    metadata: (ResourceMetadata { name, texture }, quantity),
+                                    inventory_index: item.inventory_index,
+                                    price: item.price,
+                                    overcharge_price: item.overcharge_price,
+                                }
+                            }).collect());
+
+                            let cart = PlainTrackedState::default();
+
+                            interface.open_window(&application, &mut focus_state, &SellWindow::new(sell_items.new_remote(), cart.clone()));
+                            interface.open_window(&application, &mut focus_state, &SellCartWindow::new(cart.clone()));
+                        }
+                        NetworkEvent::SellingCompleted { result } => {
+                            match result {
+                                SellItemsResult::Success => {
+                                    interface.close_window_with_class(&mut focus_state, SellWindow::WINDOW_CLASS);
+                                    interface.close_window_with_class(&mut focus_state, SellCartWindow::WINDOW_CLASS);
+                                }
+                                SellItemsResult::Error => {
+                                    chat_messages.push(ChatMessage {
+                                        text: "Failed to sell items".to_owned(),
+                                        color: MessageColor::Error,
+                                    });
+                                },
+                            }
+                        },
                     }
                 }
 
@@ -1037,7 +1109,7 @@ fn main() {
                                 interface.open_window(
                                     &application,
                                     &mut focus_state,
-                                    &InventoryWindow::new(player_inventory.get_items()),
+                                    &InventoryWindow::new(player_inventory.item_remote()),
                                 )
                             }
                         }
@@ -1046,7 +1118,7 @@ fn main() {
                                 interface.open_window(
                                     &application,
                                     &mut focus_state,
-                                    &EquipmentWindow::new(player_inventory.get_items()),
+                                    &EquipmentWindow::new(player_inventory.item_remote()),
                                 )
                             }
                         }
@@ -1104,7 +1176,10 @@ fn main() {
                                 let _ = match entity.get_entity_type() {
                                     EntityType::Npc => networking_system.start_dialog(entity_id),
                                     EntityType::Monster => networking_system.player_attack(entity_id),
-                                    EntityType::Warp => networking_system.player_move({let position = entity.get_grid_position(); WorldPosition { x: position.x, y: position.y }}),
+                                    EntityType::Warp => networking_system.player_move({
+                                        let position = entity.get_grid_position();
+                                        WorldPosition { x: position.x, y: position.y }
+                                    }),
                                     _ => Ok(())
                                 };
                             }
@@ -1221,6 +1296,24 @@ fn main() {
                         UserEvent::AcceptFriendRequest { account_id, character_id } => {
                             let _ = networking_system.accept_friend_request(account_id, character_id);
                             interface.close_window_with_class(&mut focus_state, FriendRequestWindow::WINDOW_CLASS);
+                        }
+                        UserEvent::BuyItems { items } => {
+                            let _ = networking_system.purchase_items(items);
+                        }
+                        UserEvent::CloseShop => {
+                            let _ = networking_system.close_shop();
+
+                            interface.close_window_with_class(&mut focus_state, BuyWindow::WINDOW_CLASS);
+                            interface.close_window_with_class(&mut focus_state, BuyCartWindow::WINDOW_CLASS);
+                            interface.close_window_with_class(&mut focus_state, SellWindow::WINDOW_CLASS);
+                            interface.close_window_with_class(&mut focus_state, SellCartWindow::WINDOW_CLASS);
+                        }
+                        UserEvent::BuyOrSell { shop_id, buy_or_sell } => {
+                            let _ = networking_system.select_buy_or_sell(shop_id, buy_or_sell);
+                            interface.close_window_with_class(&mut focus_state, BuyOrSellWindow::WINDOW_CLASS);
+                        },
+                        UserEvent::SellItems { items } => {
+                            let _ = networking_system.sell_items(items);
                         }
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {

@@ -1,9 +1,10 @@
 use ragnarok_packets::*;
 
 use crate::hotkey::HotkeyState;
+use crate::items::ShopItem;
 use crate::{
-    CharacterServerLoginData, EntityData, InventoryItem, LoginServerLoginData, MessageColor, UnifiedCharacterSelectionFailedReason,
-    UnifiedLoginFailedReason,
+    CharacterServerLoginData, EntityData, InventoryItem, LoginServerLoginData, MessageColor, NoMetadata,
+    UnifiedCharacterSelectionFailedReason, UnifiedLoginFailedReason,
 };
 
 /// An event triggered by one of the Ragnarok Online servers.
@@ -93,18 +94,14 @@ pub enum NetworkEvent {
     AddQuestEffect(QuestEffectPacket),
     RemoveQuestEffect(EntityId),
     SetInventory {
-        items: Vec<InventoryItem>,
+        items: Vec<InventoryItem<NoMetadata>>,
     },
-    AddIventoryItem {
-        item_index: ItemIndex,
-        item_id: ItemId,
-        is_identified: bool,
-        equip_position: EquipPosition,
-        equipped_position: EquipPosition,
+    IventoryItemAdded {
+        item: InventoryItem<NoMetadata>,
     },
     SkillTree(Vec<SkillInformation>),
     UpdateEquippedPosition {
-        index: ItemIndex,
+        index: InventoryIndex,
         equipped_position: EquipPosition,
     },
     ChangeJob(AccountId, u32),
@@ -129,6 +126,26 @@ pub enum NetworkEvent {
     SetHotkeyData {
         tab: HotbarTab,
         hotkeys: Vec<HotkeyState>,
+    },
+    OpenShop {
+        items: Vec<ShopItem<NoMetadata>>,
+    },
+    AskBuyOrSell {
+        shop_id: ShopId,
+    },
+    BuyingCompleted {
+        result: BuyShopItemsResult,
+    },
+    SellItemList {
+        items: Vec<SellItemInformation>,
+    },
+    SellingCompleted {
+        result: SellItemsResult,
+    },
+    InventoryItemRemoved {
+        reason: RemoveItemReason,
+        index: InventoryIndex,
+        amount: u16,
     },
 }
 

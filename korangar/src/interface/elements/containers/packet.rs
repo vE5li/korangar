@@ -21,7 +21,7 @@ use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::linked::LinkedElement;
 use crate::interface::theme::InterfaceTheme;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct UnknownPacket {
     pub bytes: Vec<u8>,
 }
@@ -65,7 +65,7 @@ impl<App: Application> PrototypeElement<App> for UnknownPacket {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct ErrorPacket {
     pub bytes: Vec<u8>,
     pub error: Box<ConversionError>,

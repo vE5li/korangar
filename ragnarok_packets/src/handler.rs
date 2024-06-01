@@ -24,7 +24,7 @@ pub struct DuplicateHandlerError {
 }
 
 /// Trait for monitoring the incoming and outgoing packets.
-pub trait PacketCallback: Clone + Send + 'static {
+pub trait PacketCallback: Clone + 'static {
     /// Called by the [`PacketHandler`] when a packet is received.
     fn incoming_packet<Packet>(&self, packet: &Packet)
     where
@@ -33,8 +33,7 @@ pub trait PacketCallback: Clone + Send + 'static {
         let _ = packet;
     }
 
-    /// Called by the [`NetworkingSystem`](super::NetworkingSystem) when a
-    /// packet is sent.
+    /// Called by when a packet is sent.
     fn outgoing_packet<Packet>(&self, packet: &Packet)
     where
         Packet: ragnarok_packets::Packet,

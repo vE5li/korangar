@@ -9,7 +9,7 @@ bytemuck = { version = "1.9", features = ["derive", "extern_crate_std", "min_con
 cgmath = { workspace = true, features = ["serde"] }
 chrono = { workspace = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
-derive-new = { workspace = true }
+derive-new = "0.6.0"
 image = "0.24.2"
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }

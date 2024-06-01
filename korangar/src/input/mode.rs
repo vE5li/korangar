@@ -3,16 +3,17 @@ use std::sync::Arc;
 use cgmath::Vector2;
 use korangar_interface::application::MouseInputModeTrait;
 use korangar_interface::elements::{Element, ElementCell};
+use korangar_networking::InventoryItem;
 use vulkano::image::view::ImageView;
 
 use crate::interface::application::InterfaceSettings;
 use crate::interface::resource::{ItemSource, SkillSource};
-use crate::inventory::{Item, Skill};
-use crate::loaders::{Actions, AnimationState, Sprite};
+use crate::inventory::Skill;
+use crate::loaders::{Actions, AnimationState, ResourceMetadata, Sprite};
 
 #[derive(Default)]
 pub enum MouseInputMode {
-    MoveItem(ItemSource, Item),
+    MoveItem(ItemSource, InventoryItem<ResourceMetadata>),
     MoveSkill(SkillSource, Skill),
     MoveInterface(usize),
     ResizeInterface(usize),
@@ -40,7 +41,7 @@ impl MouseInputMode {
 
     pub fn grabbed(&self) -> Option<Grabbed> {
         match self {
-            MouseInputMode::MoveItem(_, item) => Some(Grabbed::Texture(item.texture.clone())),
+            MouseInputMode::MoveItem(_, item) => Some(Grabbed::Texture(item.metadata.texture.clone())),
             MouseInputMode::MoveSkill(_, skill) => Some(Grabbed::Action(
                 skill.sprite.clone(),
                 skill.actions.clone(),

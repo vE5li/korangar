@@ -143,6 +143,11 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
                 .with_event(UserEvent::SendMessage("@allskill".to_string()))
                 .build()
                 .wrap(),
+            ButtonBuilder::new()
+                .with_text("Give 10,000 Zeny")
+                .with_event(UserEvent::SendMessage("@zeny 10000".to_string()))
+                .build()
+                .wrap(),
             Text::default().with_text("Player state").wrap(),
             ButtonBuilder::new()
                 .with_text("Mount")

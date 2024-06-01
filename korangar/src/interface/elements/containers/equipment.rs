@@ -5,6 +5,7 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::{dimension_bound, size_bound};
+use korangar_networking::{InventoryItem, InventoryItemDetails};
 use ragnarok_packets::EquipPosition;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -14,15 +15,15 @@ use crate::interface::elements::ItemBox;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::ItemSource;
 use crate::interface::theme::InterfaceTheme;
-use crate::inventory::Item;
+use crate::loaders::ResourceMetadata;
 
 pub struct EquipmentContainer {
-    items: PlainRemote<Vec<Item>>,
+    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
     state: ContainerState<InterfaceSettings>,
 }
 
 impl EquipmentContainer {
-    pub fn new(items: PlainRemote<Vec<Item>>) -> Self {
+    pub fn new(items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>) -> Self {
         const SLOT_POSITIONS: [EquipPosition; 9] = [
             EquipPosition::HEAD_TOP,
             EquipPosition::HEAD_MIDDLE,
@@ -75,13 +76,21 @@ impl EquipmentContainer {
                         .with_width(dimension_bound!(!))
                         .wrap();
 
-                    let item = items.iter().find(|item| item.equipped_position.contains(slot)).cloned();
+                    let item = items
+                        .iter()
+                        .find(|item| match &item.details {
+                            korangar_networking::InventoryItemDetails::Equippable { equipped_position, .. } => {
+                                equipped_position.contains(slot)
+                            }
+                            _ => false,
+                        })
+                        .cloned();
 
                     let item_box = ItemBox::new(
                         item,
                         ItemSource::Equipment { position: slot },
                         Box::new(
-                            move |mouse_mode| matches!(mouse_mode, MouseInputMode::MoveItem(_, item) if item.equip_position.contains(slot)),
+                            move |mouse_mode| matches!(mouse_mode, MouseInputMode::MoveItem(_, InventoryItem { details: InventoryItemDetails::Equippable { equip_position, .. }, ..}) if equip_position.contains(slot)),
                         ),
                     );
 

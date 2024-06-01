@@ -6,7 +6,6 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 bitflags = "2.4.2"
 cgmath = { version = "0.18", features = ["serde"] }
 chrono = "0.4"
-derive-new = "0.6.0"
 korangar_debug = { path = "korangar_debug" }
 korangar_interface = { path = "korangar_interface" }
 korangar_networking = { path = "korangar_networking" }

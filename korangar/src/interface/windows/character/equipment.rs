@@ -3,16 +3,17 @@ use korangar_interface::elements::ElementWrap;
 use korangar_interface::size_bound;
 use korangar_interface::state::PlainRemote;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_networking::InventoryItem;
 
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::EquipmentContainer;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
-use crate::inventory::Item;
+use crate::loaders::ResourceMetadata;
 
 #[derive(new)]
 pub struct EquipmentWindow {
-    items: PlainRemote<Vec<Item>>,
+    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
 }
 
 impl EquipmentWindow {

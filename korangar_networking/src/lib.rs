@@ -1,7 +1,7 @@
 mod entity;
 mod event;
 mod hotkey;
-mod inventory;
+mod items;
 mod message;
 mod server;
 
@@ -27,7 +27,7 @@ use tokio::task::JoinHandle;
 pub use self::entity::EntityData;
 pub use self::event::{DisconnectReason, NetworkEvent};
 pub use self::hotkey::HotkeyState;
-pub use self::inventory::InventoryItem;
+pub use self::items::{InventoryItem, InventoryItemDetails, ItemQuantity, NoMetadata, SellItem, ShopItem};
 pub use self::message::MessageColor;
 pub use self::server::{
     CharacterServerLoginData, LoginServerLoginData, NotConnectedError, UnifiedCharacterSelectionFailedReason, UnifiedLoginFailedReason,
@@ -52,7 +52,7 @@ impl NetworkingSystem<NoPacketCallback> {
 
 impl<Callback> NetworkingSystem<Callback>
 where
-    Callback: PacketCallback,
+    Callback: PacketCallback + Send,
 {
     fn inner_new(command_sender: UnboundedSender<ServerConnectCommand>, packet_callback: Callback) -> Self {
         Self {
@@ -97,7 +97,7 @@ where
                             }
 
                             let packet_handler = Self::create_login_server_packet_handler(packet_callback.clone()).unwrap();
-                            let handle = local_set.spawn_local(Self::handle_server_thing(
+                            let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
                                 event_sender,
@@ -120,7 +120,7 @@ where
                             }
 
                             let packet_handler = Self::create_character_server_packet_handler(packet_callback.clone()).unwrap();
-                            let handle = local_set.spawn_local(Self::handle_server_thing(
+                            let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
                                 event_sender,
@@ -143,7 +143,7 @@ where
                             }
 
                             let packet_handler = Self::create_map_server_packet_handler(packet_callback.clone()).unwrap();
-                            let handle = local_set.spawn_local(Self::handle_server_thing(
+                            let handle = local_set.spawn_local(Self::handle_server_connection(
                                 address,
                                 action_receiver,
                                 event_sender,
@@ -210,7 +210,7 @@ where
         events
     }
 
-    async fn handle_server_thing<PingPacket>(
+    async fn handle_server_connection<PingPacket>(
         address: SocketAddr,
         mut action_receiver: UnboundedReceiver<Vec<u8>>,
         event_sender: UnboundedSender<NetworkEvent>,
@@ -286,8 +286,14 @@ where
                                 break;
                             },
                             // The packet callback can take care of handling these properly.
-                            HandlerResult::UnhandledPacket => break,
-                            HandlerResult::InternalError(..) => break,
+                            HandlerResult::UnhandledPacket => {
+                                cut_off_buffer_base = 0;
+                                break
+                            },
+                            HandlerResult::InternalError(..) => {
+                                cut_off_buffer_base = 0;
+                                break
+                            },
                         }
                     }
 
@@ -606,7 +612,7 @@ where
         //
         // This variable provides some transient storage shared by all the inventory
         // handlers.
-        let inventory_items: Rc<RefCell<Option<Vec<InventoryItem>>>> = Rc::new(RefCell::new(None));
+        let inventory_items: Rc<RefCell<Option<Vec<InventoryItem<NoMetadata>>>>> = Rc::new(RefCell::new(None));
 
         packet_handler.register(|_: MapServerPingPacket| NoNetworkEvents)?;
         packet_handler.register(|packet: BroadcastMessagePacket| NetworkEvent::ChatMessage {
@@ -688,12 +694,31 @@ where
 
             move |packet: RegularItemListPacket| {
                 inventory_items.borrow_mut().as_mut().expect("Unexpected inventory packet").extend(
-                    packet.item_information.into_iter().map(|item| InventoryItem {
-                        index: item.index,
-                        id: item.item_id,
-                        is_identified: item.flags.contains(RegularItemFlags::IDENTIFIED),
-                        equip_position: EquipPosition::NONE,
-                        equipped_position: EquipPosition::NONE,
+                    packet.item_information.into_iter().map(|item_information| {
+                        let RegularItemInformation {
+                            index,
+                            item_id,
+                            item_type,
+                            amount,
+                            equipped_position,
+                            slot,
+                            hire_expiration_date,
+                            flags,
+                        } = item_information;
+
+                        InventoryItem {
+                            index,
+                            metadata: NoMetadata,
+                            item_id,
+                            item_type,
+                            slot,
+                            hire_expiration_date,
+                            details: InventoryItemDetails::Regular {
+                                amount,
+                                equipped_position,
+                                flags,
+                            },
+                        }
                     }),
                 );
                 NoNetworkEvents
@@ -704,12 +729,43 @@ where
 
             move |packet: EquippableItemListPacket| {
                 inventory_items.borrow_mut().as_mut().expect("Unexpected inventory packet").extend(
-                    packet.item_information.into_iter().map(|item| InventoryItem {
-                        index: item.index,
-                        id: item.item_id,
-                        is_identified: item.flags.contains(EquippableItemFlags::IDENTIFIED),
-                        equip_position: item.equip_position,
-                        equipped_position: item.equipped_position,
+                    packet.item_information.into_iter().map(|item| {
+                        let EquippableItemInformation {
+                            index,
+                            item_id,
+                            item_type,
+                            equip_position,
+                            equipped_position,
+                            slot,
+                            hire_expiration_date,
+                            bind_on_equip_type,
+                            w_item_sprite_number,
+                            option_count,
+                            option_data,
+                            refinement_level,
+                            enchantment_level,
+                            flags,
+                        } = item;
+
+                        InventoryItem {
+                            index,
+                            metadata: NoMetadata,
+                            item_id,
+                            item_type,
+                            slot,
+                            hire_expiration_date,
+                            details: InventoryItemDetails::Equippable {
+                                equip_position,
+                                equipped_position,
+                                bind_on_equip_type,
+                                w_item_sprite_number,
+                                option_count,
+                                option_data,
+                                refinement_level,
+                                enchantment_level,
+                                flags,
+                            },
+                        }
                     }),
                 );
                 NoNetworkEvents
@@ -792,14 +848,79 @@ where
             QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
             _ => NetworkEvent::AddQuestEffect(packet),
         })?;
-        packet_handler.register(|packet: ItemPickupPacket| NetworkEvent::AddIventoryItem {
-            item_index: packet.index,
-            item_id: packet.item_id,
-            is_identified: packet.is_identified != 0,
-            equip_position: packet.equip_position,
-            equipped_position: EquipPosition::NONE,
+        packet_handler.register(|packet: ItemPickupPacket| {
+            let ItemPickupPacket {
+                index,
+                count,
+                item_id,
+                is_identified,
+                is_broken,
+                cards,
+                equip_position,
+                item_type,
+                result,
+                hire_expiration_date,
+                bind_on_equip_type,
+                option_data,
+                favorite,
+                look,
+                refinement_level,
+                enchantment_level,
+            } = packet;
+
+            if result != ItemPickupResult::Success {
+                todo!();
+            }
+
+            // TODO: Not sure where to store these, since the *InventoryItem packets are not
+            // sending these either. We will certainly use them at some point though.
+            let _ = (favorite, look);
+
+            let details = match equip_position.is_empty() {
+                true => InventoryItemDetails::Regular {
+                    amount: count,
+                    equipped_position: equip_position,
+                    flags: {
+                        let mut flags = RegularItemFlags::empty();
+                        flags.set(RegularItemFlags::IDENTIFIED, is_identified != 0);
+                        flags
+                    },
+                },
+                false => InventoryItemDetails::Equippable {
+                    equip_position,
+                    equipped_position: EquipPosition::empty(),
+                    bind_on_equip_type,
+                    w_item_sprite_number: 0,
+                    option_count: option_data.len() as u8,
+                    option_data,
+                    refinement_level,
+                    enchantment_level,
+                    flags: {
+                        let mut flags = EquippableItemFlags::empty();
+                        flags.set(EquippableItemFlags::IDENTIFIED, is_identified != 0);
+                        flags.set(EquippableItemFlags::IS_BROKEN, is_broken != 0);
+                        flags
+                    },
+                },
+            };
+
+            let item = InventoryItem {
+                metadata: NoMetadata,
+                index,
+                item_id,
+                item_type,
+                slot: cards,
+                hire_expiration_date,
+                details,
+            };
+
+            NetworkEvent::IventoryItemAdded { item }
         })?;
-        packet_handler.register_noop::<RemoveItemFromInventoryPacket>()?;
+        packet_handler.register(|packet: RemoveItemFromInventoryPacket| NetworkEvent::InventoryItemRemoved {
+            reason: packet.remove_reason,
+            index: packet.index,
+            amount: packet.amount,
+        })?;
         packet_handler.register(|packet: ServerTickPacket| NetworkEvent::UpdateClientTick(packet.client_tick))?;
         packet_handler.register(|packet: RequestPlayerDetailsSuccessPacket| {
             NetworkEvent::UpdateEntityDetails(EntityId(packet.character_id.0), packet.name)
@@ -893,6 +1014,29 @@ where
         packet_handler.register_noop::<ClanInfoPacket>()?;
         packet_handler.register_noop::<ClanOnlineCountPacket>()?;
         packet_handler.register_noop::<ChangeMapCellPacket>()?;
+        packet_handler.register_noop::<OpenMarketPacket>()?;
+        packet_handler.register(|packet: BuyOrSellPacket| NetworkEvent::AskBuyOrSell { shop_id: packet.shop_id })?;
+        packet_handler.register(|packet: ShopItemListPacket| {
+            let items = packet
+                .items
+                .into_iter()
+                .map(|item| ShopItem {
+                    metadata: NoMetadata,
+                    item_id: item.item_id,
+                    item_type: item.item_type,
+                    price: item.price,
+                    quantity: items::ItemQuantity::Infinite,
+                    weight: 0,
+                    location: item.location,
+                })
+                .collect();
+
+            NetworkEvent::OpenShop { items }
+        })?;
+        packet_handler.register(|packet: BuyShopItemsResultPacket| NetworkEvent::BuyingCompleted { result: packet.result })?;
+        packet_handler.register_noop::<ParameterChangePacket>()?;
+        packet_handler.register(|packet: SellListPacket| NetworkEvent::SellItemList { items: packet.items })?;
+        packet_handler.register(|packet: SellItemsResultPacket| NetworkEvent::SellingCompleted { result: packet.result })?;
 
         Ok(packet_handler)
     }
@@ -951,11 +1095,11 @@ where
         self.send_map_server_packet(&ChooseDialogOptionPacket::new(npc_id, option))
     }
 
-    pub fn request_item_equip(&mut self, item_index: ItemIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
+    pub fn request_item_equip(&mut self, item_index: InventoryIndex, equip_position: EquipPosition) -> Result<(), NotConnectedError> {
         self.send_map_server_packet(&RequestEquipItemPacket::new(item_index, equip_position))
     }
 
-    pub fn request_item_unequip(&mut self, item_index: ItemIndex) -> Result<(), NotConnectedError> {
+    pub fn request_item_unequip(&mut self, item_index: InventoryIndex) -> Result<(), NotConnectedError> {
         self.send_map_server_packet(&RequestUnequipItemPacket::new(item_index))
     }
 
@@ -1032,6 +1176,30 @@ where
 
     pub fn set_hotkey_data(&mut self, tab: HotbarTab, index: HotbarSlot, hotkey_data: HotkeyData) -> Result<(), NotConnectedError> {
         self.send_map_server_packet(&SetHotkeyData2Packet::new(tab, index, hotkey_data))
+    }
+
+    pub fn select_buy_or_sell(&mut self, shop_id: ShopId, buy_or_sell: BuyOrSellOption) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&SelectBuyOrSellPacket::new(shop_id, buy_or_sell))
+    }
+
+    pub fn purchase_items(&mut self, items: Vec<ShopItem<u32>>) -> Result<(), NotConnectedError> {
+        let item_information = items
+            .into_iter()
+            .map(|item| BuyShopItemInformation {
+                item_id: item.item_id,
+                amount: item.metadata,
+            })
+            .collect();
+
+        self.send_map_server_packet(&BuyShopItemsPacket::new(item_information))
+    }
+
+    pub fn close_shop(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&CloseShopPacket::new())
+    }
+
+    pub fn sell_items(&mut self, items: Vec<SoldItemInformation>) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&SellItemsPacket { items })
     }
 }
 

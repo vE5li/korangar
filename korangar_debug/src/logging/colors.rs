@@ -23,6 +23,7 @@ use std::fmt::{Debug, Display};
 use self::color_codes::*;
 
 /// Wrapper struct to print anything that implements [`Display`] or [`Debug`].
+#[derive(Clone)]
 pub struct Colorized<'a, T> {
     wrapped: &'a T,
     color: &'static str,

@@ -4,6 +4,7 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
+use korangar_networking::{InventoryItem, InventoryItemDetails};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer};
 use crate::input::MouseInputMode;
@@ -11,12 +12,11 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, PartialMove};
 use crate::interface::theme::InterfaceTheme;
-use crate::inventory::Item;
-use crate::loaders::{FontSize, Scaling};
+use crate::loaders::{FontSize, ResourceMetadata, Scaling};
 
 #[derive(new)]
 pub struct ItemBox {
-    item: Option<Item>,
+    item: Option<InventoryItem<ResourceMetadata>>,
     source: ItemSource,
     highlight: Box<dyn Fn(&MouseInputMode) -> bool>,
     #[new(default)]
@@ -105,7 +105,7 @@ impl Element<InterfaceSettings> for ItemBox {
         if let Some(item) = &self.item {
             renderer.renderer.render_sprite(
                 renderer.render_target,
-                item.texture.clone(),
+                item.metadata.texture.clone(),
                 renderer.position,
                 ScreenSize::uniform(30.0).scaled(Scaling::new(application.get_scaling_factor())),
                 renderer.clip,
@@ -113,13 +113,14 @@ impl Element<InterfaceSettings> for ItemBox {
                 false,
             );
 
-            renderer.render_text(
-                //&format!("{}", self.item.amount),
-                "1",
-                ScreenPosition::default(),
-                theme.button.foreground_color.get(),
-                FontSize::new(8.0),
-            );
+            if let InventoryItemDetails::Regular { amount, .. } = &item.details {
+                renderer.render_text(
+                    &format!("{}", amount),
+                    ScreenPosition::default(),
+                    theme.button.foreground_color.get(),
+                    FontSize::new(12.0),
+                );
+            }
         }
     }
 }

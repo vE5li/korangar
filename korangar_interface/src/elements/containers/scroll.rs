@@ -51,14 +51,6 @@ where
             .scroll
             .clamp(0.0, (self.children_height - self.state.state.cached_size.height()).max(0.0));
     }
-
-    pub fn link_back(
-        &mut self,
-        weak_self: Weak<std::cell::RefCell<dyn crate::elements::Element<App>>>,
-        weak_parent: Option<Weak<std::cell::RefCell<dyn crate::elements::Element<App>>>>,
-    ) {
-        self.state.link_back(weak_self, weak_parent)
-    }
 }
 
 impl<App> Element<App> for ScrollView<App>

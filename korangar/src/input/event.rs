@@ -1,7 +1,10 @@
 use cgmath::Vector2;
 use korangar_interface::event::ClickAction;
 use korangar_interface::ElementEvent;
-use ragnarok_packets::{AccountId, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, TilePosition};
+use korangar_networking::ShopItem;
+use ragnarok_packets::{
+    AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, TilePosition,
+};
 
 use crate::interface::application::{InterfaceSettings, InternalThemeKind};
 use crate::interface::resource::Move;
@@ -69,6 +72,17 @@ pub enum UserEvent {
     AcceptFriendRequest {
         account_id: AccountId,
         character_id: CharacterId,
+    },
+    BuyItems {
+        items: Vec<ShopItem<u32>>,
+    },
+    CloseShop,
+    BuyOrSell {
+        shop_id: ShopId,
+        buy_or_sell: BuyOrSellOption,
+    },
+    SellItems {
+        items: Vec<SoldItemInformation>,
     },
     #[cfg(feature = "debug")]
     OpenMarkerDetails(MarkerIdentifier),

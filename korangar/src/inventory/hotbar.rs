@@ -23,7 +23,7 @@ impl Hotbar {
     /// Update the slot and notify the map server.
     pub fn update_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot, skill: Skill)
     where
-        Callback: PacketCallback,
+        Callback: PacketCallback + Send,
     {
         let _ = networking_system.set_hotkey_data(HotbarTab(0), slot, HotkeyData {
             is_skill: true as u8,
@@ -43,7 +43,7 @@ impl Hotbar {
         source_slot: HotbarSlot,
         destination_slot: HotbarSlot,
     ) where
-        Callback: PacketCallback,
+        Callback: PacketCallback + Send,
     {
         if source_slot != destination_slot {
             self.skills.mutate(|skills| {
@@ -87,7 +87,7 @@ impl Hotbar {
     /// Clear the slot and notify the map server.
     pub fn clear_slot<Callback>(&mut self, networking_system: &mut NetworkingSystem<Callback>, slot: HotbarSlot)
     where
-        Callback: PacketCallback,
+        Callback: PacketCallback + Send,
     {
         let _ = networking_system.set_hotkey_data(HotbarTab(0), slot, HotkeyData::UNBOUND);
 

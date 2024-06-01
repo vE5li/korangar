@@ -1,43 +1,78 @@
+use korangar_interface::application::SizeTraitExt;
 use korangar_interface::elements::{ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, WeakElementCell};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
-use korangar_interface::state::{PlainRemote, Remote};
-use korangar_networking::InventoryItem;
+use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt};
+use korangar_networking::SellItem;
+use num::Integer;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
-use crate::interface::elements::ItemBox;
-use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::interface::resource::{ItemSource, Move, PartialMove};
+use crate::interface::elements::{ShopEntry, ShopEntryOperation};
+use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::ResourceMetadata;
 
-pub struct InventoryContainer {
-    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
+pub struct SellContainer {
+    items: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
+    cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
     state: ContainerState<InterfaceSettings>,
 }
 
-impl InventoryContainer {
-    pub fn new(items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>) -> Self {
-        let elements = {
-            let items = items.get();
+impl SellContainer {
+    pub fn new(
+        items: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
+        cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
+    ) -> Self {
+        let elements = items
+            .get()
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                ShopEntry::new(
+                    item.clone(),
+                    cart.clone(),
+                    ShopEntryOperation::AddToCart,
+                    index.is_odd(),
+                    |item| Some(item.metadata.1 as usize),
+                    |item, cart, amount| {
+                        cart.mutate(|cart| {
+                            if let Some(purchase) = cart.iter_mut().find(|purchase| purchase.inventory_index == item.inventory_index) {
+                                purchase.metadata.1 += amount;
+                            } else {
+                                cart.push(SellItem {
+                                    metadata: (item.metadata.0.clone(), amount),
+                                    inventory_index: item.inventory_index,
+                                    price: item.price,
+                                    overcharge_price: item.overcharge_price,
+                                });
+                            }
+                        });
+                    },
+                    |item, cart, amount| {
+                        let cart_quantity = cart
+                            .get()
+                            .iter()
+                            .find(|cart_item| cart_item.inventory_index == item.inventory_index)
+                            .map(|cart_item| cart_item.metadata.1)
+                            .unwrap_or(0);
 
-            (0..40)
-                .map(|index| items.get(index).cloned())
-                .map(|item| ItemBox::new(item, ItemSource::Inventory, Box::new(|_| false)))
-                .map(ElementWrap::wrap)
-                .collect()
-        };
+                        item.metadata.1.saturating_sub(cart_quantity) >= amount
+                    },
+                )
+            })
+            .map(ElementWrap::wrap)
+            .collect::<Vec<ElementCell<InterfaceSettings>>>();
 
         let state = ContainerState::new(elements);
 
-        Self { items, state }
+        Self { items, cart, state }
     }
 }
 
-impl Element<InterfaceSettings> for InventoryContainer {
+impl Element<InterfaceSettings> for SellContainer {
     fn get_state(&self) -> &ElementState<InterfaceSettings> {
         &self.state.state
     }
@@ -75,7 +110,7 @@ impl Element<InterfaceSettings> for InventoryContainer {
     ) {
         let size_bound = &size_bound!(100%, ?);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::uniform(3.0));
+            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::zero());
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -83,7 +118,7 @@ impl Element<InterfaceSettings> for InventoryContainer {
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.state.state.self_element.take().unwrap();
 
-            *self = Self::new(self.items.clone());
+            *self = Self::new(self.items.clone(), self.cart.clone());
             // important: link back after creating elements, otherwise focus navigation and
             // scrolling would break
             self.link_back(weak_self, weak_parent);
@@ -100,18 +135,6 @@ impl Element<InterfaceSettings> for InventoryContainer {
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
             _ => HoverInformation::Missed,
         }
-    }
-
-    fn drop_resource(&mut self, drop_resource: PartialMove) -> Option<Move> {
-        let PartialMove::Item { source, item } = drop_resource else {
-            return None;
-        };
-
-        (source != ItemSource::Inventory).then_some(Move::Item {
-            source,
-            destination: ItemSource::Inventory,
-            item,
-        })
     }
 
     fn render(
@@ -141,12 +164,5 @@ impl Element<InterfaceSettings> for InventoryContainer {
             mouse_mode,
             second_theme,
         );
-
-        if matches!(mouse_mode, MouseInputMode::MoveItem(..)) {
-            match self.is_element_self(hovered_element) {
-                true => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba_u8(60, 160, 160, 160)),
-                false => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba_u8(160, 160, 60, 160)),
-            }
-        }
     }
 }

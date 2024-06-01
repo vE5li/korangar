@@ -25,7 +25,7 @@ pub struct PacketHeader(pub u16);
 /// followed by the packet data. If the packet does not have a fixed size,
 /// the first two bytes will be the size of the packet in bytes *including* the
 /// header. Packets are sent in little endian.
-pub trait Packet: Clone {
+pub trait Packet: std::fmt::Debug + Clone {
     /// Any scheduled packet that does not depend on in-game events should be
     /// marked as a ping. This is mostly for filtering when logging
     /// packet traffic.
@@ -134,6 +134,14 @@ pub struct HotbarTab(pub u16);
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct HotbarSlot(pub u16);
 
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct ShopId(pub u32);
+
+#[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct Price(pub u32);
+
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ServerAddress(pub [u8; 4]);
@@ -187,15 +195,15 @@ pub struct ColorRGBA {
 /// Item index is always actual index + 2.
 #[derive(Clone, Copy, Debug, FixedByteSize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-pub struct ItemIndex(pub u16);
+pub struct InventoryIndex(pub u16);
 
-impl FromBytes for ItemIndex {
+impl FromBytes for InventoryIndex {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         u16::from_bytes(byte_stream).map(|raw| Self(raw - 2))
     }
 }
 
-impl ToBytes for ItemIndex {
+impl ToBytes for InventoryIndex {
     fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
         u16::to_bytes(&(self.0 + 2))
     }
@@ -853,13 +861,13 @@ impl ToBytes for RegularItemFlags {
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct RegularItemInformation {
-    pub index: ItemIndex,
+    pub index: InventoryIndex,
     pub item_id: ItemId,
     pub item_type: u8,
     pub amount: u16,
-    pub wear_state: u32,
+    pub equipped_position: EquipPosition,
     pub slot: [u32; 4], // card ?
-    pub hire_expiration_date: i32,
+    pub hire_expiration_date: u32,
     pub flags: RegularItemFlags,
 }
 
@@ -878,7 +886,7 @@ bitflags::bitflags! {
     #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
     pub struct EquippableItemFlags: u8 {
         const IDENTIFIED = 0b001;
-        const IS_DAMAGED = 0b010;
+        const IS_BROKEN = 0b010;
         const IN_ETC_TAB = 0b110;
     }
 }
@@ -904,13 +912,13 @@ impl ToBytes for EquippableItemFlags {
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct EquippableItemInformation {
-    pub index: ItemIndex,
+    pub index: InventoryIndex,
     pub item_id: ItemId,
     pub item_type: u8,
     pub equip_position: EquipPosition,
     pub equipped_position: EquipPosition,
     pub slot: [u32; 4], // card ?
-    pub hire_expiration_date: i32,
+    pub hire_expiration_date: u32,
     pub bind_on_equip_type: u16,
     pub w_item_sprite_number: u16,
     pub option_count: u8,
@@ -933,7 +941,7 @@ pub struct EquippableItemListPacket {
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct EquippableSwitchItemInformation {
-    pub index: ItemIndex,
+    pub index: InventoryIndex,
     pub position: u32,
 }
 
@@ -1955,11 +1963,24 @@ pub struct StateChangePacket {
     pub is_pk_mode_on: u8,
 }
 
+#[derive(Debug, Clone, ByteConvertable, PartialEq, Eq)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub enum ItemPickupResult {
+    Success,
+    Invalid,
+    Overweight,
+    Unknown0,
+    NoSpace,
+    MaximumOfItem,
+    Unknown1,
+    StackLimitation,
+}
+
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0B41)]
 pub struct ItemPickupPacket {
-    pub index: ItemIndex,
+    pub index: InventoryIndex,
     pub count: u16,
     pub item_id: ItemId,
     pub is_identified: u8,
@@ -1967,7 +1988,7 @@ pub struct ItemPickupPacket {
     pub cards: [u32; 4],
     pub equip_position: EquipPosition,
     pub item_type: u8,
-    pub result: u8,
+    pub result: ItemPickupResult,
     pub hire_expiration_date: u32,
     pub bind_on_equip_type: u16,
     pub option_data: [ItemOptions; 5], // fix count
@@ -1983,7 +2004,7 @@ pub struct ItemPickupPacket {
 pub enum RemoveItemReason {
     Normal,
     ItemUsedForSkill,
-    RefinsFailed,
+    RefineFailed,
     MaterialChanged,
     MovedToStorage,
     MovedToCart,
@@ -1996,7 +2017,7 @@ pub enum RemoveItemReason {
 #[header(0x07FA)]
 pub struct RemoveItemFromInventoryPacket {
     pub remove_reason: RemoveItemReason,
-    pub index: u16,
+    pub index: InventoryIndex,
     pub amount: u16,
 }
 
@@ -2150,7 +2171,7 @@ impl ToBytes for EquipPosition {
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0998)]
 pub struct RequestEquipItemPacket {
-    pub inventory_index: ItemIndex,
+    pub inventory_index: InventoryIndex,
     pub equip_position: EquipPosition,
 }
 
@@ -2166,7 +2187,7 @@ pub enum RequestEquipItemStatus {
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0999)]
 pub struct RequestEquipItemStatusPacket {
-    pub inventory_index: ItemIndex,
+    pub inventory_index: InventoryIndex,
     pub equipped_position: EquipPosition,
     pub view_id: u16,
     pub result: RequestEquipItemStatus,
@@ -2176,7 +2197,7 @@ pub struct RequestEquipItemStatusPacket {
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x00AB)]
 pub struct RequestUnequipItemPacket {
-    pub inventory_index: ItemIndex,
+    pub inventory_index: InventoryIndex,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
@@ -2190,7 +2211,7 @@ pub enum RequestUnequipItemStatus {
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x099A)]
 pub struct RequestUnequipItemStatusPacket {
-    pub inventory_index: ItemIndex,
+    pub inventory_index: InventoryIndex,
     pub equipped_position: EquipPosition,
     pub result: RequestUnequipItemStatus,
 }
@@ -2200,6 +2221,14 @@ pub struct RequestUnequipItemStatusPacket {
 pub enum RestartType {
     Respawn,
     Disconnect,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00B1)]
+pub struct ParameterChangePacket {
+    pub variable_id: u16,
+    pub value: u32,
 }
 
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
@@ -2709,4 +2738,205 @@ pub struct ChangeMapCellPacket {
     pub cell_type: u16,
     #[length(16)]
     pub map_name: String,
+}
+
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct MarketItemInformation {
+    pub name_id: u32,
+    pub item_type: u8,
+    pub price: Price,
+    pub quantity: u32,
+    pub weight: u16,
+    pub location: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0B7A)]
+#[variable_length]
+pub struct OpenMarketPacket {
+    #[repeating_remaining]
+    pub items: Vec<MarketItemInformation>,
+}
+
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct ShopItemInformation {
+    pub item_id: ItemId,
+    pub price: Price,
+    pub discount_price: Price,
+    pub item_type: u8,
+    pub view_sprite: u16,
+    pub location: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0B77)]
+#[variable_length]
+pub struct ShopItemListPacket {
+    #[repeating_remaining]
+    pub items: Vec<ShopItemInformation>,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00C4)]
+pub struct BuyOrSellPacket {
+    pub shop_id: ShopId,
+}
+
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[numeric_type(u8)]
+pub enum BuyOrSellOption {
+    Buy,
+    Sell,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00C5)]
+pub struct SelectBuyOrSellPacket {
+    pub shop_id: ShopId,
+    pub option: BuyOrSellOption,
+}
+
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[numeric_type(u8)]
+pub enum BuyItemResult {
+    #[numeric_value(0)]
+    Successful,
+    #[numeric_value(1)]
+    NotEoughZeny,
+    #[numeric_value(2)]
+    WeightLimitExceeded,
+    #[numeric_value(3)]
+    TooManyItems,
+    #[numeric_value(9)]
+    TooManyOfThisItem,
+    #[numeric_value(10)]
+    PropsOpenAir,
+    #[numeric_value(11)]
+    ExchangeFailed,
+    #[numeric_value(12)]
+    ExchangeWellDone,
+    #[numeric_value(13)]
+    ItemSoldOut,
+    #[numeric_value(14)]
+    NotEnoughGoods,
+}
+
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct BuyItemInformation {
+    amount: u16,
+    item_id: u16,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00C8)]
+#[variable_length]
+pub struct BuyItemsPacket {
+    #[repeating_remaining]
+    pub items: Vec<BuyItemInformation>,
+}
+
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct BuyShopItemInformation {
+    pub item_id: ItemId,
+    pub amount: u32,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x09D6)]
+#[variable_length]
+pub struct BuyShopItemsPacket {
+    pub items: Vec<BuyShopItemInformation>,
+}
+
+#[derive(Debug, Clone, Copy, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[numeric_type(u16)]
+pub enum BuyShopItemsResult {
+    #[numeric_value(0)]
+    Success,
+    #[numeric_value(0xFFFF)]
+    Error,
+}
+
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct BoughtShopItemInformation {
+    pub item_id: ItemId,
+    pub amount: u16,
+    pub price: Price,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0B4E)]
+#[variable_length]
+pub struct BuyShopItemsResultPacket {
+    pub result: BuyShopItemsResult,
+    #[repeating_remaining]
+    pub purchased_items: Vec<BoughtShopItemInformation>,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x09D4)]
+pub struct CloseShopPacket {}
+
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct SellItemInformation {
+    pub inventory_index: InventoryIndex,
+    pub price: Price,
+    pub overcharge_price: Price,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00C7)]
+#[variable_length]
+pub struct SellListPacket {
+    #[repeating_remaining]
+    pub items: Vec<SellItemInformation>,
+}
+
+#[derive(Debug, Clone, FixedByteSize, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct SoldItemInformation {
+    pub inventory_index: InventoryIndex,
+    pub amount: u16,
+}
+
+#[derive(Debug, Clone, Packet, ClientPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00C9)]
+#[variable_length]
+pub struct SellItemsPacket {
+    #[repeating_remaining]
+    pub items: Vec<SoldItemInformation>,
+}
+
+#[derive(Debug, Clone, Copy, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[numeric_type(u8)]
+pub enum SellItemsResult {
+    Success,
+    Error,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x00CB)]
+pub struct SellItemsResultPacket {
+    pub result: SellItemsResult,
 }

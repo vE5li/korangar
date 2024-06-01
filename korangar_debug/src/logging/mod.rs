@@ -1,6 +1,6 @@
 mod colors;
 mod stack;
-mod symbols;
+pub mod symbols;
 #[macro_use]
 mod print;
 mod timer;

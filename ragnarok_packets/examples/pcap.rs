@@ -3,6 +3,7 @@
 use std::any::TypeId;
 
 use etherparse::{SlicedPacket, TransportSlice};
+use korangar_debug::logging::symbols::ARROW;
 use korangar_debug::logging::{Colorize, Colorized};
 use ragnarok_bytes::{ByteStream, ConversionError};
 use ragnarok_packets::handler::{HandlerResult, PacketCallback, PacketHandler};
@@ -137,7 +138,13 @@ fn handler<P: Packet + 'static>(server_type: ServerType, direction: Direction) -
             ExpandBehaviour::None => {}
             ExpandBehaviour::Whitelist(types) if !types.contains(&TypeId::of::<P>()) => {}
             ExpandBehaviour::Blacklist(types) if types.contains(&TypeId::of::<P>()) => {}
-            _ => println!("{} {:?}", "->".red(), packet),
+            _ => {
+                let arrow = match direction {
+                    Direction::Incoming => ARROW.green(),
+                    Direction::Outgoing => ARROW.red(),
+                };
+                println!(" {arrow} {packet:?}")
+            }
         }
     }
 }

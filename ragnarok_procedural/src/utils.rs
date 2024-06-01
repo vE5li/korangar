@@ -25,7 +25,7 @@ pub struct Version {
 impl Parse for Version {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let major = input.parse().expect("version must be two bytes long");
-        input.parse::<Punct>().expect("version must be seperated by commas");
+        input.parse::<Punct>().expect("version must be separated by commas");
         let minor = input.parse().expect("version must be two bytes long");
         Ok(Version { major, minor })
     }

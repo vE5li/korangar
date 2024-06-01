@@ -105,8 +105,7 @@ where
             if self.open_size_bound.height.is_flexible() {
                 let final_height = inner_placement_resolver.final_height()
                     + closed_size.height()
-                    + theme.expandable().element_offset().top() * application.get_scaling().get_factor()
-                    + theme.expandable().border_size().height() * application.get_scaling().get_factor() * 2.0;
+                    + theme.expandable().element_offset().top() * application.get_scaling().get_factor();
 
                 let final_height = self.open_size_bound.validated_height(
                     final_height,

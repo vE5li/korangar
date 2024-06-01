@@ -229,6 +229,6 @@ where
     }
 
     pub fn final_height(self) -> f32 {
-        self.total_height + self.vertical_offset + self.border.height() * self.scaling.get_factor()
+        self.total_height + self.vertical_offset + self.border.height() * 2.0 * self.scaling.get_factor()
     }
 }

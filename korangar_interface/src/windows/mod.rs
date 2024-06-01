@@ -77,7 +77,7 @@ where
 
         if self.size_bound.height.is_flexible() {
             let parent_limits = placement_resolver.get_parent_limits();
-            let final_height = theme.window().border_size().height() + placement_resolver.final_height();
+            let final_height = placement_resolver.final_height();
 
             let final_height = self.size_bound.validated_height(
                 final_height,

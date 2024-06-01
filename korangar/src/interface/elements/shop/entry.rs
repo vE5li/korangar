@@ -180,7 +180,7 @@ impl Element<InterfaceSettings> for ShopEntry {
     ) {
         let size_bound = &size_bound!(100%, ?);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::uniform(8.0));
+            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::uniform(12.0));
     }
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {

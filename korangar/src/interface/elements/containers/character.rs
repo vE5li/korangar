@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Weak;
+use std::rc::{Rc, Weak};
 
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, Text};
@@ -14,10 +14,11 @@ use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
-use crate::loaders::FontSize;
+use crate::loaders::{FontLoader, FontSize};
 
 // TODO: rework all of this
 pub struct CharacterPreview {
+    font_loader: Rc<RefCell<FontLoader>>,
     characters: PlainRemote<Vec<CharacterInformation>>,
     move_request: PlainRemote<Option<usize>>,
     slot: usize,
@@ -26,6 +27,7 @@ pub struct CharacterPreview {
 
 impl CharacterPreview {
     fn get_elements(
+        font_loader: Rc<RefCell<FontLoader>>,
         characters: &PlainRemote<Vec<CharacterInformation>>,
         move_request: &PlainRemote<Option<usize>>,
         slot: usize,
@@ -37,7 +39,7 @@ impl CharacterPreview {
             };
 
             return vec![
-                Text::default()
+                Text::new(font_loader.clone())
                     .with_text(text.to_owned())
                     .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
                     .wrap(),
@@ -49,7 +51,7 @@ impl CharacterPreview {
 
         if let Some(character_information) = character_information {
             return vec![
-                Text::default()
+                Text::new(font_loader.clone())
                     .with_text(character_information.name.clone())
                     .with_foreground_color(|_| Color::rgb_u8(220, 210, 210))
                     .with_font_size(|_| FontSize::new(18.0))
@@ -73,18 +75,24 @@ impl CharacterPreview {
         }
 
         vec![
-            Text::default()
+            Text::new(font_loader)
                 .with_text("New character")
                 .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
                 .wrap(),
         ]
     }
 
-    pub fn new(characters: PlainRemote<Vec<CharacterInformation>>, move_request: PlainRemote<Option<usize>>, slot: usize) -> Self {
-        let elements = Self::get_elements(&characters, &move_request, slot);
+    pub fn new(
+        font_loader: Rc<RefCell<FontLoader>>,
+        characters: PlainRemote<Vec<CharacterInformation>>,
+        move_request: PlainRemote<Option<usize>>,
+        slot: usize,
+    ) -> Self {
+        let elements = Self::get_elements(font_loader.clone(), &characters, &move_request, slot);
         let state = ContainerState::new(elements);
 
         Self {
+            font_loader,
             characters,
             move_request,
             slot,
@@ -146,7 +154,12 @@ impl Element<InterfaceSettings> for CharacterPreview {
             let weak_self = self.state.state.self_element.take().unwrap();
             let weak_parent = self.state.state.parent_element.clone();
 
-            *self = Self::new(self.characters.clone(), self.move_request.clone(), self.slot);
+            *self = Self::new(
+                self.font_loader.clone(),
+                self.characters.clone(),
+                self.move_request.clone(),
+                self.slot,
+            );
 
             // important: link back after creating elements, otherwise focus navigation and
             // scrolling would break

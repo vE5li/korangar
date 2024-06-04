@@ -1,9 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use derive_new::new;
 use korangar_interface::state::{PlainTrackedState, TrackedStateExt, TrackedStateVec};
 use ragnarok_packets::EntityId;
 
 use super::elements::DialogElement;
 use super::windows::DialogWindow;
+use crate::loaders::FontLoader;
 
 #[derive(new)]
 struct DialogHandle {
@@ -18,7 +22,7 @@ pub struct DialogSystem {
 
 impl DialogSystem {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn open_dialog_window(&mut self, text: String, npc_id: EntityId) -> Option<DialogWindow> {
+    pub fn open_dialog_window(&mut self, font_loader: Rc<RefCell<FontLoader>>, text: String, npc_id: EntityId) -> Option<DialogWindow> {
         if let Some(dialog_handle) = &mut self.dialog_handle {
             dialog_handle.elements.mutate(|elements| {
                 if dialog_handle.clear {
@@ -31,7 +35,7 @@ impl DialogSystem {
 
             None
         } else {
-            let (window, elements) = DialogWindow::new(text, npc_id);
+            let (window, elements) = DialogWindow::new(font_loader, text, npc_id);
             self.dialog_handle = Some(DialogHandle::new(elements, false));
 
             Some(window)

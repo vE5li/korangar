@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use derive_new::new;
 use korangar_interface::elements::ElementWrap;
 use korangar_interface::size_bound;
@@ -10,9 +13,11 @@ use crate::interface::elements::CharacterPreview;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
+use crate::loaders::FontLoader;
 
 #[derive(new)]
 pub struct CharacterSelectionWindow {
+    font_loader: Rc<RefCell<FontLoader>>,
     characters: PlainRemote<Vec<CharacterInformation>>,
     move_request: PlainRemote<Option<usize>>,
     slot_count: usize,
@@ -34,7 +39,15 @@ impl PrototypeWindow<InterfaceSettings> for CharacterSelectionWindow {
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let elements = (0..self.slot_count)
-            .map(|slot| CharacterPreview::new(self.characters.clone(), self.move_request.clone(), slot).wrap())
+            .map(|slot| {
+                CharacterPreview::new(
+                    self.font_loader.clone(),
+                    self.characters.clone(),
+                    self.move_request.clone(),
+                    slot,
+                )
+                .wrap()
+            })
             .collect();
 
         WindowBuilder::new()

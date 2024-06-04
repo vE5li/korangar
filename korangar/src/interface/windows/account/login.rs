@@ -1,4 +1,6 @@
+use std::cell::RefCell;
 use std::ops::Not;
+use std::rc::Rc;
 
 use derive_new::new;
 use korangar_interface::elements::{
@@ -15,10 +17,11 @@ use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
 use crate::loaders::client::LoginSettings;
-use crate::loaders::ClientInfo;
+use crate::loaders::{ClientInfo, FontLoader};
 
 #[derive(new)]
 pub struct LoginWindow<'a> {
+    font_loader: Rc<RefCell<FontLoader>>,
     client_info: &'a ClientInfo,
 }
 
@@ -176,13 +179,13 @@ impl<'a> PrototypeWindow<InterfaceSettings> for LoginWindow<'a> {
         };
 
         let elements = vec![
-            Text::default().with_text("Select service").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Select service").wrap(),
             PickList::default()
                 .with_options(options)
                 .with_selected(selected_service)
                 .with_event(service_changed)
                 .wrap(),
-            Text::default().with_text("Account data").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Account data").wrap(),
             InputFieldBuilder::new()
                 .with_state(username)
                 .with_ghost_text("Username")

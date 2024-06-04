@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use derive_new::new;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, Text};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
@@ -8,9 +11,11 @@ use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::loaders::FontLoader;
 
 #[derive(new)]
 pub struct FriendRequestWindow {
+    font_loader: Rc<RefCell<FontLoader>>,
     friend: Friend,
 }
 
@@ -26,7 +31,7 @@ impl PrototypeWindow<InterfaceSettings> for FriendRequestWindow {
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let elements = vec![
-            Text::default()
+            Text::new(self.font_loader.clone())
                 .with_text(format!("^ffaa00{}^000000 wants to be friends with you", self.friend.name))
                 .wrap(),
             ButtonBuilder::new()

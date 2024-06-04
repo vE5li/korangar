@@ -107,6 +107,28 @@ struct GlyphData {
     color: Color,
 }
 
+// fn new_layout_paragraph() {
+//     let mut glyphs = Vec::new();
+//     let mut caret = point(0.0, v_metrics.ascent);
+//     let mut off = 0;
+//
+//     let advance_height = v_metrics.ascent - v_metrics.descent +
+// v_metrics.line_gap;
+//
+//     while !chars.is_empty() {
+//         match layout_word(&chars[off..]) {
+//             Some((glyph, length)) => {
+//                 glyphs.push(glyph);
+//                 off += length;
+//                 // Advance caret.x
+//             },
+//             None => {
+//                 caret = point(0.0, caret.y + advance_height);
+//             },
+//         }
+//     }
+// }
+
 fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, default_color: Color) -> (Vec<GlyphData>, Vector2<f32>) {
     let mut result = Vec::new();
     let v_metrics = font.v_metrics(scale);

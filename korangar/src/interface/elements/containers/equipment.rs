@@ -70,11 +70,11 @@ impl EquipmentContainer {
                         _ => panic!("no display name for equip position"),
                     };
 
-                    let text = Text::default()
-                        .with_text(display_name.to_string())
-                        .with_foreground_color(|_| Color::monochrome_u8(200))
-                        .with_width(dimension_bound!(!))
-                        .wrap();
+                    // let text = Text::default()
+                    //     .with_text(display_name.to_string())
+                    //     .with_foreground_color(|_| Color::monochrome_u8(200))
+                    //     .with_width(dimension_bound!(!))
+                    //     .wrap();
 
                     let item = items
                         .iter()
@@ -94,7 +94,7 @@ impl EquipmentContainer {
                         ),
                     );
 
-                    Container::new(vec![item_box.wrap(), text]).wrap()
+                    Container::new(vec![item_box.wrap(), /* text */]).wrap()
                 })
                 .collect()
         };

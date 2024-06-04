@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use derive_new::new;
 use korangar_interface::elements::{ButtonBuilder, ElementWrap, InputFieldBuilder, Text};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
@@ -8,9 +12,12 @@ use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::loaders::FontLoader;
 
-#[derive(Default)]
-pub struct CommandsWindow;
+#[derive(new)]
+pub struct CommandsWindow {
+    font_loader: Rc<RefCell<FontLoader>>,
+}
 
 impl CommandsWindow {
     pub const WINDOW_CLASS: &'static str = "commands";
@@ -66,7 +73,7 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
         };
 
         let elements = vec![
-            Text::default().with_text("change job").wrap(),
+            Text::new(self.font_loader.clone()).with_text("change job").wrap(),
             InputFieldBuilder::new()
                 .with_state(input_text)
                 .with_ghost_text("Job name or job ID")
@@ -81,7 +88,7 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
                 .with_event(Box::new(change_action))
                 .build()
                 .wrap(),
-            Text::default().with_text("Base level").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Base level").wrap(),
             ButtonBuilder::new()
                 .with_text("+1")
                 .with_width_bound(dimension_bound!(25%))
@@ -106,7 +113,7 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
                 .with_event(UserEvent::SendMessage("@blvl 9999".to_string()))
                 .build()
                 .wrap(),
-            Text::default().with_text("Job level").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Job level").wrap(),
             ButtonBuilder::new()
                 .with_text("+1")
                 .with_width_bound(dimension_bound!(25%))
@@ -131,13 +138,13 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
                 .with_event(UserEvent::SendMessage("@jlvl 9999".to_string()))
                 .build()
                 .wrap(),
-            Text::default().with_text("Stats").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Stats").wrap(),
             ButtonBuilder::new()
                 .with_text("Set all stats to max")
                 .with_event(UserEvent::SendMessage("@allstats".to_string()))
                 .build()
                 .wrap(),
-            Text::default().with_text("Skills").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Skills").wrap(),
             ButtonBuilder::new()
                 .with_text("Unlock all skills")
                 .with_event(UserEvent::SendMessage("@allskill".to_string()))
@@ -148,7 +155,7 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
                 .with_event(UserEvent::SendMessage("@zeny 10000".to_string()))
                 .build()
                 .wrap(),
-            Text::default().with_text("Player state").wrap(),
+            Text::new(self.font_loader.clone()).with_text("Player state").wrap(),
             ButtonBuilder::new()
                 .with_text("Mount")
                 .with_event(UserEvent::SendMessage("@mount".to_string()))

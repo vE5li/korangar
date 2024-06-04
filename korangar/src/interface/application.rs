@@ -158,7 +158,7 @@ impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for Them
             .collect();
 
         let elements = vec![
-            Text::default().with_text(display).with_width(dimension_bound!(50%)).wrap(),
+            // Text::default().with_text(display).with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(themes)
                 .with_selected(state.clone())

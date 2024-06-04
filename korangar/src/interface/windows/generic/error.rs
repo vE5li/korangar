@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use derive_new::new;
 use korangar_interface::elements::{ElementWrap, Text};
 use korangar_interface::size_bound;
@@ -8,9 +11,11 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
+use crate::loaders::FontLoader;
 
 #[derive(new)]
 pub struct ErrorWindow {
+    font_loader: Rc<RefCell<FontLoader>>,
     message: String,
 }
 
@@ -22,7 +27,7 @@ impl PrototypeWindow<InterfaceSettings> for ErrorWindow {
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let elements = vec![
-            Text::default()
+            Text::new(self.font_loader.clone())
                 .with_text(self.message.clone())
                 .with_foreground_color(|_| Color::rgb_u8(220, 100, 100))
                 .wrap(),

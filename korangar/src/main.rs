@@ -401,7 +401,11 @@ fn main() {
     let mut saved_username = String::new();
     let mut saved_slot_count = 0;
 
-    interface.open_window(&application, &mut focus_state, &LoginWindow::new(&client_info));
+    interface.open_window(
+        &application,
+        &mut focus_state,
+        &LoginWindow::new(font_loader.clone(), &client_info),
+    );
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -557,7 +561,7 @@ fn main() {
                         }
                         NetworkEvent::LoginServerConnectionFailed { message, .. } => {
                             networking_system.disconnect_from_login_server();
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(font_loader.clone(), message.to_owned()));
                         }
                         NetworkEvent::LoginServerDisconnected { reason } => {
                             if reason != DisconnectReason::ClosedByClient {
@@ -575,7 +579,7 @@ fn main() {
                         },
                         NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
                             networking_system.disconnect_from_character_server();
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(font_loader.clone(), message.to_owned()));
                         },
                         NetworkEvent::CharacterServerDisconnected { reason } => {
                             if reason != DisconnectReason::ClosedByClient {
@@ -615,7 +619,7 @@ fn main() {
 
                             interface.close_all_windows_except(&mut focus_state);
 
-                            let character_selection_window = CharacterSelectionWindow::new(saved_characters.new_remote(), move_request.new_remote(), saved_slot_count);
+                            let character_selection_window = CharacterSelectionWindow::new(font_loader.clone(), saved_characters.new_remote(), move_request.new_remote(), saved_slot_count);
                             interface.open_window(&application, &mut focus_state, &character_selection_window);
 
                             start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
@@ -625,7 +629,7 @@ fn main() {
                         NetworkEvent::AccountId(..) => {},
                         NetworkEvent::CharacterList { characters } => {
                             saved_characters.set(characters);
-                            let character_selection_window = CharacterSelectionWindow::new(saved_characters.new_remote(), move_request.new_remote(), saved_slot_count);
+                            let character_selection_window = CharacterSelectionWindow::new(font_loader.clone(), saved_characters.new_remote(), move_request.new_remote(), saved_slot_count);
 
                             // TODO: this will do one unnecessary restore_focus. check if
                             // that will be problematic
@@ -633,7 +637,7 @@ fn main() {
                             interface.open_window(&application, &mut focus_state, &character_selection_window);
                         }
                         NetworkEvent::CharacterSelectionFailed { message, .. } => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()))
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(font_loader.clone(), message.to_owned()))
                         }
                         NetworkEvent::CharacterDeleted => {
                             let character_id = currently_deleting.take().unwrap();
@@ -642,7 +646,7 @@ fn main() {
                         },
                         NetworkEvent::CharacterDeletionFailed { message, .. } => {
                             currently_deleting = None;
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()))
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(font_loader.clone(), message.to_owned()))
                         }
                         NetworkEvent::CharacterSelected { login_data, map_name } => {
                             let saved_login_data = saved_login_data.as_ref().unwrap();
@@ -711,11 +715,11 @@ fn main() {
                             interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS);
                         },
                         NetworkEvent::CharacterCreationFailed { message, .. } => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(font_loader.clone(), message.to_owned()));
                         },
                         NetworkEvent::CharacterSlotSwitched => {},
                         NetworkEvent::CharacterSlotSwitchFailed => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new("Failed to switch character slots".to_owned()));
+                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(font_loader.clone(), "Failed to switch character slots".to_owned()));
                         },
                         NetworkEvent::AddEntity(entity_appeared_data) => {
                             // Sometimes (like after a job change) the server will tell the client
@@ -761,6 +765,10 @@ fn main() {
                         }
                         NetworkEvent::ChangeMap(map_name, player_position) => {
                             entities.truncate(1);
+
+                            // Put the dialog system in a well-defined state.
+                            dialog_system.close_dialog();
+                            interface.close_window_with_class(&mut focus_state, DialogWindow::WINDOW_CLASS);
 
                             map = map_loader
                                 .get(
@@ -833,7 +841,7 @@ fn main() {
                             player.update_status(status_type);
                         }
                         NetworkEvent::OpenDialog(text, npc_id) => {
-                            if let Some(dialog_window) = dialog_system.open_dialog_window(text, npc_id) {
+                            if let Some(dialog_window) = dialog_system.open_dialog_window(font_loader.clone(), text, npc_id) {
                                 interface.open_window(&application, &mut focus_state, &dialog_window);
                             }
                         }
@@ -886,7 +894,7 @@ fn main() {
                             networking_system.disconnect_from_map_server();
                         }
                         NetworkEvent::FriendRequest { requestee } => {
-                            interface.open_window(&application, &mut focus_state, &FriendRequestWindow::new(requestee))
+                            interface.open_window(&application, &mut focus_state, &FriendRequestWindow::new(font_loader.clone(), requestee))
                         }
                         NetworkEvent::FriendRemoved { account_id, character_id } => {
                             friend_list.retain(|(friend, _)| !(friend.account_id == account_id && friend.character_id == character_id));
@@ -1137,7 +1145,7 @@ fn main() {
                         UserEvent::OpenGraphicsSettingsWindow => interface.open_window(
                             &application,
                             &mut focus_state,
-                            &GraphicsSettingsWindow::new(present_mode_info, shadow_detail.clone_state(), framerate_limit.clone_state()),
+                            &GraphicsSettingsWindow::new(font_loader.clone(), present_mode_info, shadow_detail.clone_state(), framerate_limit.clone_state()),
                         ),
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&application, &mut focus_state, &AudioSettingsWindow),
                         UserEvent::OpenFriendsWindow => {
@@ -1333,7 +1341,7 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&application, &mut focus_state, &MapsWindow),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenCommandsWindow => interface.open_window(&application, &mut focus_state, &CommandsWindow),
+                        UserEvent::OpenCommandsWindow => interface.open_window(&application, &mut focus_state, &CommandsWindow::new(font_loader.clone())),
                         #[cfg(feature = "debug")]
                         UserEvent::OpenTimeWindow => interface.open_window(&application, &mut focus_state, &TimeWindow),
                         #[cfg(feature = "debug")]

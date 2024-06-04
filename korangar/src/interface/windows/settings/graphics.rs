@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use korangar_interface::elements::{ElementWrap, PickList, PrototypeElement, StateButtonBuilder, Text};
 use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
@@ -7,12 +10,14 @@ use crate::graphics::{PresentModeInfo, ShadowDetail};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::loaders::FontLoader;
 
 pub struct GraphicsSettingsWindow<Shadow, Framerate>
 where
     Shadow: TrackedState<ShadowDetail> + 'static,
     Framerate: TrackedStateBinary<bool>,
 {
+    font_loader: Rc<RefCell<FontLoader>>,
     present_mode_info: PresentModeInfo,
     shadow_detail: Shadow,
     framerate_limit: Framerate,
@@ -25,8 +30,14 @@ where
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
-    pub fn new(present_mode_info: PresentModeInfo, shadow_detail: Shadow, framerate_limit: Framerate) -> Self {
+    pub fn new(
+        font_loader: Rc<RefCell<FontLoader>>,
+        present_mode_info: PresentModeInfo,
+        shadow_detail: Shadow,
+        framerate_limit: Framerate,
+    ) -> Self {
         Self {
+            font_loader,
             present_mode_info,
             shadow_detail,
             framerate_limit,
@@ -50,7 +61,10 @@ where
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let mut elements = vec![
-            Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
+            Text::new(self.font_loader.clone())
+                .with_text("Shadow detail")
+                .with_width(dimension_bound!(50%))
+                .wrap(),
             PickList::default()
                 .with_options(vec![
                     ("Low", ShadowDetail::Low),

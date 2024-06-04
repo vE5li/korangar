@@ -1,4 +1,6 @@
-use crate::application::{Application, FontSizeTrait, InterfaceRenderer, PositionTraitExt};
+use crate::application::{
+    Application, FontLoaderTrait, FontSizeTraitExt, InterfaceRenderer, PartialSizeTrait, PositionTraitExt, ScalingTrait, SizeTrait,
+};
 use crate::elements::{Element, ElementState};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver};
 use crate::theme::{ButtonTheme, InterfaceTheme};
@@ -11,26 +13,11 @@ where
     T: AsRef<str> + 'static,
 {
     text: Option<T>,
+    font_loader: App::FontLoader,
     foreground_color: Option<ColorSelector<App>>,
     width_bound: Option<DimensionBound>,
     font_size: Option<FontSizeSelector<App>>,
     state: ElementState<App>,
-}
-
-impl<App, T> Default for Text<App, T>
-where
-    App: Application,
-    T: AsRef<str> + 'static,
-{
-    fn default() -> Self {
-        Self {
-            text: Default::default(),
-            foreground_color: Default::default(),
-            width_bound: Default::default(),
-            font_size: Default::default(),
-            state: Default::default(),
-        }
-    }
 }
 
 impl<App, T> Text<App, T>
@@ -38,6 +25,17 @@ where
     App: Application,
     T: AsRef<str> + 'static,
 {
+    pub fn new(font_loader: App::FontLoader) -> Self {
+        Self {
+            text: Default::default(),
+            font_loader,
+            foreground_color: Default::default(),
+            width_bound: Default::default(),
+            font_size: Default::default(),
+            state: Default::default(),
+        }
+    }
+
     pub fn with_text(mut self, text: T) -> Self {
         self.text = Some(text);
         self
@@ -79,9 +77,24 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
+    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, application: &App, theme: &App::Theme) {
+        // Not sure why but 0.0 cuts off the lower part of the text, so add some
+        // padding.
+        let padding = 3.0 * application.get_scaling().get_factor();
+
+        let height = padding
+            + self
+                .font_loader
+                .get_text_dimensions(
+                    self.text.as_ref().unwrap().as_ref(),
+                    self.get_font_size(theme).scaled(application.get_scaling()),
+                    placement_resolver.get_available().width(),
+                )
+                .height()
+                / application.get_scaling().get_factor();
+
         let height_bound = DimensionBound {
-            size: Dimension::Absolute(self.get_font_size(theme).get_value()),
+            size: Dimension::Absolute(height),
             minimum_size: None,
             maximum_size: None,
         };

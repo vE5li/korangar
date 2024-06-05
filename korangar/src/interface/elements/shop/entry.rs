@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use korangar_interface::elements::{
-    ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, Headline, WeakElementCell,
+    ButtonBuilder, ContainerState, Element, ElementCell, ElementRenderer, ElementState, ElementWrap, Focus, Headline, WeakElementCell,
 };
 use korangar_interface::event::HoverInformation;
-use korangar_interface::layout::PlacementResolver;
+use korangar_interface::layout::{PlacementResolver, SizeBound};
 use korangar_interface::state::PlainTrackedState;
 use korangar_interface::{dimension_bound, size_bound};
 use num::NumCast;
@@ -185,7 +185,6 @@ impl Element<InterfaceSettings> for ShopEntry {
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
         match mouse_mode {
-            MouseInputMode::MoveItem(..) => self.state.state.hovered_element(mouse_position),
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
             _ => HoverInformation::Missed,
         }

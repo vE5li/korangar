@@ -2832,8 +2832,8 @@ pub enum BuyItemResult {
 #[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct BuyItemInformation {
-    amount: u16,
-    item_id: u16,
+    pub amount: u16,
+    pub item_id: u16,
 }
 
 #[derive(Debug, Clone, Packet, ClientPacket, MapServer)]

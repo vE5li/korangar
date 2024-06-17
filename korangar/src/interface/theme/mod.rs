@@ -203,6 +203,8 @@ pub struct WindowTheme {
     pub gaps: MutableRange<ScreenSize, Resolve>,
     pub font_size: MutableRange<FontSize, Render>,
     pub title_height: DimensionBound,
+    pub anchor_color: Mutable<Color, Nothing>,
+    pub closest_anchor_color: Mutable<Color, Nothing>,
 }
 
 impl ThemeDefault<DefaultMenu> for WindowTheme {
@@ -230,6 +232,8 @@ impl ThemeDefault<DefaultMenu> for WindowTheme {
             ),
             font_size: MutableRange::new(FontSize::new(20.0), FontSize::new(6.0), FontSize::new(30.0)),
             title_height: dimension_bound!(30),
+            anchor_color: Mutable::new(Color::rgba_u8(60, 60, 150, 255)),
+            closest_anchor_color: Mutable::new(Color::rgba_u8(190, 125, 255, 255)),
         }
     }
 }
@@ -259,6 +263,8 @@ impl ThemeDefault<DefaultMain> for WindowTheme {
             ),
             font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
             title_height: dimension_bound!(12),
+            anchor_color: Mutable::new(Color::rgba_u8(150, 100, 100, 255)),
+            closest_anchor_color: Mutable::new(Color::rgba_u8(255, 180, 0, 255)),
         }
     }
 }
@@ -302,6 +308,14 @@ impl korangar_interface::theme::WindowTheme<InterfaceSettings> for WindowTheme {
 
     fn title_height(&self) -> korangar_interface::layout::DimensionBound {
         self.title_height
+    }
+
+    fn anchor_color(&self) -> Color {
+        self.anchor_color.get()
+    }
+
+    fn closest_anchor_color(&self) -> Color {
+        self.closest_anchor_color.get()
     }
 }
 

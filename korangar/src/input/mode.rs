@@ -60,4 +60,8 @@ impl MouseInputModeTrait<InterfaceSettings> for MouseInputMode {
     fn is_self_dragged(&self, element: &dyn Element<InterfaceSettings>) -> bool {
         matches!(self, Self::DragElement(dragged_element) if std::ptr::eq((&*dragged_element.0.borrow()) as *const _ as *const (), element as *const _ as *const ()))
     }
+
+    fn is_moving_window(&self, window_index: usize) -> bool {
+        matches!(self, Self::MoveInterface(index) if *index == window_index)
+    }
 }

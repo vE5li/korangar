@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::ClientTick;
 
 use super::application::InterfaceSettings;
@@ -98,7 +99,7 @@ impl MouseCursor {
                     texture,
                     mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
                     ScreenSize::uniform(30.0 * application.get_scaling_factor()),
-                    ScreenClip::default(),
+                    ScreenClip::unbound(),
                     Color::monochrome_u8(255),
                     false,
                 ),

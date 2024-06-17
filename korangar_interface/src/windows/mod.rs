@@ -1,8 +1,10 @@
+mod anchor;
 mod builder;
 mod prototype;
 
 use std::rc::Rc;
 
+pub use self::anchor::{Anchor, AnchorPoint};
 pub use self::builder::WindowBuilder;
 pub use self::prototype::PrototypeWindow;
 use crate::application::{Application, ClipTrait, ColorTrait, InterfaceRenderer, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
@@ -17,6 +19,7 @@ where
     App: Application,
 {
     window_class: Option<String>,
+    anchor: Anchor<App>,
     position: App::Position,
     size_bound: SizeBound,
     size: App::Size,
@@ -60,7 +63,7 @@ where
         application: &App,
         theme: &App::Theme,
         available_space: App::Size,
-    ) -> (Option<&str>, App::Position, App::Size) {
+    ) -> App::Size {
         let mut placement_resolver = PlacementResolver::new(
             font_loader.clone(),
             available_space,
@@ -117,7 +120,7 @@ where
             popup.borrow_mut().resolve(&mut placement_resolver, application, theme);
         };
 
-        (self.window_class.as_deref(), self.position, self.size)
+        self.size
     }
 
     pub fn update(&mut self) -> Option<ChangeEvent> {
@@ -171,6 +174,10 @@ where
         HoverInformation::Missed
     }
 
+    pub fn get_layout(&self) -> (Anchor<App>, App::Size) {
+        (self.anchor.clone(), self.size)
+    }
+
     pub fn get_area(&self) -> (App::Position, App::Size) {
         (self.position, self.size)
     }
@@ -185,15 +192,19 @@ where
             && self.position.top() < area_combined.top()
     }
 
-    pub fn offset(&mut self, available_space: App::Size, offset: App::Position) -> Option<(&str, App::Position)> {
+    pub fn offset(&mut self, available_space: App::Size, offset: App::Position) -> Option<(&str, Anchor<App>)> {
         self.position = self.position.combined(offset);
+        self.anchor.update(available_space, self.position, self.size);
+
         self.validate_position(available_space);
+
         self.window_class
             .as_ref()
-            .map(|window_class| (window_class.as_str(), self.position))
+            .map(|window_class| (window_class.as_str(), self.anchor.clone()))
     }
 
     fn validate_position(&mut self, available_space: App::Size) {
+        self.position = self.anchor.current_position(available_space, self.size);
         self.position = self.size_bound.validated_position(self.position, self.size, available_space);
     }
 
@@ -278,6 +289,18 @@ where
                 false,
             );
         };
+    }
+
+    pub fn render_anchors(
+        &self,
+        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        renderer: &App::Renderer,
+        theme: &App::Theme,
+        available_space: App::Size,
+    ) {
+        self.anchor
+            .render_window_anchors(render_target, renderer, theme, self.position, self.size);
+        self.anchor.render_screen_anchors(render_target, renderer, theme, available_space);
     }
 }
 

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
+use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 
@@ -182,7 +183,7 @@ impl QuestIcon {
             self.texture.clone(),
             final_position - ScreenSize::uniform(15.0),
             ScreenSize::uniform(30.0),
-            ScreenClip::default(),
+            ScreenClip::unbound(),
             self.color,
             true,
         );

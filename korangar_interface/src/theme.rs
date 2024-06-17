@@ -35,6 +35,8 @@ where
     fn gaps(&self) -> App::Size;
     fn font_size(&self) -> App::FontSize;
     fn title_height(&self) -> DimensionBound;
+    fn anchor_color(&self) -> App::Color;
+    fn closest_anchor_color(&self) -> App::Color;
 }
 
 pub trait ExpandableTheme<App>

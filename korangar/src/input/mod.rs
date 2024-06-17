@@ -190,6 +190,7 @@ impl InputSystem {
             && condition
         {
             *window_index = interface.move_window_to_top(*window_index);
+            focus_state.set_focused_window(*window_index);
             self.mouse_input_mode = MouseInputMode::ClickInterface;
 
             if let Some(hovered_element) = &hovered_element {
@@ -253,6 +254,9 @@ impl InputSystem {
 
         if self.left_mouse_button.released() {
             if let MouseInputMode::MoveInterface(identifier) = self.mouse_input_mode {
+                // We want to re-render to get rid of the anchor overlays.
+                interface.schedule_render();
+
                 match self.right_mouse_button.down() && !self.right_mouse_button.released() {
                     true => self.mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
                     false => self.mouse_input_mode = MouseInputMode::None,

@@ -2,6 +2,7 @@ use std::rc::{Rc, Weak};
 
 use crate::elements::{Element, ElementCell, WeakElementCell};
 use crate::theme::InterfaceTheme;
+use crate::windows::Anchor;
 
 pub trait Application: Sized + 'static {
     type ThemeKind: Default;
@@ -34,6 +35,8 @@ where
     fn is_none(&self) -> bool;
 
     fn is_self_dragged(&self, element: &dyn Element<App>) -> bool;
+
+    fn is_moving_window(&self, window_index: usize) -> bool;
 }
 
 pub trait FontSizeTrait: Copy {
@@ -119,7 +122,7 @@ pub trait ColorTrait: Clone {
     fn is_transparent(&self) -> bool;
 }
 
-pub trait CornerRadiusTrait {
+pub trait CornerRadiusTrait: Clone {
     fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
 
     fn top_left(&self) -> f32;
@@ -190,6 +193,8 @@ pub trait PositionTraitExt {
 
     fn scaled(&self, scaling: impl ScalingTrait) -> Self;
 
+    fn halved(&self) -> Self;
+
     fn is_equal(&self, rhs: Self) -> bool;
 }
 
@@ -238,6 +243,10 @@ where
         Self::new(self.left() * factor, self.top() * factor)
     }
 
+    fn halved(&self) -> Self {
+        Self::new(self.left() / 2.0, self.top() / 2.0)
+    }
+
     fn is_equal(&self, rhs: Self) -> bool {
         self.left() == rhs.left() && self.top() == rhs.top()
     }
@@ -255,6 +264,8 @@ pub trait SizeTraitExt {
     fn only_width(width: f32) -> Self;
 
     fn only_height(height: f32) -> Self;
+
+    fn uniform(value: f32) -> Self;
 
     fn grow(&self, growth: Self) -> Self;
 
@@ -283,6 +294,10 @@ where
 
     fn only_height(height: f32) -> Self {
         Self::new(0.0, height)
+    }
+
+    fn uniform(value: f32) -> Self {
+        Self::new(value, value)
     }
 
     fn grow(&self, size: Self) -> Self {
@@ -360,19 +375,32 @@ pub trait ClipTrait: Copy {
     fn bottom(&self) -> f32;
 }
 
+pub trait ClipTraitExt {
+    fn unbound() -> Self;
+}
+
+impl<T> ClipTraitExt for T
+where
+    T: ClipTrait,
+{
+    fn unbound() -> Self {
+        Self::new(0.0, 0.0, f32::MAX, f32::MAX)
+    }
+}
+
 pub trait WindowCache<App>
 where
     App: Application,
 {
     fn create() -> Self;
 
-    fn register_window(&mut self, window_class: &str, position: App::Position, size: App::Size);
+    fn register_window(&mut self, window_class: &str, anchor: Anchor<App>, size: App::Size);
 
-    fn update_position(&mut self, window_class: &str, position: App::Position);
+    fn update_anchor(&mut self, window_class: &str, anchor: Anchor<App>);
 
     fn update_size(&mut self, window_class: &str, size: App::Size);
 
-    fn get_window_state(&self, window_class: &str) -> Option<(App::Position, App::Size)>;
+    fn get_window_state(&self, window_class: &str) -> Option<(Anchor<App>, App::Size)>;
 }
 
 pub struct FocusState<App>

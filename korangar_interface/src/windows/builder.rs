@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use super::Window;
-use crate::application::{Application, PartialSizeTraitExt, PositionTraitExt, SizeTraitExt, WindowCache};
+use super::{Anchor, Window};
+use crate::application::{Application, PartialSizeTraitExt, WindowCache};
 use crate::builder::{Set, Unset};
 use crate::elements::{CloseButtonBuilder, Container, DragButtonBuilder, ElementCell, ElementWrap};
 use crate::layout::{Dimension, DimensionBound, SizeBound};
@@ -236,11 +236,12 @@ where
             element.borrow_mut().link_back(weak_element, None);
         });
 
-        let (cached_position, cached_size) = class
+        let (cached_anchor, cached_size) = class
             .as_ref()
             .and_then(|window_class| window_cache.get_window_state(window_class))
             .unzip();
 
+        let anchor = cached_anchor.unwrap_or(Anchor::default());
         let size = cached_size
             .map(|size| size_bound.validated_window_size(size, available_space, application.get_scaling()))
             .unwrap_or_else(|| {
@@ -249,12 +250,11 @@ where
                     .finalize_or(0.0)
             });
 
-        let position = cached_position
-            .map(|position| size_bound.validated_position(position, size, available_space))
-            .unwrap_or(App::Position::from_size(available_space.shrink(size).halved()));
+        let position = anchor.current_position(available_space, size);
 
         Window {
             window_class: class,
+            anchor,
             position,
             size_bound,
             size,

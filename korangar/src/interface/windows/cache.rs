@@ -3,15 +3,16 @@ use std::collections::HashMap;
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
+use korangar_interface::windows::Anchor;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 use crate::interface::application::InterfaceSettings;
-use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::interface::layout::ScreenSize;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct WindowState {
-    pub position: ScreenPosition,
+    pub anchor: Anchor<InterfaceSettings>,
     pub size: ScreenSize,
 }
 
@@ -55,19 +56,19 @@ impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowC
         })
     }
 
-    fn register_window(&mut self, identifier: &str, position: ScreenPosition, size: ScreenSize) {
+    fn register_window(&mut self, identifier: &str, anchor: Anchor<InterfaceSettings>, size: ScreenSize) {
         if let Some(entry) = self.entries.get_mut(identifier) {
-            entry.position = position;
+            entry.anchor = anchor;
             entry.size = size;
         } else {
-            let entry = WindowState::new(position, size);
+            let entry = WindowState::new(anchor, size);
             self.entries.insert(identifier.to_string(), entry);
         }
     }
 
-    fn update_position(&mut self, identifier: &str, position: ScreenPosition) {
+    fn update_anchor(&mut self, identifier: &str, anchor: Anchor<InterfaceSettings>) {
         if let Some(entry) = self.entries.get_mut(identifier) {
-            entry.position = position;
+            entry.anchor = anchor;
         }
     }
 
@@ -77,8 +78,8 @@ impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowC
         }
     }
 
-    fn get_window_state(&self, identifier: &str) -> Option<(ScreenPosition, ScreenSize)> {
-        self.entries.get(identifier).map(|entry| (entry.position, entry.size))
+    fn get_window_state(&self, identifier: &str) -> Option<(Anchor<InterfaceSettings>, ScreenSize)> {
+        self.entries.get(identifier).map(|entry| (entry.anchor.clone(), entry.size))
     }
 }
 

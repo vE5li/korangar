@@ -29,6 +29,8 @@ use korangar_debug::profile_block;
 use option_ext::OptionExt;
 use windows::{PrototypeWindow, Window};
 
+use crate::application::MouseInputModeTrait;
+
 // TODO: move this
 pub type Selector = Box<dyn Fn() -> bool>;
 #[allow(type_alias_bounds)]
@@ -193,17 +195,13 @@ where
                 let kind = window.get_theme_kind();
                 let theme = application.get_theme(kind);
 
-                let (window_class, new_position, new_size) = window.resolve(font_loader.clone(), application, theme, self.available_space);
+                let new_size = window.resolve(font_loader.clone(), application, theme, self.available_space);
 
                 // should only ever be the last window
                 if let Some(focused_index) = focus_state.focused_window()
                     && focused_index == window_index
                 {
                     restore_focus = true;
-                }
-
-                if let Some(window_class) = window_class {
-                    self.window_cache.register_window(window_class, new_position, new_size);
                 }
 
                 // If the window got smaller, we need to re-render the entire interface.
@@ -334,8 +332,8 @@ where
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn move_window(&mut self, window_index: usize, offset: App::Position) {
-        if let Some((window_class, position)) = self.windows[window_index].0.offset(self.available_space, offset) {
-            self.window_cache.update_position(window_class, position);
+        if let Some((window_class, anchor)) = self.windows[window_index].0.offset(self.available_space, offset) {
+            self.window_cache.update_anchor(window_class, anchor);
         }
 
         self.post_update.render();
@@ -404,7 +402,7 @@ where
         let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
         let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
 
-        for (window, post_update) in &mut self.windows {
+        for (index, (window, post_update)) in self.windows.iter_mut().enumerate() {
             if post_update.take_render() || self.post_update.needs_render() {
                 #[cfg(feature = "debug")]
                 profile_block!("render window");
@@ -421,6 +419,10 @@ where
                     focused_element,
                     mouse_mode,
                 );
+
+                if mouse_mode.is_moving_window(index) {
+                    window.render_anchors(render_target, renderer, theme, self.available_space);
+                }
             }
         }
 
@@ -441,6 +443,11 @@ where
     }
 
     fn open_new_window(&mut self, focus_state: &mut FocusState<App>, window: Window<App>) {
+        if let Some(window_class) = window.get_window_class() {
+            let (anchor, size) = window.get_layout();
+            self.window_cache.register_window(window_class, anchor, size);
+        }
+
         self.windows.push((window, PostUpdate::new().with_resolve()));
         focus_state.set_focused_window(self.windows.len() - 1);
     }

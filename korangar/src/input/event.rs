@@ -84,6 +84,7 @@ pub enum UserEvent {
     SellItems {
         items: Vec<SoldItemInformation>,
     },
+    FocusChatWindow,
     #[cfg(feature = "debug")]
     OpenMarkerDetails(MarkerIdentifier),
     #[cfg(feature = "debug")]

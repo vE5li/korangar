@@ -88,12 +88,12 @@ where
         vec![ClickAction::FocusElement]
     }
 
-    fn input_character(&mut self, character: char) -> Vec<ClickAction<App>> {
-        match character {
+    fn input_character(&mut self, character: char) -> (bool, Vec<ClickAction<App>>) {
+        (true, match character {
             '\u{8}' | '\u{7f}' => self.remove_character(),
             '\r' => (self.enter_action)(),
             character => self.add_character(character),
-        }
+        })
     }
 
     fn render(

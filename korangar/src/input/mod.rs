@@ -345,12 +345,14 @@ impl InputSystem {
         }
 
         let characters = self.input_buffer.drain(..).collect::<Vec<_>>();
+        let mut process_keys = true;
 
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
             // this will currently not affect the following statements, which is a bit
             // strange
             if self.get_key(VirtualKeyCode::Escape).pressed() {
                 focus_state.remove_focus();
+                process_keys = false;
             }
 
             if self.get_key(VirtualKeyCode::Tab).pressed() {
@@ -359,6 +361,7 @@ impl InputSystem {
                     .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
 
                 focus_state.update_focused_element(new_focused_element, *focused_window);
+                process_keys = false;
             }
 
             if self.get_key(VirtualKeyCode::Return).pressed() {
@@ -375,14 +378,22 @@ impl InputSystem {
                         _ => {}
                     }
                 }
+
+                process_keys = false;
             }
         }
 
-        if self.close_window_hotkey_pressed() && focus_state.focused_window().is_some() {
+        if self.get_key(VirtualKeyCode::LControl).down()
+            && self.get_key(VirtualKeyCode::Q).pressed()
+            && focus_state.focused_window().is_some()
+        {
             let window_index = focus_state.get_focused_window().unwrap();
+
             if interface.get_window(window_index).is_closable() {
                 interface.close_window(focus_state, window_index);
             }
+
+            process_keys = false;
         }
 
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
@@ -392,7 +403,11 @@ impl InputSystem {
                     '\t' => {}
                     '\x1b' => {}
                     valid => {
-                        let actions = interface.input_character_element(focused_element, *focused_window, valid);
+                        let (key_handled, actions) = interface.input_character_element(focused_element, *focused_window, valid);
+
+                        if key_handled {
+                            process_keys = false;
+                        }
 
                         for action in actions {
                             match action {
@@ -433,7 +448,12 @@ impl InputSystem {
                     }
                 }
             }
-        } else {
+        }
+
+        if process_keys {
+            let alt_down = self.get_key(VirtualKeyCode::LAlt).down();
+            let control_down = self.get_key(VirtualKeyCode::LControl).down();
+
             if self.get_key(VirtualKeyCode::Tab).pressed() {
                 interface.first_focused_element(focus_state);
             }
@@ -442,11 +462,11 @@ impl InputSystem {
                 events.push(UserEvent::OpenMenuWindow);
             }
 
-            if self.get_key(VirtualKeyCode::I).pressed() {
+            if alt_down && self.get_key(VirtualKeyCode::E).pressed() {
                 events.push(UserEvent::OpenInventoryWindow);
             }
 
-            if self.get_key(VirtualKeyCode::H).pressed() && shift_down {
+            if control_down && self.get_key(VirtualKeyCode::H).pressed() {
                 events.push(UserEvent::ToggleShowInterface);
             }
 
@@ -474,23 +494,27 @@ impl InputSystem {
                 events.push(UserEvent::StopSkill(HotbarSlot(2)));
             }
 
+            if self.get_key(VirtualKeyCode::Return).pressed() {
+                events.push(UserEvent::FocusChatWindow);
+            }
+
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::M).pressed() {
+            if control_down && self.get_key(VirtualKeyCode::M).pressed() {
                 events.push(UserEvent::OpenMapsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::R).pressed() {
+            if control_down && self.get_key(VirtualKeyCode::R).pressed() {
                 events.push(UserEvent::OpenRenderSettingsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::T).pressed() {
+            if control_down && self.get_key(VirtualKeyCode::T).pressed() {
                 events.push(UserEvent::OpenTimeWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::P).pressed() {
+            if control_down && self.get_key(VirtualKeyCode::P).pressed() {
                 events.push(UserEvent::OpenPacketWindow);
             }
 
@@ -626,9 +650,5 @@ impl InputSystem {
 
     pub fn get_mouse_mode(&self) -> &MouseInputMode {
         &self.mouse_input_mode
-    }
-
-    fn close_window_hotkey_pressed(&self) -> bool {
-        self.get_key(VirtualKeyCode::LControl).down() && self.get_key(VirtualKeyCode::Q).pressed()
     }
 }

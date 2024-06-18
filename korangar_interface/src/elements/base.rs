@@ -321,8 +321,8 @@ where
         None
     }
 
-    fn input_character(&mut self, _character: char) -> Vec<ClickAction<App>> {
-        Vec::new()
+    fn input_character(&mut self, _character: char) -> (bool, Vec<ClickAction<App>>) {
+        (false, Vec::new())
     }
 
     fn drop_resource(&mut self, drop_resource: App::DropResource) -> Option<App::DropResult> {

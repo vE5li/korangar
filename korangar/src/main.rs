@@ -1318,6 +1318,9 @@ fn main() {
                         UserEvent::SellItems { items } => {
                             let _ = networking_system.sell_items(items);
                         }
+                        UserEvent::FocusChatWindow => {
+                            interface.focus_window_with_class(&mut focus_state, ChatWindow::WINDOW_CLASS);
+                        },
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {
                             interface.open_window(&application, &mut focus_state, map.resolve_marker(&entities, marker_identifier))

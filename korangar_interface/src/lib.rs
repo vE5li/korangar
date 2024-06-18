@@ -316,18 +316,24 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn input_character_element(&mut self, element: &ElementCell<App>, window_index: usize, character: char) -> Vec<ClickAction<App>> {
+    pub fn input_character_element(
+        &mut self,
+        element: &ElementCell<App>,
+        window_index: usize,
+        character: char,
+    ) -> (bool, Vec<ClickAction<App>>) {
         let (_, post_update) = &mut self.windows[window_index];
         let mut propagated_actions = Vec::new();
 
-        for action in element.borrow_mut().input_character(character) {
+        let (key_handled, actions) = element.borrow_mut().input_character(character);
+        for action in actions {
             match action {
                 ClickAction::ChangeEvent(change_event) => Self::handle_change_event(&mut self.post_update, post_update, change_event),
                 other => propagated_actions.push(other),
             }
         }
 
-        propagated_actions
+        (key_handled, propagated_actions)
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -548,5 +554,18 @@ where
         let element = self.windows.last().unwrap().0.restore_focus();
 
         focus_state.set_focused_element(element, window_index);
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn focus_window_with_class(&self, focus_state: &mut FocusState<App>, window_class: &str) {
+        if let Some(index) = self
+            .windows
+            .iter()
+            .map(|(window, ..)| window.get_window_class())
+            .position(|class_option| class_option.contains(&window_class))
+        {
+            let element = self.windows[index].0.first_focused_element();
+            focus_state.set_focused_element(element, index);
+        }
     }
 }

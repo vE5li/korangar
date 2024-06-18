@@ -8,3 +8,9 @@ korangar/rdata.grf
 korangar/lua_files/
 korangar/lua_files.grf
 korangar/[Bb][Gg][Mm]/
+
+# Nix & direnv
+.direnv/
+
+# macos
+.DS_Store

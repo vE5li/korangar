@@ -7,3 +7,9 @@ korangar/data.grf
 korangar/rdata.grf
 korangar/lua_files/
 korangar/lua_files.grf
+
+# Nix & direnv
+.direnv/
+
+# macos
+.DS_Store

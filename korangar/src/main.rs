@@ -35,6 +35,7 @@ use std::sync::Arc;
 use cgmath::{Vector2, Vector3};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
+use input::MouseInputMode;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 #[cfg(feature = "debug")]
@@ -90,6 +91,24 @@ korangar_debug::create_profiler_threads!(threads, {
     Shadow,
     Deferred,
 });
+
+#[derive(rust_state::RustState)]
+struct GameState {
+    current_map: Arc<Map>,
+    shadow_detail: ShadowDetail,
+    framerate_limit: bool,
+    show_inderface: bool,
+    friend_list: Vec<(Friend, LinkedElement)>,
+    characters: Vec<CharacterInformation>,
+    shop_items: Vec<ShopItem<ResourceMetadata>>,
+    sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
+    currently_deleting: Option<CharacterId>,
+    move_request: Option<usize>,
+    main_theme: interface::theme::InterfaceTheme,
+    menu_theme: interface::theme::InterfaceTheme,
+    game_theme: interface::theme::GameTheme,
+    mouse_mode: MouseInputMode,
+}
 
 fn main() {
     const DEFAULT_MAP: &str = "geffen";

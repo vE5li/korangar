@@ -2,25 +2,27 @@ mod builder;
 
 use std::fmt::Display;
 
+use rust_state::{SafeUnwrap, Selector, Tracker};
+
 pub use self::builder::InputFieldBuilder;
 use crate::application::{
     Application, CornerRadiusTraitExt, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
 };
 use crate::elements::{Element, ElementState};
-use crate::event::{ChangeEvent, ClickAction, HoverInformation};
+use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{DimensionBound, PlacementResolver};
-use crate::state::{PlainTrackedState, TrackedState, ValueState};
-use crate::theme::{InputTheme, InterfaceTheme};
+use crate::theme::InputTheme;
 
 /// Local type alias to simplify the builder.
 type EnterAction<App> = Box<dyn FnMut() -> Vec<ClickAction<App>>>;
 
-pub struct InputField<App, Text>
+pub struct InputField<Data, App, Text>
 where
+    Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
-    input_state: PlainTrackedState<String>,
+    input_state: Data,
     ghost_text: Text,
     enter_action: EnterAction<App>,
     length: usize,
@@ -29,8 +31,9 @@ where
     state: ElementState<App>,
 }
 
-impl<App, Text> InputField<App, Text>
+/* impl<Data, App, Text> InputField<Data, App, Text>
 where
+    Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
@@ -57,10 +60,11 @@ where
             ValueState::Mutated(vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)])
         })
     }
-}
+} */
 
-impl<App, Text> Element<App> for InputField<App, Text>
+impl<Data, App, Text> Element<App> for InputField<Data, App, Text>
 where
+    Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
@@ -72,8 +76,10 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
-        let size_bound = self.width_bound.add_height(theme.input().height_bound());
+    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+        let height_bound = *state.get_safe(&InputTheme::height_bound(theme_selector));
+        let size_bound = self.width_bound.add_height(height_bound);
+
         self.state.resolve(placement_resolver, &size_bound);
     }
 
@@ -88,35 +94,35 @@ where
         vec![ClickAction::FocusElement]
     }
 
-    fn input_character(&mut self, character: char) -> (bool, Vec<ClickAction<App>>) {
+    /* fn input_character(&mut self, character: char) -> (bool, Vec<ClickAction<App>>) {
         (true, match character {
             '\u{8}' | '\u{7f}' => self.remove_character(),
             '\r' => (self.enter_action)(),
             character => self.add_character(character),
         })
-    }
+    } */
 
     fn render(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
-        let input_state = self.input_state.get();
+        let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
+        let focused_element = state.get_safe(&App::FocusedElementSelector::default());
+
+        let input_state = state.get_safe(&self.input_state);
         let is_hovererd = self.is_element_self(hovered_element);
         let is_focused = self.is_element_self(focused_element);
-        let text_offset = theme.input().text_offset();
+        let text_offset = *state.get_safe(&InputTheme::text_offset(theme_selector));
 
         let text = if input_state.is_empty() && !is_focused {
             self.ghost_text.to_string()
@@ -127,36 +133,48 @@ where
         };
 
         let background_color = if is_hovererd {
-            theme.input().hovered_background_color()
+            state.get_safe(&InputTheme::hovered_background_color(theme_selector))
         } else if is_focused {
-            theme.input().focused_background_color()
+            state.get_safe(&InputTheme::focused_background_color(theme_selector))
         } else {
-            theme.input().background_color()
+            state.get_safe(&InputTheme::background_color(theme_selector))
         };
 
         let text_color = if input_state.is_empty() && !is_focused {
-            theme.input().ghost_text_color()
+            state.get_safe(&InputTheme::ghost_text_color(theme_selector))
         } else if is_focused {
-            theme.input().focused_text_color()
+            state.get_safe(&InputTheme::focused_text_color(theme_selector))
         } else {
-            theme.input().text_color()
+            state.get_safe(&InputTheme::text_color(theme_selector))
         };
 
-        renderer.render_background(theme.input().corner_radius(), background_color);
-        renderer.render_text(&text, text_offset, text_color, theme.input().font_size());
+        renderer.render_background(*state.get_safe(&InputTheme::corner_radius(theme_selector)), *background_color);
+
+        renderer.render_text(
+            &text,
+            text_offset,
+            *text_color,
+            *state.get_safe(&InputTheme::font_size(theme_selector)),
+        );
 
         if is_focused {
-            let cursor_offset = (text_offset.left() + theme.input().cursor_offset()) * application.get_scaling().get_factor()
-                + renderer.get_text_dimensions(&text, theme.input().font_size(), f32::MAX).width();
+            let cursor_offset = (text_offset.left() + state.get_safe(&InputTheme::cursor_offset(theme_selector)))
+                * state.get_safe(&App::ScaleSelector::default()).get_factor()
+                + renderer
+                    .get_text_dimensions(&text, *state.get_safe(&InputTheme::font_size(theme_selector)), f32::MAX)
+                    .width();
 
             let cursor_position = App::Position::only_left(cursor_offset);
-            let cursor_size = App::Size::new(theme.input().cursor_width(), self.state.cached_size.height());
+            let cursor_size = App::Size::new(
+                *state.get_safe(&InputTheme::cursor_width(theme_selector)),
+                self.state.cached_size.height(),
+            );
 
             renderer.render_rectangle(
                 cursor_position,
                 cursor_size,
                 App::CornerRadius::zero(),
-                theme.input().text_color(),
+                *state.get_safe(&InputTheme::text_color(theme_selector)),
             );
         }
     }

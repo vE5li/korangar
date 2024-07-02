@@ -1,7 +1,9 @@
+use rust_state::Tracker;
+
 use crate::application::{Application, InterfaceRenderer};
 use crate::elements::{Element, ElementState};
 use crate::layout::{PlacementResolver, SizeBound};
-use crate::theme::{InterfaceTheme, LabelTheme};
+use crate::theme::LabelTheme;
 
 pub struct Headline<App>
 where
@@ -41,7 +43,7 @@ where
         false
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, _theme: &App::Theme) {
+    fn resolve(&mut self, _state: &Tracker<App>, _theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         self.state.resolve(placement_resolver, &self.size_bound);
     }
 
@@ -49,24 +51,21 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        _hovered_element: Option<&dyn Element<App>>,
-        _focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         renderer.render_text(
             &self.display,
-            theme.label().text_offset(),
-            theme.label().foreground_color(),
-            theme.label().font_size(),
+            *state.get_safe(&LabelTheme::text_offset(theme_selector)),
+            *state.get_safe(&LabelTheme::foreground_color(theme_selector)),
+            *state.get_safe(&LabelTheme::font_size(theme_selector)),
         );
     }
 }

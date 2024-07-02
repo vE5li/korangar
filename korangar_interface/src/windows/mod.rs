@@ -4,15 +4,17 @@ mod prototype;
 
 use std::rc::Rc;
 
+use rust_state::Tracker;
+
 pub use self::anchor::{Anchor, AnchorPoint};
 pub use self::builder::WindowBuilder;
 pub use self::prototype::PrototypeWindow;
 use crate::application::{Application, ClipTrait, ColorTrait, InterfaceRenderer, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
-use crate::elements::{Element, ElementCell, Focus};
+use crate::elements::{ElementCell, Focus};
 use crate::event::{ChangeEvent, HoverInformation};
 use crate::layout::{Dimension, PlacementResolver, SizeBound};
-use crate::theme::{InterfaceTheme, WindowTheme};
-use crate::{ColorSelector, Tracker};
+use crate::theme::WindowTheme;
+use crate::{ColorSelector, _Tracker};
 
 pub struct Window<App>
 where
@@ -24,7 +26,7 @@ where
     size_bound: SizeBound,
     size: App::Size,
     elements: Vec<ElementCell<App>>,
-    popup_element: Option<(ElementCell<App>, Tracker<App::Position>, Tracker<App::Size>)>,
+    popup_element: Option<(ElementCell<App>, _Tracker<App::Position>, _Tracker<App::Size>)>,
     closable: bool,
     background_color: Option<ColorSelector<App>>,
     theme_kind: App::ThemeKind,
@@ -38,15 +40,15 @@ where
         self.window_class.as_deref()
     }
 
-    fn get_background_color(&self, theme: &App::Theme) -> App::Color {
+    fn get_background_color(&self, state: &Tracker<App>, theme_selector: App::ThemeSelector) -> App::Color {
         self.background_color
             .as_ref()
-            .map(|closure| closure(theme))
-            .unwrap_or(theme.window().background_color())
+            .map(|closure| closure(state, theme_selector))
+            .unwrap_or(*state.get_safe(&WindowTheme::background_color(theme_selector)))
     }
 
-    pub fn has_transparency(&self, theme: &App::Theme) -> bool {
-        self.get_background_color(theme).is_transparent()
+    pub fn has_transparency(&self, state: &Tracker<App>, theme_selector: App::ThemeSelector) -> bool {
+        self.get_background_color(state, theme_selector).is_transparent()
     }
 
     pub fn is_closable(&self) -> bool {
@@ -60,8 +62,8 @@ where
     pub fn resolve(
         &mut self,
         font_loader: App::FontLoader,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         available_space: App::Size,
     ) -> App::Size {
         let mut placement_resolver = PlacementResolver::new(
@@ -69,14 +71,14 @@ where
             available_space,
             self.size,
             &self.size_bound,
-            theme.window().border_size(),
-            theme.window().gaps(),
-            application.get_scaling(),
+            *state.get_safe(&WindowTheme::border_size(theme_selector)),
+            *state.get_safe(&WindowTheme::gaps(theme_selector)),
+            *state.get_safe(&App::ScaleSelector::default()),
         );
 
         self.elements
             .iter()
-            .for_each(|element| element.borrow_mut().resolve(&mut placement_resolver, application, theme));
+            .for_each(|element| element.borrow_mut().resolve(state, theme_selector, &mut placement_resolver));
 
         if self.size_bound.height.is_flexible() {
             let parent_limits = placement_resolver.get_parent_limits();
@@ -87,11 +89,11 @@ where
                 available_space.height().into(),
                 available_space.height().into(),
                 &parent_limits,
-                application.get_scaling(),
+                *state.get_safe(&App::ScaleSelector::default()),
             );
 
             self.size = App::Size::new(self.size.width(), final_height);
-            self.validate_size(application, available_space);
+            self.validate_size(state, available_space);
         }
 
         self.validate_position(available_space);
@@ -114,10 +116,10 @@ where
                 &size_bound,
                 App::Size::zero(), //theme.window.border_size.get(), // TODO: Popup
                 App::Size::zero(), //theme.window.gaps.get(), // TODO: Popup
-                application.get_scaling(),
+                *state.get_safe(&App::ScaleSelector::default()),
             );
 
-            popup.borrow_mut().resolve(&mut placement_resolver, application, theme);
+            popup.borrow_mut().resolve(state, theme_selector, &mut placement_resolver);
         };
 
         self.size
@@ -208,19 +210,19 @@ where
         self.position = self.size_bound.validated_position(self.position, self.size, available_space);
     }
 
-    pub fn resize(&mut self, application: &App, available_space: App::Size, growth: App::Size) -> (Option<&str>, App::Size) {
+    pub fn resize(&mut self, application: &Tracker<App>, available_space: App::Size, growth: App::Size) -> (Option<&str>, App::Size) {
         self.size = self.size.grow(growth);
         self.validate_size(application, available_space);
         (self.window_class.as_deref(), self.size)
     }
 
-    fn validate_size(&mut self, application: &App, available_space: App::Size) {
+    fn validate_size(&mut self, state: &Tracker<App>, available_space: App::Size) {
         self.size = self
             .size_bound
-            .validated_window_size(self.size, available_space, application.get_scaling());
+            .validated_window_size(self.size, available_space, *state.get_safe(&App::ScaleSelector::default()));
     }
 
-    pub fn open_popup(&mut self, element: ElementCell<App>, position_tracker: Tracker<App::Position>, size_tracker: Tracker<App::Size>) {
+    pub fn open_popup(&mut self, element: ElementCell<App>, position_tracker: _Tracker<App::Position>, size_tracker: _Tracker<App::Size>) {
         // Very important to link back
         let weak_element = Rc::downgrade(&element);
         element.borrow_mut().link_back(weak_element, None);
@@ -236,11 +238,8 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
     ) {
         let screen_clip = App::Clip::new(
             self.position.left(),
@@ -249,26 +248,25 @@ where
             self.position.top() + self.size.height(),
         );
 
+        let corner_radius = state.get_safe(&WindowTheme::corner_radius(theme_selector));
+
         renderer.render_rectangle(
             render_target,
             self.position,
             self.size,
             screen_clip,
-            theme.window().corner_radius(),
-            self.get_background_color(theme),
+            *corner_radius,
+            self.get_background_color(state, theme_selector),
         );
 
         self.elements.iter().for_each(|element| {
             element.borrow().render(
                 render_target,
                 renderer,
-                application,
-                theme,
+                state,
+                theme_selector,
                 self.position,
                 screen_clip,
-                hovered_element,
-                focused_element,
-                mouse_mode,
                 false,
             )
         });
@@ -276,18 +274,9 @@ where
         if let Some((popup, position_tracker, _)) = &self.popup_element {
             let position = position_tracker().unwrap(); // FIX: Don't unwrap obviously
 
-            popup.borrow().render(
-                render_target,
-                renderer,
-                application,
-                theme,
-                position,
-                screen_clip,
-                hovered_element,
-                focused_element,
-                mouse_mode,
-                false,
-            );
+            popup
+                .borrow()
+                .render(render_target, renderer, state, theme_selector, position, screen_clip, false);
         };
     }
 
@@ -295,12 +284,14 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         available_space: App::Size,
     ) {
         self.anchor
-            .render_window_anchors(render_target, renderer, theme, self.position, self.size);
-        self.anchor.render_screen_anchors(render_target, renderer, theme, available_space);
+            .render_window_anchors(render_target, renderer, state, theme_selector, self.position, self.size);
+        self.anchor
+            .render_screen_anchors(render_target, renderer, state, theme_selector, available_space);
     }
 }
 

@@ -1,6 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
+use rust_state::Tracker;
+
 use crate::application::{
     Application, ClipTrait, CornerRadiusTraitExt, FontSizeTraitExt, InterfaceRenderer, PartialSizeTraitExt, PositionTrait,
     PositionTraitExt, SizeTrait, SizeTraitExt,
@@ -28,19 +30,19 @@ where
     }
 }
 
-pub struct ElementRenderer<'a, App>
+pub struct ElementRenderer<'a, 'b, App>
 where
     App: Application,
 {
     pub render_target: &'a mut <App::Renderer as InterfaceRenderer<App>>::Target,
     pub renderer: &'a App::Renderer,
-    pub application: &'a App,
+    pub state: &'a Tracker<'b, App>,
     pub position: App::Position,
     pub size: App::Size,
     pub clip: App::Clip,
 }
 
-impl<'a, App> ElementRenderer<'a, App>
+impl<'a, 'b, App> ElementRenderer<'a, 'b, App>
 where
     App: Application,
 {
@@ -49,8 +51,11 @@ where
     }
 
     pub fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size {
-        self.renderer
-            .get_text_dimensions(text, font_size.scaled(self.application.get_scaling()), available_width)
+        self.renderer.get_text_dimensions(
+            text,
+            font_size.scaled(*self.state.get_safe(&App::ScaleSelector::default())),
+            available_width,
+        )
     }
 
     pub fn set_scroll(&mut self, scroll: f32) {
@@ -63,7 +68,7 @@ where
             self.position,
             self.size,
             self.clip,
-            corner_radius.scaled(self.application.get_scaling()),
+            corner_radius.scaled(*self.state.get_safe(&App::ScaleSelector::default())),
             color,
         );
     }
@@ -74,27 +79,31 @@ where
             self.position.combined(position),
             size,
             self.clip,
-            corner_radius.scaled(self.application.get_scaling()),
+            corner_radius.scaled(*self.state.get_safe(&App::ScaleSelector::default())),
             color,
         );
     }
 
     pub fn render_text(&mut self, text: &str, offset: App::Position, foreground_color: App::Color, font_size: App::FontSize) -> f32 {
+        let scale = *self.state.get_safe(&App::ScaleSelector::default());
+
         self.renderer.render_text(
             self.render_target,
             text,
-            self.position.combined(offset.scaled(self.application.get_scaling())),
+            self.position.combined(offset.scaled(scale)),
             self.clip,
             foreground_color,
-            font_size.scaled(self.application.get_scaling()),
+            font_size.scaled(scale),
         )
     }
 
     pub fn render_checkbox(&mut self, offset: App::Position, size: App::Size, color: App::Color, checked: bool) {
+        let scale = *self.state.get_safe(&App::ScaleSelector::default());
+
         self.renderer.render_checkbox(
             self.render_target,
-            self.position.combined(offset.scaled(self.application.get_scaling())),
-            size.scaled(self.application.get_scaling()),
+            self.position.combined(offset.scaled(scale)),
+            size.scaled(scale),
             self.clip,
             color,
             checked,
@@ -102,10 +111,12 @@ where
     }
 
     pub fn render_expand_arrow(&mut self, offset: App::Position, size: App::Size, color: App::Color, expanded: bool) {
+        let scale = *self.state.get_safe(&App::ScaleSelector::default());
+
         self.renderer.render_expand_arrow(
             self.render_target,
-            self.position.combined(offset.scaled(self.application.get_scaling())),
-            size.scaled(self.application.get_scaling()),
+            self.position.combined(offset.scaled(scale)),
+            size.scaled(scale),
             self.clip,
             color,
             expanded,
@@ -115,23 +126,17 @@ where
     pub fn render_element(
         &mut self,
         element: &dyn Element<App>,
-        application: &App,
-        theme: &App::Theme,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
+        application: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         second_theme: bool,
     ) {
         element.render(
             self.render_target,
             self.renderer,
             application,
-            theme,
+            theme_selector,
             self.position,
             self.clip,
-            hovered_element,
-            focused_element,
-            mouse_mode,
             second_theme,
         )
     }
@@ -193,14 +198,14 @@ where
         HoverInformation::Missed
     }
 
-    pub fn element_renderer<'a>(
+    pub fn element_renderer<'a, 'b>(
         &self,
         render_target: &'a mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &'a App::Renderer,
-        application: &'a App,
+        state: &'a Tracker<'b, App>,
         parent_position: App::Position,
         screen_clip: App::Clip,
-    ) -> ElementRenderer<'a, App> {
+    ) -> ElementRenderer<'a, 'b, App> {
         let position = parent_position.combined(self.cached_position);
         let size = self.cached_size;
 
@@ -214,7 +219,7 @@ where
         ElementRenderer {
             render_target,
             renderer,
-            application,
+            state,
             position,
             size,
             clip: screen_clip,
@@ -295,13 +300,13 @@ where
         self.is_focusable().then_some(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, application: &App, theme: &App::Theme);
+    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>);
 
     fn update(&mut self) -> Option<ChangeEvent> {
         None
     }
 
-    fn is_element_self(&self, element: Option<&dyn Element<App>>) -> bool {
+    fn is_element_self(&self, element: &Option<&dyn Element<App>>) -> bool {
         matches!(element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
     }
 
@@ -341,14 +346,11 @@ where
     fn render(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        renderer: &App::Renderer,
+        application: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
         second_theme: bool,
     );
 }

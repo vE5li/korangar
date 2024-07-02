@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
 
+use rust_state::Selector;
+
 use super::StateButton;
 use crate::application::Application;
 use crate::builder::{Set, Unset};
 use crate::layout::DimensionBound;
-use crate::state::Remote;
 use crate::ElementEvent;
 
 /// Type state [`StateButton`] builder. This builder utilizes the type system to
@@ -66,7 +67,7 @@ where
 {
     pub fn with_remote<State>(self, remote: State) -> StateButtonBuilder<App, Text, Event, State, Background, Width>
     where
-        State: Remote<bool> + 'static,
+        State: for<'a> Selector<'a, App, bool>,
     {
         StateButtonBuilder {
             remote,
@@ -107,7 +108,7 @@ where
     App: Application,
     Text: AsRef<str> + 'static,
     Event: ElementEvent<App> + 'static,
-    State: Remote<bool> + 'static,
+    State: for<'a> Selector<'a, App, bool>,
 {
     /// Take the builder and turn it into a [`StateButton`].
     ///

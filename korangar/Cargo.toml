@@ -36,6 +36,7 @@ walkdir = "2"
 winit = "0.28.7"
 xml-rs = "0.8.0"
 yazi = "0.1.4"
+rust_state = { workspace = true }
 
 [features]
 debug = ["korangar_debug", "ragnarok_packets/debug", "random_color"]

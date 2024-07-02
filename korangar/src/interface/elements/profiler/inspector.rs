@@ -64,7 +64,7 @@ impl FrameInspectorView {
                 top: 0.0,
             };
             let line_size = ScreenSize {
-                width: theme.profiler.line_width.get() * renderer.application.get_scaling_factor(),
+                width: theme.profiler.line_width.get() * renderer.state.get_scaling_factor(),
                 height: size.height,
             };
 
@@ -73,7 +73,7 @@ impl FrameInspectorView {
             if render_numbers {
                 let offset = ScreenPosition {
                     left: x_position + (distance - text_width) / 2.0,
-                    top: size.height - theme.profiler.distance_text_offset.get() * renderer.application.get_scaling_factor(),
+                    top: size.height - theme.profiler.distance_text_offset.get() * renderer.state.get_scaling_factor(),
                 };
 
                 korangar_interface::application::InterfaceRenderer::render_text(
@@ -83,7 +83,7 @@ impl FrameInspectorView {
                     renderer.position + offset,
                     renderer.clip,
                     theme.profiler.line_color.get(),
-                    FontSize::new(theme.profiler.distance_text_size.get() * renderer.application.get_scaling_factor()),
+                    FontSize::new(theme.profiler.distance_text_size.get() * renderer.state.get_scaling_factor()),
                 );
             }
 
@@ -106,15 +106,15 @@ impl FrameInspectorView {
         // Size in scaled pixels at which the text starts fading in
         const TEXT_DISPLAY_SIZE: f32 = 50.0;
 
-        let scaled_bar_gap = theme.profiler.bar_gap.get().width * renderer.application.get_scaling_factor();
+        let scaled_bar_gap = theme.profiler.bar_gap.get().width * renderer.state.get_scaling_factor();
         let color = color_lookup.get_color(measurement.name);
-        let text_offset = theme.profiler.bar_text_offset.get() * renderer.application.get_scaling_factor();
+        let text_offset = theme.profiler.bar_text_offset.get() * renderer.state.get_scaling_factor();
         let x_position = measurement.start_time.saturating_duration_since(start_time).as_secs_f32() * unit + scaled_bar_gap;
         let x_size = measurement.end_time.saturating_duration_since(start_time).as_secs_f32() * unit - x_position - scaled_bar_gap;
         let x_size = x_size.min(total_width - x_position - scaled_bar_gap);
-        let y_size = theme.profiler.bar_height.get() * renderer.application.get_scaling_factor();
+        let y_size = theme.profiler.bar_height.get() * renderer.state.get_scaling_factor();
 
-        let alpha = Self::interpolate_alpha_linear(BAR_FADE_SPEED * renderer.application.get_scaling_factor(), 0.0, x_size);
+        let alpha = Self::interpolate_alpha_linear(BAR_FADE_SPEED * renderer.state.get_scaling_factor(), 0.0, x_size);
         if alpha < VISIBILITY_THRESHHOLD {
             return;
         }
@@ -136,8 +136,8 @@ impl FrameInspectorView {
         );
 
         let alpha = Self::interpolate_alpha_linear(
-            TEXT_FADE_SPEED * renderer.application.get_scaling_factor(),
-            TEXT_DISPLAY_SIZE * renderer.application.get_scaling_factor(),
+            TEXT_FADE_SPEED * renderer.state.get_scaling_factor(),
+            TEXT_DISPLAY_SIZE * renderer.state.get_scaling_factor(),
             x_size,
         );
 
@@ -164,12 +164,12 @@ impl FrameInspectorView {
                 text_position,
                 screen_clip,
                 theme.profiler.bar_text_color.get().multiply_alpha(alpha),
-                FontSize::new(theme.profiler.bar_text_size.get() * renderer.application.get_scaling_factor()),
+                FontSize::new(theme.profiler.bar_text_size.get() * renderer.state.get_scaling_factor()),
             );
         }
 
-        let y_position = y_position
-            + (theme.profiler.bar_gap.get().height + theme.profiler.bar_height.get()) * renderer.application.get_scaling_factor();
+        let y_position =
+            y_position + (theme.profiler.bar_gap.get().height + theme.profiler.bar_height.get()) * renderer.state.get_scaling_factor();
 
         measurement.indices.iter().for_each(|measurement| {
             Self::render_measurement(

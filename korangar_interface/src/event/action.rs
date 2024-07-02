@@ -1,8 +1,8 @@
 use super::ChangeEvent;
+use crate::_Tracker;
 use crate::application::Application;
 use crate::elements::{ElementCell, FocusMode};
 use crate::windows::PrototypeWindow;
-use crate::Tracker;
 
 pub enum ClickAction<App>
 where
@@ -18,8 +18,8 @@ where
     CloseWindow,
     OpenPopup {
         element: ElementCell<App>,
-        position_tracker: Tracker<App::Position>,
-        size_tracker: Tracker<App::Size>,
+        position_tracker: _Tracker<App::Position>,
+        size_tracker: _Tracker<App::Size>,
     },
     ClosePopup,
     Custom(App::CustomEvent),

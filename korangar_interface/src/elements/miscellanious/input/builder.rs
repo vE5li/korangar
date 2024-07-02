@@ -1,12 +1,13 @@
 use std::fmt::Display;
 use std::marker::PhantomData;
 
+use rust_state::{SafeUnwrap, Selector};
+
 use super::{EnterAction, InputField};
 use crate::application::Application;
 use crate::builder::{Set, Unset};
 use crate::event::ClickAction;
 use crate::layout::DimensionBound;
-use crate::state::PlainTrackedState;
 
 /// Type state [`InputField`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times and calling
@@ -55,14 +56,11 @@ impl<App, Text, Action, Length, Hidden, Width> InputFieldBuilder<App, Unset, Tex
 where
     App: Application,
 {
-    pub fn with_state(
-        self,
-        state: PlainTrackedState<String>,
-    ) -> InputFieldBuilder<App, PlainTrackedState<String>, Text, Action, Length, Hidden, Width> {
-        InputFieldBuilder {
-            input_state: state,
-            ..self
-        }
+    pub fn with_state<Data>(self, input_state: Data) -> InputFieldBuilder<App, Data, Text, Action, Length, Hidden, Width>
+    where
+        Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
+    {
+        InputFieldBuilder { input_state, ..self }
     }
 }
 
@@ -136,8 +134,9 @@ where
     }
 }
 
-impl<App, Text, Hidden, Width> InputFieldBuilder<App, PlainTrackedState<String>, Text, EnterAction<App>, Set, Hidden, Width>
+impl<App, State, Text, Hidden, Width> InputFieldBuilder<App, State, Text, EnterAction<App>, Set, Hidden, Width>
 where
+    State: for<'a> Selector<'a, App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
@@ -147,7 +146,7 @@ where
     /// [`with_ghost_text`](Self::with_ghost_text),
     /// [`with_enter_action`](Self::with_enter_action),
     /// and [`with_length`](Self::with_length) have been called on the builder.
-    pub fn build(self) -> InputField<App, Text> {
+    pub fn build(self) -> InputField<State, App, Text> {
         let Self {
             input_state,
             ghost_text,

@@ -11,6 +11,7 @@ korangar_debug = { workspace = true, optional = true }
 num = { workspace = true }
 option-ext = "0.2.0"
 serde = { workspace = true, optional = true }
+rust_state = { workspace = true }
 
 [features]
 cgmath = ["dep:cgmath"]

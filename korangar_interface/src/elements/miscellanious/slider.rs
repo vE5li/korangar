@@ -2,6 +2,7 @@ use std::cmp::PartialOrd;
 
 use num::traits::NumOps;
 use num::{clamp, NumCast, Zero};
+use rust_state::Tracker;
 
 use crate::application::{
     Application, CornerRadiusTraitExt, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
@@ -10,7 +11,7 @@ use crate::application::{
 use crate::elements::{Element, ElementState};
 use crate::event::{ChangeEvent, ClickAction, HoverInformation};
 use crate::layout::PlacementResolver;
-use crate::theme::{ButtonTheme, InterfaceTheme, SliderTheme};
+use crate::theme::{ButtonTheme, SliderTheme};
 
 pub struct Slider<App, Value>
 where
@@ -55,8 +56,14 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
-        self.state.resolve(placement_resolver, &theme.slider().size_bound());
+    fn resolve(
+        &mut self,
+        state: &Tracker<App>,
+        theme_selector: <App as Application>::ThemeSelector,
+        placement_resolver: &mut PlacementResolver<App>,
+    ) {
+        self.state
+            .resolve(placement_resolver, state.get_safe(&SliderTheme::size_bound(theme_selector)));
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -106,30 +113,37 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: <App as Application>::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        _focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
+
+        let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
 
         if self.is_element_self(hovered_element) {
-            renderer.render_background(theme.button().corner_radius(), theme.slider().background_color());
+            renderer.render_background(
+                *state.get_safe(&ButtonTheme::corner_radius(theme_selector)),
+                *state.get_safe(&SliderTheme::background_color(theme_selector)),
+            );
         }
 
         let bar_size = App::Size::new(self.state.cached_size.width() * 0.9, self.state.cached_size.height() / 4.0);
         let offset = App::Position::from_size((self.state.cached_size.shrink(bar_size)).halved());
 
-        renderer.render_rectangle(offset, bar_size, App::CornerRadius::uniform(0.5), theme.slider().rail_color());
+        renderer.render_rectangle(
+            offset,
+            bar_size,
+            App::CornerRadius::uniform(0.5),
+            *state.get_safe(&SliderTheme::rail_color(theme_selector)),
+        );
 
         let knob_size = App::Size::new(
-            20.0 * application.get_scaling().get_factor(),
+            20.0 * state.get_safe(&App::ScaleSelector::default()).get_factor(),
             self.state.cached_size.height() * 0.8,
         );
         let total_range = self.maximum_value - self.minimum_value;
@@ -139,6 +153,11 @@ where
             (self.state.cached_size.height() - knob_size.height()) / 2.0,
         );
 
-        renderer.render_rectangle(offset, knob_size, App::CornerRadius::uniform(4.0), theme.slider().knob_color());
+        renderer.render_rectangle(
+            offset,
+            knob_size,
+            App::CornerRadius::uniform(4.0),
+            *state.get_safe(&SliderTheme::knob_color(theme_selector)),
+        );
     }
 }

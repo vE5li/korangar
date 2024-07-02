@@ -1,12 +1,28 @@
 use std::rc::{Rc, Weak};
 
+use rust_state::{SafeUnwrap, Selector, StateMarker};
+
 use crate::elements::{Element, ElementCell, WeakElementCell};
-use crate::theme::InterfaceTheme;
+use crate::theme::{ButtonTheme, CloseButtonTheme, ExpandableTheme, InputTheme, LabelTheme, SliderTheme, ValueTheme, WindowTheme};
 use crate::windows::Anchor;
 
-pub trait Application: Sized + 'static {
-    type ThemeKind: Default;
-    type Theme: InterfaceTheme<Settings = Self>;
+pub trait Application: StateMarker + SafeUnwrap + Sized + 'static {
+    type ThemeKind: Default + Clone;
+    type ThemeSelector: From<Self::ThemeKind>
+        + for<'a> Selector<'a, Self, ButtonTheme<Self>>
+        + for<'a> Selector<'a, Self, WindowTheme<Self>>
+        + for<'a> Selector<'a, Self, ExpandableTheme<Self>>
+        + for<'a> Selector<'a, Self, LabelTheme<Self>>
+        + for<'a> Selector<'a, Self, ValueTheme<Self>>
+        + for<'a> Selector<'a, Self, CloseButtonTheme<Self>>
+        + for<'a> Selector<'a, Self, SliderTheme<Self>>
+        + for<'a> Selector<'a, Self, InputTheme<Self>>
+        + SafeUnwrap
+        + Copy;
+    type ScaleSelector: for<'a> Selector<'a, Self, Self::Scaling> + Default + SafeUnwrap;
+    type MouseModeSelector: for<'a> Selector<'a, Self, Self::MouseInputMode> + Default + SafeUnwrap;
+    type HoveredElementSelector: for<'a> Selector<'a, Self, Option<&'a dyn Element<Self>>> + Default + SafeUnwrap;
+    type FocusedElementSelector: for<'a> Selector<'a, Self, Option<&'a dyn Element<Self>>> + Default + SafeUnwrap;
     type Color: ColorTrait;
     type Renderer: InterfaceRenderer<Self>;
     type Size: SizeTrait;
@@ -22,10 +38,6 @@ pub trait Application: Sized + 'static {
     type DropResource;
     type DropResult;
     type CustomEvent;
-
-    fn get_scaling(&self) -> Self::Scaling;
-
-    fn get_theme(&self, kind: &Self::ThemeKind) -> &Self::Theme;
 }
 
 pub trait MouseInputModeTrait<App>
@@ -118,11 +130,11 @@ where
     );
 }
 
-pub trait ColorTrait: Clone {
+pub trait ColorTrait: Copy {
     fn is_transparent(&self) -> bool;
 }
 
-pub trait CornerRadiusTrait: Clone {
+pub trait CornerRadiusTrait: Copy {
     fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
 
     fn top_left(&self) -> f32;

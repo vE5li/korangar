@@ -1,11 +1,13 @@
 mod builder;
 
+use rust_state::Tracker;
+
 pub use self::builder::CloseButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PartialSizeTraitExt};
 use crate::elements::{Element, ElementState};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::PlacementResolver;
-use crate::theme::{CloseButtonTheme, InterfaceTheme};
+use crate::theme::CloseButtonTheme;
 
 pub struct CloseButton<App>
 where
@@ -26,8 +28,9 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
-        let (size, position) = placement_resolver.allocate_right(&theme.close_button().size_bound());
+    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+        let size_bound = application.get_safe(&CloseButtonTheme::size_bound(theme_selector));
+        let (size, position) = placement_resolver.allocate_right(size_bound);
         self.state.cached_size = size.finalize();
         self.state.cached_position = position;
     }
@@ -51,31 +54,32 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        application: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => theme.close_button().hovered_background_color(),
-            false => theme.close_button().background_color(),
+        let hovered_element = application.get_safe(&App::HoveredElementSelector::default());
+        let focused_element = application.get_safe(&App::FocusedElementSelector::default());
+        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+
+        let corner_radius = *application.get_safe(&CloseButtonTheme::corner_radius(theme_selector));
+        let background_color = match highlighted {
+            true => application.get_safe(&CloseButtonTheme::hovered_background_color(theme_selector)),
+            false => application.get_safe(&CloseButtonTheme::background_color(theme_selector)),
         };
 
-        renderer.render_background(theme.close_button().corner_radius(), background_color);
+        renderer.render_background(corner_radius, *background_color);
 
-        renderer.render_text(
-            "X",
-            theme.close_button().text_offset(),
-            theme.close_button().foreground_color(),
-            theme.close_button().font_size(),
-        );
+        let text_offset = *application.get_safe(&CloseButtonTheme::text_offset(theme_selector));
+        let foreground_color = *application.get_safe(&CloseButtonTheme::foreground_color(theme_selector));
+        let font_size = *application.get_safe(&CloseButtonTheme::font_size(theme_selector));
+
+        renderer.render_text("X", text_offset, foreground_color, font_size);
     }
 }

@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
+use rust_state::Tracker;
+
 use super::ContainerState;
 use crate::application::{
     Application, InterfaceRenderer, MouseInputModeTrait, PartialSizeTrait, PartialSizeTraitExt, PositionTrait, PositionTraitExt,
@@ -9,7 +11,7 @@ use crate::application::{
 use crate::elements::{Element, ElementCell, ElementState, Focus};
 use crate::event::{ChangeEvent, ClickAction, HoverInformation};
 use crate::layout::{Dimension, PlacementResolver, SizeBound};
-use crate::theme::{ExpandableTheme, InterfaceTheme};
+use crate::theme::ExpandableTheme;
 
 pub struct Expandable<App>
 where
@@ -70,14 +72,14 @@ where
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, application: &App, theme: &App::Theme) {
+    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let closed_size = self
             .closed_size_bound
             .resolve_element::<App::PartialSize>(
                 placement_resolver.get_available(),
                 placement_resolver.get_remaining(),
                 &placement_resolver.get_parent_limits(),
-                application.get_scaling(),
+                *state.get_safe(&App::ScaleSelector::default()),
             )
             .finalize::<App::Size>();
 
@@ -86,33 +88,35 @@ where
             false => &self.closed_size_bound,
         };
 
+        let element_offset = state.get_safe(&ExpandableTheme::element_offset(theme_selector));
         let screen_position = App::Position::only_top(closed_size.height())
-            .combined(theme.expandable().element_offset())
-            .scaled(application.get_scaling());
+            .combined(*element_offset)
+            .scaled(*state.get_safe(&App::ScaleSelector::default()));
 
-        let (mut inner_placement_resolver, mut size, position) =
-            placement_resolver.derive(size_bound, screen_position, theme.expandable().border_size());
+        let border_size = state.get_safe(&ExpandableTheme::border_size(theme_selector));
+        let (mut inner_placement_resolver, mut size, position) = placement_resolver.derive(size_bound, screen_position, *border_size);
         let parent_limits = inner_placement_resolver.get_parent_limits();
 
         if self.expanded && !self.state.elements.is_empty() {
-            inner_placement_resolver.set_gaps(theme.expandable().gaps());
+            let gaps = state.get_safe(&ExpandableTheme::gaps(theme_selector));
+            inner_placement_resolver.set_gaps(*gaps);
 
             self.state
                 .elements
                 .iter_mut()
-                .for_each(|element| element.borrow_mut().resolve(&mut inner_placement_resolver, application, theme));
+                .for_each(|element| element.borrow_mut().resolve(state, theme_selector, &mut inner_placement_resolver));
 
             if self.open_size_bound.height.is_flexible() {
                 let final_height = inner_placement_resolver.final_height()
                     + closed_size.height()
-                    + theme.expandable().element_offset().top() * application.get_scaling().get_factor();
+                    + element_offset.top() * state.get_safe(&App::ScaleSelector::default()).get_factor();
 
                 let final_height = self.open_size_bound.validated_height(
                     final_height,
                     placement_resolver.get_available().height(),
                     placement_resolver.get_available().height(),
                     &parent_limits,
-                    application.get_scaling(),
+                    *state.get_safe(&App::ScaleSelector::default()),
                 );
 
                 size = App::PartialSize::new(size.width(), Some(final_height));
@@ -169,56 +173,47 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
+        let corner_radius = state.get_safe(&ExpandableTheme::corner_radius(theme_selector));
         let background_color = match second_theme {
-            true => theme.expandable().second_background_color(),
-            false => theme.expandable().background_color(),
+            true => state.get_safe(&ExpandableTheme::second_background_color(theme_selector)),
+            false => state.get_safe(&ExpandableTheme::background_color(theme_selector)),
         };
 
-        renderer.render_background(theme.expandable().corner_radius(), background_color);
+        renderer.render_background(*corner_radius, *background_color);
 
-        renderer.render_expand_arrow(
-            theme.expandable().icon_offset(),
-            theme.expandable().icon_size(),
-            theme.expandable().foreground_color(),
-            self.expanded,
-        );
+        let icon_offset = state.get_safe(&ExpandableTheme::icon_offset(theme_selector));
+        let icon_size = state.get_safe(&ExpandableTheme::icon_size(theme_selector));
+        let foreground_color = state.get_safe(&ExpandableTheme::foreground_color(theme_selector));
 
-        let foreground_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => theme.expandable().hovered_foreground_color(),
-            false => theme.expandable().foreground_color(),
+        renderer.render_expand_arrow(*icon_offset, *icon_size, *foreground_color, self.expanded);
+
+        let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
+        let focused_element = state.get_safe(&App::FocusedElementSelector::default());
+        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+
+        let foreground_color = match highlighted {
+            true => state.get_safe(&ExpandableTheme::hovered_foreground_color(theme_selector)),
+            false => state.get_safe(&ExpandableTheme::foreground_color(theme_selector)),
         };
 
-        renderer.render_text(
-            &self.display,
-            theme.expandable().text_offset(),
-            foreground_color,
-            theme.expandable().font_size(),
-        );
+        let text_offset = state.get_safe(&ExpandableTheme::text_offset(theme_selector));
+        let font_size = state.get_safe(&ExpandableTheme::font_size(theme_selector));
+
+        renderer.render_text(&self.display, *text_offset, *foreground_color, *font_size);
 
         if self.expanded && !self.state.elements.is_empty() {
-            self.state.render(
-                &mut renderer,
-                application,
-                theme,
-                hovered_element,
-                focused_element,
-                mouse_mode,
-                !second_theme,
-            );
+            self.state.render(&mut renderer, state, theme_selector, !second_theme);
         }
     }
 }

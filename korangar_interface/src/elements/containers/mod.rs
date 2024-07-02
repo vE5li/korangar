@@ -6,6 +6,8 @@ use std::cell::{Cell, RefCell};
 use std::ops::Add;
 use std::rc::{Rc, Weak};
 
+use rust_state::Tracker;
+
 pub use self::default::Container;
 pub use self::expandable::Expandable;
 pub use self::scroll::ScrollView;
@@ -51,8 +53,8 @@ where
     pub fn resolve(
         &mut self,
         placement_resolver: &mut PlacementResolver<App>,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         size_bound: &SizeBound,
         border: App::Size,
     ) -> f32 {
@@ -64,7 +66,7 @@ where
 
         self.elements
             .iter_mut()
-            .for_each(|element| element.borrow_mut().resolve(&mut inner_placement_resolver, application, theme));
+            .for_each(|element| element.borrow_mut().resolve(state, theme_selector, &mut inner_placement_resolver));
 
         let final_height = inner_placement_resolver.final_height();
 
@@ -74,7 +76,7 @@ where
                 placement_resolver.get_available().height(),
                 placement_resolver.get_available().height(),
                 &parent_limits,
-                application.get_scaling(),
+                *state.get_safe(&App::ScaleSelector::default()),
             );
 
             size = App::PartialSize::new(size.width(), Some(final_height));
@@ -161,7 +163,7 @@ where
             let position = self
                 .elements
                 .iter()
-                .position(|element| element.borrow().is_element_self(Some(&*caller_cell.borrow())));
+                .position(|element| element.borrow().is_element_self(&Some(&*caller_cell.borrow())));
 
             if let Some(position) = position {
                 let offset_position = match focus.mode {
@@ -302,23 +304,12 @@ where
     pub fn render(
         &self,
         renderer: &mut ElementRenderer<App>,
-        application: &App,
-        theme: &App::Theme,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
+        application: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         second_theme: bool,
     ) {
-        self.elements.iter().for_each(|element| {
-            renderer.render_element(
-                &*element.borrow(),
-                application,
-                theme,
-                hovered_element,
-                focused_element,
-                mouse_mode,
-                second_theme,
-            )
-        });
+        self.elements
+            .iter()
+            .for_each(|element| renderer.render_element(&*element.borrow(), application, theme_selector, second_theme));
     }
 }

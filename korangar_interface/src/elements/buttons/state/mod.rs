@@ -1,21 +1,21 @@
 mod builder;
 
+use rust_state::{Selector, Tracker};
+
 pub use self::builder::StateButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
 use crate::elements::{Element, ElementState};
-use crate::event::{ChangeEvent, ClickAction, HoverInformation};
+use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{DimensionBound, PlacementResolver};
-use crate::state::{Remote, RemoteClone};
-use crate::theme::{ButtonTheme, InterfaceTheme};
+use crate::theme::ButtonTheme;
 use crate::ElementEvent;
 
-// FIX: State button won't redraw just because the state changes
 pub struct StateButton<App, Text, Event, State>
 where
     App: Application,
     Text: AsRef<str> + 'static,
     Event: ElementEvent<App> + 'static,
-    State: Remote<bool>,
+    State: for<'a> Selector<'a, App, bool>,
 {
     text: Text,
     event: Event,
@@ -30,7 +30,7 @@ where
     App: Application,
     Text: AsRef<str> + 'static,
     Event: ElementEvent<App> + 'static,
-    State: Remote<bool>,
+    State: for<'a> Selector<'a, App, bool>,
 {
     fn get_state(&self) -> &ElementState<App> {
         &self.state
@@ -40,8 +40,10 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
-        let size_bound = self.width_bound.add_height(theme.button().height_bound());
+    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+        let height_bound = *application.get_safe(&ButtonTheme::height_bound(theme_selector));
+        let size_bound = self.width_bound.add_height(height_bound);
+
         self.state.resolve(placement_resolver, &size_bound);
     }
 
@@ -56,55 +58,53 @@ where
         self.event.trigger()
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
-        self.remote.consume_changed().then_some(ChangeEvent::RENDER_WINDOW)
-    }
-
     fn render(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        application: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
+        let hovered_element = application.get_safe(&App::HoveredElementSelector::default());
+        let focused_element = application.get_safe(&App::FocusedElementSelector::default());
         let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
 
         if !self.transparent_background {
             let background_color = match highlighted {
-                true => theme.button().hovered_background_color(),
-                false => theme.button().background_color(),
+                true => application.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
+                false => application.get_safe(&ButtonTheme::background_color(theme_selector)),
             };
 
-            renderer.render_background(theme.button().corner_radius(), background_color);
+            renderer.render_background(
+                *application.get_safe(&ButtonTheme::corner_radius(theme_selector)),
+                *background_color,
+            );
         }
 
         let foreground_color = match self.transparent_background && highlighted {
-            true => theme.button().hovered_foreground_color(),
-            false => theme.button().foreground_color(),
+            true => application.get_safe(&ButtonTheme::hovered_foreground_color(theme_selector)),
+            false => application.get_safe(&ButtonTheme::foreground_color(theme_selector)),
         };
 
         renderer.render_checkbox(
-            theme.button().icon_offset(),
-            theme.button().icon_size(),
-            foreground_color.clone(),
-            self.remote.cloned(),
+            *application.get_safe(&ButtonTheme::icon_offset(theme_selector)),
+            *application.get_safe(&ButtonTheme::icon_size(theme_selector)),
+            *foreground_color,
+            application.get(&self.remote).cloned().unwrap_or_default(),
         );
 
         renderer.render_text(
             self.text.as_ref(),
-            theme.button().icon_text_offset(),
-            foreground_color,
-            theme.button().font_size(),
+            *application.get_safe(&ButtonTheme::icon_text_offset(theme_selector)),
+            *foreground_color,
+            *application.get_safe(&ButtonTheme::font_size(theme_selector)),
         );
     }
 }

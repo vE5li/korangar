@@ -1,11 +1,13 @@
 mod builder;
 
+use rust_state::Tracker;
+
 pub use self::builder::ButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
 use crate::elements::{Element, ElementState};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{DimensionBound, PlacementResolver};
-use crate::theme::{ButtonTheme, InterfaceTheme};
+use crate::theme::ButtonTheme;
 use crate::{ColorSelector, ElementEvent, Selector};
 
 pub struct Button<App, Text, Event>
@@ -52,8 +54,10 @@ where
         !self.is_disabled()
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
-        let size_bound = self.width_bound.add_height(theme.button().height_bound());
+    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+        let height_bound = *application.get_safe(&ButtonTheme::height_bound(theme_selector));
+        let size_bound = self.width_bound.add_height(height_bound);
+
         self.state.resolve(placement_resolver, &size_bound);
     }
 
@@ -75,43 +79,47 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         let disabled = self.is_disabled();
-        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            _ if disabled => theme.button().disabled_background_color(),
-            true => theme.button().hovered_background_color(),
-            false if self.background_color.is_some() => (self.background_color.as_ref().unwrap())(theme),
-            false => theme.button().background_color(),
+        let corner_radius = state.get_safe(&ButtonTheme::corner_radius(theme_selector));
+
+        let background_color = if disabled {
+            *state.get_safe(&ButtonTheme::disabled_background_color(theme_selector))
+        } else {
+            let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
+            let focused_element = state.get_safe(&App::FocusedElementSelector::default());
+            let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+
+            match highlighted {
+                true => *state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
+                false if self.background_color.is_some() => (self.background_color.as_ref().unwrap())(state, theme_selector),
+                false => *state.get_safe(&ButtonTheme::background_color(theme_selector)),
+            }
         };
 
-        renderer.render_background(theme.button().corner_radius(), background_color);
+        renderer.render_background(*corner_radius, background_color);
 
         let foreground_color = if disabled {
-            theme.button().disabled_foreground_color()
+            *state.get_safe(&ButtonTheme::disabled_foreground_color(theme_selector))
         } else {
             self.foreground_color
                 .as_ref()
-                .map(|closure| closure(theme))
-                .unwrap_or(theme.button().foreground_color())
+                .map(|closure| closure(state, theme_selector))
+                .unwrap_or(*state.get_safe(&ButtonTheme::foreground_color(theme_selector)))
         };
 
-        renderer.render_text(
-            self.text.as_ref(),
-            theme.button().text_offset(),
-            foreground_color,
-            theme.button().font_size(),
-        );
+        let text_offset = state.get_safe(&ButtonTheme::text_offset(theme_selector));
+        let font_size = state.get_safe(&ButtonTheme::font_size(theme_selector));
+
+        renderer.render_text(self.text.as_ref(), *text_offset, foreground_color, *font_size);
     }
 }

@@ -274,6 +274,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "case"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd6c0e7b807d60291f42f33f58480c0bfafe28ed08286446f45e463728cf9c1c"
+
+[[package]]
 name = "cc"
 version = "1.0.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1042,6 +1048,7 @@ dependencies = [
  "random_color",
  "rayon",
  "ron",
+ "rust_state",
  "rusttype",
  "serde",
  "serde-xml-rs",
@@ -1073,6 +1080,7 @@ dependencies = [
  "korangar_debug",
  "num",
  "option-ext",
+ "rust_state",
  "serde",
 ]
 
@@ -1728,6 +1736,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "procedural"
+version = "0.1.0"
+dependencies = [
+ "case",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
+]
+
+[[package]]
 name = "qoi"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2018,6 +2036,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "921904a62e410e37e215c40381b7117f830d9d89ba60ab5236170541dd25646b"
 dependencies = [
  "xmlparser",
+]
+
+[[package]]
+name = "rust_state"
+version = "0.1.0"
+dependencies = [
+ "procedural",
 ]
 
 [[package]]

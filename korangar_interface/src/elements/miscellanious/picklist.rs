@@ -1,12 +1,14 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use rust_state::Tracker;
+
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTraitExt, SizeTraitExt};
 use crate::elements::{ButtonBuilder, Element, ElementState, ElementWrap, ScrollView};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver, SizeBound};
 use crate::state::{TrackedState, TrackedStateClone};
-use crate::theme::{ButtonTheme, InterfaceTheme};
+use crate::theme::ButtonTheme;
 use crate::ElementEvent;
 
 pub struct PickList<App, Key, Value, State, Event>
@@ -94,15 +96,15 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
+    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+        let height_bound = *state.get_safe(&ButtonTheme::height_bound(theme_selector));
         let size_bound = self
             .width_bound
             .as_ref()
             .unwrap_or(&DimensionBound::RELATIVE_ONE_HUNDRED)
-            .add_height(theme.button().height_bound());
+            .add_height(height_bound);
 
         self.state.resolve(placement_resolver, &size_bound);
-
         *self.latest_size.borrow_mut() = self.state.cached_size;
     }
 
@@ -157,7 +159,7 @@ where
         };
 
         let element = ScrollView::new(options, size_bound)
-            .with_background_color(|theme| theme.button().background_color())
+            .with_background_color(|state, theme_selector| *state.get_safe(&ButtonTheme::background_color(theme_selector)))
             .wrap();
 
         vec![ClickAction::OpenPopup {
@@ -171,32 +173,32 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
+        let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
+        let focused_element = state.get_safe(&App::FocusedElementSelector::default());
         let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+
         let background_color = match highlighted {
-            true => theme.button().hovered_background_color(),
-            false => theme.button().background_color(),
+            true => state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
+            false => state.get_safe(&ButtonTheme::background_color(theme_selector)),
         };
 
-        renderer.render_background(theme.button().corner_radius(), background_color);
+        renderer.render_background(*state.get_safe(&ButtonTheme::corner_radius(theme_selector)), *background_color);
 
         *self.latest_position.borrow_mut() = renderer.get_position();
 
         let foreground_color = match highlighted {
-            true => theme.button().hovered_foreground_color(),
-            false => theme.button().foreground_color(),
+            true => state.get_safe(&ButtonTheme::hovered_foreground_color(theme_selector)),
+            false => state.get_safe(&ButtonTheme::foreground_color(theme_selector)),
         };
 
         // FIX: Don't unwrap. Fix logic
@@ -205,9 +207,9 @@ where
         if let Some((text, _)) = self.options.iter().find(|(_, value)| *value == current_state) {
             renderer.render_text(
                 text.as_ref(),
-                theme.button().text_offset(),
-                foreground_color,
-                theme.button().font_size(),
+                *state.get_safe(&ButtonTheme::text_offset(theme_selector)),
+                *foreground_color,
+                *state.get_safe(&ButtonTheme::font_size(theme_selector)),
             );
         }
     }

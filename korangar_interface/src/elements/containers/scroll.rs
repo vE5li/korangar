@@ -1,12 +1,14 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
+use rust_state::Tracker;
+
 use super::ContainerState;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
 use crate::elements::{Element, ElementCell, ElementState, Focus};
 use crate::event::{ChangeEvent, HoverInformation};
 use crate::layout::{PlacementResolver, SizeBound};
-use crate::theme::{ButtonTheme, InterfaceTheme};
+use crate::theme::ButtonTheme;
 use crate::ColorSelector;
 
 const SCROLL_SPEED: f32 = 0.8;
@@ -41,7 +43,7 @@ where
         }
     }
 
-    pub fn with_background_color(mut self, background_color: impl Fn(&App::Theme) -> App::Color + 'static) -> Self {
+    pub fn with_background_color(mut self, background_color: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static) -> Self {
         self.background_color = Some(Box::new(background_color));
         self
     }
@@ -81,10 +83,10 @@ where
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, application: &App, theme: &App::Theme) {
+    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         self.children_height = self
             .state
-            .resolve(placement_resolver, application, theme, &self.size_bound, App::Size::zero());
+            .resolve(placement_resolver, state, theme_selector, &self.size_bound, App::Size::zero());
         self.clamp_scroll();
     }
 
@@ -129,34 +131,26 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         if let Some(color_selector) = &self.background_color {
-            renderer.render_background(theme.button().corner_radius(), color_selector(theme));
+            renderer.render_background(
+                *state.get_safe(&ButtonTheme::corner_radius(theme_selector)),
+                color_selector(state, theme_selector),
+            );
         }
 
         renderer.set_scroll(self.scroll);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, state, theme_selector, second_theme);
     }
 }

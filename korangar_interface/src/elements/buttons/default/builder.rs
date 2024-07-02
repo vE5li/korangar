@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use rust_state::Tracker;
+
 use super::Button;
 use crate::application::Application;
 use crate::builder::{Set, Unset};
@@ -86,7 +88,7 @@ where
 {
     pub fn with_foreground_color(
         self,
-        color_selector: impl Fn(&App::Theme) -> App::Color + 'static,
+        color_selector: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static,
     ) -> ButtonBuilder<App, Text, Event, Disabled, Set, Background, Width> {
         ButtonBuilder {
             foreground_color: Some(Box::new(color_selector)),
@@ -102,7 +104,7 @@ where
 {
     pub fn with_background_color(
         self,
-        color_selector: impl Fn(&App::Theme) -> App::Color + 'static,
+        color_selector: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static,
     ) -> ButtonBuilder<App, Text, Event, Disabled, Foreground, Set, Width> {
         ButtonBuilder {
             background_color: Some(Box::new(color_selector)),

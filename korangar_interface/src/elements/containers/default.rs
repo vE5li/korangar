@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
+use rust_state::Tracker;
+
 use super::ContainerState;
 use crate::application::{Application, InterfaceRenderer, SizeTraitExt};
 use crate::elements::{Element, ElementCell, ElementState, Focus};
@@ -62,12 +64,12 @@ where
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, application: &App, theme: &App::Theme) {
+    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let default_size_bound = SizeBound::only_height(Dimension::Flexible);
         let size_bound = self.size_bound.as_ref().unwrap_or(&default_size_bound);
         let border = self.border_size.unwrap_or(App::Size::zero());
 
-        self.state.resolve(placement_resolver, application, theme, size_bound, border);
+        self.state.resolve(placement_resolver, state, theme_selector, size_bound, border);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -82,28 +84,17 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        hovered_element: Option<&dyn Element<App>>,
-        focused_element: Option<&dyn Element<App>>,
-        mouse_mode: &App::MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, state, theme_selector, second_theme);
     }
 }

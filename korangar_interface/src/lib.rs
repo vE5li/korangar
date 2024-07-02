@@ -27,6 +27,7 @@ pub use interface_procedural::{dimension_bound, size_bound};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use option_ext::OptionExt;
+use rust_state::Tracker;
 use windows::{PrototypeWindow, Window};
 
 use crate::application::MouseInputModeTrait;
@@ -34,9 +35,9 @@ use crate::application::MouseInputModeTrait;
 // TODO: move this
 pub type Selector = Box<dyn Fn() -> bool>;
 #[allow(type_alias_bounds)]
-pub type ColorSelector<App: Application> = Box<dyn Fn(&App::Theme) -> App::Color>;
+pub type ColorSelector<App: Application> = Box<dyn Fn(&Tracker<App>, App::ThemeSelector) -> App::Color>;
 #[allow(type_alias_bounds)]
-pub type FontSizeSelector<App: Application> = Box<dyn Fn(&App::Theme) -> App::FontSize>;
+pub type FontSizeSelector<App: Application> = Box<dyn Fn(&Tracker<App>, App::ThemeSelector) -> App::FontSize>;
 
 pub trait ElementEvent<App>
 where
@@ -113,7 +114,7 @@ impl<T> PostUpdate<T> {
     }
 }
 
-pub type Tracker<T> = Box<dyn Fn() -> Option<T>>;
+pub type _Tracker<T> = Box<dyn Fn() -> Option<T>>;
 
 pub struct Interface<App>
 where
@@ -174,7 +175,7 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("update user interface"))]
-    pub fn update(&mut self, application: &App, font_loader: App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
+    pub fn update(&mut self, state: &Tracker<App>, font_loader: App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
         for (window, post_update) in &mut self.windows {
             #[cfg(feature = "debug")]
             profile_block!("update window");
@@ -192,10 +193,9 @@ where
                 profile_block!("resolve window");
 
                 let (_position, previous_size) = window.get_area();
-                let kind = window.get_theme_kind();
-                let theme = application.get_theme(kind);
+                let theme_selector = window.get_theme_kind().clone().into();
 
-                let new_size = window.resolve(font_loader.clone(), application, theme, self.available_space);
+                let new_size = window.resolve(font_loader.clone(), state, theme_selector, self.available_space);
 
                 // should only ever be the last window
                 if let Some(focused_index) = focus_state.focused_window()
@@ -227,7 +227,7 @@ where
             #[cfg(feature = "debug")]
             profile_block!("flag render windows");
 
-            self.flag_render_windows(application, 0, None);
+            self.flag_render_windows(state, 0, None);
         }
 
         let render_interface = self.post_update.needs_render();
@@ -346,11 +346,11 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn resize_window(&mut self, application: &App, window_index: usize, growth: App::Size) {
+    pub fn resize_window(&mut self, state: &Tracker<App>, window_index: usize, growth: App::Size) {
         let (window, post_update) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
-        let (window_class, new_size) = window.resize(application, self.available_space, growth);
+        let (window_class, new_size) = window.resize(state, self.available_space, growth);
 
         if !previous_size.is_equal(new_size) {
             if let Some(window_class) = window_class {
@@ -369,7 +369,7 @@ where
     /// re-render a window with transparency will result in re-rendering the
     /// entire interface. This serves as a single point of truth and simplifies
     /// the rest of the code.
-    fn flag_render_windows(&mut self, application: &App, start_index: usize, area: Option<(App::Position, App::Size)>) {
+    fn flag_render_windows(&mut self, state: &Tracker<App>, start_index: usize, area: Option<(App::Position, App::Size)>) {
         for window_index in start_index..self.windows.len() {
             let needs_render = self.windows[window_index].1.needs_render();
             let is_hovering = |(position, scale)| self.windows[window_index].0.hovers_area(position, scale);
@@ -377,11 +377,9 @@ where
             if needs_render || area.map(is_hovering).unwrap_or(false) {
                 let (position, scale) = {
                     let (window, post_update) = &mut self.windows[window_index];
+                    let theme_selector = window.get_theme_kind().clone().into();
 
-                    let kind = window.get_theme_kind();
-                    let theme = application.get_theme(kind);
-
-                    if window.has_transparency(theme) {
+                    if window.has_transparency(state, theme_selector) {
                         self.post_update.render();
                         return;
                     }
@@ -390,7 +388,7 @@ where
                     window.get_area()
                 };
 
-                self.flag_render_windows(application, window_index + 1, Some((position, scale)));
+                self.flag_render_windows(state, window_index + 1, Some((position, scale)));
             }
         }
     }
@@ -400,34 +398,24 @@ where
         &mut self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        hovered_element: Option<ElementCell<App>>,
-        focused_element: Option<ElementCell<App>>,
-        mouse_mode: &App::MouseInputMode,
+        state: &Tracker<App>,
     ) {
-        let hovered_element = hovered_element.map(|element| unsafe { &*element.as_ptr() });
-        let focused_element = focused_element.map(|element| unsafe { &*element.as_ptr() });
+        // let hovered_element = hovered_element.map(|element| unsafe {
+        // &*element.as_ptr() }); let focused_element =
+        // focused_element.map(|element| unsafe { &*element.as_ptr() });
 
         for (index, (window, post_update)) in self.windows.iter_mut().enumerate() {
             if post_update.take_render() || self.post_update.needs_render() {
                 #[cfg(feature = "debug")]
                 profile_block!("render window");
 
-                let kind = window.get_theme_kind();
-                let theme = application.get_theme(kind);
+                let theme_selector = window.get_theme_kind().clone().into();
 
-                window.render(
-                    render_target,
-                    renderer,
-                    application,
-                    theme,
-                    hovered_element,
-                    focused_element,
-                    mouse_mode,
-                );
+                window.render(render_target, renderer, state, theme_selector);
 
+                let mouse_mode = state.get_safe(&App::MouseModeSelector::default());
                 if mouse_mode.is_moving_window(index) {
-                    window.render_anchors(render_target, renderer, theme, self.available_space);
+                    window.render_anchors(render_target, renderer, state, theme_selector, self.available_space);
                 }
             }
         }
@@ -470,8 +458,8 @@ where
     pub fn open_popup(
         &mut self,
         element: ElementCell<App>,
-        position_tracker: Tracker<App::Position>,
-        size_tracker: Tracker<App::Size>,
+        position_tracker: _Tracker<App::Position>,
+        size_tracker: _Tracker<App::Size>,
         window_index: usize,
     ) {
         let entry = &mut self.windows[window_index];

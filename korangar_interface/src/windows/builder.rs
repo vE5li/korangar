@@ -1,6 +1,8 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 
+use rust_state::Context;
+
 use super::{Anchor, Window};
 use crate::application::{Application, PartialSizeTraitExt, WindowCache};
 use crate::builder::{Set, Unset};
@@ -176,7 +178,7 @@ where
     /// NOTE: This method is only available if
     /// [`with_size_bound`](Self::with_size_bound) and
     /// [`with_elements`](Self::with_elements) have been called on the builder.
-    pub fn build(self, window_cache: &App::Cache, application: &App, available_space: App::Size) -> Window<App> {
+    pub fn build(self, window_cache: &App::Cache, state: &Context<App>, available_space: App::Size) -> Window<App> {
         let Self {
             title,
             closable,
@@ -243,10 +245,14 @@ where
 
         let anchor = cached_anchor.unwrap_or(Anchor::default());
         let size = cached_size
-            .map(|size| size_bound.validated_window_size(size, available_space, application.get_scaling()))
+            .map(|size| size_bound.validated_window_size(size, available_space, *state.get_safe(&App::ScaleSelector::default())))
             .unwrap_or_else(|| {
                 size_bound
-                    .resolve_window::<App::PartialSize>(available_space, available_space, application.get_scaling())
+                    .resolve_window::<App::PartialSize>(
+                        available_space,
+                        available_space,
+                        *state.get_safe(&App::ScaleSelector::default()),
+                    )
                     .finalize_or(0.0)
             });
 

@@ -1,7 +1,9 @@
+use rust_state::Tracker;
+
 use crate::application::{Application, FontSizeTrait, InterfaceRenderer, PositionTraitExt};
 use crate::elements::{Element, ElementState};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver};
-use crate::theme::{ButtonTheme, InterfaceTheme};
+use crate::theme::ButtonTheme;
 use crate::{ColorSelector, FontSizeSelector};
 
 pub struct Text<App, T>
@@ -43,12 +45,12 @@ where
         self
     }
 
-    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&App::Theme) -> App::Color + 'static) -> Self {
+    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static) -> Self {
         self.foreground_color = Some(Box::new(foreground_color));
         self
     }
 
-    pub fn with_font_size(mut self, font_size: impl Fn(&App::Theme) -> App::FontSize + 'static) -> Self {
+    pub fn with_font_size(mut self, font_size: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::FontSize + 'static) -> Self {
         self.font_size = Some(Box::new(font_size));
         self
     }
@@ -58,11 +60,11 @@ where
         self
     }
 
-    fn get_font_size(&self, theme: &App::Theme) -> App::FontSize {
+    fn get_font_size(&self, state: &Tracker<App>, theme_selector: App::ThemeSelector) -> App::FontSize {
         self.font_size
             .as_ref()
-            .map(|closure| closure(theme))
-            .unwrap_or(theme.button().font_size())
+            .map(|closure| closure(state, theme_selector))
+            .unwrap_or(*state.get_safe(&ButtonTheme::font_size(theme_selector)))
     }
 }
 
@@ -79,9 +81,9 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, placement_resolver: &mut PlacementResolver<App>, _application: &App, theme: &App::Theme) {
+    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let height_bound = DimensionBound {
-            size: Dimension::Absolute(self.get_font_size(theme).get_value()),
+            size: Dimension::Absolute(self.get_font_size(state, theme_selector).get_value()),
             minimum_size: None,
             maximum_size: None,
         };
@@ -103,31 +105,28 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &App,
-        theme: &App::Theme,
+        state: &Tracker<App>,
+        theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
-        _hovered_element: Option<&dyn Element<App>>,
-        _focused_element: Option<&dyn Element<App>>,
-        _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         let foreground_color = self
             .foreground_color
             .as_ref()
-            .map(|closure| closure(theme))
-            .unwrap_or(theme.button().foreground_color());
+            .map(|closure| closure(state, theme_selector))
+            .unwrap_or(*state.get_safe(&ButtonTheme::foreground_color(theme_selector)));
 
         let text = self.text.as_ref().unwrap();
         renderer.render_text(
             text.as_ref(),
             App::Position::zero(),
             foreground_color,
-            self.get_font_size(theme),
+            self.get_font_size(state, theme_selector),
         );
     }
 }

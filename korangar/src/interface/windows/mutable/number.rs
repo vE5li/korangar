@@ -7,10 +7,11 @@ use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use num::traits::NumOps;
 use num::{NumCast, Zero};
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(new)]
 pub struct NumberWindow<T: 'static> {
@@ -21,13 +22,8 @@ pub struct NumberWindow<T: 'static> {
     change_event: Option<ChangeEvent>,
 }
 
-impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow<InterfaceSettings> for NumberWindow<T> {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + 'static> PrototypeWindow<GameState> for NumberWindow<T> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![
             Headline::new("value".to_string(), size_bound!(100%, 12)).wrap(),
             Slider::new(self.reference, self.minimum_value, self.maximum_value, self.change_event).wrap(),

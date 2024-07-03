@@ -3,11 +3,12 @@ use korangar_interface::elements::{ButtonBuilder, ElementWrap, Text};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::Friend;
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(new)]
 pub struct FriendRequestWindow {
@@ -18,13 +19,8 @@ impl FriendRequestWindow {
     pub const WINDOW_CLASS: &'static str = "friend_request";
 }
 
-impl PrototypeWindow<InterfaceSettings> for FriendRequestWindow {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+impl PrototypeWindow<GameState> for FriendRequestWindow {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![
             Text::default()
                 .with_text(format!("^ffaa00{}^000000 wants to be friends with you", self.friend.name))

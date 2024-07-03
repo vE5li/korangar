@@ -3,34 +3,38 @@ mod builder;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use korangar_interface::application::{Application, FontSizeTraitExt};
+use korangar_interface::application::{Application, FontSizeTraitExt, ScalingTrait};
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{Dimension, PlacementResolver};
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
+use rust_state::{SafeUnwrap, Selector, Tracker};
 
 pub use self::builder::ChatBuilder;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ScreenClip, ScreenPosition};
-use crate::interface::theme::InterfaceTheme;
+use crate::interface::theme::ChatTheme;
 use crate::interface::windows::ChatMessage;
 use crate::loaders::FontLoader;
+use crate::{GameState, GameStateScalePath};
 
-pub struct Chat {
-    messages: PlainRemote<Vec<ChatMessage>>,
+pub struct Chat<Messages> {
+    messages: Messages,
     font_loader: Rc<RefCell<FontLoader>>,
-    state: ElementState<InterfaceSettings>,
+    state: ElementState<GameState>,
 }
 
-impl Element<InterfaceSettings> for Chat {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl<Messages> Element<GameState> for Chat<Messages>
+where
+    Messages: for<'a> Selector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
+{
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state
     }
 
@@ -40,28 +44,29 @@ impl Element<InterfaceSettings> for Chat {
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let mut size_bound = size_bound!(100%, 0);
         // Not sure why but 0.0 cuts off the lower part of the text, so add some
         // padding.
-        let mut height = 5.0 * application.get_scaling_factor();
+        let scale = state.get_safe(&GameStateScalePath::default()).get_factor();
+        let mut height = 5.0 * scale;
 
         // Dividing by the scaling is done to counteract the scaling being applied
         // twice per message. It's not the cleanest solution but it works.
-        for message in self.messages.get().iter() {
+        for message in state.get_safe(&self.messages).iter() {
             height += self
                 .font_loader
                 .borrow()
                 .get_text_dimensions(
                     &message.text,
-                    theme.chat.font_size.get().scaled(application.get_scaling()),
+                    state.get_safe(&ChatTheme::font_size(theme_selector)).scaled(scale),
                     placement_resolver.get_available().width,
                 )
                 .height
-                / application.get_scaling_factor();
+                / scale;
         }
 
         size_bound.height = Dimension::Absolute(height);
@@ -76,13 +81,10 @@ impl Element<InterfaceSettings> for Chat {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        _hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        _focused_element: Option<&dyn Element<InterfaceSettings>>,
-        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
@@ -91,8 +93,9 @@ impl Element<InterfaceSettings> for Chat {
 
         let mut offset = 0.0;
 
-        for message in self.messages.get().iter() {
+        for message in application.get_safe(&self.messages).iter() {
             let text = &message.text;
+            let font_size = *application.get_safe(&ChatTheme::font_size(theme_selector));
 
             renderer.render_text(
                 text,
@@ -101,25 +104,21 @@ impl Element<InterfaceSettings> for Chat {
                     top: offset + 0.2,
                 },
                 Color::monochrome_u8(0),
-                theme.chat.font_size.get(),
+                font_size,
             );
 
             let message_color = match message.color {
                 korangar_networking::MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
-                korangar_networking::MessageColor::Broadcast => theme.chat.broadcast_color.get(),
-                korangar_networking::MessageColor::Server => theme.chat.server_color.get(),
-                korangar_networking::MessageColor::Error => theme.chat.error_color.get(),
-                korangar_networking::MessageColor::Information => theme.chat.information_color.get(),
+                korangar_networking::MessageColor::Broadcast => *application.get_safe(&ChatTheme::broadcast_color(theme_selector)),
+                korangar_networking::MessageColor::Server => *application.get_safe(&ChatTheme::server_color(theme_selector)),
+                korangar_networking::MessageColor::Error => *application.get_safe(&ChatTheme::error_color(theme_selector)),
+                korangar_networking::MessageColor::Information => *application.get_safe(&ChatTheme::information_color(theme_selector)),
             };
 
             // Dividing by the scaling is done to counteract the scaling being applied
             // twice per message. It's not the cleanest solution but it works.
-            offset += renderer.render_text(
-                text,
-                ScreenPosition::only_top(offset),
-                message_color,
-                theme.chat.font_size.get(),
-            ) / application.get_scaling_factor();
+            offset +=
+                renderer.render_text(text, ScreenPosition::only_top(offset), message_color, font_size) / application.get_scaling_factor();
         }
     }
 }

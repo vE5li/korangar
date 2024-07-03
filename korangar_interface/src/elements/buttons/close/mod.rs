@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 
 pub use self::builder::CloseButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PartialSizeTraitExt};
@@ -46,7 +46,7 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, _state: &Context<App>, _force_update: &mut bool) -> Vec<ClickAction<App>> {
         vec![ClickAction::CloseWindow]
     }
 

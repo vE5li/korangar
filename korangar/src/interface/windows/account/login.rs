@@ -8,14 +8,15 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary, TrackedStateClone, TrackedStateExt};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use rust_state::{Context, SafeUnwrap, Selector, Tracker};
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
 use crate::loaders::client::LoginSettings;
-use crate::loaders::ClientInfo;
+use crate::loaders::{ClientInfo, ServiceId};
+use crate::GameState;
 
 #[derive(new)]
 pub struct LoginWindow<'a> {
@@ -26,17 +27,12 @@ impl<'a> LoginWindow<'a> {
     pub const WINDOW_CLASS: &'static str = "login";
 }
 
-impl<'a> PrototypeWindow<InterfaceSettings> for LoginWindow<'a> {
+impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let mut login_settings = LoginSettings::new();
 
         let options = self
@@ -61,71 +57,62 @@ impl<'a> PrototypeWindow<InterfaceSettings> for LoginWindow<'a> {
 
         let saved_settings = login_settings.service_settings.entry(selected_service).or_default();
 
-        let username = PlainTrackedState::new(saved_settings.username.clone());
-        let password = PlainTrackedState::new(saved_settings.password.clone());
+        // let username = PlainTrackedState::new(saved_settings.username.clone());
+        // let password = PlainTrackedState::new(saved_settings.password.clone());
+        //
+        // let selected_service = PlainTrackedState::new(selected_service);
+        // let login_settings = PlainTrackedState::new(login_settings);
 
-        let selected_service = PlainTrackedState::new(selected_service);
-        let login_settings = PlainTrackedState::new(login_settings);
-
-        let selector = {
-            let username = username.clone();
-            let password = password.clone();
-            move || !username.get().is_empty() && !password.get().is_empty()
+        let selector = |state: &Tracker<GameState>| {
+            !state.get_safe(&GameState::username()).is_empty() && !state.get_safe(&GameState::password()).is_empty()
         };
 
-        let service_changed = {
-            let mut username = username.clone();
-            let mut password = password.clone();
-            let mut login_settings = login_settings.clone();
-            let selected_service = selected_service.clone();
+        let service_changed = Box::new(move |state: &Context<GameState>| {
+            // let service_id = *state.get_safe(&service_selector);
+            // state.update_value(&LoginSettings::service_settings(login_settings_selector),
+            // Some(service_id));
 
-            Box::new(move || {
-                let service_id = selected_service.cloned();
-                let saved_settings =
-                    login_settings.mutate(|login_settings| login_settings.service_settings.entry(service_id).or_default().clone());
+            // let saved_settings =
+            //     login_settings.mutate(|login_settings|
+            // login_settings.service_settings.entry(service_id).or_default().clone());
 
-                username.mutate(|username| {
-                    *username = saved_settings.username;
-                });
-                password.mutate(|password| {
-                    *password = saved_settings.password;
-                });
+            let saved_username = String::new();
+            let saved_password = String::new();
 
-                Vec::new()
-            })
-        };
+            state.update_value(&GameState::username(), saved_username);
+            state.update_value(&GameState::password(), saved_password);
 
-        let login_action = {
-            let username = username.clone();
-            let password = password.clone();
-            let mut login_settings = login_settings.clone();
-            let selected_service = selected_service.clone();
+            Vec::new()
+        });
 
-            move || {
-                // TODO: Deduplicate code
-                let service_id = selected_service.cloned();
+        let login_action = move |state: &Context<GameState>| {
+            // TODO: Deduplicate code
+            let username = state.get_safe(&GameState::username()).clone();
+            let password = state.get_safe(&GameState::password()).clone();
+            let service_id = *state.get_safe(&GameState::selected_service());
 
-                login_settings.mutate(|login_settings| {
-                    login_settings.recent_service_id = Some(service_id);
+            state.update_value(&LoginSettings::recent_service_id(GameState::login_settings()), Some(service_id));
 
-                    let saved_settings = login_settings.service_settings.entry(service_id).or_default();
-                    saved_settings.username = username.cloned();
-                    saved_settings.password = password.cloned();
-                });
+            // login_settings.mutate(|login_settings| {
+            // login_settings.recent_service_id = Some(service_id);
 
-                vec![ClickAction::Custom(UserEvent::LogIn {
-                    service_id: selected_service.cloned(),
-                    username: username.cloned(),
-                    password: password.cloned(),
-                })]
-            }
+            // let saved_settings =
+            // login_settings.service_settings.entry(service_id).or_default();
+            // saved_settings.username = username.cloned();
+            // saved_settings.password = password.cloned();
+            // });
+
+            vec![ClickAction::Custom(UserEvent::LogIn {
+                service_id,
+                username,
+                password,
+            })]
         };
 
         let username_action = {
-            let username = username.clone();
-            Box::new(move || {
-                username
-                    .get()
+            Box::new(move |state: &Context<GameState>| {
+                state
+                    .get_safe(&GameState::username())
                     .is_empty()
                     .not()
                     .then_some(vec![ClickAction::FocusNext(FocusMode::FocusNext)])
@@ -133,35 +120,35 @@ impl<'a> PrototypeWindow<InterfaceSettings> for LoginWindow<'a> {
             })
         };
 
-        let password_action = {
-            let username = username.clone();
-            let password = password.clone();
-            let mut login_settings = login_settings.clone();
-            let selected_service = selected_service.clone();
+        let password_action = Box::new(move |state: &Context<GameState>| {
+            let username = state.get_safe(&GameState::username());
+            let password = state.get_safe(&GameState::password());
 
-            Box::new(move || match password.get().is_empty() {
-                _ if username.get().is_empty() => vec![ClickAction::FocusNext(FocusMode::FocusPrevious)],
+            match password.is_empty() {
+                _ if username.is_empty() => vec![ClickAction::FocusNext(FocusMode::FocusPrevious)],
                 true => Vec::new(),
                 false => {
                     // TODO: Deduplicate code
-                    let service_id = selected_service.cloned();
+                    let service_id = *state.get_safe(&GameState::selected_service());
 
-                    login_settings.mutate(|login_settings| {
-                        login_settings.recent_service_id = Some(service_id);
+                    state.update_value(&LoginSettings::recent_service_id(GameState::login_settings()), Some(service_id));
+
+                    /* login_settings.mutate(|login_settings| {
+                        // login_settings.recent_service_id = Some(service_id);
 
                         let saved_settings = login_settings.service_settings.entry(service_id).or_default();
                         saved_settings.username = username.cloned();
                         saved_settings.password = password.cloned();
-                    });
+                    }); */
 
                     vec![ClickAction::Custom(UserEvent::LogIn {
-                        service_id: selected_service.cloned(),
-                        username: username.cloned(),
-                        password: password.cloned(),
+                        service_id,
+                        username: username.clone(),
+                        password: password.clone(),
                     })]
                 }
-            })
-        };
+            }
+        });
 
         let remember_username = {
             let service_id = selected_service.clone();
@@ -179,19 +166,19 @@ impl<'a> PrototypeWindow<InterfaceSettings> for LoginWindow<'a> {
             Text::default().with_text("Select service").wrap(),
             PickList::default()
                 .with_options(options)
-                .with_selected(selected_service)
+                .with_selected(GameState::selected_service())
                 .with_event(service_changed)
                 .wrap(),
             Text::default().with_text("Account data").wrap(),
             InputFieldBuilder::new()
-                .with_state(username)
+                .with_state(GameState::username())
                 .with_ghost_text("Username")
                 .with_enter_action(username_action)
                 .with_length(24)
                 .build()
                 .wrap(),
             InputFieldBuilder::new()
-                .with_state(password)
+                .with_state(GameState::password())
                 .with_ghost_text("Password")
                 .with_enter_action(password_action)
                 .with_length(24)

@@ -2,14 +2,15 @@ use korangar_interface::elements::{ButtonBuilder, Container, ElementCell, Elemen
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;
-use crate::interface::application::{InterfaceSettings, InternalThemeKind};
+use crate::interface::application::InternalThemeKind;
+use crate::GameState;
 
 /// Debug actions for a single theme.
 #[derive(Default)]
 struct Actions<const KIND: InternalThemeKind>;
 
-impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for Actions<KIND> {
-    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
+impl<const KIND: InternalThemeKind> PrototypeElement<GameState> for Actions<KIND> {
+    fn to_element(&self, display: String) -> ElementCell<GameState> {
         let elements = vec![
             Headline::new(display, size_bound!(33%, 12)).wrap(),
             ButtonBuilder::new()

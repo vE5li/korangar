@@ -3,63 +3,60 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
+use rust_state::{Context, SafeUnwrap, Selector};
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
-#[derive(Default)]
-pub struct CommandsWindow;
-
-impl CommandsWindow {
-    pub const WINDOW_CLASS: &'static str = "commands";
+pub struct CommandsWindow<InputSelector> {
+    input_selector: InputSelector,
 }
 
-impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
+impl<InputSelector> CommandsWindow<InputSelector> {
+    pub const WINDOW_CLASS: &'static str = "commands";
+
+    pub fn new(input_selector: InputSelector) -> Self {
+        Self { input_selector }
+    }
+}
+
+impl<InputSelector> PrototypeWindow<GameState> for CommandsWindow<InputSelector>
+where
+    InputSelector: for<'a> Selector<'a, GameState, String> + SafeUnwrap,
+{
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let input_text = PlainTrackedState::<String>::default();
-
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let class_action = {
-            let mut input_text = input_text.clone();
+            let mut input_selector = self.input_selector.clone();
 
-            Box::new(move || {
-                let message = input_text.with_mut(|text| {
-                    if text.is_empty() {
-                        return ValueState::Unchanged(None);
-                    }
+            Box::new(move |state: &Context<GameState>| {
+                let input = state.get_safe(&input_selector);
 
-                    let message = format!("@jobchange {text}");
-                    text.clear();
-                    ValueState::Mutated(Some(message))
-                });
-
-                let Some(message) = message else {
+                if input.is_empty() {
                     return Vec::new();
                 };
+
+                let message = format!("@jobchange {input}");
+
+                state.update_value(&input_selector, String::new());
 
                 vec![ClickAction::Custom(UserEvent::SendMessage(message))]
             })
         };
 
         let change_action = {
-            let mut input_text = input_text.clone();
+            let mut input_selector = self.input_selector.clone();
 
-            move || {
-                let message = input_text.mutate(|text| {
-                    let message = format!("@jobchange {text}");
-                    text.clear();
-                    message
-                });
+            move |state: &Context<GameState>| {
+                let input = state.get_safe(&input_selector);
+                let message = format!("@jobchange {input}");
+
+                state.update_value(&input_selector, String::new());
 
                 vec![ClickAction::Custom(UserEvent::SendMessage(message))]
             }
@@ -68,7 +65,7 @@ impl PrototypeWindow<InterfaceSettings> for CommandsWindow {
         let elements = vec![
             Text::default().with_text("change job").wrap(),
             InputFieldBuilder::new()
-                .with_state(input_text)
+                .with_state(self.input_selector.clone())
                 .with_ghost_text("Job name or job ID")
                 .with_enter_action(class_action)
                 .with_length(30)

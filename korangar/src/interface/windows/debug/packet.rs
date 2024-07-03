@@ -3,25 +3,24 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
+use rust_state::{Context, SafeUnwrap, Selector};
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::{PacketHistoryRemote, PacketView};
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
-pub struct PacketWindow {
-    packets: PacketHistoryRemote,
-    show_pings: PlainTrackedState<bool>,
-    update: PlainTrackedState<bool>,
+pub struct PacketWindow<Packets, Pings, Update> {
+    packets: Packets,
+    show_pings: Pings,
+    update: Update,
 }
 
-impl PacketWindow {
+impl<Packets, Pings, Update> PacketWindow<Packets, Pings, Update> {
     pub const WINDOW_CLASS: &'static str = "network";
 
-    pub fn new(packets: PacketHistoryRemote, update: PlainTrackedState<bool>) -> Self {
-        let show_pings = PlainTrackedState::default();
-
+    pub fn new(packets: Packets, show_pings: Pings, update: Update) -> Self {
         Self {
             packets,
             show_pings,
@@ -30,18 +29,18 @@ impl PacketWindow {
     }
 }
 
-impl PrototypeWindow<InterfaceSettings> for PacketWindow {
+impl<Packets, Pings, Update> PrototypeWindow<GameState> for PacketWindow<Packets, Pings, Update>
+where
+    Packets: for<'a> Selector<'a, GameState, ()> + SafeUnwrap,
+    Pings: for<'a> Selector<'a, GameState, bool> + SafeUnwrap,
+    Update: for<'a> Selector<'a, GameState, bool> + SafeUnwrap,
+{
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![PacketView::new(self.packets.clone(), self.show_pings.new_remote()).wrap()];
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
+        /* let elements = vec![PacketView::new(self.packets.clone(), self.show_pings.new_remote()).wrap()];
 
         let clear_selector = {
             let packets = self.packets.clone();
@@ -73,7 +72,9 @@ impl PrototypeWindow<InterfaceSettings> for PacketWindow {
                 .build()
                 .wrap(),
             ScrollView::new(elements, size_bound!(100%, ? < super)).wrap(),
-        ];
+        ]; */
+
+        let elements = vec![];
 
         WindowBuilder::new()
             .with_title("Network".to_string())

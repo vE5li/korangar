@@ -4,12 +4,13 @@ use korangar_interface::size_bound;
 use korangar_interface::state::PlainRemote;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_networking::InventoryItem;
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::EquipmentContainer;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 use crate::loaders::ResourceMetadata;
+use crate::GameState;
 
 #[derive(new)]
 pub struct EquipmentWindow {
@@ -20,17 +21,12 @@ impl EquipmentWindow {
     pub const WINDOW_CLASS: &'static str = "equipment";
 }
 
-impl PrototypeWindow<InterfaceSettings> for EquipmentWindow {
+impl PrototypeWindow<GameState> for EquipmentWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![EquipmentContainer::new(self.items.clone()).wrap()];
 
         WindowBuilder::new()

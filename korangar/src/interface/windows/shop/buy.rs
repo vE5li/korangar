@@ -4,12 +4,13 @@ use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, PlainTrackedState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_networking::ShopItem;
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::BuyContainer;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 use crate::loaders::ResourceMetadata;
+use crate::GameState;
 
 #[derive(new)]
 pub struct BuyWindow {
@@ -21,17 +22,12 @@ impl BuyWindow {
     pub const WINDOW_CLASS: &'static str = "shop";
 }
 
-impl PrototypeWindow<InterfaceSettings> for BuyWindow {
+impl PrototypeWindow<GameState> for BuyWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![BuyContainer::new(self.items.clone(), self.cart.clone()).wrap()];
         let elements = vec![ScrollView::new(elements, size_bound!(100%, ? < super)).wrap()];
 

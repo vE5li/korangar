@@ -9,118 +9,121 @@ use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::SellItem;
 use num::Integer;
 use ragnarok_packets::SoldItemInformation;
+use rust_state::{Context, Tracker};
 
 use super::CartSum;
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::elements::{ShopEntry, ShopEntryOperation};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::ResourceMetadata;
+use crate::GameState;
 
 pub struct SellCartContainer {
-    cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
-    cart_remote: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
-    state: ContainerState<InterfaceSettings>,
+    state: ContainerState<GameState>,
 }
 
 impl SellCartContainer {
-    pub fn new(cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>) -> Self {
-        let mut elements = cart
-            .get()
-            .iter()
-            .enumerate()
-            .map(|(index, item)| {
-                ShopEntry::new(
-                    item.clone(),
-                    cart.clone(),
-                    ShopEntryOperation::RemoveFromCart,
-                    index.is_odd(),
-                    |item| Some(item.metadata.1 as usize),
-                    |item, cart, amount| {
-                        cart.mutate(|cart| {
-                            let purchase = cart
-                                .iter_mut()
-                                .find(|purchase| purchase.inventory_index == item.inventory_index)
-                                .unwrap();
-
-                            purchase.metadata.1 = purchase.metadata.1.saturating_sub(amount);
-
-                            if purchase.metadata.1 == 0 {
-                                cart.retain(|purchase| purchase.inventory_index != item.inventory_index);
-                            }
-                        });
-                    },
-                    |item, cart, amount| {
-                        cart.get()
-                            .iter()
-                            .find(|cart_item| cart_item.inventory_index == item.inventory_index)
-                            .map(|cart_item| amount.saturating_sub(cart_item.metadata.1) == 0)
-                            .unwrap_or(true)
-                    },
-                )
-            })
-            .map(ElementWrap::wrap)
-            .collect::<Vec<ElementCell<InterfaceSettings>>>();
-
-        {
-            let cart = cart.clone();
-
-            elements.insert(
-                0,
-                ButtonBuilder::new()
-                    .with_text("sell")
-                    .with_event(move || {
-                        let items = cart
-                            .get()
-                            .iter()
-                            .map(|item| SoldItemInformation {
-                                inventory_index: item.inventory_index,
-                                amount: item.metadata.1,
-                            })
-                            .collect();
-
-                        vec![ClickAction::Custom(UserEvent::SellItems { items })]
-                    })
-                    .with_width_bound(dimension_bound!(50%))
-                    .build()
-                    .wrap(),
-            );
-        }
-
-        elements.insert(
-            1,
-            ButtonBuilder::new()
-                .with_text("cancel")
-                .with_event(move || vec![ClickAction::Custom(UserEvent::CloseShop)])
-                .with_width_bound(dimension_bound!(!))
-                .build()
-                .wrap(),
-        );
-
-        elements.insert(
-            0,
-            CartSum::new(&cart, |item| item.price.0, |item| item.metadata.1 as u32).wrap(),
-        );
-
-        let cart_remote = cart.new_remote();
+    pub fn new() -> Self {
+        // let mut elements = cart
+        //     .get()
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(index, item)| {
+        //         ShopEntry::new(
+        //             item.clone(),
+        //             cart.clone(),
+        //             ShopEntryOperation::RemoveFromCart,
+        //             index.is_odd(),
+        //             |item| Some(item.metadata.1 as usize),
+        //             |item, cart, amount| {
+        //                 cart.mutate(|cart| {
+        //                     let purchase = cart
+        //                         .iter_mut()
+        //                         .find(|purchase| purchase.inventory_index ==
+        // item.inventory_index)                         .unwrap();
+        //
+        //                     purchase.metadata.1 =
+        // purchase.metadata.1.saturating_sub(amount);
+        //
+        //                     if purchase.metadata.1 == 0 {
+        //                         cart.retain(|purchase| purchase.inventory_index !=
+        // item.inventory_index);                     }
+        //                 });
+        //             },
+        //             |item, cart, amount| {
+        //                 cart.get()
+        //                     .iter()
+        //                     .find(|cart_item| cart_item.inventory_index ==
+        // item.inventory_index)                     .map(|cart_item|
+        // amount.saturating_sub(cart_item.metadata.1) == 0)
+        // .unwrap_or(true)             },
+        //         )
+        //     })
+        //     .map(ElementWrap::wrap)
+        //     .collect::<Vec<ElementCell<GameState>>>();
+        //
+        // {
+        //     let cart = cart.clone();
+        //
+        //     elements.insert(
+        //         0,
+        //         ButtonBuilder::new()
+        //             .with_text("sell")
+        //             .with_event(move |_: &Context<GameState>| {
+        //                 let items = cart
+        //                     .get()
+        //                     .iter()
+        //                     .map(|item| SoldItemInformation {
+        //                         inventory_index: item.inventory_index,
+        //                         amount: item.metadata.1,
+        //                     })
+        //                     .collect();
+        //
+        //                 vec![ClickAction::Custom(UserEvent::SellItems { items })]
+        //             })
+        //             .with_width_bound(dimension_bound!(50%))
+        //             .build()
+        //             .wrap(),
+        //     );
+        // }
+        //
+        // elements.insert(
+        //     1,
+        //     ButtonBuilder::new()
+        //         .with_text("cancel")
+        //         .with_event(move |_: &Context<GameState>|
+        // vec![ClickAction::Custom(UserEvent::CloseShop)])
+        //         .with_width_bound(dimension_bound!(!))
+        //         .build()
+        //         .wrap(),
+        // );
+        //
+        // elements.insert(
+        //     0,
+        //     CartSum::new(&cart, |item| item.price.0, |item| item.metadata.1 as
+        // u32).wrap(), );
+        //
+        // let cart_remote = cart.new_remote();
+        let elements = vec![];
         let state = ContainerState::new(elements);
 
-        Self { cart, cart_remote, state }
+        Self { state }
     }
 }
 
-impl Element<InterfaceSettings> for SellCartContainer {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for SellCartContainer {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state.state
     }
 
-    fn link_back(&mut self, weak_self: WeakElementCell<InterfaceSettings>, weak_parent: Option<WeakElementCell<InterfaceSettings>>) {
+    fn link_back(&mut self, weak_self: WeakElementCell<GameState>, weak_parent: Option<WeakElementCell<GameState>>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -130,29 +133,29 @@ impl Element<InterfaceSettings> for SellCartContainer {
 
     fn focus_next(
         &self,
-        self_cell: ElementCell<InterfaceSettings>,
-        caller_cell: Option<ElementCell<InterfaceSettings>>,
+        self_cell: ElementCell<GameState>,
+        caller_cell: Option<ElementCell<GameState>>,
         focus: Focus,
-    ) -> Option<ElementCell<InterfaceSettings>> {
+    ) -> Option<ElementCell<GameState>> {
         self.state.focus_next::<false>(self_cell, caller_cell, focus)
     }
 
-    fn restore_focus(&self, self_cell: ElementCell<InterfaceSettings>) -> Option<ElementCell<InterfaceSettings>> {
+    fn restore_focus(&self, self_cell: ElementCell<GameState>) -> Option<ElementCell<GameState>> {
         self.state.restore_focus(self_cell)
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(100%, ?);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::zero());
+            .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::zero());
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    /* fn update(&mut self) -> Option<ChangeEvent> {
         if self.cart_remote.consume_changed() {
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.state.state.self_element.take().unwrap();
@@ -166,9 +169,9 @@ impl Element<InterfaceSettings> for SellCartContainer {
         }
 
         None
-    }
+    } */
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::MoveItem(..) => self.state.state.hovered_element(mouse_position),
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
@@ -180,28 +183,17 @@ impl Element<InterfaceSettings> for SellCartContainer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        focused_element: Option<&dyn Element<InterfaceSettings>>,
-        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, state, theme_selector, second_theme);
     }
 }

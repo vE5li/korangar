@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
-use korangar_interface::application::ClipTraitExt;
+use korangar_interface::application::{ClipTraitExt, ScalingTrait};
 use ragnarok_packets::ClientTick;
+use rust_state::Context;
 
-use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
+use crate::GameState;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -86,19 +87,21 @@ impl MouseCursor {
         mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
         color: Color,
-        application: &InterfaceSettings,
+        application: &Context<GameState>,
     ) {
         if !self.shown {
             return;
         }
 
         if let Some(grabbed) = grabbed {
+            let scaling = *application.get_safe(&GameState::scale());
+
             match grabbed {
                 Grabbed::Texture(texture) => renderer.render_sprite(
                     render_target,
                     texture,
-                    mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
-                    ScreenSize::uniform(30.0 * application.get_scaling_factor()),
+                    mouse_position - ScreenSize::uniform(15.0 * scaling.get_factor()),
+                    ScreenSize::uniform(30.0 * scaling.get_factor()),
                     ScreenClip::unbound(),
                     Color::monochrome_u8(255),
                     false,

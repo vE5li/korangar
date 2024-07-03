@@ -8,14 +8,15 @@ use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, Tr
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::MessageColor;
+use rust_state::{Context, SafeUnwrap, Selector, Tracker};
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::ChatBuilder;
 use crate::interface::layout::ScreenSize;
-use crate::interface::theme::InterfaceTheme;
+use crate::interface::theme::{ChatTheme, InterfaceTheme};
 use crate::interface::windows::WindowCache;
 use crate::loaders::FontLoader;
+use crate::GameState;
 
 #[derive(Debug, Clone)]
 pub struct ChatMessage {
@@ -25,7 +26,6 @@ pub struct ChatMessage {
 
 #[derive(new)]
 pub struct ChatWindow {
-    messages: PlainRemote<Vec<ChatMessage>>,
     font_loader: Rc<RefCell<FontLoader>>,
 }
 
@@ -33,48 +33,33 @@ impl ChatWindow {
     pub const WINDOW_CLASS: &'static str = "chat";
 }
 
-impl PrototypeWindow<InterfaceSettings> for ChatWindow {
+impl PrototypeWindow<GameState> for ChatWindow {
     fn window_class(&self) -> Option<&str> {
-        ChatWindow::WINDOW_CLASS.into()
+        Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let input_text = PlainTrackedState::<String>::default();
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
+        let button_selector = |state: &Tracker<GameState>| !state.get_safe(&GameState::chat_input()).is_empty();
 
-        let button_selector = {
-            let input_text = input_text.clone();
+        let button_action = |state: &Context<GameState>| {
+            let message = state.get_safe(&GameState::chat_input()).clone();
+            state.update_value(&GameState::chat_input(), String::new());
 
-            move || !input_text.get().is_empty()
+            vec![ClickAction::Custom(UserEvent::SendMessage(message))]
         };
 
-        let button_action = {
-            let mut input_text = input_text.clone();
+        let input_action = Box::new(move |state: &Context<GameState>| {
+            let message = state.get_safe(&GameState::chat_input()).clone();
+            state.update_value(&GameState::chat_input(), String::new());
 
-            move || {
-                let message = input_text.take();
-                vec![ClickAction::Custom(UserEvent::SendMessage(message))]
-            }
-        };
-
-        let input_action = {
-            let mut input_text = input_text.clone();
-            Box::new(move || {
-                let message = input_text.take();
-
-                (!message.is_empty())
-                    .then_some(vec![ClickAction::Custom(UserEvent::SendMessage(message))])
-                    .unwrap_or_default()
-            })
-        };
+            (!message.is_empty())
+                .then_some(vec![ClickAction::Custom(UserEvent::SendMessage(message))])
+                .unwrap_or_default()
+        });
 
         let elements = vec![
             InputFieldBuilder::new()
-                .with_state(input_text)
+                .with_state(GameState::chat_input())
                 .with_ghost_text("Write message or command")
                 .with_enter_action(input_action)
                 .with_length(80)
@@ -91,7 +76,7 @@ impl PrototypeWindow<InterfaceSettings> for ChatWindow {
             ScrollView::new(
                 vec![
                     ChatBuilder::new()
-                        .with_messages(self.messages.clone())
+                        .with_messages(GameState::chat_messages())
                         .with_font_loader(self.font_loader.clone())
                         .build()
                         .wrap(),
@@ -104,7 +89,9 @@ impl PrototypeWindow<InterfaceSettings> for ChatWindow {
         WindowBuilder::new()
             .with_class(Self::WINDOW_CLASS.to_string())
             .with_size_bound(size_bound!(200 > 500 < 800, 100 > 100 < 600))
-            .with_background_color(Box::new(|theme: &InterfaceTheme| theme.chat.background_color.get()))
+            .with_background_color(Box::new(|state, theme_selector| {
+                *state.get_safe(&ChatTheme::background_color(theme_selector))
+            }))
             .with_elements(elements)
             .build(window_cache, application, available_space)
     }

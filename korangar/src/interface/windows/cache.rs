@@ -7,12 +7,12 @@ use korangar_interface::windows::Anchor;
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
+use crate::GameState;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct WindowState {
-    pub anchor: Anchor<InterfaceSettings>,
+    pub anchor: Anchor<GameState>,
     pub size: ScreenSize,
 }
 
@@ -43,7 +43,7 @@ impl WindowCache {
     }
 }
 
-impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowCache {
+impl korangar_interface::application::WindowCache<GameState> for WindowCache {
     fn create() -> Self {
         Self::load().unwrap_or_else(|| {
             #[cfg(feature = "debug")]
@@ -56,7 +56,7 @@ impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowC
         })
     }
 
-    fn register_window(&mut self, identifier: &str, anchor: Anchor<InterfaceSettings>, size: ScreenSize) {
+    fn register_window(&mut self, identifier: &str, anchor: Anchor<GameState>, size: ScreenSize) {
         if let Some(entry) = self.entries.get_mut(identifier) {
             entry.anchor = anchor;
             entry.size = size;
@@ -66,7 +66,7 @@ impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowC
         }
     }
 
-    fn update_anchor(&mut self, identifier: &str, anchor: Anchor<InterfaceSettings>) {
+    fn update_anchor(&mut self, identifier: &str, anchor: Anchor<GameState>) {
         if let Some(entry) = self.entries.get_mut(identifier) {
             entry.anchor = anchor;
         }
@@ -78,7 +78,7 @@ impl korangar_interface::application::WindowCache<InterfaceSettings> for WindowC
         }
     }
 
-    fn get_window_state(&self, identifier: &str) -> Option<(Anchor<InterfaceSettings>, ScreenSize)> {
+    fn get_window_state(&self, identifier: &str) -> Option<(Anchor<GameState>, ScreenSize)> {
         self.entries.get(identifier).map(|entry| (entry.anchor.clone(), entry.size))
     }
 }

@@ -6,7 +6,7 @@ use crate::elements::{Element, ElementCell, WeakElementCell};
 use crate::theme::{ButtonTheme, CloseButtonTheme, ExpandableTheme, InputTheme, LabelTheme, SliderTheme, ValueTheme, WindowTheme};
 use crate::windows::Anchor;
 
-pub trait Application: StateMarker + SafeUnwrap + Sized + 'static {
+pub trait Application: StateMarker + Sized + 'static {
     type ThemeKind: Default + Clone;
     type ThemeSelector: From<Self::ThemeKind>
         + for<'a> Selector<'a, Self, ButtonTheme<Self>>

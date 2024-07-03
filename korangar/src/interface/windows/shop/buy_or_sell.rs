@@ -3,11 +3,12 @@ use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::{BuyOrSellOption, ShopId};
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(new)]
 pub struct BuyOrSellWindow {
@@ -18,17 +19,12 @@ impl BuyOrSellWindow {
     pub const WINDOW_CLASS: &'static str = "buy_or_sell";
 }
 
-impl PrototypeWindow<InterfaceSettings> for BuyOrSellWindow {
+impl PrototypeWindow<GameState> for BuyOrSellWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![
             ButtonBuilder::new()
                 .with_text("Buy")

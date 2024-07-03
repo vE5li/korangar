@@ -6,9 +6,9 @@ use num::traits::NumOps;
 use num::{NumCast, Zero};
 
 use super::{MutableArrayValue, MutableNumberValue};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, CornerRadius, ScreenPosition, ScreenSize};
 use crate::loaders::{FontSize, Scaling};
+use crate::GameState;
 
 pub trait PrototypeMutableRangeElement<T> {
     fn to_mutable_range_element(
@@ -17,7 +17,7 @@ pub trait PrototypeMutableRangeElement<T> {
         minimum: Self,
         maximum: Self,
         change_event: Option<ChangeEvent>,
-    ) -> ElementCell<InterfaceSettings>;
+    ) -> ElementCell<GameState>;
 }
 
 // workaround for not having negative trait bounds or better specialization
@@ -37,7 +37,7 @@ impl PrototypeMutableRangeElement<f32> for f32 {
         minimum: Self,
         maximum: Self,
         change_event: Option<ChangeEvent>,
-    ) -> ElementCell<InterfaceSettings> {
+    ) -> ElementCell<GameState> {
         // SAFETY: This is obviously unsafe, so one needs to make sure that the element
         // implementing `PrototypeMutableRangeElement` will be valid and pinned while
         // this element exists. Additionally, it should only be used in a debug
@@ -65,7 +65,7 @@ where
         minimum: Self,
         maximum: Self,
         change_event: Option<ChangeEvent>,
-    ) -> ElementCell<InterfaceSettings> {
+    ) -> ElementCell<GameState> {
         // SAFETY: This is obviously unsafe, so one needs to make sure that the element
         // implementing `PrototypeMutableRangeElement` will be valid and pinned while
         // this element exists. Additionally, it should only be used in a debug

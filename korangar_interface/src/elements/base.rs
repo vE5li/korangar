@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 
 use crate::application::{
     Application, ClipTrait, CornerRadiusTraitExt, FontSizeTraitExt, InterfaceRenderer, PartialSizeTraitExt, PositionTrait,
@@ -314,11 +314,13 @@ where
         HoverInformation::Missed
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, state: &Context<App>, update: &mut bool) -> Vec<ClickAction<App>> {
+        let _ = (state, update);
         Vec::new()
     }
 
-    fn right_click(&mut self, _update: &mut bool) -> Vec<ClickAction<App>> {
+    fn right_click(&mut self, state: &Context<App>, update: &mut bool) -> Vec<ClickAction<App>> {
+        let _ = (state, update);
         Vec::new()
     }
 
@@ -326,7 +328,8 @@ where
         None
     }
 
-    fn input_character(&mut self, _character: char) -> (bool, Vec<ClickAction<App>>) {
+    fn input_character(&mut self, state: &Context<App>, character: char) -> (bool, Vec<ClickAction<App>>) {
+        let _ = (state, character);
         (false, Vec::new())
     }
 

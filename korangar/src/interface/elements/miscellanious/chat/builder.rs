@@ -3,10 +3,12 @@ use std::rc::Rc;
 
 use korangar_interface::builder::Unset;
 use korangar_interface::state::PlainRemote;
+use rust_state::{SafeUnwrap, Selector};
 
 use super::Chat;
 use crate::interface::windows::ChatMessage;
 use crate::loaders::FontLoader;
+use crate::GameState;
 
 /// Type state [`Chat`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times and calling
@@ -27,7 +29,10 @@ impl ChatBuilder<Unset, Unset> {
 }
 
 impl<Font> ChatBuilder<Unset, Font> {
-    pub fn with_messages(self, messages: PlainRemote<Vec<ChatMessage>>) -> ChatBuilder<PlainRemote<Vec<ChatMessage>>, Font> {
+    pub fn with_messages<Messages>(self, messages: Messages) -> ChatBuilder<Messages, Font>
+    where
+        Messages: for<'a> Selector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
+    {
         ChatBuilder { messages, ..self }
     }
 }
@@ -38,14 +43,17 @@ impl<Messages> ChatBuilder<Messages, Unset> {
     }
 }
 
-impl ChatBuilder<PlainRemote<Vec<ChatMessage>>, Rc<RefCell<FontLoader>>> {
+impl<Messages> ChatBuilder<Messages, Rc<RefCell<FontLoader>>>
+where
+    Messages: for<'a> Selector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
+{
     /// Take the builder and turn it into a [`Chat`].
     ///
     /// NOTE: This method is only available if
     /// [`with_messages`](Self::with_messages)
     /// and [`with_font_loader`](Self::with_font_loader) have been called on
     /// the builder.
-    pub fn build(self) -> Chat {
+    pub fn build(self) -> Chat<Messages> {
         let Self { messages, font_loader } = self;
 
         Chat {

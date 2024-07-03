@@ -8,14 +8,16 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::PlainTrackedState;
 use korangar_interface::{dimension_bound, size_bound};
 use num::NumCast;
+use rust_state::{Context, Tracker};
 
 use super::ItemResourceProvider;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::elements::ItemDisplay;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
+use crate::GameState;
 
 #[derive(Clone, Copy)]
 pub enum ShopEntryOperation {
@@ -33,34 +35,32 @@ impl std::fmt::Display for ShopEntryOperation {
 }
 
 pub struct ShopEntry {
-    state: ContainerState<InterfaceSettings>,
+    state: ContainerState<GameState>,
     secondary_color: bool,
 }
 
 impl ShopEntry {
     fn add_button<SelfItem, CartItem, Amount>(
         item: SelfItem,
-        mut cart: PlainTrackedState<Vec<CartItem>>,
         operation: ShopEntryOperation,
         amount: Amount,
         act_button_press: impl Fn(&SelfItem, &mut PlainTrackedState<Vec<CartItem>>, Amount) + 'static,
         disabled_selector: impl Fn(&SelfItem, &PlainTrackedState<Vec<CartItem>>, Amount) -> bool + 'static,
-    ) -> ElementCell<InterfaceSettings>
+    ) -> ElementCell<GameState>
     where
         SelfItem: Clone + 'static,
         CartItem: 'static,
         Amount: Display + Copy + 'static,
     {
         let disabled_item = item.clone();
-        let disabled_cart = cart.clone();
 
         ButtonBuilder::new()
             .with_text(format!("{operation} {amount}"))
-            .with_event(move || {
-                act_button_press(&item, &mut cart, amount);
+            .with_event(move |_: &Context<GameState>| {
+                // act_button_press(&item, amount);
                 vec![]
             })
-            .with_disabled_selector(move || disabled_selector(&disabled_item, &disabled_cart, amount))
+            .with_disabled_selector(move |_: &Tracker<GameState>| disabled_selector(&disabled_item, &disabled_cart, amount))
             .with_width_bound(dimension_bound!(20%))
             .build()
             .wrap()
@@ -68,7 +68,6 @@ impl ShopEntry {
 
     pub fn new<SelfItem, CartItem, Amount>(
         item: SelfItem,
-        mut cart: PlainTrackedState<Vec<CartItem>>,
         operation: ShopEntryOperation,
         secondary_color: bool,
         get_item_quantity: impl Fn(&SelfItem) -> Option<usize> + Clone + 'static,
@@ -85,7 +84,6 @@ impl ShopEntry {
             Headline::new(item.get_resource_metadata().name.clone(), size_bound!(!, 14)).wrap(),
             Self::add_button(
                 item.clone(),
-                cart.clone(),
                 operation,
                 Amount::from(1).unwrap(),
                 act_button_press.clone(),
@@ -93,7 +91,6 @@ impl ShopEntry {
             ),
             Self::add_button(
                 item.clone(),
-                cart.clone(),
                 operation,
                 Amount::from(10).unwrap(),
                 act_button_press.clone(),
@@ -101,7 +98,6 @@ impl ShopEntry {
             ),
             Self::add_button(
                 item.clone(),
-                cart.clone(),
                 operation,
                 Amount::from(100).unwrap(),
                 act_button_press.clone(),
@@ -109,7 +105,6 @@ impl ShopEntry {
             ),
             Self::add_button(
                 item.clone(),
-                cart.clone(),
                 operation,
                 Amount::from(1000).unwrap(),
                 act_button_press.clone(),
@@ -119,16 +114,15 @@ impl ShopEntry {
 
         if let Some(amount) = get_item_quantity(&item) {
             let disabled_item = item.clone();
-            let disabled_cart = cart.clone();
             let amount = Amount::from(amount).unwrap();
 
             let remaining_button = ButtonBuilder::new()
                 .with_text(format!("{operation} all"))
-                .with_event(move || {
+                .with_event(move |_: &Context<GameState>| {
                     act_button_press(&item, &mut cart, amount);
                     Vec::new()
                 })
-                .with_disabled_selector(move || disabled_selector(&disabled_item, &disabled_cart, amount))
+                .with_disabled_selector(move |_: &Tracker<GameState>| disabled_selector(&disabled_item, &disabled_cart, amount))
                 .with_width_bound(dimension_bound!(20%))
                 .build()
                 .wrap();
@@ -142,16 +136,16 @@ impl ShopEntry {
     }
 }
 
-impl Element<InterfaceSettings> for ShopEntry {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for ShopEntry {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state.state
     }
 
-    fn link_back(&mut self, weak_self: WeakElementCell<InterfaceSettings>, weak_parent: Option<WeakElementCell<InterfaceSettings>>) {
+    fn link_back(&mut self, weak_self: WeakElementCell<GameState>, weak_parent: Option<WeakElementCell<GameState>>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -161,29 +155,29 @@ impl Element<InterfaceSettings> for ShopEntry {
 
     fn focus_next(
         &self,
-        self_cell: ElementCell<InterfaceSettings>,
-        caller_cell: Option<ElementCell<InterfaceSettings>>,
+        self_cell: ElementCell<GameState>,
+        caller_cell: Option<ElementCell<GameState>>,
         focus: Focus,
-    ) -> Option<ElementCell<InterfaceSettings>> {
+    ) -> Option<ElementCell<GameState>> {
         self.state.focus_next::<false>(self_cell, caller_cell, focus)
     }
 
-    fn restore_focus(&self, self_cell: ElementCell<InterfaceSettings>) -> Option<ElementCell<InterfaceSettings>> {
+    fn restore_focus(&self, self_cell: ElementCell<GameState>) -> Option<ElementCell<GameState>> {
         self.state.restore_focus(self_cell)
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(100%, ?);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::uniform(12.0));
+            .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(12.0));
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::MoveItem(..) => self.state.state.hovered_element(mouse_position),
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
@@ -195,13 +189,10 @@ impl Element<InterfaceSettings> for ShopEntry {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        focused_element: Option<&dyn Element<InterfaceSettings>>,
-        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
@@ -214,14 +205,6 @@ impl Element<InterfaceSettings> for ShopEntry {
             false => renderer.render_background(CornerRadius::uniform(5.0), Color::monochrome_u8(50)),
         }
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, application, theme_selector, second_theme);
     }
 }

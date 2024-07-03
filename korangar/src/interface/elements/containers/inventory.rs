@@ -4,19 +4,21 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_networking::InventoryItem;
+use rust_state::Tracker;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::elements::ItemBox;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, PartialMove};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::ResourceMetadata;
+use crate::{GameState, GameStateHoveredElementPath, GameStateMouseModePath};
 
 pub struct InventoryContainer {
     items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
-    state: ContainerState<InterfaceSettings>,
+    state: ContainerState<GameState>,
 }
 
 impl InventoryContainer {
@@ -37,16 +39,16 @@ impl InventoryContainer {
     }
 }
 
-impl Element<InterfaceSettings> for InventoryContainer {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for InventoryContainer {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state.state
     }
 
-    fn link_back(&mut self, weak_self: WeakElementCell<InterfaceSettings>, weak_parent: Option<WeakElementCell<InterfaceSettings>>) {
+    fn link_back(&mut self, weak_self: WeakElementCell<GameState>, weak_parent: Option<WeakElementCell<GameState>>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -56,26 +58,26 @@ impl Element<InterfaceSettings> for InventoryContainer {
 
     fn focus_next(
         &self,
-        self_cell: ElementCell<InterfaceSettings>,
-        caller_cell: Option<ElementCell<InterfaceSettings>>,
+        self_cell: ElementCell<GameState>,
+        caller_cell: Option<ElementCell<GameState>>,
         focus: Focus,
-    ) -> Option<ElementCell<InterfaceSettings>> {
+    ) -> Option<ElementCell<GameState>> {
         self.state.focus_next::<false>(self_cell, caller_cell, focus)
     }
 
-    fn restore_focus(&self, self_cell: ElementCell<InterfaceSettings>) -> Option<ElementCell<InterfaceSettings>> {
+    fn restore_focus(&self, self_cell: ElementCell<GameState>) -> Option<ElementCell<GameState>> {
         self.state.restore_focus(self_cell)
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(100%, ?);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::uniform(3.0));
+            .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(3.0));
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -94,7 +96,7 @@ impl Element<InterfaceSettings> for InventoryContainer {
         None
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::MoveItem(..) => self.state.state.hovered_element(mouse_position),
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
@@ -118,13 +120,10 @@ impl Element<InterfaceSettings> for InventoryContainer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        focused_element: Option<&dyn Element<InterfaceSettings>>,
-        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
@@ -132,17 +131,13 @@ impl Element<InterfaceSettings> for InventoryContainer {
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, application, theme_selector, second_theme);
+
+        let mouse_mode = application.get_safe(&GameStateMouseModePath::default());
 
         if matches!(mouse_mode, MouseInputMode::MoveItem(..)) {
+            let hovered_element = application.get_safe(&GameStateHoveredElementPath::default());
+
             match self.is_element_self(hovered_element) {
                 true => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba_u8(60, 160, 160, 160)),
                 false => renderer.render_background(CornerRadius::uniform(5.0), Color::rgba_u8(160, 160, 60, 160)),

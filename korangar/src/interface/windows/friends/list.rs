@@ -5,51 +5,40 @@ use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedStateTake
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::Friend;
+use rust_state::{Context, SafeUnwrap, Selector};
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FriendView;
 use crate::interface::layout::ScreenSize;
 use crate::interface::linked::LinkedElement;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
-#[derive(new)]
-pub struct FriendsWindow {
-    friend_list: PlainRemote<Vec<(Friend, LinkedElement)>>,
-}
+#[derive(Default)]
+pub struct FriendsWindow;
 
 impl FriendsWindow {
     pub const WINDOW_CLASS: &'static str = "friends";
 }
 
-impl PrototypeWindow<InterfaceSettings> for FriendsWindow {
+impl PrototypeWindow<GameState> for FriendsWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let friend_name = PlainTrackedState::<String>::default();
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
+        let add_action = Box::new(move |state: &Context<GameState>| {
+            let taken_string = state.get_safe(&GameState::friend_name_input()).clone();
+            state.update_value(&GameState::friend_name_input(), String::new());
 
-        let add_action = {
-            let mut friend_name = friend_name.clone();
-
-            Box::new(move || {
-                let taken_string = friend_name.take();
-
-                (!taken_string.is_empty())
-                    .then_some(vec![ClickAction::Custom(UserEvent::AddFriend(taken_string))])
-                    .unwrap_or_default()
-            })
-        };
+            (!taken_string.is_empty())
+                .then_some(vec![ClickAction::Custom(UserEvent::AddFriend(taken_string))])
+                .unwrap_or_default()
+        });
 
         let elements = vec![
             InputFieldBuilder::new()
-                .with_state(friend_name)
+                .with_state(GameState::friend_name_input())
                 .with_ghost_text("Name")
                 .with_enter_action(add_action.clone())
                 .with_length(24)
@@ -62,7 +51,7 @@ impl PrototypeWindow<InterfaceSettings> for FriendsWindow {
                 .with_width_bound(dimension_bound!(!))
                 .build()
                 .wrap(),
-            FriendView::new(self.friend_list.clone()).wrap(),
+            FriendView::new().wrap(),
         ];
 
         WindowBuilder::new()

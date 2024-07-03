@@ -2,12 +2,13 @@ use korangar_interface::elements::ElementWrap;
 use korangar_interface::size_bound;
 use korangar_interface::state::PlainRemote;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::SkillTreeContainer;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 use crate::inventory::Skill;
+use crate::GameState;
 
 pub struct SkillTreeWindow {
     skills: PlainRemote<Vec<Skill>>,
@@ -23,17 +24,12 @@ impl SkillTreeWindow {
     pub const WINDOW_CLASS: &'static str = "skill_tree";
 }
 
-impl PrototypeWindow<InterfaceSettings> for SkillTreeWindow {
+impl PrototypeWindow<GameState> for SkillTreeWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![SkillTreeContainer::new(self.skills.clone()).wrap()];
 
         WindowBuilder::new()

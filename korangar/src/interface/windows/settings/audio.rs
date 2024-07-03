@@ -1,9 +1,10 @@
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(Default)]
 pub struct AudioSettingsWindow;
@@ -12,17 +13,12 @@ impl AudioSettingsWindow {
     pub const WINDOW_CLASS: &'static str = "audio_settings";
 }
 
-impl PrototypeWindow<InterfaceSettings> for AudioSettingsWindow {
+impl PrototypeWindow<GameState> for AudioSettingsWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![];
 
         WindowBuilder::new()

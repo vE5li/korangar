@@ -6,7 +6,7 @@ use super::Button;
 use crate::application::Application;
 use crate::builder::{Set, Unset};
 use crate::layout::DimensionBound;
-use crate::{ColorSelector, ElementEvent, Selector};
+use crate::{BaseSelector, ColorSelector, ElementEvent};
 
 /// Type state [`Button`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times and calling
@@ -18,7 +18,7 @@ where
 {
     text: Text,
     event: Event,
-    disabled_selector: Option<Selector>,
+    disabled_selector: Option<BaseSelector<App>>,
     foreground_color: Option<ColorSelector<App>>,
     background_color: Option<ColorSelector<App>>,
     width_bound: DimensionBound,
@@ -72,7 +72,7 @@ where
 {
     pub fn with_disabled_selector(
         self,
-        selector: impl Fn() -> bool + 'static,
+        selector: impl Fn(&Tracker<App>) -> bool + 'static,
     ) -> ButtonBuilder<App, Text, Event, Set, Foreground, Background, Width> {
         ButtonBuilder {
             disabled_selector: Some(Box::new(selector)),

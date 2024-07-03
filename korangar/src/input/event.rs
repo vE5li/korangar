@@ -5,12 +5,14 @@ use korangar_networking::ShopItem;
 use ragnarok_packets::{
     AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, TilePosition,
 };
+use rust_state::Context;
 
-use crate::interface::application::{InterfaceSettings, InternalThemeKind};
+use crate::interface::application::InternalThemeKind;
 use crate::interface::resource::Move;
 use crate::loaders::ServiceId;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
+use crate::GameState;
 
 #[derive(Clone, Debug)]
 // TODO: A lot of these are not user events, just a element events
@@ -131,8 +133,8 @@ pub enum UserEvent {
     CameraDecelerate,
 }
 
-impl ElementEvent<InterfaceSettings> for UserEvent {
-    fn trigger(&mut self) -> Vec<ClickAction<InterfaceSettings>> {
+impl ElementEvent<GameState> for UserEvent {
+    fn trigger(&mut self, _state: &Context<GameState>) -> Vec<ClickAction<GameState>> {
         vec![ClickAction::Custom(self.clone())]
     }
 }

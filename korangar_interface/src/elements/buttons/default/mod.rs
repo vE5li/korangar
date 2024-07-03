@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 
 pub use self::builder::ButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
@@ -8,7 +8,7 @@ use crate::elements::{Element, ElementState};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{DimensionBound, PlacementResolver};
 use crate::theme::ButtonTheme;
-use crate::{ColorSelector, ElementEvent, Selector};
+use crate::{BaseSelector, ColorSelector, ElementEvent};
 
 pub struct Button<App, Text, Event>
 where
@@ -18,7 +18,7 @@ where
 {
     text: Text,
     event: Event,
-    disabled_selector: Option<Selector>,
+    disabled_selector: Option<BaseSelector<App>>,
     foreground_color: Option<ColorSelector<App>>,
     background_color: Option<ColorSelector<App>>,
     width_bound: DimensionBound,
@@ -32,7 +32,8 @@ where
     Event: ElementEvent<App> + 'static,
 {
     fn is_disabled(&self) -> bool {
-        self.disabled_selector.as_ref().map(|selector| !selector()).unwrap_or(false)
+        // self.disabled_selector.as_ref().map(|selector| !selector()).unwrap_or(false)
+        false
     }
 }
 
@@ -68,10 +69,10 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, state: &Context<App>, _force_update: &mut bool) -> Vec<ClickAction<App>> {
         match self.is_disabled() {
             true => Vec::new(),
-            false => self.event.trigger(),
+            false => self.event.trigger(state),
         }
     }
 

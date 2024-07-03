@@ -20,8 +20,8 @@ use vulkano::sync::GpuFuture;
 
 use super::GameFileLoader;
 use crate::graphics::{Color, CommandBuilder, MemoryAllocator};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
+use crate::GameState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -334,7 +334,7 @@ impl FontLoader {
     }
 }
 
-impl korangar_interface::application::FontLoaderTrait<InterfaceSettings> for std::rc::Rc<std::cell::RefCell<FontLoader>> {
+impl korangar_interface::application::FontLoaderTrait<GameState> for std::rc::Rc<std::cell::RefCell<FontLoader>> {
     fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
         self.borrow().get_text_dimensions(text, font_size, available_width)
     }

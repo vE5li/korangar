@@ -59,7 +59,7 @@ where
     }
 }
 
-pub trait Selector<'a, State, To> {
+pub trait Selector<'a, State, To>: Clone + 'static {
     fn get(&self, state: &'a State) -> Option<&'a To>;
 
     fn get_mut(&self, state: &'a mut State) -> Option<&'a mut To>;
@@ -69,9 +69,9 @@ pub trait Selector<'a, State, To> {
 
 impl<'a, State, Path, Item> Selector<'a, State, Item> for VecLookup<State, Path, Item>
 where
-    State: StateMarker,
+    State: StateMarker + 'static,
     Path: Selector<'a, State, Vec<Item>>,
-    Item: VecItem,
+    Item: VecItem + 'static,
 {
     fn get(&self, state: &'a State) -> Option<&'a Item> {
         self.path.get(state)?.iter().find(|e| e.get_id() == self.id)
@@ -94,8 +94,8 @@ pub type StateChange<State> = Box<dyn FnOnce(&mut State)>;
 
 pub struct Context<State> {
     state: State,
-    state_changes: Vec<StateChange<State>>,
-    updated_paths: Vec<PathId>,
+    state_changes: UnsafeCell<Vec<StateChange<State>>>,
+    updated_paths: UnsafeCell<Vec<PathId>>,
     change_map: ChangeMap,
     version: u32,
 }
@@ -104,21 +104,26 @@ impl<State: StateMarker> Context<State> {
     pub fn new(state: State) -> Self {
         Self {
             state,
-            state_changes: Vec::new(),
-            updated_paths: Vec::new(),
+            state_changes: UnsafeCell::new(Vec::new()),
+            updated_paths: UnsafeCell::new(Vec::new()),
             change_map: ChangeMap::default(),
             version: 0,
         }
     }
 
-    fn push_change(&mut self, path_id: PathId, state_change: StateChange<State>) {
-        self.updated_paths.push(path_id);
-        self.state_changes.push(state_change);
+    fn push_change(&self, path_id: PathId, state_change: StateChange<State>) {
+        let updated_paths = UnsafeCell::raw_get(&self.updated_paths as *const UnsafeCell<Vec<PathId>>);
+        let updated_paths = unsafe { &mut *updated_paths };
+        updated_paths.push(path_id);
+
+        let state_changes = UnsafeCell::raw_get(&self.state_changes as *const UnsafeCell<Vec<StateChange<State>>>);
+        let state_changes = unsafe { &mut *state_changes };
+        state_changes.push(state_change);
     }
 
-    pub fn update_value<Path, Value>(&mut self, path: &Path, value: Value)
+    pub fn update_value<Path, Value>(&self, path: &Path, value: Value)
     where
-        Path: for<'a> Selector<'a, State, Value> + Clone + 'static,
+        Path: for<'a> Selector<'a, State, Value>,
         Value: 'static,
     {
         let path = path.clone();
@@ -131,9 +136,9 @@ impl<State: StateMarker> Context<State> {
         );
     }
 
-    pub fn remove<Path, Value>(&mut self, path: &Path, id: Value::Id)
+    pub fn remove<Path, Value>(&self, path: &Path, id: Value::Id)
     where
-        Path: for<'a> Selector<'a, State, Vec<Value>> + Clone + 'static,
+        Path: for<'a> Selector<'a, State, Vec<Value>>,
         Value: VecItem + 'static,
     {
         let path = path.clone();
@@ -146,9 +151,9 @@ impl<State: StateMarker> Context<State> {
         );
     }
 
-    pub fn push<Path, Value>(&mut self, path: &Path, value: Value)
+    pub fn push<Path, Value>(&self, path: &Path, value: Value)
     where
-        Path: for<'a> Selector<'a, State, Vec<Value>> + Clone + 'static,
+        Path: for<'a> Selector<'a, State, Vec<Value>>,
         Value: 'static,
     {
         let path = path.clone();
@@ -164,9 +169,10 @@ impl<State: StateMarker> Context<State> {
     pub fn apply(mut self) -> Self {
         self.version += 1;
 
-        self.state_changes.drain(..).for_each(|apply| apply(&mut self.state));
+        self.state_changes.get_mut().drain(..).for_each(|apply| apply(&mut self.state));
 
         self.updated_paths
+            .get_mut()
             .drain(..)
             .for_each(|path| self.change_map.update_path(path, self.version));
 

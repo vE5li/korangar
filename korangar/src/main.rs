@@ -42,16 +42,18 @@ use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
-use korangar_interface::application::{Application, FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
+use korangar_interface::application::{FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec};
 use korangar_interface::Interface;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem, SellItem, ShopItem,
 };
+use loaders::client::LoginSettings;
 use ragnarok_packets::{
     BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
     SkillType, TilePosition, UnitId, WorldPosition,
 };
+use rust_state::{Context, ReadState};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{
@@ -67,12 +69,12 @@ use winit::window::{Icon, WindowBuilder};
 
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::dialog::DialogSystem;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::linked::LinkedElement;
 use crate::interface::resource::{ItemSource, Move, SkillSource};
+use crate::interface::theme::{CursorTheme, GameTheme, IndicatorTheme, OverlayTheme};
 use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
@@ -93,6 +95,21 @@ korangar_debug::create_profiler_threads!(threads, {
 });
 
 #[derive(rust_state::RustState)]
+struct ProfilerState {
+    always_update: bool,
+    halted: bool,
+    visible_thread: threads::Enum,
+}
+
+#[derive(rust_state::RustState)]
+struct PacketsState {
+    history: (),
+    show_pings: bool,
+    update: bool,
+}
+
+#[derive(rust_state::RustState)]
+#[state_root]
 struct GameState {
     current_map: Arc<Map>,
     shadow_detail: ShadowDetail,
@@ -107,7 +124,25 @@ struct GameState {
     main_theme: interface::theme::InterfaceTheme,
     menu_theme: interface::theme::InterfaceTheme,
     game_theme: interface::theme::GameTheme,
+    hovered_element: u32, //Option<&dyn Element<InterfaceSettings>>,
+    focused_element: u32, //Option<&dyn Element<InterfaceSettings>>,
     mouse_mode: MouseInputMode,
+    scale: Scaling,
+    username: String,
+    password: String,
+    selected_service: ServiceId,
+    login_settings: LoginSettings,
+    render_settings: RenderSettings,
+    chat_input: String,
+    chat_messages: Vec<ChatMessage>,
+    friend_name_input: String,
+    character_name_input: String,
+    // Debug only
+    profiler: ProfilerState,
+    // Debug only
+    packets: PacketsState,
+    // Debug only
+    command_input: String,
 }
 
 fn main() {
@@ -357,7 +392,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("initialize interface");
 
-    let mut application = InterfaceSettings::load_or_default();
+    // let mut application = InterfaceSettings::load_or_default();
     let mut interface = Interface::new(swapchain_holder.window_screen_size());
     let mut focus_state = FocusState::default();
     let mut mouse_cursor = MouseCursor::new(&mut game_file_loader, &mut sprite_loader, &mut action_loader);
@@ -414,13 +449,10 @@ fn main() {
     let mut sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>> = PlainTrackedState::default();
     let mut currently_deleting: Option<CharacterId> = None;
     let mut saved_player_name = String::new();
-    let mut move_request: PlainTrackedState<Option<usize>> = PlainTrackedState::default();
     let mut saved_login_server_address = None;
     let mut saved_password = String::new();
     let mut saved_username = String::new();
     let mut saved_slot_count = 0;
-
-    interface.open_window(&application, &mut focus_state, &LoginWindow::new(&client_info));
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -442,6 +474,43 @@ fn main() {
     }]);
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
+
+    let mut game_state = Context::new(GameState {
+        current_map: todo!(),
+        shadow_detail: todo!(),
+        framerate_limit: todo!(),
+        show_inderface: todo!(),
+        friend_list: todo!(),
+        characters: todo!(),
+        shop_items: todo!(),
+        sell_items: todo!(),
+        currently_deleting,
+        move_request: todo!(),
+        main_theme: todo!(),
+        menu_theme: todo!(),
+        game_theme: todo!(),
+        hovered_element: todo!(),
+        focused_element: todo!(),
+        mouse_mode: todo!(),
+        scale: todo!(),
+        render_settings: todo!(),
+        chat_input: todo!(),
+        chat_messages: todo!(),
+        friend_name_input: todo!(),
+        profiler: todo!(),
+        packets: todo!(),
+        command_input: todo!(),
+        character_name_input: todo!(),
+        username: todo!(),
+        password: todo!(),
+        selected_service: todo!(),
+        login_settings: todo!(),
+    });
+
+    let mut interface_read_state = ReadState::default();
+    let mut update_read_state = ReadState::default();
+
+    interface.open_window(&game_state, &mut focus_state, &LoginWindow::new(&client_info));
 
     event_loop.run(move |event, _, control_flow| {
         match event {
@@ -532,7 +601,7 @@ fn main() {
 
                 let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
                     &mut interface,
-                    &application,
+                    &game_state,
                     &mut focus_state,
                     &mut picker_targets[swapchain_holder.get_image_number()],
                     &mut mouse_cursor,
@@ -572,11 +641,11 @@ fn main() {
                             saved_login_data = Some(login_data);
 
                             interface.close_all_windows_except(&mut focus_state);
-                            interface.open_window(&application, &mut focus_state, &SelectServerWindow::new(character_servers));
+                            interface.open_window(&game_state, &mut focus_state, &SelectServerWindow::new(character_servers));
                         }
                         NetworkEvent::LoginServerConnectionFailed { message, .. } => {
                             networking_system.disconnect_from_login_server();
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
+                            interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()));
                         }
                         NetworkEvent::LoginServerDisconnected { reason } => {
                             if reason != DisconnectReason::ClosedByClient {
@@ -594,7 +663,7 @@ fn main() {
                         },
                         NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
                             networking_system.disconnect_from_character_server();
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
+                            interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()));
                         },
                         NetworkEvent::CharacterServerDisconnected { reason } => {
                             if reason != DisconnectReason::ClosedByClient {
@@ -634,8 +703,8 @@ fn main() {
 
                             interface.close_all_windows_except(&mut focus_state);
 
-                            let character_selection_window = CharacterSelectionWindow::new(saved_characters.new_remote(), move_request.new_remote(), saved_slot_count);
-                            interface.open_window(&application, &mut focus_state, &character_selection_window);
+                            let character_selection_window = CharacterSelectionWindow::new(saved_slot_count);
+                            interface.open_window(&game_state, &mut focus_state, &character_selection_window);
 
                             start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
                             directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
@@ -644,15 +713,15 @@ fn main() {
                         NetworkEvent::AccountId(..) => {},
                         NetworkEvent::CharacterList { characters } => {
                             saved_characters.set(characters);
-                            let character_selection_window = CharacterSelectionWindow::new(saved_characters.new_remote(), move_request.new_remote(), saved_slot_count);
+                            let character_selection_window = CharacterSelectionWindow::new(saved_slot_count);
 
                             // TODO: this will do one unnecessary restore_focus. check if
                             // that will be problematic
                             interface.close_all_windows_except(&mut focus_state);
-                            interface.open_window(&application, &mut focus_state, &character_selection_window);
+                            interface.open_window(&game_state, &mut focus_state, &character_selection_window);
                         }
                         NetworkEvent::CharacterSelectionFailed { message, .. } => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()))
+                            interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()))
                         }
                         NetworkEvent::CharacterDeleted => {
                             let character_id = currently_deleting.take().unwrap();
@@ -661,7 +730,7 @@ fn main() {
                         },
                         NetworkEvent::CharacterDeletionFailed { message, .. } => {
                             currently_deleting = None;
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()))
+                            interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()))
                         }
                         NetworkEvent::CharacterSelected { login_data, map_name } => {
                             let saved_login_data = saved_login_data.as_ref().unwrap();
@@ -706,13 +775,13 @@ fn main() {
                             // TODO: this will do one unnecessary restore_focus. check if
                             // that will be problematic
                             interface.close_window_with_class(&mut focus_state, CharacterSelectionWindow::WINDOW_CLASS);
-                            interface.open_window(&application, &mut focus_state, &CharacterOverviewWindow::new());
+                            interface.open_window(&game_state, &mut focus_state, &CharacterOverviewWindow::new());
                             interface.open_window(
-                                &application,
+                                &game_state,
                                 &mut focus_state,
-                                &ChatWindow::new(chat_messages.new_remote(), font_loader.clone()),
+                                &ChatWindow::new(font_loader.clone()),
                             );
-                            interface.open_window(&application, &mut focus_state, &HotbarWindow::new(hotbar.get_skills()));
+                            interface.open_window(&game_state, &mut focus_state, &HotbarWindow::new(hotbar.get_skills()));
 
                             // Put the dialog system in a well-defined state.
                             dialog_system.close_dialog();
@@ -730,11 +799,11 @@ fn main() {
                             interface.close_window_with_class(&mut focus_state, CharacterCreationWindow::WINDOW_CLASS);
                         },
                         NetworkEvent::CharacterCreationFailed { message, .. } => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new(message.to_owned()));
+                            interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()));
                         },
                         NetworkEvent::CharacterSlotSwitched => {},
                         NetworkEvent::CharacterSlotSwitchFailed => {
-                            interface.open_window(&application, &mut focus_state, &ErrorWindow::new("Failed to switch character slots".to_owned()));
+                            interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new("Failed to switch character slots".to_owned()));
                         },
                         NetworkEvent::AddEntity(entity_appeared_data) => {
                             // Sometimes (like after a job change) the server will tell the client
@@ -853,7 +922,7 @@ fn main() {
                         }
                         NetworkEvent::OpenDialog(text, npc_id) => {
                             if let Some(dialog_window) = dialog_system.open_dialog_window(text, npc_id) {
-                                interface.open_window(&application, &mut focus_state, &dialog_window);
+                                interface.open_window(&game_state, &mut focus_state, &dialog_window);
                             }
                         }
                         NetworkEvent::AddNextButton => dialog_system.add_next_button(),
@@ -905,7 +974,7 @@ fn main() {
                             networking_system.disconnect_from_map_server();
                         }
                         NetworkEvent::FriendRequest { requestee } => {
-                            interface.open_window(&application, &mut focus_state, &FriendRequestWindow::new(requestee))
+                            interface.open_window(&game_state, &mut focus_state, &FriendRequestWindow::new(requestee))
                         }
                         NetworkEvent::FriendRemoved { account_id, character_id } => {
                             friend_list.retain(|(friend, _)| !(friend.account_id == account_id && friend.character_id == character_id));
@@ -1012,11 +1081,11 @@ fn main() {
 
                             let cart = PlainTrackedState::default();
 
-                            interface.open_window(&application, &mut focus_state, &BuyWindow::new(shop_items.new_remote(), cart.clone()));
-                            interface.open_window(&application, &mut focus_state, &BuyCartWindow::new(cart));
+                            interface.open_window(&game_state, &mut focus_state, &BuyWindow::new(shop_items.new_remote(), cart.clone()));
+                            interface.open_window(&game_state, &mut focus_state, &BuyCartWindow::new(cart));
                         }
                         NetworkEvent::AskBuyOrSell { shop_id } => {
-                            interface.open_window(&application, &mut focus_state, &BuyOrSellWindow::new(shop_id));
+                            interface.open_window(&game_state, &mut focus_state, &BuyOrSellWindow::new(shop_id));
                         }
                         NetworkEvent::BuyingCompleted { result } => {
                             match result {
@@ -1057,8 +1126,8 @@ fn main() {
 
                             let cart = PlainTrackedState::default();
 
-                            interface.open_window(&application, &mut focus_state, &SellWindow::new(sell_items.new_remote(), cart.clone()));
-                            interface.open_window(&application, &mut focus_state, &SellCartWindow::new(cart.clone()));
+                            interface.open_window(&game_state, &mut focus_state, &SellWindow::new(sell_items.new_remote(), cart.clone()));
+                            interface.open_window(&game_state, &mut focus_state, &SellCartWindow::default());
                         }
                         NetworkEvent::SellingCompleted { result } => {
                             match result {
@@ -1123,13 +1192,13 @@ fn main() {
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::OpenMenuWindow => {
                             if !entities.is_empty() {
-                                interface.open_window(&application, &mut focus_state, &MenuWindow)
+                                interface.open_window(&game_state, &mut focus_state, &MenuWindow)
                             }
                         }
                         UserEvent::OpenInventoryWindow => {
                             if !entities.is_empty() {
                                 interface.open_window(
-                                    &application,
+                                    &game_state,
                                     &mut focus_state,
                                     &InventoryWindow::new(player_inventory.item_remote()),
                                 )
@@ -1138,7 +1207,7 @@ fn main() {
                         UserEvent::OpenEquipmentWindow => {
                             if !entities.is_empty() {
                                 interface.open_window(
-                                    &application,
+                                    &game_state,
                                     &mut focus_state,
                                     &EquipmentWindow::new(player_inventory.item_remote()),
                                 )
@@ -1147,30 +1216,30 @@ fn main() {
                         UserEvent::OpenSkillTreeWindow => {
                             if !entities.is_empty() {
                                 interface.open_window(
-                                    &application,
+                                    &game_state,
                                     &mut focus_state,
                                     &SkillTreeWindow::new(player_skill_tree.get_skills()),
                                 )
                             }
                         }
                         UserEvent::OpenGraphicsSettingsWindow => interface.open_window(
-                            &application,
+                            &game_state,
                             &mut focus_state,
-                            &GraphicsSettingsWindow::new(present_mode_info, shadow_detail.clone_state(), framerate_limit.clone_state()),
+                            &GraphicsSettingsWindow::new(present_mode_info),
                         ),
-                        UserEvent::OpenAudioSettingsWindow => interface.open_window(&application, &mut focus_state, &AudioSettingsWindow),
+                        UserEvent::OpenAudioSettingsWindow => interface.open_window(&game_state, &mut focus_state, &AudioSettingsWindow),
                         UserEvent::OpenFriendsWindow => {
-                            interface.open_window(&application, &mut focus_state, &FriendsWindow::new(friend_list.new_remote()));
+                            interface.open_window(&game_state, &mut focus_state, &FriendsWindow::default());
                         }
                         UserEvent::ToggleShowInterface => show_interface = !show_interface,
-                        UserEvent::SetThemeFile { theme_file, theme_kind } => application.set_theme_file(theme_file, theme_kind),
-                        UserEvent::SaveTheme { theme_kind } => application.save_theme(theme_kind),
-                        UserEvent::ReloadTheme { theme_kind } => application.reload_theme(theme_kind),
+                        UserEvent::SetThemeFile { theme_file, theme_kind } => {}, //game_state.set_theme_file(theme_file, theme_kind),
+                        UserEvent::SaveTheme { theme_kind } => {}, //game_state.save_theme(theme_kind),
+                        UserEvent::ReloadTheme { theme_kind } => {}, //game_state.reload_theme(theme_kind),
                         UserEvent::SelectCharacter(character_slot) => {
                             let _ = networking_system.select_character(character_slot);
                         },
                         UserEvent::OpenCharacterCreationWindow(character_slot) => {
-                            interface.open_window(&application, &mut focus_state, &CharacterCreationWindow::new(character_slot))
+                            interface.open_window(&game_state, &mut focus_state, &CharacterCreationWindow::new(character_slot))
                         }
                         UserEvent::CreateCharacter(character_slot, name) => {
                             let _ = networking_system.create_character(character_slot, name);
@@ -1181,10 +1250,13 @@ fn main() {
                                 currently_deleting = Some(character_id);
                             }
                         },
-                        UserEvent::RequestSwitchCharacterSlot(origin_slot) => move_request.set(Some(origin_slot)),
-                        UserEvent::CancelSwitchCharacterSlot => move_request.set(None),
+                        UserEvent::RequestSwitchCharacterSlot(origin_slot) => game_state.update_value(&GameState::move_request(), Some(origin_slot)),
+                        UserEvent::CancelSwitchCharacterSlot => game_state.update_value(&GameState::move_request(), None),
                         UserEvent::SwitchCharacterSlot(destination_slot) => {
-                            let _ = networking_system.switch_character_slot(move_request.take().unwrap(), destination_slot);
+                            let origin_slot = game_state.get_safe(&GameState::move_request()).unwrap();
+                            game_state.update_value(&GameState::move_request(), None);
+
+                            let _ = networking_system.switch_character_slot(origin_slot, destination_slot);
                         },
                         UserEvent::RequestPlayerMove(destination) => {
                             if !entities.is_empty() {
@@ -1342,22 +1414,22 @@ fn main() {
                         },
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {
-                            interface.open_window(&application, &mut focus_state, map.resolve_marker(&entities, marker_identifier))
+                            interface.open_window(&game_state, &mut focus_state, map.resolve_marker(&entities, marker_identifier))
                         }
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(
-                            &application,
+                            &game_state,
                             &mut focus_state,
-                            &RenderSettingsWindow::new(render_settings.clone()),
+                            &RenderSettingsWindow::default(),
                         ),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapDataWindow => interface.open_window(&application, &mut focus_state, map.to_prototype_window()),
+                        UserEvent::OpenMapDataWindow => interface.open_window(&game_state, &mut focus_state, map.to_prototype_window()),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapsWindow => interface.open_window(&application, &mut focus_state, &MapsWindow),
+                        UserEvent::OpenMapsWindow => interface.open_window(&game_state, &mut focus_state, &MapsWindow),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenCommandsWindow => interface.open_window(&application, &mut focus_state, &CommandsWindow),
+                        UserEvent::OpenCommandsWindow => interface.open_window(&game_state, &mut focus_state, &CommandsWindow::new(GameState::command_input())),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenTimeWindow => interface.open_window(&application, &mut focus_state, &TimeWindow),
+                        UserEvent::OpenTimeWindow => interface.open_window(&game_state, &mut focus_state, &TimeWindow),
                         #[cfg(feature = "debug")]
                         UserEvent::SetDawn => game_timer.set_day_timer(0.0),
                         #[cfg(feature = "debug")]
@@ -1368,13 +1440,14 @@ fn main() {
                         UserEvent::SetMidnight => game_timer.set_day_timer(-std::f32::consts::FRAC_PI_2),
                         #[cfg(feature = "debug")]
                         UserEvent::OpenThemeViewerWindow => {
-                            interface.open_window(&application, &mut focus_state, application.theme_window())
+                            // interface.open_window(&game_state, &mut focus_state, game_state.theme_window())
                         }
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenProfilerWindow => interface.open_window(&application, &mut focus_state, &ProfilerWindow::new()),
+                        UserEvent::OpenProfilerWindow => interface.open_window(&game_state, &mut focus_state, &ProfilerWindow::default(
+                        )),
                         #[cfg(feature = "debug")]
                         UserEvent::OpenPacketWindow => {
-                            interface.open_window(&application, &mut focus_state, &PacketWindow::new(packet_callback.remote(), PlainTrackedState::default()))
+                            // interface.open_window(&game_state, &mut focus_state, &PacketWindow::default())
                         }
                         #[cfg(feature = "debug")]
                         UserEvent::ClearPacketHistory => packet_callback.clear_all(),
@@ -1433,8 +1506,12 @@ fn main() {
                 particle_holder.update(delta_time as f32);
                 effect_holder.update(&entities, delta_time as f32);
 
-                let (clear_interface, render_interface) = interface.update(&application, font_loader.clone(), &mut focus_state);
-                mouse_cursor.update(client_tick);
+                {
+                    let tracked_game_state = update_read_state.track_new(&mut game_state);
+
+                    let (clear_interface, render_interface) = interface.update(&tracked_game_state, font_loader.clone(), &mut focus_state);
+                    mouse_cursor.update(client_tick);
+                }
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
@@ -1556,7 +1633,7 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 let render_settings = &*render_settings.get();
-                let walk_indicator_color = application.get_game_theme().indicator.walking.get();
+                let walk_indicator_color = *game_state.get_safe(&IndicatorTheme::walking(GameTheme::indicator(GameState::game_theme())));
                 let image_number = swapchain_holder.get_image_number();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
                 let screen_target = &mut screen_targets[image_number];
@@ -1756,13 +1833,15 @@ fn main() {
 
                         interface_target.start(window_size_u32, clear_interface);
 
+                        let tracked_game_state = interface_read_state.track_new(&mut game_state);
+
                         interface.render(
                             &mut interface_target,
                             &interface_renderer,
-                            &application,
-                            hovered_element,
-                            focused_element,
-                            input_system.get_mouse_mode(),
+                            &tracked_game_state,
+                            // hovered_element,
+                            // focused_element,
+                            // input_system.get_mouse_mode(),
                         );
 
                         let font_future = font_loader.borrow_mut().submit_load_buffer();
@@ -1797,8 +1876,8 @@ fn main() {
                         entity.render_status(
                             screen_target,
                             &deferred_renderer,
+                            &game_state,
                             current_camera,
-                            application.get_game_theme(),
                             window_size,
                         );
 
@@ -1836,22 +1915,23 @@ fn main() {
                     entities[0].render_status(
                         screen_target,
                         &deferred_renderer,
+                        &game_state,
                         current_camera,
-                        application.get_game_theme(),
                         window_size,
                     );
                 }
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_frames_per_second {
-                    let game_theme = application.get_game_theme();
+                    let scaling = *game_state.get_safe(&GameState::scale());
+
 
                     deferred_renderer.render_text(
                         screen_target,
                         &game_timer.last_frames_per_second().to_string(),
-                        game_theme.overlay.text_offset.get().scaled(application.get_scaling()),
-                        game_theme.overlay.foreground_color.get(),
-                        game_theme.overlay.font_size.get().scaled(application.get_scaling()),
+                        game_state.get_safe(&OverlayTheme::text_offset(GameTheme::overlay(GameState::game_theme()))).scaled(scaling),
+                        *game_state.get_safe(&OverlayTheme::foreground_color(GameTheme::overlay(GameState::game_theme()))),
+                        game_state.get_safe(&OverlayTheme::font_size(GameTheme::overlay(GameState::game_theme()))).scaled(scaling),
                     );
                 }
 
@@ -1863,8 +1943,8 @@ fn main() {
                         &deferred_renderer,
                         input_system.get_mouse_position(),
                         input_system.get_mouse_mode().grabbed(),
-                        application.get_game_theme().cursor.color.get(),
-                        &application,
+                        *game_state.get_safe(&CursorTheme::color(GameTheme::cursor(GameState::game_theme()))),
+                        &game_state,
                     );
                 }
 

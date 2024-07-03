@@ -6,19 +6,21 @@ use cgmath::{Array, Vector2};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_interface::application::ScalingTrait;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
+use rust_state::{Context, Tracker};
 use vulkano::image::view::ImageView;
 
 use super::error::LoadError;
 use super::Sprite;
 use crate::graphics::{Color, Renderer, SpriteRenderer};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
+use crate::{GameState, GameStateScalePath};
 
 #[derive(Clone, Debug, new)]
 pub struct AnimationState {
@@ -124,7 +126,7 @@ impl Actions {
         position: ScreenPosition,
         camera_direction: usize,
         color: Color,
-        application: &InterfaceSettings,
+        application: &Context<GameState>,
     ) where
         T: Renderer + SpriteRenderer,
     {
@@ -161,7 +163,7 @@ impl Actions {
                     Vector2::new(image_size[0], image_size[1])
                 })
                 .map(|component| component as f32);
-            let zoom = sprite_clip.zoom.unwrap_or(1.0) * application.get_scaling_factor();
+            let zoom = sprite_clip.zoom.unwrap_or(1.0) * application.get_safe(&GameStateScalePath::default()).get_factor();
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;

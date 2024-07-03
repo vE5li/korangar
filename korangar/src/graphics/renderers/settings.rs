@@ -1,6 +1,7 @@
 use derive_new::new;
+use rust_state::RustState;
 
-#[derive(new)]
+#[derive(RustState, new)]
 pub struct RenderSettings {
     #[new(value = "true")]
     pub frame_limit: bool,

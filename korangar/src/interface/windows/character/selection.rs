@@ -4,17 +4,16 @@ use korangar_interface::size_bound;
 use korangar_interface::state::PlainRemote;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use ragnarok_packets::CharacterInformation;
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::CharacterPreview;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(new)]
 pub struct CharacterSelectionWindow {
-    characters: PlainRemote<Vec<CharacterInformation>>,
-    move_request: PlainRemote<Option<usize>>,
     slot_count: usize,
 }
 
@@ -22,20 +21,13 @@ impl CharacterSelectionWindow {
     pub const WINDOW_CLASS: &'static str = "character_selection";
 }
 
-impl PrototypeWindow<InterfaceSettings> for CharacterSelectionWindow {
+impl PrototypeWindow<GameState> for CharacterSelectionWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let elements = (0..self.slot_count)
-            .map(|slot| CharacterPreview::new(self.characters.clone(), self.move_request.clone(), slot).wrap())
-            .collect();
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
+        let elements = (0..self.slot_count).map(|slot| CharacterPreview::new(slot).wrap()).collect();
 
         WindowBuilder::new()
             .with_title("Character Selection".to_string())

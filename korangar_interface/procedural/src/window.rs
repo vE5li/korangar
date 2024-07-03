@@ -19,7 +19,7 @@ pub fn derive_prototype_window_struct(
 
     if std::env::var("CARGO_PKG_NAME").unwrap() == "korangar" {
         return quote! {
-            impl #impl_generics korangar_interface::windows::PrototypeWindow<crate::interface::application::InterfaceSettings> for #name #type_generics #where_clause {
+            impl #impl_generics korangar_interface::windows::PrototypeWindow<crate::GameState> for #name #type_generics #where_clause {
 
                 fn window_class(&self) -> Option<&str> {
                     #window_class_ref_option
@@ -27,10 +27,9 @@ pub fn derive_prototype_window_struct(
 
                 fn to_window(&self,
                     window_cache: &crate::interface::windows::WindowCache,
-                    application: &crate::interface::application::InterfaceSettings,
+                    application: &korangar_interface::__macro::Context<crate::GameState>,
                     available_space: crate::interface::layout::ScreenSize
-                ) -> korangar_interface::windows::Window<crate::interface::application::InterfaceSettings> {
-                    use crate::interface::application::InterfaceSettings;
+                ) -> korangar_interface::windows::Window<crate::GameState> {
                     use korangar_interface::elements::ElementCell;
                     use korangar_interface::elements::ScrollView;
                     use korangar_interface::windows::WindowBuilder;
@@ -39,7 +38,7 @@ pub fn derive_prototype_window_struct(
                     use std::rc::Rc;
 
                     let scroll_view = ScrollView::new(vec![#(#initializers),*], size_bound!(100%, super > ? < super));
-                    let elements: Vec<ElementCell<InterfaceSettings>> = vec![Rc::new(RefCell::new(scroll_view))];
+                    let elements: Vec<ElementCell<crate::GameState>> = vec![Rc::new(RefCell::new(scroll_view))];
 
                     WindowBuilder::new()
                         .with_title(#window_title.to_string())
@@ -50,7 +49,8 @@ pub fn derive_prototype_window_struct(
                         .build(window_cache, application, available_space)
                 }
             }
-        }.into();
+        }
+        .into();
     }
 
     quote! {
@@ -60,7 +60,7 @@ pub fn derive_prototype_window_struct(
                 #window_class_ref_option
             }
 
-            fn to_window(&self, window_cache: &App::Cache, application: &App, available_space: App::Size) -> korangar_interface::windows::Window<App> {
+            fn to_window(&self, window_cache: &App::Cache, application: &korangar_interface::__macro::Context<App>, available_space: App::Size) -> korangar_interface::windows::Window<App> {
                 let scroll_view = korangar_interface::elements::ScrollView::new(vec![#(#initializers),*], korangar_interface::size_bound!(100%, super > ? < super));
                 let elements: Vec<korangar_interface::elements::ElementCell<App>> = vec![std::rc::Rc::new(std::cell::RefCell::new(scroll_view))];
 

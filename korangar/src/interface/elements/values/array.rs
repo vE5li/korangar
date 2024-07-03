@@ -4,15 +4,17 @@ use std::fmt::Display;
 use korangar_interface::elements::{Element, ElementDisplay, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
+use korangar_interface::theme::ValueTheme;
 use num::traits::NumOps;
 use num::{NumCast, Zero};
+use rust_state::{Context, Tracker};
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ArrayType, ScreenClip, ScreenPosition};
-use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::ArrayWindow;
+use crate::GameState;
 
 pub struct MutableArrayValue<T>
 where
@@ -27,7 +29,7 @@ where
     change_event: Option<ChangeEvent>,
     cached_inner: T,
     cached_values: String,
-    state: ElementState<InterfaceSettings>,
+    state: ElementState<GameState>,
 }
 
 impl<T> MutableArrayValue<T>
@@ -54,27 +56,28 @@ where
     }
 }
 
-impl<T> Element<InterfaceSettings> for MutableArrayValue<T>
+impl<T> Element<GameState> for MutableArrayValue<T>
 where
     T: ArrayType + ElementDisplay + Copy + PartialEq + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
     [(); T::ELEMENT_COUNT]:,
 {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        _application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
-        self.state.resolve(placement_resolver, &theme.value.size_bound);
+        let size_bound = state.get_safe(&ValueTheme::size_bound(theme_selector));
+        self.state.resolve(placement_resolver, size_bound);
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -89,14 +92,14 @@ where
         None
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction<InterfaceSettings>> {
+    fn left_click(&mut self, _state: &Context<GameState>, _force_update: &mut bool) -> Vec<ClickAction<GameState>> {
         let prototype_window = ArrayWindow::new(
             self.name.clone(),
             self.reference,
@@ -112,31 +115,28 @@ where
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        _focused_element: Option<&dyn Element<InterfaceSettings>>,
-        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) {
-            true => theme.value.hovered_background_color.get(),
-            false => theme.value.background_color.get(),
+            true => state.get_safe(&ValueTheme::hovered_background_color(theme_selector)),
+            false => state.get_safe(&ValueTheme::background_color(theme_selector)),
         };
 
-        renderer.render_background(theme.value.corner_radius.get(), background_color);
+        renderer.render_background(*state.get_safe(&ValueTheme::corner_radius(theme_selector)), *background_color);
 
         renderer.render_text(
             &self.cached_values,
-            theme.value.text_offset.get(),
-            theme.value.foreground_color.get(),
-            theme.value.font_size.get(),
+            *state.get_safe(&ValueTheme::text_offset(theme_selector)),
+            *state.get_safe(&ValueTheme::foreground_color(theme_selector)),
+            *state.get_safe(&ValueTheme::font_size(theme_selector)),
         );
     }
 }

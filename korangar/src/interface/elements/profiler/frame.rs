@@ -2,43 +2,31 @@
 use korangar_debug::profiling::Profiler;
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementState};
-use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
+use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
-use korangar_interface::state::{PlainRemote, Remote};
+use rust_state::{Context, SafeUnwrap, Selector, Tracker};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::FrameInspectorWindow;
 use crate::loaders::FontSize;
+use crate::{GameState, ProfilerState};
 
+#[derive(Default)]
 pub struct FrameView {
-    state: ElementState<InterfaceSettings>,
+    state: ElementState<GameState>,
     frame_counter: usize,
-    always_update: PlainRemote<bool>,
-    visible_thread: PlainRemote<crate::threads::Enum>,
 }
 
-impl FrameView {
-    pub fn new(always_update: PlainRemote<bool>, visible_thread: PlainRemote<crate::threads::Enum>) -> Self {
-        Self {
-            state: ElementState::default(),
-            frame_counter: 0,
-            always_update,
-            visible_thread,
-        }
-    }
-}
-
-impl Element<InterfaceSettings> for FrameView {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for FrameView {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state
     }
 
@@ -48,15 +36,15 @@ impl Element<InterfaceSettings> for FrameView {
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        _application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(100%, 300);
         self.state.resolve(placement_resolver, size_bound);
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    /* fn update(&mut self) -> Option<ChangeEvent> {
         self.frame_counter += 1;
 
         if *self.always_update.get() || self.frame_counter == Profiler::SAVED_FRAME_COUNT {
@@ -65,17 +53,17 @@ impl Element<InterfaceSettings> for FrameView {
         }
 
         None
-    }
+    } */
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
         }
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<InterfaceSettings>> {
-        let visible_thread = *self.visible_thread.get();
+    fn left_click(&mut self, state: &Context<GameState>, _update: &mut bool) -> Vec<ClickAction<GameState>> {
+        let visible_thread = *state.get_safe(&ProfilerState::visible_thread(GameState::profiler()));
         let mouse_position = self.state.mouse_position.get();
         let number_of_frames = korangar_debug::profiling::get_number_of_saved_frames(visible_thread);
 
@@ -90,20 +78,18 @@ impl Element<InterfaceSettings> for FrameView {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        _theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        _hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        _focused_element: Option<&dyn Element<InterfaceSettings>>,
-        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        let (entries, statistics_map, longest_frame) = korangar_debug::profiling::get_statistics_data(*self.visible_thread.get());
+        let visible_thread = *application.get_safe(&ProfilerState::visible_thread(GameState::profiler()));
+        let (entries, statistics_map, longest_frame) = korangar_debug::profiling::get_statistics_data(visible_thread);
 
         let bar_width = (self.state.cached_size.width - 50.0) / entries.len() as f32;
         let gap_width = 50.0 / entries.len() as f32;

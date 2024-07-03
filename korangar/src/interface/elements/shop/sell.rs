@@ -6,19 +6,21 @@ use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt};
 use korangar_networking::SellItem;
 use num::Integer;
+use rust_state::Tracker;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::elements::{ShopEntry, ShopEntryOperation};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::ResourceMetadata;
+use crate::GameState;
 
 pub struct SellContainer {
     items: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
     cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
-    state: ContainerState<InterfaceSettings>,
+    state: ContainerState<GameState>,
 }
 
 impl SellContainer {
@@ -64,7 +66,7 @@ impl SellContainer {
                 )
             })
             .map(ElementWrap::wrap)
-            .collect::<Vec<ElementCell<InterfaceSettings>>>();
+            .collect::<Vec<ElementCell<GameState>>>();
 
         let state = ContainerState::new(elements);
 
@@ -72,16 +74,16 @@ impl SellContainer {
     }
 }
 
-impl Element<InterfaceSettings> for SellContainer {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for SellContainer {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state.state
     }
 
-    fn link_back(&mut self, weak_self: WeakElementCell<InterfaceSettings>, weak_parent: Option<WeakElementCell<InterfaceSettings>>) {
+    fn link_back(&mut self, weak_self: WeakElementCell<GameState>, weak_parent: Option<WeakElementCell<GameState>>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -91,26 +93,26 @@ impl Element<InterfaceSettings> for SellContainer {
 
     fn focus_next(
         &self,
-        self_cell: ElementCell<InterfaceSettings>,
-        caller_cell: Option<ElementCell<InterfaceSettings>>,
+        self_cell: ElementCell<GameState>,
+        caller_cell: Option<ElementCell<GameState>>,
         focus: Focus,
-    ) -> Option<ElementCell<InterfaceSettings>> {
+    ) -> Option<ElementCell<GameState>> {
         self.state.focus_next::<false>(self_cell, caller_cell, focus)
     }
 
-    fn restore_focus(&self, self_cell: ElementCell<InterfaceSettings>) -> Option<ElementCell<InterfaceSettings>> {
+    fn restore_focus(&self, self_cell: ElementCell<GameState>) -> Option<ElementCell<GameState>> {
         self.state.restore_focus(self_cell)
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(100%, ?);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::zero());
+            .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::zero());
     }
 
     fn update(&mut self) -> Option<ChangeEvent> {
@@ -129,7 +131,7 @@ impl Element<InterfaceSettings> for SellContainer {
         None
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::MoveItem(..) => self.state.state.hovered_element(mouse_position),
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
@@ -141,13 +143,10 @@ impl Element<InterfaceSettings> for SellContainer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        focused_element: Option<&dyn Element<InterfaceSettings>>,
-        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
@@ -155,14 +154,6 @@ impl Element<InterfaceSettings> for SellContainer {
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, application, theme_selector, second_theme);
     }
 }

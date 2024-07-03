@@ -4,9 +4,13 @@ use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::event::{Nothing, Render, Resolve};
 use korangar_interface::layout::{DimensionBound, SizeBound};
+use korangar_interface::theme::{
+    ButtonTheme, CloseButtonTheme, ExpandableTheme, InputTheme, LabelTheme, SliderTheme, ValueTheme, WindowTheme,
+};
 use korangar_interface::windows::PrototypeWindow;
 use korangar_interface::{dimension_bound, size_bound};
 use ron::ser::PrettyConfig;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "debug")]
@@ -14,11 +18,11 @@ mod actions;
 
 #[cfg(feature = "debug")]
 use self::actions::ThemeActions;
-use super::application::InterfaceSettings;
 use super::elements::{Mutable, MutableRange};
 use super::layout::{CornerRadius, ScreenPosition, ScreenSize};
 use crate::graphics::Color;
 use crate::loaders::FontSize;
+use crate::GameState;
 
 /// Themes the user interface can use.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -44,26 +48,7 @@ pub trait ThemeDefault<T: ThemeKindMarker> {
     fn default() -> Self;
 }
 
-// TODO: Make all theme fileds private. Use the traits to access fields
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct ButtonTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub hovered_background_color: Mutable<Color, Render>,
-    pub disabled_background_color: Mutable<Color, Render>,
-    pub foreground_color: Mutable<Color, Render>,
-    pub hovered_foreground_color: Mutable<Color, Render>,
-    pub disabled_foreground_color: Mutable<Color, Render>,
-    pub debug_foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub icon_offset: MutableRange<ScreenPosition, Render>,
-    pub icon_size: MutableRange<ScreenSize, Render>,
-    pub icon_text_offset: MutableRange<ScreenPosition, Render>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub height_bound: DimensionBound,
-}
-
-impl ThemeDefault<DefaultMenu> for ButtonTheme {
+/* impl ThemeDefault<DefaultMenu> for ButtonTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::rgb_u8(150, 70, 255)),
@@ -131,83 +116,9 @@ impl ThemeDefault<DefaultMain> for ButtonTheme {
             height_bound: dimension_bound!(16),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::ButtonTheme<InterfaceSettings> for ButtonTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn hovered_background_color(&self) -> Color {
-        self.hovered_background_color.get()
-    }
-
-    fn disabled_background_color(&self) -> Color {
-        self.disabled_background_color.get()
-    }
-
-    fn foreground_color(&self) -> Color {
-        self.foreground_color.get()
-    }
-
-    fn hovered_foreground_color(&self) -> Color {
-        self.hovered_foreground_color.get()
-    }
-
-    fn disabled_foreground_color(&self) -> Color {
-        self.disabled_foreground_color.get()
-    }
-
-    fn debug_foreground_color(&self) -> Color {
-        self.debug_foreground_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn icon_offset(&self) -> ScreenPosition {
-        self.icon_offset.get()
-    }
-
-    fn icon_size(&self) -> ScreenSize {
-        self.icon_size.get()
-    }
-
-    fn icon_text_offset(&self) -> ScreenPosition {
-        self.icon_text_offset.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn height_bound(&self) -> korangar_interface::layout::DimensionBound {
-        self.height_bound
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct WindowTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub title_background_color: Mutable<Color, Render>,
-    pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub title_corner_radius: MutableRange<CornerRadius, Render>,
-    pub border_size: MutableRange<ScreenSize, Resolve>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub gaps: MutableRange<ScreenSize, Resolve>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub title_height: DimensionBound,
-    pub anchor_color: Mutable<Color, Nothing>,
-    pub closest_anchor_color: Mutable<Color, Nothing>,
-}
-
-impl ThemeDefault<DefaultMenu> for WindowTheme {
+/* impl ThemeDefault<DefaultMenu> for WindowTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome_u8(30)),
@@ -267,75 +178,9 @@ impl ThemeDefault<DefaultMain> for WindowTheme {
             closest_anchor_color: Mutable::new(Color::rgba_u8(255, 180, 0, 255)),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::WindowTheme<InterfaceSettings> for WindowTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn title_background_color(&self) -> Color {
-        self.title_background_color.get()
-    }
-
-    fn foreground_color(&self) -> Color {
-        self.foreground_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn title_corner_radius(&self) -> CornerRadius {
-        self.title_corner_radius.get()
-    }
-
-    fn border_size(&self) -> ScreenSize {
-        self.border_size.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn gaps(&self) -> ScreenSize {
-        self.gaps.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn title_height(&self) -> korangar_interface::layout::DimensionBound {
-        self.title_height
-    }
-
-    fn anchor_color(&self) -> Color {
-        self.anchor_color.get()
-    }
-
-    fn closest_anchor_color(&self) -> Color {
-        self.closest_anchor_color.get()
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct ExpandableTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub second_background_color: Mutable<Color, Render>,
-    pub foreground_color: Mutable<Color, Render>,
-    pub hovered_foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub border_size: MutableRange<ScreenSize, Resolve>,
-    pub element_offset: MutableRange<ScreenPosition, Resolve>,
-    pub icon_offset: MutableRange<ScreenPosition, Render>,
-    pub icon_size: MutableRange<ScreenSize, Render>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub gaps: MutableRange<ScreenSize, Resolve>,
-    pub font_size: MutableRange<FontSize, Render>,
-}
-
-impl ThemeDefault<DefaultMenu> for ExpandableTheme {
+/* impl ThemeDefault<DefaultMenu> for ExpandableTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome_u8(60)),
@@ -395,69 +240,9 @@ impl ThemeDefault<DefaultMain> for ExpandableTheme {
             font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::ExpandableTheme<InterfaceSettings> for ExpandableTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn second_background_color(&self) -> Color {
-        self.second_background_color.get()
-    }
-
-    fn foreground_color(&self) -> Color {
-        self.foreground_color.get()
-    }
-
-    fn hovered_foreground_color(&self) -> Color {
-        self.hovered_foreground_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn border_size(&self) -> ScreenSize {
-        self.border_size.get()
-    }
-
-    fn element_offset(&self) -> ScreenPosition {
-        self.element_offset.get()
-    }
-
-    fn icon_offset(&self) -> ScreenPosition {
-        self.icon_offset.get()
-    }
-
-    fn icon_size(&self) -> ScreenSize {
-        self.icon_size.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn gaps(&self) -> ScreenSize {
-        self.gaps.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct LabelTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub size_bound: SizeBound,
-}
-
-impl ThemeDefault<DefaultMenu> for LabelTheme {
+/* impl ThemeDefault<DefaultMenu> for LabelTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome_u8(130)),
@@ -489,46 +274,9 @@ impl ThemeDefault<DefaultMain> for LabelTheme {
             size_bound: size_bound!(120 > 50% < 300, 0),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::LabelTheme<InterfaceSettings> for LabelTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn foreground_color(&self) -> Color {
-        self.foreground_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct ValueTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub hovered_background_color: Mutable<Color, Render>,
-    pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub size_bound: SizeBound,
-}
-
-impl ThemeDefault<DefaultMenu> for ValueTheme {
+/* impl ThemeDefault<DefaultMenu> for ValueTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::rgb_u8(100, 100, 100)),
@@ -562,50 +310,9 @@ impl ThemeDefault<DefaultMain> for ValueTheme {
             size_bound: size_bound!(60 > !, 14),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::ValueTheme<InterfaceSettings> for ValueTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn hovered_background_color(&self) -> Color {
-        self.hovered_background_color.get()
-    }
-
-    fn foreground_color(&self) -> Color {
-        self.foreground_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct CloseButtonTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub hovered_background_color: Mutable<Color, Render>,
-    pub foreground_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub size_bound: SizeBound,
-}
-
-impl ThemeDefault<DefaultMenu> for CloseButtonTheme {
+/* impl ThemeDefault<DefaultMenu> for CloseButtonTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::rgb_u8(200, 100, 100)),
@@ -643,46 +350,16 @@ impl ThemeDefault<DefaultMain> for CloseButtonTheme {
             size_bound: size_bound!(25, 12),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::CloseButtonTheme<InterfaceSettings> for CloseButtonTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn hovered_background_color(&self) -> Color {
-        self.hovered_background_color.get()
-    }
-
-    fn foreground_color(&self) -> Color {
-        self.foreground_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct OverlayTheme {
-    pub foreground_color: Mutable<Color, Nothing>,
-    pub text_offset: MutableRange<ScreenPosition, Nothing>,
-    pub font_size: MutableRange<FontSize, Nothing>,
+    pub foreground_color: Color,
+    pub text_offset: ScreenPosition,
+    pub font_size: FontSize,
 }
 
-impl Default for OverlayTheme {
+/* impl Default for OverlayTheme {
     fn default() -> Self {
         Self {
             foreground_color: Mutable::new(Color::monochrome_u8(220)),
@@ -694,17 +371,9 @@ impl Default for OverlayTheme {
             font_size: MutableRange::new(FontSize::new(18.0), FontSize::new(6.0), FontSize::new(50.0)),
         }
     }
-}
+} */
 
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct SliderTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub rail_color: Mutable<Color, Render>,
-    pub knob_color: Mutable<Color, Render>,
-    pub size_bound: SizeBound,
-}
-
-impl ThemeDefault<DefaultMenu> for SliderTheme {
+/* impl ThemeDefault<DefaultMenu> for SliderTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
@@ -724,43 +393,9 @@ impl ThemeDefault<DefaultMain> for SliderTheme {
             size_bound: size_bound!(100%, 18),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::SliderTheme<InterfaceSettings> for SliderTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn rail_color(&self) -> Color {
-        self.rail_color.get()
-    }
-
-    fn knob_color(&self) -> Color {
-        self.knob_color.get()
-    }
-
-    fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound.clone()
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
-pub struct InputTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub hovered_background_color: Mutable<Color, Render>,
-    pub focused_background_color: Mutable<Color, Render>,
-    pub text_color: Mutable<Color, Render>,
-    pub ghost_text_color: Mutable<Color, Render>,
-    pub focused_text_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub text_offset: MutableRange<ScreenPosition, Render>,
-    pub cursor_offset: MutableRange<f32, Render>,
-    pub cursor_width: MutableRange<f32, Render>,
-    pub height_bound: DimensionBound,
-}
-
-impl ThemeDefault<DefaultMenu> for InputTheme {
+/* impl ThemeDefault<DefaultMenu> for InputTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome_u8(45)),
@@ -808,69 +443,19 @@ impl ThemeDefault<DefaultMain> for InputTheme {
             height_bound: dimension_bound!(15),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::InputTheme<InterfaceSettings> for InputTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn hovered_background_color(&self) -> Color {
-        self.hovered_background_color.get()
-    }
-
-    fn focused_background_color(&self) -> Color {
-        self.focused_background_color.get()
-    }
-
-    fn text_color(&self) -> Color {
-        self.text_color.get()
-    }
-
-    fn ghost_text_color(&self) -> Color {
-        self.ghost_text_color.get()
-    }
-
-    fn focused_text_color(&self) -> Color {
-        self.focused_text_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn text_offset(&self) -> ScreenPosition {
-        self.text_offset.get()
-    }
-
-    fn cursor_offset(&self) -> f32 {
-        self.cursor_offset.get()
-    }
-
-    fn cursor_width(&self) -> f32 {
-        self.cursor_width.get()
-    }
-
-    fn height_bound(&self) -> korangar_interface::layout::DimensionBound {
-        self.height_bound
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct ChatTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub font_size: MutableRange<FontSize, Render>,
-    pub broadcast_color: Mutable<Color, Render>,
-    pub server_color: Mutable<Color, Render>,
-    pub error_color: Mutable<Color, Render>,
-    pub information_color: Mutable<Color, Render>,
+    pub background_color: Color,
+    pub font_size: FontSize,
+    pub broadcast_color: Color,
+    pub server_color: Color,
+    pub error_color: Color,
+    pub information_color: Color,
 }
 
-impl ThemeDefault<DefaultMenu> for ChatTheme {
+/* impl ThemeDefault<DefaultMenu> for ChatTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
@@ -894,64 +479,38 @@ impl ThemeDefault<DefaultMain> for ChatTheme {
             information_color: Mutable::new(Color::rgb_u8(200, 255, 200)),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::ChatTheme<InterfaceSettings> for ChatTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn font_size(&self) -> FontSize {
-        self.font_size.get()
-    }
-
-    fn broadcast_color(&self) -> Color {
-        self.broadcast_color.get()
-    }
-
-    fn server_color(&self) -> Color {
-        self.server_color.get()
-    }
-
-    fn error_color(&self) -> Color {
-        self.error_color.get()
-    }
-
-    fn information_color(&self) -> Color {
-        self.information_color.get()
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct CursorTheme {
-    pub color: Mutable<Color, Nothing>,
+    pub color: Color,
 }
 
-impl Default for CursorTheme {
+/* impl Default for CursorTheme {
     fn default() -> Self {
         Self {
             color: Mutable::new(Color::monochrome_u8(255)),
         }
     }
-}
+} */
 
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct ProfilerTheme {
-    pub background_color: Mutable<Color, Render>,
-    pub corner_radius: MutableRange<CornerRadius, Render>,
-    pub line_color: Mutable<Color, Render>,
-    pub line_width: MutableRange<f32, Render>,
-    pub bar_height: MutableRange<f32, Render>,
-    pub bar_gap: MutableRange<ScreenSize, Render>,
-    pub bar_corner_radius: MutableRange<CornerRadius, Render>,
-    pub bar_text_color: Mutable<Color, Render>,
-    pub bar_text_size: MutableRange<f32, Render>,
-    pub bar_text_offset: MutableRange<ScreenPosition, Render>,
-    pub distance_text_size: MutableRange<f32, Render>,
-    pub distance_text_offset: MutableRange<f32, Render>,
+    pub background_color: Color,
+    pub corner_radius: CornerRadius,
+    pub line_color: Color,
+    pub line_width: f32,
+    pub bar_height: f32,
+    pub bar_gap: ScreenSize,
+    pub bar_corner_radius: CornerRadius,
+    pub bar_text_color: Color,
+    pub bar_text_size: f32,
+    pub bar_text_offset: ScreenPosition,
+    pub distance_text_size: f32,
+    pub distance_text_offset: f32,
 }
 
-impl ThemeDefault<DefaultMenu> for ProfilerTheme {
+/* impl ThemeDefault<DefaultMenu> for ProfilerTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome_u8(55)),
@@ -1001,76 +560,26 @@ impl ThemeDefault<DefaultMain> for ProfilerTheme {
             distance_text_offset: MutableRange::new(20.0, 0.0, 200.0),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::ProfilerTheme<InterfaceSettings> for ProfilerTheme {
-    fn background_color(&self) -> Color {
-        self.background_color.get()
-    }
-
-    fn corner_radius(&self) -> CornerRadius {
-        self.corner_radius.get()
-    }
-
-    fn line_color(&self) -> Color {
-        self.line_color.get()
-    }
-
-    fn line_width(&self) -> f32 {
-        self.line_width.get()
-    }
-
-    fn bar_height(&self) -> f32 {
-        self.bar_height.get()
-    }
-
-    fn bar_gap(&self) -> ScreenSize {
-        self.bar_gap.get()
-    }
-
-    fn bar_corner_radius(&self) -> CornerRadius {
-        self.bar_corner_radius.get()
-    }
-
-    fn bar_text_color(&self) -> Color {
-        self.bar_text_color.get()
-    }
-
-    fn bar_text_size(&self) -> f32 {
-        self.bar_text_size.get()
-    }
-
-    fn bar_text_offset(&self) -> ScreenPosition {
-        self.bar_text_offset.get()
-    }
-
-    fn distance_text_size(&self) -> f32 {
-        self.distance_text_size.get()
-    }
-
-    fn distance_text_offset(&self) -> f32 {
-        self.distance_text_offset.get()
-    }
-}
-
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct StatusBarTheme {
-    pub background_color: Mutable<Color, Nothing>,
-    pub player_health_color: Mutable<Color, Nothing>,
-    pub enemy_health_color: Mutable<Color, Nothing>,
-    pub spell_point_color: Mutable<Color, Nothing>,
-    pub activity_point_color: Mutable<Color, Nothing>,
-    pub player_bar_width: MutableRange<f32, Render>,
-    pub enemy_bar_width: MutableRange<f32, Render>,
-    pub health_height: MutableRange<f32, Render>,
-    pub enemy_health_height: MutableRange<f32, Render>,
-    pub spell_point_height: MutableRange<f32, Render>,
-    pub activity_point_height: MutableRange<f32, Render>,
-    pub border_size: MutableRange<ScreenSize, Render>,
-    pub gap: MutableRange<f32, Render>,
+    pub background_color: Color,
+    pub player_health_color: Color,
+    pub enemy_health_color: Color,
+    pub spell_point_color: Color,
+    pub activity_point_color: Color,
+    pub player_bar_width: f32,
+    pub enemy_bar_width: f32,
+    pub health_height: f32,
+    pub enemy_health_height: f32,
+    pub spell_point_height: f32,
+    pub activity_point_height: f32,
+    pub border_size: ScreenSize,
+    pub gap: f32,
 }
 
-impl Default for StatusBarTheme {
+/* impl Default for StatusBarTheme {
     fn default() -> Self {
         Self {
             background_color: Mutable::new(Color::monochrome_u8(40)),
@@ -1092,36 +601,36 @@ impl Default for StatusBarTheme {
             gap: MutableRange::new(1.0, 0.0, 10.0),
         }
     }
-}
+} */
 
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct IndicatorTheme {
-    pub walking: Mutable<Color, Render>,
+    pub walking: Color,
 }
 
-impl Default for IndicatorTheme {
+/* impl Default for IndicatorTheme {
     fn default() -> Self {
         Self {
             walking: Mutable::new(Color::rgba_u8(0, 255, 170, 170)),
         }
     }
-}
+} */
 
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(Serialize, Deserialize)]
 pub struct InterfaceTheme {
-    pub button: ButtonTheme,
-    pub window: WindowTheme,
-    pub expandable: ExpandableTheme,
-    pub label: LabelTheme,
-    pub value: ValueTheme,
-    pub close_button: CloseButtonTheme,
-    pub slider: SliderTheme,
-    pub input: InputTheme,
+    pub button: ButtonTheme<GameState>,
+    pub window: WindowTheme<GameState>,
+    pub expandable: ExpandableTheme<GameState>,
+    pub label: LabelTheme<GameState>,
+    pub value: ValueTheme<GameState>,
+    pub close_button: CloseButtonTheme<GameState>,
+    pub slider: SliderTheme<GameState>,
+    pub input: InputTheme<GameState>,
     pub profiler: ProfilerTheme,
     pub chat: ChatTheme,
 }
 
-impl<T: ThemeKindMarker> ThemeDefault<T> for InterfaceTheme
+/* impl<T: ThemeKindMarker> ThemeDefault<T> for InterfaceTheme
 where
     ButtonTheme: ThemeDefault<T>,
     WindowTheme: ThemeDefault<T>,
@@ -1148,63 +657,9 @@ where
             chat: ThemeDefault::<T>::default(),
         }
     }
-}
+} */
 
-impl korangar_interface::theme::InterfaceTheme for InterfaceTheme {
-    type Button = ButtonTheme;
-    type Chat = ChatTheme;
-    type CloseButton = CloseButtonTheme;
-    type Expandable = ExpandableTheme;
-    type Input = InputTheme;
-    type Label = LabelTheme;
-    type Profiler = ProfilerTheme;
-    type Settings = InterfaceSettings;
-    type Slider = SliderTheme;
-    type Value = ValueTheme;
-    type Window = WindowTheme;
-
-    fn button(&self) -> &Self::Button {
-        &self.button
-    }
-
-    fn window(&self) -> &Self::Window {
-        &self.window
-    }
-
-    fn expandable(&self) -> &Self::Expandable {
-        &self.expandable
-    }
-
-    fn label(&self) -> &Self::Label {
-        &self.label
-    }
-
-    fn value(&self) -> &Self::Value {
-        &self.value
-    }
-
-    fn close_button(&self) -> &Self::CloseButton {
-        &self.close_button
-    }
-
-    fn slider(&self) -> &Self::Slider {
-        &self.slider
-    }
-
-    fn input(&self) -> &Self::Input {
-        &self.input
-    }
-
-    fn profiler(&self) -> &Self::Profiler {
-        &self.profiler
-    }
-
-    fn chat(&self) -> &Self::Chat {
-        &self.chat
-    }
-}
-
-#[derive(Default, Serialize, Deserialize, PrototypeElement)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct GameTheme {
     pub overlay: OverlayTheme,
     pub status_bar: StatusBarTheme,
@@ -1212,7 +667,7 @@ pub struct GameTheme {
     pub cursor: CursorTheme,
 }
 
-#[derive(PrototypeWindow)]
+/* #[derive(PrototypeWindow)]
 #[window_title("Theme Viewer")]
 #[window_class("theme_viewer")]
 pub struct Themes {
@@ -1225,9 +680,9 @@ pub struct Themes {
     pub main: InterfaceTheme,
     #[name("Game")]
     pub game: GameTheme,
-}
+} */
 
-impl Themes {
+/* impl Themes {
     pub fn new(menu: InterfaceTheme, main: InterfaceTheme, game: GameTheme) -> Self {
         Self {
             #[cfg(feature = "debug")]
@@ -1303,4 +758,4 @@ impl GameTheme {
         let data = ron::ser::to_string_pretty(self, PrettyConfig::new()).unwrap();
         std::fs::write(theme_file, data).expect("unable to write file");
     }
-}
+} */

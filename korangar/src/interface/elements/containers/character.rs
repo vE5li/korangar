@@ -6,30 +6,29 @@ use korangar_interface::elements::{ButtonBuilder, ContainerState, Element, Eleme
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
+use korangar_interface::theme::{ButtonTheme, CloseButtonTheme};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::CharacterInformation;
+use rust_state::{Context, Tracker};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::FontSize;
+use crate::GameState;
 
 // TODO: rework all of this
 pub struct CharacterPreview {
-    characters: PlainRemote<Vec<CharacterInformation>>,
-    move_request: PlainRemote<Option<usize>>,
     slot: usize,
-    state: ContainerState<InterfaceSettings>,
+    state: ContainerState<GameState>,
 }
 
 impl CharacterPreview {
-    fn get_elements(
-        characters: &PlainRemote<Vec<CharacterInformation>>,
-        move_request: &PlainRemote<Option<usize>>,
+    /* fn get_elements(
         slot: usize,
-    ) -> Vec<ElementCell<InterfaceSettings>> {
+    ) -> Vec<ElementCell<GameState>> {
         if let Some(origin_slot) = *move_request.get() {
             let text = match origin_slot == slot {
                 true => "Click to cancel",
@@ -39,7 +38,7 @@ impl CharacterPreview {
             return vec![
                 Text::default()
                     .with_text(text.to_owned())
-                    .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
+                    .with_foreground_color(|_, _| Color::rgb_u8(200, 140, 180))
                     .wrap(),
             ];
         }
@@ -51,21 +50,21 @@ impl CharacterPreview {
             return vec![
                 Text::default()
                     .with_text(character_information.name.clone())
-                    .with_foreground_color(|_| Color::rgb_u8(220, 210, 210))
-                    .with_font_size(|_| FontSize::new(18.0))
+                    .with_foreground_color(|_, _| Color::rgb_u8(220, 210, 210))
+                    .with_font_size(|_, _| FontSize::new(18.0))
                     .wrap(),
                 ButtonBuilder::new()
                     .with_text("Switch")
                     .with_event(UserEvent::RequestSwitchCharacterSlot(slot))
-                    .with_background_color(|_| Color::rgb_u8(161, 141, 141))
+                    .with_background_color(|_, _| Color::rgb_u8(161, 141, 141))
                     .with_width_bound(dimension_bound!(50%))
                     .build()
                     .wrap(),
                 ButtonBuilder::new()
                     .with_text("Delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
-                    .with_background_color(|theme: &InterfaceTheme| theme.close_button.background_color.get())
-                    .with_foreground_color(|theme: &InterfaceTheme| theme.close_button.foreground_color.get())
+                    .with_background_color(|state: &Tracker<GameState>, theme_selector: ThemeSelector2| *state.get_safe(&CloseButtonTheme::background_color(theme_selector)))
+                    .with_foreground_color(|state: &Tracker<GameState>, theme_selector: ThemeSelector2| *state.get_safe(&CloseButtonTheme::foreground_color(theme_selector)))
                     .with_width_bound(dimension_bound!(50%))
                     .build()
                     .wrap(),
@@ -75,21 +74,17 @@ impl CharacterPreview {
         vec![
             Text::default()
                 .with_text("New character")
-                .with_foreground_color(|_| Color::rgb_u8(200, 140, 180))
+                .with_foreground_color(|_, _| Color::rgb_u8(200, 140, 180))
                 .wrap(),
         ]
-    }
+    } */
 
-    pub fn new(characters: PlainRemote<Vec<CharacterInformation>>, move_request: PlainRemote<Option<usize>>, slot: usize) -> Self {
-        let elements = Self::get_elements(&characters, &move_request, slot);
+    pub fn new(slot: usize) -> Self {
+        // let elements = Self::get_elements(slot);
+        let elements = vec![];
         let state = ContainerState::new(elements);
 
-        Self {
-            characters,
-            move_request,
-            slot,
-            state,
-        }
+        Self { slot, state }
     }
 
     fn has_character(&self) -> bool {
@@ -97,20 +92,16 @@ impl CharacterPreview {
     }
 }
 
-impl Element<InterfaceSettings> for CharacterPreview {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for CharacterPreview {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state.state
     }
 
-    fn link_back(
-        &mut self,
-        weak_self: Weak<RefCell<dyn Element<InterfaceSettings>>>,
-        weak_parent: Option<Weak<RefCell<dyn Element<InterfaceSettings>>>>,
-    ) {
+    fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element<GameState>>>, weak_parent: Option<Weak<RefCell<dyn Element<GameState>>>>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -120,25 +111,25 @@ impl Element<InterfaceSettings> for CharacterPreview {
 
     fn focus_next(
         &self,
-        self_cell: ElementCell<InterfaceSettings>,
-        caller_cell: Option<ElementCell<InterfaceSettings>>,
+        self_cell: ElementCell<GameState>,
+        caller_cell: Option<ElementCell<GameState>>,
         focus: Focus,
-    ) -> Option<ElementCell<InterfaceSettings>> {
+    ) -> Option<ElementCell<GameState>> {
         self.state.focus_next::<true>(self_cell, caller_cell, focus)
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(20%, 150);
         self.state
-            .resolve(placement_resolver, application, theme, size_bound, ScreenSize::uniform(4.0));
+            .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(4.0));
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    /* fn update(&mut self) -> Option<ChangeEvent> {
         let characters_changed = self.characters.consume_changed();
         let move_request_changed = self.move_request.consume_changed();
 
@@ -156,10 +147,10 @@ impl Element<InterfaceSettings> for CharacterPreview {
         }
 
         None
-    }
+    } */
 
-    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<InterfaceSettings>> {
-        if let Some(origin_slot) = *self.move_request.get() {
+    fn left_click(&mut self, state: &Context<GameState>, _update: &mut bool) -> Vec<ClickAction<GameState>> {
+        if let Some(origin_slot) = *state.get_safe(&GameState::move_request()) {
             let event = match origin_slot == self.slot {
                 true => UserEvent::CancelSwitchCharacterSlot,
                 false => UserEvent::SwitchCharacterSlot(self.slot),
@@ -176,7 +167,7 @@ impl Element<InterfaceSettings> for CharacterPreview {
         vec![ClickAction::Custom(event)]
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, true),
             _ => HoverInformation::Missed,
@@ -187,35 +178,24 @@ impl Element<InterfaceSettings> for CharacterPreview {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        focused_element: Option<&dyn Element<InterfaceSettings>>,
-        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
             .state
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
-            true => theme.button.hovered_background_color.get(),
-            false => theme.button.background_color.get(),
+            true => *state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
+            false => *state.get_safe(&ButtonTheme::background_color(theme_selector)),
         };
 
-        renderer.render_background(theme.button.corner_radius.get(), background_color);
+        renderer.render_background(*state.get_safe(&ButtonTheme::corner_radius(theme_selector)), background_color);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, state, theme_selector, second_theme);
     }
 }

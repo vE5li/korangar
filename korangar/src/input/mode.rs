@@ -6,10 +6,10 @@ use korangar_interface::elements::{Element, ElementCell};
 use korangar_networking::InventoryItem;
 use vulkano::image::view::ImageView;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::inventory::Skill;
 use crate::loaders::{Actions, AnimationState, ResourceMetadata, Sprite};
+use crate::GameState;
 
 #[derive(Default)]
 pub enum MouseInputMode {
@@ -17,7 +17,7 @@ pub enum MouseInputMode {
     MoveSkill(SkillSource, Skill),
     MoveInterface(usize),
     ResizeInterface(usize),
-    DragElement((ElementCell<InterfaceSettings>, usize)),
+    DragElement((ElementCell<GameState>, usize)),
     ClickInterface,
     RotateCamera,
     Walk(Vector2<usize>),
@@ -52,12 +52,12 @@ impl MouseInputMode {
     }
 }
 
-impl MouseInputModeTrait<InterfaceSettings> for MouseInputMode {
+impl MouseInputModeTrait<GameState> for MouseInputMode {
     fn is_none(&self) -> bool {
         matches!(self, MouseInputMode::None)
     }
 
-    fn is_self_dragged(&self, element: &dyn Element<InterfaceSettings>) -> bool {
+    fn is_self_dragged(&self, element: &dyn Element<GameState>) -> bool {
         matches!(self, Self::DragElement(dragged_element) if std::ptr::eq((&*dragged_element.0.borrow()) as *const _ as *const (), element as *const _ as *const ()))
     }
 

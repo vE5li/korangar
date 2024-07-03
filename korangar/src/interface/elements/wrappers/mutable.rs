@@ -5,8 +5,8 @@ use korangar_interface::elements::{ElementCell, PrototypeElement};
 use korangar_interface::event::{ChangeEvent, IntoChangeEvent};
 use serde::{Deserialize, Serialize};
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::PrototypeMutableElement;
+use crate::GameState;
 
 #[derive(Serialize, Deserialize, new)]
 pub struct Mutable<T, E>
@@ -30,12 +30,12 @@ where
     }
 }
 
-impl<T, E> PrototypeElement<InterfaceSettings> for Mutable<T, E>
+impl<T, E> PrototypeElement<GameState> for Mutable<T, E>
 where
     T: Copy + PrototypeMutableElement,
     E: IntoChangeEvent,
 {
-    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
+    fn to_element(&self, display: String) -> ElementCell<GameState> {
         self.data.to_mutable_element(display, E::into_change_event())
     }
 }
@@ -45,7 +45,7 @@ where
     T: Copy + PrototypeMutableElement,
     E: IntoChangeEvent,
 {
-    fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell<InterfaceSettings> {
+    fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell<GameState> {
         self.data.to_mutable_element(display, E::into_change_event())
     }
 }

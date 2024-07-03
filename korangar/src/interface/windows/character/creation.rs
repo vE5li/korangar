@@ -4,12 +4,13 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateClone};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
+use rust_state::{Context, SafeUnwrap, Selector, Tracker};
 
-use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
+use crate::input::{InputSystem, UserEvent};
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 const MINIMUM_NAME_LENGTH: usize = 4;
 const MAXIMUM_NAME_LENGTH: usize = 24;
@@ -23,36 +24,30 @@ impl CharacterCreationWindow {
     pub const WINDOW_CLASS: &'static str = "character_creation";
 }
 
-impl PrototypeWindow<InterfaceSettings> for CharacterCreationWindow {
+impl PrototypeWindow<GameState> for CharacterCreationWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let name = PlainTrackedState::<String>::default();
-
-        let selector = {
-            let name = name.clone();
-            move || name.get().len() >= MINIMUM_NAME_LENGTH
-        };
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
+        let selector = |state: &Tracker<GameState>| state.get_safe(&GameState::character_name_input()).len() >= MINIMUM_NAME_LENGTH;
 
         let action = {
             let slot = self.slot;
-            let name = name.clone();
 
-            move || vec![ClickAction::Custom(UserEvent::CreateCharacter(slot, name.cloned()))]
+            move |state: &Context<GameState>| {
+                vec![ClickAction::Custom(UserEvent::CreateCharacter(
+                    slot,
+                    state.get_safe(&GameState::character_name_input()).clone(),
+                ))]
+            }
         };
 
-        let input_action = Box::new(move || vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
+        let input_action = Box::new(move |_: &Context<GameState>| vec![ClickAction::FocusNext(FocusMode::FocusNext)]);
 
         let elements = vec![
             InputFieldBuilder::new()
-                .with_state(name)
+                .with_state(GameState::character_name_input())
                 .with_ghost_text("Character name")
                 .with_enter_action(input_action)
                 .with_length(MAXIMUM_NAME_LENGTH)

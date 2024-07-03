@@ -1,4 +1,5 @@
 pub use interface_procedural::PrototypeWindow;
+use rust_state::Context;
 
 use crate::application::Application;
 use crate::Window;
@@ -11,5 +12,5 @@ where
         None
     }
 
-    fn to_window(&self, window_cache: &App::Cache, application: &App, available_space: App::Size) -> Window<App>;
+    fn to_window(&self, window_cache: &App::Cache, application: &Context<App>, available_space: App::Size) -> Window<App>;
 }

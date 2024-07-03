@@ -8,10 +8,11 @@ use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use num::traits::NumOps;
 use num::{NumCast, Zero};
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(new)]
 pub struct ArrayWindow<T>
@@ -27,18 +28,13 @@ where
     change_event: Option<ChangeEvent>,
 }
 
-impl<T> PrototypeWindow<InterfaceSettings> for ArrayWindow<T>
+impl<T> PrototypeWindow<GameState> for ArrayWindow<T>
 where
     T: ArrayType + 'static,
     T::Element: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static,
     [(); T::ELEMENT_COUNT]:,
 {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let mut elements = Vec::new();
 
         let minimum_value = self.minimum_value.get_inner();

@@ -1,13 +1,16 @@
 use korangar_debug::profiling::Profiler;
 use korangar_interface::elements::{ElementWrap, PickList, StateButtonBuilder};
-use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, TrackedStateBinary, ValueState};
+use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, ValueState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
+use rust_state::{Context, SafeUnwrap, Selector};
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FrameView;
 use crate::interface::layout::ScreenSize;
+use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
+use crate::threads::Deferred;
+use crate::{GameState, ProfilerState};
 
 /// Wrapper struct that exposes an implementation of [`TrackedState`] for the
 /// halted state of the profiler.
@@ -84,35 +87,19 @@ impl Remote<bool> for ProfilerHaltedRemote {
     }
 }
 
-pub struct ProfilerWindow {
-    always_update: PlainTrackedState<bool>,
-    visible_thread: PlainTrackedState<crate::threads::Enum>,
-}
+#[derive(Default)]
+pub struct ProfilerWindow;
 
 impl ProfilerWindow {
     pub const WINDOW_CLASS: &'static str = "profiler";
-
-    pub fn new() -> Self {
-        Self {
-            always_update: PlainTrackedState::new(true),
-            visible_thread: PlainTrackedState::new(crate::threads::Enum::Main),
-        }
-    }
 }
 
-impl PrototypeWindow<InterfaceSettings> for ProfilerWindow {
+impl PrototypeWindow<GameState> for ProfilerWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let profiler_halted_state = TrackedProfilerHaltedState::default();
-
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![
             PickList::default()
                 .with_options(vec![
@@ -121,28 +108,33 @@ impl PrototypeWindow<InterfaceSettings> for ProfilerWindow {
                     ("Shadow thread", crate::threads::Enum::Shadow),
                     ("Deferred thread", crate::threads::Enum::Deferred),
                 ])
-                .with_selected(self.visible_thread.clone())
+                .with_selected(ProfilerState::visible_thread(GameState::profiler()))
                 .with_width(dimension_bound!(150))
-                .with_event(Box::new(Vec::new))
+                .with_event(move |_: &Context<GameState>| Vec::new())
                 .wrap(),
             StateButtonBuilder::new()
                 .with_text("Always update")
-                .with_event(self.always_update.toggle_action())
-                .with_remote(self.always_update.new_remote())
+                .with_remote(ProfilerState::always_update(GameState::profiler()))
+                .with_event(move |state: &Context<GameState>| {
+                    let current_value = *state.get_safe(&ProfilerState::always_update(GameState::profiler()));
+                    state.update_value(&ProfilerState::always_update(GameState::profiler()), !current_value);
+                    vec![]
+                })
                 .with_width_bound(dimension_bound!(150))
                 .build()
                 .wrap(),
             StateButtonBuilder::new()
                 .with_text("Halt")
-                .with_remote(profiler_halted_state.new_remote())
-                .with_event(profiler_halted_state.toggle_action())
+                .with_remote(ProfilerState::halted(GameState::profiler()))
+                .with_event(move |state: &Context<GameState>| {
+                    let current_value = *state.get_safe(&ProfilerState::halted(GameState::profiler()));
+                    state.update_value(&ProfilerState::halted(GameState::profiler()), !current_value);
+                    vec![]
+                })
                 .with_width_bound(dimension_bound!(150))
                 .build()
                 .wrap(),
-            ElementWrap::wrap(FrameView::new(
-                self.always_update.new_remote(),
-                self.visible_thread.new_remote(),
-            )),
+            ElementWrap::wrap(FrameView::default()),
         ];
 
         WindowBuilder::new()

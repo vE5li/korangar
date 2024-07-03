@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::{Selector, Tracker};
+use rust_state::{Context, Selector, Tracker};
 
 pub use self::builder::StateButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
@@ -54,8 +54,8 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction<App>> {
-        self.event.trigger()
+    fn left_click(&mut self, state: &Context<App>, _force_update: &mut bool) -> Vec<ClickAction<App>> {
+        self.event.trigger(state)
     }
 
     fn render(

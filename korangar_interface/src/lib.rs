@@ -27,13 +27,17 @@ pub use interface_procedural::{dimension_bound, size_bound};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 use option_ext::OptionExt;
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 use windows::{PrototypeWindow, Window};
 
 use crate::application::MouseInputModeTrait;
 
-// TODO: move this
-pub type Selector = Box<dyn Fn() -> bool>;
+pub mod __macro {
+    pub use rust_state::{Context, Tracker};
+}
+
+// TODO: Remove this
+pub type BaseSelector<App> = Box<dyn Fn(&Tracker<App>) -> bool>;
 #[allow(type_alias_bounds)]
 pub type ColorSelector<App: Application> = Box<dyn Fn(&Tracker<App>, App::ThemeSelector) -> App::Color>;
 #[allow(type_alias_bounds)]
@@ -43,16 +47,16 @@ pub trait ElementEvent<App>
 where
     App: Application,
 {
-    fn trigger(&mut self) -> Vec<ClickAction<App>>;
+    fn trigger(&mut self, state: &Context<App>) -> Vec<ClickAction<App>>;
 }
 
 impl<App, F> ElementEvent<App> for F
 where
     App: Application,
-    F: FnMut() -> Vec<ClickAction<App>> + 'static,
+    F: FnMut(&Context<App>) -> Vec<ClickAction<App>> + 'static,
 {
-    fn trigger(&mut self) -> Vec<ClickAction<App>> {
-        self()
+    fn trigger(&mut self, state: &Context<App>) -> Vec<ClickAction<App>> {
+        self(state)
     }
 }
 
@@ -269,11 +273,16 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn left_click_element(&mut self, hovered_element: &ElementCell<App>, window_index: usize) -> Vec<ClickAction<App>> {
+    pub fn left_click_element(
+        &mut self,
+        state: &Context<App>,
+        hovered_element: &ElementCell<App>,
+        window_index: usize,
+    ) -> Vec<ClickAction<App>> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut resolve = false;
 
-        let action = hovered_element.borrow_mut().left_click(&mut resolve); // TODO: add same change_event check as for input character ?
+        let action = hovered_element.borrow_mut().left_click(state, &mut resolve); // TODO: add same change_event check as for input character ?
 
         if resolve {
             post_update.resolve();
@@ -283,11 +292,16 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn right_click_element(&mut self, hovered_element: &ElementCell<App>, window_index: usize) -> Vec<ClickAction<App>> {
+    pub fn right_click_element(
+        &mut self,
+        state: &Context<App>,
+        hovered_element: &ElementCell<App>,
+        window_index: usize,
+    ) -> Vec<ClickAction<App>> {
         let (_, post_update) = &mut self.windows[window_index];
         let mut resolve = false;
 
-        let action = hovered_element.borrow_mut().right_click(&mut resolve); // TODO: add same change_event check as for input character ?
+        let action = hovered_element.borrow_mut().right_click(state, &mut resolve); // TODO: add same change_event check as for input character ?
 
         if resolve {
             post_update.resolve();
@@ -318,6 +332,7 @@ where
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn input_character_element(
         &mut self,
+        state: &Context<App>,
         element: &ElementCell<App>,
         window_index: usize,
         character: char,
@@ -325,7 +340,7 @@ where
         let (_, post_update) = &mut self.windows[window_index];
         let mut propagated_actions = Vec::new();
 
-        let (key_handled, actions) = element.borrow_mut().input_character(character);
+        let (key_handled, actions) = element.borrow_mut().input_character(state, character);
         for action in actions {
             match action {
                 ClickAction::ChangeEvent(change_event) => Self::handle_change_event(&mut self.post_update, post_update, change_event),
@@ -447,9 +462,9 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn open_window(&mut self, application: &App, focus_state: &mut FocusState<App>, prototype_window: &dyn PrototypeWindow<App>) {
+    pub fn open_window(&mut self, state: &Context<App>, focus_state: &mut FocusState<App>, prototype_window: &dyn PrototypeWindow<App>) {
         if !self.window_exists(prototype_window.window_class()) {
-            let window = prototype_window.to_window(&self.window_cache, application, self.available_space);
+            let window = prototype_window.to_window(&self.window_cache, state, self.available_space);
             self.open_new_window(focus_state, window);
         }
     }

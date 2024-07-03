@@ -2,7 +2,7 @@ use std::cmp::PartialOrd;
 
 use num::traits::NumOps;
 use num::{clamp, NumCast, Zero};
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 
 use crate::application::{
     Application, CornerRadiusTraitExt, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
@@ -87,7 +87,7 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, _state: &Context<App>, _force_update: &mut bool) -> Vec<ClickAction<App>> {
         vec![ClickAction::DragElement]
     }
 

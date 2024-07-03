@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::marker::PhantomData;
 
-use rust_state::{SafeUnwrap, Selector};
+use rust_state::{Context, SafeUnwrap, Selector};
 
 use super::{EnterAction, InputField};
 use crate::application::Application;
@@ -84,7 +84,7 @@ where
     /// Set an action that will be executed when the user presses the enter key.
     pub fn with_enter_action(
         self,
-        enter_action: impl FnMut() -> Vec<ClickAction<App>> + 'static,
+        enter_action: impl FnMut(&Context<App>) -> Vec<ClickAction<App>> + 'static,
     ) -> InputFieldBuilder<App, State, Text, EnterAction<App>, Length, Hidden, Width> {
         InputFieldBuilder {
             enter_action: Box::new(enter_action),

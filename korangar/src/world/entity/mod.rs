@@ -7,19 +7,20 @@ use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
+use rust_state::Context;
 use vulkano::buffer::Subbuffer;
 
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
 use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, ModelVertex, Renderer};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::theme::GameTheme;
+use crate::interface::theme::{GameTheme, StatusBarTheme};
 use crate::interface::windows::WindowCache;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
+use crate::GameState;
 
 pub enum ResourceState<T> {
     Available(T),
@@ -828,8 +829,8 @@ impl Player {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
+        state: &Context<GameState>,
         camera: &dyn Camera,
-        theme: &GameTheme,
         window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
@@ -844,27 +845,31 @@ impl Player {
             top: screen_position.y * window_size.height + 5.0,
         };
 
-        let bar_width = theme.status_bar.player_bar_width.get();
-        let gap = theme.status_bar.gap.get();
-        let total_height = theme.status_bar.health_height.get()
-            + theme.status_bar.spell_point_height.get()
-            + theme.status_bar.activity_point_height.get()
+        let status_bar_selector = GameTheme::status_bar(GameState::game_theme());
+
+        let bar_width = *state.get_safe(&StatusBarTheme::player_bar_width(status_bar_selector.clone()));
+        let gap = *state.get_safe(&StatusBarTheme::gap(status_bar_selector.clone()));
+        let total_height = *state.get_safe(&StatusBarTheme::health_height(status_bar_selector.clone()))
+            + *state.get_safe(&StatusBarTheme::spell_point_height(status_bar_selector.clone()))
+            + *state.get_safe(&StatusBarTheme::activity_point_height(status_bar_selector.clone()))
             + gap * 2.0;
 
         let mut offset = 0.0;
 
-        let background_position = final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0);
+        let background_position = final_position
+            - *state.get_safe(&StatusBarTheme::border_size(status_bar_selector.clone()))
+            - ScreenSize::only_width(bar_width / 2.0);
 
         let background_size = ScreenSize {
             width: bar_width,
             height: total_height,
-        } + theme.status_bar.border_size.get() * 2.0;
+        } + *state.get_safe(&StatusBarTheme::border_size(status_bar_selector.clone())) * 2.0;
 
         renderer.render_rectangle(
             render_target,
             background_position,
             background_size,
-            theme.status_bar.background_color.get(),
+            *state.get_safe(&StatusBarTheme::background_color(status_bar_selector.clone())),
         );
 
         renderer.render_bar(
@@ -872,37 +877,37 @@ impl Player {
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.health_height.get(),
+                height: *state.get_safe(&StatusBarTheme::health_height(status_bar_selector.clone())),
             },
-            theme.status_bar.player_health_color.get(),
+            *state.get_safe(&StatusBarTheme::enemy_health_color(status_bar_selector.clone())),
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
 
-        offset += gap + theme.status_bar.health_height.get();
+        offset += gap + state.get_safe(&StatusBarTheme::health_height(status_bar_selector.clone()));
 
         renderer.render_bar(
             render_target,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.spell_point_height.get(),
+                height: *state.get_safe(&StatusBarTheme::spell_point_height(status_bar_selector.clone())),
             },
-            theme.status_bar.spell_point_color.get(),
+            *state.get_safe(&StatusBarTheme::spell_point_color(status_bar_selector.clone())),
             self.maximum_spell_points as f32,
             self.spell_points as f32,
         );
 
-        offset += gap + theme.status_bar.spell_point_height.get();
+        offset += gap + *state.get_safe(&StatusBarTheme::spell_point_height(status_bar_selector.clone()));
 
         renderer.render_bar(
             render_target,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.activity_point_height.get(),
+                height: *state.get_safe(&StatusBarTheme::activity_point_height(status_bar_selector.clone())),
             },
-            theme.status_bar.activity_point_color.get(),
+            *state.get_safe(&StatusBarTheme::activity_point_color(status_bar_selector.clone())),
             self.maximum_activity_points as f32,
             self.activity_points as f32,
         );
@@ -949,8 +954,8 @@ impl Npc {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
+        state: &Context<GameState>,
         camera: &dyn Camera,
-        theme: &GameTheme,
         window_size: ScreenSize,
     ) {
         if self.common.entity_type != EntityType::Monster {
@@ -969,16 +974,19 @@ impl Npc {
             top: screen_position.top * window_size.height + 5.0,
         };
 
-        let bar_width = theme.status_bar.enemy_bar_width.get();
+        let status_bar_selector = GameTheme::status_bar(GameState::game_theme());
+        let bar_width = *state.get_safe(&StatusBarTheme::enemy_bar_width(status_bar_selector.clone()));
 
         renderer.render_rectangle(
             render_target,
-            final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0),
+            final_position
+                - *state.get_safe(&StatusBarTheme::border_size(status_bar_selector.clone()))
+                - ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.enemy_health_height.get(),
-            } + (theme.status_bar.border_size.get() * 2.0),
-            theme.status_bar.background_color.get(),
+                height: *state.get_safe(&StatusBarTheme::enemy_health_height(status_bar_selector.clone())),
+            } + (*state.get_safe(&StatusBarTheme::border_size(status_bar_selector.clone())) * 2.0),
+            *state.get_safe(&StatusBarTheme::background_color(status_bar_selector.clone())),
         );
 
         renderer.render_bar(
@@ -986,9 +994,9 @@ impl Npc {
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.enemy_health_height.get(),
+                height: *state.get_safe(&StatusBarTheme::enemy_health_height(status_bar_selector.clone())),
             },
-            theme.status_bar.enemy_health_color.get(),
+            *state.get_safe(&StatusBarTheme::enemy_health_color(status_bar_selector.clone())),
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
@@ -1116,24 +1124,19 @@ impl Entity {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         renderer: &DeferredRenderer,
+        state: &Context<GameState>,
         camera: &dyn Camera,
-        theme: &GameTheme,
         window_size: ScreenSize,
     ) {
         match self {
-            Self::Player(player) => player.render_status(render_target, renderer, camera, theme, window_size),
-            Self::Npc(npc) => npc.render_status(render_target, renderer, camera, theme, window_size),
+            Self::Player(player) => player.render_status(render_target, renderer, state, camera, window_size),
+            Self::Npc(npc) => npc.render_status(render_target, renderer, state, camera, window_size),
         }
     }
 }
 
-impl PrototypeWindow<InterfaceSettings> for Entity {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+impl PrototypeWindow<GameState> for Entity {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         match self {
             Entity::Player(player) => player.to_window(window_cache, application, available_space),
             Entity::Npc(npc) => npc.to_window(window_cache, application, available_space),

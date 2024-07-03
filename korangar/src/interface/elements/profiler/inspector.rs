@@ -2,25 +2,26 @@ use std::time::{Duration, Instant};
 
 use derive_new::new;
 use korangar_debug::profiling::Measurement;
-use korangar_interface::application::FontSizeTrait;
+use korangar_interface::application::{FontSizeTrait, ScalingTrait, SizeTraitExt};
 use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
+use rust_state::Tracker;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::interface::theme::InterfaceTheme;
-use crate::FontSize;
+use crate::interface::theme::ProfilerTheme;
+use crate::{FontSize, GameState, GameStateScalePath};
 
 const VISIBILITY_THRESHHOLD: f32 = 0.01;
 
 #[derive(new)]
 pub struct FrameInspectorView {
     #[new(default)]
-    state: ElementState<InterfaceSettings>,
+    state: ElementState<GameState>,
     measurement: Measurement,
     #[new(default)]
     start_offset: Duration,
@@ -46,8 +47,8 @@ impl FrameInspectorView {
     }
 
     fn render_lines(
-        renderer: &mut ElementRenderer<'_, InterfaceSettings>,
-        theme: &InterfaceTheme,
+        renderer: &mut ElementRenderer<'_, '_, GameState>,
+        theme_selector: ThemeSelector2,
         text: &str,
         text_width: f32,
         mut x_position: f32,
@@ -56,7 +57,8 @@ impl FrameInspectorView {
         alpha: f32,
         render_numbers: bool,
     ) {
-        let color = theme.profiler.line_color.get().multiply_alpha(alpha);
+        let line_color = *renderer.state.get_safe(&ProfilerTheme::line_color(theme_selector));
+        let background_color = line_color.multiply_alpha(alpha);
 
         while x_position < size.width {
             let line_position = ScreenPosition {
@@ -64,16 +66,18 @@ impl FrameInspectorView {
                 top: 0.0,
             };
             let line_size = ScreenSize {
-                width: theme.profiler.line_width.get() * renderer.state.get_scaling_factor(),
+                width: *renderer.state.get_safe(&ProfilerTheme::line_width(theme_selector)) * renderer.state.get_scaling_factor(),
                 height: size.height,
             };
 
-            renderer.render_rectangle(line_position, line_size, CornerRadius::default(), color);
+            renderer.render_rectangle(line_position, line_size, CornerRadius::default(), background_color);
 
             if render_numbers {
                 let offset = ScreenPosition {
                     left: x_position + (distance - text_width) / 2.0,
-                    top: size.height - theme.profiler.distance_text_offset.get() * renderer.state.get_scaling_factor(),
+                    top: size.height
+                        - *renderer.state.get_safe(&ProfilerTheme::distance_text_offset(theme_selector))
+                            * renderer.state.get_scaling_factor(),
                 };
 
                 korangar_interface::application::InterfaceRenderer::render_text(
@@ -82,8 +86,10 @@ impl FrameInspectorView {
                     text,
                     renderer.position + offset,
                     renderer.clip,
-                    theme.profiler.line_color.get(),
-                    FontSize::new(theme.profiler.distance_text_size.get() * renderer.state.get_scaling_factor()),
+                    line_color,
+                    FontSize::new(
+                        *renderer.state.get_safe(&ProfilerTheme::distance_text_size(theme_selector)) * renderer.state.get_scaling_factor(),
+                    ),
                 );
             }
 
@@ -92,9 +98,9 @@ impl FrameInspectorView {
     }
 
     fn render_measurement(
-        renderer: &mut ElementRenderer<'_, InterfaceSettings>,
+        renderer: &mut ElementRenderer<'_, '_, GameState>,
         color_lookup: &mut super::ColorLookup,
-        theme: &InterfaceTheme,
+        theme_selector: ThemeSelector2,
         measurement: &Measurement,
         start_time: Instant,
         total_width: f32,
@@ -106,15 +112,19 @@ impl FrameInspectorView {
         // Size in scaled pixels at which the text starts fading in
         const TEXT_DISPLAY_SIZE: f32 = 50.0;
 
-        let scaled_bar_gap = theme.profiler.bar_gap.get().width * renderer.state.get_scaling_factor();
+        let scaling = renderer.state.get_safe(&GameState::scale()).get_factor();
+        let bar_gap = *renderer.state.get_safe(&ProfilerTheme::bar_gap(theme_selector));
+        let scaled_bar_gap = bar_gap.width * renderer.state.get_safe(&GameStateScalePath::default()).get_factor();
         let color = color_lookup.get_color(measurement.name);
-        let text_offset = theme.profiler.bar_text_offset.get() * renderer.state.get_scaling_factor();
+        let text_offset = *renderer.state.get_safe(&ProfilerTheme::bar_text_offset(theme_selector))
+            * renderer.state.get_safe(&GameStateScalePath::default()).get_factor();
         let x_position = measurement.start_time.saturating_duration_since(start_time).as_secs_f32() * unit + scaled_bar_gap;
         let x_size = measurement.end_time.saturating_duration_since(start_time).as_secs_f32() * unit - x_position - scaled_bar_gap;
         let x_size = x_size.min(total_width - x_position - scaled_bar_gap);
-        let y_size = theme.profiler.bar_height.get() * renderer.state.get_scaling_factor();
+        let y_size = *renderer.state.get_safe(&ProfilerTheme::bar_height(theme_selector))
+            * renderer.state.get_safe(&GameStateScalePath::default()).get_factor();
 
-        let alpha = Self::interpolate_alpha_linear(BAR_FADE_SPEED * renderer.state.get_scaling_factor(), 0.0, x_size);
+        let alpha = Self::interpolate_alpha_linear(BAR_FADE_SPEED * scaling, 0.0, x_size);
         if alpha < VISIBILITY_THRESHHOLD {
             return;
         }
@@ -131,12 +141,12 @@ impl FrameInspectorView {
         renderer.render_rectangle(
             block_position,
             block_size,
-            theme.profiler.bar_corner_radius.get(),
+            *renderer.state.get_safe(&ProfilerTheme::bar_corner_radius(theme_selector)),
             color.multiply_alpha(alpha),
         );
 
         let alpha = Self::interpolate_alpha_linear(
-            TEXT_FADE_SPEED * renderer.state.get_scaling_factor(),
+            TEXT_FADE_SPEED * scaling,
             TEXT_DISPLAY_SIZE * renderer.state.get_scaling_factor(),
             x_size,
         );
@@ -163,19 +173,21 @@ impl FrameInspectorView {
                 &text,
                 text_position,
                 screen_clip,
-                theme.profiler.bar_text_color.get().multiply_alpha(alpha),
-                FontSize::new(theme.profiler.bar_text_size.get() * renderer.state.get_scaling_factor()),
+                renderer
+                    .state
+                    .get_safe(&ProfilerTheme::bar_text_color(theme_selector))
+                    .multiply_alpha(alpha),
+                FontSize::new(*renderer.state.get_safe(&ProfilerTheme::bar_text_size(theme_selector)) * scaling),
             );
         }
 
-        let y_position =
-            y_position + (theme.profiler.bar_gap.get().height + theme.profiler.bar_height.get()) * renderer.state.get_scaling_factor();
+        let y_position = y_position + (bar_gap.height + *renderer.state.get_safe(&ProfilerTheme::bar_height(theme_selector))) * scaling;
 
         measurement.indices.iter().for_each(|measurement| {
             Self::render_measurement(
                 renderer,
                 color_lookup,
-                theme,
+                theme_selector,
                 measurement,
                 start_time,
                 total_width,
@@ -186,12 +198,12 @@ impl FrameInspectorView {
     }
 }
 
-impl Element<InterfaceSettings> for FrameInspectorView {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for FrameInspectorView {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state
     }
 
@@ -201,15 +213,15 @@ impl Element<InterfaceSettings> for FrameInspectorView {
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        _application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         let size_bound = &size_bound!(100%, 300);
         self.state.resolve(placement_resolver, size_bound);
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position),
             _ => HoverInformation::Missed,
@@ -238,13 +250,10 @@ impl Element<InterfaceSettings> for FrameInspectorView {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        _hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        _focused_element: Option<&dyn Element<InterfaceSettings>>,
-        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
         // Multiple of the size of the distance number that needs to be available to
@@ -255,7 +264,10 @@ impl Element<InterfaceSettings> for FrameInspectorView {
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        renderer.render_background(theme.profiler.corner_radius.get(), theme.profiler.background_color.get());
+        renderer.render_background(
+            *application.get_safe(&ProfilerTheme::corner_radius(theme_selector)),
+            *application.get_safe(&ProfilerTheme::background_color(theme_selector)),
+        );
 
         let mut colors = super::ColorLookup::default();
 
@@ -279,7 +291,11 @@ impl Element<InterfaceSettings> for FrameInspectorView {
                     let offset = ((self.start_offset.$div_function() as f32 / $divider) * -distance) % distance;
 
                     let text_width = renderer
-                        .get_text_dimensions($text, FontSize::new(theme.profiler.distance_text_size.get()), f32::MAX)
+                        .get_text_dimensions(
+                            $text,
+                            FontSize::new(*application.get_safe(&ProfilerTheme::distance_text_size(theme_selector))),
+                            f32::MAX,
+                        )
                         .width;
                     let show_numbers = !numbers_shown && distance > text_width * DISTANCE_NUMBER_SIZE;
 
@@ -290,7 +306,7 @@ impl Element<InterfaceSettings> for FrameInspectorView {
 
                     Self::render_lines(
                         &mut renderer,
-                        theme,
+                        theme_selector,
                         $text,
                         text_width,
                         offset,
@@ -315,12 +331,12 @@ impl Element<InterfaceSettings> for FrameInspectorView {
         Self::render_measurement(
             &mut renderer,
             &mut colors,
-            theme,
+            theme_selector,
             &self.measurement,
             start_time,
             self.state.cached_size.width,
             self.state.cached_size.width / viewed_duration.as_secs_f32(),
-            theme.profiler.bar_gap.get().height * application.get_scaling_factor(),
+            application.get_safe(&ProfilerTheme::bar_gap(theme_selector)).height * application.get_safe(&GameState::scale()).get_factor(),
         );
     }
 }

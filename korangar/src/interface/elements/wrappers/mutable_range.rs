@@ -5,8 +5,8 @@ use korangar_interface::elements::{ElementCell, PrototypeElement};
 use korangar_interface::event::{ChangeEvent, IntoChangeEvent};
 use serde::{Deserialize, Serialize};
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::{PrototypeMutableElement, PrototypeMutableRangeElement};
+use crate::GameState;
 
 // TODO: rework when const generics are able to do this:
 //pub struct MutableRange<T, const MIN: Vector2<T>, const MAX: Vector2<T>>(pub
@@ -36,12 +36,12 @@ where
     }
 }
 
-impl<T, E> PrototypeElement<InterfaceSettings> for MutableRange<T, E>
+impl<T, E> PrototypeElement<GameState> for MutableRange<T, E>
 where
     T: Copy + PrototypeMutableRangeElement<T>,
     E: IntoChangeEvent,
 {
-    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
+    fn to_element(&self, display: String) -> ElementCell<GameState> {
         self.inner
             .to_mutable_range_element(display, self.minimum, self.maximum, E::into_change_event())
     }
@@ -52,7 +52,7 @@ where
     T: Copy + PrototypeMutableRangeElement<T>,
     E: IntoChangeEvent,
 {
-    fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell<InterfaceSettings> {
+    fn to_mutable_element(&self, display: String, _change_event: Option<ChangeEvent>) -> ElementCell<GameState> {
         self.inner
             .to_mutable_range_element(display, self.minimum, self.maximum, E::into_change_event())
     }

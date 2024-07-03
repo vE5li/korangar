@@ -16,8 +16,8 @@ pub fn derive_prototype_element_struct(
     if std::env::var("CARGO_PKG_NAME").unwrap() == "korangar" {
         if initializers.len() == 1 && is_unnamed {
             return quote! {
-                impl #impl_generics korangar_interface::elements::PrototypeElement<crate::interface::application::InterfaceSettings> for #name #type_generics #where_clause {
-                    fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<crate::interface::application::InterfaceSettings> {
+                impl #impl_generics korangar_interface::elements::PrototypeElement<crate::GameState> for #name #type_generics #where_clause {
+                    fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<crate::GameState> {
                         korangar_interface::elements::PrototypeElement::to_element(&self.0, display)
                     }
                 }
@@ -26,9 +26,9 @@ pub fn derive_prototype_element_struct(
         }
 
         return quote! {
-            impl #impl_generics korangar_interface::elements::PrototypeElement<crate::interface::application::InterfaceSettings> for #name #type_generics #where_clause {
-                fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<crate::interface::application::InterfaceSettings> {
-                    let elements: Vec<korangar_interface::elements::ElementCell<crate::interface::application::InterfaceSettings>> = vec![#(#initializers),*];
+            impl #impl_generics korangar_interface::elements::PrototypeElement<crate::GameState> for #name #type_generics #where_clause {
+                fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<crate::GameState> {
+                    let elements: Vec<korangar_interface::elements::ElementCell<crate::GameState>> = vec![#(#initializers),*];
                     std::rc::Rc::new(std::cell::RefCell::new(korangar_interface::elements::Expandable::new(display, elements, false)))
                 }
             }
@@ -71,8 +71,8 @@ pub fn derive_prototype_element_enum(data_enum: DataEnum, generics: Generics, na
 
     if std::env::var("CARGO_PKG_NAME").unwrap() == "korangar" {
         return quote! {
-            impl #impl_generics korangar_interface::elements::PrototypeElement<crate::interface::application::InterfaceSettings> for #name #type_generics #where_clause {
-                fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<crate::interface::application::InterfaceSettings> {
+            impl #impl_generics korangar_interface::elements::PrototypeElement<crate::GameState> for #name #type_generics #where_clause {
+                fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<crate::GameState> {
                     match self {
                         #( Self::#variants => korangar_interface::elements::PrototypeElement::to_element(&#variant_strings, display), )*
                     }

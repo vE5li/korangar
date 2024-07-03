@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 
 use super::ContainerState;
 use crate::application::{
@@ -163,7 +163,7 @@ where
         HoverInformation::Missed
     }
 
-    fn left_click(&mut self, force_update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, _state: &Context<App>, force_update: &mut bool) -> Vec<ClickAction<App>> {
         self.expanded = !self.expanded;
         *force_update = true;
         Vec::new()

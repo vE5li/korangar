@@ -2,11 +2,12 @@ use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use ragnarok_packets::TilePosition;
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(Default)]
 pub struct MapsWindow;
@@ -15,17 +16,12 @@ impl MapsWindow {
     pub const WINDOW_CLASS: &'static str = "maps";
 }
 
-impl PrototypeWindow<InterfaceSettings> for MapsWindow {
+impl PrototypeWindow<GameState> for MapsWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let map_warps = [
             ("geffen", TilePosition { x: 119, y: 59 }),
             ("alberta", TilePosition { x: 28, y: 234 }),

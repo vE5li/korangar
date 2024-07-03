@@ -3,12 +3,13 @@ use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use ragnarok_packets::CharacterServerInformation;
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(new)]
 pub struct SelectServerWindow {
@@ -19,17 +20,12 @@ impl SelectServerWindow {
     pub const WINDOW_CLASS: &'static str = "service_server";
 }
 
-impl PrototypeWindow<InterfaceSettings> for SelectServerWindow {
+impl PrototypeWindow<GameState> for SelectServerWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = self
             .servers
             .iter()

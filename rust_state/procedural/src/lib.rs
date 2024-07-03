@@ -82,6 +82,14 @@ fn impl_for_root(ident: syn::Ident, data: syn::Data, generics: syn::Generics) ->
                             }
                         }
                     }
+
+                    impl #impl_generics Default for #struct_name #type_generics #where_clause {
+                        fn default() -> Self {
+                            Self {
+                                _marker: std::marker::PhantomData,
+                            }
+                        }
+                    }
                 });
             }
         }
@@ -102,7 +110,7 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
     let type_params = generics.type_params().map(|type_param| quote!(#type_param)).collect::<Vec<_>>();
 
     let mut struct_generics = generics.clone();
-    struct_generics.params.push(parse_quote!(S));
+    struct_generics.params.push(parse_quote!(S: 'static));
     struct_generics.params.push(parse_quote!(P));
     let (struct_impl_generics, struct_type_generics, struct_where_clause) = struct_generics.split_for_impl();
 
@@ -112,11 +120,16 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
 
     let mut selector_generics = generics.clone();
     selector_generics.params.push(parse_quote!('_a));
-    selector_generics.params.push(parse_quote!(S: rust_state::StateMarker));
+    selector_generics.params.push(parse_quote!(S: rust_state::StateMarker + 'static));
     selector_generics
         .params
         .push(parse_quote!(P: rust_state::Selector<'_a, S, #ident #type_generics> + Clone));
     let (selector_impl_generics, _, selector_where_clause) = selector_generics.split_for_impl();
+
+    let mut unwrap_generics = generics.clone();
+    unwrap_generics.params.push(parse_quote!(S: 'static));
+    unwrap_generics.params.push(parse_quote!(P: rust_state::SafeUnwrap));
+    let (unwrap_impl_generics, unwrap_type_generics, unwrap_where_clause) = unwrap_generics.split_for_impl();
 
     let mut base_getters = Vec::new();
 
@@ -172,6 +185,8 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
                             #struct_name { path, _marker: std::marker::PhantomData }
                         }
                     }
+
+                    impl #unwrap_impl_generics rust_state::SafeUnwrap for #struct_name #unwrap_type_generics #unwrap_where_clause {}
                 });
             }
         }

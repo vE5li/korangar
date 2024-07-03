@@ -2,7 +2,7 @@ mod builder;
 
 use std::fmt::Display;
 
-use rust_state::{SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, SafeUnwrap, Selector, Tracker};
 
 pub use self::builder::InputFieldBuilder;
 use crate::application::{
@@ -14,7 +14,7 @@ use crate::layout::{DimensionBound, PlacementResolver};
 use crate::theme::InputTheme;
 
 /// Local type alias to simplify the builder.
-type EnterAction<App> = Box<dyn FnMut() -> Vec<ClickAction<App>>>;
+type EnterAction<App> = Box<dyn FnMut(&Context<App>) -> Vec<ClickAction<App>>>;
 
 pub struct InputField<Data, App, Text>
 where
@@ -31,36 +31,34 @@ where
     state: ElementState<App>,
 }
 
-/* impl<Data, App, Text> InputField<Data, App, Text>
+impl<Data, App, Text> InputField<Data, App, Text>
 where
     Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
-    fn remove_character(&mut self) -> Vec<ClickAction<App>> {
-        self.input_state.with_mut(|input_state| {
-            if input_state.is_empty() {
-                return ValueState::Unchanged(Vec::new());
-            }
+    fn remove_character(&self, state: &Context<App>) -> Vec<ClickAction<App>> {
+        let mut current_input = state.get_safe(&self.input_state).clone();
 
-            input_state.pop();
+        if !current_input.is_empty() {
+            current_input.pop();
+            state.update_value(&self.input_state, current_input);
+        }
 
-            ValueState::Mutated(vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)])
-        })
+        return vec![];
     }
 
-    fn add_character(&mut self, character: char) -> Vec<ClickAction<App>> {
-        self.input_state.with_mut(|input_state| {
-            if input_state.len() >= self.length {
-                return ValueState::Unchanged(Vec::new());
-            }
+    fn add_character(&self, state: &Context<App>, character: char) -> Vec<ClickAction<App>> {
+        let mut current_input = state.get_safe(&self.input_state).clone();
 
-            input_state.push(character);
+        if current_input.len() < self.length {
+            current_input.push(character);
+            state.update_value(&self.input_state, current_input);
+        }
 
-            ValueState::Mutated(vec![ClickAction::ChangeEvent(ChangeEvent::RENDER_WINDOW)])
-        })
+        return vec![];
     }
-} */
+}
 
 impl<Data, App, Text> Element<App> for InputField<Data, App, Text>
 where
@@ -90,17 +88,17 @@ where
         }
     }
 
-    fn left_click(&mut self, _update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, _state: &Context<App>, _update: &mut bool) -> Vec<ClickAction<App>> {
         vec![ClickAction::FocusElement]
     }
 
-    /* fn input_character(&mut self, character: char) -> (bool, Vec<ClickAction<App>>) {
+    fn input_character(&mut self, state: &Context<App>, character: char) -> (bool, Vec<ClickAction<App>>) {
         (true, match character {
-            '\u{8}' | '\u{7f}' => self.remove_character(),
-            '\r' => (self.enter_action)(),
-            character => self.add_character(character),
+            '\u{8}' | '\u{7f}' => self.remove_character(state),
+            '\r' => (self.enter_action)(state),
+            character => self.add_character(state, character),
         })
-    } */
+    }
 
     fn render(
         &self,

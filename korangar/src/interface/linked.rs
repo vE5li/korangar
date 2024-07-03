@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 
 use korangar_interface::elements::ElementCell;
 
-use crate::interface::application::InterfaceSettings;
+use crate::GameState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LinkedElementInner {
@@ -22,7 +22,7 @@ impl LinkedElement {
         }
     }
 
-    pub fn link(&self, element: &ElementCell<InterfaceSettings>) {
+    pub fn link(&self, element: &ElementCell<GameState>) {
         let element_address = element.as_ptr() as *const () as usize;
         unsafe { *self.inner.get() = LinkedElementInner::Set(element_address) };
     }
@@ -39,7 +39,7 @@ impl LinkedElement {
         unsafe { *self.inner.get() == LinkedElementInner::Hidden }
     }
 
-    pub fn is_linked_to(&self, element: &ElementCell<InterfaceSettings>) -> bool {
+    pub fn is_linked_to(&self, element: &ElementCell<GameState>) -> bool {
         unsafe { *self.inner.get() == LinkedElementInner::Set(element.as_ptr() as *const () as usize) }
     }
 }

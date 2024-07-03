@@ -1,12 +1,14 @@
 use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
+use korangar_interface::theme::ButtonTheme;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(Default)]
 pub struct MenuWindow;
@@ -15,17 +17,12 @@ impl MenuWindow {
     pub const WINDOW_CLASS: &'static str = "menu";
 }
 
-impl PrototypeWindow<InterfaceSettings> for MenuWindow {
+impl PrototypeWindow<GameState> for MenuWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![
             ButtonBuilder::new()
                 .with_text("Graphics settings")
@@ -41,56 +38,56 @@ impl PrototypeWindow<InterfaceSettings> for MenuWindow {
             ButtonBuilder::new()
                 .with_text("Render settings")
                 .with_event(UserEvent::OpenRenderSettingsWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Map viewer")
                 .with_event(UserEvent::OpenMapDataWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Maps")
                 .with_event(UserEvent::OpenMapsWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Commands")
                 .with_event(UserEvent::OpenCommandsWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Time")
                 .with_event(UserEvent::OpenTimeWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Theme viewer")
                 .with_event(UserEvent::OpenThemeViewerWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Profiler")
                 .with_event(UserEvent::OpenProfilerWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             #[cfg(feature = "debug")]
             ButtonBuilder::new()
                 .with_text("Packets")
                 .with_event(UserEvent::OpenPacketWindow)
-                .with_foreground_color(|theme: &InterfaceTheme| theme.button.debug_foreground_color.get())
+                .with_foreground_color(|state, theme_selector| *state.get_safe(&ButtonTheme::debug_foreground_color(theme_selector)))
                 .build()
                 .wrap(),
             ButtonBuilder::new()

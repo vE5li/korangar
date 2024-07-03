@@ -3,17 +3,17 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
+use rust_state::Tracker;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
-use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ScreenClip, ScreenPosition};
-use crate::interface::theme::InterfaceTheme;
 use crate::loaders::FontSize;
+use crate::GameState;
 
 pub struct CartSum {
     total_price: u32,
-    state: ElementState<InterfaceSettings>,
+    state: ElementState<GameState>,
 }
 
 impl CartSum {
@@ -28,12 +28,12 @@ impl CartSum {
     }
 }
 
-impl Element<InterfaceSettings> for CartSum {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for CartSum {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state
     }
 
@@ -43,9 +43,9 @@ impl Element<InterfaceSettings> for CartSum {
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        _application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
+        _state: &Tracker<GameState>,
+        _theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         self.state.resolve(placement_resolver, &size_bound!(100%, 20));
     }
@@ -54,18 +54,15 @@ impl Element<InterfaceSettings> for CartSum {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        _theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        _theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        _hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        _focused_element: Option<&dyn Element<InterfaceSettings>>,
-        _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         renderer.render_text(
             &format!("Total price: {}", self.total_price),

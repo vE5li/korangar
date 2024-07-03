@@ -7,19 +7,19 @@ use korangar_interface::dimension_bound;
 use korangar_interface::elements::{Container, ElementCell, ElementWrap, PickList, PrototypeElement, Text};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedStateClone};
-use korangar_interface::windows::PrototypeWindow;
 use ron::ser::PrettyConfig;
+use rust_state::{PathId, PathUuid, Selector};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
-use super::elements::MutableRange;
 use super::layout::{CornerRadius, PartialScreenSize, ScreenClip, ScreenPosition, ScreenSize};
 use super::resource::{Move, PartialMove};
-use super::theme::{DefaultMain, DefaultMenu, GameTheme, InterfaceTheme, InterfaceThemeKind, Themes};
+use super::theme::InterfaceThemeKind;
 use super::windows::WindowCache;
 use crate::graphics::{Color, InterfaceRenderer};
 use crate::input::{MouseInputMode, UserEvent};
 use crate::loaders::{FontLoader, FontSize, Scaling};
+use crate::{GameState, GameStateFocusedElementPath, GameStateHoveredElementPath, GameStateMouseModePath, GameStateScalePath};
 
 impl korangar_interface::application::ColorTrait for Color {
     fn is_transparent(&self) -> bool {
@@ -128,7 +128,7 @@ pub enum InternalThemeKind {
 
 impl ConstParamTy for InternalThemeKind {}
 
-#[derive(Serialize, Deserialize)]
+/* #[derive(Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ThemeSelector<const KIND: InternalThemeKind>(pub String);
 
@@ -142,8 +142,8 @@ impl<const KIND: InternalThemeKind> ThemeSelector<KIND> {
     }
 }
 
-impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for ThemeSelector<KIND> {
-    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
+impl<const KIND: InternalThemeKind> PrototypeElement<GameState> for ThemeSelector<KIND> {
+    fn to_element(&self, display: String) -> ElementCell<GameState> {
         let state = PlainTrackedState::new(self.0.clone());
 
         let themes = WalkDir::new("client/themes/")
@@ -174,7 +174,7 @@ impl<const KIND: InternalThemeKind> PrototypeElement<InterfaceSettings> for Them
 
         Container::new(elements).wrap()
     }
-}
+} */
 
 #[derive(Serialize, Deserialize)]
 struct InterfaceSettingsStorage {
@@ -230,7 +230,7 @@ impl InterfaceSettingsStorage {
     }
 }
 
-#[derive(PrototypeElement)]
+/*#[derive(PrototypeElement)]
 pub struct InterfaceSettings {
     #[name("Main theme")]
     pub main_theme: ThemeSelector<{ InternalThemeKind::Main }>,
@@ -308,9 +308,66 @@ impl InterfaceSettings {
             InternalThemeKind::Game => self.themes.game.reload(self.game_theme.get_file()),
         }
     }
+}*/
+
+#[derive(Clone, Copy)]
+pub struct ThemeSelector2 {
+    kind: InterfaceThemeKind,
 }
 
-impl Application for InterfaceSettings {
+impl From<InterfaceThemeKind> for ThemeSelector2 {
+    fn from(kind: InterfaceThemeKind) -> Self {
+        ThemeSelector2 { kind }
+    }
+}
+
+macro_rules! impl_theme_selector {
+    ($selector:ty, $subtype:ty, $field:ident) => {
+        impl<'a> Selector<'a, GameState, $subtype> for $selector {
+            fn get(&self, state: &'a GameState) -> Option<&'a $subtype> {
+                match self.kind {
+                    InterfaceThemeKind::Main => Some(&state.main_theme.$field),
+                    InterfaceThemeKind::Menu => Some(&state.menu_theme.$field),
+                }
+            }
+
+            fn get_mut(&self, state: &'a mut GameState) -> Option<&'a mut $subtype> {
+                match self.kind {
+                    InterfaceThemeKind::Main => Some(&mut state.main_theme.$field),
+                    InterfaceThemeKind::Menu => Some(&mut state.menu_theme.$field),
+                }
+            }
+
+            fn get_path_id(&self) -> rust_state::PathId {
+                match self.kind {
+                    InterfaceThemeKind::Main => PathId::new(vec![PathUuid(100001)]),
+                    InterfaceThemeKind::Menu => PathId::new(vec![PathUuid(100002)]),
+                }
+            }
+        }
+    };
+}
+
+impl_theme_selector!(ThemeSelector2, korangar_interface::theme::ButtonTheme<GameState>, button);
+impl_theme_selector!(ThemeSelector2, korangar_interface::theme::WindowTheme<GameState>, window);
+impl_theme_selector!(
+    ThemeSelector2,
+    korangar_interface::theme::ExpandableTheme<GameState>,
+    expandable
+);
+impl_theme_selector!(ThemeSelector2, korangar_interface::theme::LabelTheme<GameState>, label);
+impl_theme_selector!(ThemeSelector2, korangar_interface::theme::ValueTheme<GameState>, value);
+impl_theme_selector!(
+    ThemeSelector2,
+    korangar_interface::theme::CloseButtonTheme<GameState>,
+    close_button
+);
+impl_theme_selector!(ThemeSelector2, korangar_interface::theme::SliderTheme<GameState>, slider);
+impl_theme_selector!(ThemeSelector2, korangar_interface::theme::InputTheme<GameState>, input);
+impl_theme_selector!(ThemeSelector2, super::theme::ProfilerTheme, profiler);
+impl_theme_selector!(ThemeSelector2, super::theme::ChatTheme, chat);
+
+impl Application for GameState {
     type Cache = WindowCache;
     type Clip = ScreenClip;
     type Color = Color;
@@ -318,30 +375,23 @@ impl Application for InterfaceSettings {
     type CustomEvent = UserEvent;
     type DropResource = PartialMove;
     type DropResult = Move;
+    type FocusedElementSelector = GameStateFocusedElementPath;
     type FontLoader = std::rc::Rc<std::cell::RefCell<FontLoader>>;
     type FontSize = FontSize;
+    type HoveredElementSelector = GameStateHoveredElementPath;
     type MouseInputMode = MouseInputMode;
+    type MouseModeSelector = GameStateMouseModePath;
     type PartialSize = PartialScreenSize;
     type Position = ScreenPosition;
     type Renderer = InterfaceRenderer;
+    type ScaleSelector = GameStateScalePath;
     type Scaling = Scaling;
     type Size = ScreenSize;
-    type Theme = InterfaceTheme;
     type ThemeKind = InterfaceThemeKind;
-
-    fn get_scaling(&self) -> Self::Scaling {
-        self.scaling.get()
-    }
-
-    fn get_theme(&self, kind: &InterfaceThemeKind) -> &InterfaceTheme {
-        match kind {
-            InterfaceThemeKind::Menu => &self.themes.menu,
-            InterfaceThemeKind::Main => &self.themes.main,
-        }
-    }
+    type ThemeSelector = ThemeSelector2;
 }
 
-impl Drop for InterfaceSettings {
+/*impl Drop for GameState {
     fn drop(&mut self) {
         InterfaceSettingsStorage {
             menu_theme: self.menu_theme.get_file().to_owned(),
@@ -351,4 +401,4 @@ impl Drop for InterfaceSettings {
         }
         .save();
     }
-}
+}*/

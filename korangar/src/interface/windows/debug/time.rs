@@ -1,11 +1,12 @@
 use korangar_interface::elements::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use rust_state::Context;
 
 use crate::input::UserEvent;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 #[derive(Default)]
 pub struct TimeWindow;
@@ -14,17 +15,12 @@ impl TimeWindow {
     pub const WINDOW_CLASS: &'static str = "time";
 }
 
-impl PrototypeWindow<InterfaceSettings> for TimeWindow {
+impl PrototypeWindow<GameState> for TimeWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         // TODO: Unify Set* events into one that takes a specific time
         let elements = vec![
             ButtonBuilder::new()

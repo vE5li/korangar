@@ -16,8 +16,8 @@ use vulkano::buffer::Subbuffer;
 use vulkano::image::view::ImageView;
 
 use crate::graphics::*;
-use crate::interface::application::InterfaceSettings;
 use crate::world::*;
+use crate::GameState;
 
 fn average_tile_height(tile: &Tile) -> f32 {
     (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
@@ -355,7 +355,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow<InterfaceSettings> {
+    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow<GameState> {
         &self.map_data
     }
 
@@ -371,11 +371,7 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn resolve_marker<'a>(
-        &'a self,
-        entities: &'a [Entity],
-        marker_identifier: MarkerIdentifier,
-    ) -> &dyn PrototypeWindow<InterfaceSettings> {
+    pub fn resolve_marker<'a>(&'a self, entities: &'a [Entity], marker_identifier: MarkerIdentifier) -> &dyn PrototypeWindow<GameState> {
         match marker_identifier {
             MarkerIdentifier::Object(index) => &self.objects[index],
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],

@@ -19,9 +19,9 @@ use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
 use super::{IntoFormat, SubpassAttachments};
 use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
+use crate::GameState;
 
 #[derive(PartialEq, Eq)]
 pub enum InterfaceSubrenderer {
@@ -137,26 +137,26 @@ impl InterfaceRenderer {
     }
 }
 
-impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for InterfaceRenderer {
+impl korangar_interface::application::InterfaceRenderer<GameState> for InterfaceRenderer {
     type Target = <Self as Renderer>::Target;
 
     fn get_text_dimensions(
         &self,
         text: &str,
-        font_size: <InterfaceSettings as Application>::FontSize,
+        font_size: <GameState as Application>::FontSize,
         available_width: f32,
-    ) -> <InterfaceSettings as Application>::Size {
+    ) -> <GameState as Application>::Size {
         self.font_loader.borrow().get_text_dimensions(text, font_size, available_width)
     }
 
     fn render_rectangle(
         &self,
         render_target: &mut Self::Target,
-        position: <InterfaceSettings as Application>::Position,
-        size: <InterfaceSettings as Application>::Size,
-        clip: <InterfaceSettings as Application>::Clip,
-        corner_radius: <InterfaceSettings as Application>::CornerRadius,
-        color: <InterfaceSettings as Application>::Color,
+        position: <GameState as Application>::Position,
+        size: <GameState as Application>::Size,
+        clip: <GameState as Application>::Clip,
+        corner_radius: <GameState as Application>::CornerRadius,
+        color: <GameState as Application>::Color,
     ) {
         self.rectangle_renderer.render(
             render_target,
@@ -173,10 +173,10 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         &self,
         render_target: &mut Self::Target,
         text: &str,
-        position: <InterfaceSettings as Application>::Position,
-        clip: <InterfaceSettings as Application>::Clip,
-        color: <InterfaceSettings as Application>::Color,
-        font_size: <InterfaceSettings as Application>::FontSize,
+        position: <GameState as Application>::Position,
+        clip: <GameState as Application>::Clip,
+        color: <GameState as Application>::Color,
+        font_size: <GameState as Application>::FontSize,
     ) -> f32 {
         self.text_renderer
             .render(render_target, text, self.get_window_size(), position, clip, color, font_size)
@@ -185,10 +185,10 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
     fn render_checkbox(
         &self,
         render_target: &mut Self::Target,
-        position: <InterfaceSettings as Application>::Position,
-        size: <InterfaceSettings as Application>::Size,
-        clip: <InterfaceSettings as Application>::Clip,
-        color: <InterfaceSettings as Application>::Color,
+        position: <GameState as Application>::Position,
+        size: <GameState as Application>::Size,
+        clip: <GameState as Application>::Clip,
+        color: <GameState as Application>::Color,
         checked: bool,
     ) {
         let texture = match checked {
@@ -202,10 +202,10 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
     fn render_expand_arrow(
         &self,
         render_target: &mut Self::Target,
-        position: <InterfaceSettings as Application>::Position,
-        size: <InterfaceSettings as Application>::Size,
-        clip: <InterfaceSettings as Application>::Clip,
-        color: <InterfaceSettings as Application>::Color,
+        position: <GameState as Application>::Position,
+        size: <GameState as Application>::Size,
+        clip: <GameState as Application>::Clip,
+        color: <GameState as Application>::Color,
         expanded: bool,
     ) {
         let texture = match expanded {

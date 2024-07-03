@@ -3,11 +3,12 @@ use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use ragnarok_packets::EntityId;
+use rust_state::Context;
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::{DialogContainer, DialogElement};
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
 pub struct DialogWindow {
     elements: PlainTrackedState<Vec<DialogElement>>,
@@ -29,17 +30,12 @@ impl DialogWindow {
     }
 }
 
-impl PrototypeWindow<InterfaceSettings> for DialogWindow {
+impl PrototypeWindow<GameState> for DialogWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let elements = vec![DialogContainer::new(self.elements.new_remote(), self.npc_id).wrap()];
 
         WindowBuilder::new()

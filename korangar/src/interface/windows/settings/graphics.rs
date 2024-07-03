@@ -1,54 +1,31 @@
 use korangar_interface::elements::{ElementWrap, PickList, PrototypeElement, StateButtonBuilder, Text};
-use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
+use rust_state::Context;
 
 use crate::graphics::{PresentModeInfo, ShadowDetail};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::GameState;
 
-pub struct GraphicsSettingsWindow<Shadow, Framerate>
-where
-    Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
-{
+pub struct GraphicsSettingsWindow {
     present_mode_info: PresentModeInfo,
-    shadow_detail: Shadow,
-    framerate_limit: Framerate,
 }
 
-impl<Shadow, Framerate> GraphicsSettingsWindow<Shadow, Framerate>
-where
-    Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
-{
+impl GraphicsSettingsWindow {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
-    pub fn new(present_mode_info: PresentModeInfo, shadow_detail: Shadow, framerate_limit: Framerate) -> Self {
-        Self {
-            present_mode_info,
-            shadow_detail,
-            framerate_limit,
-        }
+    pub fn new(present_mode_info: PresentModeInfo) -> Self {
+        Self { present_mode_info }
     }
 }
 
-impl<Shadow, Framerate> PrototypeWindow<InterfaceSettings> for GraphicsSettingsWindow<Shadow, Framerate>
-where
-    Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
-{
+impl PrototypeWindow<GameState> for GraphicsSettingsWindow {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
         let mut elements = vec![
             Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
@@ -58,11 +35,12 @@ where
                     ("High", ShadowDetail::High),
                     ("Ultra", ShadowDetail::Ultra),
                 ])
-                .with_selected(self.shadow_detail.clone())
-                .with_event(Box::new(Vec::new))
+                .with_selected(GameState::shadow_detail())
+                .with_event(|_: &Context<GameState>| Vec::new())
                 .with_width(dimension_bound!(!))
                 .wrap(),
-            application.to_element("Interface settings".to_string()),
+            // FIX: Put back
+            // application.to_element("Interface settings".to_string()),
         ];
 
         // TODO: Instead of not showing this option, disable the checkbox and add a
@@ -72,8 +50,12 @@ where
                 0,
                 StateButtonBuilder::new()
                     .with_text("Framerate limit")
-                    .with_event(self.framerate_limit.toggle_action())
-                    .with_remote(self.framerate_limit.new_remote())
+                    .with_event(move |state: &Context<GameState>| {
+                        let current_value = *state.get_safe(&GameState::framerate_limit());
+                        state.update_value(&GameState::framerate_limit(), !current_value);
+                        vec![]
+                    })
+                    .with_remote(GameState::framerate_limit())
                     .build()
                     .wrap(),
             );

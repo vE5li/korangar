@@ -13,13 +13,14 @@ use korangar_interface::state::{PlainRemote, Remote, RemoteClone};
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
 use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{Packet, PacketHeader};
+use rust_state::Tracker;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::linked::LinkedElement;
-use crate::interface::theme::InterfaceTheme;
+use crate::GameState;
 
 #[derive(Debug, Clone)]
 struct UnknownPacket {
@@ -130,14 +131,14 @@ impl Display for Direction {
 }
 
 struct PacketEntry {
-    element: Box<dyn PrototypeElement<InterfaceSettings> + Send>,
+    element: Box<dyn PrototypeElement<GameState> + Send>,
     name: &'static str,
     is_ping: bool,
     direction: Direction,
 }
 
 impl PacketEntry {
-    pub fn new_incoming(element: Box<dyn PrototypeElement<InterfaceSettings> + Send>, name: &'static str, is_ping: bool) -> Self {
+    pub fn new_incoming(element: Box<dyn PrototypeElement<GameState> + Send>, name: &'static str, is_ping: bool) -> Self {
         Self {
             element,
             name,
@@ -146,7 +147,7 @@ impl PacketEntry {
         }
     }
 
-    pub fn new_outgoing(element: Box<dyn PrototypeElement<InterfaceSettings> + Send>, name: &'static str, is_ping: bool) -> Self {
+    pub fn new_outgoing(element: Box<dyn PrototypeElement<GameState> + Send>, name: &'static str, is_ping: bool) -> Self {
         Self {
             element,
             name,
@@ -159,7 +160,7 @@ impl PacketEntry {
         self.is_ping
     }
 
-    fn to_element(&self) -> ElementCell<InterfaceSettings> {
+    fn to_element(&self) -> ElementCell<GameState> {
         self.element.to_element(format!("{} {}", self.direction, self.name))
     }
 }
@@ -272,7 +273,7 @@ impl PacketHistoryRemote {
 pub struct PacketView {
     packets: PacketHistoryRemote,
     show_pings: PlainRemote<bool>,
-    state: ContainerState<InterfaceSettings>,
+    state: ContainerState<GameState>,
 }
 
 impl PacketView {
@@ -310,20 +311,16 @@ impl PacketView {
     }
 }
 
-impl Element<InterfaceSettings> for PacketView {
-    fn get_state(&self) -> &ElementState<InterfaceSettings> {
+impl Element<GameState> for PacketView {
+    fn get_state(&self) -> &ElementState<GameState> {
         &self.state.state
     }
 
-    fn get_state_mut(&mut self) -> &mut ElementState<InterfaceSettings> {
+    fn get_state_mut(&mut self) -> &mut ElementState<GameState> {
         &mut self.state.state
     }
 
-    fn link_back(
-        &mut self,
-        weak_self: Weak<RefCell<dyn Element<InterfaceSettings>>>,
-        weak_parent: Option<Weak<RefCell<dyn Element<InterfaceSettings>>>>,
-    ) {
+    fn link_back(&mut self, weak_self: Weak<RefCell<dyn Element<GameState>>>, weak_parent: Option<Weak<RefCell<dyn Element<GameState>>>>) {
         self.state.link_back(weak_self, weak_parent);
     }
 
@@ -333,27 +330,27 @@ impl Element<InterfaceSettings> for PacketView {
 
     fn focus_next(
         &self,
-        self_cell: ElementCell<InterfaceSettings>,
-        caller_cell: Option<ElementCell<InterfaceSettings>>,
+        self_cell: ElementCell<GameState>,
+        caller_cell: Option<ElementCell<GameState>>,
         focus: Focus,
-    ) -> Option<ElementCell<InterfaceSettings>> {
+    ) -> Option<ElementCell<GameState>> {
         self.state.focus_next::<false>(self_cell, caller_cell, focus)
     }
 
-    fn restore_focus(&self, self_cell: ElementCell<InterfaceSettings>) -> Option<ElementCell<InterfaceSettings>> {
+    fn restore_focus(&self, self_cell: ElementCell<GameState>) -> Option<ElementCell<GameState>> {
         self.state.restore_focus(self_cell)
     }
 
     fn resolve(
         &mut self,
-        placement_resolver: &mut PlacementResolver<InterfaceSettings>,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        state: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
+        placement_resolver: &mut PlacementResolver<GameState>,
     ) {
         self.state.resolve(
             placement_resolver,
-            application,
-            theme,
+            state,
+            theme_selector,
             &size_bound!(100%, ?),
             ScreenSize::default(),
         );
@@ -441,7 +438,7 @@ impl Element<InterfaceSettings> for PacketView {
         }
     }
 
-    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<InterfaceSettings> {
+    fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {
             MouseInputMode::None => self.state.hovered_element(mouse_position, mouse_mode, false),
             _ => HoverInformation::Missed,
@@ -452,13 +449,10 @@ impl Element<InterfaceSettings> for PacketView {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &InterfaceSettings,
-        theme: &InterfaceTheme,
+        application: &Tracker<GameState>,
+        theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
-        hovered_element: Option<&dyn Element<InterfaceSettings>>,
-        focused_element: Option<&dyn Element<InterfaceSettings>>,
-        mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
         let mut renderer = self
@@ -466,14 +460,6 @@ impl Element<InterfaceSettings> for PacketView {
             .state
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
-        self.state.render(
-            &mut renderer,
-            application,
-            theme,
-            hovered_element,
-            focused_element,
-            mouse_mode,
-            second_theme,
-        );
+        self.state.render(&mut renderer, application, theme_selector, second_theme);
     }
 }

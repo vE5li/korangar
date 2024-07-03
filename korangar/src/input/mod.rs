@@ -11,6 +11,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
 use ragnarok_packets::{ClientTick, HotbarSlot};
+use rust_state::Context;
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
@@ -20,10 +21,11 @@ pub use self::mode::{Grabbed, MouseInputMode};
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
 use crate::graphics::{PickerRenderTarget, PickerTarget};
-use crate::interface::application::InterfaceSettings;
+use crate::interface::application;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::PartialMove;
+use crate::GameState;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
@@ -133,9 +135,9 @@ impl InputSystem {
     #[cfg_attr(feature = "debug", korangar_debug::profile("update user input"))]
     pub fn user_events(
         &mut self,
-        interface: &mut Interface<InterfaceSettings>,
-        application: &InterfaceSettings,
-        focus_state: &mut FocusState<InterfaceSettings>,
+        interface: &mut Interface<GameState>,
+        application: &Context<GameState>,
+        focus_state: &mut FocusState<GameState>,
         picker_target: &mut PickerRenderTarget,
         mouse_cursor: &mut MouseCursor,
         #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
@@ -143,8 +145,8 @@ impl InputSystem {
         client_tick: ClientTick,
     ) -> (
         Vec<UserEvent>,
-        Option<ElementCell<InterfaceSettings>>,
-        Option<ElementCell<InterfaceSettings>>,
+        Option<ElementCell<GameState>>,
+        Option<ElementCell<GameState>>,
         Option<PickerTarget>,
     ) {
         let mut events = Vec::new();
@@ -195,8 +197,8 @@ impl InputSystem {
 
             if let Some(hovered_element) = &hovered_element {
                 let actions = match self.left_mouse_button.pressed() {
-                    true => interface.left_click_element(hovered_element, *window_index),
-                    false => interface.right_click_element(hovered_element, *window_index),
+                    true => interface.left_click_element(application, hovered_element, *window_index),
+                    false => interface.right_click_element(application, hovered_element, *window_index),
                 };
 
                 for action in actions {

@@ -1,13 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rust_state::Tracker;
+use rust_state::{Context, Selector, Tracker};
 
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTraitExt, SizeTraitExt};
 use crate::elements::{ButtonBuilder, Element, ElementState, ElementWrap, ScrollView};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver, SizeBound};
-use crate::state::{TrackedState, TrackedStateClone};
 use crate::theme::ButtonTheme;
 use crate::ElementEvent;
 
@@ -16,7 +15,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: TrackedState<Value> + 'static,
+    State: for<'a> Selector<'a, App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     options: Vec<(Key, Value)>,
@@ -35,7 +34,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: TrackedState<Value> + 'static,
+    State: for<'a> Selector<'a, App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     fn default() -> Self {
@@ -56,7 +55,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: TrackedState<Value> + 'static,
+    State: for<'a> Selector<'a, App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     pub fn with_options(mut self, options: Vec<(Key, Value)>) -> Self {
@@ -85,7 +84,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: TrackedState<Value> + 'static,
+    State: for<'a> Selector<'a, App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     fn get_state(&self) -> &ElementState<App> {
@@ -115,7 +114,7 @@ where
         }
     }
 
-    fn left_click(&mut self, _force_update: &mut bool) -> Vec<ClickAction<App>> {
+    fn left_click(&mut self, _state: &Context<App>, _force_update: &mut bool) -> Vec<ClickAction<App>> {
         let position_tracker = {
             let latest_position = Rc::downgrade(&self.latest_position);
             move || latest_position.upgrade().map(|position| *position.borrow())
@@ -132,21 +131,22 @@ where
             .cloned()
             .map(|(text, option)| {
                 // FIX: What is the behavior here when slected is none?
-                let mut selected = self.selected.clone().unwrap();
+                let selected = self.selected.clone().unwrap();
                 let mut event = self.event.clone();
 
                 ButtonBuilder::new()
                     .with_text(text)
-                    .with_event(Box::new(move || {
-                        selected.set(option.clone());
+                    .with_event(move |state: &Context<App>| {
+                        state.update_value(&selected, option.clone());
+
                         let mut actions = vec![ClickAction::ClosePopup];
 
                         if let Some(event) = &mut event {
-                            actions.extend(event.trigger());
+                            actions.extend(event.trigger(state));
                         };
 
                         actions
-                    }))
+                    })
                     .build()
                     .wrap()
             })
@@ -202,15 +202,18 @@ where
         };
 
         // FIX: Don't unwrap. Fix logic
-        let current_state = self.selected.as_ref().map(|state| state.cloned()).unwrap();
+        let selector = self.selected.as_ref().unwrap();
+        let current_state = state.get(selector);
 
-        if let Some((text, _)) = self.options.iter().find(|(_, value)| *value == current_state) {
-            renderer.render_text(
-                text.as_ref(),
-                *state.get_safe(&ButtonTheme::text_offset(theme_selector)),
-                *foreground_color,
-                *state.get_safe(&ButtonTheme::font_size(theme_selector)),
-            );
+        if let Some(current_state) = current_state {
+            if let Some((text, _)) = self.options.iter().find(|(_, value)| *value == *current_state) {
+                renderer.render_text(
+                    text.as_ref(),
+                    *state.get_safe(&ButtonTheme::text_offset(theme_selector)),
+                    *foreground_color,
+                    *state.get_safe(&ButtonTheme::font_size(theme_selector)),
+                );
+            }
         }
     }
 }

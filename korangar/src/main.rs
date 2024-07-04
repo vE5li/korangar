@@ -721,7 +721,7 @@ fn main() {
                                 .expect("failed to load initial map");
 
                             game_state.update_value(&GameStateCurrentMapPath::default(), new_map);
-                            // game_state = game_state.apply();
+                            game_state.apply();
 
                             interface.close_all_windows_except(&mut focus_state);
 
@@ -777,7 +777,7 @@ fn main() {
                                 .unwrap();
 
                             game_state.update_value(&GameStateCurrentMapPath::default(), new_map);
-                            // game_state = game_state.apply();
+                            game_state.apply();
 
                             saved_player_name = character_information.name.clone();
 
@@ -886,7 +886,7 @@ fn main() {
                                 .unwrap();
 
                             game_state.update_value(&GameStateCurrentMapPath::default(), new_map);
-                            // game_state = game_state.apply();
+                            game_state.apply();
 
                             let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
                             entities[0].set_position(game_state.get_safe(&GameStateCurrentMapPath::default()), player_position, client_tick);

@@ -264,7 +264,7 @@ impl<State: StateMarker> Context<State> {
         );
     }
 
-    pub fn apply(mut self) -> Self {
+    pub fn apply(&mut self) {
         self.version += 1;
 
         self.state_changes.get_mut().drain(..).for_each(|apply| apply(&mut self.state));
@@ -273,8 +273,6 @@ impl<State: StateMarker> Context<State> {
             .get_mut()
             .drain(..)
             .for_each(|path| self.change_map.update_path(path, self.version));
-
-        self
     }
 
     pub fn get<'a, Path, Output>(&'a self, path: &Path) -> Option<&'a Output>

@@ -20,13 +20,12 @@ use crate::loaders::ResourceMetadata;
 use crate::GameState;
 
 pub struct EquipmentContainer {
-    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
     state: ContainerState<GameState>,
 }
 
 impl EquipmentContainer {
-    pub fn new(items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>) -> Self {
-        const SLOT_POSITIONS: [EquipPosition; 9] = [
+    pub fn new() -> Self {
+        /* const SLOT_POSITIONS: [EquipPosition; 9] = [
             EquipPosition::HEAD_TOP,
             EquipPosition::HEAD_MIDDLE,
             EquipPosition::HEAD_LOWER,
@@ -74,7 +73,7 @@ impl EquipmentContainer {
 
                     let text = Text::default()
                         .with_text(display_name.to_string())
-                        .with_foreground_color(|_| Color::monochrome_u8(200))
+                        .with_foreground_color(|_, _| Color::monochrome_u8(200))
                         .with_width(dimension_bound!(!))
                         .wrap();
 
@@ -99,11 +98,12 @@ impl EquipmentContainer {
                     Container::new(vec![item_box.wrap(), text]).wrap()
                 })
                 .collect()
-        };
+        }; */
 
+        let elements = vec![];
         let state = ContainerState::new(elements);
 
-        Self { items, state }
+        Self { state }
     }
 }
 
@@ -148,7 +148,7 @@ impl Element<GameState> for EquipmentContainer {
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(3.0));
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    /* fn update(&mut self) -> Option<ChangeEvent> {
         if self.items.consume_changed() {
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.state.state.self_element.take().unwrap();
@@ -162,7 +162,7 @@ impl Element<GameState> for EquipmentContainer {
         }
 
         None
-    }
+    } */
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {

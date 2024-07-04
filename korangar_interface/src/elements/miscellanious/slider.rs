@@ -124,8 +124,7 @@ where
             .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
-
-        if self.is_element_self(hovered_element) {
+        if self.is_cell_self(&hovered_element) {
             renderer.render_background(
                 *state.get_safe(&ButtonTheme::corner_radius(theme_selector)),
                 *state.get_safe(&SliderTheme::background_color(theme_selector)),

@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
 
-use rust_state::Selector;
+use rust_state::{Context, Selector};
 
 use super::StateButton;
 use crate::application::Application;
 use crate::builder::{Set, Unset};
+use crate::event::ClickAction;
 use crate::layout::DimensionBound;
 use crate::ElementEvent;
 
@@ -57,6 +58,27 @@ where
         self,
         event: Event,
     ) -> StateButtonBuilder<App, Text, Event, State, Background, Width> {
+        StateButtonBuilder { event, ..self }
+    }
+}
+
+impl<App, Text, State, Background, Width> StateButtonBuilder<App, Text, Unset, State, Background, Width>
+where
+    App: Application,
+    State: for<'a> Selector<'a, App, bool>,
+{
+    pub fn with_toggle_event(
+        self,
+    ) -> StateButtonBuilder<App, Text, Box<dyn Fn(&Context<App>) -> Vec<ClickAction<App>>>, State, Background, Width> {
+        let selector = self.remote.clone();
+        let event = Box::new(move |state: &Context<App>| {
+            if let Some(current_value) = state.get(&selector) {
+                state.update_value(&selector, !current_value);
+            }
+
+            vec![]
+        });
+
         StateButtonBuilder { event, ..self }
     }
 }

@@ -10,7 +10,7 @@ use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ScreenClip, ScreenPosition};
 use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::ColorWindow;
-use crate::GameState;
+use crate::{GameState, GameStateHoveredElementPath};
 
 pub struct MutableColorValue {
     name: String,
@@ -110,7 +110,8 @@ impl Element<GameState> for MutableColorValue {
             .state
             .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
-        let background_color = match self.is_element_self(hovered_element) {
+        let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
+        let background_color = match self.is_cell_self(&hovered_element) {
             true => self.cached_color.shade(),
             false => self.cached_color,
         };

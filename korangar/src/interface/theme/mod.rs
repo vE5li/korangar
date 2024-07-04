@@ -22,6 +22,7 @@ use super::elements::{Mutable, MutableRange};
 use super::layout::{CornerRadius, ScreenPosition, ScreenSize};
 use crate::graphics::Color;
 use crate::loaders::FontSize;
+use crate::threads::Deferred;
 use crate::GameState;
 
 /// Themes the user interface can use.
@@ -48,309 +49,205 @@ pub trait ThemeDefault<T: ThemeKindMarker> {
     fn default() -> Self;
 }
 
-/* impl ThemeDefault<DefaultMenu> for ButtonTheme {
+impl ThemeDefault<DefaultMenu> for ButtonTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(150, 70, 255)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(200, 70, 255)),
-            disabled_background_color: Mutable::new(Color::monochrome_u8(70)),
-            foreground_color: Mutable::new(Color::monochrome_u8(200)),
-            hovered_foreground_color: Mutable::new(Color::rgb_u8(220, 170, 215)),
-            disabled_foreground_color: Mutable::new(Color::monochrome_u8(140)),
-            debug_foreground_color: Mutable::new(Color::rgb_u8(230, 140, 230)),
-            corner_radius: MutableRange::new(
-                CornerRadius::uniform(26.0),
-                CornerRadius::default(),
-                CornerRadius::uniform(30.0),
-            ),
-            icon_offset: MutableRange::new(
-                ScreenPosition { left: 7.0, top: 2.5 },
-                ScreenPosition::default(),
-                ScreenPosition::uniform(20.0),
-            ),
-            icon_size: MutableRange::new(ScreenSize::uniform(16.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            icon_text_offset: MutableRange::new(
-                ScreenPosition { left: 40.0, top: 4.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 100.0, top: 20.0 },
-            ),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 15.0, top: 6.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 100.0, top: 20.0 },
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::rgb_u8(150, 70, 255),
+            hovered_background_color: Color::rgb_u8(200, 70, 255),
+            disabled_background_color: Color::monochrome_u8(70),
+            foreground_color: Color::monochrome_u8(200),
+            hovered_foreground_color: Color::rgb_u8(220, 170, 215),
+            disabled_foreground_color: Color::monochrome_u8(140),
+            debug_foreground_color: Color::rgb_u8(230, 140, 230),
+            corner_radius: CornerRadius::uniform(26.0),
+            icon_offset: ScreenPosition { left: 7.0, top: 2.5 },
+            icon_size: ScreenSize::uniform(16.0),
+            icon_text_offset: ScreenPosition { left: 40.0, top: 4.0 },
+            text_offset: ScreenPosition { left: 15.0, top: 6.0 },
+            font_size: FontSize::new(14.0),
             height_bound: dimension_bound!(26),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for ButtonTheme {
+impl ThemeDefault<DefaultMain> for ButtonTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(100)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(140, 120, 140)),
-            disabled_background_color: Mutable::new(Color::monochrome_u8(70)),
-            foreground_color: Mutable::new(Color::monochrome_u8(200)),
-            hovered_foreground_color: Mutable::new(Color::rgb_u8(220, 170, 215)),
-            disabled_foreground_color: Mutable::new(Color::monochrome_u8(140)),
-            debug_foreground_color: Mutable::new(Color::rgb_u8(230, 140, 230)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            icon_offset: MutableRange::new(
-                ScreenPosition { left: 7.0, top: 2.5 },
-                ScreenPosition::default(),
-                ScreenPosition::uniform(20.0),
-            ),
-            icon_size: MutableRange::new(ScreenSize::uniform(10.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            icon_text_offset: MutableRange::new(
-                ScreenPosition { left: 20.0, top: 1.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 100.0, top: 20.0 },
-            ),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: 1.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 100.0, top: 20.0 },
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::monochrome_u8(100),
+            hovered_background_color: Color::rgb_u8(140, 120, 140),
+            disabled_background_color: Color::monochrome_u8(70),
+            foreground_color: Color::monochrome_u8(200),
+            hovered_foreground_color: Color::rgb_u8(220, 170, 215),
+            disabled_foreground_color: Color::monochrome_u8(140),
+            debug_foreground_color: Color::rgb_u8(230, 140, 230),
+            corner_radius: CornerRadius::uniform(6.0),
+            icon_offset: ScreenPosition { left: 7.0, top: 2.5 },
+            icon_size: ScreenSize::uniform(10.0),
+            icon_text_offset: ScreenPosition { left: 20.0, top: 1.0 },
+            text_offset: ScreenPosition { left: 5.0, top: 1.0 },
+            font_size: FontSize::new(14.0),
             height_bound: dimension_bound!(16),
         }
     }
-} */
+}
 
-/* impl ThemeDefault<DefaultMenu> for WindowTheme {
+impl ThemeDefault<DefaultMenu> for WindowTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(30)),
-            title_background_color: Mutable::new(Color::rgba_u8(70, 60, 70, 0)),
-            foreground_color: Mutable::new(Color::rgb_u8(150, 70, 255)),
-            corner_radius: MutableRange::new(
-                CornerRadius::uniform(30.0),
-                CornerRadius::default(),
-                CornerRadius::uniform(30.0),
-            ),
-            title_corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            border_size: MutableRange::new(ScreenSize::uniform(30.0), ScreenSize::default(), ScreenSize::uniform(30.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: -1.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 50.0, top: 30.0 },
-            ),
-            gaps: MutableRange::new(
-                ScreenSize { width: 9.0, height: 19.0 },
-                ScreenSize::default(),
-                ScreenSize::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(20.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::monochrome_u8(30),
+            title_background_color: Color::rgba_u8(70, 60, 70, 0),
+            foreground_color: Color::rgb_u8(150, 70, 255),
+            corner_radius: CornerRadius::uniform(30.0),
+            title_corner_radius: CornerRadius::uniform(6.0),
+            border_size: ScreenSize::uniform(30.0),
+            text_offset: ScreenPosition { left: 5.0, top: -1.0 },
+            gaps: ScreenSize { width: 9.0, height: 19.0 },
+            font_size: FontSize::new(20.0),
             title_height: dimension_bound!(30),
-            anchor_color: Mutable::new(Color::rgba_u8(60, 60, 150, 255)),
-            closest_anchor_color: Mutable::new(Color::rgba_u8(190, 125, 255, 255)),
+            anchor_color: Color::rgba_u8(60, 60, 150, 255),
+            closest_anchor_color: Color::rgba_u8(190, 125, 255, 255),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for WindowTheme {
+impl ThemeDefault<DefaultMain> for WindowTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(40)),
-            title_background_color: Mutable::new(Color::rgb_u8(170, 60, 70)),
-            foreground_color: Mutable::new(Color::monochrome_u8(160)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(4.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            title_corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            border_size: MutableRange::new(
-                ScreenSize { width: 12.0, height: 6.0 },
-                ScreenSize::default(),
-                ScreenSize::uniform(30.0),
-            ),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: -1.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 50.0, top: 30.0 },
-            ),
-            gaps: MutableRange::new(
-                ScreenSize { width: 4.0, height: 5.0 },
-                ScreenSize::default(),
-                ScreenSize::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::monochrome_u8(40),
+            title_background_color: Color::rgb_u8(170, 60, 70),
+            foreground_color: Color::monochrome_u8(160),
+            corner_radius: CornerRadius::uniform(4.0),
+            title_corner_radius: CornerRadius::uniform(6.0),
+            border_size: ScreenSize { width: 12.0, height: 6.0 },
+            text_offset: ScreenPosition { left: 5.0, top: -1.0 },
+            gaps: ScreenSize { width: 4.0, height: 5.0 },
+            font_size: FontSize::new(14.0),
             title_height: dimension_bound!(12),
-            anchor_color: Mutable::new(Color::rgba_u8(150, 100, 100, 255)),
-            closest_anchor_color: Mutable::new(Color::rgba_u8(255, 180, 0, 255)),
-        }
-    }
-} */
-
-/* impl ThemeDefault<DefaultMenu> for ExpandableTheme {
-    fn default() -> Self {
-        Self {
-            background_color: Mutable::new(Color::monochrome_u8(60)),
-            second_background_color: Mutable::new(Color::monochrome_u8(45)),
-            foreground_color: Mutable::new(Color::monochrome_u8(170)),
-            hovered_foreground_color: Mutable::new(Color::rgb_u8(190, 145, 185)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            border_size: MutableRange::new(ScreenSize::uniform(5.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            element_offset: MutableRange::new(
-                ScreenPosition { left: 7.0, top: -2.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 30.0, top: 30.0 },
-            ),
-            icon_offset: MutableRange::new(
-                ScreenPosition { left: 6.0, top: 5.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 30.0, top: 50.0 },
-            ),
-            icon_size: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 14.0, top: 1.5 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 50.0, top: 20.0 },
-            ),
-            gaps: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            anchor_color: Color::rgba_u8(150, 100, 100, 255),
+            closest_anchor_color: Color::rgba_u8(255, 180, 0, 255),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for ExpandableTheme {
+impl ThemeDefault<DefaultMenu> for ExpandableTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(60)),
-            second_background_color: Mutable::new(Color::monochrome_u8(45)),
-            foreground_color: Mutable::new(Color::monochrome_u8(170)),
-            hovered_foreground_color: Mutable::new(Color::rgb_u8(190, 145, 185)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            border_size: MutableRange::new(ScreenSize::uniform(5.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            element_offset: MutableRange::new(
-                ScreenPosition { left: 7.0, top: -2.0 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(30.0),
-            ),
-            icon_offset: MutableRange::new(
-                ScreenPosition { left: 6.0, top: 5.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 30.0, top: 50.0 },
-            ),
-            icon_size: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 14.0, top: 1.5 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 50.0, top: 20.0 },
-            ),
-            gaps: MutableRange::new(ScreenSize::uniform(6.0), ScreenSize::default(), ScreenSize::uniform(20.0)),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::monochrome_u8(60),
+            second_background_color: Color::monochrome_u8(45),
+            foreground_color: Color::monochrome_u8(170),
+            hovered_foreground_color: Color::rgb_u8(190, 145, 185),
+            corner_radius: CornerRadius::uniform(6.0),
+            border_size: ScreenSize::uniform(5.0),
+            element_offset: ScreenPosition { left: 7.0, top: -2.0 },
+            icon_offset: ScreenPosition { left: 6.0, top: 5.0 },
+            icon_size: ScreenSize::uniform(6.0),
+            text_offset: ScreenPosition { left: 14.0, top: 1.5 },
+            gaps: ScreenSize::uniform(6.0),
+            font_size: FontSize::new(14.0),
         }
     }
-} */
+}
 
-/* impl ThemeDefault<DefaultMenu> for LabelTheme {
+impl ThemeDefault<DefaultMain> for ExpandableTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(130)),
-            foreground_color: Mutable::new(Color::monochrome_u8(255)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: 0.0 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::monochrome_u8(60),
+            second_background_color: Color::monochrome_u8(45),
+            foreground_color: Color::monochrome_u8(170),
+            hovered_foreground_color: Color::rgb_u8(190, 145, 185),
+            corner_radius: CornerRadius::uniform(6.0),
+            border_size: ScreenSize::uniform(5.0),
+            element_offset: ScreenPosition { left: 7.0, top: -2.0 },
+            icon_offset: ScreenPosition { left: 6.0, top: 5.0 },
+            icon_size: ScreenSize::uniform(6.0),
+            text_offset: ScreenPosition { left: 14.0, top: 1.5 },
+            gaps: ScreenSize::uniform(6.0),
+            font_size: FontSize::new(14.0),
+        }
+    }
+}
+
+impl ThemeDefault<DefaultMenu> for LabelTheme<GameState> {
+    fn default() -> Self {
+        Self {
+            background_color: Color::monochrome_u8(130),
+            foreground_color: Color::monochrome_u8(255),
+            corner_radius: CornerRadius::uniform(6.0),
+            text_offset: ScreenPosition { left: 5.0, top: 0.0 },
+            font_size: FontSize::new(14.0),
             size_bound: size_bound!(120 > 50% < 300, 0),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for LabelTheme {
+impl ThemeDefault<DefaultMain> for LabelTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(130)),
-            foreground_color: Mutable::new(Color::monochrome_u8(255)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: 0.0 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::monochrome_u8(130),
+            foreground_color: Color::monochrome_u8(255),
+            corner_radius: CornerRadius::uniform(6.0),
+            text_offset: ScreenPosition { left: 5.0, top: 0.0 },
+            font_size: FontSize::new(14.0),
             size_bound: size_bound!(120 > 50% < 300, 0),
         }
     }
-} */
+}
 
-/* impl ThemeDefault<DefaultMenu> for ValueTheme {
+impl ThemeDefault<DefaultMenu> for ValueTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(100, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(130, 100, 120)),
-            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: 0.0 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::rgb_u8(100, 100, 100),
+            hovered_background_color: Color::rgb_u8(130, 100, 120),
+            foreground_color: Color::rgb_u8(220, 220, 220),
+            corner_radius: CornerRadius::uniform(6.0),
+            text_offset: ScreenPosition { left: 5.0, top: 0.0 },
+            font_size: FontSize::new(14.0),
             size_bound: size_bound!(60 > !, 14),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for ValueTheme {
+impl ThemeDefault<DefaultMain> for ValueTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(100, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(130, 100, 120)),
-            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 5.0, top: 0.0 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::rgb_u8(100, 100, 100),
+            hovered_background_color: Color::rgb_u8(130, 100, 120),
+            foreground_color: Color::rgb_u8(220, 220, 220),
+            corner_radius: CornerRadius::uniform(6.0),
+            text_offset: ScreenPosition { left: 5.0, top: 0.0 },
+            font_size: FontSize::new(14.0),
             size_bound: size_bound!(60 > !, 14),
         }
     }
-} */
+}
 
-/* impl ThemeDefault<DefaultMenu> for CloseButtonTheme {
+impl ThemeDefault<DefaultMenu> for CloseButtonTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(200, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(200, 140, 100)),
-            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
-            corner_radius: MutableRange::new(
-                CornerRadius::uniform(26.0),
-                CornerRadius::default(),
-                CornerRadius::uniform(30.0),
-            ),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 8.35, top: 2.55 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(20.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::rgb_u8(200, 100, 100),
+            hovered_background_color: Color::rgb_u8(200, 140, 100),
+            foreground_color: Color::rgb_u8(220, 220, 220),
+            corner_radius: CornerRadius::uniform(26.0),
+            text_offset: ScreenPosition { left: 8.35, top: 2.55 },
+            font_size: FontSize::new(20.0),
             size_bound: size_bound!(26, 26),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for CloseButtonTheme {
+impl ThemeDefault<DefaultMain> for CloseButtonTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(200, 100, 100)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(200, 140, 100)),
-            foreground_color: Mutable::new(Color::rgb_u8(220, 220, 220)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(1.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 9.0, top: 0.0 },
-                ScreenPosition::uniform(-10.0),
-                ScreenPosition::uniform(20.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(12.0), FontSize::new(6.0), FontSize::new(30.0)),
+            background_color: Color::rgb_u8(200, 100, 100),
+            hovered_background_color: Color::rgb_u8(200, 140, 100),
+            foreground_color: Color::rgb_u8(220, 220, 220),
+            corner_radius: CornerRadius::uniform(1.0),
+            text_offset: ScreenPosition { left: 9.0, top: 0.0 },
+            font_size: FontSize::new(12.0),
             size_bound: size_bound!(25, 12),
         }
     }
-} */
+}
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct OverlayTheme {
@@ -359,91 +256,75 @@ pub struct OverlayTheme {
     pub font_size: FontSize,
 }
 
-/* impl Default for OverlayTheme {
+impl Default for OverlayTheme {
     fn default() -> Self {
         Self {
-            foreground_color: Mutable::new(Color::monochrome_u8(220)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 20.0, top: 10.0 },
-                ScreenPosition::default(),
-                ScreenPosition { left: 1000.0, top: 500.0 },
-            ),
-            font_size: MutableRange::new(FontSize::new(18.0), FontSize::new(6.0), FontSize::new(50.0)),
+            foreground_color: Color::monochrome_u8(220),
+            text_offset: ScreenPosition { left: 20.0, top: 10.0 },
+            font_size: FontSize::new(18.0),
         }
     }
-} */
+}
 
-/* impl ThemeDefault<DefaultMenu> for SliderTheme {
+impl ThemeDefault<DefaultMenu> for SliderTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
-            rail_color: Mutable::new(Color::rgb_u8(150, 130, 150)),
-            knob_color: Mutable::new(Color::rgb_u8(100, 180, 180)),
+            background_color: Color::rgb_u8(140, 80, 100),
+            rail_color: Color::rgb_u8(150, 130, 150),
+            knob_color: Color::rgb_u8(100, 180, 180),
             size_bound: size_bound!(100%, 18),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for SliderTheme {
+impl ThemeDefault<DefaultMain> for SliderTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgb_u8(140, 80, 100)),
-            rail_color: Mutable::new(Color::rgb_u8(150, 130, 150)),
-            knob_color: Mutable::new(Color::rgb_u8(100, 180, 180)),
+            background_color: Color::rgb_u8(140, 80, 100),
+            rail_color: Color::rgb_u8(150, 130, 150),
+            knob_color: Color::rgb_u8(100, 180, 180),
             size_bound: size_bound!(100%, 18),
         }
     }
-} */
+}
 
-/* impl ThemeDefault<DefaultMenu> for InputTheme {
+impl ThemeDefault<DefaultMenu> for InputTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(45)),
-            hovered_background_color: Mutable::new(Color::rgb_u8(70, 60, 80)),
-            focused_background_color: Mutable::new(Color::monochrome_u8(100)),
-            text_color: Mutable::new(Color::monochrome_u8(200)),
-            ghost_text_color: Mutable::new(Color::monochrome_u8(100)),
-            focused_text_color: Mutable::new(Color::monochrome_u8(200)),
-            corner_radius: MutableRange::new(
-                CornerRadius::uniform(26.0),
-                CornerRadius::default(),
-                CornerRadius::uniform(30.0),
-            ),
-            font_size: MutableRange::new(FontSize::new(15.0), FontSize::new(6.0), FontSize::new(50.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 15.0, top: 6.0 },
-                ScreenPosition::default(),
-                ScreenPosition::uniform(50.0),
-            ),
-            cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
-            cursor_width: MutableRange::new(3.0, 2.0, 30.0),
+            background_color: Color::monochrome_u8(45),
+            hovered_background_color: Color::rgb_u8(70, 60, 80),
+            focused_background_color: Color::monochrome_u8(100),
+            text_color: Color::monochrome_u8(200),
+            ghost_text_color: Color::monochrome_u8(100),
+            focused_text_color: Color::monochrome_u8(200),
+            corner_radius: CornerRadius::uniform(26.0),
+            font_size: FontSize::new(15.0),
+            text_offset: ScreenPosition { left: 15.0, top: 6.0 },
+            cursor_offset: 2.0,
+            cursor_width: 3.0,
             height_bound: dimension_bound!(26),
         }
     }
 }
 
-impl ThemeDefault<DefaultMain> for InputTheme {
+impl ThemeDefault<DefaultMain> for InputTheme<GameState> {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(60)),
-            hovered_background_color: Mutable::new(Color::monochrome_u8(80)),
-            focused_background_color: Mutable::new(Color::monochrome_u8(100)),
-            text_color: Mutable::new(Color::monochrome_u8(200)),
-            ghost_text_color: Mutable::new(Color::monochrome_u8(100)),
-            focused_text_color: Mutable::new(Color::monochrome_u8(200)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(6.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(50.0)),
-            text_offset: MutableRange::new(
-                ScreenPosition { left: 4.0, top: 0.0 },
-                ScreenPosition::default(),
-                ScreenPosition::uniform(50.0),
-            ),
-            cursor_offset: MutableRange::new(2.0, 0.0, 10.0),
-            cursor_width: MutableRange::new(3.0, 2.0, 30.0),
+            background_color: Color::monochrome_u8(60),
+            hovered_background_color: Color::monochrome_u8(80),
+            focused_background_color: Color::monochrome_u8(100),
+            text_color: Color::monochrome_u8(200),
+            ghost_text_color: Color::monochrome_u8(100),
+            focused_text_color: Color::monochrome_u8(200),
+            corner_radius: CornerRadius::uniform(6.0),
+            font_size: FontSize::new(14.0),
+            text_offset: ScreenPosition { left: 4.0, top: 0.0 },
+            cursor_offset: 2.0,
+            cursor_width: 3.0,
             height_bound: dimension_bound!(15),
         }
     }
-} */
+}
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct ChatTheme {
@@ -455,15 +336,15 @@ pub struct ChatTheme {
     pub information_color: Color,
 }
 
-/* impl ThemeDefault<DefaultMenu> for ChatTheme {
+impl ThemeDefault<DefaultMenu> for ChatTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(50.0)),
-            broadcast_color: Mutable::new(Color::rgb_u8(210, 210, 210)),
-            server_color: Mutable::new(Color::rgb_u8(255, 255, 210)),
-            error_color: Mutable::new(Color::rgb_u8(255, 150, 150)),
-            information_color: Mutable::new(Color::rgb_u8(200, 255, 200)),
+            background_color: Color::rgba_u8(0, 0, 0, 170),
+            font_size: FontSize::new(14.0),
+            broadcast_color: Color::rgb_u8(210, 210, 210),
+            server_color: Color::rgb_u8(255, 255, 210),
+            error_color: Color::rgb_u8(255, 150, 150),
+            information_color: Color::rgb_u8(200, 255, 200),
         }
     }
 }
@@ -471,28 +352,28 @@ pub struct ChatTheme {
 impl ThemeDefault<DefaultMain> for ChatTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::rgba_u8(0, 0, 0, 170)),
-            font_size: MutableRange::new(FontSize::new(14.0), FontSize::new(6.0), FontSize::new(50.0)),
-            broadcast_color: Mutable::new(Color::rgb_u8(210, 210, 210)),
-            server_color: Mutable::new(Color::rgb_u8(255, 255, 210)),
-            error_color: Mutable::new(Color::rgb_u8(255, 150, 150)),
-            information_color: Mutable::new(Color::rgb_u8(200, 255, 200)),
+            background_color: Color::rgba_u8(0, 0, 0, 170),
+            font_size: FontSize::new(14.0),
+            broadcast_color: Color::rgb_u8(210, 210, 210),
+            server_color: Color::rgb_u8(255, 255, 210),
+            error_color: Color::rgb_u8(255, 150, 150),
+            information_color: Color::rgb_u8(200, 255, 200),
         }
     }
-} */
+}
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct CursorTheme {
     pub color: Color,
 }
 
-/* impl Default for CursorTheme {
+impl Default for CursorTheme {
     fn default() -> Self {
         Self {
-            color: Mutable::new(Color::monochrome_u8(255)),
+            color: Color::monochrome_u8(255),
         }
     }
-} */
+}
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct ProfilerTheme {
@@ -510,28 +391,21 @@ pub struct ProfilerTheme {
     pub distance_text_offset: f32,
 }
 
-/* impl ThemeDefault<DefaultMenu> for ProfilerTheme {
+impl ThemeDefault<DefaultMenu> for ProfilerTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(55)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(2.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            line_color: Mutable::new(Color::rgb_u8(80, 90, 80)),
-            line_width: MutableRange::new(2.0, 0.5, 4.0),
-            bar_height: MutableRange::new(15.0, 5.0, 30.0),
-            bar_gap: MutableRange::new(ScreenSize { width: 1.0, height: 5.0 }, ScreenSize::default(), ScreenSize {
-                width: 10.0,
-                height: 20.0,
-            }),
-            bar_corner_radius: MutableRange::new(CornerRadius::default(), CornerRadius::default(), CornerRadius::uniform(15.0)),
-            bar_text_color: Mutable::new(Color::monochrome_u8(0)),
-            bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
-            bar_text_offset: MutableRange::new(
-                ScreenPosition { left: 7.0, top: 0.0 },
-                ScreenPosition { left: 0.0, top: -10.0 },
-                ScreenPosition { left: 40.0, top: 10.0 },
-            ),
-            distance_text_size: MutableRange::new(12.0, 6.0, 50.0),
-            distance_text_offset: MutableRange::new(20.0, 0.0, 200.0),
+            background_color: Color::monochrome_u8(55),
+            corner_radius: CornerRadius::uniform(2.0),
+            line_color: Color::rgb_u8(80, 90, 80),
+            line_width: 2.0,
+            bar_height: 15.0,
+            bar_gap: ScreenSize { width: 1.0, height: 5.0 },
+            bar_corner_radius: CornerRadius::default(),
+            bar_text_color: Color::monochrome_u8(0),
+            bar_text_size: 14.0,
+            bar_text_offset: ScreenPosition { left: 7.0, top: 0.0 },
+            distance_text_size: 12.0,
+            distance_text_offset: 20.0,
         }
     }
 }
@@ -539,28 +413,21 @@ pub struct ProfilerTheme {
 impl ThemeDefault<DefaultMain> for ProfilerTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(55)),
-            corner_radius: MutableRange::new(CornerRadius::uniform(2.0), CornerRadius::default(), CornerRadius::uniform(30.0)),
-            line_color: Mutable::new(Color::rgb_u8(80, 90, 80)),
-            line_width: MutableRange::new(2.0, 0.5, 4.0),
-            bar_height: MutableRange::new(15.0, 5.0, 30.0),
-            bar_gap: MutableRange::new(ScreenSize { width: 1.0, height: 5.0 }, ScreenSize::default(), ScreenSize {
-                width: 10.0,
-                height: 20.0,
-            }),
-            bar_corner_radius: MutableRange::new(CornerRadius::default(), CornerRadius::default(), CornerRadius::uniform(15.0)),
-            bar_text_color: Mutable::new(Color::monochrome_u8(0)),
-            bar_text_size: MutableRange::new(14.0, 6.0, 50.0),
-            bar_text_offset: MutableRange::new(
-                ScreenPosition { left: 7.0, top: 0.0 },
-                ScreenPosition { left: 0.0, top: -10.0 },
-                ScreenPosition { left: 40.0, top: 10.0 },
-            ),
-            distance_text_size: MutableRange::new(12.0, 6.0, 50.0),
-            distance_text_offset: MutableRange::new(20.0, 0.0, 200.0),
+            background_color: Color::monochrome_u8(55),
+            corner_radius: CornerRadius::uniform(2.0),
+            line_color: Color::rgb_u8(80, 90, 80),
+            line_width: 2.0,
+            bar_height: 15.0,
+            bar_gap: ScreenSize { width: 1.0, height: 5.0 },
+            bar_corner_radius: CornerRadius::default(),
+            bar_text_color: Color::monochrome_u8(0),
+            bar_text_size: 14.0,
+            bar_text_offset: ScreenPosition { left: 7.0, top: 0.0 },
+            distance_text_size: 12.0,
+            distance_text_offset: 20.0,
         }
     }
-} */
+}
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct StatusBarTheme {
@@ -579,42 +446,38 @@ pub struct StatusBarTheme {
     pub gap: f32,
 }
 
-/* impl Default for StatusBarTheme {
+impl Default for StatusBarTheme {
     fn default() -> Self {
         Self {
-            background_color: Mutable::new(Color::monochrome_u8(40)),
-            player_health_color: Mutable::new(Color::rgb_u8(67, 163, 83)),
-            enemy_health_color: Mutable::new(Color::rgb_u8(206, 49, 116)),
-            spell_point_color: Mutable::new(Color::rgb_u8(0, 129, 163)),
-            activity_point_color: Mutable::new(Color::rgb_u8(218, 145, 81)),
-            player_bar_width: MutableRange::new(85.0, 20.0, 300.0),
-            enemy_bar_width: MutableRange::new(60.0, 20.0, 300.0),
-            health_height: MutableRange::new(8.0, 2.0, 30.0),
-            enemy_health_height: MutableRange::new(6.0, 2.0, 30.0),
-            spell_point_height: MutableRange::new(4.0, 2.0, 30.0),
-            activity_point_height: MutableRange::new(4.0, 2.0, 30.0),
-            border_size: MutableRange::new(
-                ScreenSize { width: 2.0, height: 1.0 },
-                ScreenSize::default(),
-                ScreenSize::uniform(20.0),
-            ),
-            gap: MutableRange::new(1.0, 0.0, 10.0),
+            background_color: Color::monochrome_u8(40),
+            player_health_color: Color::rgb_u8(67, 163, 83),
+            enemy_health_color: Color::rgb_u8(206, 49, 116),
+            spell_point_color: Color::rgb_u8(0, 129, 163),
+            activity_point_color: Color::rgb_u8(218, 145, 81),
+            player_bar_width: 85.0,
+            enemy_bar_width: 60.0,
+            health_height: 8.0,
+            enemy_health_height: 6.0,
+            spell_point_height: 4.0,
+            activity_point_height: 4.0,
+            border_size: ScreenSize { width: 2.0, height: 1.0 },
+            gap: 1.0,
         }
     }
-} */
+}
 
 #[derive(RustState, Serialize, Deserialize)]
 pub struct IndicatorTheme {
     pub walking: Color,
 }
 
-/* impl Default for IndicatorTheme {
+impl Default for IndicatorTheme {
     fn default() -> Self {
         Self {
-            walking: Mutable::new(Color::rgba_u8(0, 255, 170, 170)),
+            walking: Color::rgba_u8(0, 255, 170, 170),
         }
     }
-} */
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct InterfaceTheme {
@@ -630,16 +493,16 @@ pub struct InterfaceTheme {
     pub chat: ChatTheme,
 }
 
-/* impl<T: ThemeKindMarker> ThemeDefault<T> for InterfaceTheme
+impl<T: ThemeKindMarker> ThemeDefault<T> for InterfaceTheme
 where
-    ButtonTheme: ThemeDefault<T>,
-    WindowTheme: ThemeDefault<T>,
-    ExpandableTheme: ThemeDefault<T>,
-    LabelTheme: ThemeDefault<T>,
-    ValueTheme: ThemeDefault<T>,
-    CloseButtonTheme: ThemeDefault<T>,
-    SliderTheme: ThemeDefault<T>,
-    InputTheme: ThemeDefault<T>,
+    ButtonTheme<GameState>: ThemeDefault<T>,
+    WindowTheme<GameState>: ThemeDefault<T>,
+    ExpandableTheme<GameState>: ThemeDefault<T>,
+    LabelTheme<GameState>: ThemeDefault<T>,
+    ValueTheme<GameState>: ThemeDefault<T>,
+    CloseButtonTheme<GameState>: ThemeDefault<T>,
+    SliderTheme<GameState>: ThemeDefault<T>,
+    InputTheme<GameState>: ThemeDefault<T>,
     ProfilerTheme: ThemeDefault<T>,
     ChatTheme: ThemeDefault<T>,
 {
@@ -657,9 +520,9 @@ where
             chat: ThemeDefault::<T>::default(),
         }
     }
-} */
+}
 
-#[derive(RustState, Serialize, Deserialize)]
+#[derive(RustState, Serialize, Deserialize, Default)]
 pub struct GameTheme {
     pub overlay: OverlayTheme,
     pub status_bar: StatusBarTheme,

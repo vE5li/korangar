@@ -8,15 +8,15 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary, TrackedStateClone, TrackedStateExt};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use rust_state::{Context, SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, MapLookup, SafeUnwrap, Selector, Tracker};
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
-use crate::loaders::client::LoginSettings;
+use crate::loaders::client::{LoginSettings, ServiceSettings};
 use crate::loaders::{ClientInfo, ServiceId};
-use crate::GameState;
+use crate::{GameState, GameStateLoginSettingsPath};
 
 #[derive(new)]
 pub struct LoginWindow<'a> {
@@ -33,7 +33,7 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
     }
 
     fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
-        let mut login_settings = LoginSettings::new();
+        // let mut login_settings = LoginSettings::new();
 
         let options = self
             .client_info
@@ -42,20 +42,24 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
             .map(|service| (service.display_name.clone().unwrap(), service.service_id()))
             .collect();
 
+        // let login_settings =
+        // application.get_safe(&GameStateLoginSettingsPath::default());
+
         // FIX: This will panic when no services are present. What is the correct
         // behavior?
-        let selected_service = login_settings
-            .recent_service_id
-            // Only use the recent server if it is still in the client info
-            .filter(|&recent_service_id| {
-                self.client_info
-                    .services
-                    .iter()
-                    .any(|service| service.service_id() == recent_service_id)
-            })
-            .unwrap_or_else(|| self.client_info.services[0].service_id());
+        /*let selected_service = login_settings
+        .recent_service_id
+        // Only use the recent server if it is still in the client info
+        .filter(|&recent_service_id| {
+            self.client_info
+                .services
+                .iter()
+                .any(|service| service.service_id() == recent_service_id)
+        })
+        .unwrap_or_else(|| self.client_info.services[0].service_id());*/
 
-        let saved_settings = login_settings.service_settings.entry(selected_service).or_default();
+        // let saved_settings =
+        // login_settings.service_settings.entry(selected_service).or_default();
 
         // let username = PlainTrackedState::new(saved_settings.username.clone());
         // let password = PlainTrackedState::new(saved_settings.password.clone());
@@ -150,17 +154,15 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
             }
         });
 
-        let remember_username = {
-            let service_id = selected_service.clone();
-
-            login_settings.mapped(move |login_settings| &login_settings.service_settings.get(&service_id.get()).unwrap().remember_username)
-        };
-
-        let remember_password = {
-            let service_id = selected_service.clone();
-
-            login_settings.mapped(move |login_settings| &login_settings.service_settings.get(&service_id.get()).unwrap().remember_password)
-        };
+        let service_id = *application.get_safe(&GameState::selected_service());
+        let remember_username = ServiceSettings::remember_username(MapLookup::new(
+            LoginSettings::service_settings(GameState::login_settings()),
+            service_id,
+        ));
+        let remember_password = ServiceSettings::remember_password(MapLookup::new(
+            LoginSettings::service_settings(GameState::login_settings()),
+            service_id,
+        ));
 
         let elements = vec![
             Text::default().with_text("Select service").wrap(),
@@ -189,15 +191,15 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
                 vec![
                     StateButtonBuilder::new()
                         .with_text("Remember username")
-                        .with_remote(remember_username.new_remote())
-                        .with_event(remember_username.toggle_action())
+                        .with_remote(remember_username)
+                        .with_toggle_event()
                         .with_transparent_background()
                         .build()
                         .wrap(),
                     StateButtonBuilder::new()
                         .with_text("Remember password")
-                        .with_remote(remember_password.new_remote())
-                        .with_event(remember_password.toggle_action())
+                        .with_remote(remember_password)
+                        .with_toggle_event()
                         .with_transparent_background()
                         .build()
                         .wrap(),

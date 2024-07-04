@@ -51,8 +51,8 @@ where
         let mut size_bound = size_bound!(100%, 0);
         // Not sure why but 0.0 cuts off the lower part of the text, so add some
         // padding.
-        let scale = state.get_safe(&GameStateScalePath::default()).get_factor();
-        let mut height = 5.0 * scale;
+        let scale = state.get_safe(&GameStateScalePath::default());
+        let mut height = 5.0 * scale.get_factor();
 
         // Dividing by the scaling is done to counteract the scaling being applied
         // twice per message. It's not the cleanest solution but it works.
@@ -62,20 +62,20 @@ where
                 .borrow()
                 .get_text_dimensions(
                     &message.text,
-                    state.get_safe(&ChatTheme::font_size(theme_selector)).scaled(scale),
+                    state.get_safe(&ChatTheme::font_size(theme_selector)).scaled(*scale),
                     placement_resolver.get_available().width,
                 )
                 .height
-                / scale;
+                / scale.get_factor();
         }
 
         size_bound.height = Dimension::Absolute(height);
         self.state.resolve(placement_resolver, &size_bound);
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
-        self.messages.consume_changed().then_some(ChangeEvent::RESOLVE_WINDOW)
-    }
+    // fn update(&mut self) -> Option<ChangeEvent> {
+    //     self.messages.consume_changed().then_some(ChangeEvent::RESOLVE_WINDOW)
+    // }
 
     fn render(
         &self,
@@ -117,8 +117,8 @@ where
 
             // Dividing by the scaling is done to counteract the scaling being applied
             // twice per message. It's not the cleanest solution but it works.
-            offset +=
-                renderer.render_text(text, ScreenPosition::only_top(offset), message_color, font_size) / application.get_scaling_factor();
+            offset += renderer.render_text(text, ScreenPosition::only_top(offset), message_color, font_size)
+                / application.get_safe(&GameStateScalePath::default()).get_factor();
         }
     }
 }

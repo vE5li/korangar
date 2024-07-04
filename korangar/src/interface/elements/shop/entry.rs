@@ -44,8 +44,8 @@ impl ShopEntry {
         item: SelfItem,
         operation: ShopEntryOperation,
         amount: Amount,
-        act_button_press: impl Fn(&SelfItem, &mut PlainTrackedState<Vec<CartItem>>, Amount) + 'static,
-        disabled_selector: impl Fn(&SelfItem, &PlainTrackedState<Vec<CartItem>>, Amount) -> bool + 'static,
+        act_button_press: impl Fn(&Context<GameState>, &SelfItem, Amount) + 'static,
+        disabled_selector: impl Fn(&Tracker<GameState>, &SelfItem, Amount) -> bool + 'static,
     ) -> ElementCell<GameState>
     where
         SelfItem: Clone + 'static,
@@ -56,11 +56,11 @@ impl ShopEntry {
 
         ButtonBuilder::new()
             .with_text(format!("{operation} {amount}"))
-            .with_event(move |_: &Context<GameState>| {
-                // act_button_press(&item, amount);
+            .with_event(move |state: &Context<GameState>| {
+                act_button_press(state, &item, amount);
                 vec![]
             })
-            .with_disabled_selector(move |_: &Tracker<GameState>| disabled_selector(&disabled_item, &disabled_cart, amount))
+            .with_disabled_selector(move |state: &Tracker<GameState>| disabled_selector(state, &disabled_item, amount))
             .with_width_bound(dimension_bound!(20%))
             .build()
             .wrap()
@@ -71,8 +71,8 @@ impl ShopEntry {
         operation: ShopEntryOperation,
         secondary_color: bool,
         get_item_quantity: impl Fn(&SelfItem) -> Option<usize> + Clone + 'static,
-        act_button_press: impl Fn(&SelfItem, &mut PlainTrackedState<Vec<CartItem>>, Amount) + Clone + 'static,
-        disabled_selector: impl Fn(&SelfItem, &PlainTrackedState<Vec<CartItem>>, Amount) -> bool + Clone + 'static,
+        act_button_press: impl Fn(&Context<GameState>, &SelfItem, Amount) + Clone + 'static,
+        disabled_selector: impl Fn(&Tracker<GameState>, &SelfItem, Amount) -> bool + Clone + 'static,
     ) -> Self
     where
         SelfItem: ItemResourceProvider + Clone + 'static,
@@ -80,7 +80,7 @@ impl ShopEntry {
         Amount: NumCast + Display + Copy + 'static,
     {
         let mut elements = vec![
-            ItemDisplay::new(item.clone(), get_item_quantity.clone()).wrap(),
+            /* ItemDisplay::new(item.clone(), get_item_quantity.clone()).wrap(),
             Headline::new(item.get_resource_metadata().name.clone(), size_bound!(!, 14)).wrap(),
             Self::add_button(
                 item.clone(),
@@ -109,7 +109,7 @@ impl ShopEntry {
                 Amount::from(1000).unwrap(),
                 act_button_press.clone(),
                 disabled_selector.clone(),
-            ),
+            ), */
         ];
 
         if let Some(amount) = get_item_quantity(&item) {
@@ -118,11 +118,11 @@ impl ShopEntry {
 
             let remaining_button = ButtonBuilder::new()
                 .with_text(format!("{operation} all"))
-                .with_event(move |_: &Context<GameState>| {
-                    act_button_press(&item, &mut cart, amount);
+                .with_event(move |state: &Context<GameState>| {
+                    act_button_press(state, &item, amount);
                     Vec::new()
                 })
-                .with_disabled_selector(move |_: &Tracker<GameState>| disabled_selector(&disabled_item, &disabled_cart, amount))
+                .with_disabled_selector(move |state: &Tracker<GameState>| disabled_selector(state, &disabled_item, amount))
                 .with_width_bound(dimension_bound!(20%))
                 .build()
                 .wrap();

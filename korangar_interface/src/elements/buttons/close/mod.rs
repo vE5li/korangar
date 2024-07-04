@@ -66,7 +66,7 @@ where
 
         let hovered_element = application.get_safe(&App::HoveredElementSelector::default());
         let focused_element = application.get_safe(&App::FocusedElementSelector::default());
-        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+        let highlighted = self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element);
 
         let corner_radius = *application.get_safe(&CloseButtonTheme::corner_radius(theme_selector));
         let background_color = match highlighted {

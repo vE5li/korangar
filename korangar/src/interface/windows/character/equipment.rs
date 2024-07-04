@@ -12,10 +12,8 @@ use crate::interface::windows::WindowCache;
 use crate::loaders::ResourceMetadata;
 use crate::GameState;
 
-#[derive(new)]
-pub struct EquipmentWindow {
-    items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
-}
+#[derive(Default)]
+pub struct EquipmentWindow;
 
 impl EquipmentWindow {
     pub const WINDOW_CLASS: &'static str = "equipment";
@@ -27,7 +25,7 @@ impl PrototypeWindow<GameState> for EquipmentWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
-        let elements = vec![EquipmentContainer::new(self.items.clone()).wrap()];
+        let elements = vec![EquipmentContainer::new().wrap()];
 
         WindowBuilder::new()
             .with_title("Equipment".to_string())

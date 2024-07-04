@@ -50,12 +50,8 @@ impl PrototypeWindow<GameState> for GraphicsSettingsWindow {
                 0,
                 StateButtonBuilder::new()
                     .with_text("Framerate limit")
-                    .with_event(move |state: &Context<GameState>| {
-                        let current_value = *state.get_safe(&GameState::framerate_limit());
-                        state.update_value(&GameState::framerate_limit(), !current_value);
-                        vec![]
-                    })
                     .with_remote(GameState::framerate_limit())
+                    .with_toggle_event()
                     .build()
                     .wrap(),
             );

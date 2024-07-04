@@ -8,7 +8,7 @@ use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
-use crate::GameState;
+use crate::{GameState, GameStateScalePath};
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -114,7 +114,7 @@ impl MouseCursor {
                     mouse_position,
                     0,
                     Color::monochrome_u8(255),
-                    application,
+                    *application.get_safe(&GameStateScalePath::default()),
                 ),
             }
         }
@@ -133,7 +133,7 @@ impl MouseCursor {
             mouse_position,
             direction,
             color,
-            application,
+            *application.get_safe(&GameStateScalePath::default()),
         );
     }
 }

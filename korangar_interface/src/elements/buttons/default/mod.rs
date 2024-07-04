@@ -98,7 +98,7 @@ where
         } else {
             let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
             let focused_element = state.get_safe(&App::FocusedElementSelector::default());
-            let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+            let highlighted = self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element);
 
             match highlighted {
                 true => *state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),

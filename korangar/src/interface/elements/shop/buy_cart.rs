@@ -8,7 +8,7 @@ use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedS
 use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::ShopItem;
 use num::Integer;
-use rust_state::Tracker;
+use rust_state::{Context, Tracker};
 
 use super::CartSum;
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -20,26 +20,23 @@ use crate::loaders::ResourceMetadata;
 use crate::GameState;
 
 pub struct BuyCartContainer {
-    cart: PlainTrackedState<Vec<ShopItem<(ResourceMetadata, u32)>>>,
-    cart_remote: PlainRemote<Vec<ShopItem<(ResourceMetadata, u32)>>>,
     state: ContainerState<GameState>,
 }
 
 impl BuyCartContainer {
-    pub fn new(cart: PlainTrackedState<Vec<ShopItem<(ResourceMetadata, u32)>>>) -> Self {
-        let mut elements = cart
+    pub fn new() -> Self {
+        /* let mut elements = cart
             .get()
             .iter()
             .enumerate()
             .map(|(index, item)| {
                 ShopEntry::new(
                     item.clone(),
-                    cart.clone(),
                     ShopEntryOperation::RemoveFromCart,
                     index.is_odd(),
                     |item| Some(item.metadata.1 as usize),
-                    |item, cart, amount| {
-                        cart.mutate(|cart| {
+                    |state, item, amount| {
+                        /* cart.mutate(|cart| {
                             let purchase = cart.iter_mut().find(|purchase| purchase.item_id == item.item_id).unwrap();
 
                             purchase.metadata.1 = purchase.metadata.1.saturating_sub(amount);
@@ -47,10 +44,11 @@ impl BuyCartContainer {
                             if purchase.metadata.1 == 0 {
                                 cart.retain(|purchase| purchase.item_id != item.item_id);
                             }
-                        });
+                        }); */
                     },
-                    |item, cart, amount| {
-                        cart.get()
+                    |state, item, amount| {
+                        state
+                            .get_safe(&GameState::buy_cart())
                             .iter()
                             .find(|cart_item| cart_item.item_id == item.item_id)
                             .map(|cart_item| amount.saturating_sub(cart_item.metadata.1) == 0)
@@ -61,47 +59,43 @@ impl BuyCartContainer {
             .map(ElementWrap::wrap)
             .collect::<Vec<ElementCell<GameState>>>();
 
-        {
-            let cart = cart.clone();
+        elements.insert(
+            0,
+            ButtonBuilder::new()
+                .with_text("purchase")
+                .with_event(move |state: &Context<GameState>| {
+                    let items = state
+                        .get_safe(&GameState::buy_cart())
+                        .iter()
+                        .map(|item| ShopItem {
+                            metadata: item.metadata.1,
+                            ..item.clone()
+                        })
+                        .collect();
 
-            elements.insert(
-                0,
-                ButtonBuilder::new()
-                    .with_text("purchase")
-                    .with_event(move || {
-                        let items = cart
-                            .get()
-                            .iter()
-                            .map(|item| ShopItem {
-                                metadata: item.metadata.1,
-                                ..item.clone()
-                            })
-                            .collect();
-
-                        vec![ClickAction::Custom(UserEvent::BuyItems { items })]
-                    })
-                    .with_width_bound(dimension_bound!(50%))
-                    .build()
-                    .wrap(),
-            );
-        }
+                    vec![ClickAction::Custom(UserEvent::BuyItems { items })]
+                })
+                .with_width_bound(dimension_bound!(50%))
+                .build()
+                .wrap(),
+        );
 
         elements.insert(
             1,
             ButtonBuilder::new()
                 .with_text("cancel")
-                .with_event(move || vec![ClickAction::Custom(UserEvent::CloseShop)])
+                .with_event(move |_: &Context<GameState>| vec![ClickAction::Custom(UserEvent::CloseShop)])
                 .with_width_bound(dimension_bound!(!))
                 .build()
                 .wrap(),
         );
 
-        elements.insert(0, CartSum::new(&cart, |item| item.price.0, |item| item.metadata.1).wrap());
+        elements.insert(0, CartSum::new(&cart, |item| item.price.0, |item| item.metadata.1).wrap()); */
 
-        let cart_remote = cart.new_remote();
+        let elements = vec![];
         let state = ContainerState::new(elements);
 
-        Self { cart, cart_remote, state }
+        Self { state }
     }
 }
 
@@ -146,7 +140,7 @@ impl Element<GameState> for BuyCartContainer {
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::zero());
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    /* fn update(&mut self) -> Option<ChangeEvent> {
         if self.cart_remote.consume_changed() {
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.state.state.self_element.take().unwrap();
@@ -160,7 +154,7 @@ impl Element<GameState> for BuyCartContainer {
         }
 
         None
-    }
+    } */
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {

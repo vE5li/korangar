@@ -9,20 +9,20 @@ pub struct ButtonTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    hovered_background_color: App::Color,
-    disabled_background_color: App::Color,
-    foreground_color: App::Color,
-    hovered_foreground_color: App::Color,
-    disabled_foreground_color: App::Color,
-    debug_foreground_color: App::Color,
-    corner_radius: App::CornerRadius,
-    icon_offset: App::Position,
-    icon_size: App::Size,
-    icon_text_offset: App::Position,
-    text_offset: App::Position,
-    font_size: App::FontSize,
-    height_bound: DimensionBound,
+    pub background_color: App::Color,
+    pub hovered_background_color: App::Color,
+    pub disabled_background_color: App::Color,
+    pub foreground_color: App::Color,
+    pub hovered_foreground_color: App::Color,
+    pub disabled_foreground_color: App::Color,
+    pub debug_foreground_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub icon_offset: App::Position,
+    pub icon_size: App::Size,
+    pub icon_text_offset: App::Position,
+    pub text_offset: App::Position,
+    pub font_size: App::FontSize,
+    pub height_bound: DimensionBound,
 }
 
 #[derive(RustState)]
@@ -31,18 +31,18 @@ pub struct WindowTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    title_background_color: App::Color,
-    foreground_color: App::Color,
-    corner_radius: App::CornerRadius,
-    title_corner_radius: App::CornerRadius,
-    border_size: App::Size,
-    text_offset: App::Position,
-    gaps: App::Size,
-    font_size: App::FontSize,
-    title_height: DimensionBound,
-    anchor_color: App::Color,
-    closest_anchor_color: App::Color,
+    pub background_color: App::Color,
+    pub title_background_color: App::Color,
+    pub foreground_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub title_corner_radius: App::CornerRadius,
+    pub border_size: App::Size,
+    pub text_offset: App::Position,
+    pub gaps: App::Size,
+    pub font_size: App::FontSize,
+    pub title_height: DimensionBound,
+    pub anchor_color: App::Color,
+    pub closest_anchor_color: App::Color,
 }
 
 #[derive(RustState)]
@@ -51,18 +51,18 @@ pub struct ExpandableTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    second_background_color: App::Color,
-    foreground_color: App::Color,
-    hovered_foreground_color: App::Color,
-    corner_radius: App::CornerRadius,
-    border_size: App::Size,
-    element_offset: App::Position,
-    icon_offset: App::Position,
-    icon_size: App::Size,
-    text_offset: App::Position,
-    gaps: App::Size,
-    font_size: App::FontSize,
+    pub background_color: App::Color,
+    pub second_background_color: App::Color,
+    pub foreground_color: App::Color,
+    pub hovered_foreground_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub border_size: App::Size,
+    pub element_offset: App::Position,
+    pub icon_offset: App::Position,
+    pub icon_size: App::Size,
+    pub text_offset: App::Position,
+    pub gaps: App::Size,
+    pub font_size: App::FontSize,
 }
 
 #[derive(RustState)]
@@ -71,12 +71,12 @@ pub struct LabelTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    foreground_color: App::Color,
-    corner_radius: App::CornerRadius,
-    text_offset: App::Position,
-    font_size: App::FontSize,
-    size_bound: SizeBound,
+    pub background_color: App::Color,
+    pub foreground_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub text_offset: App::Position,
+    pub font_size: App::FontSize,
+    pub size_bound: SizeBound,
 }
 
 #[derive(RustState)]
@@ -85,13 +85,13 @@ pub struct ValueTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    hovered_background_color: App::Color,
-    foreground_color: App::Color,
-    corner_radius: App::CornerRadius,
-    text_offset: App::Position,
-    font_size: App::FontSize,
-    size_bound: SizeBound,
+    pub background_color: App::Color,
+    pub hovered_background_color: App::Color,
+    pub foreground_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub text_offset: App::Position,
+    pub font_size: App::FontSize,
+    pub size_bound: SizeBound,
 }
 
 #[derive(RustState)]
@@ -100,13 +100,13 @@ pub struct CloseButtonTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    hovered_background_color: App::Color,
-    foreground_color: App::Color,
-    corner_radius: App::CornerRadius,
-    text_offset: App::Position,
-    font_size: App::FontSize,
-    size_bound: SizeBound,
+    pub background_color: App::Color,
+    pub hovered_background_color: App::Color,
+    pub foreground_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub text_offset: App::Position,
+    pub font_size: App::FontSize,
+    pub size_bound: SizeBound,
 }
 
 #[derive(RustState)]
@@ -115,10 +115,10 @@ pub struct SliderTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    rail_color: App::Color,
-    knob_color: App::Color,
-    size_bound: SizeBound,
+    pub background_color: App::Color,
+    pub rail_color: App::Color,
+    pub knob_color: App::Color,
+    pub size_bound: SizeBound,
 }
 
 #[derive(RustState)]
@@ -127,16 +127,16 @@ pub struct InputTheme<App>
 where
     App: Application,
 {
-    background_color: App::Color,
-    hovered_background_color: App::Color,
-    focused_background_color: App::Color,
-    text_color: App::Color,
-    ghost_text_color: App::Color,
-    focused_text_color: App::Color,
-    corner_radius: App::CornerRadius,
-    font_size: App::FontSize,
-    text_offset: App::Position,
-    cursor_offset: f32,
-    cursor_width: f32,
-    height_bound: DimensionBound,
+    pub background_color: App::Color,
+    pub hovered_background_color: App::Color,
+    pub focused_background_color: App::Color,
+    pub text_color: App::Color,
+    pub ghost_text_color: App::Color,
+    pub focused_text_color: App::Color,
+    pub corner_radius: App::CornerRadius,
+    pub font_size: App::FontSize,
+    pub text_offset: App::Position,
+    pub cursor_offset: f32,
+    pub cursor_width: f32,
+    pub height_bound: DimensionBound,
 }

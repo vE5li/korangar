@@ -95,7 +95,7 @@ impl Element<GameState> for ItemBox {
         let mouse_mode = state.get_safe(&GameStateMouseModePath::default());
         let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
         let focused_element = state.get_safe(&GameStateFocusedElementPath::default());
-        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+        let highlighted = self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element);
 
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match highlighted {

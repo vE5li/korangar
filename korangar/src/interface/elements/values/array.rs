@@ -14,7 +14,7 @@ use crate::input::MouseInputMode;
 use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ArrayType, ScreenClip, ScreenPosition};
 use crate::interface::windows::ArrayWindow;
-use crate::GameState;
+use crate::{GameState, GameStateHoveredElementPath};
 
 pub struct MutableArrayValue<T>
 where
@@ -125,7 +125,8 @@ where
             .state
             .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
-        let background_color = match self.is_element_self(hovered_element) {
+        let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
+        let background_color = match self.is_cell_self(&hovered_element) {
             true => state.get_safe(&ValueTheme::hovered_background_color(theme_selector)),
             false => state.get_safe(&ValueTheme::background_color(theme_selector)),
         };

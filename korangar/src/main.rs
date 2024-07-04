@@ -43,17 +43,18 @@ use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_interface::application::{FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
+use korangar_interface::elements::{Element, ElementCell};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec};
 use korangar_interface::Interface;
 use korangar_networking::{
-    DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem, SellItem, ShopItem,
+    DisconnectReason, HotkeyState, InventoryItem, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem, SellItem, ShopItem,
 };
 use loaders::client::LoginSettings;
 use ragnarok_packets::{
-    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
-    SkillType, TilePosition, UnitId, WorldPosition,
+    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, LoginServerPacket,
+    SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
-use rust_state::{Context, ReadState};
+use rust_state::{Context, ReadState, Selector};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{
@@ -74,7 +75,9 @@ use crate::interface::dialog::DialogSystem;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::linked::LinkedElement;
 use crate::interface::resource::{ItemSource, Move, SkillSource};
-use crate::interface::theme::{CursorTheme, GameTheme, IndicatorTheme, OverlayTheme};
+use crate::interface::theme::{
+    CursorTheme, DefaultMain, DefaultMenu, GameTheme, IndicatorTheme, InterfaceTheme, OverlayTheme, ThemeDefault,
+};
 use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
@@ -117,15 +120,18 @@ struct GameState {
     show_inderface: bool,
     friend_list: Vec<(Friend, LinkedElement)>,
     characters: Vec<CharacterInformation>,
-    shop_items: Vec<ShopItem<ResourceMetadata>>,
+    inventory_items: Vec<InventoryItem<ResourceMetadata>>,
+    buy_items: Vec<ShopItem<ResourceMetadata>>,
+    buy_cart: Vec<ShopItem<(ResourceMetadata, u32)>>,
     sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
+    sell_cart: Vec<SellItem<(ResourceMetadata, u16)>>,
     currently_deleting: Option<CharacterId>,
     move_request: Option<usize>,
     main_theme: interface::theme::InterfaceTheme,
     menu_theme: interface::theme::InterfaceTheme,
     game_theme: interface::theme::GameTheme,
-    hovered_element: u32, //Option<&dyn Element<InterfaceSettings>>,
-    focused_element: u32, //Option<&dyn Element<InterfaceSettings>>,
+    hovered_element: Option<ElementCell<GameState>>,
+    focused_element: Option<ElementCell<GameState>>,
     mouse_mode: MouseInputMode,
     scale: Scaling,
     username: String,
@@ -290,7 +296,7 @@ fn main() {
     #[cfg(feature = "debug")]
     let timer = Timer::new("load resources");
 
-    let mut map = map_loader
+    let map = map_loader
         .get(
             DEFAULT_MAP.to_string(),
             &mut game_file_loader,
@@ -352,13 +358,14 @@ fn main() {
     let timer = Timer::new("load settings");
 
     let mut input_system = InputSystem::new();
-    let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
+    let graphics_settings = GraphicsSettings::new();
 
-    let mut shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
-    let mut framerate_limit = graphics_settings.mapped(|settings| &settings.frame_limit).new_remote();
+    // let mut shadow_detail = graphics_settings.mapped(|settings|
+    // &settings.shadow_detail).new_remote(); let mut framerate_limit =
+    // graphics_settings.mapped(|settings| &settings.frame_limit).new_remote();
 
     #[cfg(feature = "debug")]
-    let render_settings = PlainTrackedState::new(RenderSettings::new());
+    let render_settings = RenderSettings::new();
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -383,7 +390,7 @@ fn main() {
     let mut directional_shadow_targets = swapchain_holder
         .get_swapchain_images()
         .into_iter()
-        .map(|_| shadow_renderer.create_render_target(shadow_detail.get().into_resolution()))
+        .map(|_| shadow_renderer.create_render_target(graphics_settings.shadow_detail.into_resolution()))
         .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
 
     #[cfg(feature = "debug")]
@@ -468,43 +475,55 @@ fn main() {
         "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
         env!("CARGO_PKG_VERSION")
     );
-    let mut chat_messages = PlainTrackedState::new(vec![ChatMessage {
+    let chat_messages = vec![ChatMessage {
         text: welcome_string,
         color: MessageColor::Server,
-    }]);
+    }];
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
+    let mut login_settings = LoginSettings::new();
     let mut game_state = Context::new(GameState {
-        current_map: todo!(),
-        shadow_detail: todo!(),
-        framerate_limit: todo!(),
-        show_inderface: todo!(),
-        friend_list: todo!(),
-        characters: todo!(),
-        shop_items: todo!(),
-        sell_items: todo!(),
-        currently_deleting,
-        move_request: todo!(),
-        main_theme: todo!(),
-        menu_theme: todo!(),
-        game_theme: todo!(),
-        hovered_element: todo!(),
-        focused_element: todo!(),
-        mouse_mode: todo!(),
-        scale: todo!(),
-        render_settings: todo!(),
-        chat_input: todo!(),
-        chat_messages: todo!(),
-        friend_name_input: todo!(),
-        profiler: todo!(),
-        packets: todo!(),
-        command_input: todo!(),
-        character_name_input: todo!(),
-        username: todo!(),
-        password: todo!(),
-        selected_service: todo!(),
-        login_settings: todo!(),
+        current_map: map,
+        shadow_detail: graphics_settings.shadow_detail,
+        framerate_limit: graphics_settings.frame_limit,
+        show_inderface: true,
+        friend_list: Default::default(),
+        characters: Default::default(),
+        currently_deleting: None,
+        move_request: None,
+        main_theme: ThemeDefault::<DefaultMain>::default(),
+        menu_theme: ThemeDefault::<DefaultMenu>::default(),
+        game_theme: GameTheme::default(),
+        hovered_element: None,
+        focused_element: None,
+        mouse_mode: MouseInputMode::None,
+        scale: Scaling::new(1.0),
+        render_settings,
+        chat_input: Default::default(),
+        chat_messages,
+        friend_name_input: Default::default(),
+        profiler: ProfilerState {
+            always_update: true,
+            halted: false,
+            visible_thread: crate::threads::Enum::Main,
+        },
+        packets: PacketsState {
+            history: Default::default(),
+            show_pings: false,
+            update: true,
+        },
+        command_input: Default::default(),
+        character_name_input: Default::default(),
+        username: Default::default(),
+        password: Default::default(),
+        selected_service: ServiceId(0),
+        login_settings,
+        buy_items: Default::default(),
+        buy_cart: Default::default(),
+        sell_items: Default::default(),
+        sell_cart: Default::default(),
+        inventory_items: Default::default(),
     });
 
     let mut interface_read_state = ReadState::default();
@@ -606,7 +625,7 @@ fn main() {
                     &mut picker_targets[swapchain_holder.get_image_number()],
                     &mut mouse_cursor,
                     #[cfg(feature = "debug")]
-                    &render_settings,
+                    &game_state.get_safe(&GameStateRenderSettingsPath::default()),
                     swapchain_holder.window_size(),
                     client_tick,
                 );
@@ -691,7 +710,7 @@ fn main() {
                             particle_holder.clear();
                             effect_holder.clear();
 
-                            map = map_loader
+                            let new_map = map_loader
                                 .get(
                                     DEFAULT_MAP.to_string(),
                                     &mut game_file_loader,
@@ -700,6 +719,9 @@ fn main() {
                                     &mut texture_loader,
                                 )
                                 .expect("failed to load initial map");
+
+                            game_state.update_value(&GameStateCurrentMapPath::default(), new_map);
+                            // game_state = game_state.apply();
 
                             interface.close_all_windows_except(&mut focus_state);
 
@@ -744,7 +766,7 @@ fn main() {
                                 .cloned()
                                 .unwrap();
 
-                            map = map_loader
+                            let new_map = map_loader
                                 .get(
                                     map_name,
                                     &mut game_file_loader,
@@ -754,6 +776,9 @@ fn main() {
                                 )
                                 .unwrap();
 
+                            game_state.update_value(&GameStateCurrentMapPath::default(), new_map);
+                            // game_state = game_state.apply();
+
                             saved_player_name = character_information.name.clone();
 
                             let player = Player::new(
@@ -761,7 +786,7 @@ fn main() {
                                 &mut sprite_loader,
                                 &mut action_loader,
                                 &script_loader,
-                                &map,
+                                game_state.get_safe(&GameStateCurrentMapPath::default()),
                                 saved_login_data.account_id,
                                 character_information,
                                 WorldPosition { x: 0, y: 0 },
@@ -816,7 +841,7 @@ fn main() {
                                 &mut sprite_loader,
                                 &mut action_loader,
                                 &script_loader,
-                                &map,
+                                game_state.get_safe(&GameStateCurrentMapPath::default()),
                                 entity_appeared_data,
                                 client_tick,
                             );
@@ -834,7 +859,7 @@ fn main() {
                                 let position_from = Vector2::new(position_from.x, position_from.y);
                                 let position_to = Vector2::new(position_to.x, position_to.y);
 
-                                entity.move_from_to(&map, position_from, position_to, starting_timestamp);
+                                entity.move_from_to(game_state.get_safe(&GameStateCurrentMapPath::default()), position_from, position_to, starting_timestamp);
                                 /*#[cfg(feature = "debug")]
                                 entity.generate_steps_vertex_buffer(device.clone(), &map);*/
                             }
@@ -842,7 +867,7 @@ fn main() {
                         NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
                             let position_from = Vector2::new(position_from.x, position_from.y);
                             let position_to = Vector2::new(position_to.x, position_to.y);
-                            entities[0].move_from_to(&map, position_from, position_to, starting_timestamp);
+                            entities[0].move_from_to(game_state.get_safe(&GameStateCurrentMapPath::default()), position_from, position_to, starting_timestamp);
 
                             /*#[cfg(feature = "debug")]
                             entities[0].generate_steps_vertex_buffer(device.clone(), &map);*/
@@ -850,7 +875,7 @@ fn main() {
                         NetworkEvent::ChangeMap(map_name, player_position) => {
                             entities.truncate(1);
 
-                            map = map_loader
+                            let new_map = map_loader
                                 .get(
                                     map_name,
                                     &mut game_file_loader,
@@ -860,8 +885,11 @@ fn main() {
                                 )
                                 .unwrap();
 
+                            game_state.update_value(&GameStateCurrentMapPath::default(), new_map);
+                            // game_state = game_state.apply();
+
                             let player_position = Vector2::new(player_position.x as usize, player_position.y as usize);
-                            entities[0].set_position(&map, player_position, client_tick);
+                            entities[0].set_position(game_state.get_safe(&GameStateCurrentMapPath::default()), player_position, client_tick);
                             player_camera.set_focus_point(entities[0].get_position());
 
                             particle_holder.clear();
@@ -874,14 +902,14 @@ fn main() {
                         }
                         NetworkEvent::SetPlayerPosition(player_position) => {
                             let player_position = Vector2::new(player_position.x, player_position.y);
-                            entities[0].set_position(&map, player_position, client_tick);
+                            entities[0].set_position(game_state.get_safe(&GameStateCurrentMapPath::default()), player_position, client_tick);
                             player_camera.set_focus_point(entities[0].get_position());
                         }
                         NetworkEvent::UpdateClientTick(client_tick) => {
                             game_timer.set_client_tick(client_tick);
                         }
                         NetworkEvent::ChatMessage { text, color } => {
-                            chat_messages.push(ChatMessage { text, color });
+                            // chat_messages.push(ChatMessage { text, color });
                         }
                         NetworkEvent::UpdateEntityDetails(entity_id, name) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -929,7 +957,7 @@ fn main() {
                         NetworkEvent::AddCloseButton => dialog_system.add_close_button(),
                         NetworkEvent::AddChoiceButtons(choices) => dialog_system.add_choice_buttons(choices),
                         NetworkEvent::AddQuestEffect(quest_effect) => {
-                            particle_holder.add_quest_icon(&mut game_file_loader, &mut texture_loader, &map, quest_effect)
+                            particle_holder.add_quest_icon(&mut game_file_loader, &mut texture_loader, game_state.get_safe(&GameStateCurrentMapPath::default()), quest_effect)
                         }
                         NetworkEvent::RemoveQuestEffect(entity_id) => particle_holder.remove_quest_icon(entity_id),
                         NetworkEvent::SetInventory { items } => {
@@ -1000,7 +1028,7 @@ fn main() {
                         NetworkEvent::AddSkillUnit(entity_id, unit_id, position) => match unit_id {
                             UnitId::Firewall => {
                                 let position = Vector2::new(position.x as usize, position.y as usize);
-                                let position = map.get_world_position(position);
+                                let position = game_state.get_safe(&GameStateCurrentMapPath::default()).get_world_position(position);
                                 let effect = effect_loader
                                     .get("firewall.str", &mut game_file_loader, &mut texture_loader)
                                     .unwrap();
@@ -1022,7 +1050,7 @@ fn main() {
                             }
                             UnitId::Pneuma => {
                                 let position = Vector2::new(position.x as usize, position.y as usize);
-                                let position = map.get_world_position(position);
+                                let position = game_state.get_safe(&GameStateCurrentMapPath::default()).get_world_position(position);
                                 let effect = effect_loader
                                     .get("pneuma1.str", &mut game_file_loader, &mut texture_loader)
                                     .unwrap();
@@ -1079,10 +1107,8 @@ fn main() {
                                 script_loader.load_market_item_metadata(&mut game_file_loader, &mut texture_loader, item)
                             }).collect());
 
-                            let cart = PlainTrackedState::default();
-
-                            interface.open_window(&game_state, &mut focus_state, &BuyWindow::new(shop_items.new_remote(), cart.clone()));
-                            interface.open_window(&game_state, &mut focus_state, &BuyCartWindow::new(cart));
+                            interface.open_window(&game_state, &mut focus_state, &BuyWindow::default());
+                            interface.open_window(&game_state, &mut focus_state, &BuyCartWindow::default());
                         }
                         NetworkEvent::AskBuyOrSell { shop_id } => {
                             interface.open_window(&game_state, &mut focus_state, &BuyOrSellWindow::new(shop_id));
@@ -1096,10 +1122,10 @@ fn main() {
                                     interface.close_window_with_class(&mut focus_state, BuyCartWindow::WINDOW_CLASS);
                                 }
                                 BuyShopItemsResult::Error => {
-                                    chat_messages.push(ChatMessage {
+                                    /* chat_messages.push(ChatMessage {
                                         text: "Failed to buy items".to_owned(),
                                         color: MessageColor::Error,
-                                    });
+                                    }); */
                                 },
                             }
                         },
@@ -1124,9 +1150,7 @@ fn main() {
                                 }
                             }).collect());
 
-                            let cart = PlainTrackedState::default();
-
-                            interface.open_window(&game_state, &mut focus_state, &SellWindow::new(sell_items.new_remote(), cart.clone()));
+                            interface.open_window(&game_state, &mut focus_state, &SellWindow::default());
                             interface.open_window(&game_state, &mut focus_state, &SellCartWindow::default());
                         }
                         NetworkEvent::SellingCompleted { result } => {
@@ -1136,10 +1160,10 @@ fn main() {
                                     interface.close_window_with_class(&mut focus_state, SellCartWindow::WINDOW_CLASS);
                                 }
                                 SellItemsResult::Error => {
-                                    chat_messages.push(ChatMessage {
+                                    /* chat_messages.push(ChatMessage {
                                         text: "Failed to sell items".to_owned(),
                                         color: MessageColor::Error,
-                                    });
+                                    }); */
                                 },
                             }
                         },
@@ -1209,7 +1233,7 @@ fn main() {
                                 interface.open_window(
                                     &game_state,
                                     &mut focus_state,
-                                    &EquipmentWindow::new(player_inventory.item_remote()),
+                                    &EquipmentWindow::default(),
                                 )
                             }
                         }
@@ -1414,7 +1438,7 @@ fn main() {
                         },
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMarkerDetails(marker_identifier) => {
-                            interface.open_window(&game_state, &mut focus_state, map.resolve_marker(&entities, marker_identifier))
+                            interface.open_window(&game_state, &mut focus_state, game_state.get_safe(&GameStateCurrentMapPath::default()).resolve_marker(&entities, marker_identifier))
                         }
                         #[cfg(feature = "debug")]
                         UserEvent::OpenRenderSettingsWindow => interface.open_window(
@@ -1423,7 +1447,7 @@ fn main() {
                             &RenderSettingsWindow::default(),
                         ),
                         #[cfg(feature = "debug")]
-                        UserEvent::OpenMapDataWindow => interface.open_window(&game_state, &mut focus_state, map.to_prototype_window()),
+                        UserEvent::OpenMapDataWindow => {}, //interface.open_window(&game_state, &mut focus_state, map.to_prototype_window()),
                         #[cfg(feature = "debug")]
                         UserEvent::OpenMapsWindow => interface.open_window(&game_state, &mut focus_state, &MapsWindow),
                         #[cfg(feature = "debug")]
@@ -1482,7 +1506,7 @@ fn main() {
 
                 entities
                     .iter_mut()
-                    .for_each(|entity| entity.update(&map, delta_time as f32, client_tick));
+                    .for_each(|entity| entity.update(game_state.get_safe(&GameStateCurrentMapPath::default()), delta_time as f32, client_tick));
 
                 #[cfg(feature = "debug")]
                 update_entities_measurement.stop();
@@ -1506,12 +1530,14 @@ fn main() {
                 particle_holder.update(delta_time as f32);
                 effect_holder.update(&entities, delta_time as f32);
 
-                {
+                let (clear_interface, render_interface) = {
                     let tracked_game_state = update_read_state.track_new(&mut game_state);
 
-                    let (clear_interface, render_interface) = interface.update(&tracked_game_state, font_loader.clone(), &mut focus_state);
+                    let foo = interface.update(&tracked_game_state, font_loader.clone(), &mut focus_state);
                     mouse_cursor.update(client_tick);
-                }
+
+                    foo
+                };
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
@@ -1523,7 +1549,7 @@ fn main() {
                         viewport.clone(),
                         swapchain_holder.window_size_u32(),
                         #[cfg(feature = "debug")]
-                        render_settings.get().show_wireframe,
+                        game_state.get_safe(&GameStateRenderSettingsPath::default()).show_wireframe,
                     );
                     interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
                     picker_renderer.recreate_pipeline(viewport, swapchain_holder.window_size_u32());
@@ -1548,7 +1574,7 @@ fn main() {
                     return;
                 }
 
-                if shadow_detail.consume_changed() {
+                /*if shadow_detail.consume_changed() {
                     #[cfg(feature = "debug")]
                     print_debug!("re-creating {}", "directional shadow targets".magenta());
 
@@ -1562,15 +1588,15 @@ fn main() {
                         .into_iter()
                         .map(|_| shadow_renderer.create_render_target(new_shadow_detail.into_resolution()))
                         .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
-                }
+                }*/
 
-                if framerate_limit.consume_changed() {
+                /*if framerate_limit.consume_changed() {
                     swapchain_holder.set_frame_limit(present_mode_info, framerate_limit.cloned());
 
                     // For some reason the interface buffer becomes messed up when
                     // recreating the swapchain, so we need to render it again.
                     interface.schedule_render();
-                }
+                }*/
 
                 #[cfg(feature = "debug")]
                 let matrices_measurement = Profiler::start_measurement("generate view and projection matrices");
@@ -1582,7 +1608,7 @@ fn main() {
                 player_camera.generate_view_projection(swapchain_holder.window_size());
                 directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
                 #[cfg(feature = "debug")]
-                if render_settings.get().use_debug_camera {
+                if game_state.get_safe(&GameStateRenderSettingsPath::default()).use_debug_camera {
                     debug_camera.generate_view_projection(swapchain_holder.window_size());
                 }
 
@@ -1591,7 +1617,7 @@ fn main() {
 
                 let current_camera: &(dyn Camera + Send + Sync) = match entities.is_empty() {
                     #[cfg(feature = "debug")]
-                    _ if render_settings.get().use_debug_camera => &debug_camera,
+                    _ if game_state.get_safe(&GameStateRenderSettingsPath::default()).use_debug_camera => &debug_camera,
                     true => &start_camera,
                     false => &player_camera,
                 };
@@ -1631,8 +1657,10 @@ fn main() {
                 #[cfg(feature = "debug")]
                 let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
 
+                // FIX: Don't clone here
+                let map = game_state.get_safe(&GameStateCurrentMapPath::default()).clone();
                 #[cfg(feature = "debug")]
-                let render_settings = &*render_settings.get();
+                let render_settings = &game_state.get_safe(&GameStateRenderSettingsPath::default()).clone(); // FIX: Don't clone
                 let walk_indicator_color = *game_state.get_safe(&IndicatorTheme::walking(GameTheme::indicator(GameState::game_theme())));
                 let image_number = swapchain_holder.get_image_number();
                 let directional_shadow_image = directional_shadow_targets[image_number].image.clone();

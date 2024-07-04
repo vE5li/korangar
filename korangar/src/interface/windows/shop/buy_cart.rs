@@ -12,10 +12,8 @@ use crate::interface::windows::WindowCache;
 use crate::loaders::ResourceMetadata;
 use crate::GameState;
 
-#[derive(new)]
-pub struct BuyCartWindow {
-    cart: PlainTrackedState<Vec<ShopItem<(ResourceMetadata, u32)>>>,
-}
+#[derive(Default)]
+pub struct BuyCartWindow;
 
 impl BuyCartWindow {
     pub const WINDOW_CLASS: &'static str = "buy_cart";
@@ -27,7 +25,7 @@ impl PrototypeWindow<GameState> for BuyCartWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
-        let elements = vec![BuyCartContainer::new(self.cart.clone()).wrap()];
+        let elements = vec![BuyCartContainer::new().wrap()];
         let elements = vec![ScrollView::new(elements, size_bound!(100%, ? < super)).wrap()];
 
         WindowBuilder::new()

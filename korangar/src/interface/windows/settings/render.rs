@@ -11,12 +11,8 @@ use crate::GameState;
 fn render_state_button(text: &'static str, selector: impl for<'a> Selector<'a, GameState, bool> + SafeUnwrap) -> ElementCell<GameState> {
     StateButtonBuilder::new()
         .with_text(text)
-        .with_event(move |state: &Context<GameState>| {
-            let current_value = *state.get_safe(&selector);
-            state.update_value(&selector, !current_value);
-            vec![]
-        })
-        .with_remote(selector)
+        .with_remote(selector.clone())
+        .with_toggle_event()
         .build()
         .wrap()
 }

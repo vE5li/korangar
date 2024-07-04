@@ -118,8 +118,8 @@ where
         let focused_element = state.get_safe(&App::FocusedElementSelector::default());
 
         let input_state = state.get_safe(&self.input_state);
-        let is_hovererd = self.is_element_self(hovered_element);
-        let is_focused = self.is_element_self(focused_element);
+        let is_hovererd = self.is_cell_self(&hovered_element);
+        let is_focused = self.is_cell_self(&focused_element);
         let text_offset = *state.get_safe(&InputTheme::text_offset(theme_selector));
 
         let text = if input_state.is_empty() && !is_focused {

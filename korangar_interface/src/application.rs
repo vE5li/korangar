@@ -21,8 +21,8 @@ pub trait Application: StateMarker + Sized + 'static {
         + Copy;
     type ScaleSelector: for<'a> Selector<'a, Self, Self::Scaling> + Default + SafeUnwrap;
     type MouseModeSelector: for<'a> Selector<'a, Self, Self::MouseInputMode> + Default + SafeUnwrap;
-    type HoveredElementSelector: for<'a> Selector<'a, Self, Option<&'a dyn Element<Self>>> + Default + SafeUnwrap;
-    type FocusedElementSelector: for<'a> Selector<'a, Self, Option<&'a dyn Element<Self>>> + Default + SafeUnwrap;
+    type HoveredElementSelector: for<'a> Selector<'a, Self, Option<ElementCell<Self>>> + Default + SafeUnwrap;
+    type FocusedElementSelector: for<'a> Selector<'a, Self, Option<ElementCell<Self>>> + Default + SafeUnwrap;
     type Color: ColorTrait;
     type Renderer: InterfaceRenderer<Self>;
     type Size: SizeTrait;

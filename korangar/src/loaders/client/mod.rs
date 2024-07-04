@@ -3,7 +3,7 @@ use std::collections::HashMap;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use ron::ser::PrettyConfig;
-use rust_state::RustState;
+use rust_state::{MapItem, PathUuid, RustState, ToUuid};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -16,12 +16,22 @@ pub struct LoginSettings {
     pub recent_service_id: Option<ServiceId>,
 }
 
-#[derive(Clone, Default, Deserialize)]
+#[derive(RustState, Clone, Default, Deserialize)]
 pub struct ServiceSettings {
     pub username: String,
     pub password: String,
     pub remember_username: bool,
     pub remember_password: bool,
+}
+
+impl ToUuid for ServiceId {
+    fn to_uuid(&self) -> PathUuid {
+        PathUuid(self.0 as u32)
+    }
+}
+
+impl MapItem for ServiceSettings {
+    type Id = ServiceId;
 }
 
 impl Serialize for ServiceSettings {

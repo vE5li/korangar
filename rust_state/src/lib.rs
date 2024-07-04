@@ -7,6 +7,7 @@ extern crate self as rust_state;
 
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 pub trait StateMarker {}
@@ -59,14 +60,6 @@ where
     }
 }
 
-pub trait Selector<'a, State, To>: Clone + 'static {
-    fn get(&self, state: &'a State) -> Option<&'a To>;
-
-    fn get_mut(&self, state: &'a mut State) -> Option<&'a mut To>;
-
-    fn get_path_id(&self) -> PathId;
-}
-
 impl<'a, State, Path, Item> Selector<'a, State, Item> for VecLookup<State, Path, Item>
 where
     State: StateMarker + 'static,
@@ -89,6 +82,77 @@ where
 }
 
 impl<State, Path, Item> !SafeUnwrap for VecLookup<State, Path, Item> {}
+
+pub trait MapItem {
+    type Id: Eq + PartialEq + Hash + Clone + ToUuid;
+}
+
+pub struct MapLookup<State, Path, Item>
+where
+    Item: MapItem,
+{
+    path: Path,
+    id: Item::Id,
+    _marker: PhantomData<State>,
+}
+
+impl<State, Path, Item> MapLookup<State, Path, Item>
+where
+    Item: MapItem,
+{
+    pub fn new(path: Path, id: Item::Id) -> Self {
+        Self {
+            path,
+            id,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<State, Path, Item> Clone for MapLookup<State, Path, Item>
+where
+    Path: Clone,
+    Item: MapItem,
+{
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            id: self.id.clone(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, State, Path, Item> Selector<'a, State, Item> for MapLookup<State, Path, Item>
+where
+    State: StateMarker + 'static,
+    Path: Selector<'a, State, HashMap<Item::Id, Item>>,
+    Item: MapItem + 'static,
+{
+    fn get(&self, state: &'a State) -> Option<&'a Item> {
+        self.path.get(state)?.get(&self.id)
+    }
+
+    fn get_mut(&self, state: &'a mut State) -> Option<&'a mut Item> {
+        self.path.get_mut(state)?.get_mut(&self.id)
+    }
+
+    fn get_path_id(&self) -> PathId {
+        let mut inner = self.path.get_path_id();
+        inner.parts.push(self.id.to_uuid());
+        inner
+    }
+}
+
+impl<State, Path, Item> !SafeUnwrap for MapLookup<State, Path, Item> {}
+
+pub trait Selector<'a, State, To>: Clone + 'static {
+    fn get(&self, state: &'a State) -> Option<&'a To>;
+
+    fn get_mut(&self, state: &'a mut State) -> Option<&'a mut To>;
+
+    fn get_path_id(&self) -> PathId;
+}
 
 pub type StateChange<State> = Box<dyn FnOnce(&mut State)>;
 
@@ -136,7 +200,22 @@ impl<State: StateMarker> Context<State> {
         );
     }
 
-    pub fn remove<Path, Value>(&self, path: &Path, id: Value::Id)
+    pub fn vec_push<Path, Value>(&self, path: &Path, value: Value)
+    where
+        Path: for<'a> Selector<'a, State, Vec<Value>>,
+        Value: 'static,
+    {
+        let path = path.clone();
+        self.push_change(
+            path.get_path_id(),
+            Box::new(move |state: &mut State| match path.get_mut(state) {
+                Some(reference) => reference.push(value),
+                None => println!("Failed to update state"),
+            }),
+        );
+    }
+
+    pub fn vec_remove<Path, Value>(&self, path: &Path, id: Value::Id)
     where
         Path: for<'a> Selector<'a, State, Vec<Value>>,
         Value: VecItem + 'static,
@@ -151,16 +230,35 @@ impl<State: StateMarker> Context<State> {
         );
     }
 
-    pub fn push<Path, Value>(&self, path: &Path, value: Value)
+    pub fn map_insert<Path, Value>(&self, path: &Path, id: Value::Id, value: Value)
     where
-        Path: for<'a> Selector<'a, State, Vec<Value>>,
-        Value: 'static,
+        Path: for<'a> Selector<'a, State, HashMap<Value::Id, Value>>,
+        Value: MapItem + 'static,
     {
         let path = path.clone();
         self.push_change(
             path.get_path_id(),
             Box::new(move |state: &mut State| match path.get_mut(state) {
-                Some(reference) => reference.push(value),
+                Some(reference) => {
+                    reference.insert(id, value);
+                }
+                None => println!("Failed to update state"),
+            }),
+        );
+    }
+
+    pub fn map_remove<Path, Value>(&self, path: &Path, id: Value::Id)
+    where
+        Path: for<'a> Selector<'a, State, HashMap<Value::Id, Value>>,
+        Value: MapItem + 'static,
+    {
+        let path = path.clone();
+        self.push_change(
+            path.get_path_id(),
+            Box::new(move |state: &mut State| match path.get_mut(state) {
+                Some(reference) => {
+                    reference.remove(&id);
+                }
                 None => println!("Failed to update state"),
             }),
         );

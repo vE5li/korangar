@@ -70,8 +70,7 @@ where
             .element_renderer(render_target, renderer, application, parent_position, screen_clip);
 
         let hovered_element = application.get_safe(&App::HoveredElementSelector::default());
-
-        if self.is_element_self(hovered_element) {
+        if self.is_cell_self(&hovered_element) {
             let title_corner_radius = *application.get_safe(&WindowTheme::title_corner_radius(theme_selector));
             let title_background_color = *application.get_safe(&WindowTheme::title_background_color(theme_selector));
 

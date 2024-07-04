@@ -11,7 +11,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
 use ragnarok_packets::{ClientTick, HotbarSlot};
-use rust_state::Context;
+use rust_state::{Context, ReadState};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
@@ -140,7 +140,7 @@ impl InputSystem {
         focus_state: &mut FocusState<GameState>,
         picker_target: &mut PickerRenderTarget,
         mouse_cursor: &mut MouseCursor,
-        #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
+        #[cfg(feature = "debug")] render_settings: &RenderSettings,
         window_size: Vector2<usize>,
         client_tick: ClientTick,
     ) -> (
@@ -156,7 +156,7 @@ impl InputSystem {
         let shift_down = self.get_key(VirtualKeyCode::LShift).down();
 
         #[cfg(feature = "debug")]
-        let lock_actions = render_settings.get().use_debug_camera;
+        let lock_actions = render_settings.use_debug_camera;
         #[cfg(not(feature = "debug"))]
         let lock_actions = false;
 
@@ -324,7 +324,8 @@ impl InputSystem {
             }
             MouseInputMode::ResizeInterface(identifier) => {
                 if self.mouse_delta != ScreenSize::default() {
-                    interface.resize_window(application, *identifier, self.mouse_delta);
+                    // interface.resize_window(application, *identifier,
+                    // self.mouse_delta);
                 }
             }
             MouseInputMode::RotateCamera => {
@@ -367,7 +368,7 @@ impl InputSystem {
             }
 
             if self.get_key(VirtualKeyCode::Return).pressed() {
-                let actions = interface.left_click_element(focused_element, *focused_window);
+                let actions = interface.left_click_element(application, focused_element, *focused_window);
 
                 for action in actions {
                     // TODO: remove and replace with proper event
@@ -405,7 +406,8 @@ impl InputSystem {
                     '\t' => {}
                     '\x1b' => {}
                     valid => {
-                        let (key_handled, actions) = interface.input_character_element(focused_element, *focused_window, valid);
+                        let (key_handled, actions) =
+                            interface.input_character_element(application, focused_element, *focused_window, valid);
 
                         if key_handled {
                             process_keys = false;
@@ -521,12 +523,12 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::LShift).pressed() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::LShift).pressed() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraAccelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::LShift).released() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::LShift).released() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraDecelerate);
             }
 
@@ -534,7 +536,7 @@ impl InputSystem {
             if self.right_mouse_button.down()
                 && !self.right_mouse_button.pressed()
                 && self.mouse_input_mode.is_none()
-                && render_settings.get().use_debug_camera
+                && render_settings.use_debug_camera
             {
                 events.push(UserEvent::CameraLookAround(-Vector2::new(
                     self.mouse_delta.width,
@@ -543,27 +545,27 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::W).down() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::W).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveForward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::S).down() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::S).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveBackward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::A).down() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::A).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveLeft);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::D).down() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::D).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveRight);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::Space).down() && render_settings.get().use_debug_camera {
+            if self.get_key(VirtualKeyCode::Space).down() && render_settings.use_debug_camera {
                 events.push(UserEvent::CameraMoveUp);
             }
         }

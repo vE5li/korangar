@@ -16,7 +16,7 @@ use rust_state::{Context, Tracker};
 use vulkano::image::view::ImageView;
 
 use super::error::LoadError;
-use super::Sprite;
+use super::{Scaling, Sprite};
 use crate::graphics::{Color, Renderer, SpriteRenderer};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
@@ -126,7 +126,7 @@ impl Actions {
         position: ScreenPosition,
         camera_direction: usize,
         color: Color,
-        application: &Context<GameState>,
+        scaling: Scaling,
     ) where
         T: Renderer + SpriteRenderer,
     {
@@ -163,7 +163,7 @@ impl Actions {
                     Vector2::new(image_size[0], image_size[1])
                 })
                 .map(|component| component as f32);
-            let zoom = sprite_clip.zoom.unwrap_or(1.0) * application.get_safe(&GameStateScalePath::default()).get_factor();
+            let zoom = sprite_clip.zoom.unwrap_or(1.0) * scaling.get_factor();
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimesions.zip(zoom2, f32::mul) * zoom;

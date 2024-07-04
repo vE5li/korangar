@@ -1,4 +1,4 @@
-use korangar_interface::application::{FontSizeTrait, SizeTraitExt};
+use korangar_interface::application::{FontSizeTrait, ScalingTrait, SizeTraitExt};
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
@@ -95,7 +95,7 @@ where
         let mouse_mode = application.get_safe(&GameStateMouseModePath::default());
         let hovered_element = application.get_safe(&GameStateHoveredElementPath::default());
         let focused_element = application.get_safe(&GameStateFocusedElementPath::default());
-        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+        let highlighted = self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element);
 
         let background_color = match highlighted {
             true if matches!(mouse_mode, MouseInputMode::None) => {
@@ -110,7 +110,7 @@ where
             renderer.render_target,
             self.item.get_resource_metadata().texture.clone(),
             renderer.position,
-            ScreenSize::uniform(30.0).scaled(Scaling::new(application.get_scaling_factor())),
+            ScreenSize::uniform(30.0).scaled(*application.get_safe(&GameState::scale())),
             renderer.clip,
             Color::monochrome_u8(255),
             false,

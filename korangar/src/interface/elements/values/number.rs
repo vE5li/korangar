@@ -110,7 +110,7 @@ impl<T: Zero + NumOps + NumCast + Copy + PartialOrd + Display + 'static> Element
             .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
         let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
-        let background_color = match self.is_element_self(hovered_element) {
+        let background_color = match self.is_cell_self(&hovered_element) {
             true => state.get_safe(&ValueTheme::hovered_background_color(theme_selector)),
             false => state.get_safe(&ValueTheme::background_color(theme_selector)),
         };

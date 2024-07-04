@@ -306,6 +306,11 @@ where
         None
     }
 
+    fn is_cell_self(&self, element: &Option<ElementCell<App>>) -> bool {
+        let element = element.as_ref().map(|element| unsafe { &*element.as_ptr() });
+        matches!(element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
+    }
+
     fn is_element_self(&self, element: &Option<&dyn Element<App>>) -> bool {
         matches!(element, Some(reference) if std::ptr::eq(reference as *const _ as *const (), self as *const _ as *const ()))
     }

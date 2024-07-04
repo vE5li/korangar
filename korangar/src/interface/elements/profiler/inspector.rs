@@ -57,6 +57,7 @@ impl FrameInspectorView {
         alpha: f32,
         render_numbers: bool,
     ) {
+        let scaling = renderer.state.get_safe(&GameState::scale()).get_factor();
         let line_color = *renderer.state.get_safe(&ProfilerTheme::line_color(theme_selector));
         let background_color = line_color.multiply_alpha(alpha);
 
@@ -66,7 +67,7 @@ impl FrameInspectorView {
                 top: 0.0,
             };
             let line_size = ScreenSize {
-                width: *renderer.state.get_safe(&ProfilerTheme::line_width(theme_selector)) * renderer.state.get_scaling_factor(),
+                width: *renderer.state.get_safe(&ProfilerTheme::line_width(theme_selector)) * scaling,
                 height: size.height,
             };
 
@@ -75,9 +76,7 @@ impl FrameInspectorView {
             if render_numbers {
                 let offset = ScreenPosition {
                     left: x_position + (distance - text_width) / 2.0,
-                    top: size.height
-                        - *renderer.state.get_safe(&ProfilerTheme::distance_text_offset(theme_selector))
-                            * renderer.state.get_scaling_factor(),
+                    top: size.height - *renderer.state.get_safe(&ProfilerTheme::distance_text_offset(theme_selector)) * scaling,
                 };
 
                 korangar_interface::application::InterfaceRenderer::render_text(
@@ -87,9 +86,7 @@ impl FrameInspectorView {
                     renderer.position + offset,
                     renderer.clip,
                     line_color,
-                    FontSize::new(
-                        *renderer.state.get_safe(&ProfilerTheme::distance_text_size(theme_selector)) * renderer.state.get_scaling_factor(),
-                    ),
+                    FontSize::new(*renderer.state.get_safe(&ProfilerTheme::distance_text_size(theme_selector)) * scaling),
                 );
             }
 
@@ -145,11 +142,7 @@ impl FrameInspectorView {
             color.multiply_alpha(alpha),
         );
 
-        let alpha = Self::interpolate_alpha_linear(
-            TEXT_FADE_SPEED * scaling,
-            TEXT_DISPLAY_SIZE * renderer.state.get_scaling_factor(),
-            x_size,
-        );
+        let alpha = Self::interpolate_alpha_linear(TEXT_FADE_SPEED * scaling, TEXT_DISPLAY_SIZE * scaling, x_size);
 
         if alpha > VISIBILITY_THRESHHOLD {
             let text = format!("{} ({:?})", measurement.name, measurement.end_time - measurement.start_time);

@@ -18,59 +18,55 @@ use crate::loaders::ResourceMetadata;
 use crate::GameState;
 
 pub struct SellContainer {
-    items: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
-    cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
     state: ContainerState<GameState>,
 }
 
 impl SellContainer {
-    pub fn new(
-        items: PlainRemote<Vec<SellItem<(ResourceMetadata, u16)>>>,
-        cart: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
-    ) -> Self {
-        let elements = items
-            .get()
-            .iter()
-            .enumerate()
-            .map(|(index, item)| {
-                ShopEntry::new(
-                    item.clone(),
-                    cart.clone(),
-                    ShopEntryOperation::AddToCart,
-                    index.is_odd(),
-                    |item| Some(item.metadata.1 as usize),
-                    |item, cart, amount| {
-                        cart.mutate(|cart| {
-                            if let Some(purchase) = cart.iter_mut().find(|purchase| purchase.inventory_index == item.inventory_index) {
-                                purchase.metadata.1 += amount;
-                            } else {
-                                cart.push(SellItem {
-                                    metadata: (item.metadata.0.clone(), amount),
-                                    inventory_index: item.inventory_index,
-                                    price: item.price,
-                                    overcharge_price: item.overcharge_price,
-                                });
-                            }
-                        });
-                    },
-                    |item, cart, amount| {
-                        let cart_quantity = cart
-                            .get()
-                            .iter()
-                            .find(|cart_item| cart_item.inventory_index == item.inventory_index)
-                            .map(|cart_item| cart_item.metadata.1)
-                            .unwrap_or(0);
+    pub fn new() -> Self {
+        // let elements = items
+        //     .get()
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(index, item)| {
+        //         ShopEntry::new(
+        //             item.clone(),
+        //             ShopEntryOperation::AddToCart,
+        //             index.is_odd(),
+        //             |item| Some(item.metadata.1 as usize),
+        //             |state, item, amount| {
+        //                 // cart.mutate(|cart| {
+        //                 //     if let Some(purchase) =
+        // cart.iter_mut().find(|purchase| purchase.inventory_index ==
+        // item.inventory_index) {                 //
+        // purchase.metadata.1 += amount;                 //     } else {
+        //                 //         cart.push(SellItem {
+        //                 //             metadata: (item.metadata.0.clone(), amount),
+        //                 //             inventory_index: item.inventory_index,
+        //                 //             price: item.price,
+        //                 //             overcharge_price: item.overcharge_price,
+        //                 //         });
+        //                 //     }
+        //                 // });
+        //             },
+        //             |state, item, amount| {
+        //                 let cart_quantity = cart
+        //                     .get()
+        //                     .iter()
+        //                     .find(|cart_item| cart_item.inventory_index ==
+        // item.inventory_index)                     .map(|cart_item|
+        // cart_item.metadata.1)                     .unwrap_or(0);
+        //
+        //                 item.metadata.1.saturating_sub(cart_quantity) >= amount
+        //             },
+        //         )
+        //     })
+        //     .map(ElementWrap::wrap)
+        //     .collect::<Vec<ElementCell<GameState>>>();
 
-                        item.metadata.1.saturating_sub(cart_quantity) >= amount
-                    },
-                )
-            })
-            .map(ElementWrap::wrap)
-            .collect::<Vec<ElementCell<GameState>>>();
-
+        let elements = vec![];
         let state = ContainerState::new(elements);
 
-        Self { items, cart, state }
+        Self { state }
     }
 }
 
@@ -115,7 +111,7 @@ impl Element<GameState> for SellContainer {
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::zero());
     }
 
-    fn update(&mut self) -> Option<ChangeEvent> {
+    /* fn update(&mut self) -> Option<ChangeEvent> {
         if self.items.consume_changed() {
             let weak_parent = self.state.state.parent_element.take();
             let weak_self = self.state.state.self_element.take().unwrap();
@@ -129,7 +125,7 @@ impl Element<GameState> for SellContainer {
         }
 
         None
-    }
+    } */
 
     fn hovered_element(&self, mouse_position: ScreenPosition, mouse_mode: &MouseInputMode) -> HoverInformation<GameState> {
         match mouse_mode {

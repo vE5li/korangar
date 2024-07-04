@@ -17,7 +17,7 @@ use crate::interface::application::ThemeSelector2;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::FontSize;
-use crate::GameState;
+use crate::{GameState, GameStateFocusedElementPath, GameStateHoveredElementPath};
 
 // TODO: rework all of this
 pub struct CharacterPreview {
@@ -189,7 +189,10 @@ impl Element<GameState> for CharacterPreview {
             .state
             .element_renderer(render_target, renderer, state, parent_position, screen_clip);
 
-        let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
+        let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
+        let focused_element = state.get_safe(&GameStateFocusedElementPath::default());
+
+        let background_color = match self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element) {
             true => *state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
             false => *state.get_safe(&ButtonTheme::background_color(theme_selector)),
         };

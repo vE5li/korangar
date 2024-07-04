@@ -1,5 +1,5 @@
 use derive_new::new;
-use korangar_interface::application::FontSizeTrait;
+use korangar_interface::application::{FontSizeTrait, ScalingTrait};
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
@@ -95,7 +95,7 @@ impl Element<GameState> for SkillBox {
         let mouse_mode = state.get_safe(&GameStateMouseModePath::default());
         let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
         let focused_element = state.get_safe(&GameStateFocusedElementPath::default());
-        let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
+        let highlighted = self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element);
 
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match highlighted {
@@ -116,7 +116,7 @@ impl Element<GameState> for SkillBox {
                 renderer.position + ScreenPosition::uniform(15.0 * state.get_safe(&GameStateScalePath::default()).get_factor()),
                 0,
                 Color::monochrome_u8(255),
-                state,
+                *state.get_safe(&GameStateScalePath::default()),
             );
 
             renderer.render_text(

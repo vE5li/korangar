@@ -9,7 +9,7 @@ use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::theme::{ButtonTheme, CloseButtonTheme};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::CharacterInformation;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
@@ -63,8 +63,8 @@ impl CharacterPreview {
                 ButtonBuilder::new()
                     .with_text("Delete")
                     .with_event(UserEvent::DeleteCharacter(character_information.character_id))
-                    .with_background_color(|state: &Tracker<GameState>, theme_selector: ThemeSelector2| *state.get_safe(&CloseButtonTheme::background_color(theme_selector)))
-                    .with_foreground_color(|state: &Tracker<GameState>, theme_selector: ThemeSelector2| *state.get_safe(&CloseButtonTheme::foreground_color(theme_selector)))
+                    .with_background_color(|state: &View<GameState>, theme_selector: ThemeSelector2| *state.get_safe(&CloseButtonTheme::background_color(theme_selector)))
+                    .with_foreground_color(|state: &View<GameState>, theme_selector: ThemeSelector2| *state.get_safe(&CloseButtonTheme::foreground_color(theme_selector)))
                     .with_width_bound(dimension_bound!(50%))
                     .build()
                     .wrap(),
@@ -118,12 +118,7 @@ impl Element<GameState> for CharacterPreview {
         self.state.focus_next::<true>(self_cell, caller_cell, focus)
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let size_bound = &size_bound!(20%, 150);
         self.state
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(4.0));
@@ -178,7 +173,7 @@ impl Element<GameState> for CharacterPreview {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        state: &Tracker<GameState>,
+        state: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,
@@ -192,7 +187,7 @@ impl Element<GameState> for CharacterPreview {
         let hovered_element = state.get_safe(&GameStateHoveredElementPath::default());
         let focused_element = state.get_safe(&GameStateFocusedElementPath::default());
 
-        let background_color = match self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element) {
+        let background_color = match self.is_cell_self(hovered_element) || self.is_cell_self(focused_element) {
             true => *state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
             false => *state.get_safe(&ButtonTheme::background_color(theme_selector)),
         };

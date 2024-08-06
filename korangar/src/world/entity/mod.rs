@@ -7,7 +7,7 @@ use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
-use rust_state::Context;
+use rust_state::{Context, MapItem, PathId, PathUuid, RawSelector, ToUuid};
 use vulkano::buffer::Subbuffer;
 
 #[cfg(feature = "debug")]
@@ -1010,7 +1010,63 @@ pub enum Entity {
     Npc(Npc),
 }
 
+#[derive(Clone)]
+pub struct EntityDetailsSelector<EntitySelector> {
+    entity_selector: EntitySelector,
+}
+
+impl<'a, EntitySelector> RawSelector<'a, GameState, ResourceState<String>> for EntityDetailsSelector<EntitySelector>
+where
+    EntitySelector: for<'s> RawSelector<'s, GameState, Entity>,
+{
+    fn get(&self, state: &'a GameState) -> Option<&'a ResourceState<String>> {
+        Some(&self.entity_selector.get(state)?.get_common().details)
+    }
+
+    fn get_mut(&self, state: &'a mut GameState) -> Option<&'a mut ResourceState<String>> {
+        Some(&mut self.entity_selector.get_mut(state)?.get_common_mut().details)
+    }
+
+    fn get_path_id(&self) -> rust_state::PathId {
+        let mut inner = self.entity_selector.get_path_id();
+        inner.push(PathUuid(333333)); // FIX: What should be the index here?
+        inner
+    }
+}
+
+#[derive(Clone)]
+pub struct EntityTypeSelector<EntitySelector> {
+    entity_selector: EntitySelector,
+}
+
+impl<'a, EntitySelector> RawSelector<'a, GameState, EntityType> for EntityTypeSelector<EntitySelector>
+where
+    EntitySelector: for<'s> RawSelector<'s, GameState, Entity>,
+{
+    fn get(&self, state: &'a GameState) -> Option<&'a EntityType> {
+        Some(&self.entity_selector.get(state)?.get_common().entity_type)
+    }
+
+    fn get_mut(&self, state: &'a mut GameState) -> Option<&'a mut EntityType> {
+        Some(&mut self.entity_selector.get_mut(state)?.get_common_mut().entity_type)
+    }
+
+    fn get_path_id(&self) -> rust_state::PathId {
+        let mut inner = self.entity_selector.get_path_id();
+        inner.push(PathUuid(333334)); // FIX: What should be the index here?
+        inner
+    }
+}
+
 impl Entity {
+    pub fn details<EntitySelector>(entity_selector: EntitySelector) -> EntityDetailsSelector<EntitySelector> {
+        EntityDetailsSelector { entity_selector }
+    }
+
+    pub fn entity_type<EntitySelector>(entity_selector: EntitySelector) -> EntityTypeSelector<EntitySelector> {
+        EntityTypeSelector { entity_selector }
+    }
+
     fn get_common(&self) -> &Common {
         match self {
             Self::Player(player) => player.get_common(),
@@ -1133,6 +1189,10 @@ impl Entity {
             Self::Npc(npc) => npc.render_status(render_target, renderer, state, camera, window_size),
         }
     }
+}
+
+impl MapItem for Entity {
+    type Id = EntityId;
 }
 
 impl PrototypeWindow<GameState> for Entity {

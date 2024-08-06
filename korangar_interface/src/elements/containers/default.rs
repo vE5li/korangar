@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
-use rust_state::Tracker;
+use rust_state::View;
 
 use super::ContainerState;
 use crate::application::{Application, InterfaceRenderer, SizeTraitExt};
@@ -64,7 +64,7 @@ where
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let default_size_bound = SizeBound::only_height(Dimension::Flexible);
         let size_bound = self.size_bound.as_ref().unwrap_or(&default_size_bound);
         let border = self.border_size.unwrap_or(App::Size::zero());
@@ -84,7 +84,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

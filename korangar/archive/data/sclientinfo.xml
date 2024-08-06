@@ -18,4 +18,18 @@
             <image>loading00.jpg</image>
         </loading>
     </connection>
+    <connection>
+        <display>Test</display>
+        <desc>Ragnarok Online</desc>
+        <balloon>Sakray Server</balloon>
+        <address>49.12.109.207</address>
+        <port>6900</port>
+        <version>20</version>
+        <langtype>1</langtype>
+        <yellow />
+        <aid />
+        <loading>
+            <image>loading00.jpg</image>
+        </loading>
+    </connection>
 </clientinfo>

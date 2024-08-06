@@ -8,7 +8,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary, TrackedStateClone, TrackedStateExt};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use rust_state::{Context, MapLookup, SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, MapLookup, RawSelector, SafeUnwrap, View};
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
@@ -16,7 +16,7 @@ use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
 use crate::loaders::client::{LoginSettings, ServiceSettings};
 use crate::loaders::{ClientInfo, ServiceId};
-use crate::{GameState, GameStateLoginSettingsPath};
+use crate::{GameState, GameStateLoginSettingsPath, GameStatePasswordPath, GameStateSelectedServicePath, GameStateUsernamePath};
 
 #[derive(new)]
 pub struct LoginWindow<'a> {
@@ -33,8 +33,6 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
     }
 
     fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
-        // let mut login_settings = LoginSettings::new();
-
         let options = self
             .client_info
             .services
@@ -42,69 +40,45 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
             .map(|service| (service.display_name.clone().unwrap(), service.service_id()))
             .collect();
 
-        // let login_settings =
-        // application.get_safe(&GameStateLoginSettingsPath::default());
-
-        // FIX: This will panic when no services are present. What is the correct
-        // behavior?
-        /*let selected_service = login_settings
-        .recent_service_id
-        // Only use the recent server if it is still in the client info
-        .filter(|&recent_service_id| {
-            self.client_info
-                .services
-                .iter()
-                .any(|service| service.service_id() == recent_service_id)
-        })
-        .unwrap_or_else(|| self.client_info.services[0].service_id());*/
-
-        // let saved_settings =
-        // login_settings.service_settings.entry(selected_service).or_default();
-
-        // let username = PlainTrackedState::new(saved_settings.username.clone());
-        // let password = PlainTrackedState::new(saved_settings.password.clone());
-        //
-        // let selected_service = PlainTrackedState::new(selected_service);
-        // let login_settings = PlainTrackedState::new(login_settings);
-
-        let selector = |state: &Tracker<GameState>| {
+        let selector = |state: &View<GameState>| {
             !state.get_safe(&GameState::username()).is_empty() && !state.get_safe(&GameState::password()).is_empty()
         };
 
         let service_changed = Box::new(move |state: &Context<GameState>| {
-            // let service_id = *state.get_safe(&service_selector);
-            // state.update_value(&LoginSettings::service_settings(login_settings_selector),
-            // Some(service_id));
+            let service_id = *state.get_safe(&GameStateSelectedServicePath::default());
+            let service_settings_selector = MapLookup::new(
+                LoginSettings::service_settings(GameStateLoginSettingsPath::default()),
+                service_id,
+            );
 
-            // let saved_settings =
-            //     login_settings.mutate(|login_settings|
-            // login_settings.service_settings.entry(service_id).or_default().clone());
+            if let Some(username) = state.get(&ServiceSettings::username(service_settings_selector.clone())) {
+                state.update_value(&GameState::username(), username.clone());
+            }
 
-            let saved_username = String::new();
-            let saved_password = String::new();
+            if let Some(password) = state.get(&ServiceSettings::password(service_settings_selector.clone())) {
+                state.update_value(&GameState::password(), password.clone());
+            }
 
-            state.update_value(&GameState::username(), saved_username);
-            state.update_value(&GameState::password(), saved_password);
+            state.update_value(
+                &LoginSettings::recent_service_id(GameStateLoginSettingsPath::default()),
+                Some(service_id),
+            );
 
             Vec::new()
         });
 
         let login_action = move |state: &Context<GameState>| {
-            // TODO: Deduplicate code
             let username = state.get_safe(&GameState::username()).clone();
             let password = state.get_safe(&GameState::password()).clone();
             let service_id = *state.get_safe(&GameState::selected_service());
+            let service_settings_selector = MapLookup::new(
+                LoginSettings::service_settings(GameStateLoginSettingsPath::default()),
+                service_id,
+            );
 
+            state.update_value(&ServiceSettings::username(service_settings_selector.clone()), username.clone());
+            state.update_value(&ServiceSettings::password(service_settings_selector.clone()), password.clone());
             state.update_value(&LoginSettings::recent_service_id(GameState::login_settings()), Some(service_id));
-
-            // login_settings.mutate(|login_settings| {
-            // login_settings.recent_service_id = Some(service_id);
-
-            // let saved_settings =
-            // login_settings.service_settings.entry(service_id).or_default();
-            // saved_settings.username = username.cloned();
-            // saved_settings.password = password.cloned();
-            // });
 
             vec![ClickAction::Custom(UserEvent::LogIn {
                 service_id,
@@ -132,18 +106,15 @@ impl<'a> PrototypeWindow<GameState> for LoginWindow<'a> {
                 _ if username.is_empty() => vec![ClickAction::FocusNext(FocusMode::FocusPrevious)],
                 true => Vec::new(),
                 false => {
-                    // TODO: Deduplicate code
                     let service_id = *state.get_safe(&GameState::selected_service());
+                    let service_settings_selector = MapLookup::new(
+                        LoginSettings::service_settings(GameStateLoginSettingsPath::default()),
+                        service_id,
+                    );
 
+                    state.update_value(&ServiceSettings::username(service_settings_selector.clone()), username.clone());
+                    state.update_value(&ServiceSettings::password(service_settings_selector.clone()), password.clone());
                     state.update_value(&LoginSettings::recent_service_id(GameState::login_settings()), Some(service_id));
-
-                    /* login_settings.mutate(|login_settings| {
-                        // login_settings.recent_service_id = Some(service_id);
-
-                        let saved_settings = login_settings.service_settings.entry(service_id).or_default();
-                        saved_settings.username = username.cloned();
-                        saved_settings.password = password.cloned();
-                    }); */
 
                     vec![ClickAction::Custom(UserEvent::LogIn {
                         service_id,

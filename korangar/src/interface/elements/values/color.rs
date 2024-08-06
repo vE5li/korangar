@@ -2,7 +2,7 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::theme::ValueTheme;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -53,12 +53,7 @@ impl Element<GameState> for MutableColorValue {
         &mut self.state
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let size_bound = state.get_safe(&ValueTheme::size_bound(theme_selector));
         self.state.resolve(placement_resolver, size_bound);
     }
@@ -100,7 +95,7 @@ impl Element<GameState> for MutableColorValue {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        state: &Tracker<GameState>,
+        state: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

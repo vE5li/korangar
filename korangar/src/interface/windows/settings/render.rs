@@ -1,14 +1,14 @@
 use korangar_interface::elements::{ElementCell, ElementWrap, Expandable, StateButtonBuilder};
 use korangar_interface::size_bound;
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
-use rust_state::{Context, SafeUnwrap, Selector};
+use rust_state::{Context, RawSelector, SafeUnwrap};
 
 use crate::graphics::RenderSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 use crate::GameState;
 
-fn render_state_button(text: &'static str, selector: impl for<'a> Selector<'a, GameState, bool> + SafeUnwrap) -> ElementCell<GameState> {
+fn render_state_button(text: &'static str, selector: impl for<'a> RawSelector<'a, GameState, bool> + SafeUnwrap) -> ElementCell<GameState> {
     StateButtonBuilder::new()
         .with_text(text)
         .with_remote(selector.clone())

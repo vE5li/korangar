@@ -5,7 +5,7 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
-use rust_state::{Context, SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, RawSelector, SafeUnwrap, View};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -34,12 +34,7 @@ impl Element<GameState> for FrameView {
         false
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let size_bound = &size_bound!(100%, 300);
         self.state.resolve(placement_resolver, size_bound);
     }
@@ -78,7 +73,7 @@ impl Element<GameState> for FrameView {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         _theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

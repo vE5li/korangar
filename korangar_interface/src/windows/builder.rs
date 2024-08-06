@@ -8,7 +8,7 @@ use crate::application::{Application, PartialSizeTraitExt, WindowCache};
 use crate::builder::{Set, Unset};
 use crate::elements::{CloseButtonBuilder, Container, DragButtonBuilder, ElementCell, ElementWrap};
 use crate::layout::{Dimension, DimensionBound, SizeBound};
-use crate::ColorSelector;
+use crate::ColorEvaluator;
 
 /// Type state [`Window`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times, calling
@@ -25,7 +25,7 @@ where
     class: Option<String>,
     size_bound: Size,
     elements: Elements,
-    background_color: Option<ColorSelector<App>>,
+    background_color: Option<ColorEvaluator<App>>,
     theme_kind: App::ThemeKind,
     marker: PhantomData<(Title, Closable, Class, Background, Theme)>,
 }
@@ -142,7 +142,7 @@ where
 {
     pub fn with_background_color(
         self,
-        background_color: ColorSelector<App>,
+        background_color: ColorEvaluator<App>,
     ) -> WindowBuilder<App, Title, Closable, Class, Size, Elements, Set, Theme> {
         WindowBuilder {
             background_color: Some(background_color),

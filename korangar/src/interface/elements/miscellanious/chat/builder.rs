@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use korangar_interface::builder::Unset;
 use korangar_interface::state::PlainRemote;
-use rust_state::{SafeUnwrap, Selector};
+use rust_state::{RawSelector, SafeUnwrap};
 
 use super::Chat;
 use crate::interface::windows::ChatMessage;
@@ -31,7 +31,7 @@ impl ChatBuilder<Unset, Unset> {
 impl<Font> ChatBuilder<Unset, Font> {
     pub fn with_messages<Messages>(self, messages: Messages) -> ChatBuilder<Messages, Font>
     where
-        Messages: for<'a> Selector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
+        Messages: for<'a> RawSelector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
     {
         ChatBuilder { messages, ..self }
     }
@@ -45,7 +45,7 @@ impl<Messages> ChatBuilder<Messages, Unset> {
 
 impl<Messages> ChatBuilder<Messages, Rc<RefCell<FontLoader>>>
 where
-    Messages: for<'a> Selector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
+    Messages: for<'a> RawSelector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
 {
     /// Take the builder and turn it into a [`Chat`].
     ///

@@ -1,11 +1,11 @@
 use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
-use rust_state::{Context, Tracker};
+use rust_state::{Context, DynSelector, ReadState, RustState, SafeUnwrap, Selector, View};
 
 use crate::application::{
-    Application, ClipTrait, CornerRadiusTraitExt, FontSizeTraitExt, InterfaceRenderer, PartialSizeTraitExt, PositionTrait,
-    PositionTraitExt, SizeTrait, SizeTraitExt,
+    Application, ClipTrait, CornerRadiusTraitExt, FontSizeTraitExt, InterfaceRenderer, MouseInputModeTrait, PartialSizeTraitExt,
+    PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt,
 };
 use crate::event::{ChangeEvent, ClickAction, HoverInformation};
 use crate::layout::{PlacementResolver, SizeBound};
@@ -36,7 +36,7 @@ where
 {
     pub render_target: &'a mut <App::Renderer as InterfaceRenderer<App>>::Target,
     pub renderer: &'a App::Renderer,
-    pub state: &'a Tracker<'b, App>,
+    pub state: &'a View<'b, App>,
     pub position: App::Position,
     pub size: App::Size,
     pub clip: App::Clip,
@@ -126,7 +126,7 @@ where
     pub fn render_element(
         &mut self,
         element: &dyn Element<App>,
-        application: &Tracker<App>,
+        application: &View<App>,
         theme_selector: App::ThemeSelector,
         second_theme: bool,
     ) {
@@ -202,7 +202,7 @@ where
         &self,
         render_target: &'a mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &'a App::Renderer,
-        state: &'a Tracker<'b, App>,
+        state: &'a View<'b, App>,
         parent_position: App::Position,
         screen_clip: App::Clip,
     ) -> ElementRenderer<'a, 'b, App> {
@@ -300,7 +300,7 @@ where
         self.is_focusable().then_some(self_cell)
     }
 
-    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>);
+    fn resolve(&mut self, application: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>);
 
     fn update(&mut self) -> Option<ChangeEvent> {
         None
@@ -355,10 +355,1006 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &Tracker<App>,
+        application: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,
         second_theme: bool,
     );
+}
+
+////////////////////////////////
+
+#[derive(RustState)]
+#[state_root]
+pub struct Element2State<App>
+where
+    App: Application,
+{
+    pub cached_size: App::Size,
+    pub cached_position: App::Position,
+    pub self_element: ElementHandle,
+    pub parent_element: Option<ElementHandle>,
+    // pub mouse_position: Cell<App::Position>,
+    // pub focus_cache: Cell<Option<usize>>,
+    pub elements: Vec<ElementHandle>,
+    pub __custom: Option<Box<dyn std::any::Any>>,
+}
+
+#[derive(Clone)]
+pub struct CustomBoxSelector;
+
+impl<App> Element2State<App>
+where
+    App: Application,
+{
+    pub fn new(
+        self_element: ElementHandle,
+        parent_element: Option<ElementHandle>,
+        custom: Option<Box<dyn std::any::Any>>,
+    ) -> Context<Self> {
+        Context::new(Self {
+            cached_size: App::Size::new(0.0, 0.0),
+            cached_position: App::Position::new(0.0, 0.0),
+            self_element,
+            parent_element,
+            elements: Vec::new(),
+            __custom: custom,
+        })
+    }
+
+    pub fn custom() -> CustomBoxSelector {
+        CustomBoxSelector
+    }
+}
+
+impl<App: Application, To> Selector<Element2State<App>, To> for CustomBoxSelector {
+    fn get<'a>(&self, state: &'a Element2State<App>) -> Option<&'a To> {
+        state.__custom?.downcast_ref::<To>()
+    }
+
+    fn get_mut<'a>(&self, state: &'a mut Element2State<App>) -> Option<&'a mut To> {
+        state.__custom?.downcast_mut::<To>()
+    }
+
+    fn get_path_id(&self) -> rust_state::PathId {
+        Element2State::<App>::__custom().get_path_id()
+    }
+}
+
+impl !SafeUnwrap for CustomBoxSelector {}
+
+pub enum Resolve<App: Application> {
+    Default(fn(&World<App>) -> SizeBound),
+    Custom(fn(&World<App>, &mut PlacementResolver<App>)),
+}
+
+pub enum Focusable<App: Application> {
+    Yes,
+    No,
+    Dynamic(fn(&World<App>) -> bool),
+}
+
+pub enum HoverCheck<App: Application> {
+    Default,
+    Custom(
+        fn(
+            &Context<Element2State<App>>,
+            &Context<App>,
+            App::Position,
+            &App::MouseInputMode,
+            &ElementAllocator<App>,
+        ) -> HoverInformation<App>,
+    ),
+}
+
+pub enum ModeCheck<App: Application> {
+    Default,
+    Custom(fn(&Context<Element2State<App>>, &Context<App>, &App::MouseInputMode) -> bool),
+}
+
+pub struct World<'a, App: Application> {
+    pub this: View<'a, Element2State<App>>,
+    pub global: View<'a, App>,
+    pub theme_selector: App::ThemeSelector,
+}
+
+impl<'a, App: Application> World<'a, App> {
+    pub fn evaluator<EvaluatorSelector, Evaluator, To>(&self, selector: &EvaluatorSelector) -> To
+    where
+        EvaluatorSelector: Selector<Element2State<App>, Evaluator>,
+        Evaluator: Fn(&World<App>) -> To,
+    {
+        let evaluator = self.this.get(selector).unwrap();
+        evaluator(self)
+    }
+
+    pub fn evaluator_option<EvaluatorSelector, Evaluator, To>(&self, selector: &EvaluatorSelector) -> Option<To>
+    where
+        EvaluatorSelector: Selector<Element2State<App>, Option<Evaluator>>,
+        Evaluator: Fn(&World<App>) -> To,
+    {
+        self.this.get(selector).unwrap().map(|evaluator| evaluator(self))
+    }
+
+    pub fn evaluator_option_fallback<EvaluatorSelector, FallbackSelector, Evaluator, To>(
+        &self,
+        selector: &EvaluatorSelector,
+        fallback: &FallbackSelector,
+    ) -> To
+    where
+        EvaluatorSelector: Selector<Element2State<App>, Option<Evaluator>>,
+        FallbackSelector: Selector<App, To> + SafeUnwrap,
+        Evaluator: Fn(&World<App>) -> To,
+        To: Clone,
+    {
+        self.this
+            .get(selector)
+            .unwrap()
+            .map(|evaluator| evaluator(self))
+            .unwrap_or_else(|| self.global.get_safe(fallback).clone())
+    }
+}
+
+/* pub trait OptionWorldExt<T> {
+    fn unwrap_or_selector<App: Application>(self, world: &World<App>, selector: &(impl Selector<App, T> + SafeUnwrap)) -> T;
+}
+
+impl<T> OptionWorldExt<T> for Option<T>
+where
+    T: Clone,
+{
+    fn unwrap_or_selector<App: Application>(self, world: &World<App>, selector: &(impl Selector<App, T> + SafeUnwrap)) -> T {
+        self.unwrap_or_else(|| world.global.get_safe(selector).clone())
+    }
+} */
+
+pub type ClickHandler<App: Application> = fn(&World<App>) -> ();
+pub type InputHandler<App: Application> = fn(&World<App>, character: char) -> ();
+pub type ResourceHandler<App: Application> = fn(&World<App>, resource: App::DropResource) -> Option<App::DropResult>;
+pub type ScrollHandler<App: Application> = fn(&World<App>, delta: f32) -> ();
+pub type RenderFunction<App: Application> = fn(&World<App>, &mut ElementRenderer<App>);
+
+type Function<App: Application> = fn(&World<App>) -> Vec<ClickAction<App>>;
+type Procedure<App: Application> = fn(&World<App>);
+
+struct VTable<App: Application> {
+    pub on_initialize: Option<fn(&World<App>, ElementManager<App>)>,
+    pub on_is_focusable: Focusable<App>,
+    pub on_resolve: Resolve<App>,
+
+    pub hover_check: HoverCheck<App>,
+    pub mode_check: ModeCheck<App>,
+
+    pub on_left_click: Option<Function<App>>,
+    pub on_right_click: Option<Function<App>>,
+    pub on_drag: Option<Function<App>>,
+    pub on_input_character: Option<InputHandler<App>>,
+    pub on_drop_resource: Option<ResourceHandler<App>>,
+    pub on_scroll: Option<ScrollHandler<App>>,
+    pub background: Option<fn(&World<App>) -> (App::Color, App::CornerRadius)>,
+    pub render: RenderFunction<App>,
+}
+
+#[derive(Default)]
+struct ElementReadStates {
+    initialize_read_this: ReadState,
+    initialize_read_state: ReadState,
+    resolve_read_this: ReadState,
+    resolve_read_state: ReadState,
+    render_read_this: ReadState,
+    render_read_state: ReadState,
+}
+
+struct Element2<App>
+where
+    App: Application,
+{
+    vtable: &'static VTable<App>,
+    state: Context<Element2State<App>>,
+    read_state: RefCell<ElementReadStates>,
+}
+
+impl<App: Application> Element2<App> {
+    pub fn new(
+        vtable: &'static VTable<App>,
+        custom: Option<Box<dyn std::any::Any>>,
+        state: &Context<App>,
+        allocator: &mut ElementAllocator<App>,
+        parent_handle: Option<ElementHandle>,
+        theme_selector: App::ThemeSelector,
+    ) -> ElementHandle {
+        let handle = {
+            let handle = allocator.allocate(move |handle| Self {
+                vtable,
+                state: Element2State::new(handle, parent_handle, custom),
+                read_state: RefCell::new(ElementReadStates::default()),
+            });
+            let element = allocator.get(&handle).unwrap();
+            let element_manager = ElementManager::new(allocator, &element.state);
+
+            if let Some(initialize) = vtable.on_initialize {
+                let mut read_states = element.read_state.borrow_mut();
+                let this_tracker = read_states.initialize_read_this.track(&element.state);
+                let state_tracker = read_states.initialize_read_this.track(state);
+
+                let world = World {
+                    this: this_tracker,
+                    global: state_tracker,
+                    theme_selector,
+                };
+
+                initialize(&world, element_manager);
+            }
+
+            handle
+        };
+
+        let element = allocator.get_mut(&handle).unwrap();
+        element.state.apply();
+
+        handle
+    }
+
+    pub fn focus_next(
+        &self,
+        self_handle: ElementHandle,
+        caller_handle: Option<ElementHandle>,
+        focus: Focus,
+        allocator: &ElementAllocator<App>,
+    ) -> Option<ElementHandle> {
+        if focus.downwards {
+            return Some(self_handle);
+        }
+
+        self.state
+            .get_safe(&Element2State::<App>::parent_element())
+            .and_then(|parent_handle| {
+                let parent_element = allocator.get(&parent_handle).unwrap();
+                parent_element.focus_next(parent_handle, Some(self_handle), focus, allocator)
+            })
+    }
+
+    fn restore_focus(&self, self_handle: ElementHandle) -> Option<ElementHandle> {
+        // if let Some(index) = self.focus_cache.get()
+        //     && !self.elements.is_empty()
+        // {
+        //     let focused_element =
+        // self.elements[0..index.add(1).min(self.elements.len())]
+        //         .iter()
+        //         .rev()
+        //         .find_map(|element| element.borrow().restore_focus(element.clone()));
+        //
+        //     if focused_element.is_some() {
+        //         return focused_element;
+        //     }
+        // }
+        //
+        // // TODO: only if focusable
+        // Some(self_cell)
+        None
+    }
+
+    pub fn hovered_element(
+        &self,
+        state: &Context<App>,
+        mouse_position: App::Position,
+        mouse_mode: &App::MouseInputMode,
+        allocator: &ElementAllocator<App>,
+    ) -> Option<ElementHandle> {
+        match self.vtable.hover_check {
+            HoverCheck::Default => {
+                let cached_position = self.state.get_safe(&Element2State::<App>::cached_position());
+                let cached_size = self.state.get_safe(&Element2State::<App>::cached_size());
+                let elements = self.state.get_safe(&Element2State::<App>::elements());
+
+                let absolute_position = mouse_position.relative_to(*cached_position);
+
+                if absolute_position.left() >= 0.0
+                    && absolute_position.top() >= 0.0
+                    && absolute_position.left() <= cached_size.width()
+                    && absolute_position.top() <= cached_size.height()
+                {
+                    for handle in elements {
+                        let element = allocator.get(handle).unwrap();
+
+                        if let Some(handle) = element.hovered_element(state, absolute_position, mouse_mode, allocator) {
+                            return Some(handle);
+                        }
+                    }
+
+                    // for containers
+                    if
+                    /* hoverable */
+                    true {
+                        let self_handle = self.state.get_safe(&Element2State::<App>::self_element()).clone();
+
+                        match self.vtable.mode_check {
+                            ModeCheck::Default => {
+                                if mouse_mode.is_none() {
+                                    return Some(self_handle);
+                                }
+                            }
+                            ModeCheck::Custom(checker) => {
+                                if checker(&self.state, state, mouse_mode) {
+                                    return Some(self_handle);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                None
+            }
+            HoverCheck::Custom(_) => todo!(),
+        }
+    }
+
+    pub fn check_needs_render(&self, state: &Context<App>) -> bool {
+        false
+    }
+
+    pub fn resolve(&mut self, state: &Context<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+        let mut read_states = self.read_state.borrow_mut();
+        let this_tracker = read_states.resolve_read_this.track(&self.state);
+        let state_tracker = read_states.resolve_read_this.track(state);
+
+        let world = World {
+            this: this_tracker,
+            global: state_tracker,
+            theme_selector,
+        };
+
+        let size_bound = (self.vtable.size_bound)(&world);
+
+        let (size, position) = placement_resolver.allocate(&size_bound);
+        // self.cached_size = size.finalize();
+        // self.cached_position = position;
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct ElementVersion(usize);
+
+impl ElementVersion {
+    pub fn increment(&self) -> Self {
+        Self(self.0.wrapping_add(1))
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct ElementHandle {
+    version: ElementVersion,
+    index: usize,
+}
+
+enum ElementSlot<App: Application> {
+    Used { version: ElementVersion, element: Element2<App> },
+    Free { version: ElementVersion },
+}
+
+struct ElementAllocator<App: Application> {
+    slots: Vec<ElementSlot<App>>,
+}
+
+impl<App: Application> ElementAllocator<App> {
+    pub fn allocate(&mut self, f: impl Fn(ElementHandle) -> Element2<App>) -> ElementHandle {
+        for (index, slot) in self.slots.iter_mut().enumerate() {
+            let ElementSlot::Free { version } = slot else {
+                continue;
+            };
+            let version = *version;
+
+            let handle = ElementHandle { index, version };
+            let element = f(handle.clone());
+            *slot = ElementSlot::Used { version, element };
+
+            return handle;
+        }
+
+        let index = self.slots.len();
+        let version = ElementVersion(0);
+        let handle = ElementHandle { index, version };
+
+        let element = f(handle.clone());
+        self.slots.push(ElementSlot::Used { version, element });
+
+        handle
+    }
+
+    pub fn deallocate(&mut self, handle: ElementHandle) {
+        let Some(slot) = self.slots.get_mut(handle.index) else {
+            return;
+        };
+
+        let (version, child_handles) = {
+            let ElementSlot::Used { version, element } = slot else {
+                return;
+            };
+
+            if *version != handle.version {
+                return;
+            }
+
+            let element_handles = element.state.get_safe(&Element2State::<App>::elements()).iter().collect::<Vec<_>>();
+            (version, element_handles)
+        };
+
+        *slot = ElementSlot::Free {
+            version: version.increment(),
+        }
+    }
+
+    pub fn get(&self, handle: &ElementHandle) -> Option<&Element2<App>> {
+        let slot = self.slots.get(handle.index)?;
+
+        let ElementSlot::Used { version, element } = slot else {
+            return None;
+        };
+
+        if *version != handle.version {
+            return None;
+        }
+
+        Some(element)
+    }
+
+    pub fn get_mut(&mut self, handle: &ElementHandle) -> Option<&mut Element2<App>> {
+        let slot = self.slots.get_mut(handle.index)?;
+
+        let ElementSlot::Used { version, element } = slot else {
+            return None;
+        };
+
+        if *version != handle.version {
+            return None;
+        }
+
+        Some(element)
+    }
+}
+
+struct ElementManager<'a, App: Application> {
+    allocator: &'a mut ElementAllocator<App>,
+    state: &'a Context<Element2State<App>>,
+}
+
+impl<'a, App: Application> ElementManager<'a, App> {
+    pub fn new(allocator: &'a mut ElementAllocator<App>, state: &'a Context<Element2State<App>>) -> Self {
+        Self { allocator, state }
+    }
+
+    pub fn add(&mut self, handle: ElementHandle) {
+        self.state
+            .update_value_with(&Element2State::<App>::elements(), move |elements| elements.push(handle));
+    }
+
+    pub fn remove(&mut self, handle: ElementHandle) {
+        self.allocator.deallocate(handle.clone());
+        self.state.update_value_with(&Element2State::<App>::elements(), move |elements| {
+            elements.retain(|element| *element != handle)
+        });
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'a, ElementHandle> {
+        self.state.get_safe(&Element2State::<App>::elements()).iter()
+    }
+}
+
+pub trait PrototypeSelectorElement<App>
+where
+    App: Application,
+{
+    fn to_selected_element(
+        state: &Context<App>,
+        selector: DynSelector<App, Self>,
+        allocator: &mut ElementAllocator<App>,
+        parent_handle: Option<ElementHandle>,
+        theme_selector: App::ThemeSelector,
+    ) -> ElementHandle
+    where
+        Self: Sized;
+}
+
+mod vec_container {
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::marker::PhantomData;
+
+    use rust_state::{Context, DynSelector, RustState, Selector, SelectorExt, VecItem, VecLookup, View};
+
+    use super::{
+        Element2, Element2State, ElementAllocator, ElementHandle, ElementManager, ElementRenderer, Focusable, HoverCheck, ModeCheck,
+        PrototypeSelectorElement, Resolve, World,
+    };
+    use crate::application::{Application, InterfaceRenderer, PartialSizeTraitExt};
+    use crate::elements::base::VTable;
+    use crate::layout::{Dimension, PlacementResolver, SizeBound};
+    use crate::theme::ExpandableTheme;
+
+    #[derive(RustState)]
+    struct VecState<App, Item>
+    where
+        App: Application,
+        Item: VecItem + 'static,
+    {
+        selector: DynSelector<App, Vec<Item>>,
+        associated_ids: RefCell<HashMap<ElementHandle, Item::Id>>,
+        expanded: bool,
+        _marker: PhantomData<(App, Item)>,
+    }
+
+    fn background_color_thing<App: Application>(world: &World<App>) -> (App::Color, App::CornerRadius) {
+        let color = world
+            .global
+            .get_safe(&ExpandableTheme::<App>::background_color(world.theme_selector))
+            .clone();
+        let corner_radius = world
+            .global
+            .get_safe(&ExpandableTheme::<App>::corner_radius(world.theme_selector))
+            .clone();
+
+        (color, corner_radius)
+    }
+
+    fn specific_resolve<App, Item>(world: &World<App>)
+    where
+        App: Application,
+        Item: PrototypeSelectorElement<App> + VecItem,
+    {
+        let state: &VecState<App, Item> = world.this.get(&Element2State::<App>::custom()).unwrap();
+    }
+
+    fn size_bound<App, Item>(world: &World<App>, placement_resolver: &mut PlacementResolver<App>) -> SizeBound
+    where
+        App: Application,
+        Item: VecItem + 'static,
+    {
+        let elements = *world.this.get(&Element2State::<App>::elements()).unwrap();
+        let expanded = *world
+            .this
+            .get(&VecState::<App, Item>::expanded(Element2State::<App>::custom()))
+            .unwrap();
+
+        let closed_size_bound = SizeBound::only_height(Dimension::Absolute(18.0));
+
+        let closed_size = closed_size_bound
+            .resolve_element::<App::PartialSize>(
+                placement_resolver.get_available(),
+                placement_resolver.get_remaining(),
+                &placement_resolver.get_parent_limits(),
+                *world.global.get_safe(&App::ScaleSelector::default()),
+            )
+            .finalize::<App::Size>();
+
+        match expanded && !elements.is_empty() {
+            true => SizeBound::only_height(Dimension::Flexible),
+            false => closed_size_bound,
+        }
+    }
+
+    fn initialize<App, Item>(world: &World<App>, mut elements: ElementManager<App>)
+    where
+        App: Application,
+        Item: PrototypeSelectorElement<App> + VecItem,
+    {
+        let custom_selector = Element2State::<App>::custom();
+
+        // TODO: add some debug message+icon if the state is no longer available.
+        let Some(associated) = world.this.get(&VecState::<App, Item>::associated_ids(custom_selector.clone())) else {
+            return;
+        };
+        let Some(selector) = world.this.get(&VecState::<App, Item>::selector(custom_selector.clone())) else {
+            return;
+        };
+        let Some(items) = world.global.get(selector) else {
+            return;
+        };
+
+        let self_handle = world.this.get_safe(&Element2State::<App>::self_element());
+
+        for handle in elements.iter() {
+            let associated_id = associated.borrow().get(handle).unwrap();
+
+            if !items.iter().any(|item| item.get_id() == *associated_id) {
+                elements.remove(handle.clone());
+            }
+        }
+
+        for item in items {
+            // if associated.borrow().get(handle).is_none() {
+            let item_id = item.get_id();
+            let item_selector = VecLookup::new(selector.clone_inner(), item_id.clone());
+            let element_handle = Item::to_selected_element(
+                world.global.get_context(),
+                item_selector.to_dyn(),
+                elements.allocator,
+                Some(self_handle.clone()),
+                world.theme_selector,
+            );
+
+            elements.add(element_handle.clone());
+            associated.borrow_mut().insert(element_handle, item_id);
+        }
+        // }
+    }
+
+    fn render<App>(world: &World<App>, renderer: Element2Renderer<App>)
+    where
+        App: Application,
+    {
+    }
+
+    impl<App, Item> PrototypeSelectorElement<App> for Vec<Item>
+    where
+        App: Application,
+        Item: PrototypeSelectorElement<App> + VecItem,
+    {
+        fn to_selected_element(
+            state: &Context<App>,
+            selector: DynSelector<App, Self>,
+            allocator: &mut ElementAllocator<App>,
+            parent_handle: Option<ElementHandle>,
+            theme_selector: App::ThemeSelector,
+        ) -> ElementHandle {
+            let vtable = const {
+                &VTable {
+                    on_initialize: Some(initialize::<App, Item>),
+                    on_is_focusable: Focusable::No,
+                    on_resolve: Resolve::Custom(size_bound::<App, Item>),
+                    hover_check: HoverCheck::Default,
+                    mode_check: ModeCheck::Default,
+                    on_left_click: None,
+                    on_right_click: None,
+                    on_drag: None,
+                    on_input_character: None,
+                    on_drop_resource: None,
+                    on_scroll: None,
+                    background: Some(background_color_thing::<App>),
+                    render: render::<App>,
+                }
+            };
+
+            let custom = Box::new(VecState {
+                expanded: false,
+                selector,
+                associated_ids: RefCell::new(HashMap::new()),
+                _marker: PhantomData,
+            });
+
+            Element2::new(vtable, Some(custom), state, allocator, parent_handle, theme_selector)
+        }
+    }
+}
+
+mod button {
+    use std::borrow::Cow;
+    use std::marker::PhantomData;
+
+    use interface_procedural::dimension_bound;
+    use rust_state::{Context, RustState, SafeUnwrap, Selector};
+
+    use super::{
+        Element2, Element2State, ElementAllocator, ElementHandle, ElementRenderer, Focusable, HoverCheck, ModeCheck, Resolve, World,
+    };
+    use crate::application::Application;
+    use crate::builder::{Set, Unset};
+    use crate::elements::base::VTable;
+    use crate::event::ClickAction;
+    use crate::layout::{DimensionBound, SizeBound};
+    use crate::theme::ButtonTheme;
+    use crate::{ClickEvaluator, ColorEvaluator, DimensionBoundEvaluator, DisabledEvaluator, TextEvaluator};
+
+    #[derive(RustState)]
+    struct ButtonState<App>
+    where
+        App: Application,
+    {
+        background_color: Option<ColorEvaluator<App>>,
+        foreground_color: Option<ColorEvaluator<App>>,
+        width_bound: Option<DimensionBoundEvaluator<App>>,
+        click_event: ClickEvaluator<App>,
+        disabled: Option<DisabledEvaluator<App>>,
+        text: TextEvaluator<App>,
+    }
+
+    fn focusable<App>(world: &World<App>) -> bool
+    where
+        App: Application,
+    {
+        !world
+            .evaluator_option(&ButtonState::<App>::disabled(Element2State::<App>::custom()))
+            .unwrap_or_default()
+    }
+
+    fn size_bound<App>(world: &World<App>) -> SizeBound
+    where
+        App: Application,
+    {
+        let width_bound = world
+            .evaluator_option(&ButtonState::<App>::width_bound(Element2State::<App>::custom()))
+            .unwrap_or(dimension_bound!(100%));
+        let height_bound = world.global.get_safe(&ButtonTheme::height_bound(world.theme_selector)).clone();
+
+        width_bound.add_height(height_bound)
+    }
+
+    fn on_click<App>(world: &World<App>) -> Vec<ClickAction<App>>
+    where
+        App: Application,
+    {
+        world.evaluator(&ButtonState::<App>::click_event(Element2State::<App>::custom()))
+    }
+
+    fn background_color_thing<App>(world: &World<App>) -> (App::Color, App::CornerRadius)
+    where
+        App: Application,
+    {
+        // TODO: Disabled etc.
+
+        let color = world.evaluator_option_fallback(
+            &ButtonState::<App>::background_color(Element2State::<App>::custom()),
+            &ButtonTheme::background_color(world.theme_selector),
+        );
+
+        let corner_radius = world
+            .global
+            .get_safe(&ButtonTheme::<App>::corner_radius(world.theme_selector))
+            .clone();
+
+        (color, corner_radius)
+    }
+
+    fn render<App>(world: &World<App>, renderer: &mut ElementRenderer<App>)
+    where
+        App: Application,
+    {
+        let disabled = world
+            .evaluator_option(&ButtonState::<App>::disabled(Element2State::<App>::custom()))
+            .unwrap_or_default();
+
+        let foreground_color = if disabled {
+            world
+                .global
+                .get_safe(&ButtonTheme::disabled_foreground_color(world.theme_selector))
+                .clone()
+        } else {
+            world.evaluator_option_fallback(
+                &ButtonState::<App>::foreground_color(Element2State::<App>::custom()),
+                &ButtonTheme::foreground_color(world.theme_selector),
+            )
+        };
+
+        let text = world.evaluator(&ButtonState::<App>::text(Element2State::<App>::custom()));
+        let text_offset = world.global.get_safe(&ButtonTheme::text_offset(world.theme_selector));
+        let font_size = world.global.get_safe(&ButtonTheme::font_size(world.theme_selector));
+
+        renderer.render_text(text.as_ref(), *text_offset, foreground_color, *font_size);
+    }
+
+    pub struct ButtonBuilder<App, Background, Foreground, Width, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        background_color: Option<ColorEvaluator<App>>,
+        foreground_color: Option<ColorEvaluator<App>>,
+        width_bound: Option<DimensionBoundEvaluator<App>>,
+        click_event: Event,
+        disabled: Option<DisabledEvaluator<App>>,
+        text: Text,
+        _marker: PhantomData<(Background, Foreground, Width, Disabled)>,
+    }
+
+    impl<App, Foreground, Width, Event, Disabled, Text> ButtonBuilder<App, Unset, Foreground, Width, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn background_color(
+            self,
+            evaluator: impl Fn(&World<App>) -> App::Color,
+        ) -> ButtonBuilder<App, Set, Foreground, Width, Event, Disabled, Text> {
+            ButtonBuilder {
+                background_color: Some(Box::new(evaluator)),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Foreground, Width, Event, Disabled, Text> ButtonBuilder<App, Unset, Foreground, Width, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn background_color_selector(
+            self,
+            selector: impl Selector<App, App::Color> + SafeUnwrap,
+        ) -> ButtonBuilder<App, Set, Foreground, Width, Event, Disabled, Text> {
+            ButtonBuilder {
+                background_color: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Width, Event, Disabled, Text> ButtonBuilder<App, Background, Unset, Width, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn foreground_color(
+            self,
+            evaluator: impl Fn(&World<App>) -> App::Color,
+        ) -> ButtonBuilder<App, Background, Set, Width, Event, Disabled, Text> {
+            ButtonBuilder {
+                foreground_color: Some(Box::new(evaluator)),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Width, Event, Disabled, Text> ButtonBuilder<App, Background, Unset, Width, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn foreground_color_selector(
+            self,
+            selector: impl Selector<App, App::Color> + SafeUnwrap,
+        ) -> ButtonBuilder<App, Background, Set, Width, Event, Disabled, Text> {
+            ButtonBuilder {
+                foreground_color: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Event, Disabled, Text> ButtonBuilder<App, Background, Foreground, Unset, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn width_bound(
+            self,
+            evaluator: impl Fn(&World<App>) -> DimensionBound,
+        ) -> ButtonBuilder<App, Background, Foreground, Set, Event, Disabled, Text> {
+            ButtonBuilder {
+                width_bound: Some(Box::new(evaluator)),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Event, Disabled, Text> ButtonBuilder<App, Background, Foreground, Unset, Event, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn width_bound_selector(
+            self,
+            selector: impl Selector<App, DimensionBound> + SafeUnwrap,
+        ) -> ButtonBuilder<App, Background, Foreground, Set, Event, Disabled, Text> {
+            ButtonBuilder {
+                width_bound: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Width, Disabled, Text> ButtonBuilder<App, Background, Foreground, Width, Unset, Disabled, Text>
+    where
+        App: Application,
+    {
+        pub fn click_event(
+            self,
+            click_event: impl Fn(&World<App>) -> Vec<ClickAction<App>>,
+        ) -> ButtonBuilder<App, Background, Foreground, Width, ClickEvaluator<App>, Disabled, Text> {
+            ButtonBuilder {
+                click_event: Box::new(click_event),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Width, Event, Text> ButtonBuilder<App, Background, Foreground, Width, Event, Unset, Text>
+    where
+        App: Application,
+    {
+        pub fn disabled(
+            self,
+            evaluator: impl Fn(&World<App>) -> bool,
+        ) -> ButtonBuilder<App, Background, Foreground, Width, Event, Set, Text> {
+            ButtonBuilder {
+                disabled: Some(Box::new(evaluator)),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Width, Event, Text> ButtonBuilder<App, Background, Foreground, Width, Event, Unset, Text>
+    where
+        App: Application,
+    {
+        pub fn disabled_selector(
+            self,
+            selector: impl Selector<App, bool> + SafeUnwrap,
+        ) -> ButtonBuilder<App, Background, Foreground, Width, Event, Set, Text> {
+            ButtonBuilder {
+                disabled: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Width, Event, Disabled> ButtonBuilder<App, Background, Foreground, Width, Event, Disabled, Unset>
+    where
+        App: Application,
+    {
+        pub fn text(
+            self,
+            evaluator: impl for<'a> Fn(&'a World<'a, App>) -> Cow<'a, str>,
+        ) -> ButtonBuilder<App, Background, Foreground, Width, Event, Disabled, TextEvaluator<App>> {
+            ButtonBuilder {
+                text: Box::new(evaluator),
+                _marker: PhantomData,
+                ..self
+            }
+        }
+    }
+
+    impl<App, Background, Foreground, Width, Disabled>
+        ButtonBuilder<App, Background, Foreground, Width, ClickEvaluator<App>, Disabled, TextEvaluator<App>>
+    where
+        App: Application,
+    {
+        pub fn build(
+            self,
+            state: &Context<App>,
+            allocator: &mut ElementAllocator<App>,
+            parent_handle: Option<ElementHandle>,
+            theme_selector: App::ThemeSelector,
+        ) -> ElementHandle {
+            let vtable = const {
+                &VTable {
+                    on_initialize: None,
+                    on_is_focusable: Focusable::Dynamic(focusable::<App>),
+                    on_resolve: Resolve::Default(size_bound::<App>),
+                    hover_check: HoverCheck::Default,
+                    mode_check: ModeCheck::Default,
+                    on_left_click: Some(on_click::<App>),
+                    on_right_click: None,
+                    on_drag: None,
+                    on_input_character: None,
+                    on_drop_resource: None,
+                    on_scroll: None,
+                    background: Some(background_color_thing::<App>),
+                    render: render::<App>,
+                }
+            };
+
+            let ButtonBuilder {
+                background_color,
+                foreground_color,
+                width_bound,
+                click_event,
+                disabled,
+                text,
+                ..
+            } = self;
+
+            let button_state = ButtonState {
+                background_color,
+                foreground_color,
+                width_bound,
+                click_event,
+                disabled,
+                text,
+            };
+
+            Element2::new(vtable, None, state, allocator, parent_handle, theme_selector)
+        }
+    }
 }

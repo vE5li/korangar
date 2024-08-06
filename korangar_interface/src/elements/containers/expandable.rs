@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
-use rust_state::{Context, Tracker};
+use rust_state::{Context, RustState, SafeUnwrap, Selector, View};
 
 use super::ContainerState;
 use crate::application::{
@@ -72,7 +72,7 @@ where
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let closed_size = self
             .closed_size_bound
             .resolve_element::<App::PartialSize>(
@@ -173,7 +173,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

@@ -5,7 +5,7 @@ use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedStateTake
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::Friend;
-use rust_state::{Context, SafeUnwrap, Selector};
+use rust_state::{Context, RawSelector, SafeUnwrap};
 
 use crate::input::UserEvent;
 use crate::interface::elements::FriendView;

@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::{Context, Selector, Tracker};
+use rust_state::{Context, Selector, View};
 
 pub use self::builder::StateButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
@@ -15,7 +15,7 @@ where
     App: Application,
     Text: AsRef<str> + 'static,
     Event: ElementEvent<App> + 'static,
-    State: for<'a> Selector<'a, App, bool>,
+    State: Selector<App, bool>,
 {
     text: Text,
     event: Event,
@@ -30,7 +30,7 @@ where
     App: Application,
     Text: AsRef<str> + 'static,
     Event: ElementEvent<App> + 'static,
-    State: for<'a> Selector<'a, App, bool>,
+    State: Selector<App, bool>,
 {
     fn get_state(&self) -> &ElementState<App> {
         &self.state
@@ -40,7 +40,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, application: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let height_bound = *application.get_safe(&ButtonTheme::height_bound(theme_selector));
         let size_bound = self.width_bound.add_height(height_bound);
 
@@ -62,7 +62,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &Tracker<App>,
+        application: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

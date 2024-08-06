@@ -27,6 +27,7 @@ mod loaders;
 mod world;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::net::ToSocketAddrs;
 use std::rc::Rc;
@@ -51,10 +52,10 @@ use korangar_networking::{
 };
 use loaders::client::LoginSettings;
 use ragnarok_packets::{
-    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, LoginServerPacket,
+    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, EntityId, Friend, HotbarSlot, LoginServerPacket,
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
-use rust_state::{Context, ReadState, Selector};
+use rust_state::{Context, MapLookup, RawSelector, ReadState};
 use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
 #[cfg(feature = "debug")]
 use vulkano::instance::debug::{
@@ -70,6 +71,7 @@ use winit::window::{Icon, WindowBuilder};
 
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
+use crate::interface::application;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::dialog::DialogSystem;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
@@ -113,11 +115,13 @@ struct PacketsState {
 
 #[derive(rust_state::RustState)]
 #[state_root]
-struct GameState {
+pub struct GameState {
     current_map: Arc<Map>,
+    player_id: Option<EntityId>,
+    entities: HashMap<EntityId, Entity>,
     shadow_detail: ShadowDetail,
     framerate_limit: bool,
-    show_inderface: bool,
+    show_interface: bool,
     friend_list: Vec<(Friend, LinkedElement)>,
     characters: Vec<CharacterInformation>,
     inventory_items: Vec<InventoryItem<ResourceMetadata>>,
@@ -404,7 +408,6 @@ fn main() {
     let mut focus_state = FocusState::default();
     let mut mouse_cursor = MouseCursor::new(&mut game_file_loader, &mut sprite_loader, &mut action_loader);
     let mut dialog_system = DialogSystem::default();
-    let mut show_interface = true;
 
     #[cfg(feature = "debug")]
     timer.stop();
@@ -448,13 +451,11 @@ fn main() {
     #[cfg(feature = "debug")]
     let mut networking_system = NetworkingSystem::spawn_with_callback(packet_callback.clone());
 
-    let mut friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>> = PlainTrackedState::default();
     let mut saved_login_data: Option<LoginServerLoginData> = None;
     let mut saved_character_server: Option<CharacterServerInformation> = None;
     let mut saved_characters: PlainTrackedState<Vec<CharacterInformation>> = PlainTrackedState::default();
     let mut shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>> = PlainTrackedState::default();
     let mut sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>> = PlainTrackedState::default();
-    let mut currently_deleting: Option<CharacterId> = None;
     let mut saved_player_name = String::new();
     let mut saved_login_server_address = None;
     let mut saved_password = String::new();
@@ -482,12 +483,22 @@ fn main() {
 
     let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
 
-    let mut login_settings = LoginSettings::new();
+    let login_settings = LoginSettings::new();
+    // FIX: This will panic when no services are present. What is the correct
+    // behavior?
+    let selected_service = login_settings
+        .recent_service_id
+        // Only use the recent server if it is still in the client info
+        .filter(|&recent_service_id| client_info.services.iter().any(|service| service.service_id() == recent_service_id))
+        .unwrap_or_else(|| client_info.services[0].service_id());
+
     let mut game_state = Context::new(GameState {
         current_map: map,
+        entities: HashMap::new(),
+        player_id: None,
         shadow_detail: graphics_settings.shadow_detail,
         framerate_limit: graphics_settings.frame_limit,
-        show_inderface: true,
+        show_interface: true,
         friend_list: Default::default(),
         characters: Default::default(),
         currently_deleting: None,
@@ -517,7 +528,7 @@ fn main() {
         character_name_input: Default::default(),
         username: Default::default(),
         password: Default::default(),
-        selected_service: ServiceId(0),
+        selected_service,
         login_settings,
         buy_items: Default::default(),
         buy_cart: Default::default(),
@@ -525,9 +536,6 @@ fn main() {
         sell_cart: Default::default(),
         inventory_items: Default::default(),
     });
-
-    let mut interface_read_state = ReadState::default();
-    let mut update_read_state = ReadState::default();
 
     interface.open_window(&game_state, &mut focus_state, &LoginWindow::new(&client_info));
 
@@ -618,28 +626,34 @@ fn main() {
 
                 let network_events = networking_system.get_events();
 
-                let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
+                let (user_events, mouse_target) = input_system.user_events(
                     &mut interface,
                     &game_state,
                     &mut focus_state,
                     &mut picker_targets[swapchain_holder.get_image_number()],
                     &mut mouse_cursor,
                     #[cfg(feature = "debug")]
-                    &game_state.get_safe(&GameStateRenderSettingsPath::default()),
+                    game_state.get_safe(&GameStateRenderSettingsPath::default()),
                     swapchain_holder.window_size(),
                     client_tick,
                 );
+                game_state.apply();
 
                 #[cfg(feature = "debug")]
                 let picker_measurement = Profiler::start_measurement("update picker target");
 
                 if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-                    if let Some(entity) = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
-                        if entity.are_details_unavailable() && networking_system.entity_details(entity_id).is_ok() {
-                            entity.set_details_requested();
-                        }
+                    let resource_selector = Entity::details(MapLookup::new(GameState::entities(), entity_id));
+                    let type_selector = Entity::entity_type(MapLookup::new(GameState::entities(), entity_id));
 
-                        match entity.get_entity_type() {
+                    if let Some(details) = game_state.get(&resource_selector) {
+                        if matches!(details, ResourceState::Unavailable) && networking_system.entity_details(entity_id).is_ok() {
+                            game_state.update_value(&resource_selector, ResourceState::Requested);
+                        }
+                    }
+
+                    if let Some(entity_type) = game_state.get(&type_selector) {
+                        match entity_type {
                             EntityType::Npc => mouse_cursor.set_state(MouseCursorState::Dialog, client_tick),
                             EntityType::Warp => mouse_cursor.set_state(MouseCursorState::Warp, client_tick),
                             EntityType::Monster => mouse_cursor.set_state(MouseCursorState::Attack, client_tick),
@@ -706,7 +720,7 @@ fn main() {
                             let server = saved_character_server.clone().unwrap();
                             networking_system.connect_to_character_server(login_data, server);
 
-                            entities.clear();
+                            game_state.update_value(&GameState::entities(), HashMap::new());
                             particle_holder.clear();
                             effect_holder.clear();
 
@@ -746,12 +760,13 @@ fn main() {
                             interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()))
                         }
                         NetworkEvent::CharacterDeleted => {
-                            let character_id = currently_deleting.take().unwrap();
+                            let character_id = game_state.get_safe(&GameState::currently_deleting()).unwrap();
+                            game_state.update_value(&GameState::currently_deleting(), None);
 
                             saved_characters.retain(|character| character.character_id != character_id);
                         },
                         NetworkEvent::CharacterDeletionFailed { message, .. } => {
-                            currently_deleting = None;
+                            game_state.update_value(&GameState::currently_deleting(), None);
                             interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new(message.to_owned()))
                         }
                         NetworkEvent::CharacterSelected { login_data, map_name } => {
@@ -795,7 +810,7 @@ fn main() {
                             let player = Entity::Player(player);
 
                             player_camera.set_focus_point(player.get_position());
-                            entities.push(player);
+                            game_state.map_insert(&GameState::entities(), EntityId(saved_login_data.account_id.0), player);
 
                             // TODO: this will do one unnecessary restore_focus. check if
                             // that will be problematic
@@ -831,11 +846,7 @@ fn main() {
                             interface.open_window(&game_state, &mut focus_state, &ErrorWindow::new("Failed to switch character slots".to_owned()));
                         },
                         NetworkEvent::AddEntity(entity_appeared_data) => {
-                            // Sometimes (like after a job change) the server will tell the client
-                            // that a new entity appeared, even though it was already on screen. So
-                            // to prevent the entity existing twice, we remove the old one.
-                            entities.retain(|entity| entity.get_entity_id() != entity_appeared_data.entity_id);
-
+                            let entity_id = entity_appeared_data.entity_id;
                             let npc = Npc::new(
                                 &mut game_file_loader,
                                 &mut sprite_loader,
@@ -846,11 +857,14 @@ fn main() {
                                 client_tick,
                             );
 
-                            let npc = Entity::Npc(npc);
-                            entities.push(npc);
+                            // Sometimes (like after a job change) the server will tell the client
+                            // that a new entity appeared, even though it was already on screen.
+                            // Inserting into the list of entities will overwrite the previous
+                            // entity, so it's not a problem, but something to keep in mind.
+                            game_state.map_insert(&GameState::entities(), entity_id, Entity::Npc(npc));
                         }
                         NetworkEvent::RemoveEntity(entity_id) => {
-                            entities.retain(|entity| entity.get_entity_id() != entity_id);
+                            game_state.map_remove(&GameState::entities(), entity_id);
                         }
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -1005,10 +1019,10 @@ fn main() {
                             interface.open_window(&game_state, &mut focus_state, &FriendRequestWindow::new(requestee))
                         }
                         NetworkEvent::FriendRemoved { account_id, character_id } => {
-                            friend_list.retain(|(friend, _)| !(friend.account_id == account_id && friend.character_id == character_id));
+                            // friend_list.retain(|(friend, _)| !(friend.account_id == account_id && friend.character_id == character_id));
                         }
                         NetworkEvent::FriendAdded { friend } => {
-                            friend_list.push((friend, LinkedElement::new()));
+                            // friend_list.push((friend, LinkedElement::new()));
                         }
                         NetworkEvent::VisualEffect(path, entity_id) => {
                             let effect = effect_loader.get(path, &mut game_file_loader, &mut texture_loader).unwrap();
@@ -1076,9 +1090,9 @@ fn main() {
                             effect_holder.remove_unit(entity_id);
                         }
                         NetworkEvent::SetFriendList { friends } => {
-                            friend_list.mutate(|friend_list| {
-                                *friend_list = friends.into_iter().map(|friend| (friend, LinkedElement::new())).collect();
-                            });
+                            // friend_list.mutate(|friend_list| {
+                            //     *friend_list = friends.into_iter().map(|friend| (friend, LinkedElement::new())).collect();
+                            // });
                         }
                         NetworkEvent::SetHotkeyData { tab, hotkeys } => {
                             // FIX: Since we only have one hotbar at the moment, we ignore
@@ -1168,6 +1182,8 @@ fn main() {
                             }
                         },
                     }
+
+                    game_state.apply();
                 }
 
                 #[cfg(feature = "debug")]
@@ -1215,12 +1231,12 @@ fn main() {
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::OpenMenuWindow => {
-                            if !entities.is_empty() {
+                            if game_state.get_safe(&GameState::player_id()).is_some() {
                                 interface.open_window(&game_state, &mut focus_state, &MenuWindow)
                             }
                         }
                         UserEvent::OpenInventoryWindow => {
-                            if !entities.is_empty() {
+                            if game_state.get_safe(&GameState::player_id()).is_some() {
                                 interface.open_window(
                                     &game_state,
                                     &mut focus_state,
@@ -1229,7 +1245,7 @@ fn main() {
                             }
                         }
                         UserEvent::OpenEquipmentWindow => {
-                            if !entities.is_empty() {
+                            if game_state.get_safe(&GameState::player_id()).is_some() {
                                 interface.open_window(
                                     &game_state,
                                     &mut focus_state,
@@ -1238,7 +1254,7 @@ fn main() {
                             }
                         }
                         UserEvent::OpenSkillTreeWindow => {
-                            if !entities.is_empty() {
+                            if game_state.get_safe(&GameState::player_id()).is_some() {
                                 interface.open_window(
                                     &game_state,
                                     &mut focus_state,
@@ -1255,7 +1271,9 @@ fn main() {
                         UserEvent::OpenFriendsWindow => {
                             interface.open_window(&game_state, &mut focus_state, &FriendsWindow::default());
                         }
-                        UserEvent::ToggleShowInterface => show_interface = !show_interface,
+                        UserEvent::ToggleShowInterface => {
+                            game_state.update_value_with(&GameState::show_interface(), |show_interface| *show_interface = !show_interface);
+                        },
                         UserEvent::SetThemeFile { theme_file, theme_kind } => {}, //game_state.set_theme_file(theme_file, theme_kind),
                         UserEvent::SaveTheme { theme_kind } => {}, //game_state.save_theme(theme_kind),
                         UserEvent::ReloadTheme { theme_kind } => {}, //game_state.reload_theme(theme_kind),
@@ -1269,9 +1287,11 @@ fn main() {
                             let _ = networking_system.create_character(character_slot, name);
                         },
                         UserEvent::DeleteCharacter(character_id) => {
+                            let currently_deleting = game_state.get_safe(&GameState::currently_deleting());
+
                             if currently_deleting.is_none() {
                                 let _ = networking_system.delete_character(character_id);
-                                currently_deleting = Some(character_id);
+                                game_state.update_value(&GameState::currently_deleting(), Some(character_id));
                             }
                         },
                         UserEvent::RequestSwitchCharacterSlot(origin_slot) => game_state.update_value(&GameState::move_request(), Some(origin_slot)),
@@ -1283,20 +1303,20 @@ fn main() {
                             let _ = networking_system.switch_character_slot(origin_slot, destination_slot);
                         },
                         UserEvent::RequestPlayerMove(destination) => {
-                            if !entities.is_empty() {
+                            if game_state.get_safe(&GameState::player_id()).is_some() {
                                 let _ = networking_system.player_move(WorldPosition { x: destination.x, y: destination.y });
                             }
                         }
                         UserEvent::RequestPlayerInteract(entity_id) => {
-                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
+                            let entity_selector = MapLookup::new(GameState::entities(), entity_id);
 
-                            if let Some(entity) = entity {
+                            if let Some(entity) = game_state.get(&entity_selector) {
                                 let _ = match entity.get_entity_type() {
                                     EntityType::Npc => networking_system.start_dialog(entity_id),
                                     EntityType::Monster => networking_system.player_attack(entity_id),
                                     EntityType::Warp => networking_system.player_move({
-                                        let position = entity.get_grid_position();
-                                        WorldPosition { x: position.x, y: position.y }
+                                        let Vector2 { x, y } = entity.get_grid_position();
+                                        WorldPosition { x, y }
                                     }),
                                     _ => Ok(())
                                 };
@@ -1372,18 +1392,18 @@ fn main() {
                                             let _ = networking_system.cast_channeling_skill(
                                                 skill.skill_id,
                                                 skill.skill_level,
-                                                entities[0].get_entity_id(),
+                                                game_state.get_safe(&GameState::player_id()).unwrap(),
                                             );
                                         },
                                         false => {
-                                            let _ = networking_system.cast_skill(skill.skill_id, skill.skill_level, entities[0].get_entity_id());
+                                            let _ = networking_system.cast_skill(skill.skill_id, skill.skill_level, game_state.get_safe(&GameState::player_id()).unwrap());
                                         }
                                     },
                                     SkillType::Support => {
                                         if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
                                             let _ = networking_system.cast_skill(skill.skill_id, skill.skill_level, entity_id);
                                         } else {
-                                            let _ = networking_system.cast_skill(skill.skill_id, skill.skill_level, entities[0].get_entity_id());
+                                            let _ = networking_system.cast_skill(skill.skill_id, skill.skill_level, game_state.get_safe(&GameState::player_id()).unwrap());
                                         }
                                     }
                                 }
@@ -1492,6 +1512,8 @@ fn main() {
                         #[cfg(feature = "debug")]
                         UserEvent::CameraDecelerate => debug_camera.decelerate(),
                     }
+
+                    game_state.apply();
                 }
 
                 #[cfg(feature = "debug")]
@@ -1530,14 +1552,9 @@ fn main() {
                 particle_holder.update(delta_time as f32);
                 effect_holder.update(&entities, delta_time as f32);
 
-                let (clear_interface, render_interface) = {
-                    let tracked_game_state = update_read_state.track_new(&mut game_state);
+                let (clear_interface, render_interface) = interface.update(&tracked_game_state, font_loader.clone(), &mut focus_state);
 
-                    let foo = interface.update(&tracked_game_state, font_loader.clone(), &mut focus_state);
-                    mouse_cursor.update(client_tick);
-
-                    foo
-                };
+                mouse_cursor.update(client_tick);
 
                 if swapchain_holder.is_swapchain_invalid() {
                     #[cfg(feature = "debug")]
@@ -1657,8 +1674,8 @@ fn main() {
                 #[cfg(feature = "debug")]
                 let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
 
-                // FIX: Don't clone here
-                let map = game_state.get_safe(&GameStateCurrentMapPath::default()).clone();
+                let map = game_state.get_safe(&GameStateCurrentMapPath::default());
+
                 #[cfg(feature = "debug")]
                 let render_settings = &game_state.get_safe(&GameStateRenderSettingsPath::default()).clone(); // FIX: Don't clone
                 let walk_indicator_color = *game_state.get_safe(&IndicatorTheme::walking(GameTheme::indicator(GameState::game_theme())));
@@ -1860,17 +1877,7 @@ fn main() {
                         profile_block!("render user interface");
 
                         interface_target.start(window_size_u32, clear_interface);
-
-                        let tracked_game_state = interface_read_state.track_new(&mut game_state);
-
-                        interface.render(
-                            &mut interface_target,
-                            &interface_renderer,
-                            &tracked_game_state,
-                            // hovered_element,
-                            // focused_element,
-                            // input_system.get_mouse_mode(),
-                        );
+                        interface.render(&mut interface_target, &interface_renderer, &game_state);
 
                         let font_future = font_loader.borrow_mut().submit_load_buffer();
                         interface_target.finish(font_future);
@@ -1963,14 +1970,14 @@ fn main() {
                     );
                 }
 
-                if show_interface {
+                if *game_state.get_safe(&GameState::show_interface()) {
                     deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
 
                     mouse_cursor.render(
                         screen_target,
                         &deferred_renderer,
                         input_system.get_mouse_position(),
-                        input_system.get_mouse_mode().grabbed(),
+                        game_state.get_safe(&GameState::mouse_mode()).grabbed(),
                         *game_state.get_safe(&CursorTheme::color(GameTheme::cursor(GameState::game_theme()))),
                         &game_state,
                     );

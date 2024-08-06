@@ -1,4 +1,4 @@
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::application::{Application, InterfaceRenderer};
 use crate::elements::{Element, ElementState};
@@ -43,7 +43,7 @@ where
         false
     }
 
-    fn resolve(&mut self, _state: &Tracker<App>, _theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, _state: &View<App>, _theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         self.state.resolve(placement_resolver, &self.size_bound);
     }
 
@@ -51,7 +51,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

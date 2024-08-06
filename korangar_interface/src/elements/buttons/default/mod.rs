@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 pub use self::builder::ButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
@@ -8,7 +8,7 @@ use crate::elements::{Element, ElementState};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{DimensionBound, PlacementResolver};
 use crate::theme::ButtonTheme;
-use crate::{BaseSelector, ColorSelector, ElementEvent};
+use crate::{ColorEvaluator, ElementEvent};
 
 pub struct Button<App, Text, Event>
 where
@@ -19,8 +19,8 @@ where
     text: Text,
     event: Event,
     disabled_selector: Option<BaseSelector<App>>,
-    foreground_color: Option<ColorSelector<App>>,
-    background_color: Option<ColorSelector<App>>,
+    foreground_color: Option<ColorEvaluator<App>>,
+    background_color: Option<ColorEvaluator<App>>,
     width_bound: DimensionBound,
     state: ElementState<App>,
 }
@@ -55,7 +55,7 @@ where
         !self.is_disabled()
     }
 
-    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, application: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let height_bound = *application.get_safe(&ButtonTheme::height_bound(theme_selector));
         let size_bound = self.width_bound.add_height(height_bound);
 
@@ -80,7 +80,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

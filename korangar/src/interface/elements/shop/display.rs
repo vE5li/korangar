@@ -4,7 +4,7 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::theme::ButtonTheme;
 use korangar_networking::{SellItem, ShopItem};
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer};
 use crate::input::MouseInputMode;
@@ -69,12 +69,7 @@ where
         false
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         self.state.resolve(placement_resolver, &size_bound!(30, 30));
     }
 
@@ -82,7 +77,7 @@ where
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

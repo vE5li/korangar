@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 pub use self::builder::CloseButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PartialSizeTraitExt};
@@ -28,7 +28,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, application: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let size_bound = application.get_safe(&CloseButtonTheme::size_bound(theme_selector));
         let (size, position) = placement_resolver.allocate_right(size_bound);
         self.state.cached_size = size.finalize();
@@ -54,7 +54,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &Tracker<App>,
+        application: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

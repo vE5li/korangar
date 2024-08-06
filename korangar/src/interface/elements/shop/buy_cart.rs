@@ -8,7 +8,7 @@ use korangar_interface::state::{PlainRemote, PlainTrackedState, Remote, TrackedS
 use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::ShopItem;
 use num::Integer;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 use super::CartSum;
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -129,12 +129,7 @@ impl Element<GameState> for BuyCartContainer {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let size_bound = &size_bound!(100%, ?);
         self.state
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::zero());
@@ -168,7 +163,7 @@ impl Element<GameState> for BuyCartContainer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

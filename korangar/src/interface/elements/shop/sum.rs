@@ -3,7 +3,7 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::interface::application::ThemeSelector2;
@@ -43,7 +43,7 @@ impl Element<GameState> for CartSum {
 
     fn resolve(
         &mut self,
-        _state: &Tracker<GameState>,
+        _state: &View<GameState>,
         _theme_selector: ThemeSelector2,
         placement_resolver: &mut PlacementResolver<GameState>,
     ) {
@@ -54,7 +54,7 @@ impl Element<GameState> for CartSum {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        state: &Tracker<GameState>,
+        state: &View<GameState>,
         _theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

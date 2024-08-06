@@ -65,12 +65,12 @@ where
 impl<App, Text, State, Background, Width> StateButtonBuilder<App, Text, Unset, State, Background, Width>
 where
     App: Application,
-    State: for<'a> Selector<'a, App, bool>,
+    State: Selector<App, bool>,
 {
     pub fn with_toggle_event(
         self,
     ) -> StateButtonBuilder<App, Text, Box<dyn Fn(&Context<App>) -> Vec<ClickAction<App>>>, State, Background, Width> {
-        let selector = self.remote.clone();
+        let selector = self.remote.clone_inner();
         let event = Box::new(move |state: &Context<App>| {
             if let Some(current_value) = state.get(&selector) {
                 state.update_value(&selector, !current_value);
@@ -89,7 +89,7 @@ where
 {
     pub fn with_remote<State>(self, remote: State) -> StateButtonBuilder<App, Text, Event, State, Background, Width>
     where
-        State: for<'a> Selector<'a, App, bool>,
+        State: Selector<App, bool>,
     {
         StateButtonBuilder {
             remote,
@@ -130,7 +130,7 @@ where
     App: Application,
     Text: AsRef<str> + 'static,
     Event: ElementEvent<App> + 'static,
-    State: for<'a> Selector<'a, App, bool>,
+    State: Selector<App, bool>,
 {
     /// Take the builder and turn it into a [`StateButton`].
     ///

@@ -1,4 +1,4 @@
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::application::{Application, InterfaceRenderer, PartialSizeTrait, ScalingTrait, SizeTrait};
 use crate::elements::{Element, ElementState};
@@ -37,7 +37,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let mut size_bound = state.get_safe(&LabelTheme::size_bound(theme_selector)).clone();
 
         let size = placement_resolver.get_text_dimensions(
@@ -60,7 +60,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

@@ -2,7 +2,7 @@ use std::cmp::PartialOrd;
 
 use num::traits::NumOps;
 use num::{clamp, NumCast, Zero};
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 use crate::application::{
     Application, CornerRadiusTraitExt, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
@@ -58,7 +58,7 @@ where
 
     fn resolve(
         &mut self,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: <App as Application>::ThemeSelector,
         placement_resolver: &mut PlacementResolver<App>,
     ) {
@@ -113,7 +113,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: <App as Application>::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

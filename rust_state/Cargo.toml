@@ -5,3 +5,4 @@ edition = "2021"
 
 [dependencies]
 procedural = { path = "procedural" }
+dyn-clone = "1.0"

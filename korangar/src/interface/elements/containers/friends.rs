@@ -6,7 +6,7 @@ use korangar_interface::event::HoverInformation;
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use ragnarok_packets::Friend;
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
@@ -86,12 +86,7 @@ impl Element<GameState> for FriendView {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         self.state.resolve(
             placement_resolver,
             state,
@@ -150,7 +145,7 @@ impl Element<GameState> for FriendView {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

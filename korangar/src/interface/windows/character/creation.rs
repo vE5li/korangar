@@ -4,7 +4,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateClone};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
-use rust_state::{Context, SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, RawSelector, SafeUnwrap, View};
 
 use crate::input::{InputSystem, UserEvent};
 use crate::interface::layout::ScreenSize;
@@ -30,7 +30,7 @@ impl PrototypeWindow<GameState> for CharacterCreationWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
-        let selector = |state: &Tracker<GameState>| state.get_safe(&GameState::character_name_input()).len() >= MINIMUM_NAME_LENGTH;
+        let selector = |state: &View<GameState>| state.get_safe(&GameState::character_name_input()).len() >= MINIMUM_NAME_LENGTH;
 
         let action = {
             let slot = self.slot;

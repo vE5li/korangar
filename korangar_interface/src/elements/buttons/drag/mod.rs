@@ -1,6 +1,6 @@
 mod builder;
 
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 pub use self::builder::DragButtonBuilder;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
@@ -30,7 +30,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, application: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, application: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let title_height = *application.get_safe(&WindowTheme::title_height(theme_selector));
         let size_bound = self.width_bound.add_height(title_height);
 
@@ -59,7 +59,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        application: &Tracker<App>,
+        application: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

@@ -9,20 +9,20 @@ use crate::windows::Anchor;
 pub trait Application: StateMarker + Sized + 'static {
     type ThemeKind: Default + Clone;
     type ThemeSelector: From<Self::ThemeKind>
-        + for<'a> Selector<'a, Self, ButtonTheme<Self>>
-        + for<'a> Selector<'a, Self, WindowTheme<Self>>
-        + for<'a> Selector<'a, Self, ExpandableTheme<Self>>
-        + for<'a> Selector<'a, Self, LabelTheme<Self>>
-        + for<'a> Selector<'a, Self, ValueTheme<Self>>
-        + for<'a> Selector<'a, Self, CloseButtonTheme<Self>>
-        + for<'a> Selector<'a, Self, SliderTheme<Self>>
-        + for<'a> Selector<'a, Self, InputTheme<Self>>
+        + Selector<Self, ButtonTheme<Self>>
+        + Selector<Self, WindowTheme<Self>>
+        + Selector<Self, ExpandableTheme<Self>>
+        + Selector<Self, LabelTheme<Self>>
+        + Selector<Self, ValueTheme<Self>>
+        + Selector<Self, CloseButtonTheme<Self>>
+        + Selector<Self, SliderTheme<Self>>
+        + Selector<Self, InputTheme<Self>>
         + SafeUnwrap
         + Copy;
-    type ScaleSelector: for<'a> Selector<'a, Self, Self::Scaling> + Default + SafeUnwrap;
-    type MouseModeSelector: for<'a> Selector<'a, Self, Self::MouseInputMode> + Default + SafeUnwrap;
-    type HoveredElementSelector: for<'a> Selector<'a, Self, Option<ElementCell<Self>>> + Default + SafeUnwrap;
-    type FocusedElementSelector: for<'a> Selector<'a, Self, Option<ElementCell<Self>>> + Default + SafeUnwrap;
+    type ScaleSelector: Selector<Self, Self::Scaling> + Default + SafeUnwrap;
+    type MouseModeSelector: Selector<Self, Self::MouseInputMode> + Default + SafeUnwrap;
+    type HoveredElementSelector: Selector<Self, Option<ElementCell<Self>>> + Default + SafeUnwrap;
+    type FocusedElementSelector: Selector<Self, Option<ElementCell<Self>>> + Default + SafeUnwrap;
     type Color: ColorTrait;
     type Renderer: InterfaceRenderer<Self>;
     type Size: SizeTrait;

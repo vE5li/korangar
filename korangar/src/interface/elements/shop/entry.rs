@@ -8,7 +8,7 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::PlainTrackedState;
 use korangar_interface::{dimension_bound, size_bound};
 use num::NumCast;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 use super::ItemResourceProvider;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -45,7 +45,7 @@ impl ShopEntry {
         operation: ShopEntryOperation,
         amount: Amount,
         act_button_press: impl Fn(&Context<GameState>, &SelfItem, Amount) + 'static,
-        disabled_selector: impl Fn(&Tracker<GameState>, &SelfItem, Amount) -> bool + 'static,
+        disabled_selector: impl Fn(&View<GameState>, &SelfItem, Amount) -> bool + 'static,
     ) -> ElementCell<GameState>
     where
         SelfItem: Clone + 'static,
@@ -60,7 +60,7 @@ impl ShopEntry {
                 act_button_press(state, &item, amount);
                 vec![]
             })
-            .with_disabled_selector(move |state: &Tracker<GameState>| disabled_selector(state, &disabled_item, amount))
+            .with_disabled_selector(move |state: &View<GameState>| disabled_selector(state, &disabled_item, amount))
             .with_width_bound(dimension_bound!(20%))
             .build()
             .wrap()
@@ -72,7 +72,7 @@ impl ShopEntry {
         secondary_color: bool,
         get_item_quantity: impl Fn(&SelfItem) -> Option<usize> + Clone + 'static,
         act_button_press: impl Fn(&Context<GameState>, &SelfItem, Amount) + Clone + 'static,
-        disabled_selector: impl Fn(&Tracker<GameState>, &SelfItem, Amount) -> bool + Clone + 'static,
+        disabled_selector: impl Fn(&View<GameState>, &SelfItem, Amount) -> bool + Clone + 'static,
     ) -> Self
     where
         SelfItem: ItemResourceProvider + Clone + 'static,
@@ -122,7 +122,7 @@ impl ShopEntry {
                     act_button_press(state, &item, amount);
                     Vec::new()
                 })
-                .with_disabled_selector(move |state: &Tracker<GameState>| disabled_selector(state, &disabled_item, amount))
+                .with_disabled_selector(move |state: &View<GameState>| disabled_selector(state, &disabled_item, amount))
                 .with_width_bound(dimension_bound!(20%))
                 .build()
                 .wrap();
@@ -166,12 +166,7 @@ impl Element<GameState> for ShopEntry {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let size_bound = &size_bound!(100%, ?);
         self.state
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(12.0));
@@ -189,7 +184,7 @@ impl Element<GameState> for ShopEntry {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

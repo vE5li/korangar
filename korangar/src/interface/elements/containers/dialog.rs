@@ -4,7 +4,7 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
 use ragnarok_packets::EntityId;
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
@@ -83,12 +83,7 @@ impl Element<GameState> for DialogContainer {
 
     // TODO: focus related things
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let size_bound = &size_bound!(100%, ?);
         self.state
             .resolve(placement_resolver, state, theme_selector, size_bound, ScreenSize::uniform(3.0));
@@ -114,7 +109,7 @@ impl Element<GameState> for DialogContainer {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

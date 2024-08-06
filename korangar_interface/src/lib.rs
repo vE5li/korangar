@@ -5,6 +5,8 @@
 #![feature(option_zip)]
 #![feature(specialization)]
 #![feature(type_changing_struct_update)]
+#![feature(inline_const)]
+#![allow(type_alias_bounds)]
 #![allow(incomplete_features)]
 
 pub mod application;
@@ -17,31 +19,36 @@ pub mod elements;
 pub mod builder;
 pub mod windows;
 
+extern crate self as korangar_interface;
+
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use application::{Application, FocusState, InterfaceRenderer, SizeTrait, SizeTraitExt, WindowCache};
-use elements::ElementCell;
+use elements::{Element2State, ElementCell, World};
 use event::{ChangeEvent, ClickAction, HoverInformation};
 // Re-export proc macros.
 pub use interface_procedural::{dimension_bound, size_bound};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
+use layout::{DimensionBound, SizeBound};
 use option_ext::OptionExt;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 use windows::{PrototypeWindow, Window};
 
 use crate::application::MouseInputModeTrait;
 
 pub mod __macro {
-    pub use rust_state::{Context, Tracker};
+    pub use rust_state::{Context, View};
 }
 
-// TODO: Remove this
-pub type BaseSelector<App> = Box<dyn Fn(&Tracker<App>) -> bool>;
-#[allow(type_alias_bounds)]
-pub type ColorSelector<App: Application> = Box<dyn Fn(&Tracker<App>, App::ThemeSelector) -> App::Color>;
-#[allow(type_alias_bounds)]
-pub type FontSizeSelector<App: Application> = Box<dyn Fn(&Tracker<App>, App::ThemeSelector) -> App::FontSize>;
+pub type ColorEvaluator<App: Application> = Box<dyn Fn(&World<App>) -> App::Color>;
+pub type DisabledEvaluator<App: Application> = Box<dyn Fn(&World<App>) -> bool>;
+pub type TextEvaluator<App: Application> = Box<dyn for<'a> Fn(&'a World<'a, App>) -> Cow<'a, str>>;
+pub type FontSizeEvaluator<App: Application> = Box<dyn Fn(&World<App>) -> App::FontSize>;
+pub type SizeBoundEvaluator<App: Application> = Box<dyn Fn(&World<App>) -> SizeBound>;
+pub type DimensionBoundEvaluator<App: Application> = Box<dyn Fn(&World<App>) -> DimensionBound>;
+pub type ClickEvaluator<App: Application> = Box<dyn Fn(&World<App>) -> Vec<ClickAction<App>>>;
 
 pub trait ElementEvent<App>
 where
@@ -179,7 +186,7 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("update user interface"))]
-    pub fn update(&mut self, state: &Tracker<App>, font_loader: App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
+    pub fn update(&mut self, state: &View<App>, font_loader: App::FontLoader, focus_state: &mut FocusState<App>) -> (bool, bool) {
         for (window, post_update) in &mut self.windows {
             #[cfg(feature = "debug")]
             profile_block!("update window");
@@ -361,7 +368,7 @@ where
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn resize_window(&mut self, state: &Tracker<App>, window_index: usize, growth: App::Size) {
+    pub fn resize_window(&mut self, state: &View<App>, window_index: usize, growth: App::Size) {
         let (window, post_update) = &mut self.windows[window_index];
 
         let (_position, previous_size) = window.get_area();
@@ -384,7 +391,7 @@ where
     /// re-render a window with transparency will result in re-rendering the
     /// entire interface. This serves as a single point of truth and simplifies
     /// the rest of the code.
-    fn flag_render_windows(&mut self, state: &Tracker<App>, start_index: usize, area: Option<(App::Position, App::Size)>) {
+    fn flag_render_windows(&mut self, state: &View<App>, start_index: usize, area: Option<(App::Position, App::Size)>) {
         for window_index in start_index..self.windows.len() {
             let needs_render = self.windows[window_index].1.needs_render();
             let is_hovering = |(position, scale)| self.windows[window_index].0.hovers_area(position, scale);
@@ -413,7 +420,7 @@ where
         &mut self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
     ) {
         // let hovered_element = hovered_element.map(|element| unsafe {
         // &*element.as_ptr() }); let focused_element =

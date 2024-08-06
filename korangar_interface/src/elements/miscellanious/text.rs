@@ -1,10 +1,10 @@
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::application::{Application, FontSizeTrait, InterfaceRenderer, PositionTraitExt};
 use crate::elements::{Element, ElementState};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver};
 use crate::theme::ButtonTheme;
-use crate::{ColorSelector, FontSizeSelector};
+use crate::{ColorEvaluator, FontSizeEvaluator};
 
 pub struct Text<App, T>
 where
@@ -13,9 +13,9 @@ where
     T: AsRef<str> + 'static,
 {
     text: Option<T>,
-    foreground_color: Option<ColorSelector<App>>,
+    foreground_color: Option<ColorEvaluator<App>>,
     width_bound: Option<DimensionBound>,
-    font_size: Option<FontSizeSelector<App>>,
+    font_size: Option<FontSizeEvaluator<App>>,
     state: ElementState<App>,
 }
 
@@ -45,12 +45,12 @@ where
         self
     }
 
-    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static) -> Self {
+    pub fn with_foreground_color(mut self, foreground_color: impl Fn(&View<App>, App::ThemeSelector) -> App::Color + 'static) -> Self {
         self.foreground_color = Some(Box::new(foreground_color));
         self
     }
 
-    pub fn with_font_size(mut self, font_size: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::FontSize + 'static) -> Self {
+    pub fn with_font_size(mut self, font_size: impl Fn(&View<App>, App::ThemeSelector) -> App::FontSize + 'static) -> Self {
         self.font_size = Some(Box::new(font_size));
         self
     }
@@ -60,7 +60,7 @@ where
         self
     }
 
-    fn get_font_size(&self, state: &Tracker<App>, theme_selector: App::ThemeSelector) -> App::FontSize {
+    fn get_font_size(&self, state: &View<App>, theme_selector: App::ThemeSelector) -> App::FontSize {
         self.font_size
             .as_ref()
             .map(|closure| closure(state, theme_selector))
@@ -81,7 +81,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let height_bound = DimensionBound {
             size: Dimension::Absolute(self.get_font_size(state, theme_selector).get_value()),
             minimum_size: None,
@@ -105,7 +105,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

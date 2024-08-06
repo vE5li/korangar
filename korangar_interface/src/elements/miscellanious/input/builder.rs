@@ -58,7 +58,7 @@ where
 {
     pub fn with_state<Data>(self, input_state: Data) -> InputFieldBuilder<App, Data, Text, Action, Length, Hidden, Width>
     where
-        Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
+        Data: Selector<App, String> + SafeUnwrap,
     {
         InputFieldBuilder { input_state, ..self }
     }
@@ -136,7 +136,7 @@ where
 
 impl<App, State, Text, Hidden, Width> InputFieldBuilder<App, State, Text, EnterAction<App>, Set, Hidden, Width>
 where
-    State: for<'a> Selector<'a, App, String> + SafeUnwrap,
+    State: Selector<App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {

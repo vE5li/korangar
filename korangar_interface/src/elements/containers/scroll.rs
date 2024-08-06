@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Weak;
 
-use rust_state::Tracker;
+use rust_state::View;
 
 use super::ContainerState;
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
@@ -9,7 +9,7 @@ use crate::elements::{Element, ElementCell, ElementState, Focus};
 use crate::event::{ChangeEvent, HoverInformation};
 use crate::layout::{PlacementResolver, SizeBound};
 use crate::theme::ButtonTheme;
-use crate::ColorSelector;
+use crate::ColorEvaluator;
 
 const SCROLL_SPEED: f32 = 0.8;
 
@@ -21,7 +21,7 @@ where
     children_height: f32,
     state: ContainerState<App>,
     size_bound: SizeBound,
-    background_color: Option<ColorSelector<App>>,
+    background_color: Option<ColorEvaluator<App>>,
 }
 
 impl<App> ScrollView<App>
@@ -43,7 +43,7 @@ where
         }
     }
 
-    pub fn with_background_color(mut self, background_color: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static) -> Self {
+    pub fn with_background_color(mut self, background_color: impl Fn(&View<App>, App::ThemeSelector) -> App::Color + 'static) -> Self {
         self.background_color = Some(Box::new(background_color));
         self
     }
@@ -83,7 +83,7 @@ where
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         self.children_height = self
             .state
             .resolve(placement_resolver, state, theme_selector, &self.size_bound, App::Size::zero());
@@ -131,7 +131,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

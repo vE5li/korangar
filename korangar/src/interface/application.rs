@@ -8,7 +8,7 @@ use korangar_interface::elements::{Container, ElementCell, ElementWrap, PickList
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedStateClone};
 use ron::ser::PrettyConfig;
-use rust_state::{PathId, PathUuid, Selector};
+use rust_state::{PathId, PathUuid, RawSelector};
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 

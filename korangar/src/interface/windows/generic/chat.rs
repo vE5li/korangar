@@ -8,7 +8,7 @@ use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState, Tr
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::MessageColor;
-use rust_state::{Context, SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, RawSelector, SafeUnwrap, View};
 
 use crate::input::UserEvent;
 use crate::interface::elements::ChatBuilder;
@@ -39,7 +39,7 @@ impl PrototypeWindow<GameState> for ChatWindow {
     }
 
     fn to_window(&self, window_cache: &WindowCache, application: &Context<GameState>, available_space: ScreenSize) -> Window<GameState> {
-        let button_selector = |state: &Tracker<GameState>| !state.get_safe(&GameState::chat_input()).is_empty();
+        let button_selector = |state: &View<GameState>| !state.get_safe(&GameState::chat_input()).is_empty();
 
         let button_action = |state: &Context<GameState>| {
             let message = state.get_safe(&GameState::chat_input()).clone();

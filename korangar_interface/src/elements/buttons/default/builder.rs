@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 
-use rust_state::Tracker;
+use rust_state::View;
 
 use super::Button;
 use crate::application::Application;
 use crate::builder::{Set, Unset};
 use crate::layout::DimensionBound;
-use crate::{BaseSelector, ColorSelector, ElementEvent};
+use crate::{ColorEvaluator, ElementEvent};
 
 /// Type state [`Button`] builder. This builder utilizes the type system to
 /// prevent calling the same method multiple times and calling
@@ -19,8 +19,8 @@ where
     text: Text,
     event: Event,
     disabled_selector: Option<BaseSelector<App>>,
-    foreground_color: Option<ColorSelector<App>>,
-    background_color: Option<ColorSelector<App>>,
+    foreground_color: Option<ColorEvaluator<App>>,
+    background_color: Option<ColorEvaluator<App>>,
     width_bound: DimensionBound,
     marker: PhantomData<(Disabled, Foreground, Background, Width)>,
 }
@@ -72,7 +72,7 @@ where
 {
     pub fn with_disabled_selector(
         self,
-        selector: impl Fn(&Tracker<App>) -> bool + 'static,
+        selector: impl Fn(&View<App>) -> bool + 'static,
     ) -> ButtonBuilder<App, Text, Event, Set, Foreground, Background, Width> {
         ButtonBuilder {
             disabled_selector: Some(Box::new(selector)),
@@ -88,7 +88,7 @@ where
 {
     pub fn with_foreground_color(
         self,
-        color_selector: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static,
+        color_selector: impl Fn(&View<App>, App::ThemeSelector) -> App::Color + 'static,
     ) -> ButtonBuilder<App, Text, Event, Disabled, Set, Background, Width> {
         ButtonBuilder {
             foreground_color: Some(Box::new(color_selector)),
@@ -104,7 +104,7 @@ where
 {
     pub fn with_background_color(
         self,
-        color_selector: impl Fn(&Tracker<App>, App::ThemeSelector) -> App::Color + 'static,
+        color_selector: impl Fn(&View<App>, App::ThemeSelector) -> App::Color + 'static,
     ) -> ButtonBuilder<App, Text, Event, Disabled, Foreground, Set, Width> {
         ButtonBuilder {
             background_color: Some(Box::new(color_selector)),

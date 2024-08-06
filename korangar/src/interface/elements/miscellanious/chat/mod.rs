@@ -9,7 +9,7 @@ use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{Dimension, PlacementResolver};
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use rust_state::{SafeUnwrap, Selector, Tracker};
+use rust_state::{RawSelector, SafeUnwrap, View};
 
 pub use self::builder::ChatBuilder;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -28,7 +28,7 @@ pub struct Chat<Messages> {
 
 impl<Messages> Element<GameState> for Chat<Messages>
 where
-    Messages: for<'a> Selector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
+    Messages: for<'a> RawSelector<'a, GameState, Vec<ChatMessage>> + SafeUnwrap,
 {
     fn get_state(&self) -> &ElementState<GameState> {
         &self.state
@@ -42,12 +42,7 @@ where
         false
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         let mut size_bound = size_bound!(100%, 0);
         // Not sure why but 0.0 cuts off the lower part of the text, so add some
         // padding.
@@ -81,7 +76,7 @@ where
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

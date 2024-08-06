@@ -10,6 +10,7 @@ use ragnarok_bytes::{
 pub use ragnarok_procedural::{CharacterServer, ClientPacket, LoginServer, MapServer, Packet, ServerPacket};
 #[cfg(not(feature = "derive"))]
 use ragnarok_procedural::{CharacterServer, ClientPacket, LoginServer, MapServer, Packet, ServerPacket};
+use rust_state::PathUuid;
 
 pub use self::position::{WorldPosition, WorldPosition2};
 
@@ -117,6 +118,12 @@ pub struct PartyId(pub u32);
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct EntityId(pub u32);
+
+impl rust_state::ToUuid for EntityId {
+    fn to_uuid(&self) -> PathUuid {
+        PathUuid(self.0)
+    }
+}
 
 #[derive(Clone, Copy, Debug, ByteConvertable, FixedByteSize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]

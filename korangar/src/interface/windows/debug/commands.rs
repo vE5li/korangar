@@ -3,7 +3,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateExt, ValueState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
-use rust_state::{Context, SafeUnwrap, Selector};
+use rust_state::{Context, RawSelector, SafeUnwrap};
 
 use crate::input::UserEvent;
 use crate::interface::layout::ScreenSize;
@@ -24,7 +24,7 @@ impl<InputSelector> CommandsWindow<InputSelector> {
 
 impl<InputSelector> PrototypeWindow<GameState> for CommandsWindow<InputSelector>
 where
-    InputSelector: for<'a> Selector<'a, GameState, String> + SafeUnwrap,
+    InputSelector: for<'a> RawSelector<'a, GameState, String> + SafeUnwrap,
 {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()

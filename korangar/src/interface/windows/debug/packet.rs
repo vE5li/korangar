@@ -3,7 +3,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
-use rust_state::{Context, SafeUnwrap, Selector};
+use rust_state::{Context, RawSelector, SafeUnwrap};
 
 use crate::input::UserEvent;
 use crate::interface::elements::{PacketHistoryRemote, PacketView};
@@ -31,9 +31,9 @@ impl<Packets, Pings, Update> PacketWindow<Packets, Pings, Update> {
 
 impl<Packets, Pings, Update> PrototypeWindow<GameState> for PacketWindow<Packets, Pings, Update>
 where
-    Packets: for<'a> Selector<'a, GameState, ()> + SafeUnwrap,
-    Pings: for<'a> Selector<'a, GameState, bool> + SafeUnwrap,
-    Update: for<'a> Selector<'a, GameState, bool> + SafeUnwrap,
+    Packets: for<'a> RawSelector<'a, GameState, ()> + SafeUnwrap,
+    Pings: for<'a> RawSelector<'a, GameState, bool> + SafeUnwrap,
+    Update: for<'a> RawSelector<'a, GameState, bool> + SafeUnwrap,
 {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()

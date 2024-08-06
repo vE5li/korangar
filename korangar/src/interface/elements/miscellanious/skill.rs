@@ -5,7 +5,7 @@ use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::theme::ButtonTheme;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -41,7 +41,7 @@ impl Element<GameState> for SkillBox {
 
     fn resolve(
         &mut self,
-        _state: &Tracker<GameState>,
+        _state: &View<GameState>,
         _theme_selector: ThemeSelector2,
         placement_resolver: &mut PlacementResolver<GameState>,
     ) {
@@ -82,7 +82,7 @@ impl Element<GameState> for SkillBox {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        state: &Tracker<GameState>,
+        state: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

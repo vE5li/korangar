@@ -1,6 +1,8 @@
 #![feature(negative_impls)]
 #![feature(auto_traits)]
+#![feature(trait_alias)]
 
+use dyn_clone::DynClone;
 pub use procedural::RustState;
 
 extern crate self as rust_state;
@@ -19,7 +21,7 @@ pub trait ToUuid {
 }
 
 pub trait VecItem {
-    type Id: PartialEq + Clone + ToUuid;
+    type Id: Clone + PartialEq + Eq + Hash + ToUuid;
 
     fn get_id(&self) -> Self::Id;
 }
@@ -48,29 +50,29 @@ where
 
 impl<State, Path, Item> Clone for VecLookup<State, Path, Item>
 where
-    Path: Clone,
+    Path: Selector<State, Vec<Item>>,
     Item: VecItem,
 {
     fn clone(&self) -> Self {
         Self {
-            path: self.path.clone(),
+            path: self.path.clone_inner(),
             id: self.id.clone(),
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, State, Path, Item> Selector<'a, State, Item> for VecLookup<State, Path, Item>
+impl<State, Path, Item> Selector<State, Item> for VecLookup<State, Path, Item>
 where
     State: StateMarker + 'static,
-    Path: Selector<'a, State, Vec<Item>>,
+    Path: Selector<State, Vec<Item>>,
     Item: VecItem + 'static,
 {
-    fn get(&self, state: &'a State) -> Option<&'a Item> {
+    fn get<'a>(&self, state: &'a State) -> Option<&'a Item> {
         self.path.get(state)?.iter().find(|e| e.get_id() == self.id)
     }
 
-    fn get_mut(&self, state: &'a mut State) -> Option<&'a mut Item> {
+    fn get_mut<'a>(&self, state: &'a mut State) -> Option<&'a mut Item> {
         self.path.get_mut(state)?.iter_mut().find(|e| e.get_id() == self.id)
     }
 
@@ -111,29 +113,29 @@ where
 
 impl<State, Path, Item> Clone for MapLookup<State, Path, Item>
 where
-    Path: Clone,
+    Path: Selector<State, HashMap<Item::Id, Item>>,
     Item: MapItem,
 {
     fn clone(&self) -> Self {
         Self {
-            path: self.path.clone(),
+            path: self.path.clone_inner(),
             id: self.id.clone(),
             _marker: PhantomData,
         }
     }
 }
 
-impl<'a, State, Path, Item> Selector<'a, State, Item> for MapLookup<State, Path, Item>
+impl<State, Path, Item> Selector<State, Item> for MapLookup<State, Path, Item>
 where
     State: StateMarker + 'static,
-    Path: Selector<'a, State, HashMap<Item::Id, Item>>,
+    Path: Selector<State, HashMap<Item::Id, Item>>,
     Item: MapItem + 'static,
 {
-    fn get(&self, state: &'a State) -> Option<&'a Item> {
+    fn get<'a>(&self, state: &'a State) -> Option<&'a Item> {
         self.path.get(state)?.get(&self.id)
     }
 
-    fn get_mut(&self, state: &'a mut State) -> Option<&'a mut Item> {
+    fn get_mut<'a>(&self, state: &'a mut State) -> Option<&'a mut Item> {
         self.path.get_mut(state)?.get_mut(&self.id)
     }
 
@@ -146,12 +148,83 @@ where
 
 impl<State, Path, Item> !SafeUnwrap for MapLookup<State, Path, Item> {}
 
-pub trait Selector<'a, State, To>: Clone + 'static {
-    fn get(&self, state: &'a State) -> Option<&'a To>;
+pub trait Selector<State, To>: DynClone + 'static {
+    fn get<'a>(&self, state: &'a State) -> Option<&'a To>;
 
-    fn get_mut(&self, state: &'a mut State) -> Option<&'a mut To>;
+    fn get_mut<'a>(&self, state: &'a mut State) -> Option<&'a mut To>;
 
     fn get_path_id(&self) -> PathId;
+
+    fn clone_inner(&self) -> Self
+    where
+        Self: Sized,
+    {
+        todo!()
+    }
+}
+
+pub trait SelectorExt<State, To> {
+    fn to_dyn(self) -> DynSelector<State, To>;
+}
+
+// TODO: Gate this with an auto trait and negative impl so we can't make
+// DynSelector<DynSelector<DynSelector<...>>>
+impl<State, To, T> SelectorExt<State, To> for T
+where
+    T: Selector<State, To>,
+{
+    fn to_dyn(self) -> DynSelector<State, To> {
+        DynSelector::new(self)
+    }
+}
+
+// pub trait Selector<State, To> = for<'a> RawSelector<'a, State, To>;
+
+pub struct DynSelector<State, To> {
+    raw: Box<dyn Selector<State, To>>,
+}
+
+impl<State, To> DynSelector<State, To> {
+    pub fn new(selector: impl Selector<State, To>) -> Self {
+        Self { raw: Box::new(selector) }
+    }
+}
+
+impl<State, To> Selector<State, To> for DynSelector<State, To>
+where
+    State: 'static,
+    To: 'static,
+{
+    fn get<'a>(&self, state: &'a State) -> Option<&'a To> {
+        self.raw.get(state)
+    }
+
+    fn get_mut<'a>(&self, state: &'a mut State) -> Option<&'a mut To> {
+        self.raw.get_mut(state)
+    }
+
+    fn get_path_id(&self) -> PathId {
+        self.raw.get_path_id()
+    }
+
+    fn clone_inner(&self) -> Self
+    where
+        Self: Sized,
+    {
+        Self {
+            raw: dyn_clone::clone_box(&*self.raw),
+        }
+    }
+}
+
+impl<State, To> Clone for DynSelector<State, To>
+where
+    State: 'static,
+    To: 'static,
+{
+    fn clone(&self) -> Self {
+        self.clone_inner()
+    }
 }
 
 pub type StateChange<State> = Box<dyn FnOnce(&mut State)>;
@@ -187,10 +260,10 @@ impl<State: StateMarker> Context<State> {
 
     pub fn update_value<Path, Value>(&self, path: &Path, value: Value)
     where
-        Path: for<'a> Selector<'a, State, Value>,
+        Path: Selector<State, Value>,
         Value: 'static,
     {
-        let path = path.clone();
+        let path = path.clone_inner();
         self.push_change(
             path.get_path_id(),
             Box::new(move |state: &mut State| match path.get_mut(state) {
@@ -200,12 +273,27 @@ impl<State: StateMarker> Context<State> {
         );
     }
 
+    pub fn update_value_with<Path, Value, F>(&self, path: &Path, closure: F)
+    where
+        Path: Selector<State, Value>,
+        F: Fn(&mut Value) + 'static,
+    {
+        let path = path.clone_inner();
+        self.push_change(
+            path.get_path_id(),
+            Box::new(move |state: &mut State| match path.get_mut(state) {
+                Some(reference) => closure(reference),
+                None => println!("Failed to update state"),
+            }),
+        );
+    }
+
     pub fn vec_push<Path, Value>(&self, path: &Path, value: Value)
     where
-        Path: for<'a> Selector<'a, State, Vec<Value>>,
+        Path: Selector<State, Vec<Value>>,
         Value: 'static,
     {
-        let path = path.clone();
+        let path = path.clone_inner();
         self.push_change(
             path.get_path_id(),
             Box::new(move |state: &mut State| match path.get_mut(state) {
@@ -217,10 +305,10 @@ impl<State: StateMarker> Context<State> {
 
     pub fn vec_remove<Path, Value>(&self, path: &Path, id: Value::Id)
     where
-        Path: for<'a> Selector<'a, State, Vec<Value>>,
+        Path: Selector<State, Vec<Value>>,
         Value: VecItem + 'static,
     {
-        let path = path.clone();
+        let path = path.clone_inner();
         self.push_change(
             path.get_path_id(),
             Box::new(move |state: &mut State| match path.get_mut(state) {
@@ -232,10 +320,10 @@ impl<State: StateMarker> Context<State> {
 
     pub fn map_insert<Path, Value>(&self, path: &Path, id: Value::Id, value: Value)
     where
-        Path: for<'a> Selector<'a, State, HashMap<Value::Id, Value>>,
+        Path: Selector<State, HashMap<Value::Id, Value>>,
         Value: MapItem + 'static,
     {
-        let path = path.clone();
+        let path = path.clone_inner();
         self.push_change(
             path.get_path_id(),
             Box::new(move |state: &mut State| match path.get_mut(state) {
@@ -249,10 +337,10 @@ impl<State: StateMarker> Context<State> {
 
     pub fn map_remove<Path, Value>(&self, path: &Path, id: Value::Id)
     where
-        Path: for<'a> Selector<'a, State, HashMap<Value::Id, Value>>,
+        Path: Selector<State, HashMap<Value::Id, Value>>,
         Value: MapItem + 'static,
     {
-        let path = path.clone();
+        let path = path.clone_inner();
         self.push_change(
             path.get_path_id(),
             Box::new(move |state: &mut State| match path.get_mut(state) {
@@ -265,26 +353,28 @@ impl<State: StateMarker> Context<State> {
     }
 
     pub fn apply(&mut self) {
-        self.version += 1;
+        if !self.updated_paths.get_mut().is_empty() {
+            self.version = self.version.wrapping_add(1);
 
-        self.state_changes.get_mut().drain(..).for_each(|apply| apply(&mut self.state));
+            self.state_changes.get_mut().drain(..).for_each(|apply| apply(&mut self.state));
 
-        self.updated_paths
-            .get_mut()
-            .drain(..)
-            .for_each(|path| self.change_map.update_path(path, self.version));
+            self.updated_paths
+                .get_mut()
+                .drain(..)
+                .for_each(|path| self.change_map.update_path(path, self.version));
+        }
     }
 
     pub fn get<'a, Path, Output>(&'a self, path: &Path) -> Option<&'a Output>
     where
-        Path: Selector<'a, State, Output>,
+        Path: Selector<State, Output>,
     {
         path.get(&self.state)
     }
 
     pub fn get_safe<'a, Path, Output>(&'a self, path: &Path) -> &'a Output
     where
-        Path: Selector<'a, State, Output> + SafeUnwrap,
+        Path: Selector<State, Output> + SafeUnwrap,
     {
         path.get(&self.state).unwrap()
     }
@@ -401,8 +491,8 @@ impl ChangeMap {
                 };
 
                 match entry {
-                    ChangeEntry::Complex(inner_map) => inner_map.version > version,
-                    ChangeEntry::Leaf(old_version) => *old_version > version,
+                    ChangeEntry::Complex(inner_map) => inner_map.version != version,
+                    ChangeEntry::Leaf(old_version) => *old_version != version,
                 }
             }
             [uuid, ..] => {
@@ -436,7 +526,7 @@ pub struct ReadState {
 }
 
 impl ReadState {
-    pub fn track_new<'s, State>(&'s mut self, context: &'s mut Context<State>) -> Tracker<'s, State>
+    pub fn track_new<'s, State>(&'s mut self, context: &'s Context<State>) -> View<'s, State>
     where
         State: StateMarker,
     {
@@ -444,13 +534,13 @@ impl ReadState {
         self.track(context)
     }
 
-    pub fn track<'s, State>(&'s mut self, context: &'s mut Context<State>) -> Tracker<'s, State>
+    pub fn track<'s, State>(&'s mut self, context: &'s Context<State>) -> View<'s, State>
     where
         State: StateMarker,
     {
-        Tracker {
+        View {
             context,
-            accesses: UnsafeCell::new(&mut self.accesses),
+            accesses: Some(UnsafeCell::new(&mut self.accesses)),
         }
     }
 
@@ -464,27 +554,33 @@ impl ReadState {
     }
 }
 
-pub struct Tracker<'s, State> {
+pub struct View<'s, State> {
     context: &'s Context<State>,
-    accesses: UnsafeCell<&'s mut Vec<PathRead>>,
+    accesses: Option<UnsafeCell<&'s mut Vec<PathRead>>>,
 }
 
-impl<'s, State> Tracker<'s, State>
+impl<'s, State> View<'s, State>
 where
     State: StateMarker,
 {
+    pub fn get_context(&self) -> &Context<State> {
+        self.context
+    }
+
     fn register_read(&self, path: PathId) {
-        let accesses = UnsafeCell::raw_get(&self.accesses as *const UnsafeCell<&'s mut Vec<PathRead>>);
-        let accesses = unsafe { &mut *accesses };
-        accesses.push(PathRead {
-            path,
-            version: self.context.get_version(),
-        });
+        if let Some(accesses) = &self.accesses {
+            let accesses = UnsafeCell::raw_get(accesses as *const UnsafeCell<&'s mut Vec<PathRead>>);
+            let accesses = unsafe { &mut *accesses };
+            accesses.push(PathRead {
+                path,
+                version: self.context.get_version(),
+            });
+        }
     }
 
     pub fn get<'a, Path, Output>(&'a self, path: &Path) -> Option<&'a Output>
     where
-        Path: Selector<'a, State, Output>,
+        Path: Selector<State, Output>,
     {
         self.register_read(path.get_path_id());
         self.context.get(path)
@@ -492,17 +588,58 @@ where
 
     pub fn get_safe<'a, Path, Output>(&'a self, path: &Path) -> &'a Output
     where
-        Path: Selector<'a, State, Output> + SafeUnwrap,
+        Path: Selector<State, Output> + SafeUnwrap,
     {
         self.register_read(path.get_path_id());
         self.context.get_safe(path)
     }
 }
 
+/*pub struct Overlay<ValueSelector, Value, State> {
+    selector: ValueSelector,
+    value: Option<Value>,
+    _marker: PhantomData<State>,
+}
+
+impl<ValueSelector, Value, State> Overlay<ValueSelector, Value, State>
+where
+    ValueSelector: for<'a> RawSelector<'a, State, Value> + SafeUnwrap,
+    Value: 'static,
+    State: StateMarker,
+{
+    pub fn new(selector: ValueSelector) -> Self {
+        Self {
+            selector,
+            value: None,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn get<'a, 'b>(&'a self, state: &'b Context<State>) -> &'b Value
+    where
+        'a: 'b,
+    {
+        match &self.value {
+            Some(value) => value,
+            None => state.get_safe(&self.selector),
+        }
+    }
+
+    pub fn set(&mut self, value: Value) {
+        self.value = Some(value);
+    }
+
+    pub fn apply(self, state: &Context<State>) {
+        if let Some(value) = self.value {
+            state.update_value(&self.selector, value);
+        }
+    }
+}*/
+
 #[derive(RustState)]
 struct State<T>
 where
-    T: Clone + 'static,
+    T: DynClone + 'static,
 {
     other: String,
     pd: std::marker::PhantomData<T>,
@@ -512,7 +649,7 @@ where
 mod test {
     use procedural::RustState;
 
-    use crate::{Context, PathUuid, Selector, ToUuid, VecItem, VecLookup};
+    use crate::{Context, PathUuid, RawSelector, ToUuid, VecItem, VecLookup};
 
     impl ToUuid for u32 {
         fn to_uuid(&self) -> PathUuid {
@@ -535,14 +672,14 @@ mod test {
 
     struct Using<T>
     where
-        T: for<'a> Selector<'a, State, u32>,
+        T: for<'a> RawSelector<'a, State, u32>,
     {
         path: T,
     }
 
     impl<T> Using<T>
     where
-        T: for<'a> Selector<'a, State, u32>,
+        T: for<'a> RawSelector<'a, State, u32>,
     {
         fn use_(&self, state: &Context<State>) {
             println!("{:?}", state.get(&self.path));

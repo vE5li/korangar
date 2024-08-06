@@ -6,7 +6,7 @@ use std::cell::{Cell, RefCell};
 use std::ops::Add;
 use std::rc::{Rc, Weak};
 
-use rust_state::Tracker;
+use rust_state::View;
 
 pub use self::default::Container;
 pub use self::expandable::Expandable;
@@ -53,7 +53,7 @@ where
     pub fn resolve(
         &mut self,
         placement_resolver: &mut PlacementResolver<App>,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         size_bound: &SizeBound,
         border: App::Size,
@@ -304,7 +304,7 @@ where
     pub fn render(
         &self,
         renderer: &mut ElementRenderer<App>,
-        application: &Tracker<App>,
+        application: &View<App>,
         theme_selector: App::ThemeSelector,
         second_theme: bool,
     ) {

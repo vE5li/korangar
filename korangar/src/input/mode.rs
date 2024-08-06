@@ -11,7 +11,7 @@ use crate::inventory::Skill;
 use crate::loaders::{Actions, AnimationState, ResourceMetadata, Sprite};
 use crate::GameState;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum MouseInputMode {
     MoveItem(ItemSource, InventoryItem<ResourceMetadata>),
     MoveSkill(SkillSource, Skill),

@@ -1,4 +1,4 @@
-use rust_state::Tracker;
+use rust_state::{Context, View};
 
 use crate::application::{
     Application, ClipTraitExt, CornerRadiusTrait, InterfaceRenderer, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt,
@@ -161,7 +161,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &Context<App>,
         theme_selector: App::ThemeSelector,
         window_position: App::Position,
         window_size: App::Size,
@@ -255,7 +255,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &Context<App>,
         theme_selector: App::ThemeSelector,
         available_space: App::Size,
     ) {

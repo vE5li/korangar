@@ -11,7 +11,7 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
 use ragnarok_packets::{ClientTick, HotbarSlot};
-use rust_state::{Context, ReadState};
+use rust_state::{Context, Overlay, ReadState};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
 
@@ -40,7 +40,7 @@ pub struct InputSystem {
     left_mouse_button: Key,
     right_mouse_button: Key,
     keys: [Key; KEY_COUNT],
-    mouse_input_mode: MouseInputMode,
+    // mouse_input_mode: MouseInputMode,
     input_buffer: Vec<char>,
 }
 
@@ -58,7 +58,7 @@ impl InputSystem {
         let right_mouse_button = Key::default();
         let keys = [Key::default(); KEY_COUNT];
 
-        let mouse_input_mode = MouseInputMode::None;
+        // let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
 
         Self {
@@ -71,7 +71,7 @@ impl InputSystem {
             left_mouse_button,
             right_mouse_button,
             keys,
-            mouse_input_mode,
+            // mouse_input_mode,
             input_buffer,
         }
     }
@@ -80,7 +80,7 @@ impl InputSystem {
         self.left_mouse_button.reset();
         self.right_mouse_button.reset();
         self.keys.iter_mut().for_each(|key| key.reset());
-        self.mouse_input_mode = MouseInputMode::None;
+        // self.mouse_input_mode = MouseInputMode::None;
     }
 
     pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
@@ -143,15 +143,13 @@ impl InputSystem {
         #[cfg(feature = "debug")] render_settings: &RenderSettings,
         window_size: Vector2<usize>,
         client_tick: ClientTick,
-    ) -> (
-        Vec<UserEvent>,
-        Option<ElementCell<GameState>>,
-        Option<ElementCell<GameState>>,
-        Option<PickerTarget>,
-    ) {
+    ) -> (Vec<UserEvent>, Option<PickerTarget>) {
+        let mut mouse_input_mode = application.get_safe(&GameState::mouse_mode()).clone();
+        // let mouse_input_mode = Overlay::new(GameState::mouse_mode());
+
         let mut events = Vec::new();
         let mut mouse_target = None;
-        let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
+        let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &mouse_input_mode);
 
         let shift_down = self.get_key(VirtualKeyCode::LShift).down();
 
@@ -170,12 +168,12 @@ impl InputSystem {
 
                 if self.left_mouse_button.pressed() {
                     *window_index = interface.move_window_to_top(*window_index);
-                    self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
+                    mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
                 }
 
                 if self.right_mouse_button.pressed() {
                     *window_index = interface.move_window_to_top(*window_index);
-                    self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
+                    mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
                 }
             }
         }
@@ -188,12 +186,12 @@ impl InputSystem {
 
         let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;
         if let Some(window_index) = &mut window_index
-            && self.mouse_input_mode.is_none()
+            && mouse_input_mode.is_none()
             && condition
         {
             *window_index = interface.move_window_to_top(*window_index);
             focus_state.set_focused_window(*window_index);
-            self.mouse_input_mode = MouseInputMode::ClickInterface;
+            mouse_input_mode = MouseInputMode::ClickInterface;
 
             if let Some(hovered_element) = &hovered_element {
                 let actions = match self.left_mouse_button.pressed() {
@@ -219,10 +217,10 @@ impl InputSystem {
 
                         ClickAction::Custom(event) => events.push(event),
 
-                        ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
+                        ClickAction::MoveInterface => mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
 
                         ClickAction::DragElement => {
-                            self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
+                            mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
                         }
 
                         ClickAction::Move(drop_resource) => {
@@ -230,7 +228,7 @@ impl InputSystem {
                                 PartialMove::Item { source, item } => MouseInputMode::MoveItem(source, item),
                                 PartialMove::Skill { source, skill } => MouseInputMode::MoveSkill(source, skill),
                             };
-                            self.mouse_input_mode = input_mode;
+                            mouse_input_mode = input_mode;
                             // Needs to re-render because some elements will
                             // render differently
                             // based on the mouse input mode.
@@ -255,16 +253,16 @@ impl InputSystem {
         }
 
         if self.left_mouse_button.released() {
-            if let MouseInputMode::MoveInterface(identifier) = self.mouse_input_mode {
+            if let MouseInputMode::MoveInterface(identifier) = mouse_input_mode {
                 // We want to re-render to get rid of the anchor overlays.
                 interface.schedule_render();
 
                 match self.right_mouse_button.down() && !self.right_mouse_button.released() {
-                    true => self.mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
-                    false => self.mouse_input_mode = MouseInputMode::None,
+                    true => mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
+                    false => mouse_input_mode = MouseInputMode::None,
                 }
             } else {
-                let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
+                let mouse_input_mode = std::mem::take(&mut mouse_input_mode);
                 // Needs to re-render because some elements will render differently
                 // based on the mouse input mode.
                 interface.schedule_render();
@@ -290,26 +288,26 @@ impl InputSystem {
         }
 
         if self.right_mouse_button.released() {
-            if let MouseInputMode::ResizeInterface(identifier) = self.mouse_input_mode {
+            if let MouseInputMode::ResizeInterface(identifier) = mouse_input_mode {
                 match self.left_mouse_button.down() && !self.left_mouse_button.released() {
-                    true => self.mouse_input_mode = MouseInputMode::MoveInterface(identifier),
-                    false => self.mouse_input_mode = MouseInputMode::None,
+                    true => mouse_input_mode = MouseInputMode::MoveInterface(identifier),
+                    false => mouse_input_mode = MouseInputMode::None,
                 }
             } else {
-                self.mouse_input_mode = MouseInputMode::None;
+                mouse_input_mode = MouseInputMode::None;
             }
         }
 
         if self.right_mouse_button.down()
             && !self.right_mouse_button.pressed()
-            && self.mouse_input_mode.is_none()
+            && mouse_input_mode.is_none()
             && self.mouse_delta.width != 0.0
             && !lock_actions
         {
-            self.mouse_input_mode = MouseInputMode::RotateCamera;
+            mouse_input_mode = MouseInputMode::RotateCamera;
         }
 
-        match &self.mouse_input_mode {
+        match &mouse_input_mode {
             MouseInputMode::DragElement((element, window_index)) => {
                 if self.mouse_delta != ScreenSize::default() {
                     interface.drag_element(element, *window_index, ScreenPosition::from_size(self.mouse_delta));
@@ -431,9 +429,9 @@ impl InputSystem {
                                     focus_state.update_focused_element(new_focused_element, *focused_window);
                                 }
                                 ClickAction::Custom(event) => events.push(event),
-                                ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
+                                ClickAction::MoveInterface => mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
                                 ClickAction::DragElement => {
-                                    self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
+                                    mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
                                 }
                                 // TODO: should just move immediately ?
                                 ClickAction::Move(..) => {}
@@ -535,7 +533,7 @@ impl InputSystem {
             #[cfg(feature = "debug")]
             if self.right_mouse_button.down()
                 && !self.right_mouse_button.pressed()
-                && self.mouse_input_mode.is_none()
+                && mouse_input_mode.is_none()
                 && render_settings.use_debug_camera
             {
                 events.push(UserEvent::CameraLookAround(-Vector2::new(
@@ -570,7 +568,7 @@ impl InputSystem {
             }
         }
 
-        if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
+        if window_index.is_none() && (mouse_input_mode.is_none() || mouse_input_mode.is_walk()) {
             if let Some(fence) = picker_target.state.try_take_fence() {
                 fence.wait(None).unwrap();
             }
@@ -589,7 +587,7 @@ impl InputSystem {
                             PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
                             PickerTarget::Tile { x, y } => {
                                 let position = Vector2::new(x as usize, y as usize);
-                                self.mouse_input_mode = MouseInputMode::Walk(position);
+                                mouse_input_mode = MouseInputMode::Walk(position);
 
                                 events.push(UserEvent::RequestPlayerMove(position));
                             }
@@ -597,7 +595,7 @@ impl InputSystem {
                             PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
                         }
                     } else if self.left_mouse_button.down()
-                        && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode
+                        && let MouseInputMode::Walk(requested_position) = &mut mouse_input_mode
                         && let PickerTarget::Tile { x, y } = picker_target
                     {
                         let new_position = Vector2::new(x as usize, y as usize);
@@ -609,7 +607,7 @@ impl InputSystem {
                         }
                     }
 
-                    if !self.mouse_input_mode.is_walk() {
+                    if !mouse_input_mode.is_walk() {
                         mouse_target = Some(picker_target);
                     }
                 }
@@ -619,7 +617,7 @@ impl InputSystem {
         // TODO: this will fail if the user hovers over an entity that changes the
         // cursor and then immediately over a different one that doesn't,
         // because main wont set the default cursor
-        if self.mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(_))) {
+        if mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(_))) {
             mouse_cursor.set_state(MouseCursorState::Default, client_tick);
         }
 
@@ -645,14 +643,14 @@ impl InputSystem {
 
         let focused_element = focus_state.update(&hovered_element, window_index);
 
-        (events, hovered_element, focused_element, mouse_target)
+        application.update_value(&GameState::mouse_mode(), mouse_input_mode);
+        application.update_value(&GameState::hovered_element(), hovered_element);
+        application.update_value(&GameState::focused_element(), focused_element);
+
+        (events, mouse_target)
     }
 
     pub fn get_mouse_position(&self) -> ScreenPosition {
         self.new_mouse_position
-    }
-
-    pub fn get_mouse_mode(&self) -> &MouseInputMode {
-        &self.mouse_input_mode
     }
 }

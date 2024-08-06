@@ -12,7 +12,7 @@ use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
-use rust_state::{Context, Tracker};
+use rust_state::{Context, View};
 use vulkano::image::view::ImageView;
 
 use super::error::LoadError;

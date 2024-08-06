@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use rust_state::{Context, Selector, Tracker};
+use rust_state::{Context, Selector, View};
 
 use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTraitExt, SizeTraitExt};
 use crate::elements::{ButtonBuilder, Element, ElementState, ElementWrap, ScrollView};
@@ -15,7 +15,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: for<'a> Selector<'a, App, Value>,
+    State: Selector<App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     options: Vec<(Key, Value)>,
@@ -34,7 +34,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: for<'a> Selector<'a, App, Value>,
+    State: Selector<App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     fn default() -> Self {
@@ -55,7 +55,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: for<'a> Selector<'a, App, Value>,
+    State: Selector<App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     pub fn with_options(mut self, options: Vec<(Key, Value)>) -> Self {
@@ -84,7 +84,7 @@ where
     App: Application,
     Key: Clone + AsRef<str> + 'static,
     Value: Clone + PartialEq + 'static,
-    State: for<'a> Selector<'a, App, Value>,
+    State: Selector<App, Value>,
     Event: Clone + ElementEvent<App> + 'static,
 {
     fn get_state(&self) -> &ElementState<App> {
@@ -95,7 +95,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let height_bound = *state.get_safe(&ButtonTheme::height_bound(theme_selector));
         let size_bound = self
             .width_bound
@@ -131,7 +131,7 @@ where
             .cloned()
             .map(|(text, option)| {
                 // FIX: What is the behavior here when slected is none?
-                let selected = self.selected.clone().unwrap();
+                let selected = self.selected.as_ref().unwrap().clone_inner();
                 let mut event = self.event.clone();
 
                 ButtonBuilder::new()
@@ -173,7 +173,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

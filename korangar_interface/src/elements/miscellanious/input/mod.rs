@@ -2,7 +2,7 @@ mod builder;
 
 use std::fmt::Display;
 
-use rust_state::{Context, SafeUnwrap, Selector, Tracker};
+use rust_state::{Context, SafeUnwrap, Selector, View};
 
 pub use self::builder::InputFieldBuilder;
 use crate::application::{
@@ -18,7 +18,7 @@ type EnterAction<App> = Box<dyn FnMut(&Context<App>) -> Vec<ClickAction<App>>>;
 
 pub struct InputField<Data, App, Text>
 where
-    Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
+    Data: Selector<App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
@@ -33,7 +33,7 @@ where
 
 impl<Data, App, Text> InputField<Data, App, Text>
 where
-    Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
+    Data: Selector<App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
@@ -62,7 +62,7 @@ where
 
 impl<Data, App, Text> Element<App> for InputField<Data, App, Text>
 where
-    Data: for<'a> Selector<'a, App, String> + SafeUnwrap,
+    Data: Selector<App, String> + SafeUnwrap,
     App: Application,
     Text: Display + 'static,
 {
@@ -74,7 +74,7 @@ where
         &mut self.state
     }
 
-    fn resolve(&mut self, state: &Tracker<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
+    fn resolve(&mut self, state: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
         let height_bound = *state.get_safe(&InputTheme::height_bound(theme_selector));
         let size_bound = self.width_bound.add_height(height_bound);
 
@@ -104,7 +104,7 @@ where
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
         renderer: &App::Renderer,
-        state: &Tracker<App>,
+        state: &View<App>,
         theme_selector: App::ThemeSelector,
         parent_position: App::Position,
         screen_clip: App::Clip,

@@ -29,10 +29,6 @@ pub fn derive_prototype_element(token_stream: InterfaceTokenStream) -> Interface
 }
 
 fn impl_for_root(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -> TokenStream {
-    let mut selector_generics = generics.clone();
-    selector_generics.params.push(parse_quote!('_a));
-    let selector_impl_generics = selector_generics.split_for_impl().0;
-
     let lifetimes = generics.lifetimes().map(|lifetime| quote!(&#lifetime ())).collect::<Vec<_>>();
     let type_params = generics.type_params().map(|type_param| quote!(#type_param)).collect::<Vec<_>>();
 
@@ -56,17 +52,24 @@ fn impl_for_root(ident: syn::Ident, data: syn::Data, generics: syn::Generics) ->
                 let uuid = index as u32;
 
                 base_getters.push(quote! {
-                    #[derive(Clone)]
                     pub struct #struct_name #type_generics #where_clause {
                         _marker: std::marker::PhantomData<(#(#lifetimes,)* #(#type_params,)*)>,
                     }
 
-                    impl #selector_impl_generics rust_state::Selector<'_a, #ident #type_generics, #field_type> for #struct_name #type_generics #where_clause {
-                        fn get(&self, state: &'_a #ident #type_generics) -> Option<&'_a #field_type> {
+                    impl #impl_generics Clone for #struct_name #type_generics #where_clause {
+                        fn clone(&self) -> Self {
+                            Self {
+                                _marker: std::marker::PhantomData,
+                            }
+                        }
+                    }
+
+                    impl #impl_generics rust_state::Selector<#ident #type_generics, #field_type> for #struct_name #type_generics #where_clause {
+                        fn get<'_a>(&self, state: &'_a #ident #type_generics) -> Option<&'_a #field_type> {
                             Some(&state.#field_name)
                         }
 
-                        fn get_mut(&self, state: &'_a mut #ident #type_generics) -> Option<&'_a mut #field_type> {
+                        fn get_mut<'_a>(&self, state: &'_a mut #ident #type_generics) -> Option<&'_a mut #field_type> {
                             Some(&mut state.#field_name)
                         }
 
@@ -90,6 +93,8 @@ fn impl_for_root(ident: syn::Ident, data: syn::Data, generics: syn::Generics) ->
                             }
                         }
                     }
+
+                    impl #impl_generics rust_state::SafeUnwrap for #struct_name #type_generics #where_clause {}
                 });
             }
         }
@@ -119,11 +124,10 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
     clone_where_clause.predicates.push(parse_quote!(P: Clone));
 
     let mut selector_generics = generics.clone();
-    selector_generics.params.push(parse_quote!('_a));
     selector_generics.params.push(parse_quote!(S: rust_state::StateMarker + 'static));
     selector_generics
         .params
-        .push(parse_quote!(P: rust_state::Selector<'_a, S, #ident #type_generics> + Clone));
+        .push(parse_quote!(P: rust_state::Selector<S, #ident #type_generics> + Clone));
     let (selector_impl_generics, _, selector_where_clause) = selector_generics.split_for_impl();
 
     let mut unwrap_generics = generics.clone();
@@ -154,8 +158,7 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
                         _marker: std::marker::PhantomData<(S, #(#lifetimes,)* #(#type_params,)*)>,
                     }
 
-                    impl #struct_impl_generics Clone for #struct_name #struct_type_generics #clone_where_clause
-                    {
+                    impl #struct_impl_generics Clone for #struct_name #struct_type_generics #clone_where_clause {
                         fn clone(&self) -> Self {
                             Self {
                                 path: self.path.clone(),
@@ -164,12 +167,12 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
                         }
                     }
 
-                    impl #selector_impl_generics rust_state::Selector<'_a, S, #field_type> for #struct_name #struct_type_generics #selector_where_clause {
-                        fn get(&self, state: &'_a S) -> Option<&'_a #field_type> {
+                    impl #selector_impl_generics rust_state::Selector<S, #field_type> for #struct_name #struct_type_generics #selector_where_clause {
+                        fn get<'_a>(&self, state: &'_a S) -> Option<&'_a #field_type> {
                             Some(&self.path.get(state)?.#field_name)
                         }
 
-                        fn get_mut(&self, state: &'_a mut S) -> Option<&'_a mut #field_type> {
+                        fn get_mut<'_a>(&self, state: &'_a mut S) -> Option<&'_a mut #field_type> {
                             Some(&mut self.path.get_mut(state)?.#field_name)
                         }
 

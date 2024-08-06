@@ -3,7 +3,7 @@ use korangar_interface::elements::{ElementWrap, PickList, StateButtonBuilder};
 use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, ValueState};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
-use rust_state::{Context, SafeUnwrap, Selector};
+use rust_state::{Context, RawSelector, SafeUnwrap};
 
 use crate::interface::elements::FrameView;
 use crate::interface::layout::ScreenSize;

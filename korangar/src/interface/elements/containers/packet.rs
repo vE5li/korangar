@@ -13,7 +13,7 @@ use korangar_interface::state::{PlainRemote, Remote, RemoteClone};
 use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
 use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{Packet, PacketHeader};
-use rust_state::Tracker;
+use rust_state::View;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -341,12 +341,7 @@ impl Element<GameState> for PacketView {
         self.state.restore_focus(self_cell)
     }
 
-    fn resolve(
-        &mut self,
-        state: &Tracker<GameState>,
-        theme_selector: ThemeSelector2,
-        placement_resolver: &mut PlacementResolver<GameState>,
-    ) {
+    fn resolve(&mut self, state: &View<GameState>, theme_selector: ThemeSelector2, placement_resolver: &mut PlacementResolver<GameState>) {
         self.state.resolve(
             placement_resolver,
             state,
@@ -449,7 +444,7 @@ impl Element<GameState> for PacketView {
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
         renderer: &InterfaceRenderer,
-        application: &Tracker<GameState>,
+        application: &View<GameState>,
         theme_selector: ThemeSelector2,
         parent_position: ScreenPosition,
         screen_clip: ScreenClip,

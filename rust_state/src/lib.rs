@@ -81,6 +81,10 @@ where
         inner.parts.push(self.id.to_uuid());
         inner
     }
+
+    fn clone_inner(&self) -> Self {
+        self.clone()
+    }
 }
 
 impl<State, Path, Item> !SafeUnwrap for VecLookup<State, Path, Item> {}
@@ -144,6 +148,10 @@ where
         inner.parts.push(self.id.to_uuid());
         inner
     }
+
+    fn clone_inner(&self) -> Self {
+        self.clone()
+    }
 }
 
 impl<State, Path, Item> !SafeUnwrap for MapLookup<State, Path, Item> {}
@@ -157,10 +165,7 @@ pub trait Selector<State, To>: DynClone + 'static {
 
     fn clone_inner(&self) -> Self
     where
-        Self: Sized,
-    {
-        todo!()
-    }
+        Self: Sized;
 }
 
 pub trait SelectorExt<State, To> {
@@ -636,20 +641,11 @@ where
     }
 }*/
 
-#[derive(RustState)]
-struct State<T>
-where
-    T: DynClone + 'static,
-{
-    other: String,
-    pd: std::marker::PhantomData<T>,
-}
-
 #[cfg(test)]
 mod test {
     use procedural::RustState;
 
-    use crate::{Context, PathUuid, RawSelector, ToUuid, VecItem, VecLookup};
+    use crate::{Context, PathUuid, Selector, ToUuid, VecItem, VecLookup};
 
     impl ToUuid for u32 {
         fn to_uuid(&self) -> PathUuid {
@@ -672,14 +668,14 @@ mod test {
 
     struct Using<T>
     where
-        T: for<'a> RawSelector<'a, State, u32>,
+        T: Selector<State, u32>,
     {
         path: T,
     }
 
     impl<T> Using<T>
     where
-        T: for<'a> RawSelector<'a, State, u32>,
+        T: Selector<State, u32>,
     {
         fn use_(&self, state: &Context<State>) {
             println!("{:?}", state.get(&self.path));
@@ -696,8 +692,8 @@ mod test {
     fn update_interface(state: &mut Context<State>) {
         println!("Updating UI with: {:?}", state.get(&State::entities()));
 
-        state.remove(&State::entities(), 23);
-        state.push(&State::entities(), Entity { id: 50 });
+        state.vec_remove(&State::entities(), 23);
+        state.vec_push(&State::entities(), Entity { id: 50 });
     }
 
     fn initialize_state() -> Context<State> {
@@ -720,7 +716,7 @@ mod test {
 
         update_interface(&mut context);
 
-        let context = context.apply();
+        context.apply();
 
         let path = Entity::id(VecLookup::new(State::entities(), 50));
         println!("After UI: {:?}", context.get(&path));
@@ -756,7 +752,7 @@ mod test {
         context.update_value(&path, String::from("After"));
         assert_eq!(context.get_safe(&path).as_str(), "Before");
 
-        let context = context.apply();
+        context.apply();
         assert_eq!(context.get_safe(&path).as_str(), "After");
     }
 

@@ -76,6 +76,10 @@ fn impl_for_root(ident: syn::Ident, data: syn::Data, generics: syn::Generics) ->
                         fn get_path_id(&self) -> rust_state::PathId {
                             rust_state::PathId::new(vec![rust_state::PathUuid(#uuid)])
                         }
+
+                        fn clone_inner(&self) -> Self {
+                            self.clone()
+                        }
                     }
 
                     impl #impl_generics #ident #type_generics #where_clause {
@@ -180,6 +184,10 @@ fn impl_for_inner(ident: syn::Ident, data: syn::Data, generics: syn::Generics) -
                             let mut inner = self.path.get_path_id();
                             inner.push(rust_state::PathUuid(#uuid));
                             inner
+                        }
+
+                        fn clone_inner(&self) -> Self {
+                            self.clone()
                         }
                     }
 

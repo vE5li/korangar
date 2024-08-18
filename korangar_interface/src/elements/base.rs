@@ -420,6 +420,13 @@ impl<App: Application, To> Selector<Element2State<App>, To> for CustomBoxSelecto
     fn get_path_id(&self) -> rust_state::PathId {
         Element2State::<App>::__custom().get_path_id()
     }
+
+    fn clone_inner(&self) -> Self
+    where
+        Self: Sized,
+    {
+        self.clone()
+    }
 }
 
 impl !SafeUnwrap for CustomBoxSelector {}
@@ -518,7 +525,7 @@ pub type RenderFunction<App: Application> = fn(&World<App>, &mut ElementRenderer
 type Function<App: Application> = fn(&World<App>) -> Vec<ClickAction<App>>;
 type Procedure<App: Application> = fn(&World<App>);
 
-struct VTable<App: Application> {
+pub struct VTable<App: Application> {
     pub on_initialize: Option<fn(&World<App>, ElementManager<App>)>,
     pub on_is_focusable: Focusable<App>,
     pub on_resolve: Resolve<App>,
@@ -537,7 +544,7 @@ struct VTable<App: Application> {
 }
 
 #[derive(Default)]
-struct ElementReadStates {
+pub struct ElementReadStates {
     initialize_read_this: ReadState,
     initialize_read_state: ReadState,
     resolve_read_this: ReadState,
@@ -546,7 +553,7 @@ struct ElementReadStates {
     render_read_state: ReadState,
 }
 
-struct Element2<App>
+pub struct Element2<App>
 where
     App: Application,
 {
@@ -714,7 +721,7 @@ impl<App: Application> Element2<App> {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-struct ElementVersion(usize);
+pub struct ElementVersion(usize);
 
 impl ElementVersion {
     pub fn increment(&self) -> Self {
@@ -723,7 +730,7 @@ impl ElementVersion {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct ElementHandle {
+pub struct ElementHandle {
     version: ElementVersion,
     index: usize,
 }
@@ -733,7 +740,7 @@ enum ElementSlot<App: Application> {
     Free { version: ElementVersion },
 }
 
-struct ElementAllocator<App: Application> {
+pub struct ElementAllocator<App: Application> {
     slots: Vec<ElementSlot<App>>,
 }
 
@@ -814,7 +821,7 @@ impl<App: Application> ElementAllocator<App> {
     }
 }
 
-struct ElementManager<'a, App: Application> {
+pub struct ElementManager<'a, App: Application> {
     allocator: &'a mut ElementAllocator<App>,
     state: &'a Context<Element2State<App>>,
 }
@@ -1023,338 +1030,6 @@ mod vec_container {
             });
 
             Element2::new(vtable, Some(custom), state, allocator, parent_handle, theme_selector)
-        }
-    }
-}
-
-mod button {
-    use std::borrow::Cow;
-    use std::marker::PhantomData;
-
-    use interface_procedural::dimension_bound;
-    use rust_state::{Context, RustState, SafeUnwrap, Selector};
-
-    use super::{
-        Element2, Element2State, ElementAllocator, ElementHandle, ElementRenderer, Focusable, HoverCheck, ModeCheck, Resolve, World,
-    };
-    use crate::application::Application;
-    use crate::builder::{Set, Unset};
-    use crate::elements::base::VTable;
-    use crate::event::ClickAction;
-    use crate::layout::{DimensionBound, SizeBound};
-    use crate::theme::ButtonTheme;
-    use crate::{ClickEvaluator, ColorEvaluator, DimensionBoundEvaluator, DisabledEvaluator, TextEvaluator};
-
-    #[derive(RustState)]
-    struct ButtonState<App>
-    where
-        App: Application,
-    {
-        background_color: Option<ColorEvaluator<App>>,
-        foreground_color: Option<ColorEvaluator<App>>,
-        width_bound: Option<DimensionBoundEvaluator<App>>,
-        click_event: ClickEvaluator<App>,
-        disabled: Option<DisabledEvaluator<App>>,
-        text: TextEvaluator<App>,
-    }
-
-    fn focusable<App>(world: &World<App>) -> bool
-    where
-        App: Application,
-    {
-        !world
-            .evaluator_option(&ButtonState::<App>::disabled(Element2State::<App>::custom()))
-            .unwrap_or_default()
-    }
-
-    fn size_bound<App>(world: &World<App>) -> SizeBound
-    where
-        App: Application,
-    {
-        let width_bound = world
-            .evaluator_option(&ButtonState::<App>::width_bound(Element2State::<App>::custom()))
-            .unwrap_or(dimension_bound!(100%));
-        let height_bound = world.global.get_safe(&ButtonTheme::height_bound(world.theme_selector)).clone();
-
-        width_bound.add_height(height_bound)
-    }
-
-    fn on_click<App>(world: &World<App>) -> Vec<ClickAction<App>>
-    where
-        App: Application,
-    {
-        world.evaluator(&ButtonState::<App>::click_event(Element2State::<App>::custom()))
-    }
-
-    fn background_color_thing<App>(world: &World<App>) -> (App::Color, App::CornerRadius)
-    where
-        App: Application,
-    {
-        // TODO: Disabled etc.
-
-        let color = world.evaluator_option_fallback(
-            &ButtonState::<App>::background_color(Element2State::<App>::custom()),
-            &ButtonTheme::background_color(world.theme_selector),
-        );
-
-        let corner_radius = world
-            .global
-            .get_safe(&ButtonTheme::<App>::corner_radius(world.theme_selector))
-            .clone();
-
-        (color, corner_radius)
-    }
-
-    fn render<App>(world: &World<App>, renderer: &mut ElementRenderer<App>)
-    where
-        App: Application,
-    {
-        let disabled = world
-            .evaluator_option(&ButtonState::<App>::disabled(Element2State::<App>::custom()))
-            .unwrap_or_default();
-
-        let foreground_color = if disabled {
-            world
-                .global
-                .get_safe(&ButtonTheme::disabled_foreground_color(world.theme_selector))
-                .clone()
-        } else {
-            world.evaluator_option_fallback(
-                &ButtonState::<App>::foreground_color(Element2State::<App>::custom()),
-                &ButtonTheme::foreground_color(world.theme_selector),
-            )
-        };
-
-        let text = world.evaluator(&ButtonState::<App>::text(Element2State::<App>::custom()));
-        let text_offset = world.global.get_safe(&ButtonTheme::text_offset(world.theme_selector));
-        let font_size = world.global.get_safe(&ButtonTheme::font_size(world.theme_selector));
-
-        renderer.render_text(text.as_ref(), *text_offset, foreground_color, *font_size);
-    }
-
-    pub struct ButtonBuilder<App, Background, Foreground, Width, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        background_color: Option<ColorEvaluator<App>>,
-        foreground_color: Option<ColorEvaluator<App>>,
-        width_bound: Option<DimensionBoundEvaluator<App>>,
-        click_event: Event,
-        disabled: Option<DisabledEvaluator<App>>,
-        text: Text,
-        _marker: PhantomData<(Background, Foreground, Width, Disabled)>,
-    }
-
-    impl<App, Foreground, Width, Event, Disabled, Text> ButtonBuilder<App, Unset, Foreground, Width, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn background_color(
-            self,
-            evaluator: impl Fn(&World<App>) -> App::Color,
-        ) -> ButtonBuilder<App, Set, Foreground, Width, Event, Disabled, Text> {
-            ButtonBuilder {
-                background_color: Some(Box::new(evaluator)),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Foreground, Width, Event, Disabled, Text> ButtonBuilder<App, Unset, Foreground, Width, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn background_color_selector(
-            self,
-            selector: impl Selector<App, App::Color> + SafeUnwrap,
-        ) -> ButtonBuilder<App, Set, Foreground, Width, Event, Disabled, Text> {
-            ButtonBuilder {
-                background_color: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Width, Event, Disabled, Text> ButtonBuilder<App, Background, Unset, Width, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn foreground_color(
-            self,
-            evaluator: impl Fn(&World<App>) -> App::Color,
-        ) -> ButtonBuilder<App, Background, Set, Width, Event, Disabled, Text> {
-            ButtonBuilder {
-                foreground_color: Some(Box::new(evaluator)),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Width, Event, Disabled, Text> ButtonBuilder<App, Background, Unset, Width, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn foreground_color_selector(
-            self,
-            selector: impl Selector<App, App::Color> + SafeUnwrap,
-        ) -> ButtonBuilder<App, Background, Set, Width, Event, Disabled, Text> {
-            ButtonBuilder {
-                foreground_color: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Event, Disabled, Text> ButtonBuilder<App, Background, Foreground, Unset, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn width_bound(
-            self,
-            evaluator: impl Fn(&World<App>) -> DimensionBound,
-        ) -> ButtonBuilder<App, Background, Foreground, Set, Event, Disabled, Text> {
-            ButtonBuilder {
-                width_bound: Some(Box::new(evaluator)),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Event, Disabled, Text> ButtonBuilder<App, Background, Foreground, Unset, Event, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn width_bound_selector(
-            self,
-            selector: impl Selector<App, DimensionBound> + SafeUnwrap,
-        ) -> ButtonBuilder<App, Background, Foreground, Set, Event, Disabled, Text> {
-            ButtonBuilder {
-                width_bound: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Width, Disabled, Text> ButtonBuilder<App, Background, Foreground, Width, Unset, Disabled, Text>
-    where
-        App: Application,
-    {
-        pub fn click_event(
-            self,
-            click_event: impl Fn(&World<App>) -> Vec<ClickAction<App>>,
-        ) -> ButtonBuilder<App, Background, Foreground, Width, ClickEvaluator<App>, Disabled, Text> {
-            ButtonBuilder {
-                click_event: Box::new(click_event),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Width, Event, Text> ButtonBuilder<App, Background, Foreground, Width, Event, Unset, Text>
-    where
-        App: Application,
-    {
-        pub fn disabled(
-            self,
-            evaluator: impl Fn(&World<App>) -> bool,
-        ) -> ButtonBuilder<App, Background, Foreground, Width, Event, Set, Text> {
-            ButtonBuilder {
-                disabled: Some(Box::new(evaluator)),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Width, Event, Text> ButtonBuilder<App, Background, Foreground, Width, Event, Unset, Text>
-    where
-        App: Application,
-    {
-        pub fn disabled_selector(
-            self,
-            selector: impl Selector<App, bool> + SafeUnwrap,
-        ) -> ButtonBuilder<App, Background, Foreground, Width, Event, Set, Text> {
-            ButtonBuilder {
-                disabled: Some(Box::new(move |world| world.global.get_safe(&selector).clone())),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Width, Event, Disabled> ButtonBuilder<App, Background, Foreground, Width, Event, Disabled, Unset>
-    where
-        App: Application,
-    {
-        pub fn text(
-            self,
-            evaluator: impl for<'a> Fn(&'a World<'a, App>) -> Cow<'a, str>,
-        ) -> ButtonBuilder<App, Background, Foreground, Width, Event, Disabled, TextEvaluator<App>> {
-            ButtonBuilder {
-                text: Box::new(evaluator),
-                _marker: PhantomData,
-                ..self
-            }
-        }
-    }
-
-    impl<App, Background, Foreground, Width, Disabled>
-        ButtonBuilder<App, Background, Foreground, Width, ClickEvaluator<App>, Disabled, TextEvaluator<App>>
-    where
-        App: Application,
-    {
-        pub fn build(
-            self,
-            state: &Context<App>,
-            allocator: &mut ElementAllocator<App>,
-            parent_handle: Option<ElementHandle>,
-            theme_selector: App::ThemeSelector,
-        ) -> ElementHandle {
-            let vtable = const {
-                &VTable {
-                    on_initialize: None,
-                    on_is_focusable: Focusable::Dynamic(focusable::<App>),
-                    on_resolve: Resolve::Default(size_bound::<App>),
-                    hover_check: HoverCheck::Default,
-                    mode_check: ModeCheck::Default,
-                    on_left_click: Some(on_click::<App>),
-                    on_right_click: None,
-                    on_drag: None,
-                    on_input_character: None,
-                    on_drop_resource: None,
-                    on_scroll: None,
-                    background: Some(background_color_thing::<App>),
-                    render: render::<App>,
-                }
-            };
-
-            let ButtonBuilder {
-                background_color,
-                foreground_color,
-                width_bound,
-                click_event,
-                disabled,
-                text,
-                ..
-            } = self;
-
-            let button_state = ButtonState {
-                background_color,
-                foreground_color,
-                width_bound,
-                click_event,
-                disabled,
-                text,
-            };
-
-            Element2::new(vtable, None, state, allocator, parent_handle, theme_selector)
         }
     }
 }

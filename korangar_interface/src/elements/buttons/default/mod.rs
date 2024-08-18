@@ -1,126 +1,84 @@
 mod builder;
 
-use rust_state::{Context, View};
+use interface_procedural::dimension_bound;
+use rust_state::RustState;
 
 pub use self::builder::ButtonBuilder;
-use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait};
-use crate::elements::{Element, ElementState};
-use crate::event::{ClickAction, HoverInformation};
-use crate::layout::{DimensionBound, PlacementResolver};
+use crate::application::Application;
+use crate::elements::{Element2State, ElementRenderer, World};
+use crate::event::ClickAction;
+use crate::layout::SizeBound;
 use crate::theme::ButtonTheme;
-use crate::{ColorEvaluator, ElementEvent};
+use crate::{ClickEvaluator, ColorEvaluator, DimensionBoundEvaluator, DisabledEvaluator, TextEvaluator};
 
-pub struct Button<App, Text, Event>
+#[derive(RustState)]
+struct ButtonState<App>
 where
     App: Application,
-    Text: AsRef<str> + 'static,
-    Event: ElementEvent<App> + 'static,
 {
-    text: Text,
-    event: Event,
-    disabled_selector: Option<BaseSelector<App>>,
-    foreground_color: Option<ColorEvaluator<App>>,
     background_color: Option<ColorEvaluator<App>>,
-    width_bound: DimensionBound,
-    state: ElementState<App>,
+    foreground_color: Option<ColorEvaluator<App>>,
+    width_bound: Option<DimensionBoundEvaluator<App>>,
+    click_event: ClickEvaluator<App>,
+    disabled: Option<DisabledEvaluator<App>>,
+    text: TextEvaluator<App>,
 }
 
-impl<App, Text, Event> Button<App, Text, Event>
-where
-    App: Application,
-    Text: AsRef<str> + 'static,
-    Event: ElementEvent<App> + 'static,
-{
-    fn is_disabled(&self) -> bool {
-        // self.disabled_selector.as_ref().map(|selector| !selector()).unwrap_or(false)
-        false
-    }
+fn focusable<App: Application>(world: &World<App>) -> bool {
+    !world
+        .evaluator_option(&ButtonState::<App>::disabled(Element2State::<App>::custom()))
+        .unwrap_or_default()
 }
 
-impl<App, Text, Event> Element<App> for Button<App, Text, Event>
-where
-    App: Application,
-    Text: AsRef<str> + 'static,
-    Event: ElementEvent<App>,
-{
-    fn get_state(&self) -> &ElementState<App> {
-        &self.state
-    }
+fn size_bound<App: Application>(world: &World<App>) -> SizeBound {
+    let width_bound = world
+        .evaluator_option(&ButtonState::<App>::width_bound(Element2State::<App>::custom()))
+        .unwrap_or(dimension_bound!(100%));
+    let height_bound = world.global.get_safe(&ButtonTheme::height_bound(world.theme_selector)).clone();
 
-    fn get_state_mut(&mut self) -> &mut ElementState<App> {
-        &mut self.state
-    }
+    width_bound.add_height(height_bound)
+}
 
-    fn is_focusable(&self) -> bool {
-        !self.is_disabled()
-    }
+fn on_click<App: Application>(world: &World<App>) -> Vec<ClickAction<App>> {
+    world.evaluator(&ButtonState::<App>::click_event(Element2State::<App>::custom()))
+}
 
-    fn resolve(&mut self, application: &View<App>, theme_selector: App::ThemeSelector, placement_resolver: &mut PlacementResolver<App>) {
-        let height_bound = *application.get_safe(&ButtonTheme::height_bound(theme_selector));
-        let size_bound = self.width_bound.add_height(height_bound);
+fn background_color_thing<App: Application>(world: &World<App>) -> (App::Color, App::CornerRadius) {
+    // TODO: Disabled etc.
 
-        self.state.resolve(placement_resolver, &size_bound);
-    }
+    let color = world.evaluator_option_fallback(
+        &ButtonState::<App>::background_color(Element2State::<App>::custom()),
+        &ButtonTheme::background_color(world.theme_selector),
+    );
 
-    fn hovered_element(&self, mouse_position: App::Position, mouse_mode: &App::MouseInputMode) -> HoverInformation<App> {
-        match mouse_mode.is_none() {
-            true => self.state.hovered_element(mouse_position),
-            false => HoverInformation::Missed,
-        }
-    }
+    let corner_radius = world
+        .global
+        .get_safe(&ButtonTheme::<App>::corner_radius(world.theme_selector))
+        .clone();
 
-    fn left_click(&mut self, state: &Context<App>, _force_update: &mut bool) -> Vec<ClickAction<App>> {
-        match self.is_disabled() {
-            true => Vec::new(),
-            false => self.event.trigger(state),
-        }
-    }
+    (color, corner_radius)
+}
 
-    fn render(
-        &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        renderer: &App::Renderer,
-        state: &View<App>,
-        theme_selector: App::ThemeSelector,
-        parent_position: App::Position,
-        screen_clip: App::Clip,
-        _second_theme: bool,
-    ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, renderer, state, parent_position, screen_clip);
+fn render<App: Application>(world: &World<App>, renderer: &mut ElementRenderer<App>) {
+    let disabled = world
+        .evaluator_option(&ButtonState::<App>::disabled(Element2State::<App>::custom()))
+        .unwrap_or_default();
 
-        let disabled = self.is_disabled();
-        let corner_radius = state.get_safe(&ButtonTheme::corner_radius(theme_selector));
+    let foreground_color = if disabled {
+        world
+            .global
+            .get_safe(&ButtonTheme::disabled_foreground_color(world.theme_selector))
+            .clone()
+    } else {
+        world.evaluator_option_fallback(
+            &ButtonState::<App>::foreground_color(Element2State::<App>::custom()),
+            &ButtonTheme::foreground_color(world.theme_selector),
+        )
+    };
 
-        let background_color = if disabled {
-            *state.get_safe(&ButtonTheme::disabled_background_color(theme_selector))
-        } else {
-            let hovered_element = state.get_safe(&App::HoveredElementSelector::default());
-            let focused_element = state.get_safe(&App::FocusedElementSelector::default());
-            let highlighted = self.is_cell_self(&hovered_element) || self.is_cell_self(&focused_element);
+    let text = world.evaluator(&ButtonState::<App>::text(Element2State::<App>::custom()));
+    let text_offset = world.global.get_safe(&ButtonTheme::text_offset(world.theme_selector));
+    let font_size = world.global.get_safe(&ButtonTheme::font_size(world.theme_selector));
 
-            match highlighted {
-                true => *state.get_safe(&ButtonTheme::hovered_background_color(theme_selector)),
-                false if self.background_color.is_some() => (self.background_color.as_ref().unwrap())(state, theme_selector),
-                false => *state.get_safe(&ButtonTheme::background_color(theme_selector)),
-            }
-        };
-
-        renderer.render_background(*corner_radius, background_color);
-
-        let foreground_color = if disabled {
-            *state.get_safe(&ButtonTheme::disabled_foreground_color(theme_selector))
-        } else {
-            self.foreground_color
-                .as_ref()
-                .map(|closure| closure(state, theme_selector))
-                .unwrap_or(*state.get_safe(&ButtonTheme::foreground_color(theme_selector)))
-        };
-
-        let text_offset = state.get_safe(&ButtonTheme::text_offset(theme_selector));
-        let font_size = state.get_safe(&ButtonTheme::font_size(theme_selector));
-
-        renderer.render_text(self.text.as_ref(), *text_offset, foreground_color, *font_size);
-    }
+    renderer.render_text(text.as_ref(), *text_offset, foreground_color, *font_size);
 }

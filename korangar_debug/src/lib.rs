@@ -1,5 +1,4 @@
 #![feature(decl_macro)]
-#![feature(inline_const)]
 #![feature(let_chains)]
 #![feature(thread_local)]
 

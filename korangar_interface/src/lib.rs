@@ -1,11 +1,9 @@
+#![allow(incomplete_features)]
 #![feature(auto_traits)]
-#![feature(generic_const_exprs)]
 #![feature(let_chains)]
 #![feature(negative_impls)]
 #![feature(option_zip)]
-#![feature(specialization)]
 #![feature(type_changing_struct_update)]
-#![allow(incomplete_features)]
 
 pub mod application;
 pub mod event;

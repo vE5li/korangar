@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 chrono = { workspace = true }
 debug_procedural = { path = "procedural" }
-lazy_static = { version = "1.4.0" }
 
 [features]
 unicode = []

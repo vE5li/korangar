@@ -1,6 +1,4 @@
-use std::sync::Mutex;
-
-use lazy_static::lazy_static;
+use std::sync::{LazyLock, Mutex};
 
 struct StackItem {
     pub message_count: usize,
@@ -13,9 +11,7 @@ impl StackItem {
     }
 }
 
-lazy_static! {
-    static ref STACK: Mutex<Vec<StackItem>> = Mutex::new(Vec::new());
-}
+static STACK: LazyLock<Mutex<Vec<StackItem>>> = LazyLock::new(|| Mutex::new(Vec::new()));
 
 pub fn stack_size() -> usize {
     match STACK.try_lock() {

@@ -122,13 +122,11 @@ pub trait Renderer {
     type Target;
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, ConstParamTy)]
 struct SubpassAttachments {
     color: u32,
     depth: u32,
 }
-
-impl ConstParamTy for SubpassAttachments {}
 
 pub trait GeometryRenderer {
     fn render_geometry(

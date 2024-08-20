@@ -1,5 +1,5 @@
-#![feature(adt_const_params)]
 #![allow(incomplete_features)]
+#![feature(unsized_const_params)]
 
 pub mod action;
 pub mod archive;

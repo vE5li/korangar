@@ -170,7 +170,7 @@ impl GeometryRenderer {
         #[cfg(feature = "debug")]
         measurement.stop();
 
-        let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
+        let vertex_count = vertex_buffer.size() as usize / size_of::<ModelVertex>();
         let constants = Constants {
             world: world_matrix.into(),
         };

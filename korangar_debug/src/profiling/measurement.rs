@@ -13,7 +13,7 @@ impl ActiveMeasurement {
     }
 
     pub fn stop(self) {
-        std::mem::drop(self);
+        drop(self);
     }
 }
 

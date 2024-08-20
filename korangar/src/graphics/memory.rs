@@ -160,7 +160,7 @@ where
 {
     pub(super) fn new(memory_allocator: &Arc<MemoryAllocator>) -> Self {
         let allocator = SubbufferAllocator::new(memory_allocator.clone(), SubbufferAllocatorCreateInfo {
-            arena_size: std::mem::size_of::<M>() as u64,
+            arena_size: size_of::<M>() as u64,
             buffer_usage: BufferUsage::UNIFORM_BUFFER,
             memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
             ..Default::default()

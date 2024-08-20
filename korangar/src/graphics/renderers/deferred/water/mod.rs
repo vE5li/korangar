@@ -102,7 +102,7 @@ impl WaterRenderer {
             0, buffer,
         )]);
 
-        let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<WaterVertex>();
+        let vertex_count = vertex_buffer.size() as usize / size_of::<WaterVertex>();
         let constants = Constants { wave_offset: day_timer };
 
         render_target

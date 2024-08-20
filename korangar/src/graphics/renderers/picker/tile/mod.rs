@@ -88,7 +88,7 @@ impl TileRenderer {
             0, buffer,
         )]);
 
-        let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<TileVertex>();
+        let vertex_count = vertex_buffer.size() as usize / size_of::<TileVertex>();
 
         render_target
             .state

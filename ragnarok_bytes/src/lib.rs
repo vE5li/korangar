@@ -1,5 +1,4 @@
 #![cfg_attr(test, feature(assert_matches))]
-#![feature(const_trait_impl)]
 
 mod error;
 mod fixed;

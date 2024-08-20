@@ -119,14 +119,12 @@ impl korangar_interface::application::PartialSizeTrait for PartialScreenSize {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ConstParamTy)]
 pub enum InternalThemeKind {
     Main,
     Menu,
     Game,
 }
-
-impl ConstParamTy for InternalThemeKind {}
 
 #[derive(Serialize, Deserialize)]
 #[serde(transparent)]

@@ -8,4 +8,5 @@ chrono = { workspace = true }
 debug_procedural = { path = "procedural" }
 
 [features]
+plain = []
 unicode = []

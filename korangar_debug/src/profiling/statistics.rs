@@ -3,7 +3,7 @@ use std::ops::Div;
 use std::time::Duration;
 
 use super::measurement::Measurement;
-use crate::profiling::LockThreadProfier;
+use crate::profiling::LockThreadProfiler;
 
 #[derive(Default, Debug)]
 struct MeasurementTiming {
@@ -66,7 +66,7 @@ pub struct FrameData {
     pub total_time: Duration,
 }
 
-pub fn get_statistics_data(thread: impl LockThreadProfier) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
+pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
     let profiler = thread.lock_profiler();
     let mut longest_frame_time = Duration::default();
 
@@ -109,12 +109,12 @@ pub fn get_statistics_data(thread: impl LockThreadProfier) -> (Vec<FrameData>, H
     (frame_data, statistics_map, longest_frame_time)
 }
 
-pub fn get_number_of_saved_frames(thread: impl LockThreadProfier) -> usize {
+pub fn get_number_of_saved_frames(thread: impl LockThreadProfiler) -> usize {
     let profiler = thread.lock_profiler();
     profiler.get_saved_frames().iter().count()
 }
 
-pub fn get_frame_by_index(thread: impl LockThreadProfier, index: usize) -> Measurement {
+pub fn get_frame_by_index(thread: impl LockThreadProfiler, index: usize) -> Measurement {
     let profiler = thread.lock_profiler();
 
     // TODO: maybe don't use the iterator to receive the frame? That would help

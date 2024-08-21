@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{print_debug, Colorize};
 use vulkano::device::physical::PhysicalDevice;
 use vulkano::device::{Device, Queue};
 use vulkano::format::{Format, NumericFormat};
@@ -184,7 +184,7 @@ impl SwapchainHolder {
         };
 
         #[cfg(feature = "debug")]
-        Timer::new_dynamic(format!("set swapchain present mode to {:?}", self.present_mode.magenta())).stop();
+        print_debug!("set swapchain present mode to {:?}", self.present_mode.magenta());
 
         self.invalidate_swapchain();
     }

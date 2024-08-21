@@ -29,7 +29,7 @@ use cgmath::{Vector2, Vector3};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, ImageFormat};
 #[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_debug::logging::{print_debug, Colorize};
 #[cfg(feature = "debug")]
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
@@ -91,331 +91,292 @@ fn main() {
     #[cfg(feature = "debug")]
     let _measurement = threads::Main::start_frame();
 
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create device");
-
-    let library = VulkanLibrary::new().unwrap();
-    let event_loop = EventLoop::new();
-    let create_info = InstanceCreateInfo {
-        enabled_extensions: InstanceExtensions {
-            ext_debug_utils: true,
-            ..Surface::required_extensions(&event_loop)
-        },
-        enabled_layers: get_layers(&library),
-        flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
-        ..Default::default()
-    };
-
-    let instance = Instance::new(library, create_info).expect("failed to create instance");
-
-    #[cfg(feature = "debug")]
-    let _debug_callback = DebugUtilsMessenger::new(instance.clone(), DebugUtilsMessengerCreateInfo {
-        message_severity: DebugUtilsMessageSeverity::ERROR
-            | DebugUtilsMessageSeverity::WARNING
-            | DebugUtilsMessageSeverity::INFO
-            | DebugUtilsMessageSeverity::VERBOSE,
-        message_type: DebugUtilsMessageType::GENERAL | DebugUtilsMessageType::VALIDATION | DebugUtilsMessageType::PERFORMANCE,
-        ..DebugUtilsMessengerCreateInfo::user_callback(unsafe { DebugUtilsMessengerCallback::new(vulkan_message_callback) })
-    })
-    .ok();
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}", "instance".magenta());
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create window");
-
-    // TODO: move this somewhere else
-    let file_data = include_bytes!("../archive/data/icon.png");
-
-    let reader = ImageReader::with_format(Cursor::new(file_data), ImageFormat::Png);
-    let image_buffer = reader.decode().unwrap().to_rgba8();
-    let image_data = image_buffer.as_bytes().to_vec();
-
-    assert_eq!(image_buffer.width(), image_buffer.height(), "icon must be square");
-    let icon = Icon::from_rgba(image_data, image_buffer.width(), image_buffer.height()).unwrap();
-    //
-
-    let window = WindowBuilder::new()
-        .with_title("Korangar".to_string())
-        .with_window_icon(Some(icon))
-        .build(&event_loop)
-        .unwrap();
-    window.set_cursor_visible(false);
-    let window = Arc::new(window);
-
-    let surface = Surface::from_window(instance.clone(), window).unwrap();
-
-    #[cfg(feature = "debug")]
-    print_debug!("created {}", "window".magenta());
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("choose physical device");
-
-    let desired_device_extensions = get_device_extensions();
-    let (physical_device, queue_family_index) = choose_physical_device(&instance, &surface, &desired_device_extensions);
-
-    let present_mode_info = PresentModeInfo::from_device(&physical_device, &surface);
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create device");
-
-    let (device, mut queues) = Device::new(physical_device.clone(), DeviceCreateInfo {
-        enabled_extensions: get_device_extensions(),
-        enabled_features: vulkano::device::Features {
-            sampler_anisotropy: true,
+    // Helper macro to time and print the startup time of Korangar
+    macro_rules! time_phase {
+        ($message:expr, { $($statements:tt)* }) => {
             #[cfg(feature = "debug")]
-            fill_mode_non_solid: true,
+            let _statement_timer = korangar_debug::logging::Timer::new($message);
+
+            $($statements)*
+
+            #[cfg(feature = "debug")]
+            _statement_timer.stop();
+        }
+    }
+
+    time_phase!("create device", {
+        let library = VulkanLibrary::new().unwrap();
+        let event_loop = EventLoop::new();
+        let create_info = InstanceCreateInfo {
+            enabled_extensions: InstanceExtensions {
+                ext_debug_utils: true,
+                ..Surface::required_extensions(&event_loop)
+            },
+            enabled_layers: get_layers(&library),
+            flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
             ..Default::default()
-        },
-        queue_create_infos: vec![QueueCreateInfo {
-            queue_family_index,
+        };
+
+        let instance = Instance::new(library, create_info).expect("failed to create instance");
+
+        #[cfg(feature = "debug")]
+        let _debug_callback = DebugUtilsMessenger::new(instance.clone(), DebugUtilsMessengerCreateInfo {
+            message_severity: DebugUtilsMessageSeverity::ERROR
+                | DebugUtilsMessageSeverity::WARNING
+                | DebugUtilsMessageSeverity::INFO
+                | DebugUtilsMessageSeverity::VERBOSE,
+            message_type: DebugUtilsMessageType::GENERAL | DebugUtilsMessageType::VALIDATION | DebugUtilsMessageType::PERFORMANCE,
+            ..DebugUtilsMessengerCreateInfo::user_callback(unsafe { DebugUtilsMessengerCallback::new(vulkan_message_callback) })
+        })
+        .ok();
+
+        #[cfg(feature = "debug")]
+        print_debug!("created {}", "instance".magenta());
+    });
+
+    time_phase!("create window", {
+        // TODO: move this somewhere else
+        let file_data = include_bytes!("../archive/data/icon.png");
+
+        let reader = ImageReader::with_format(Cursor::new(file_data), ImageFormat::Png);
+        let image_buffer = reader.decode().unwrap().to_rgba8();
+        let image_data = image_buffer.as_bytes().to_vec();
+
+        assert_eq!(image_buffer.width(), image_buffer.height(), "icon must be square");
+        let icon = Icon::from_rgba(image_data, image_buffer.width(), image_buffer.height()).unwrap();
+        //
+
+        let window = WindowBuilder::new()
+            .with_title("Korangar".to_string())
+            .with_window_icon(Some(icon))
+            .build(&event_loop)
+            .unwrap();
+        window.set_cursor_visible(false);
+        let window = Arc::new(window);
+
+        let surface = Surface::from_window(instance.clone(), window).unwrap();
+
+        #[cfg(feature = "debug")]
+        print_debug!("created {}", "window".magenta());
+    });
+
+    time_phase!("choose physical device", {
+        let desired_device_extensions = get_device_extensions();
+        let (physical_device, queue_family_index) = choose_physical_device(&instance, &surface, &desired_device_extensions);
+
+        let present_mode_info = PresentModeInfo::from_device(&physical_device, &surface);
+    });
+
+    time_phase!("create device", {
+        let (device, mut queues) = Device::new(physical_device.clone(), DeviceCreateInfo {
+            enabled_extensions: get_device_extensions(),
+            enabled_features: vulkano::device::Features {
+                sampler_anisotropy: true,
+                #[cfg(feature = "debug")]
+                fill_mode_non_solid: true,
+                ..Default::default()
+            },
+            queue_create_infos: vec![QueueCreateInfo {
+                queue_family_index,
+                ..Default::default()
+            }],
             ..Default::default()
-        }],
-        ..Default::default()
-    })
-    .expect("failed to create device");
+        })
+        .expect("failed to create device");
 
-    #[cfg(feature = "debug")]
-    print_debug!("created {}", "vulkan device".magenta());
+        #[cfg(feature = "debug")]
+        print_debug!("created {}", "vulkan device".magenta());
 
-    let queue = queues.next().unwrap();
+        let queue = queues.next().unwrap();
 
-    #[cfg(feature = "debug")]
-    print_debug!("received {} from {}", "queue".magenta(), "device".magenta());
+        #[cfg(feature = "debug")]
+        print_debug!("received {} from {}", "queue".magenta(), "device".magenta());
+    });
 
-    #[cfg(feature = "debug")]
-    timer.stop();
+    time_phase!("create resource managers", {
+        std::fs::create_dir_all("client/themes").unwrap();
 
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create resource managers");
+        let mut game_file_loader = GameFileLoader::default();
 
-    std::fs::create_dir_all("client/themes").unwrap();
+        game_file_loader.load_archives_from_settings();
+        game_file_loader.load_patched_lua_files();
 
-    let mut game_file_loader = GameFileLoader::default();
+        let memory_allocator = Arc::new(MemoryAllocator::new(device.clone()));
 
-    game_file_loader.load_archives_from_settings();
-    game_file_loader.load_patched_lua_files();
-
-    let memory_allocator = Arc::new(MemoryAllocator::new(device.clone()));
-
-    let font_loader = Rc::new(RefCell::new(FontLoader::new(
-        memory_allocator.clone(),
-        queue.clone(),
-        &mut game_file_loader,
-    )));
-
-    let mut buffer_allocator = BufferAllocator::new(memory_allocator.clone(), queue.clone());
-    let mut model_loader = ModelLoader::new();
-    let mut texture_loader = TextureLoader::new(memory_allocator.clone(), queue.clone());
-    let mut map_loader = MapLoader::new();
-    let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
-    let mut action_loader = ActionLoader::default();
-    let mut effect_loader = EffectLoader::default();
-    let script_loader = ScriptLoader::new(&mut game_file_loader);
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("load resources");
-
-    let mut map = map_loader
-        .get(
-            DEFAULT_MAP.to_string(),
+        let font_loader = Rc::new(RefCell::new(FontLoader::new(
+            memory_allocator.clone(),
+            queue.clone(),
             &mut game_file_loader,
+        )));
+
+        let mut buffer_allocator = BufferAllocator::new(memory_allocator.clone(), queue.clone());
+        let mut model_loader = ModelLoader::new();
+        let mut texture_loader = TextureLoader::new(memory_allocator.clone(), queue.clone());
+        let mut map_loader = MapLoader::new();
+        let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
+        let mut action_loader = ActionLoader::default();
+        let mut effect_loader = EffectLoader::default();
+        let script_loader = ScriptLoader::new(&mut game_file_loader);
+    });
+
+    time_phase!("load resources", {
+        let mut map = map_loader
+            .get(
+                DEFAULT_MAP.to_string(),
+                &mut game_file_loader,
+                &mut buffer_allocator,
+                &mut model_loader,
+                &mut texture_loader,
+            )
+            .expect("failed to load initial map");
+    });
+
+    time_phase!("create swapchain", {
+        let mut swapchain_holder = SwapchainHolder::new(&physical_device, device.clone(), queue.clone(), surface.clone());
+        let viewport = swapchain_holder.viewport();
+    });
+
+    time_phase!("create renderers", {
+        let mut deferred_renderer = DeferredRenderer::new(
+            memory_allocator.clone(),
             &mut buffer_allocator,
-            &mut model_loader,
+            &mut game_file_loader,
             &mut texture_loader,
-        )
-        .expect("failed to load initial map");
+            queue.clone(),
+            swapchain_holder.swapchain_format(),
+            viewport.clone(),
+            swapchain_holder.window_size_u32(),
+        );
 
-    #[cfg(feature = "debug")]
-    timer.stop();
+        let mut interface_renderer = InterfaceRenderer::new(
+            memory_allocator.clone(),
+            &mut game_file_loader,
+            &mut texture_loader,
+            font_loader.clone(),
+            queue.clone(),
+            viewport.clone(),
+            swapchain_holder.window_size_u32(),
+        );
 
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create swapchain");
+        let mut picker_renderer = PickerRenderer::new(
+            memory_allocator.clone(),
+            queue.clone(),
+            viewport,
+            swapchain_holder.window_size_u32(),
+        );
 
-    let mut swapchain_holder = SwapchainHolder::new(&physical_device, device.clone(), queue.clone(), surface.clone());
-    let viewport = swapchain_holder.viewport();
+        let shadow_renderer = ShadowRenderer::new(memory_allocator, &mut game_file_loader, &mut texture_loader, queue);
+    });
 
-    #[cfg(feature = "debug")]
-    timer.stop();
+    time_phase!("load settings", {
+        let mut input_system = InputSystem::new();
+        let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
 
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create renderers");
+        let mut shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
+        let mut framerate_limit = graphics_settings.mapped(|settings| &settings.frame_limit).new_remote();
 
-    let mut deferred_renderer = DeferredRenderer::new(
-        memory_allocator.clone(),
-        &mut buffer_allocator,
-        &mut game_file_loader,
-        &mut texture_loader,
-        queue.clone(),
-        swapchain_holder.swapchain_format(),
-        viewport.clone(),
-        swapchain_holder.window_size_u32(),
-    );
+        #[cfg(feature = "debug")]
+        let render_settings = PlainTrackedState::new(RenderSettings::new());
+    });
 
-    let mut interface_renderer = InterfaceRenderer::new(
-        memory_allocator.clone(),
-        &mut game_file_loader,
-        &mut texture_loader,
-        font_loader.clone(),
-        queue.clone(),
-        viewport.clone(),
-        swapchain_holder.window_size_u32(),
-    );
+    time_phase!("create render targets", {
+        let mut screen_targets = swapchain_holder
+            .get_swapchain_images()
+            .into_iter()
+            .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
+            .collect::<Vec<<DeferredRenderer as Renderer>::Target>>();
 
-    let mut picker_renderer = PickerRenderer::new(
-        memory_allocator.clone(),
-        queue.clone(),
-        viewport,
-        swapchain_holder.window_size_u32(),
-    );
+        let mut interface_target = interface_renderer.create_render_target();
 
-    let shadow_renderer = ShadowRenderer::new(memory_allocator, &mut game_file_loader, &mut texture_loader, queue);
+        let mut picker_targets = swapchain_holder
+            .get_swapchain_images()
+            .into_iter()
+            .map(|_| picker_renderer.create_render_target())
+            .collect::<Vec<<PickerRenderer as Renderer>::Target>>();
 
-    #[cfg(feature = "debug")]
-    timer.stop();
+        let mut directional_shadow_targets = swapchain_holder
+            .get_swapchain_images()
+            .into_iter()
+            .map(|_| shadow_renderer.create_render_target(shadow_detail.get().into_resolution()))
+            .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
+    });
 
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("load settings");
+    time_phase!("initialize interface", {
+        let mut application = InterfaceSettings::load_or_default();
+        let mut interface = Interface::new(swapchain_holder.window_screen_size());
+        let mut focus_state = FocusState::default();
+        let mut mouse_cursor = MouseCursor::new(&mut game_file_loader, &mut sprite_loader, &mut action_loader);
+        let mut dialog_system = DialogSystem::default();
+        let mut show_interface = true;
+    });
 
-    let mut input_system = InputSystem::new();
-    let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
+    time_phase!("initialize timer", {
+        let mut game_timer = GameTimer::new();
+    });
 
-    let mut shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
-    let mut framerate_limit = graphics_settings.mapped(|settings| &settings.frame_limit).new_remote();
+    time_phase!("initialize camera", {
+        #[cfg(feature = "debug")]
+        let mut debug_camera = DebugCamera::new();
+        let mut start_camera = StartCamera::new();
+        let mut player_camera = PlayerCamera::new();
+        let mut directional_shadow_camera = ShadowCamera::new();
 
-    #[cfg(feature = "debug")]
-    let render_settings = PlainTrackedState::new(RenderSettings::new());
+        start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+        directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+    });
 
-    #[cfg(feature = "debug")]
-    timer.stop();
+    time_phase!("initialize networking", {
+        let client_info = load_client_info(&mut game_file_loader);
 
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("create render targets");
+        #[cfg(not(feature = "debug"))]
+        let mut networking_system = NetworkingSystem::spawn();
+        #[cfg(feature = "debug")]
+        let packet_callback = {
+            // SAFETY: This function leaks memory, but it's fine since we only call
+            // it once.
+            unsafe { interface::elements::PacketHistoryCallback::new() }
+        };
+        #[cfg(feature = "debug")]
+        let mut networking_system = NetworkingSystem::spawn_with_callback(packet_callback.clone());
 
-    let mut screen_targets = swapchain_holder
-        .get_swapchain_images()
-        .into_iter()
-        .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
-        .collect::<Vec<<DeferredRenderer as Renderer>::Target>>();
+        let mut friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>> = PlainTrackedState::default();
+        let mut saved_login_data: Option<LoginServerLoginData> = None;
+        let mut saved_character_server: Option<CharacterServerInformation> = None;
+        let mut saved_characters: PlainTrackedState<Vec<CharacterInformation>> = PlainTrackedState::default();
+        let mut shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>> = PlainTrackedState::default();
+        let mut sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>> = PlainTrackedState::default();
+        let mut currently_deleting: Option<CharacterId> = None;
+        let mut saved_player_name = String::new();
+        let mut move_request: PlainTrackedState<Option<usize>> = PlainTrackedState::default();
+        let mut saved_login_server_address = None;
+        let mut saved_password = String::new();
+        let mut saved_username = String::new();
+        let mut saved_slot_count = 0;
 
-    let mut interface_target = interface_renderer.create_render_target();
+        interface.open_window(&application, &mut focus_state, &LoginWindow::new(&client_info));
+    });
 
-    let mut picker_targets = swapchain_holder
-        .get_swapchain_images()
-        .into_iter()
-        .map(|_| picker_renderer.create_render_target())
-        .collect::<Vec<<PickerRenderer as Renderer>::Target>>();
+    time_phase!("create resources", {
+        let mut particle_holder = ParticleHolder::default();
+        let mut effect_holder = EffectHolder::default();
+        let mut entities = Vec::<Entity>::new();
+        let mut player_inventory = Inventory::default();
+        let mut player_skill_tree = SkillTree::default();
+        let mut hotbar = Hotbar::default();
 
-    let mut directional_shadow_targets = swapchain_holder
-        .get_swapchain_images()
-        .into_iter()
-        .map(|_| shadow_renderer.create_render_target(shadow_detail.get().into_resolution()))
-        .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
+        let welcome_string = format!(
+            "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
+            env!("CARGO_PKG_VERSION")
+        );
+        let mut chat_messages = PlainTrackedState::new(vec![ChatMessage {
+            text: welcome_string,
+            color: MessageColor::Server,
+        }]);
+    });
 
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("initialize interface");
-
-    let mut application = InterfaceSettings::load_or_default();
-    let mut interface = Interface::new(swapchain_holder.window_screen_size());
-    let mut focus_state = FocusState::default();
-    let mut mouse_cursor = MouseCursor::new(&mut game_file_loader, &mut sprite_loader, &mut action_loader);
-    let mut dialog_system = DialogSystem::default();
-    let mut show_interface = true;
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("initialize timer");
-
-    let mut game_timer = GameTimer::new();
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("initialize camera");
-
-    #[cfg(feature = "debug")]
-    let mut debug_camera = DebugCamera::new();
-    let mut start_camera = StartCamera::new();
-    let mut player_camera = PlayerCamera::new();
-    let mut directional_shadow_camera = ShadowCamera::new();
-
-    start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
-    directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    #[cfg(feature = "debug")]
-    let timer = Timer::new("initialize networking");
-
-    let client_info = load_client_info(&mut game_file_loader);
-
-    #[cfg(not(feature = "debug"))]
-    let mut networking_system = NetworkingSystem::spawn();
-    #[cfg(feature = "debug")]
-    let packet_callback = {
-        // SAFETY: This function leaks memory, but it's fine since we only call
-        // it once.
-        unsafe { interface::elements::PacketHistoryCallback::new() }
-    };
-    #[cfg(feature = "debug")]
-    let mut networking_system = NetworkingSystem::spawn_with_callback(packet_callback.clone());
-
-    let mut friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>> = PlainTrackedState::default();
-    let mut saved_login_data: Option<LoginServerLoginData> = None;
-    let mut saved_character_server: Option<CharacterServerInformation> = None;
-    let mut saved_characters: PlainTrackedState<Vec<CharacterInformation>> = PlainTrackedState::default();
-    let mut shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>> = PlainTrackedState::default();
-    let mut sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>> = PlainTrackedState::default();
-    let mut currently_deleting: Option<CharacterId> = None;
-    let mut saved_player_name = String::new();
-    let mut move_request: PlainTrackedState<Option<usize>> = PlainTrackedState::default();
-    let mut saved_login_server_address = None;
-    let mut saved_password = String::new();
-    let mut saved_username = String::new();
-    let mut saved_slot_count = 0;
-
-    interface.open_window(&application, &mut focus_state, &LoginWindow::new(&client_info));
-
-    #[cfg(feature = "debug")]
-    timer.stop();
-
-    let mut particle_holder = ParticleHolder::default();
-    let mut effect_holder = EffectHolder::default();
-    let mut entities = Vec::<Entity>::new();
-    let mut player_inventory = Inventory::default();
-    let mut player_skill_tree = SkillTree::default();
-    let mut hotbar = Hotbar::default();
-
-    let welcome_string = format!(
-        "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
-        env!("CARGO_PKG_VERSION")
-    );
-    let mut chat_messages = PlainTrackedState::new(vec![ChatMessage {
-        text: welcome_string,
-        color: MessageColor::Server,
-    }]);
-
-    let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
+    time_phase!("create thread pool", {
+        let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
+    });
 
     event_loop.run(move |event, _, control_flow| {
         match event {

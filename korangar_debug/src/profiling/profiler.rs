@@ -1,5 +1,4 @@
 use std::cell::Cell;
-use std::marker::PhantomPinned;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
 use std::time::Instant;
@@ -20,14 +19,11 @@ pub struct Profiler {
 }
 
 #[derive(Default)]
-pub struct ProfilerInner {
+struct ProfilerInner {
     root_measurement: Option<Measurement>,
     /// Self referencing pointers
     active_measurements: Vec<*const Measurement>,
     saved_frames: RingBuffer<Measurement, { Profiler::SAVED_FRAME_COUNT }>,
-    /// Since the profiler has some self-referencing fields, we want it to be
-    /// !Unpin.
-    _pin: PhantomPinned,
 }
 
 // Safety: It's in general safe to send a Profiler between threads, since the

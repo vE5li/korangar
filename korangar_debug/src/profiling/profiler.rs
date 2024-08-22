@@ -1,10 +1,10 @@
 use std::cell::Cell;
 use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
-use std::time::Instant;
 
-use super::{ActiveMeasurement, Measurement, RingBuffer};
+use super::{ActiveMeasurement, RingBuffer};
 use crate::logging::{print_debug, Colorize};
+use crate::profiling::frame_measurement::FrameMeasurement;
 
 #[thread_local]
 static PROFILER: Cell<Option<&'static Mutex<Profiler>>> = Cell::new(None);
@@ -12,24 +12,10 @@ static PROFILER_HALTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Default)]
 pub struct Profiler {
-    // Safety: The profiler has self-referencing fields, so we must make sure that the memory of
-    // these fields never move: The backing fields inside the inner profiler are saved on the heap
-    // and are not accessible by the outer API.
-    inner: Box<ProfilerInner>,
+    active_measurements: Vec<usize>,
+    latest_frame: FrameMeasurement,
+    saved_frames: RingBuffer<FrameMeasurement, { Profiler::SAVED_FRAME_COUNT }>,
 }
-
-#[derive(Default)]
-struct ProfilerInner {
-    root_measurement: Option<Measurement>,
-    /// Self referencing pointers
-    active_measurements: Vec<*const Measurement>,
-    saved_frames: RingBuffer<Measurement, { Profiler::SAVED_FRAME_COUNT }>,
-}
-
-// Safety: It's in general safe to send a Profiler between threads, since the
-// referencing fields only point to inner data and the inner data is not moved
-// by sending it to other threads.
-unsafe impl Send for ProfilerInner {}
 
 impl Profiler {
     pub const ROOT_MEASUREMENT_NAME: &'static str = "total";
@@ -72,22 +58,22 @@ impl Profiler {
     }
 
     /// Get the measurements of the previous SAVE_FRAME_COUNT frames.
-    pub(crate) fn get_saved_frames(&self) -> &RingBuffer<Measurement, { Self::SAVED_FRAME_COUNT }> {
-        &self.inner.saved_frames
+    pub(crate) fn get_saved_frames(&self) -> &RingBuffer<FrameMeasurement, { Self::SAVED_FRAME_COUNT }> {
+        &self.saved_frames
     }
 
     /// Start a new frame by creating a new root measurement.
     #[doc(hidden)]
     pub fn start_frame(&mut self) -> ActiveMeasurement {
         // Make sure that there are no active measurements.
-        if self.inner.active_measurements.len() > 1 {
+        if self.active_measurements.len() > 1 {
+            let frame_measurement = &self.latest_frame;
             let measurement_names = self
-                .inner
                 .active_measurements
                 .iter()
                 .skip(1)
                 .copied()
-                .map(|pointer| unsafe { (*pointer).name })
+                .map(|index| frame_measurement[index].name)
                 .collect::<Vec<&'static str>>()
                 .join(", ");
 
@@ -98,49 +84,49 @@ impl Profiler {
             );
         }
 
-        // Start a new root measurement.
+        // Discard the currents frame measurement if profiling is halted.
+        if !PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed) {
+            self.saved_frames.push_default_or_recycle();
+
+            // Swap the current and the replaced frame to avoid allocating new vectors on
+            // the heap.
+            std::mem::swap(self.saved_frames.back_mut().unwrap(), &mut self.latest_frame);
+        }
+
+        // Start a new frame and root measurement.
+        self.latest_frame.clear();
         let name = Self::ROOT_MEASUREMENT_NAME;
-        let previous_measurement = self.inner.root_measurement.replace(Measurement {
-            name,
-            start_time: Instant::now(),
-            end_time: Instant::now(),
-            indices: Vec::new(),
-        });
+        let index = self.latest_frame.new_measurement(name);
 
         // Set `active_measurements` to a well-defined state.
-        self.inner.active_measurements = vec![self.inner.root_measurement.as_ref().unwrap() as *const _];
-
-        // Save the completed frame, so we can inspect it in the profiler later on.
-        let profiler_halted = PROFILER_HALTED.load(std::sync::atomic::Ordering::Relaxed);
-        if let Some(previous_measurement) = previous_measurement
-            && !profiler_halted
-        {
-            self.inner.saved_frames.push(previous_measurement);
-        }
+        self.active_measurements.clear();
+        self.active_measurements.push(index);
 
         ActiveMeasurement::new(name)
     }
 
     /// Start a new measurement.
     fn start_measurement_inner(&mut self, name: &'static str) -> ActiveMeasurement {
+        // Add a new measurement.
+        let index = self.latest_frame.new_measurement(name);
+
         // Get the most recent active measurement.
-        let top_measurement = self.inner.active_measurements.last().copied().unwrap();
-        let measurement = unsafe { &mut *(top_measurement as *mut Measurement) };
+        let recent_index = self.active_measurements.last().copied().unwrap();
+        let measurement = &mut self.latest_frame[recent_index];
 
-        // Add a new index to the measurement.
-        measurement.indices.push(Measurement::new(name));
+        // Add the new index to the parent measurement.
+        measurement.indices.push(index);
 
-        // Set the index as the new most recent active measurement.
-        let index = measurement.indices.last().unwrap();
-
-        self.inner.active_measurements.push(index as *const _);
+        // Set the new index as the new most recent active measurement.
+        self.active_measurements.push(index);
 
         ActiveMeasurement::new(name)
     }
 
     /// Stop a running measurement.
     fn stop_measurement_inner(&mut self, name: &'static str) {
-        let Some(top_measurement) = self.inner.active_measurements.last().copied() else {
+        // Remove the measurement from the list of active measurements.
+        let Some(index) = self.active_measurements.pop() else {
             print_debug!(
                 "[{}] tried to stop measurement {} but no measurement is active",
                 "warning".yellow(),
@@ -149,23 +135,20 @@ impl Profiler {
             return;
         };
 
-        let measurement = unsafe { &mut *(top_measurement as *mut Measurement) };
+        let measurement = &mut self.latest_frame[index];
+
+        // Set the end time of the measurement.
+        measurement.stop_measurement();
 
         // Assert that the names match to emit a warning when something went wrong.
         if !std::ptr::addr_eq(name, measurement.name) {
             print_debug!(
-                "[{}] active measurement mismatch; exepcted {} but got {}",
+                "[{}] active measurement mismatch; expected {} but got {}",
                 "warning".yellow(),
                 measurement.name.magenta(),
                 name.magenta(),
             );
         }
-
-        // Set the end time of the measurement.
-        measurement.set_end_time();
-
-        // Remove the measurement from the list of active measurements.
-        self.inner.active_measurements.pop();
     }
 }
 

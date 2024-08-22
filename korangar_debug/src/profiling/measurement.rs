@@ -28,22 +28,32 @@ pub struct Measurement {
     pub name: &'static str,
     pub start_time: Instant,
     pub end_time: Instant,
-    pub indices: Vec<Measurement>,
+    pub indices: Vec<usize>,
 }
 
-impl Measurement {
-    pub fn new(name: &'static str) -> Self {
+impl Default for Measurement {
+    fn default() -> Self {
         let start_time = Instant::now();
 
         Self {
-            name,
+            name: "",
             start_time,
             end_time: start_time,
             indices: Vec::new(),
         }
     }
+}
 
-    pub(super) fn set_end_time(&mut self) {
+impl Measurement {
+    pub(super) fn start_measurement(&mut self, name: &'static str) {
+        let start_time = Instant::now();
+        self.name = name;
+        self.start_time = start_time;
+        self.end_time = start_time;
+        self.indices.clear();
+    }
+
+    pub(super) fn stop_measurement(&mut self) {
         self.end_time = Instant::now();
     }
 

@@ -3,6 +3,7 @@ use std::ops::Div;
 use std::time::Duration;
 
 use super::measurement::Measurement;
+use crate::profiling::frame_measurement::FrameMeasurement;
 use crate::profiling::LockThreadProfiler;
 
 #[derive(Default, Debug)]
@@ -25,7 +26,7 @@ impl MeasurementTiming {
     }
 }
 
-fn process_timing<const RECURSE: bool>(measurement: &Measurement, timings: &mut HashMap<&'static str, MeasurementTiming>) {
+fn process_timing(measurement: &Measurement, timings: &mut HashMap<&'static str, MeasurementTiming>) {
     let total_time = measurement.total_time_taken();
     let timing = timings.entry(measurement.name).or_insert(MeasurementTiming {
         shortest_time: Duration::MAX,
@@ -37,13 +38,6 @@ fn process_timing<const RECURSE: bool>(measurement: &Measurement, timings: &mut 
     timing.longest_time = timing.longest_time.max(total_time);
     timing.total_time += total_time;
     timing.times_called += 1;
-
-    if RECURSE {
-        measurement
-            .indices
-            .iter()
-            .for_each(|measurement| process_timing::<RECURSE>(measurement, timings));
-    }
 }
 
 fn calculate_standard_deviation(mean: Duration, times: &[Duration]) -> f64 {
@@ -68,19 +62,25 @@ pub struct FrameData {
 
 pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
     let profiler = thread.lock_profiler();
+    let saved_frames = profiler.get_saved_frames();
+    let frame_count = saved_frames.len();
     let mut longest_frame_time = Duration::default();
 
-    let frame_data = profiler
-        .get_saved_frames()
+    let frame_data = saved_frames
         .iter()
-        .map(|measurement| {
-            let total_time = measurement.total_time_taken();
+        .take(frame_count)
+        .map(|frame_measurement| {
+            let root_measurement = frame_measurement.root_measurement();
+            let total_time = root_measurement.total_time_taken();
             longest_frame_time = longest_frame_time.max(total_time);
 
-            let frame_times = measurement
+            let frame_times = root_measurement
                 .indices
                 .iter()
-                .map(|entry| (entry.name, entry.total_time_taken()))
+                .map(|index| {
+                    let measurement = &frame_measurement[*index];
+                    (measurement.name, measurement.total_time_taken())
+                })
                 .collect();
 
             FrameData { frame_times, total_time }
@@ -89,12 +89,13 @@ pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, 
 
     let mut timing_map = HashMap::new();
 
-    profiler.get_saved_frames().iter().for_each(|measurement| {
-        process_timing::<false>(measurement, &mut timing_map);
-        measurement
-            .indices
-            .iter()
-            .for_each(|measurement| process_timing::<false>(measurement, &mut timing_map))
+    saved_frames.iter().take(frame_count).for_each(|frame_measurement| {
+        let root_measurement = &frame_measurement.root_measurement();
+        process_timing(root_measurement, &mut timing_map);
+        root_measurement.indices.iter().for_each(|index| {
+            let measurement = &frame_measurement[*index];
+            process_timing(measurement, &mut timing_map)
+        })
     });
 
     let statistics_map = timing_map
@@ -111,15 +112,11 @@ pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, 
 
 pub fn get_number_of_saved_frames(thread: impl LockThreadProfiler) -> usize {
     let profiler = thread.lock_profiler();
-    profiler.get_saved_frames().iter().count()
+    profiler.get_saved_frames().len()
 }
 
-pub fn get_frame_by_index(thread: impl LockThreadProfiler, index: usize) -> Measurement {
+pub fn get_frame_by_index(thread: impl LockThreadProfiler, index: usize) -> FrameMeasurement {
     let profiler = thread.lock_profiler();
-
-    // TODO: maybe don't use the iterator to receive the frame? That would help
-    // performance
-    let measurement = profiler.get_saved_frames().iter().nth(index).unwrap();
-
-    measurement.clone()
+    let frames = profiler.get_saved_frames();
+    frames[index].clone()
 }

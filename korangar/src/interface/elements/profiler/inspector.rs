@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use derive_new::new;
-use korangar_debug::profiling::Measurement;
+use korangar_debug::profiling::{FrameMeasurement, Measurement};
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
@@ -21,7 +21,7 @@ const VISIBILITY_THRESHHOLD: f32 = 0.01;
 pub struct FrameInspectorView {
     #[new(default)]
     state: ElementState<InterfaceSettings>,
-    measurement: Measurement,
+    frame_measurement: FrameMeasurement,
     #[new(default)]
     start_offset: Duration,
     #[new(default)]
@@ -95,6 +95,7 @@ impl FrameInspectorView {
         renderer: &mut ElementRenderer<'_, InterfaceSettings>,
         color_lookup: &mut super::ColorLookup,
         theme: &InterfaceTheme,
+        frame_measurement: &FrameMeasurement,
         measurement: &Measurement,
         start_time: Instant,
         total_width: f32,
@@ -171,12 +172,13 @@ impl FrameInspectorView {
         let y_position = y_position
             + (theme.profiler.bar_gap.get().height + theme.profiler.bar_height.get()) * renderer.application.get_scaling_factor();
 
-        measurement.indices.iter().for_each(|measurement| {
+        measurement.indices.iter().for_each(|index| {
             Self::render_measurement(
                 renderer,
                 color_lookup,
                 theme,
-                measurement,
+                frame_measurement,
+                &frame_measurement[*index],
                 start_time,
                 total_width,
                 unit,
@@ -219,7 +221,8 @@ impl Element<InterfaceSettings> for FrameInspectorView {
     fn scroll(&mut self, delta: f32) -> Option<ChangeEvent> {
         const ZOOM_SPEED: f32 = 0.004;
 
-        let viewed_duration = self.measurement.total_time_taken() - (self.start_offset + self.end_offset);
+        let root_measurement = self.frame_measurement.root_measurement();
+        let viewed_duration = root_measurement.total_time_taken() - (self.start_offset + self.end_offset);
         let side_bias = (1.0 / self.state.cached_size.width) * self.state.mouse_position.get().left;
         let total_offset = viewed_duration.mul_f32(delta.abs() * ZOOM_SPEED);
 
@@ -259,8 +262,9 @@ impl Element<InterfaceSettings> for FrameInspectorView {
 
         let mut colors = super::ColorLookup::default();
 
-        let start_time = self.measurement.start_time + self.start_offset;
-        let end_time = self.measurement.end_time - self.end_offset;
+        let root_measurement = self.frame_measurement.root_measurement();
+        let start_time = root_measurement.start_time + self.start_offset;
+        let end_time = root_measurement.end_time - self.end_offset;
         let viewed_duration = end_time - start_time;
 
         // We only ever want to display a single unit, so we render from smallest to
@@ -316,7 +320,8 @@ impl Element<InterfaceSettings> for FrameInspectorView {
             &mut renderer,
             &mut colors,
             theme,
-            &self.measurement,
+            &self.frame_measurement,
+            root_measurement,
             start_time,
             self.state.cached_size.width,
             self.state.cached_size.width / viewed_duration.as_secs_f32(),

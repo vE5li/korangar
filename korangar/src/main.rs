@@ -331,11 +331,7 @@ fn main() {
         #[cfg(not(feature = "debug"))]
         let mut networking_system = NetworkingSystem::spawn();
         #[cfg(feature = "debug")]
-        let packet_callback = {
-            // SAFETY: This function leaks memory, but it's fine since we only call
-            // it once.
-            unsafe { interface::elements::PacketHistoryCallback::new() }
-        };
+        let packet_callback = interface::elements::PacketHistoryCallback::new();
         #[cfg(feature = "debug")]
         let mut networking_system = NetworkingSystem::spawn_with_callback(packet_callback.clone());
 

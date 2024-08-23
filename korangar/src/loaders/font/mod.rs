@@ -115,6 +115,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
     let mut last_glyph_id = None;
     let mut color = default_color;
     let mut chars = text.chars();
+    let text_address = text.as_ptr() as usize;
 
     while let Some(character) = chars.next() {
         if character.is_control() {
@@ -137,12 +138,9 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
                 .map(|_| cloned_chars.next())
                 .all(|option| option.is_some_and(|character| character.is_ascii_hexdigit()))
             {
-                // Advance the actual iterator
-                let color_bytes: [u8; 6] = chars.next_chunk().unwrap().map(|character| character as u8);
-
-                // We made sure that all characters are ascii hexdigits, so this is completetly
-                // safe.
-                let color_code = unsafe { std::str::from_utf8_unchecked(&color_bytes) };
+                let start_offset = chars.as_str().as_ptr() as usize - text_address;
+                let (color_code, remaining) = text[start_offset..].split_at(6);
+                chars = remaining.chars();
 
                 color = match color_code {
                     "000000" => default_color,

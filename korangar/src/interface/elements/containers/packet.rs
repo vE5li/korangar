@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::{Rc, Weak};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use korangar_debug::profiling::RingBuffer;
 use korangar_interface::application::Application;
@@ -164,18 +164,21 @@ impl PacketEntry {
     }
 }
 
+type PacketHistoryBuffer = RingBuffer<(PacketEntry, LinkedElement), 256>;
+type PacketHistoryBufferPointer = &'static Mutex<(PacketHistoryBuffer, usize)>;
+
 #[derive(Clone)]
 pub struct PacketHistoryCallback {
-    buffer_pointer: &'static Mutex<(RingBuffer<(PacketEntry, LinkedElement), 256>, usize)>,
+    buffer_pointer: PacketHistoryBufferPointer,
 }
 
-impl PacketHistoryCallback {
-    /// SAFETY: This function is unsafe because it leaks memory. It should
-    /// only be called once during the lifetime of the program.
-    pub unsafe fn new() -> Self {
-        let buffer_pointer = Box::leak(Box::new(Mutex::new((RingBuffer::default(), 0))));
+static BUFFER_POINTER: LazyLock<PacketHistoryBufferPointer> = LazyLock::new(|| Box::leak(Box::new(Mutex::new((RingBuffer::default(), 0)))));
 
-        Self { buffer_pointer }
+impl PacketHistoryCallback {
+    pub fn new() -> Self {
+        Self {
+            buffer_pointer: &BUFFER_POINTER,
+        }
     }
 
     pub fn remote(&self) -> PacketHistoryRemote {
@@ -245,7 +248,7 @@ impl PacketCallback for PacketHistoryCallback {
 
 #[derive(Clone)]
 pub struct PacketHistoryRemote {
-    buffer_pointer: &'static Mutex<(RingBuffer<(PacketEntry, LinkedElement), 256>, usize)>,
+    buffer_pointer: PacketHistoryBufferPointer,
     version: usize,
 }
 
@@ -260,7 +263,7 @@ impl PacketHistoryRemote {
         changed
     }
 
-    fn get(&self) -> MutexGuard<'_, (RingBuffer<(PacketEntry, LinkedElement), 256>, usize)> {
+    fn get(&self) -> MutexGuard<'_, (PacketHistoryBuffer, usize)> {
         self.buffer_pointer.lock().unwrap()
     }
 

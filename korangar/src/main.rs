@@ -331,7 +331,7 @@ fn main() {
         #[cfg(not(feature = "debug"))]
         let mut networking_system = NetworkingSystem::spawn();
         #[cfg(feature = "debug")]
-        let packet_callback = interface::elements::PacketHistoryCallback::new();
+        let packet_callback = interface::elements::PacketHistoryCallback::get_static_instance();
         #[cfg(feature = "debug")]
         let mut networking_system = NetworkingSystem::spawn_with_callback(packet_callback.clone());
 

@@ -175,7 +175,7 @@ pub struct PacketHistoryCallback {
 static BUFFER_POINTER: LazyLock<PacketHistoryBufferPointer> = LazyLock::new(|| Box::leak(Box::new(Mutex::new((RingBuffer::default(), 0)))));
 
 impl PacketHistoryCallback {
-    pub fn new() -> Self {
+    pub fn get_static_instance() -> Self {
         Self {
             buffer_pointer: &BUFFER_POINTER,
         }

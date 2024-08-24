@@ -3,8 +3,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use derive_new::new;
-use image::io::Reader as ImageReader;
-use image::{EncodableLayout, ImageFormat, Rgba};
+use image::{EncodableLayout, ImageFormat, ImageReader, Rgba};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};

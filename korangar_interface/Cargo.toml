@@ -9,7 +9,7 @@ cgmath = { workspace = true, optional = true }
 interface_procedural = { path = "procedural" }
 korangar_debug = { workspace = true, optional = true }
 num = { workspace = true }
-option-ext = "0.2.0"
+option-ext = { workspace = true }
 serde = { workspace = true, optional = true }
 
 [features]

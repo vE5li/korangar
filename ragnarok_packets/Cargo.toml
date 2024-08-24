@@ -10,9 +10,9 @@ ragnarok_bytes = { workspace = true, features = ["derive"] }
 ragnarok_procedural = { workspace = true }
 
 [dev-dependencies]
-etherparse = "0.15"
+etherparse = { workspace = true }
 korangar_debug = { workspace = true }
-pcap = "2.0.0"
+pcap = { workspace = true }
 
 [features]
 debug = []

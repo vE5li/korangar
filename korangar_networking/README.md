@@ -13,7 +13,7 @@ It connects to the server as a client and uses `Ollama` to generate responses to
 To run this example you need to set `USERNAME`, `PASSWORD`, and `CHARACTER_NAME` in the source code (you might also have to adjust `OLLAMA_ENDPOINT` and `OLLAMA_MODEL` depending on your setup).
 Afterwards you can run it with
 ```bash
-cargo run --example ollama-chat-bot
+cargo run --example ollama-chat-bot --features=example
 ```
 
 ##### Note: Make sure that Ollama is serving and the model specified in `OLLAMA_MODEL` is installed, otherwise you will get a `404`

@@ -4,38 +4,36 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bitflags = { workspace = true }
-bytemuck = { version = "1.9", features = ["derive", "extern_crate_std", "min_const_generics"] }
+bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["serde"] }
 chrono = { workspace = true }
 collision = { git = "https://github.com/rustgd/collision-rs.git" }
-derive-new = "0.6.0"
-image = "0.24.2"
+derive-new = { workspace = true }
+image = { workspace = true, features = ["bmp", "png", "tga", "rayon"] }
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
 korangar_networking = { workspace = true, features = ["debug"] }
-lunify = "1.1.0"
-mlua = { version = "0.8", features = ["lua51", "vendored"] }
+lunify = { workspace = true }
+mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
-option-ext = "0.2.0"
-pathfinding = "2.2.2"
+option-ext = { workspace = true }
+pathfinding = { workspace = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }
 ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
-rand = "0.8.5"
-random_color = { version = "0.6.1", optional = true }
-rayon = "1.5.3"
-ron = "0.8.0"
-rusttype = { version = "0.9.2", features = ["gpu_cache"] }
+rand = { workspace = true }
+random_color = { workspace = true, optional = true }
+rayon = { workspace = true }
+ron = { workspace = true }
+rusttype = { workspace = true, features = ["gpu_cache"] }
 serde = { workspace = true }
-serde-xml-rs = "0.6.0"
-tokio = { version = "1.37.0", features = ["full"] }
-vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
-vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
-walkdir = "2"
-winit = "0.28.7"
-xml-rs = "0.8.0"
-yazi = "0.1.4"
+serde-xml-rs = { workspace = true }
+vulkano = { workspace = true }
+vulkano-shaders = { workspace = true }
+walkdir = { workspace = true }
+winit = { workspace = true }
+xml-rs = { workspace = true }
+yazi = { workspace = true }
 
 [features]
 debug = ["korangar_debug", "ragnarok_packets/debug", "random_color"]

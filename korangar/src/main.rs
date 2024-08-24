@@ -216,7 +216,24 @@ fn main() {
         let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
         let mut action_loader = ActionLoader::default();
         let mut effect_loader = EffectLoader::default();
-        let script_loader = ScriptLoader::new(&mut game_file_loader);
+
+        let script_loader = ScriptLoader::new(&mut game_file_loader).unwrap_or_else(|_| {
+            // The scrip loader not being created correctly means that the lua files were
+            // not valid. It's possible that the archive was copied from a
+            // differen machine with a different architecture, so the one thing
+            // we can try is generating it again.
+
+            #[cfg(feature = "debug")]
+            print_debug!(
+                "[{}] failed to execute lua files; attempting to fix it by re-patching",
+                "error".red()
+            );
+
+            game_file_loader.remove_patched_lua_files();
+            game_file_loader.load_patched_lua_files();
+
+            ScriptLoader::new(&mut game_file_loader).unwrap()
+        });
     });
 
     time_phase!("load resources", {

@@ -82,6 +82,16 @@ impl GameFileLoader {
         timer.stop();
     }
 
+    pub fn remove_patched_lua_files(&self) {
+        if Path::new(LUA_GRF_FILE_NAME).exists() {
+            #[cfg(feature = "patched_as_folder")]
+            std::fs::remove_dir_all(LUA_GRF_FILE_NAME).unwrap();
+
+            #[cfg(not(feature = "patched_as_folder"))]
+            std::fs::remove_file(LUA_GRF_FILE_NAME).unwrap();
+        }
+    }
+
     pub fn load_patched_lua_files(&mut self) {
         if !Path::new(LUA_GRF_FILE_NAME).exists() {
             self.patch_lua_files();

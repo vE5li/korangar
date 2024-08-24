@@ -19,19 +19,19 @@ pub struct ScriptLoader {
 }
 
 impl ScriptLoader {
-    pub fn new(game_file_loader: &mut GameFileLoader) -> Self {
+    pub fn new(game_file_loader: &mut GameFileLoader) -> mlua::Result<Self> {
         let state = Lua::new();
 
         let data = game_file_loader
             .get("data\\luafiles514\\lua files\\datainfo\\jobidentity.lub")
             .unwrap();
-        state.load(&data).exec().unwrap();
+        state.load(&data).exec()?;
 
         let data = game_file_loader
             .get("data\\luafiles514\\lua files\\datainfo\\iteminfo.lub")
             .unwrap();
 
-        state.load(&data).exec().unwrap();
+        state.load(&data).exec()?;
 
         let job_id_function = r#"
 function get_job_name_from_id(id)
@@ -58,9 +58,9 @@ function get_job_name_from_id(id)
 end
 "#;
 
-        state.load(job_id_function).exec().unwrap();
+        state.load(job_id_function).exec()?;
 
-        Self { state }
+        Ok(Self { state })
     }
 
     // TODO: move this to a different class that utilizes the script loader

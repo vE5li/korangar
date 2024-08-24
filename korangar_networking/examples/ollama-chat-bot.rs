@@ -59,7 +59,7 @@ impl MessageHistory {
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Chat bot settings.
     const SOCKET_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(49, 12, 109, 207)), 6900);

@@ -26,8 +26,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
-use image::io::Reader as ImageReader;
-use image::{EncodableLayout, ImageFormat};
+use image::{EncodableLayout, ImageFormat, ImageReader};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 #[cfg(feature = "debug")]

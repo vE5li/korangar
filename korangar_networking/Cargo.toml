@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-korangar_debug = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true }
 ragnarok_packets = { workspace = true }
-reqwest = { workspace = true, features = ["json"], optional = true }
-serde = { workspace = true, features = ["derive"], optional = true }
 tokio = { workspace = true, features = ["rt", "io-util", "net", "macros", "sync", "time"] }
+
+[dev-dependencies]
+korangar_debug = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+serde = { workspace = true, features = ["derive"] }
 
 [features]
 debug = []
-example = ["korangar_debug", "reqwest", "serde"]

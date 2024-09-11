@@ -1,21 +1,22 @@
-use std::sync::Arc;
-
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use collision::{Aabb3, Frustum, Relation};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
+#[cfg(feature = "debug")]
 use korangar_interface::windows::PrototypeWindow;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
-use ragnarok_formats::map::{EffectSource, LightSettings, LightSource, MapData, SoundSource, Tile, TileFlags, WaterSettings};
+#[cfg(feature = "debug")]
+use ragnarok_formats::map::MapData;
+use ragnarok_formats::map::{EffectSource, LightSettings, LightSource, SoundSource, Tile, TileFlags, WaterSettings};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
-use vulkano::buffer::Subbuffer;
-use vulkano::image::view::ImageView;
+use wgpu::RenderPass;
 
 use crate::graphics::*;
+#[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
 use crate::world::*;
 
@@ -46,7 +47,7 @@ fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
 
 fn get_ambient_light_color(ambient_color: Color, day_timer: f32) -> Color {
     let sun_offset = 0.0;
-    let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.35 + Vector3::from_value(0.65)) * 255.0;
+    let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
     color_from_channel(ambient_color, ambient_channels)
 }
 
@@ -58,13 +59,13 @@ fn get_directional_light_color_intensity(directional_color: Color, intensity: f3
 
     if directional_channels.x.is_sign_positive() {
         let directional_color = color_from_channel(directional_color, directional_channels);
-        return (directional_color, f32::min(intensity * 1.2, 1.0));
+        return (directional_color, f32::min(intensity * 1.5, 1.0));
     }
 
     let directional_channels = get_channels(day_timer, moon_offset, [0.3; 3]) * 255.0;
     let directional_color = color_from_channel(Color::rgb_u8(150, 150, 255), directional_channels);
 
-    (directional_color, f32::min(intensity * 1.2, 1.0))
+    (directional_color, f32::min(intensity * 1.5, 1.0))
 }
 
 pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
@@ -101,15 +102,15 @@ pub struct Map {
     water_settings: Option<WaterSettings>,
     light_settings: LightSettings,
     tiles: Vec<Tile>,
-    ground_vertex_buffer: Subbuffer<[ModelVertex]>,
-    water_vertex_buffer: Option<Subbuffer<[WaterVertex]>>,
-    ground_textures: Vec<Arc<ImageView>>,
+    ground_vertex_buffer: Buffer<ModelVertex>,
+    water_vertex_buffer: Option<Buffer<WaterVertex>>,
+    ground_textures: TextureGroup,
     objects: Vec<Object>,
     light_sources: Vec<LightSource>,
     sound_sources: Vec<SoundSource>,
     effect_sources: Vec<EffectSource>,
-    tile_picker_vertex_buffer: Subbuffer<[TileVertex]>,
-    tile_vertex_buffer: Subbuffer<[ModelVertex]>,
+    tile_picker_vertex_buffer: Buffer<TileVertex>,
+    tile_vertex_buffer: Buffer<ModelVertex>,
     #[cfg(feature = "debug")]
     map_data: MapData,
 }
@@ -134,14 +135,21 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_ground<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera, time: f32)
-    where
+    pub fn render_ground<T>(
+        &self,
+        render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
+        renderer: &T,
+        camera: &dyn Camera,
+        time: f32,
+    ) where
         T: Renderer + GeometryRenderer,
     {
         renderer.render_geometry(
             render_target,
+            render_pass,
             camera,
-            self.ground_vertex_buffer.clone(),
+            &self.ground_vertex_buffer,
             &self.ground_textures,
             Matrix4::identity(),
             time,
@@ -152,6 +160,7 @@ impl Map {
     pub fn render_objects<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         client_tick: ClientTick,
@@ -167,7 +176,7 @@ impl Map {
         for object in &self.objects {
             #[cfg(feature = "debug")]
             if !frustum_culling {
-                object.render_geometry(render_target, renderer, camera, client_tick, time);
+                object.render_geometry(render_target, render_pass, renderer, camera, client_tick, time);
                 continue;
             }
 
@@ -187,7 +196,7 @@ impl Map {
             culling_measurement.stop();
 
             if !culled {
-                object.render_geometry(render_target, renderer, camera, client_tick, time);
+                object.render_geometry(render_target, render_pass, renderer, camera, client_tick, time);
             };
         }
     }
@@ -197,6 +206,7 @@ impl Map {
         &self,
         entities: &[Entity],
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         include_self: bool,
@@ -206,7 +216,7 @@ impl Map {
         entities
             .iter()
             .skip(!include_self as usize)
-            .for_each(|entity| entity.render(render_target, renderer, camera));
+            .for_each(|entity| entity.render(render_target, render_pass, renderer, camera));
     }
 
     #[cfg(feature = "debug")]
@@ -214,6 +224,7 @@ impl Map {
     pub fn render_bounding(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         player_camera: &dyn Camera,
@@ -242,19 +253,26 @@ impl Map {
             let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
             let transform = Transform::position(position);
 
-            renderer.render_bounding_box(render_target, camera, &transform, &bounding_box, color);
+            renderer.render_bounding_box(render_target, render_pass, camera, &transform, &bounding_box, color);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_tiles(&self, render_target: &mut <PickerRenderer as Renderer>::Target, renderer: &PickerRenderer, camera: &dyn Camera) {
-        renderer.render_tiles(render_target, camera, self.tile_picker_vertex_buffer.clone());
+    pub fn render_tiles(
+        &self,
+        render_target: &mut <PickerRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        renderer: &PickerRenderer,
+        camera: &dyn Camera,
+    ) {
+        renderer.render_tiles(render_target, render_pass, camera, &self.tile_picker_vertex_buffer);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_walk_indicator<T>(
         &self,
         render_target: &mut <T>::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         color: Color,
@@ -263,19 +281,29 @@ impl Map {
         T: Renderer + IndicatorRenderer,
     {
         const OFFSET: f32 = 1.0;
+        const TILE_SIZE: f32 = 5.0;
 
         let tile = self.get_tile(position);
 
         if tile.flags.contains(TileFlags::WALKABLE) {
-            let base_x = position.x as f32 * 5.0;
-            let base_y = position.y as f32 * 5.0;
+            let base_x = position.x as f32 * TILE_SIZE;
+            let base_y = position.y as f32 * TILE_SIZE;
 
             let upper_left = Vector3::new(base_x, tile.upper_left_height + OFFSET, base_y);
-            let upper_right = Vector3::new(base_x + 5.0, tile.upper_right_height + OFFSET, base_y);
-            let lower_left = Vector3::new(base_x, tile.lower_left_height + OFFSET, base_y + 5.0);
-            let lower_right = Vector3::new(base_x + 5.0, tile.lower_right_height + OFFSET, base_y + 5.0);
+            let upper_right = Vector3::new(base_x + TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
+            let lower_left = Vector3::new(base_x, tile.lower_left_height + OFFSET, base_y + TILE_SIZE);
+            let lower_right = Vector3::new(base_x + TILE_SIZE, tile.lower_right_height + OFFSET, base_y + TILE_SIZE);
 
-            renderer.render_walk_indicator(render_target, camera, color, upper_left, upper_right, lower_left, lower_right);
+            renderer.render_walk_indicator(
+                render_target,
+                render_pass,
+                camera,
+                color,
+                upper_left,
+                upper_right,
+                lower_left,
+                lower_right,
+            );
         }
     }
 
@@ -283,28 +311,36 @@ impl Map {
     pub fn render_water(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         day_timer: f32,
     ) {
         if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
-            renderer.render_water(render_target, camera, water_vertex_buffer.clone(), day_timer);
+            renderer.render_water(render_target, render_pass, camera, water_vertex_buffer, day_timer);
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn ambient_light(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, day_timer: f32) {
+    pub fn ambient_light(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        renderer: &DeferredRenderer,
+        day_timer: f32,
+    ) {
         let ambient_color = get_ambient_light_color(self.light_settings.ambient_color.to_owned().unwrap().into(), day_timer);
-        renderer.ambient_light(render_target, ambient_color);
+        renderer.ambient_light(render_target, render_pass, ambient_color);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn directional_light(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        light_image: Arc<ImageView>,
+        light_texture: &Texture,
         light_matrix: Matrix4<f32>,
         day_timer: f32,
     ) {
@@ -317,8 +353,9 @@ impl Map {
 
         renderer.directional_light(
             render_target,
+            render_pass,
             camera,
-            light_image,
+            light_texture,
             light_matrix,
             light_direction,
             directional_color,
@@ -330,18 +367,20 @@ impl Map {
     pub fn point_lights(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
         self.light_sources
             .iter()
-            .for_each(|light_source| light_source.render_light(render_target, renderer, camera));
+            .for_each(|light_source| light_source.render_light(render_target, render_pass, renderer, camera));
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn water_light(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
@@ -351,7 +390,7 @@ impl Map {
             .and_then(|settings| settings.water_level)
             .unwrap_or_default();
 
-        renderer.water_light(render_target, camera, water_level);
+        renderer.water_light(render_target, render_pass, camera, water_level);
     }
 
     #[cfg(feature = "debug")]
@@ -364,10 +403,11 @@ impl Map {
     pub fn render_overlay_tiles(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        renderer.render_overlay_tiles(render_target, camera, self.tile_vertex_buffer.clone());
+        renderer.render_overlay_tiles(render_target, render_pass, camera, &self.tile_vertex_buffer);
     }
 
     #[cfg(feature = "debug")]
@@ -392,6 +432,7 @@ impl Map {
     pub fn render_markers<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         render_settings: &RenderSettings,
@@ -406,6 +447,7 @@ impl Map {
 
                 object.render_marker(
                     render_target,
+                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -420,6 +462,7 @@ impl Map {
 
                 light_source.render_marker(
                     render_target,
+                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -434,6 +477,7 @@ impl Map {
 
                 sound_source.render_marker(
                     render_target,
+                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -448,6 +492,7 @@ impl Map {
 
                 effect_source.render_marker(
                     render_target,
+                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -462,6 +507,7 @@ impl Map {
 
                 entity.render_marker(
                     render_target,
+                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -476,12 +522,13 @@ impl Map {
     pub fn render_marker_box(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
     ) {
         match marker_identifier {
-            MarkerIdentifier::Object(index) => self.objects[index].render_bounding_box(render_target, renderer, camera),
+            MarkerIdentifier::Object(index) => self.objects[index].render_bounding_box(render_target, render_pass, renderer, camera),
             MarkerIdentifier::LightSource(_index) => {}
             MarkerIdentifier::SoundSource(_index) => {}
             MarkerIdentifier::EffectSource(_index) => {}

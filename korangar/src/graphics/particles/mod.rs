@@ -1,10 +1,12 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
 use derive_new::new;
 use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
+use wgpu::RenderPass;
 
 use crate::graphics::*;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -17,6 +19,7 @@ pub trait Particle {
     fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
@@ -52,17 +55,14 @@ impl Particle for DamageNumber {
     fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
-        let screen_position = Vector2::new(
-            clip_space_position.x / clip_space_position.w + 1.0,
-            clip_space_position.y / clip_space_position.w + 1.0,
-        );
-        let screen_position = screen_position / 2.0;
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
             top: screen_position.y * window_size.height,
@@ -70,6 +70,7 @@ impl Particle for DamageNumber {
 
         renderer.render_damage_text(
             render_target,
+            render_pass,
             &self.damage_amount,
             final_position,
             Color::monochrome_u8(255),
@@ -101,17 +102,14 @@ impl Particle for HealNumber {
     fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
-        let screen_position = Vector2::new(
-            clip_space_position.x / clip_space_position.w + 1.0,
-            clip_space_position.y / clip_space_position.w + 1.0,
-        );
-        let screen_position = screen_position / 2.0;
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
             top: screen_position.y * window_size.height,
@@ -119,6 +117,7 @@ impl Particle for HealNumber {
 
         renderer.render_damage_text(
             render_target,
+            render_pass,
             &self.heal_amount,
             final_position,
             Color::rgb_u8(30, 255, 30),
@@ -129,7 +128,7 @@ impl Particle for HealNumber {
 
 pub struct QuestIcon {
     position: Vector3<f32>,
-    texture: Arc<ImageView>,
+    texture: Arc<Texture>,
     color: Color,
 }
 
@@ -162,17 +161,15 @@ impl QuestIcon {
     fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
+        scaling_factor: f32,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
-        let screen_position = Vector2::new(
-            clip_space_position.x / clip_space_position.w + 1.0,
-            clip_space_position.y / clip_space_position.w + 1.0,
-        );
-        let screen_position = screen_position / 2.0;
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
             top: screen_position.y * window_size.height,
@@ -180,9 +177,10 @@ impl QuestIcon {
 
         renderer.render_sprite(
             render_target,
-            self.texture.clone(),
-            final_position - ScreenSize::uniform(15.0),
-            ScreenSize::uniform(30.0),
+            render_pass,
+            &self.texture,
+            final_position - ScreenSize::uniform(15.0 * scaling_factor),
+            ScreenSize::uniform(30.0 * scaling_factor),
             ScreenClip::unbound(),
             self.color,
             true,
@@ -232,18 +230,20 @@ impl ParticleHolder {
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
+        scaling_factor: f32,
         entities: &[Entity],
     ) {
         self.particles
             .iter()
-            .for_each(|particle| particle.render(render_target, renderer, camera, window_size));
+            .for_each(|particle| particle.render(render_target, render_pass, renderer, camera, window_size));
 
         entities
             .iter()
             .filter_map(|entity| self.quest_icons.get(&entity.get_entity_id()))
-            .for_each(|quest_icon| quest_icon.render(render_target, renderer, camera, window_size));
+            .for_each(|quest_icon| quest_icon.render(render_target, render_pass, renderer, camera, window_size, scaling_factor));
     }
 }

@@ -1,6 +1,5 @@
+mod math;
 mod timer;
-#[macro_use]
-mod vulkan;
 
+pub use self::math::multiply_matrix4_and_vector3;
 pub use self::timer::GameTimer;
-pub use self::vulkan::*;

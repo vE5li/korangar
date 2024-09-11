@@ -1,103 +1,152 @@
-vertex_shader!("src/graphics/renderers/picker/tile/vertex_shader.glsl");
-fragment_shader!("src/graphics/renderers/picker/tile/fragment_shader.glsl");
-
 use std::sync::Arc;
 
-use vulkano::descriptor_set::WriteDescriptorSet;
-use vulkano::device::{Device, DeviceOwned};
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
-use vulkano::render_pass::Subpass;
-use vulkano::shader::EntryPoint;
+use bytemuck::{Pod, Zeroable};
+use wgpu::{
+    include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+    BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState,
+    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
+};
 
-use self::vertex_shader::Matrices;
-use super::PickerSubrenderer;
-use crate::graphics::renderers::pipeline::PipelineBuilder;
+use super::PickerSubRenderer;
 use crate::graphics::*;
 
+const SHADER: ShaderModuleDescriptor = include_wgsl!("title.wgsl");
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+struct Matrices {
+    view_projection: [[f32; 4]; 4],
+}
+
 pub struct TileRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
-    vertex_shader: EntryPoint,
-    fragment_shader: EntryPoint,
-    matrices_buffer: MatrixAllocator<Matrices>,
-    pipeline: Arc<GraphicsPipeline>,
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    matrices_buffer: Buffer<Matrices>,
+    bind_group_layout: BindGroupLayout,
+    pipeline: RenderPipeline,
 }
 
 impl TileRenderer {
-    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
-        let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::entry_point(&device);
-        let fragment_shader = fragment_shader::entry_point(&device);
-        let matrices_buffer = MatrixAllocator::new(&memory_allocator);
-        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, output_color_format: TextureFormat, output_depth_format: TextureFormat) -> Self {
+        let shader_module = device.create_shader_module(SHADER);
+        let matrices_buffer = Buffer::with_capacity(
+            &device,
+            "tile",
+            BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            size_of::<Matrices>() as _,
+        );
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("tile"),
+            entries: &[BindGroupLayoutEntry {
+                binding: 0,
+                visibility: ShaderStages::VERTEX,
+                ty: BindingType::Buffer {
+                    ty: BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: matrices_buffer.byte_capacity(),
+                },
+                count: None,
+            }],
+        });
+
+        let pipeline = Self::create_pipeline(
+            &device,
+            &shader_module,
+            &bind_group_layout,
+            output_color_format,
+            output_depth_format,
+        );
 
         Self {
-            memory_allocator,
-            vertex_shader,
-            fragment_shader,
+            device,
+            queue,
             matrices_buffer,
+            bind_group_layout,
             pipeline,
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
-        self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
-    }
-
     fn create_pipeline(
-        device: Arc<Device>,
-        subpass: Subpass,
-        viewport: Viewport,
-        vertex_shader: &EntryPoint,
-        fragment_shader: &EntryPoint,
-    ) -> Arc<GraphicsPipeline> {
-        PipelineBuilder::<_, { PickerRenderer::subpass() }>::new([vertex_shader, fragment_shader])
-            .vertex_input_state::<TileVertex>(vertex_shader)
-            .fixed_viewport(viewport)
-            .simple_depth_test()
-            .build(device, subpass)
+        device: &Device,
+        shader_module: &ShaderModule,
+        bind_group_layout: &BindGroupLayout,
+        output_color_format: TextureFormat,
+        output_depth_format: TextureFormat,
+    ) -> RenderPipeline {
+        let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("tile"),
+            bind_group_layouts: &[bind_group_layout],
+            push_constant_ranges: &[],
+        });
+
+        device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("tile"),
+            layout: Some(&layout),
+            vertex: VertexState {
+                module: shader_module,
+                entry_point: "vs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[TileVertex::buffer_layout()],
+            },
+            fragment: Some(FragmentState {
+                module: shader_module,
+                entry_point: "fs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: output_color_format,
+                    blend: None,
+                    write_mask: ColorWrites::default(),
+                })],
+            }),
+            multiview: None,
+            primitive: PrimitiveState::default(),
+            multisample: MultisampleState::default(),
+            depth_stencil: Some(DepthStencilState {
+                format: output_depth_format,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Greater,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            cache: None,
+        })
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target) {
-        render_target
-            .state
-            .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .unwrap();
+    fn bind_pipeline(&self, render_pass: &mut RenderPass, camera: &dyn Camera) {
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let uniform_data = Matrices {
+            view_projection: (projection_matrix * view_matrix).into(),
+        };
+        self.matrices_buffer.write_exact(&self.queue, &[uniform_data]);
+
+        let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
+            label: Some("geometry"),
+            layout: &self.bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: self.matrices_buffer.as_entire_binding(),
+            }],
+        });
+
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &bind_group, &[]);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render tiles"))]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[TileVertex]>,
+        vertex_buffer: &Buffer<TileVertex>,
     ) {
-        if render_target.bind_subrenderer(PickerSubrenderer::Tile) {
-            self.bind_pipeline(render_target);
+        if render_target.bound_sub_renderer(PickerSubRenderer::Tile) {
+            self.bind_pipeline(render_pass, camera);
         }
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let buffer = self.matrices_buffer.allocate(Matrices {
-            view_projection: (projection_matrix * view_matrix).into(),
-        });
-
-        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [WriteDescriptorSet::buffer(
-            0, buffer,
-        )]);
-
-        let vertex_count = vertex_buffer.size() as usize / size_of::<TileVertex>();
-
-        render_target
-            .state
-            .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, set_id, set)
-            .unwrap()
-            .bind_vertex_buffers(0, vertex_buffer)
-            .unwrap()
-            .draw(vertex_count as u32, 1, 0, 0)
-            .unwrap();
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        render_pass.draw(0..vertex_buffer.count(), 0..1);
     }
 }

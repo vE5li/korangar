@@ -6,35 +6,23 @@ use derive_new::new;
 use image::{EncodableLayout, ImageFormat, ImageReader, Rgba};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
-use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
-};
-use vulkano::device::Queue;
-use vulkano::format::Format;
-use vulkano::image::view::ImageView;
-use vulkano::image::{Image, ImageCreateInfo, ImageUsage};
-use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
-use vulkano::sync::future::FenceSignalFuture;
-use vulkano::sync::GpuFuture;
+use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
 use super::error::LoadError;
 use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
-use crate::graphics::MemoryAllocator;
+use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
 
 #[derive(new)]
 pub struct TextureLoader {
-    memory_allocator: Arc<MemoryAllocator>,
+    device: Arc<Device>,
     queue: Arc<Queue>,
     #[new(default)]
-    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator>>,
-    #[new(value = "HashMap::new()")]
-    cache: HashMap<String, Arc<ImageView>>,
+    cache: HashMap<String, Arc<Texture>>,
 }
 
 impl TextureLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, LoadError> {
+    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Texture>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}", path.magenta()));
 
@@ -76,46 +64,27 @@ impl TextureLoader {
                 .for_each(|pixel| *pixel = Rgba([0; 4]));
         }
 
-        let load_buffer = self.load_buffer.get_or_insert_with(|| {
-            AutoCommandBufferBuilder::primary(
-                &*self.memory_allocator,
-                self.queue.queue_family_index(),
-                CommandBufferUsage::OneTimeSubmit,
-            )
-            .unwrap()
-        });
-
-        let buffer = Buffer::from_iter(
-            &*self.memory_allocator,
-            BufferCreateInfo {
-                usage: BufferUsage::TRANSFER_SRC,
-                ..Default::default()
+        let texture = Texture::new_with_data(
+            &self.device,
+            &self.queue,
+            &TextureDescriptor {
+                label: Some(path),
+                size: Extent3d {
+                    width: image_buffer.width(),
+                    height: image_buffer.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
             },
-            AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                ..Default::default()
-            },
-            image_buffer.as_bytes().iter().copied(),
-        )
-        .unwrap();
+            image_buffer.as_bytes(),
+        );
+        let texture = Arc::new(texture);
 
-        let image = Image::new(
-            &*self.memory_allocator,
-            ImageCreateInfo {
-                format: Format::R8G8B8A8_UNORM,
-                extent: [image_buffer.width(), image_buffer.height(), 1],
-                usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
-                ..Default::default()
-            },
-            AllocationCreateInfo::default(),
-        )
-        .unwrap();
-
-        load_buffer
-            .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(buffer, image.clone()))
-            .unwrap();
-
-        let texture = ImageView::new_default(image).unwrap();
         self.cache.insert(path.to_string(), texture.clone());
 
         #[cfg(feature = "debug")]
@@ -124,23 +93,10 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<ImageView>, LoadError> {
+    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Texture>, LoadError> {
         match self.cache.get(path) {
             Some(texture) => Ok(texture.clone()),
             None => self.load(path, game_file_loader),
         }
-    }
-
-    pub fn submit_load_buffer(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
-        self.load_buffer.take().map(|buffer| {
-            buffer
-                .build()
-                .unwrap()
-                .execute(self.queue.clone())
-                .unwrap()
-                .boxed()
-                .then_signal_fence_and_flush()
-                .unwrap()
-        })
     }
 }

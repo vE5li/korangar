@@ -7,7 +7,7 @@ bitflags = "2.6"
 bytemuck = "1.17"
 cgmath = "0.18"
 chrono = "0.4"
-derive-new = "0.6"
+derive-new = "0.7"
 etherparse = "0.15"
 image = { version = "0.25", default-features = false }
 korangar_debug = { path = "korangar_debug" }
@@ -19,6 +19,7 @@ num = "0.4"
 option-ext = "0.2"
 pathfinding = "4.10"
 pcap = "2.0"
+pollster = "0.3"
 proc-macro2 = "1.0"
 quote = "1.0"
 ragnarok_bytes = { path = "ragnarok_bytes" }
@@ -35,9 +36,8 @@ serde = "1.0"
 serde-xml-rs = "0.6"
 syn = "2.0"
 tokio = { version = "1.39", default-features = false }
-vulkano = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
-vulkano-shaders = { git = "https://github.com/vulkano-rs/vulkano.git", rev = "db3df4e55f80c137ea6187250957eb92c2291627" }
 walkdir = "2.5"
-winit = "0.28"
+wgpu = "22.1"
+winit = "0.30"
 xml-rs = "0.8"
 yazi = "0.2"

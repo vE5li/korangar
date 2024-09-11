@@ -9,6 +9,7 @@ use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{Dimension, PlacementResolver};
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
+use wgpu::RenderPass;
 
 pub use self::builder::ChatBuilder;
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
@@ -75,6 +76,7 @@ impl Element<InterfaceSettings> for Chat {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -87,7 +89,7 @@ impl Element<InterfaceSettings> for Chat {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         let mut offset = 0.0;
 

@@ -11,11 +11,11 @@ use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
-use vulkano::image::view::ImageView;
+use wgpu::RenderPass;
 
 use super::error::LoadError;
 use super::Sprite;
-use crate::graphics::{Color, Renderer, SpriteRenderer};
+use crate::graphics::{Color, Renderer, SpriteRenderer, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
@@ -78,13 +78,13 @@ pub struct Actions {
 }
 
 impl Actions {
-    pub fn render(
+    pub fn render<'a>(
         &self,
-        sprite: &Sprite,
+        sprite: &'a Sprite,
         animation_state: &AnimationState,
         camera_direction: usize,
         head_direction: usize,
-    ) -> (Arc<ImageView>, Vector2<f32>, bool) {
+    ) -> (&'a Texture, Vector2<f32>, bool) {
         let direction = (camera_direction + head_direction) % 8;
         let aa = animation_state.action * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
@@ -104,13 +104,13 @@ impl Actions {
 
         let fs = &a.motions[frame as usize % a.motions.len()];
 
-        let texture = sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone();
-        let texture_size = texture.image().extent().map(|component| component as f32);
+        let texture = &sprite.textures[fs.sprite_clips[0].sprite_number as usize];
+        let texture_size = texture.get_extend();
         let offset = fs.sprite_clips[0].position.map(|component| component as f32);
 
         (
             texture,
-            Vector2::new(-offset.x, offset.y + texture_size[1] / 2.0) / 10.0,
+            Vector2::new(-offset.x, offset.y + (texture_size.height as f32) / 2.0) / 10.0,
             fs.sprite_clips[0].mirror_on != 0,
         )
     }
@@ -118,6 +118,7 @@ impl Actions {
     pub fn render2<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         sprite: &Sprite,
         animation_state: &AnimationState,
@@ -157,8 +158,8 @@ impl Actions {
             let dimesions = sprite_clip
                 .size
                 .unwrap_or_else(|| {
-                    let image_size = texture.image().extent();
-                    Vector2::new(image_size[0], image_size[1])
+                    let image_size = texture.get_extend();
+                    Vector2::new(image_size.width, image_size.height)
                 })
                 .map(|component| component as f32);
             let zoom = sprite_clip.zoom.unwrap_or(1.0) * application.get_scaling_factor();
@@ -186,7 +187,8 @@ impl Actions {
 
             renderer.render_sprite(
                 render_target,
-                texture.clone(),
+                render_pass,
+                texture,
                 final_position,
                 final_size,
                 screen_clip,

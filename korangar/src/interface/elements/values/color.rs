@@ -1,6 +1,7 @@
 use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
+use wgpu::RenderPass;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -95,6 +96,7 @@ impl Element<InterfaceSettings> for MutableColorValue {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -107,7 +109,7 @@ impl Element<InterfaceSettings> for MutableColorValue {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) {
             true => self.cached_color.shade(),

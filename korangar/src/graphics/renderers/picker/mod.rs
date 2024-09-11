@@ -9,10 +9,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
 use ragnarok_packets::EntityId;
-use vulkano::device::{DeviceOwned, Queue};
-use vulkano::format::Format;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::render_pass::RenderPass;
+use wgpu::{Device, Queue, RenderPass};
 
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
@@ -20,7 +17,6 @@ use self::geometry::GeometryRenderer;
 use self::marker::MarkerRenderer;
 pub use self::target::PickerTarget;
 use self::tile::TileRenderer;
-use super::SubpassAttachments;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
@@ -28,7 +24,7 @@ use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as
 use crate::world::MarkerIdentifier;
 
 #[derive(PartialEq, Eq)]
-pub enum PickerSubrenderer {
+pub enum PickerSubRenderer {
     Geometry,
     Entity,
     Tile,
@@ -37,9 +33,7 @@ pub enum PickerSubrenderer {
 }
 
 pub struct PickerRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
-    queue: Arc<Queue>,
-    render_pass: Arc<RenderPass>,
+    device: Arc<Device>,
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     tile_renderer: TileRenderer,
@@ -48,50 +42,19 @@ pub struct PickerRenderer {
     dimensions: [u32; 2],
 }
 
-unsafe impl Send for PickerRenderer {}
-unsafe impl Sync for PickerRenderer {}
-
 impl PickerRenderer {
-    const fn subpass() -> SubpassAttachments {
-        SubpassAttachments { color: 1, depth: 1 }
-    }
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, dimensions: [u32; 2]) -> Self {
+        let output_color_format = <Self as Renderer>::Target::output_color_format();
+        let output_depth_format = <Self as Renderer>::Target::depth_texture_format();
 
-    pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, viewport: Viewport, dimensions: [u32; 2]) -> Self {
-        let device = memory_allocator.device().clone();
-        let render_pass = vulkano::single_pass_renderpass!(
-            device,
-            attachments: {
-                color: {
-                    format: Format::R32_UINT,
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                depth: {
-                    format: Format::D16_UNORM,
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: DontCare,
-                }
-            },
-            pass: {
-                color: [color],
-                depth_stencil: {depth}
-            }
-        )
-        .unwrap();
-
-        let subpass = render_pass.clone().first_subpass();
-        let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
-        let entity_renderer = EntityRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
-        let tile_renderer = TileRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
+        let geometry_renderer = GeometryRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
+        let entity_renderer = EntityRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
+        let tile_renderer = TileRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
         #[cfg(feature = "debug")]
-        let marker_renderer = MarkerRenderer::new(memory_allocator.clone(), subpass, viewport);
+        let marker_renderer = MarkerRenderer::new(device.clone(), output_color_format, output_depth_format);
 
         Self {
-            memory_allocator,
-            queue,
-            render_pass,
+            device,
             geometry_renderer,
             entity_renderer,
             tile_renderer,
@@ -101,38 +64,24 @@ impl PickerRenderer {
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("recreate picker pipeline"))]
-    pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
-        let device = self.memory_allocator.device().clone();
-        let subpass = self.render_pass.clone().first_subpass();
-        self.geometry_renderer
-            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone(), false);
-        self.entity_renderer
-            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
-        self.tile_renderer
-            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
-        #[cfg(feature = "debug")]
-        self.marker_renderer.recreate_pipeline(device, subpass, viewport);
+    #[cfg_attr(feature = "debug", korangar_debug::profile("reconfigure picker pipeline"))]
+    pub fn reconfigure_pipeline(&mut self, dimensions: [u32; 2]) {
         self.dimensions = dimensions;
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("create picker render target"))]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
-        <Self as Renderer>::Target::new(
-            self.memory_allocator.clone(),
-            self.queue.clone(),
-            self.render_pass.clone(),
-            self.dimensions,
-        )
+        <Self as Renderer>::Target::new(&self.device, self.dimensions)
     }
 
     pub fn render_tiles(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[TileVertex]>,
+        vertex_buffer: &Buffer<TileVertex>,
     ) {
-        self.tile_renderer.render(render_target, camera, vertex_buffer);
+        self.tile_renderer.render(render_target, render_pass, camera, vertex_buffer);
     }
 }
 
@@ -144,16 +93,17 @@ impl GeometryRendererTrait for PickerRenderer {
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[ModelVertex]>,
-        textures: &[Arc<ImageView>],
+        vertex_buffer: &Buffer<ModelVertex>,
+        textures: &TextureGroup,
         world_matrix: Matrix4<f32>,
         _time: f32,
     ) where
         Self: Renderer,
     {
         self.geometry_renderer
-            .render(render_target, camera, vertex_buffer, textures, world_matrix);
+            .render(render_target, render_pass, camera, vertex_buffer, textures, world_matrix);
     }
 }
 
@@ -161,8 +111,9 @@ impl EntityRendererTrait for PickerRenderer {
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        texture: Arc<ImageView>,
+        texture: &Texture,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,
@@ -175,6 +126,7 @@ impl EntityRendererTrait for PickerRenderer {
     {
         self.entity_renderer.render(
             render_target,
+            render_pass,
             camera,
             texture,
             position,
@@ -193,6 +145,7 @@ impl MarkerRendererTrait for PickerRenderer {
     fn render_marker(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         position: Vector3<f32>,
@@ -203,10 +156,10 @@ impl MarkerRendererTrait for PickerRenderer {
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
 
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
-            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
+            let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
 
             self.marker_renderer
-                .render(render_target, screen_position, screen_size, marker_identifier);
+                .render(render_target, render_pass, screen_position, screen_size, marker_identifier);
         }
     }
 }

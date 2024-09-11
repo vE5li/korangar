@@ -4,8 +4,8 @@ use cgmath::Vector2;
 use korangar_interface::application::MouseInputModeTrait;
 use korangar_interface::elements::{Element, ElementCell};
 use korangar_networking::InventoryItem;
-use vulkano::image::view::ImageView;
 
+use crate::graphics::Texture;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::inventory::Skill;
@@ -26,7 +26,7 @@ pub enum MouseInputMode {
 }
 
 pub enum Grabbed {
-    Texture(Arc<ImageView>),
+    Texture(Arc<Texture>),
     Action(Arc<Sprite>, Arc<Actions>, AnimationState),
 }
 

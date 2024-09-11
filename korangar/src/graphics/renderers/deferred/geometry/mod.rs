@@ -1,193 +1,284 @@
-vertex_shader!("src/graphics/renderers/deferred/geometry/vertex_shader.glsl");
-fragment_shader!("src/graphics/renderers/deferred/geometry/fragment_shader.glsl");
-
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::Matrix4;
-use vulkano::descriptor_set::WriteDescriptorSet;
-use vulkano::device::{Device, DeviceOwned};
-use vulkano::image::sampler::Sampler;
-use vulkano::image::SampleCount;
-use vulkano::pipeline::graphics::rasterization::{CullMode, PolygonMode, RasterizationState};
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint, StateMode};
-use vulkano::render_pass::Subpass;
-use vulkano::shader::EntryPoint;
+use bytemuck::{cast_slice, Pod, Zeroable};
+use cgmath::{Matrix, Matrix4, SquareMatrix, Transform};
+use wgpu::{
+    include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
+    BindingResource, BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
+    Device, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PolygonMode,
+    PrimitiveState, PushConstantRange, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, SamplerBindingType, ShaderModule,
+    ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
+};
 
-//use self::fragment_shader::SpecializationConstants;
-use self::vertex_shader::{Constants, Matrices};
-use crate::graphics::renderers::deferred::DeferredSubrenderer;
-use crate::graphics::renderers::pipeline::PipelineBuilder;
+use crate::graphics::renderers::deferred::DeferredSubRenderer;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::{allocate_descriptor_set, *};
+use crate::graphics::{Buffer, Camera, DeferredRenderer, ModelVertex, Renderer, TextureGroup};
+
+const SHADER: ShaderModuleDescriptor = include_wgsl!("geometry.wgsl");
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+pub struct Matrices {
+    view_projection: [[f32; 4]; 4],
+    time: f32,
+    padding: [u8; 12],
+}
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+pub struct Constants {
+    world: [[f32; 4]; 4],
+    inv_world: [[f32; 4]; 4],
+}
 
 pub struct GeometryRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
-    vertex_shader: EntryPoint,
-    fragment_shader: EntryPoint,
-    matrices_buffer: MatrixAllocator<Matrices>,
-    nearest_sampler: Arc<Sampler>,
-    linear_sampler: Arc<Sampler>,
-    pipeline: Arc<GraphicsPipeline>,
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    shader_module: ShaderModule,
+    matrices_buffer: Buffer<Matrices>,
+    bind_group_layout: BindGroupLayout,
+    bind_group: BindGroup,
+    output_diffuse_format: TextureFormat,
+    output_normal_format: TextureFormat,
+    output_water_format: TextureFormat,
+    output_depth_format: TextureFormat,
+    pipeline: RenderPipeline,
 }
 
 impl GeometryRenderer {
-    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
-        let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::entry_point(&device);
-        let fragment_shader = fragment_shader::entry_point(&device);
-        let matrices_buffer = MatrixAllocator::new(&memory_allocator);
-        let nearest_sampler = create_new_sampler(&device, SamplerType::Nearest);
-        let linear_sampler = create_new_sampler(&device, SamplerType::LinearAnisotropic(4.0));
+    pub fn new(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        output_diffuse_format: TextureFormat,
+        output_normal_format: TextureFormat,
+        output_water_format: TextureFormat,
+        output_depth_format: TextureFormat,
+    ) -> Self {
+        let shader_module = device.create_shader_module(SHADER);
+        let matrices_buffer = Buffer::with_capacity(
+            &device,
+            "geometry matrices",
+            BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            size_of::<Matrices>() as _,
+        );
+        let nearest_sampler = create_new_sampler(&device, "geometry nearest", SamplerType::Nearest);
+        let linear_sampler = create_new_sampler(&device, "geometry anisotropic", SamplerType::LinearAnisotropic(4));
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("geometry matrices"),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: matrices_buffer.byte_capacity(),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("geometry uniforms"),
+            layout: &bind_group_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: matrices_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::Sampler(&nearest_sampler),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::Sampler(&linear_sampler),
+                },
+            ],
+        });
+
         let pipeline = Self::create_pipeline(
-            device,
-            subpass,
-            viewport,
-            &vertex_shader,
-            &fragment_shader,
+            &device,
+            &bind_group_layout,
+            &shader_module,
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
             #[cfg(feature = "debug")]
             false,
         );
 
         Self {
-            memory_allocator,
-            vertex_shader,
-            fragment_shader,
+            device,
+            queue,
+            shader_module,
             matrices_buffer,
-            nearest_sampler,
-            linear_sampler,
+            bind_group_layout,
+            bind_group,
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
             pipeline,
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn recreate_pipeline(
-        &mut self,
-        device: Arc<Device>,
-        subpass: Subpass,
-        viewport: Viewport,
-        #[cfg(feature = "debug")] wireframe: bool,
-    ) {
+    pub fn recreate_pipeline(&mut self, #[cfg(feature = "debug")] wireframe: bool) {
         self.pipeline = Self::create_pipeline(
-            device,
-            subpass,
-            viewport,
-            &self.vertex_shader,
-            &self.fragment_shader,
+            &self.device,
+            &self.bind_group_layout,
+            &self.shader_module,
+            self.output_diffuse_format,
+            self.output_normal_format,
+            self.output_water_format,
+            self.output_depth_format,
             #[cfg(feature = "debug")]
             wireframe,
         );
     }
 
     fn create_pipeline(
-        device: Arc<Device>,
-        subpass: Subpass,
-        viewport: Viewport,
-        vertex_shader: &EntryPoint,
-        fragment_shader: &EntryPoint,
+        device: &Device,
+        matrices_bind_group_layout: &BindGroupLayout,
+        shader_module: &ShaderModule,
+        output_diffuse_format: TextureFormat,
+        output_normal_format: TextureFormat,
+        output_water_format: TextureFormat,
+        output_depth_format: TextureFormat,
         #[cfg(feature = "debug")] wireframe: bool,
-    ) -> Arc<GraphicsPipeline> {
+    ) -> RenderPipeline {
         #[cfg(feature = "debug")]
         let (polygon_mode, additional_color) = match wireframe {
-            true => (PolygonMode::Line, 1.0f32),
-            false => (PolygonMode::Fill, 0.0f32),
+            true => (PolygonMode::Line, 1.0f64),
+            false => (PolygonMode::Fill, 0.0f64),
         };
 
         #[cfg(not(feature = "debug"))]
-        let (polygon_mode, additional_color) = (PolygonMode::Fill, 0.0f32);
+        let (polygon_mode, additional_color) = (PolygonMode::Fill, 0.0f64);
 
-        let rasterization_state = RasterizationState {
-            cull_mode: StateMode::Fixed(CullMode::Back),
-            polygon_mode,
-            ..Default::default()
-        };
+        let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("geometry"),
+            bind_group_layouts: &[matrices_bind_group_layout, TextureGroup::bind_group_layout(device)],
+            push_constant_ranges: &[PushConstantRange {
+                stages: ShaderStages::VERTEX,
+                range: 0..size_of::<Constants>() as _,
+            }],
+        });
 
-        let vertex_shader_constants = [];
-        let fragment_shader_contsants = [(0, additional_color.into())];
-        let specialization_constants = [vertex_shader_constants.as_slice(), fragment_shader_contsants.as_slice()];
+        let mut constants = HashMap::new();
+        constants.insert("additional_color".to_owned(), additional_color);
 
-        PipelineBuilder::<_, { DeferredRenderer::deferred_subpass() }>::new([vertex_shader, fragment_shader])
-            .vertex_input_state::<ModelVertex>(vertex_shader)
-            .fixed_viewport(viewport)
-            .rasterization_state(rasterization_state)
-            .multisample(SampleCount::Sample4)
-            .simple_depth_test()
-            .build_with_specialization(device, subpass, specialization_constants)
+        device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("geometry"),
+            layout: Some(&layout),
+            vertex: VertexState {
+                module: shader_module,
+                entry_point: "vs_main",
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
+                buffers: &[ModelVertex::buffer_layout()],
+            },
+            fragment: Some(FragmentState {
+                module: shader_module,
+                entry_point: "fs_main",
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
+                targets: &[
+                    Some(ColorTargetState {
+                        format: output_diffuse_format,
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                    Some(ColorTargetState {
+                        format: output_normal_format,
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                    Some(ColorTargetState {
+                        format: output_water_format,
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                ],
+            }),
+            multiview: None,
+            primitive: PrimitiveState {
+                cull_mode: Some(Face::Back),
+                front_face: FrontFace::Ccw,
+                polygon_mode,
+                ..Default::default()
+            },
+            multisample: MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: output_depth_format,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Greater,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            cache: None,
+        })
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn bind_pipeline(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, camera: &dyn Camera, time: f32) {
+    fn bind_pipeline(&self, render_pass: &mut RenderPass, camera: &dyn Camera, time: f32) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let buffer = self.matrices_buffer.allocate(Matrices {
+        let uniform_data = Matrices {
             view_projection: (projection_matrix * view_matrix).into(),
             time,
-        });
+            padding: Default::default(),
+        };
+        self.matrices_buffer.write_exact(&self.queue, &[uniform_data]);
 
-        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [WriteDescriptorSet::buffer(
-            0, buffer,
-        )]);
-
-        render_target
-            .state
-            .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .unwrap()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, set_id, set)
-            .unwrap();
+        render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_bind_group(0, &self.bind_group, &[]);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render geometry"))]
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[ModelVertex]>,
-        textures: &[Arc<ImageView>],
+        vertex_buffer: &Buffer<ModelVertex>,
+        textures: &TextureGroup,
         world_matrix: Matrix4<f32>,
         time: f32,
     ) {
-        if render_target.bind_subrenderer(DeferredSubrenderer::Geometry) {
-            self.bind_pipeline(render_target, camera, time);
+        if render_target.bound_sub_renderer(DeferredSubRenderer::Geometry) {
+            self.bind_pipeline(render_pass, camera, time);
         }
 
-        if textures.is_empty() {
-            return;
-        }
-
-        const TEXTURE_COUNT: usize = 30;
-
-        let texture_count = textures.len();
-        let mut textures: Vec<Arc<ImageView>> = textures
-            .iter()
-            .take(TEXTURE_COUNT.min(texture_count))
-            .map(|texture| texture.clone() as _)
-            .collect();
-
-        for _ in 0..TEXTURE_COUNT.saturating_sub(texture_count) {
-            textures.push(textures[0].clone());
-        }
-
-        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 1, [
-            WriteDescriptorSet::sampler(0, self.nearest_sampler.clone()),
-            WriteDescriptorSet::sampler(1, self.linear_sampler.clone()),
-            WriteDescriptorSet::image_view_array(2, 0, textures),
-        ]);
-
-        let vertex_count = vertex_buffer.size() as usize / std::mem::size_of::<ModelVertex>();
-        let constants = Constants {
+        let push_constants = Constants {
             world: world_matrix.into(),
+            inv_world: world_matrix.inverse_transform().unwrap_or(Matrix4::identity()).transpose().into(),
         };
 
-        render_target
-            .state
-            .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
-            .unwrap()
-            .push_constants(layout, 0, constants)
-            .unwrap()
-            .bind_vertex_buffers(0, vertex_buffer)
-            .unwrap()
-            .draw(vertex_count as u32, 1, 0, 0)
-            .unwrap();
+        render_pass.set_push_constants(ShaderStages::VERTEX, 0, cast_slice(&[push_constants]));
+        render_pass.set_bind_group(1, textures.bind_group(), &[]);
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        render_pass.draw(0..vertex_buffer.count(), 0..1);
     }
 }

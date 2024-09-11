@@ -168,6 +168,7 @@ where
     fn render(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -178,10 +179,10 @@ where
         mouse_mode: &App::MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+        let mut renderer =
+            self.state
+                .state
+                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         let background_color = match second_theme {
             true => theme.expandable().second_background_color(),

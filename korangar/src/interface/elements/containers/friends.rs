@@ -7,6 +7,7 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
 use ragnarok_packets::Friend;
+use wgpu::RenderPass;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::{MouseInputMode, UserEvent};
@@ -154,6 +155,7 @@ impl Element<InterfaceSettings> for FriendView {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -164,10 +166,10 @@ impl Element<InterfaceSettings> for FriendView {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+        let mut renderer =
+            self.state
+                .state
+                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

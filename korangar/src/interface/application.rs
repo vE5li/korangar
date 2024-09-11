@@ -321,6 +321,7 @@ impl Application for InterfaceSettings {
     type MouseInputMode = MouseInputMode;
     type PartialSize = PartialScreenSize;
     type Position = ScreenPosition;
+    type RenderPass<'encoder> = wgpu::RenderPass<'encoder>;
     type Renderer = InterfaceRenderer;
     type Scaling = Scaling;
     type Size = ScreenSize;

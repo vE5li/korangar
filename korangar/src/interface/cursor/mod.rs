@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::ClientTick;
+use wgpu::RenderPass;
 
 use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -82,6 +83,7 @@ impl MouseCursor {
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
@@ -96,7 +98,8 @@ impl MouseCursor {
             match grabbed {
                 Grabbed::Texture(texture) => renderer.render_sprite(
                     render_target,
-                    texture,
+                    render_pass,
+                    &texture,
                     mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
                     ScreenSize::uniform(30.0 * application.get_scaling_factor()),
                     ScreenClip::unbound(),
@@ -105,6 +108,7 @@ impl MouseCursor {
                 ),
                 Grabbed::Action(sprite, actions, animation_state) => actions.render2(
                     render_target,
+                    render_pass,
                     renderer,
                     &sprite,
                     &animation_state,
@@ -124,6 +128,7 @@ impl MouseCursor {
 
         self.actions.render2(
             render_target,
+            render_pass,
             renderer,
             &self.sprite,
             &self.animation_state,

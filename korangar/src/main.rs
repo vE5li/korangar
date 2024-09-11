@@ -33,7 +33,9 @@ use korangar_debug::logging::{print_debug, Colorize};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
-use korangar_interface::application::{Application, FocusState, FontSizeTrait, FontSizeTraitExt, PositionTraitExt};
+#[cfg(feature = "debug")]
+use korangar_interface::application::{Application, FontSizeTraitExt, PositionTraitExt};
+use korangar_interface::application::{FocusState, FontSizeTrait};
 use korangar_interface::state::{PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec};
 use korangar_interface::Interface;
 use korangar_networking::{
@@ -43,18 +45,11 @@ use ragnarok_packets::{
     BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
     SkillType, TilePosition, UnitId, WorldPosition,
 };
-use vulkano::device::{Device, DeviceCreateInfo, QueueCreateInfo};
-#[cfg(feature = "debug")]
-use vulkano::instance::debug::{
-    DebugUtilsMessageSeverity, DebugUtilsMessageType, DebugUtilsMessenger, DebugUtilsMessengerCallback, DebugUtilsMessengerCreateInfo,
-};
-use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo, InstanceExtensions};
-use vulkano::swapchain::Surface;
-use vulkano::sync::{now, GpuFuture};
-use vulkano::VulkanLibrary;
+use wgpu::{CommandEncoderDescriptor, Features, Instance, InstanceFlags, Limits, Maintain, MemoryHints, TextureViewDescriptor};
 use winit::event::{Event, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::{Icon, WindowBuilder};
+use winit::event_loop::EventLoop;
+use winit::keyboard::PhysicalKey;
+use winit::window::{Icon, Window};
 
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
@@ -67,12 +62,14 @@ use crate::interface::resource::{ItemSource, Move, SkillSource};
 use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
-#[cfg(feature = "debug")]
-use crate::system::vulkan_message_callback;
-use crate::system::{choose_physical_device, get_device_extensions, get_layers, GameTimer};
+use crate::system::GameTimer;
 use crate::world::*;
 
+const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
+// The real limiting factor is WGPUs
+// "Limit::max_sampled_textures_per_shader_stage".
+const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = 30;
 
 // Create the `threads` module.
 #[cfg(feature = "debug")]
@@ -103,36 +100,6 @@ fn main() {
         }
     }
 
-    time_phase!("create device", {
-        let library = VulkanLibrary::new().unwrap();
-        let event_loop = EventLoop::new();
-        let create_info = InstanceCreateInfo {
-            enabled_extensions: InstanceExtensions {
-                ext_debug_utils: true,
-                ..Surface::required_extensions(&event_loop)
-            },
-            enabled_layers: get_layers(&library),
-            flags: InstanceCreateFlags::ENUMERATE_PORTABILITY,
-            ..Default::default()
-        };
-
-        let instance = Instance::new(library, create_info).expect("failed to create instance");
-
-        #[cfg(feature = "debug")]
-        let _debug_callback = DebugUtilsMessenger::new(instance.clone(), DebugUtilsMessengerCreateInfo {
-            message_severity: DebugUtilsMessageSeverity::ERROR
-                | DebugUtilsMessageSeverity::WARNING
-                | DebugUtilsMessageSeverity::INFO
-                | DebugUtilsMessageSeverity::VERBOSE,
-            message_type: DebugUtilsMessageType::GENERAL | DebugUtilsMessageType::VALIDATION | DebugUtilsMessageType::PERFORMANCE,
-            ..DebugUtilsMessengerCreateInfo::user_callback(unsafe { DebugUtilsMessengerCallback::new(vulkan_message_callback) })
-        })
-        .ok();
-
-        #[cfg(feature = "debug")]
-        print_debug!("created {}", "instance".magenta());
-    });
-
     time_phase!("create window", {
         // TODO: move this somewhere else
         let file_data = include_bytes!("../archive/data/icon.png");
@@ -143,53 +110,108 @@ fn main() {
 
         assert_eq!(image_buffer.width(), image_buffer.height(), "icon must be square");
         let icon = Icon::from_rgba(image_data, image_buffer.width(), image_buffer.height()).unwrap();
-        //
 
-        let window = WindowBuilder::new()
-            .with_title("Korangar".to_string())
-            .with_window_icon(Some(icon))
-            .build(&event_loop)
-            .unwrap();
+        let event_loop = EventLoop::new().unwrap();
+        let window_attributes = Window::default_attributes().with_title(CLIENT_NAME).with_window_icon(Some(icon));
+        // TODO: NHA create_window is deprecated and we need to restructure the
+        //       initialization.
+        let window = event_loop.create_window(window_attributes).unwrap();
+
         window.set_cursor_visible(false);
         let window = Arc::new(window);
-
-        let surface = Surface::from_window(instance.clone(), window).unwrap();
 
         #[cfg(feature = "debug")]
         print_debug!("created {}", "window".magenta());
     });
 
-    time_phase!("choose physical device", {
-        let desired_device_extensions = get_device_extensions();
-        let (physical_device, queue_family_index) = choose_physical_device(&instance, &surface, &desired_device_extensions);
+    time_phase!("create adapter and surface", {
+        let trace_dir = std::env::var("WGPU_TRACE");
+        let backends = wgpu::util::backend_bits_from_env().unwrap_or_default();
+        let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
+        let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
+        let flags = InstanceFlags::from_build_config().with_env();
 
-        let present_mode_info = PresentModeInfo::from_device(&physical_device, &surface);
+        let instance = Instance::new(wgpu::InstanceDescriptor {
+            backends,
+            flags,
+            dx12_shader_compiler,
+            gles_minor_version,
+        });
+
+        let surface = instance.create_surface(window.clone()).unwrap();
+
+        let adapter = pollster::block_on(async {
+            wgpu::util::initialize_adapter_from_env_or_default(&instance, Some(&surface))
+                .await
+                .unwrap()
+        });
+
+        let adapter_info = adapter.get_info();
+
+        let backend = adapter_info.backend.to_string();
+        window.set_title(&format!("{CLIENT_NAME} ({})", str::to_uppercase(&backend)));
+
+        #[cfg(feature = "debug")]
+        print_debug!("using adapter {} ({})", adapter_info.name, adapter_info.backend);
+
+        #[cfg(feature = "debug")]
+        print_debug!("using device {} ({})", adapter_info.device, adapter_info.vendor);
+
+        #[cfg(feature = "debug")]
+        print_debug!("using driver {} ({})", adapter_info.driver, adapter_info.driver_info);
     });
 
     time_phase!("create device", {
-        let (device, mut queues) = Device::new(physical_device.clone(), DeviceCreateInfo {
-            enabled_extensions: get_device_extensions(),
-            enabled_features: vulkano::device::Features {
-                sampler_anisotropy: true,
-                #[cfg(feature = "debug")]
-                fill_mode_non_solid: true,
-                ..Default::default()
-            },
-            queue_create_infos: vec![QueueCreateInfo {
-                queue_family_index,
-                ..Default::default()
-            }],
+        let required_features = Features::PUSH_CONSTANTS | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
+        #[cfg(feature = "debug")]
+        let required_features = required_features | Features::POLYGON_MODE_LINE;
+
+        let adapter_features = adapter.features();
+        assert!(
+            adapter_features.contains(required_features),
+            "Adapter does not support required features: {:?}",
+            required_features - adapter_features
+        );
+        set_supported_features(adapter_features);
+
+        #[cfg(feature = "debug")]
+        {
+            let supported = match features_supported(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
+                true => "supported".green(),
+                false => "unsupported".yellow(),
+            };
+            print_debug!("PARTIALLY_BOUND_BINDING_ARRAY: {}", supported);
+        }
+
+        let required_limits = Limits {
+            max_push_constant_size: 128,
+            max_sampled_textures_per_shader_stage: u32::try_from(MAX_BINDING_TEXTURE_ARRAY_COUNT).unwrap(),
             ..Default::default()
-        })
-        .expect("failed to create device");
+        }
+        .using_resolution(adapter.limits());
+
+        let (device, queue) = pollster::block_on(async {
+            adapter
+                .request_device(
+                    &wgpu::DeviceDescriptor {
+                        label: None,
+                        required_features: adapter_features | required_features,
+                        required_limits,
+                        memory_hints: MemoryHints::Performance,
+                    },
+                    trace_dir.ok().as_ref().map(std::path::Path::new),
+                )
+                .await
+                .unwrap()
+        });
+        let device = Arc::new(device);
+        let queue = Arc::new(queue);
 
         #[cfg(feature = "debug")]
-        print_debug!("created {}", "vulkan device".magenta());
-
-        let queue = queues.next().unwrap();
+        device.on_uncaptured_error(Box::new(error_handler));
 
         #[cfg(feature = "debug")]
-        print_debug!("received {} from {}", "queue".magenta(), "device".magenta());
+        print_debug!("received {} and {}", "queue".magenta(), "device".magenta());
     });
 
     time_phase!("create resource managers", {
@@ -200,26 +222,19 @@ fn main() {
         game_file_loader.load_archives_from_settings();
         game_file_loader.load_patched_lua_files();
 
-        let memory_allocator = Arc::new(MemoryAllocator::new(device.clone()));
+        let font_loader = Rc::new(RefCell::new(FontLoader::new(&device, queue.clone(), &mut game_file_loader)));
 
-        let font_loader = Rc::new(RefCell::new(FontLoader::new(
-            memory_allocator.clone(),
-            queue.clone(),
-            &mut game_file_loader,
-        )));
-
-        let mut buffer_allocator = BufferAllocator::new(memory_allocator.clone(), queue.clone());
-        let mut model_loader = ModelLoader::new();
-        let mut texture_loader = TextureLoader::new(memory_allocator.clone(), queue.clone());
-        let mut map_loader = MapLoader::new();
-        let mut sprite_loader = SpriteLoader::new(memory_allocator.clone(), queue.clone());
+        let mut model_loader = ModelLoader::new(device.clone(), queue.clone());
+        let mut texture_loader = TextureLoader::new(device.clone(), queue.clone());
+        let mut map_loader = MapLoader::new(device.clone(), queue.clone());
+        let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone());
         let mut action_loader = ActionLoader::default();
         let mut effect_loader = EffectLoader::default();
 
         let script_loader = ScriptLoader::new(&mut game_file_loader).unwrap_or_else(|_| {
             // The scrip loader not being created correctly means that the lua files were
             // not valid. It's possible that the archive was copied from a
-            // differen machine with a different architecture, so the one thing
+            // different machine with a different architecture, so the one thing
             // we can try is generating it again.
 
             #[cfg(feature = "debug")]
@@ -235,53 +250,34 @@ fn main() {
         });
     });
 
-    time_phase!("load resources", {
-        let mut map = map_loader
-            .get(
-                DEFAULT_MAP.to_string(),
-                &mut game_file_loader,
-                &mut buffer_allocator,
-                &mut model_loader,
-                &mut texture_loader,
-            )
-            .expect("failed to load initial map");
-    });
-
-    time_phase!("create swapchain", {
-        let mut swapchain_holder = SwapchainHolder::new(&physical_device, device.clone(), queue.clone(), surface.clone());
-        let viewport = swapchain_holder.viewport();
+    time_phase!("configure surface", {
+        let size = window.inner_size();
+        let mut surface = Surface::new(adapter, device.clone(), surface, size.width, size.height);
+        let max_frame_count = surface.max_frame_count();
+        let dimensions = surface.window_size_u32();
     });
 
     time_phase!("create renderers", {
         let mut deferred_renderer = DeferredRenderer::new(
-            memory_allocator.clone(),
-            &mut buffer_allocator,
+            device.clone(),
+            queue.clone(),
             &mut game_file_loader,
             &mut texture_loader,
-            queue.clone(),
-            swapchain_holder.swapchain_format(),
-            viewport.clone(),
-            swapchain_holder.window_size_u32(),
+            surface.format(),
+            dimensions,
         );
 
         let mut interface_renderer = InterfaceRenderer::new(
-            memory_allocator.clone(),
+            device.clone(),
             &mut game_file_loader,
             &mut texture_loader,
             font_loader.clone(),
-            queue.clone(),
-            viewport.clone(),
-            swapchain_holder.window_size_u32(),
+            dimensions,
         );
 
-        let mut picker_renderer = PickerRenderer::new(
-            memory_allocator.clone(),
-            queue.clone(),
-            viewport,
-            swapchain_holder.window_size_u32(),
-        );
+        let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), dimensions);
 
-        let shadow_renderer = ShadowRenderer::new(memory_allocator, &mut game_file_loader, &mut texture_loader, queue);
+        let shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone(), &mut game_file_loader, &mut texture_loader);
     });
 
     time_phase!("load settings", {
@@ -296,30 +292,29 @@ fn main() {
     });
 
     time_phase!("create render targets", {
-        let mut screen_targets = swapchain_holder
-            .get_swapchain_images()
-            .into_iter()
-            .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
+        // TODO: NHA We should make double buffering optional and selectable in the
+        //       settings. Since WGPU uses staging buffers and we record changed
+        //       in advance, double buffering is not really needed anymore (especially
+        //       with FIFO).
+
+        let mut screen_targets = (0..max_frame_count)
+            .map(|_| deferred_renderer.create_render_target())
             .collect::<Vec<<DeferredRenderer as Renderer>::Target>>();
 
         let mut interface_target = interface_renderer.create_render_target();
 
-        let mut picker_targets = swapchain_holder
-            .get_swapchain_images()
-            .into_iter()
+        let mut picker_targets = (0..max_frame_count)
             .map(|_| picker_renderer.create_render_target())
             .collect::<Vec<<PickerRenderer as Renderer>::Target>>();
 
-        let mut directional_shadow_targets = swapchain_holder
-            .get_swapchain_images()
-            .into_iter()
+        let mut shadow_targets = (0..max_frame_count)
             .map(|_| shadow_renderer.create_render_target(shadow_detail.get().into_resolution()))
             .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
     });
 
     time_phase!("initialize interface", {
         let mut application = InterfaceSettings::load_or_default();
-        let mut interface = Interface::new(swapchain_holder.window_screen_size());
+        let mut interface = Interface::new(surface.window_screen_size());
         let mut focus_state = FocusState::default();
         let mut mouse_cursor = MouseCursor::new(&mut game_file_loader, &mut sprite_loader, &mut action_loader);
         let mut dialog_system = DialogSystem::default();
@@ -390,7 +385,18 @@ fn main() {
         let thread_pool = rayon::ThreadPoolBuilder::new().num_threads(3).build().unwrap();
     });
 
-    event_loop.run(move |event, _, control_flow| {
+    time_phase!("load default map", {
+        let mut map = map_loader
+            .get(
+                DEFAULT_MAP.to_string(),
+                &mut game_file_loader,
+                &mut model_loader,
+                &mut texture_loader,
+            )
+            .expect("failed to load initial map");
+    });
+
+    event_loop.run(move |event, active_event_loop| {
         match event {
             Event::WindowEvent {
                 event: WindowEvent::CloseRequested,
@@ -399,23 +405,19 @@ fn main() {
                 // FIX: For some reason GraphicsSettings is not dropped unless we use it in this
                 // scope. This fixes it.
                 let _ = &graphics_settings;
-                control_flow.set_exit()
+                active_event_loop.exit();
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 ..
             } => {
-                let window_size = surface
-                    .object()
-                    .unwrap()
-                    .downcast_ref::<winit::window::Window>()
-                    .unwrap()
-                    .inner_size();
+                let window_size = window.inner_size();
                 interface.update_window_size(ScreenSize {
                     width: window_size.width as f32,
                     height: window_size.height as f32,
                 });
-                swapchain_holder.update_window_size(window_size.into());
+                surface.update_window_size(window_size.into());
+                window.request_redraw();
             }
             Event::WindowEvent {
                 event: WindowEvent::Focused(focused),
@@ -447,18 +449,23 @@ fn main() {
                 ..
             } => input_system.update_mouse_wheel(delta),
             Event::WindowEvent {
-                event: WindowEvent::KeyboardInput { input, .. },
+                event: WindowEvent::KeyboardInput { event, .. },
                 ..
             } => {
-                if let Some(keycode) = input.virtual_keycode {
-                    input_system.update_keyboard(keycode, input.state)
+                if let PhysicalKey::Code(keycode) = event.physical_key {
+                    input_system.update_keyboard(keycode, event.state);
+                }
+                // TODO: NHA We should also support IME in the long term (winit::event::Ime)
+                if let Some(text) = event.text && event.state.is_pressed(){
+                    for char in text.chars() {
+                        input_system.buffer_character(char);
+                    }
                 }
             }
             Event::WindowEvent {
-                event: WindowEvent::ReceivedCharacter(character),
+                event: WindowEvent::RedrawRequested,
                 ..
-            } => input_system.buffer_character(character),
-            Event::MainEventsCleared => {
+            } => {
                 #[cfg(feature = "debug")]
                 let _measurement = threads::Main::start_frame();
 
@@ -481,11 +488,10 @@ fn main() {
                     &mut interface,
                     &application,
                     &mut focus_state,
-                    &mut picker_targets[swapchain_holder.get_image_number()],
+                    &mut picker_targets[surface.frame_number()],
                     &mut mouse_cursor,
                     #[cfg(feature = "debug")]
                     &render_settings,
-                    swapchain_holder.window_size(),
                     client_tick,
                 );
 
@@ -573,7 +579,6 @@ fn main() {
                                 .get(
                                     DEFAULT_MAP.to_string(),
                                     &mut game_file_loader,
-                                    &mut buffer_allocator,
                                     &mut model_loader,
                                     &mut texture_loader,
                                 )
@@ -626,7 +631,6 @@ fn main() {
                                 .get(
                                     map_name,
                                     &mut game_file_loader,
-                                    &mut buffer_allocator,
                                     &mut model_loader,
                                     &mut texture_loader,
                                 )
@@ -732,7 +736,6 @@ fn main() {
                                 .get(
                                     map_name,
                                     &mut game_file_loader,
-                                    &mut buffer_allocator,
                                     &mut model_loader,
                                     &mut texture_loader,
                                 )
@@ -1065,7 +1068,7 @@ fn main() {
                         UserEvent::LogOut => {
                             let _ = networking_system.log_out();
                         },
-                        UserEvent::Exit => *control_flow = ControlFlow::Exit,
+                        UserEvent::Exit => active_event_loop.exit(),
                         UserEvent::CameraZoom(factor) => player_camera.soft_zoom(factor),
                         UserEvent::CameraRotate(factor) => player_camera.soft_rotate(factor),
                         UserEvent::OpenMenuWindow => {
@@ -1103,7 +1106,7 @@ fn main() {
                         UserEvent::OpenGraphicsSettingsWindow => interface.open_window(
                             &application,
                             &mut focus_state,
-                            &GraphicsSettingsWindow::new(present_mode_info, shadow_detail.clone_state(), framerate_limit.clone_state()),
+                            &GraphicsSettingsWindow::new(surface.present_mode_info(), shadow_detail.clone_state(), framerate_limit.clone_state()),
                         ),
                         UserEvent::OpenAudioSettingsWindow => interface.open_window(&application, &mut focus_state, &AudioSettingsWindow),
                         UserEvent::OpenFriendsWindow => {
@@ -1347,10 +1350,6 @@ fn main() {
                 #[cfg(feature = "debug")]
                 user_event_measurement.stop();
 
-                let buffer_fence = buffer_allocator.submit_load_buffer();
-                let texture_fence = texture_loader.submit_load_buffer();
-                let sprite_fence = sprite_loader.submit_load_buffer();
-
                 #[cfg(feature = "debug")]
                 let update_entities_measurement = Profiler::start_measurement("update entities");
 
@@ -1364,7 +1363,7 @@ fn main() {
                 if !entities.is_empty() {
                     let player_position = entities[0].get_position();
                     player_camera.set_smoothed_focus_point(player_position);
-                    directional_shadow_camera.set_focus_point(player_camera.get_focus_point());
+                    directional_shadow_camera.set_focus_point(player_camera.focus_point());
                 }
 
                 #[cfg(feature = "debug")]
@@ -1383,40 +1382,41 @@ fn main() {
                 let (clear_interface, render_interface) = interface.update(&application, font_loader.clone(), &mut focus_state);
                 mouse_cursor.update(client_tick);
 
-                if swapchain_holder.is_swapchain_invalid() {
+                if surface.is_invalid() {
                     #[cfg(feature = "debug")]
                     profile_block!("re-create buffers");
 
-                    let viewport = swapchain_holder.recreate_swapchain();
+                    surface.reconfigure();
+                    let dimensions = surface.window_size_u32();
 
-                    deferred_renderer.recreate_pipeline(
-                        viewport.clone(),
-                        swapchain_holder.window_size_u32(),
+                    deferred_renderer.reconfigure_pipeline(
+                        surface.format(),
+                        dimensions,
                         #[cfg(feature = "debug")]
                         render_settings.get().show_wireframe,
                     );
-                    interface_renderer.recreate_pipeline(viewport.clone(), swapchain_holder.window_size_u32());
-                    picker_renderer.recreate_pipeline(viewport, swapchain_holder.window_size_u32());
+                    interface_renderer.reconfigure_pipeline(dimensions);
+                    picker_renderer.reconfigure_pipeline(dimensions);
 
-                    screen_targets = swapchain_holder
-                        .get_swapchain_images()
-                        .into_iter()
-                        .map(|swapchain_image| deferred_renderer.create_render_target(swapchain_image))
+                    screen_targets = (0..max_frame_count)
+                        .map(|_| deferred_renderer.create_render_target())
                         .collect();
 
                     interface_target = interface_renderer.create_render_target();
 
-                    picker_targets = swapchain_holder
-                        .get_swapchain_images()
-                        .into_iter()
+                    picker_targets = (0..max_frame_count)
                         .map(|_| picker_renderer.create_render_target())
                         .collect();
                 }
 
-                if swapchain_holder.acquire_next_image().is_err() {
-                    // temporary check?
-                    return;
-                }
+                #[cfg(feature = "debug")]
+                let frame_measurement = Profiler::start_measurement("get next frame");
+
+                let (frame_number, frame) = surface.acquire();
+                let frame_view = frame.texture.create_view(&TextureViewDescriptor::default());
+
+                #[cfg(feature = "debug")]
+                frame_measurement.stop();
 
                 if shadow_detail.consume_changed() {
                     #[cfg(feature = "debug")]
@@ -1427,18 +1427,16 @@ fn main() {
 
                     let new_shadow_detail = shadow_detail.get();
 
-                    directional_shadow_targets = swapchain_holder
-                        .get_swapchain_images()
-                        .into_iter()
+                    shadow_targets = (0..max_frame_count)
                         .map(|_| shadow_renderer.create_render_target(new_shadow_detail.into_resolution()))
                         .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
                 }
 
                 if framerate_limit.consume_changed() {
-                    swapchain_holder.set_frame_limit(present_mode_info, framerate_limit.cloned());
+                    surface.set_frame_limit(framerate_limit.cloned());
 
                     // For some reason the interface buffer becomes messed up when
-                    // recreating the swapchain, so we need to render it again.
+                    // recreating the surface, so we need to render it again.
                     interface.schedule_render();
                 }
 
@@ -1446,14 +1444,14 @@ fn main() {
                 let matrices_measurement = Profiler::start_measurement("generate view and projection matrices");
 
                 if entities.is_empty() {
-                    start_camera.generate_view_projection(swapchain_holder.window_size());
+                    start_camera.generate_view_projection(surface.window_size());
                 }
 
-                player_camera.generate_view_projection(swapchain_holder.window_size());
-                directional_shadow_camera.generate_view_projection(swapchain_holder.window_size());
+                player_camera.generate_view_projection(surface.window_size());
+                directional_shadow_camera.generate_view_projection(surface.window_size());
                 #[cfg(feature = "debug")]
                 if render_settings.get().use_debug_camera {
-                    debug_camera.generate_view_projection(swapchain_holder.window_size());
+                    debug_camera.generate_view_projection(surface.window_size());
                 }
 
                 #[cfg(feature = "debug")]
@@ -1466,55 +1464,62 @@ fn main() {
                     false => &player_camera,
                 };
 
-                if let Some(mut fence) = screen_targets[swapchain_holder.get_image_number()].state.try_take_fence() {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for frame in current slot");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
-                if let Some(mut fence) = buffer_fence {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for buffers");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
-                if let Some(mut fence) = texture_fence {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for textures");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
-                if let Some(mut fence) = sprite_fence {
-                    #[cfg(feature = "debug")]
-                    profile_block!("wait for sprites");
-
-                    fence.wait(None).unwrap();
-                    fence.cleanup_finished();
-                }
-
                 #[cfg(feature = "debug")]
                 let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
 
                 #[cfg(feature = "debug")]
                 let render_settings = &*render_settings.get();
                 let walk_indicator_color = application.get_game_theme().indicator.walking.get();
-                let image_number = swapchain_holder.get_image_number();
-                let directional_shadow_image = directional_shadow_targets[image_number].image.clone();
-                let screen_target = &mut screen_targets[image_number];
-                let window_size = swapchain_holder.window_screen_size();
-                let window_size_u32 = swapchain_holder.window_size_u32();
+                let window_size = surface.window_screen_size();
                 let entities = &entities[..];
                 #[cfg(feature = "debug")]
                 let hovered_marker_identifier = match mouse_target {
                     Some(PickerTarget::Marker(marker_identifier)) => Some(marker_identifier),
                     _ => None,
                 };
+
+                let picker_target = &mut picker_targets[frame_number];
+                let shadow_target = &mut shadow_targets[frame_number];
+                let deferred_target = &mut screen_targets[frame_number];
+
+                // TODO: NHA Lifetime limitation
+                let shadow_map = shadow_target.texture.clone();
+
+                #[cfg(feature = "debug")]
+                let command_buffer_measurement = Profiler::start_measurement("allocate command buffer");
+
+                let mut picker_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor{
+                        label: Some("Picker")
+                    });
+                let mut picker_render_pass = picker_target.start(&mut picker_command_encoder);
+
+                let mut interface_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor{
+                        label: Some("Interface")
+                    });
+                let mut interface_render_pass = interface_target.start(&mut interface_command_encoder, clear_interface);
+
+                let mut shadow_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor{
+                        label: Some("Shadow")
+                    });
+                let mut shadow_render_pass = shadow_target.start(&mut shadow_command_encoder);
+
+                let mut geometry_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor{
+                        label: Some("Geometry")
+                    });
+                let mut geometry_render_pass = deferred_target.start_geometry_pass(&mut geometry_command_encoder);
+
+                let mut screen_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor{
+                        label: Some("Screen")
+                    });
+                let mut screen_render_pass = deferred_target.start_screen_pass(&frame_view, &mut screen_command_encoder);
+
+                #[cfg(feature = "debug")]
+                command_buffer_measurement.stop();
 
                 #[cfg(feature = "debug")]
                 prepare_frame_measurement.stop();
@@ -1524,40 +1529,32 @@ fn main() {
                         #[cfg(feature = "debug")]
                         let _measurement = threads::Picker::start_frame();
 
-                        let picker_target = &mut picker_targets[image_number];
-
-                        picker_target.start();
-
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                        map.render_tiles(picker_target, &picker_renderer, current_camera);
+                        map.render_tiles(picker_target, &mut picker_render_pass, &picker_renderer, current_camera);
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                        map.render_entities(entities, picker_target, &picker_renderer, current_camera, false);
+                        map.render_entities(entities, picker_target, &mut picker_render_pass, &picker_renderer, current_camera, false);
 
                         #[cfg(feature = "debug")]
                         map.render_markers(
                             picker_target,
+                            &mut picker_render_pass,
                             &picker_renderer,
                             current_camera,
                             render_settings,
                             entities,
                             hovered_marker_identifier,
                         );
-
-                        picker_target.finish();
                     });
 
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
                         let _measurement = threads::Shadow::start_frame();
 
-                        let directional_shadow_target = &mut directional_shadow_targets[image_number];
-
-                        directional_shadow_target.start();
-
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         map.render_ground(
-                            directional_shadow_target,
+                            shadow_target,
+                            &mut shadow_render_pass,
                             &shadow_renderer,
                             &directional_shadow_camera,
                             animation_timer,
@@ -1565,7 +1562,8 @@ fn main() {
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         map.render_objects(
-                            directional_shadow_target,
+                            shadow_target,
+                            &mut shadow_render_pass,
                             &shadow_renderer,
                             &directional_shadow_camera,
                             client_tick,
@@ -1577,7 +1575,8 @@ fn main() {
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                         map.render_entities(
                             entities,
-                            directional_shadow_target,
+                            shadow_target,
+                            &mut shadow_render_pass,
                             &shadow_renderer,
                             &directional_shadow_camera,
                             true,
@@ -1588,34 +1587,32 @@ fn main() {
                         {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                             map.render_walk_indicator(
-                                directional_shadow_target,
+                                shadow_target,
+                                &mut shadow_render_pass,
                                 &shadow_renderer,
                                 &directional_shadow_camera,
                                 walk_indicator_color,
                                 Vector2::new(x as usize, y as usize),
                             );
                         }
-
-                        directional_shadow_target.finish();
                     });
 
                     scope.spawn(|_| {
                         #[cfg(feature = "debug")]
                         let _measurement = threads::Deferred::start_frame();
 
-                        screen_target.start();
-
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                        map.render_ground(screen_target, &deferred_renderer, current_camera, animation_timer);
+                        map.render_ground(deferred_target, &mut geometry_render_pass, &deferred_renderer, current_camera, animation_timer);
 
                         #[cfg(feature = "debug")]
                         if render_settings.show_map_tiles {
-                            map.render_overlay_tiles(screen_target, &deferred_renderer, current_camera);
+                            map.render_overlay_tiles(deferred_target, &mut geometry_render_pass, &deferred_renderer, current_camera);
                         }
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         map.render_objects(
-                            screen_target,
+                            deferred_target,
+                            &mut geometry_render_pass,
                             &deferred_renderer,
                             current_camera,
                             client_tick,
@@ -1625,17 +1622,18 @@ fn main() {
                         );
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                        map.render_entities(entities, screen_target, &deferred_renderer, current_camera, true);
+                        map.render_entities(entities, deferred_target, &mut geometry_render_pass, &deferred_renderer, current_camera, true);
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
-                        map.render_water(screen_target, &deferred_renderer, current_camera, animation_timer);
+                        map.render_water(deferred_target, &mut geometry_render_pass, &deferred_renderer, current_camera, animation_timer);
 
                         if let Some(PickerTarget::Tile { x, y }) = mouse_target
                             && !entities.is_empty()
                         {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                             map.render_walk_indicator(
-                                screen_target,
+                                deferred_target,
+                                &mut geometry_render_pass,
                                 &deferred_renderer,
                                 current_camera,
                                 walk_indicator_color,
@@ -1643,33 +1641,35 @@ fn main() {
                             );
                         }
 
-                        screen_target.lighting_pass();
+                        // We switch to record the screen render pass.
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers()))]
-                        map.ambient_light(screen_target, &deferred_renderer, day_timer);
+                        map.ambient_light(deferred_target, &mut screen_render_pass, &deferred_renderer, day_timer);
 
                         let (view_matrix, projection_matrix) = directional_shadow_camera.view_projection_matrices();
                         let light_matrix = projection_matrix * view_matrix;
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light && !render_settings.show_buffers()))]
                         map.directional_light(
-                            screen_target,
+                            deferred_target,
+                            &mut screen_render_pass,
                             &deferred_renderer,
                             current_camera,
-                            directional_shadow_image.clone(),
+                            &shadow_map,
                             light_matrix,
                             day_timer,
                         );
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
-                        map.point_lights(screen_target, &deferred_renderer, current_camera);
+                        map.point_lights(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera);
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers()))]
-                        map.water_light(screen_target, &deferred_renderer, current_camera);
+                        map.water_light(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera);
 
                         #[cfg(feature = "debug")]
                         map.render_markers(
-                            screen_target,
+                            deferred_target,
+                            &mut screen_render_pass,
                             &deferred_renderer,
                             current_camera,
                             render_settings,
@@ -1680,7 +1680,8 @@ fn main() {
                         #[cfg(feature = "debug")]
                         if render_settings.show_bounding_boxes {
                             map.render_bounding(
-                                screen_target,
+                                deferred_target,
+                                &mut screen_render_pass,
                                 &deferred_renderer,
                                 current_camera,
                                 &player_camera,
@@ -1690,45 +1691,36 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         if let Some(marker_identifier) = hovered_marker_identifier {
-                            map.render_marker_box(screen_target, &deferred_renderer, current_camera, marker_identifier);
+                            map.render_marker_box(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera, marker_identifier);
                         }
 
-                        particle_holder.render(screen_target, &deferred_renderer, current_camera, window_size, entities);
-                        effect_holder.render(screen_target, &deferred_renderer, current_camera);
+                        particle_holder.render(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera, window_size, application.get_scaling_factor(), entities);
+                        effect_holder.render(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera);
                     });
 
                     if render_interface {
                         #[cfg(feature = "debug")]
                         profile_block!("render user interface");
 
-                        interface_target.start(window_size_u32, clear_interface);
-
                         interface.render(
                             &mut interface_target,
+                            &mut interface_render_pass,
                             &interface_renderer,
                             &application,
                             hovered_element,
                             focused_element,
                             input_system.get_mouse_mode(),
                         );
-
-                        let font_future = font_loader.borrow_mut().submit_load_buffer();
-                        interface_target.finish(font_future);
                     }
                 });
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_buffers() {
-                    let picker_target = &mut picker_targets[image_number];
-
-                    if let Some(fence) = picker_target.state.try_take_fence() {
-                        fence.wait(None).unwrap();
-                    }
-
                     deferred_renderer.overlay_buffers(
-                        screen_target,
-                        picker_target.image.clone(),
-                        directional_shadow_image,
+                        deferred_target,
+                        &mut screen_render_pass,
+                        &picker_target.texture,
+                        &shadow_map,
                         font_loader.borrow().get_font_atlas(),
                         render_settings,
                     );
@@ -1742,7 +1734,8 @@ fn main() {
 
                     if let Some(entity) = entity {
                         entity.render_status(
-                            screen_target,
+                            deferred_target,
+                            &mut screen_render_pass,
                             &deferred_renderer,
                             current_camera,
                             application.get_game_theme(),
@@ -1757,16 +1750,19 @@ fn main() {
                                 top: 20.0,
                             };
 
+                            // TODO: move variables into theme
                             deferred_renderer.render_text(
-                                screen_target,
+                                deferred_target,
+                                &mut screen_render_pass,
                                 name,
                                 input_system.get_mouse_position() + offset + ScreenPosition::uniform(1.0),
                                 Color::monochrome_u8(0),
                                 FontSize::new(12.0),
-                            ); // TODO: move variables into theme
+                            );
 
                             deferred_renderer.render_text(
-                                screen_target,
+                                deferred_target,
+                                &mut screen_render_pass,
                                 name,
                                 input_system.get_mouse_position() + offset,
                                 Color::monochrome_u8(255),
@@ -1781,7 +1777,8 @@ fn main() {
                     profile_block!("render player status");
 
                     entities[0].render_status(
-                        screen_target,
+                        deferred_target,
+                        &mut screen_render_pass,
                         &deferred_renderer,
                         current_camera,
                         application.get_game_theme(),
@@ -1794,7 +1791,8 @@ fn main() {
                     let game_theme = application.get_game_theme();
 
                     deferred_renderer.render_text(
-                        screen_target,
+                        deferred_target,
+                        &mut screen_render_pass,
                         &game_timer.last_frames_per_second().to_string(),
                         game_theme.overlay.text_offset.get().scaled(application.get_scaling()),
                         game_theme.overlay.foreground_color.get(),
@@ -1803,10 +1801,11 @@ fn main() {
                 }
 
                 if show_interface {
-                    deferred_renderer.overlay_interface(screen_target, interface_target.image.clone());
+                    deferred_renderer.overlay_interface(deferred_target, &mut screen_render_pass, &interface_target.texture);
 
                     mouse_cursor.render(
-                        screen_target,
+                        deferred_target,
+                        &mut screen_render_pass,
                         &deferred_renderer,
                         input_system.get_mouse_position(),
                         input_system.get_mouse_mode().grabbed(),
@@ -1816,26 +1815,42 @@ fn main() {
                 }
 
                 #[cfg(feature = "debug")]
-                let finalize_frame_measurement = Profiler::start_measurement("finalize frame");
+                let finalize_frame_measurement = Profiler::start_measurement("finishing command encoders");
 
-                let interface_future = interface_target
-                    .state
-                    .try_take_semaphore()
-                    .unwrap_or_else(|| now(device.clone()).boxed());
-                let directional_shadow_future = directional_shadow_targets[image_number].state.take_semaphore();
-                let swapchain_acquire_future = swapchain_holder.take_acquire_future();
-
-                let combined_future = interface_future
-                    .join(directional_shadow_future)
-                    .join(swapchain_acquire_future)
-                    .boxed();
-
-                screen_target.finish(swapchain_holder.get_swapchain(), combined_future, image_number);
+                drop(picker_render_pass);
+                drop(interface_render_pass);
+                drop(shadow_render_pass);
+                drop(geometry_render_pass);
+                drop(screen_render_pass);
+                let picker_command_buffer = picker_target.finish(picker_command_encoder);
+                let interface_command_buffer = interface_target.finish(interface_command_encoder);
+                let shadow_command_buffer = shadow_target.finish(shadow_command_encoder);
+                let (deferred_command_buffer, screen_command_buffer) = deferred_target.finish(geometry_command_encoder, screen_command_encoder);
 
                 #[cfg(feature = "debug")]
                 finalize_frame_measurement.stop();
+
+                #[cfg(feature = "debug")]
+                let queue_measurement = Profiler::start_measurement("queue command buffers");
+
+                // We need to wait for the last submission to finish to be able to resolve all outstanding mapping callback.
+                device.poll(Maintain::Wait);
+                queue.submit([picker_command_buffer, interface_command_buffer, shadow_command_buffer, deferred_command_buffer, screen_command_buffer]);
+
+                #[cfg(feature = "debug")]
+                queue_measurement.stop();
+
+                #[cfg(feature = "debug")]
+                let present_measurement = Profiler::start_measurement("present frame");
+
+                frame.present();
+
+                #[cfg(feature = "debug")]
+                present_measurement.stop();
+
+                window.request_redraw();
             }
             _ignored => {},
         }
-    });
+    }).unwrap();
 }

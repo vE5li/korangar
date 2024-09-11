@@ -8,37 +8,25 @@ use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
 use ragnarok_formats::version::InternalVersion;
-use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo, PrimaryAutoCommandBuffer, PrimaryCommandBufferAbstract,
-};
-use vulkano::device::Queue;
-use vulkano::format::Format;
-use vulkano::image::view::ImageView;
-use vulkano::image::{Image, ImageCreateInfo, ImageUsage};
-use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
-use vulkano::sync::future::FenceSignalFuture;
-use vulkano::sync::GpuFuture;
+use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
 use super::FALLBACK_SPRITE_FILE;
-use crate::graphics::MemoryAllocator;
+use crate::graphics::Texture;
 use crate::loaders::error::LoadError;
 use crate::loaders::GameFileLoader;
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
     #[hidden_element]
-    pub textures: Vec<Arc<ImageView>>,
+    pub textures: Vec<Arc<Texture>>,
     #[cfg(feature = "debug")]
     sprite_data: SpriteData,
 }
 
 #[derive(new)]
 pub struct SpriteLoader {
-    memory_allocator: Arc<MemoryAllocator>,
+    device: Arc<Device>,
     queue: Arc<Queue>,
-    #[new(default)]
-    load_buffer: Option<AutoCommandBufferBuilder<PrimaryAutoCommandBuffer<MemoryAllocator>, MemoryAllocator>>,
     #[new(default)]
     cache: HashMap<String, Arc<Sprite>>,
 }
@@ -100,49 +88,29 @@ impl SpriteLoader {
             }
         });
 
-        let load_buffer = self.load_buffer.get_or_insert_with(|| {
-            AutoCommandBufferBuilder::primary(
-                &*self.memory_allocator,
-                self.queue.queue_family_index(),
-                CommandBufferUsage::OneTimeSubmit,
-            )
-            .unwrap()
-        });
-
         let textures = rgba_images
             .chain(palette_images)
             .map(|image_data| {
-                let buffer = Buffer::from_iter(
-                    &*self.memory_allocator,
-                    BufferCreateInfo {
-                        usage: BufferUsage::TRANSFER_SRC,
-                        ..Default::default()
+                let texture = Texture::new_with_data(
+                    &self.device,
+                    &self.queue,
+                    &TextureDescriptor {
+                        label: Some(path),
+                        size: Extent3d {
+                            width: image_data.width as u32,
+                            height: image_data.height as u32,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: TextureDimension::D2,
+                        format: TextureFormat::Rgba8UnormSrgb,
+                        usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                        view_formats: &[],
                     },
-                    AllocationCreateInfo {
-                        memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                        ..Default::default()
-                    },
-                    image_data.data.iter().copied(),
-                )
-                .unwrap();
-
-                let image = Image::new(
-                    &*self.memory_allocator,
-                    ImageCreateInfo {
-                        format: Format::R8G8B8A8_UNORM,
-                        extent: [image_data.width as u32, image_data.height as u32, 1],
-                        usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
-                        ..Default::default()
-                    },
-                    AllocationCreateInfo::default(),
-                )
-                .unwrap();
-
-                load_buffer
-                    .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(buffer, image.clone()))
-                    .unwrap();
-
-                ImageView::new_default(image).unwrap()
+                    &image_data.data,
+                );
+                Arc::new(texture)
             })
             .collect();
 
@@ -165,18 +133,5 @@ impl SpriteLoader {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path, game_file_loader),
         }
-    }
-
-    pub fn submit_load_buffer(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
-        self.load_buffer.take().map(|buffer| {
-            buffer
-                .build()
-                .unwrap()
-                .execute(self.queue.clone())
-                .unwrap()
-                .boxed()
-                .then_signal_fence_and_flush()
-                .unwrap()
-        })
     }
 }

@@ -7,15 +7,11 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Vector2, Vector3};
 use ragnarok_packets::EntityId;
 use serde::{Deserialize, Serialize};
-use vulkano::device::{DeviceOwned, Queue};
-use vulkano::format::{ClearValue, Format};
-use vulkano::image::{ImageUsage, SampleCount};
-use vulkano::render_pass::RenderPass;
+use wgpu::{Device, Queue, RenderPass, TextureFormat, TextureUsages};
 
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
 use self::indicator::IndicatorRenderer;
-use super::SubpassAttachments;
 use crate::graphics::{
     EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait, *,
 };
@@ -41,65 +37,32 @@ impl ShadowDetail {
 }
 
 #[derive(PartialEq, Eq)]
-pub enum ShadowSubrenderer {
+pub enum ShadowSubRenderer {
     Geometry,
     Entity,
     Indicator,
 }
 
 pub struct ShadowRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
-    queue: Arc<Queue>,
-    render_pass: Arc<RenderPass>,
+    device: Arc<Device>,
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     indicator_renderer: IndicatorRenderer,
-    walk_indicator: Arc<ImageView>,
+    walk_indicator: Arc<Texture>,
 }
 
-unsafe impl Send for ShadowRenderer {}
-unsafe impl Sync for ShadowRenderer {}
-
 impl ShadowRenderer {
-    const fn subpass() -> SubpassAttachments {
-        SubpassAttachments { color: 0, depth: 1 }
-    }
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader, texture_loader: &mut TextureLoader) -> Self {
+        let output_depth_format = <Self as Renderer>::Target::output_texture_format();
 
-    pub fn new(
-        memory_allocator: Arc<MemoryAllocator>,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        queue: Arc<Queue>,
-    ) -> Self {
-        let device = memory_allocator.device().clone();
-        let render_pass = vulkano::single_pass_renderpass!(
-            device,
-            attachments: {
-                depth: {
-                    format: Format::D32_SFLOAT,
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: Store,
-                }
-            },
-            pass: {
-                color: [],
-                depth_stencil: {depth}
-            }
-        )
-        .unwrap();
-
-        let subpass = render_pass.clone().first_subpass();
-        let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), subpass.clone());
-        let entity_renderer = EntityRenderer::new(memory_allocator.clone(), subpass.clone());
-        let indicator_renderer = IndicatorRenderer::new(memory_allocator.clone(), subpass);
+        let geometry_renderer = GeometryRenderer::new(device.clone(), queue.clone(), output_depth_format);
+        let entity_renderer = EntityRenderer::new(device.clone(), queue.clone(), output_depth_format);
+        let indicator_renderer = IndicatorRenderer::new(device.clone(), output_depth_format);
 
         let walk_indicator = texture_loader.get("grid.tga", game_file_loader).unwrap();
 
         Self {
-            memory_allocator,
-            queue,
-            render_pass,
+            device,
             geometry_renderer,
             entity_renderer,
             indicator_renderer,
@@ -109,13 +72,12 @@ impl ShadowRenderer {
 
     pub fn create_render_target(&self, size: u32) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
-            self.memory_allocator.clone(),
-            self.queue.clone(),
-            self.render_pass.clone(),
+            &self.device,
+            "shadow",
             [size; 2],
-            SampleCount::Sample1,
-            ImageUsage::SAMPLED | ImageUsage::DEPTH_STENCIL_ATTACHMENT,
-            ClearValue::Depth(1.0),
+            1,
+            TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            1.0,
         )
     }
 }
@@ -123,29 +85,30 @@ impl ShadowRenderer {
 pub struct ShadowFormat {}
 
 impl IntoFormat for ShadowFormat {
-    fn into_format() -> Format {
-        Format::D32_SFLOAT
+    fn into_format() -> TextureFormat {
+        TextureFormat::Depth32Float
     }
 }
 
 impl Renderer for ShadowRenderer {
-    type Target = SingleRenderTarget<ShadowFormat, ShadowSubrenderer, ClearValue>;
+    type Target = SingleRenderTarget<ShadowFormat, ShadowSubRenderer, f32>;
 }
 
 impl GeometryRendererTrait for ShadowRenderer {
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[ModelVertex]>,
-        textures: &[Arc<ImageView>],
+        vertex_buffer: &Buffer<ModelVertex>,
+        textures: &TextureGroup,
         world_matrix: Matrix4<f32>,
         time: f32,
     ) where
         Self: Renderer,
     {
         self.geometry_renderer
-            .render(render_target, camera, vertex_buffer, textures, world_matrix, time);
+            .render(render_target, render_pass, camera, vertex_buffer, textures, world_matrix, time);
     }
 }
 
@@ -153,8 +116,9 @@ impl EntityRendererTrait for ShadowRenderer {
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        texture: Arc<ImageView>,
+        texture: &Texture,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,
@@ -167,6 +131,7 @@ impl EntityRendererTrait for ShadowRenderer {
     {
         self.entity_renderer.render(
             render_target,
+            render_pass,
             camera,
             texture,
             position,
@@ -183,6 +148,7 @@ impl IndicatorRendererTrait for ShadowRenderer {
     fn render_walk_indicator(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
         _color: Color,
         upper_left: Vector3<f32>,
@@ -194,8 +160,9 @@ impl IndicatorRendererTrait for ShadowRenderer {
     {
         self.indicator_renderer.render_ground_indicator(
             render_target,
+            render_pass,
             camera,
-            self.walk_indicator.clone(),
+            &self.walk_indicator,
             upper_left,
             upper_right,
             lower_left,

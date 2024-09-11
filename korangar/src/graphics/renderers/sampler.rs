@@ -1,37 +1,34 @@
-use std::sync::Arc;
-
-use vulkano::device::Device;
-use vulkano::image::sampler::{Filter, Sampler, SamplerAddressMode, SamplerCreateInfo};
+use wgpu::{Device, FilterMode, Sampler, SamplerDescriptor};
 
 pub(super) enum SamplerType {
     Linear,
-    LinearAnisotropic(f32),
+    LinearAnisotropic(u16),
     Nearest,
 }
 
-pub(super) fn create_new_sampler(device: &Arc<Device>, sampler_type: SamplerType) -> Arc<Sampler> {
+pub(super) fn create_new_sampler(device: &Device, label: &str, sampler_type: SamplerType) -> Sampler {
     match sampler_type {
-        SamplerType::Linear => Sampler::new(device.clone(), SamplerCreateInfo {
-            mag_filter: Filter::Linear,
-            min_filter: Filter::Linear,
-            address_mode: [SamplerAddressMode::ClampToEdge; 3],
+        SamplerType::Linear => device.create_sampler(&SamplerDescriptor {
+            label: Some(label),
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            mipmap_filter: FilterMode::Linear,
             ..Default::default()
-        })
-        .unwrap(),
-        SamplerType::LinearAnisotropic(anisotropy) => Sampler::new(device.clone(), SamplerCreateInfo {
-            mag_filter: Filter::Linear,
-            min_filter: Filter::Linear,
-            anisotropy: Some(anisotropy),
-            address_mode: [SamplerAddressMode::ClampToEdge; 3],
+        }),
+        SamplerType::LinearAnisotropic(anisotropy_clamp) => device.create_sampler(&SamplerDescriptor {
+            label: Some(label),
+            mag_filter: FilterMode::Linear,
+            min_filter: FilterMode::Linear,
+            mipmap_filter: FilterMode::Linear,
+            anisotropy_clamp,
             ..Default::default()
-        })
-        .unwrap(),
-        SamplerType::Nearest => Sampler::new(device.clone(), SamplerCreateInfo {
-            mag_filter: Filter::Nearest,
-            min_filter: Filter::Nearest,
-            address_mode: [SamplerAddressMode::ClampToEdge; 3],
+        }),
+        SamplerType::Nearest => device.create_sampler(&SamplerDescriptor {
+            label: Some(label),
+            mag_filter: FilterMode::Nearest,
+            min_filter: FilterMode::Nearest,
+            mipmap_filter: FilterMode::Nearest,
             ..Default::default()
-        })
-        .unwrap(),
+        }),
     }
 }

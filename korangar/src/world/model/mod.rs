@@ -9,6 +9,7 @@ use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::ModelData;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
+use wgpu::RenderPass;
 
 pub use self::node::{BoundingBox, Node, OrientedBox};
 use crate::graphics::{Camera, GeometryRenderer, Renderer};
@@ -27,6 +28,7 @@ impl Model {
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         root_transform: &Transform,
@@ -36,7 +38,7 @@ impl Model {
         T: Renderer + GeometryRenderer,
     {
         self.root_node
-            .render_geometry(render_target, renderer, camera, root_transform, client_tick, time);
+            .render_geometry(render_target, render_pass, renderer, camera, root_transform, client_tick, time);
     }
 
     #[cfg(feature = "debug")]
@@ -72,12 +74,14 @@ impl Model {
     pub fn render_bounding_box(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         root_transform: &Transform,
     ) {
         renderer.render_bounding_box(
             render_target,
+            render_pass,
             camera,
             root_transform,
             &self.bounding_box,

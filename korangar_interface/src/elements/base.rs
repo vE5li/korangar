@@ -28,11 +28,12 @@ where
     }
 }
 
-pub struct ElementRenderer<'a, App>
+pub struct ElementRenderer<'a, 'encoder, App>
 where
     App: Application,
 {
     pub render_target: &'a mut <App::Renderer as InterfaceRenderer<App>>::Target,
+    pub render_pass: &'a mut App::RenderPass<'encoder>,
     pub renderer: &'a App::Renderer,
     pub application: &'a App,
     pub position: App::Position,
@@ -40,7 +41,7 @@ where
     pub clip: App::Clip,
 }
 
-impl<'a, App> ElementRenderer<'a, App>
+impl<'a, 'encoder, App> ElementRenderer<'a, 'encoder, App>
 where
     App: Application,
 {
@@ -60,6 +61,7 @@ where
     pub fn render_background(&mut self, corner_radius: App::CornerRadius, color: App::Color) {
         self.renderer.render_rectangle(
             self.render_target,
+            self.render_pass,
             self.position,
             self.size,
             self.clip,
@@ -71,6 +73,7 @@ where
     pub fn render_rectangle(&mut self, position: App::Position, size: App::Size, corner_radius: App::CornerRadius, color: App::Color) {
         self.renderer.render_rectangle(
             self.render_target,
+            self.render_pass,
             self.position.combined(position),
             size,
             self.clip,
@@ -82,6 +85,7 @@ where
     pub fn render_text(&mut self, text: &str, offset: App::Position, foreground_color: App::Color, font_size: App::FontSize) -> f32 {
         self.renderer.render_text(
             self.render_target,
+            self.render_pass,
             text,
             self.position.combined(offset.scaled(self.application.get_scaling())),
             self.clip,
@@ -93,6 +97,7 @@ where
     pub fn render_checkbox(&mut self, offset: App::Position, size: App::Size, color: App::Color, checked: bool) {
         self.renderer.render_checkbox(
             self.render_target,
+            self.render_pass,
             self.position.combined(offset.scaled(self.application.get_scaling())),
             size.scaled(self.application.get_scaling()),
             self.clip,
@@ -104,6 +109,7 @@ where
     pub fn render_expand_arrow(&mut self, offset: App::Position, size: App::Size, color: App::Color, expanded: bool) {
         self.renderer.render_expand_arrow(
             self.render_target,
+            self.render_pass,
             self.position.combined(offset.scaled(self.application.get_scaling())),
             size.scaled(self.application.get_scaling()),
             self.clip,
@@ -124,6 +130,7 @@ where
     ) {
         element.render(
             self.render_target,
+            self.render_pass,
             self.renderer,
             application,
             theme,
@@ -193,14 +200,15 @@ where
         HoverInformation::Missed
     }
 
-    pub fn element_renderer<'a>(
+    pub fn element_renderer<'a, 'encoder>(
         &self,
         render_target: &'a mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        render_pass: &'a mut App::RenderPass<'encoder>,
         renderer: &'a App::Renderer,
         application: &'a App,
         parent_position: App::Position,
         screen_clip: App::Clip,
-    ) -> ElementRenderer<'a, App> {
+    ) -> ElementRenderer<'a, 'encoder, App> {
         let position = parent_position.combined(self.cached_position);
         let size = self.cached_size;
 
@@ -213,6 +221,7 @@ where
 
         ElementRenderer {
             render_target,
+            render_pass,
             renderer,
             application,
             position,
@@ -341,6 +350,7 @@ where
     fn render(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        render_pass: &mut App::RenderPass<'_>,
         render: &App::Renderer,
         application: &App,
         theme: &App::Theme,

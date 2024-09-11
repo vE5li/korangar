@@ -3,6 +3,7 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_networking::{SellItem, ShopItem};
+use wgpu::RenderPass;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer};
 use crate::input::MouseInputMode;
@@ -78,6 +79,7 @@ where
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -90,7 +92,7 @@ where
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true if matches!(mouse_mode, MouseInputMode::None) => theme.button.hovered_background_color.get(),
@@ -101,7 +103,8 @@ where
 
         renderer.renderer.render_sprite(
             renderer.render_target,
-            self.item.get_resource_metadata().texture.clone(),
+            renderer.render_pass,
+            &self.item.get_resource_metadata().texture,
             renderer.position,
             ScreenSize::uniform(30.0).scaled(Scaling::new(application.get_scaling_factor())),
             renderer.clip,

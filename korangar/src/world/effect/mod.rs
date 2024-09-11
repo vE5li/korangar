@@ -2,6 +2,8 @@ mod lookup;
 
 use cgmath::Vector3;
 use ragnarok_formats::map::EffectSource;
+#[cfg(feature = "debug")]
+use wgpu::RenderPass;
 
 #[cfg(feature = "debug")]
 use crate::graphics::{Camera, MarkerRenderer, Renderer};
@@ -15,6 +17,7 @@ pub trait EffectSourceExt {
     fn render_marker<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
@@ -32,6 +35,7 @@ impl EffectSourceExt for EffectSource {
     fn render_marker<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
@@ -39,6 +43,6 @@ impl EffectSourceExt for EffectSource {
     ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, marker_identifier, self.position, hovered);
+        renderer.render_marker(render_target, render_pass, camera, marker_identifier, self.position, hovered);
     }
 }

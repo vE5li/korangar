@@ -9,6 +9,7 @@ use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::SellItem;
 use num::Integer;
 use ragnarok_packets::SoldItemInformation;
+use wgpu::RenderPass;
 
 use super::CartSum;
 use crate::graphics::{InterfaceRenderer, Renderer};
@@ -179,6 +180,7 @@ impl Element<InterfaceSettings> for SellCartContainer {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -189,10 +191,10 @@ impl Element<InterfaceSettings> for SellCartContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+        let mut renderer =
+            self.state
+                .state
+                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

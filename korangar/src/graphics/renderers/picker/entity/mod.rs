@@ -1,99 +1,177 @@
-vertex_shader!("src/graphics/renderers/picker/entity/vertex_shader.glsl");
-fragment_shader!("src/graphics/renderers/picker/entity/fragment_shader.glsl");
-
 use std::sync::Arc;
 
+use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::{Vector2, Vector3};
 use ragnarok_packets::EntityId;
-use vulkano::descriptor_set::WriteDescriptorSet;
-use vulkano::device::{Device, DeviceOwned};
-use vulkano::image::sampler::Sampler;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::pipeline::{GraphicsPipeline, PipelineBindPoint};
-use vulkano::render_pass::Subpass;
-use vulkano::shader::EntryPoint;
+use wgpu::{
+    include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
+    BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState,
+    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PushConstantRange, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, ShaderModule, ShaderModuleDescriptor, ShaderStages,
+    TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
+};
 
-use self::vertex_shader::{Constants, Matrices};
-use super::PickerSubrenderer;
-use crate::graphics::renderers::pipeline::PipelineBuilder;
+use super::PickerSubRenderer;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::renderers::PickerTarget;
 use crate::graphics::*;
 
+const SHADER: ShaderModuleDescriptor = include_wgsl!("entity.wgsl");
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+struct Matrices {
+    view: [[f32; 4]; 4],
+    projection: [[f32; 4]; 4],
+}
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+struct Constants {
+    world: [[f32; 4]; 4],
+    texture_position: [f32; 2],
+    texture_size: [f32; 2],
+    identifier: u32,
+    mirror: u32,
+}
+
 pub struct EntityRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
-    vertex_shader: EntryPoint,
-    fragment_shader: EntryPoint,
-    matrices_buffer: MatrixAllocator<Matrices>,
-    nearest_sampler: Arc<Sampler>,
-    pipeline: Arc<GraphicsPipeline>,
+    device: Arc<Device>,
+    queue: Arc<Queue>,
+    matrices_buffer: Buffer<Matrices>,
+    nearest_sampler: Sampler,
+    bind_group_layout: BindGroupLayout,
+    pipeline: RenderPipeline,
 }
 
 impl EntityRenderer {
-    pub fn new(memory_allocator: Arc<MemoryAllocator>, subpass: Subpass, viewport: Viewport) -> Self {
-        let device = memory_allocator.device().clone();
-        let vertex_shader = vertex_shader::entry_point(&device);
-        let fragment_shader = fragment_shader::entry_point(&device);
-        let matrices_buffer = MatrixAllocator::new(&memory_allocator);
-        let nearest_sampler = create_new_sampler(&device, SamplerType::Nearest);
-        let pipeline = Self::create_pipeline(device, subpass, viewport, &vertex_shader, &fragment_shader);
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, output_color_format: TextureFormat, output_depth_format: TextureFormat) -> Self {
+        let shader_module = device.create_shader_module(SHADER);
+        let matrices_buffer = Buffer::with_capacity(
+            &device,
+            "entity",
+            BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            size_of::<Matrices>() as _,
+        );
+        let nearest_sampler = create_new_sampler(&device, "entity nearest", SamplerType::Nearest);
+        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("entity"),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: matrices_buffer.byte_capacity(),
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: true },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+            ],
+        });
+
+        let pipeline = Self::create_pipeline(
+            &device,
+            &shader_module,
+            &bind_group_layout,
+            output_color_format,
+            output_depth_format,
+        );
 
         Self {
-            memory_allocator,
-            pipeline,
-            vertex_shader,
-            fragment_shader,
+            device,
+            queue,
             matrices_buffer,
             nearest_sampler,
+            bind_group_layout,
+            pipeline,
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn recreate_pipeline(&mut self, device: Arc<Device>, subpass: Subpass, viewport: Viewport) {
-        self.pipeline = Self::create_pipeline(device, subpass, viewport, &self.vertex_shader, &self.fragment_shader);
-    }
-
     fn create_pipeline(
-        device: Arc<Device>,
-        subpass: Subpass,
-        viewport: Viewport,
-        vertex_shader: &EntryPoint,
-        fragment_shader: &EntryPoint,
-    ) -> Arc<GraphicsPipeline> {
-        PipelineBuilder::<_, { PickerRenderer::subpass() }>::new([vertex_shader, fragment_shader])
-            .vertex_input_state::<ModelVertex>(vertex_shader)
-            .fixed_viewport(viewport)
-            .simple_depth_test()
-            .build(device, subpass)
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn bind_pipeline(&self, render_target: &mut <PickerRenderer as Renderer>::Target, camera: &dyn Camera) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let buffer = self.matrices_buffer.allocate(Matrices {
-            view: view_matrix.into(),
-            projection: projection_matrix.into(),
+        device: &Device,
+        shader_module: &ShaderModule,
+        bind_group_layout: &BindGroupLayout,
+        output_color_format: TextureFormat,
+        output_depth_format: TextureFormat,
+    ) -> RenderPipeline {
+        let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("entity"),
+            bind_group_layouts: &[bind_group_layout],
+            push_constant_ranges: &[PushConstantRange {
+                stages: ShaderStages::VERTEX_FRAGMENT,
+                range: 0..size_of::<Constants>() as _,
+            }],
         });
 
-        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 0, [WriteDescriptorSet::buffer(
-            0, buffer,
-        )]);
+        device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some("entity"),
+            layout: Some(&layout),
+            vertex: VertexState {
+                module: shader_module,
+                entry_point: "vs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(FragmentState {
+                module: shader_module,
+                entry_point: "fs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: output_color_format,
+                    blend: None,
+                    write_mask: ColorWrites::default(),
+                })],
+            }),
+            multiview: None,
+            primitive: PrimitiveState::default(),
+            multisample: MultisampleState::default(),
+            depth_stencil: Some(DepthStencilState {
+                format: output_depth_format,
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Greater,
+                stencil: Default::default(),
+                bias: Default::default(),
+            }),
+            cache: None,
+        })
+    }
 
-        render_target
-            .state
-            .get_builder()
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .unwrap()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout, set_id, set)
-            .unwrap();
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn bind_pipeline(&self, render_pass: &mut RenderPass, camera: &dyn Camera) {
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let uniform_data = Matrices {
+            view: view_matrix.into(),
+            projection: projection_matrix.into(),
+        };
+        self.matrices_buffer.write_exact(&self.queue, &[uniform_data]);
+
+        render_pass.set_pipeline(&self.pipeline);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render entity"))]
     pub fn render(
         &self,
         render_target: &mut <PickerRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        texture: Arc<ImageView>,
+        texture: &Texture,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,
@@ -102,14 +180,14 @@ impl EntityRenderer {
         entity_id: EntityId,
         mirror: bool,
     ) {
-        if render_target.bind_subrenderer(PickerSubrenderer::Entity) {
-            self.bind_pipeline(render_target, camera);
+        if render_target.bound_sub_renderer(PickerSubRenderer::Entity) {
+            self.bind_pipeline(render_pass, camera);
         }
 
-        let image_dimensions = texture.image().extent();
+        let texture_dimensions = texture.get_extend();
         let size = Vector2::new(
-            image_dimensions[0] as f32 * scale.x / 10.0,
-            image_dimensions[1] as f32 * scale.y / 10.0,
+            texture_dimensions.width as f32 * scale.x / 10.0,
+            texture_dimensions.height as f32 * scale.y / 10.0,
         );
 
         let world_matrix = camera.billboard_matrix(position, origin, size);
@@ -117,11 +195,26 @@ impl EntityRenderer {
         let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
         let picker_target = PickerTarget::Entity(entity_id);
 
-        let (layout, set, set_id) = allocate_descriptor_set(&self.pipeline, &self.memory_allocator, 1, [
-            WriteDescriptorSet::image_view_sampler(0, texture, self.nearest_sampler.clone()),
-        ]);
+        let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
+            label: Some("entity"),
+            layout: &self.bind_group_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: self.matrices_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::Sampler(&self.nearest_sampler),
+                },
+            ],
+        });
 
-        let constants = Constants {
+        let push_constants = Constants {
             world: world_matrix.into(),
             texture_position: texture_position.into(),
             texture_size: texture_size.into(),
@@ -129,14 +222,8 @@ impl EntityRenderer {
             mirror: mirror as u32,
         };
 
-        render_target
-            .state
-            .get_builder()
-            .bind_descriptor_sets(PipelineBindPoint::Graphics, layout.clone(), set_id, set)
-            .unwrap()
-            .push_constants(layout, 0, constants)
-            .unwrap()
-            .draw(6, 1, 0, 0)
-            .unwrap();
+        render_pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, cast_slice(&[push_constants]));
+        render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.draw(0..6, 0..1);
     }
 }

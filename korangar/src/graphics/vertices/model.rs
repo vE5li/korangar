@@ -1,19 +1,14 @@
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Vector2, Vector3};
-use vulkano::pipeline::graphics::vertex_input::Vertex;
+use wgpu::{vertex_attr_array, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
 #[repr(C)]
-#[derive(Default, Debug, Clone, Copy, Zeroable, Pod, Vertex)]
+#[derive(Default, Debug, Clone, Copy, Zeroable, Pod)]
 pub struct ModelVertex {
-    #[format(R32G32B32_SFLOAT)]
     pub position: [f32; 3],
-    #[format(R32G32B32_SFLOAT)]
     pub normal: [f32; 3],
-    #[format(R32G32_SFLOAT)]
     pub texture_coordinates: [f32; 2],
-    #[format(R32_SINT)]
     pub texture_index: i32,
-    #[format(R32_SFLOAT)]
     pub wind_affinity: f32,
 }
 
@@ -31,6 +26,22 @@ impl ModelVertex {
             texture_coordinates: [texture_coordinates.x, texture_coordinates.y],
             texture_index,
             wind_affinity,
+        }
+    }
+
+    pub fn buffer_layout() -> VertexBufferLayout<'static> {
+        static ATTRIBUTES: &[VertexAttribute] = &vertex_attr_array!(
+                0 => Float32x3,
+                1 => Float32x3,
+                2 => Float32x2,
+                3 => Sint32,
+                4 => Float32,
+        );
+
+        VertexBufferLayout {
+            array_stride: size_of::<Self>() as _,
+            step_mode: VertexStepMode::Vertex,
+            attributes: ATTRIBUTES,
         }
     }
 }

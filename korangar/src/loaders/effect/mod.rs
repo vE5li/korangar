@@ -9,11 +9,11 @@ use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::effect::{EffectData, Frame};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::EntityId;
-use vulkano::image::view::ImageView;
+use wgpu::RenderPass;
 
 use super::error::LoadError;
 use super::TextureLoader;
-use crate::graphics::{Camera, Color, DeferredRenderer, Renderer};
+use crate::graphics::{Camera, Color, DeferredRenderer, Renderer, Texture};
 use crate::loaders::GameFileLoader;
 
 fn ease_interpolate(start_value: f32, end_value: f32, time: f32, bias: f32, sub_multiplier: f32) -> f32 {
@@ -80,7 +80,7 @@ pub struct EffectLoader {
 }
 
 pub struct Layer {
-    pub textures: Vec<Arc<ImageView>>,
+    pub textures: Vec<Arc<Texture>>,
     pub frames: Vec<Frame>,
     pub indices: Vec<Option<usize>>,
 }
@@ -141,20 +141,15 @@ impl Effect {
     pub fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         frame_timer: &FrameTimer,
         position: Vector3<f32>,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let world_to_screen_matrix = projection_matrix * view_matrix;
-
-        let clip_space_position = world_to_screen_matrix * position.extend(1.0);
-        let screen_space_position = Vector2::new(
-            clip_space_position.x / clip_space_position.w + 1.0,
-            clip_space_position.y / clip_space_position.w + 1.0,
-        );
-
+        let clip_space_position = projection_matrix * view_matrix * position.extend(1.0);
+        let screen_space_position = camera.clip_to_screen_space(clip_space_position);
         for layer in &self.layers {
             let Some(frame) = layer.interpolate(frame_timer) else {
                 continue;
@@ -166,7 +161,8 @@ impl Effect {
 
             renderer.render_effect(
                 render_target,
-                layer.textures[frame.texture_index as usize].clone(),
+                render_pass,
+                &layer.textures[frame.texture_index as usize],
                 [
                     Vector2::new(frame.xy[0], frame.xy[4]),
                     Vector2::new(frame.xy[1], frame.xy[5]),
@@ -308,7 +304,13 @@ pub trait EffectBase {
 
     fn mark_for_deletion(&mut self);
 
-    fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera);
+    fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    );
 }
 
 #[derive(new)]
@@ -357,10 +359,17 @@ impl EffectBase for EffectWithLight {
         self.gets_deleted = true;
     }
 
-    fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+    fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    ) {
         if !self.gets_deleted {
             self.effect.render(
                 render_target,
+                render_pass,
                 renderer,
                 camera,
                 &self.frame_timer,
@@ -370,6 +379,7 @@ impl EffectBase for EffectWithLight {
 
         renderer.point_light(
             render_target,
+            render_pass,
             camera,
             self.center.to_position() + self.light_offset,
             self.light_color,
@@ -407,9 +417,15 @@ impl EffectHolder {
         self.effects.retain_mut(|(effect, _)| effect.update(entities, delta_time));
     }
 
-    pub fn render(&self, render_target: &mut <DeferredRenderer as Renderer>::Target, renderer: &DeferredRenderer, camera: &dyn Camera) {
+    pub fn render(
+        &self,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        renderer: &DeferredRenderer,
+        camera: &dyn Camera,
+    ) {
         self.effects
             .iter()
-            .for_each(|(effect, _)| effect.render(render_target, renderer, camera));
+            .for_each(|(effect, _)| effect.render(render_target, render_pass, renderer, camera));
     }
 }

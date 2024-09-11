@@ -7,80 +7,50 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use korangar_interface::application::Application;
-use vulkano::device::{DeviceOwned, Queue};
-use vulkano::format::{ClearColorValue, Format};
-use vulkano::image::view::ImageView;
-use vulkano::image::{ImageUsage, SampleCount};
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::render_pass::RenderPass;
+use wgpu::{Device, RenderPass, TextureFormat, TextureUsages};
 
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::text::TextRenderer;
-use super::{IntoFormat, SubpassAttachments};
-use crate::graphics::{Color, MemoryAllocator, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait};
+use super::IntoFormat;
+use crate::graphics::{Color, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
 
 #[derive(PartialEq, Eq)]
-pub enum InterfaceSubrenderer {
+pub enum InterfaceSubRenderer {
     Rectangle,
     Sprite,
     Text,
 }
 
 pub struct InterfaceRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
+    device: Arc<Device>,
     font_loader: Rc<RefCell<FontLoader>>,
-    queue: Arc<Queue>,
-    render_pass: Arc<RenderPass>,
     rectangle_renderer: RectangleRenderer,
     sprite_renderer: SpriteRenderer,
     text_renderer: TextRenderer,
-    checked_box_texture: Arc<ImageView>,
-    unchecked_box_texture: Arc<ImageView>,
-    expanded_arrow_texture: Arc<ImageView>,
-    collapsed_arrow_texture: Arc<ImageView>,
+    checked_box_texture: Arc<Texture>,
+    unchecked_box_texture: Arc<Texture>,
+    expanded_arrow_texture: Arc<Texture>,
+    collapsed_arrow_texture: Arc<Texture>,
     dimensions: [u32; 2],
 }
 
 impl InterfaceRenderer {
-    const fn subpass() -> SubpassAttachments {
-        SubpassAttachments { color: 1, depth: 0 }
-    }
-
     pub fn new(
-        memory_allocator: Arc<MemoryAllocator>,
+        device: Arc<Device>,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         font_loader: Rc<RefCell<FontLoader>>,
-        queue: Arc<Queue>,
-        viewport: Viewport,
         dimensions: [u32; 2],
     ) -> Self {
-        let device = memory_allocator.device().clone();
-        let render_pass = vulkano::single_pass_renderpass!(
-            device,
-            attachments: {
-                interface: {
-                    format: Format::R8G8B8A8_UNORM,
-                    samples: 4,
-                    load_op: DontCare,
-                    store_op: Store,
-                }
-            },
-            pass: {
-                color: [interface],
-                depth_stencil: {}
-            }
-        )
-        .unwrap();
+        let output_texture_format = <Self as Renderer>::Target::output_texture_format();
 
-        let subpass = render_pass.clone().first_subpass();
-        let rectangle_renderer = RectangleRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
-        let sprite_renderer = SpriteRenderer::new(memory_allocator.clone(), subpass.clone(), viewport.clone());
-        let font_renderer = TextRenderer::new(memory_allocator.clone(), subpass, viewport, font_loader.clone());
+        let rectangle_renderer = RectangleRenderer::new(device.clone(), output_texture_format);
+        let sprite_renderer = SpriteRenderer::new(device.clone(), output_texture_format);
+        let text_renderer = TextRenderer::new(device.clone(), output_texture_format, font_loader.clone());
 
         let checked_box_texture = texture_loader.get("checked_box.png", game_file_loader).unwrap();
         let unchecked_box_texture = texture_loader.get("unchecked_box.png", game_file_loader).unwrap();
@@ -88,13 +58,11 @@ impl InterfaceRenderer {
         let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", game_file_loader).unwrap();
 
         Self {
-            memory_allocator,
+            device,
             font_loader,
-            queue,
-            render_pass,
             rectangle_renderer,
             sprite_renderer,
-            text_renderer: font_renderer,
+            text_renderer,
             checked_box_texture,
             unchecked_box_texture,
             expanded_arrow_texture,
@@ -103,29 +71,25 @@ impl InterfaceRenderer {
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("re-create interface pipeline"))]
-    pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2]) {
-        let device = self.memory_allocator.device().clone();
-        let subpass = self.render_pass.clone().first_subpass();
-
-        self.rectangle_renderer
-            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
-        self.sprite_renderer
-            .recreate_pipeline(device.clone(), subpass.clone(), viewport.clone());
-        self.text_renderer.recreate_pipeline(device, subpass, viewport);
+    #[cfg_attr(feature = "debug", korangar_debug::profile("reconfigure interface pipeline"))]
+    pub fn reconfigure_pipeline(&mut self, dimensions: [u32; 2]) {
         self.dimensions = dimensions;
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("create interface render target"))]
     pub fn create_render_target(&self) -> <Self as Renderer>::Target {
         <Self as Renderer>::Target::new(
-            self.memory_allocator.clone(),
-            self.queue.clone(),
-            self.render_pass.clone(),
+            &self.device,
+            "interface",
             self.dimensions,
-            SampleCount::Sample4,
-            ImageUsage::SAMPLED | ImageUsage::TRANSFER_DST | ImageUsage::COLOR_ATTACHMENT | ImageUsage::INPUT_ATTACHMENT,
-            ClearColorValue::Float([0.0, 0.0, 0.0, 0.0]),
+            4,
+            TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+            wgpu::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.0,
+            },
         )
     }
 
@@ -152,6 +116,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
     fn render_rectangle(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut RenderPass,
         position: <InterfaceSettings as Application>::Position,
         size: <InterfaceSettings as Application>::Size,
         clip: <InterfaceSettings as Application>::Clip,
@@ -160,6 +125,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
     ) {
         self.rectangle_renderer.render(
             render_target,
+            render_pass,
             self.get_window_size(),
             position,
             size,
@@ -172,19 +138,29 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
     fn render_text(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut RenderPass,
         text: &str,
         position: <InterfaceSettings as Application>::Position,
         clip: <InterfaceSettings as Application>::Clip,
         color: <InterfaceSettings as Application>::Color,
         font_size: <InterfaceSettings as Application>::FontSize,
     ) -> f32 {
-        self.text_renderer
-            .render(render_target, text, self.get_window_size(), position, clip, color, font_size)
+        self.text_renderer.render(
+            render_target,
+            render_pass,
+            text,
+            self.get_window_size(),
+            position,
+            clip,
+            color,
+            font_size,
+        )
     }
 
     fn render_checkbox(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut RenderPass,
         position: <InterfaceSettings as Application>::Position,
         size: <InterfaceSettings as Application>::Size,
         clip: <InterfaceSettings as Application>::Clip,
@@ -192,16 +168,17 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         checked: bool,
     ) {
         let texture = match checked {
-            true => self.checked_box_texture.clone(),
-            false => self.unchecked_box_texture.clone(),
+            true => &self.checked_box_texture,
+            false => &self.unchecked_box_texture,
         };
 
-        self.render_sprite(render_target, texture, position, size, clip, color, true);
+        self.render_sprite(render_target, render_pass, texture, position, size, clip, color, true);
     }
 
     fn render_expand_arrow(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut RenderPass,
         position: <InterfaceSettings as Application>::Position,
         size: <InterfaceSettings as Application>::Size,
         clip: <InterfaceSettings as Application>::Clip,
@@ -209,31 +186,32 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         expanded: bool,
     ) {
         let texture = match expanded {
-            true => self.expanded_arrow_texture.clone(),
-            false => self.collapsed_arrow_texture.clone(),
+            true => &self.expanded_arrow_texture,
+            false => &self.collapsed_arrow_texture,
         };
 
-        self.render_sprite(render_target, texture, position, size, clip, color, true);
+        self.render_sprite(render_target, render_pass, texture, position, size, clip, color, true);
     }
 }
 
 pub struct InterfaceFormat {}
 
 impl IntoFormat for InterfaceFormat {
-    fn into_format() -> Format {
-        Format::R8G8B8A8_UNORM
+    fn into_format() -> TextureFormat {
+        TextureFormat::Rgba8UnormSrgb
     }
 }
 
 impl Renderer for InterfaceRenderer {
-    type Target = SingleRenderTarget<InterfaceFormat, InterfaceSubrenderer, ClearColorValue>;
+    type Target = SingleRenderTarget<InterfaceFormat, InterfaceSubRenderer, wgpu::Color>;
 }
 
 impl SpriteRendererTrait for InterfaceRenderer {
     fn render_sprite(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        texture: Arc<ImageView>,
+        render_pass: &mut RenderPass,
+        texture: &Texture,
         position: ScreenPosition,
         size: ScreenSize,
         screen_clip: ScreenClip,
@@ -244,6 +222,7 @@ impl SpriteRendererTrait for InterfaceRenderer {
     {
         self.sprite_renderer.render(
             render_target,
+            render_pass,
             texture,
             self.get_window_size(),
             position,

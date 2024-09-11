@@ -158,6 +158,7 @@ where
     pub(super) fn render_window_anchors(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         theme: &App::Theme,
         window_position: App::Position,
@@ -170,6 +171,7 @@ where
 
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(window_size.shrink(dot_size).halved()),
             dot_size,
             screen_clip,
@@ -178,6 +180,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position,
             dot_size,
             screen_clip,
@@ -186,6 +189,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(App::Size::only_width(window_size.width() - wide_dot_width).halved()),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
@@ -194,6 +198,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(App::Size::only_width(window_size.width() - dot_width)),
             dot_size,
             screen_clip,
@@ -202,6 +207,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(App::Size::new(
                 window_size.shrink(dot_size).width(),
                 window_size.shrink(App::Size::only_height(wide_dot_width)).halved().height(),
@@ -213,6 +219,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(window_size.shrink(dot_size)),
             dot_size,
             screen_clip,
@@ -221,6 +228,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(App::Size::new(
                 window_size.shrink(App::Size::only_width(wide_dot_width)).halved().width(),
                 window_size.shrink(dot_size).height(),
@@ -232,6 +240,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(App::Size::only_height(window_size.height() - dot_width)),
             dot_size,
             screen_clip,
@@ -240,6 +249,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             window_position.offset(App::Size::only_height(window_size.height() - wide_dot_width).halved()),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
@@ -251,6 +261,7 @@ where
     pub(super) fn render_screen_anchors(
         &self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         theme: &App::Theme,
         available_space: App::Size,
@@ -262,6 +273,7 @@ where
 
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::from_size(available_space.shrink(dot_size).halved()),
             dot_size,
             screen_clip,
@@ -270,6 +282,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::zero(),
             dot_size,
             screen_clip,
@@ -278,6 +291,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::only_left(available_space.width() - wide_dot_width).halved(),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
@@ -286,6 +300,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::only_left(available_space.width() - dot_width),
             dot_size,
             screen_clip,
@@ -294,6 +309,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::new(
                 available_space.shrink(dot_size).width(),
                 available_space.shrink(App::Size::only_height(wide_dot_width)).halved().height(),
@@ -305,6 +321,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::from_size(available_space.shrink(dot_size)),
             dot_size,
             screen_clip,
@@ -313,6 +330,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::new(
                 available_space.shrink(App::Size::only_width(wide_dot_width)).halved().width(),
                 available_space.shrink(dot_size).height(),
@@ -324,6 +342,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::only_top(available_space.height() - dot_width),
             dot_size,
             screen_clip,
@@ -332,6 +351,7 @@ where
         );
         renderer.render_rectangle(
             render_target,
+            render_pass,
             App::Position::only_top(available_space.height() - wide_dot_width).halved(),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,

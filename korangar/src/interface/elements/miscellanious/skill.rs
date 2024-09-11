@@ -4,6 +4,7 @@ use korangar_interface::elements::{Element, ElementState};
 use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
+use wgpu::RenderPass;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -78,6 +79,7 @@ impl Element<InterfaceSettings> for SkillBox {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -90,7 +92,7 @@ impl Element<InterfaceSettings> for SkillBox {
     ) {
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
@@ -105,6 +107,7 @@ impl Element<InterfaceSettings> for SkillBox {
         if let Some(skill) = &self.skill {
             skill.actions.render2(
                 renderer.render_target,
+                renderer.render_pass,
                 renderer.renderer,
                 &skill.sprite,
                 &skill.animation_state,

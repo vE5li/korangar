@@ -8,17 +8,19 @@ use korangar_debug::logging::{print_debug, Colorize, Timer};
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
-use vulkano::image::view::ImageView;
+use wgpu::{BufferUsages, Device, Queue};
 
 use super::error::LoadError;
 use super::FALLBACK_MODEL_FILE;
-use crate::graphics::{BufferAllocator, NativeModelVertex};
+use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::system::multiply_matrix4_and_vector3;
 use crate::world::{BoundingBox, Model, Node};
 
 #[derive(new)]
 pub struct ModelLoader {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
     #[new(default)]
     cache: HashMap<(String, bool), Arc<Model>>,
 }
@@ -129,10 +131,11 @@ impl ModelLoader {
     }
 
     fn process_node_mesh(
-        buffer_allocator: &mut BufferAllocator,
+        device: &Device,
+        queue: &Queue,
         current_node: &NodeData,
         nodes: &Vec<NodeData>,
-        textures: &Vec<Arc<ImageView>>,
+        textures: &Vec<Arc<Texture>>,
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut BoundingBox,
         root_node_name: &ModelString<40>,
@@ -141,7 +144,13 @@ impl ModelLoader {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
         let vertices = NativeModelVertex::to_vertices(Self::make_vertices(current_node, &main_matrix, reverse_order));
 
-        let vertex_buffer = buffer_allocator.allocate_vertex_buffer(vertices);
+        let vertex_buffer = Buffer::with_data(
+            device,
+            queue,
+            &current_node.node_name.inner,
+            BufferUsages::COPY_DST | BufferUsages::VERTEX,
+            &vertices,
+        );
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = BoundingBox::new(
@@ -163,7 +172,7 @@ impl ModelLoader {
             false => transform_matrix,
         };
 
-        let node_textures = current_node
+        let node_textures: Vec<Arc<Texture>> = current_node
             .texture_indices
             .iter()
             .map(|index| *index as usize)
@@ -176,7 +185,8 @@ impl ModelLoader {
             .filter(|node| node.parent_node_name != node.node_name)
             .map(|node| {
                 Self::process_node_mesh(
-                    buffer_allocator,
+                    device,
+                    queue,
                     node,
                     nodes,
                     textures,
@@ -187,6 +197,8 @@ impl ModelLoader {
                 )
             })
             .collect();
+
+        let node_textures = TextureGroup::new(device, &root_node_name.inner, node_textures);
 
         Node::new(
             final_matrix,
@@ -199,7 +211,6 @@ impl ModelLoader {
 
     fn load(
         &mut self,
-        buffer_allocator: &mut BufferAllocator,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         model_file: &str,
@@ -222,13 +233,7 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(
-                    buffer_allocator,
-                    game_file_loader,
-                    texture_loader,
-                    FALLBACK_MODEL_FILE,
-                    reverse_order,
-                );
+                return self.get(game_file_loader, texture_loader, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
 
@@ -248,7 +253,8 @@ impl ModelLoader {
 
         let mut bounding_box = BoundingBox::uninitialized();
         let root_node = Self::process_node_mesh(
-            buffer_allocator,
+            &self.device,
+            &self.queue,
             root_node,
             &model_data.nodes,
             &textures,
@@ -274,7 +280,6 @@ impl ModelLoader {
 
     pub fn get(
         &mut self,
-        buffer_allocator: &mut BufferAllocator,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         model_file: &str,
@@ -283,7 +288,7 @@ impl ModelLoader {
         match self.cache.get(&(model_file.to_string(), reverse_order)) {
             // kinda dirty
             Some(model) => Ok(model.clone()),
-            None => self.load(buffer_allocator, game_file_loader, texture_loader, model_file, reverse_order),
+            None => self.load(game_file_loader, texture_loader, model_file, reverse_order),
         }
     }
 }

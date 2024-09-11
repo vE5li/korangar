@@ -5,6 +5,7 @@ use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use crate::input::UserEvent;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
+#[cfg(feature = "debug")]
 use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::WindowCache;
 

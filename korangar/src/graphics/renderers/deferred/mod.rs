@@ -24,12 +24,7 @@ use korangar_interface::application::FontSizeTrait;
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::EntityId;
-use vulkano::device::{DeviceOwned, Queue};
-use vulkano::format::Format;
-use vulkano::image::Image;
-use vulkano::ordered_passes_renderpass;
-use vulkano::pipeline::graphics::viewport::Viewport;
-use vulkano::render_pass::{RenderPass, Subpass};
+use wgpu::{Device, Queue, RenderPass, TextureFormat};
 
 use self::ambient::AmbientLightRenderer;
 #[cfg(feature = "debug")]
@@ -47,9 +42,8 @@ use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
-use super::SubpassAttachments;
 use crate::graphics::{
-    EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait,
+    Buffer, EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait,
     SpriteRenderer as SpriteRendererTrait, *,
 };
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -58,7 +52,7 @@ use crate::loaders::{FontSize, GameFileLoader, TextureLoader};
 use crate::world::{BoundingBox, MarkerIdentifier};
 
 #[derive(PartialEq, Eq)]
-pub enum DeferredSubrenderer {
+pub enum DeferredSubRenderer {
     Geometry,
     Entity,
     Water,
@@ -78,9 +72,7 @@ pub enum DeferredSubrenderer {
 }
 
 pub struct DeferredRenderer {
-    memory_allocator: Arc<MemoryAllocator>,
-    queue: Arc<Queue>,
-    render_pass: Arc<RenderPass>,
+    device: Arc<Device>,
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     water_renderer: WaterRenderer,
@@ -98,117 +90,85 @@ pub struct DeferredRenderer {
     #[cfg(feature = "debug")]
     box_renderer: BoxRenderer,
     #[cfg(feature = "debug")]
-    tile_textures: [Arc<ImageView>; 7],
-    font_map: Arc<ImageView>,
-    walk_indicator: Arc<ImageView>,
+    tile_textures: TextureGroup,
+    font_map: Arc<Texture>,
+    walk_indicator: Arc<Texture>,
+    surface_format: TextureFormat,
     dimensions: [u32; 2],
 }
 
-unsafe impl Send for DeferredRenderer {}
-unsafe impl Sync for DeferredRenderer {}
-
 impl DeferredRenderer {
-    const fn deferred_subpass() -> SubpassAttachments {
-        SubpassAttachments { color: 3, depth: 1 }
-    }
-
-    const fn lighting_subpass() -> SubpassAttachments {
-        SubpassAttachments { color: 1, depth: 0 }
-    }
-
     pub fn new(
-        memory_allocator: Arc<MemoryAllocator>,
-        buffer_allocator: &mut BufferAllocator,
+        device: Arc<Device>,
+        queue: Arc<Queue>,
         game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
-        queue: Arc<Queue>,
-        swapchain_format: Format,
-        viewport: Viewport,
+        surface_format: TextureFormat,
         dimensions: [u32; 2],
     ) -> Self {
-        let device = memory_allocator.device().clone();
-        let render_pass = ordered_passes_renderpass!(device,
-            attachments: {
-                output: {
-                    format: swapchain_format,
-                    samples: 1,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                diffuse: {
-                    format: Format::R32G32B32A32_SFLOAT,
-                    samples: 4,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                normal: {
-                    format: Format::R16G16B16A16_SFLOAT,
-                    samples: 4,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                water: {
-                    format: Format::R8G8B8A8_UNORM,
-                    samples: 4,
-                    load_op: Clear,
-                    store_op: Store,
-                },
-                depth: {
-                    format: Format::D32_SFLOAT,
-                    samples: 4,
-                    load_op: Clear,
-                    store_op: Store,
-                }
-            },
-            passes: [
-                {
-                    color: [diffuse, normal, water],
-                    depth_stencil: {depth},
-                    input: []
-                },
-                {
-                    color: [output],
-                    depth_stencil: {},
-                    input: [diffuse, normal, water, depth]
-                }
-            ]
-        )
-        .unwrap();
+        let output_diffuse_format = <Self as Renderer>::Target::output_diffuse_format();
+        let output_normal_format = <Self as Renderer>::Target::output_normal_format();
+        let output_water_format = <Self as Renderer>::Target::output_water_format();
+        let output_depth_format = <Self as Renderer>::Target::output_depth_format();
 
-        let geometry_subpass = Subpass::from(render_pass.clone(), 0).unwrap();
-        let lighting_subpass = Subpass::from(render_pass.clone(), 1).unwrap();
+        let geometry_renderer = GeometryRenderer::new(
+            device.clone(),
+            queue.clone(),
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
+        );
+        let entity_renderer = EntityRenderer::new(
+            device.clone(),
+            queue.clone(),
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
+        );
+        let water_renderer = WaterRenderer::new(
+            device.clone(),
+            queue.clone(),
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
+        );
+        let indicator_renderer = IndicatorRenderer::new(
+            device.clone(),
+            queue.clone(),
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
+        );
 
-        let geometry_renderer = GeometryRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
-        let entity_renderer = EntityRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
-        let water_renderer = WaterRenderer::new(memory_allocator.clone(), geometry_subpass.clone(), viewport.clone());
-        let indicator_renderer = IndicatorRenderer::new(memory_allocator.clone(), geometry_subpass, viewport.clone());
-        let ambient_light_renderer = AmbientLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
-        let directional_light_renderer =
-            DirectionalLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
-        let point_light_renderer = PointLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
-        let water_light_renderer = WaterLightRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
-        let overlay_renderer = OverlayRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
-        let rectangle_renderer = RectangleRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), surface_format);
+        let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), queue.clone(), surface_format);
+        let point_light_renderer = PointLightRenderer::new(device.clone(), queue.clone(), surface_format);
+        let water_light_renderer = WaterLightRenderer::new(device.clone(), surface_format);
+        let overlay_renderer = OverlayRenderer::new(device.clone(), surface_format);
+        let rectangle_renderer = RectangleRenderer::new(device.clone(), surface_format);
         let sprite_renderer = SpriteRenderer::new(
-            memory_allocator.clone(),
-            lighting_subpass.clone(),
-            viewport.clone(),
+            device.clone(),
+            surface_format,
             #[cfg(feature = "debug")]
             game_file_loader,
             #[cfg(feature = "debug")]
             texture_loader,
         );
-        let effect_renderer = EffectRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let effect_renderer = EffectRenderer::new(device.clone(), surface_format);
         #[cfg(feature = "debug")]
-        let buffer_renderer = BufferRenderer::new(memory_allocator.clone(), lighting_subpass.clone(), viewport.clone());
+        let buffer_renderer = BufferRenderer::new(device.clone(), surface_format);
         #[cfg(feature = "debug")]
-        let box_renderer = BoxRenderer::new(memory_allocator.clone(), buffer_allocator, lighting_subpass, viewport);
+        let box_renderer = BoxRenderer::new(device.clone(), queue.clone(), surface_format);
 
         let font_map = texture_loader.get("font.png", game_file_loader).unwrap();
         let walk_indicator = texture_loader.get("grid.tga", game_file_loader).unwrap();
 
         #[cfg(feature = "debug")]
-        let tile_textures = [
+        let tile_textures: Vec<Arc<Texture>> = vec![
             texture_loader.get("0.png", game_file_loader).unwrap(),
             texture_loader.get("1.png", game_file_loader).unwrap(),
             texture_loader.get("2.png", game_file_loader).unwrap(),
@@ -218,10 +178,11 @@ impl DeferredRenderer {
             texture_loader.get("6.png", game_file_loader).unwrap(),
         ];
 
+        #[cfg(feature = "debug")]
+        let tile_textures = TextureGroup::new(&device, "tile textures", tile_textures);
+
         Self {
-            memory_allocator,
-            queue,
-            render_pass,
+            device,
             geometry_renderer,
             entity_renderer,
             water_renderer,
@@ -242,109 +203,112 @@ impl DeferredRenderer {
             tile_textures,
             font_map,
             walk_indicator,
+            surface_format,
             dimensions,
         }
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("re-create deferred pipeline"))]
-    pub fn recreate_pipeline(&mut self, viewport: Viewport, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
-        let device = self.memory_allocator.device().clone();
-        let geometry_subpass = Subpass::from(self.render_pass.clone(), 0).unwrap();
-        let lighting_subpass = Subpass::from(self.render_pass.clone(), 1).unwrap();
-
+    #[cfg_attr(feature = "debug", korangar_debug::profile("reconfigure deferred pipeline"))]
+    pub fn reconfigure_pipeline(&mut self, surface_format: TextureFormat, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
         self.geometry_renderer.recreate_pipeline(
-            device.clone(),
-            geometry_subpass.clone(),
-            viewport.clone(),
             #[cfg(feature = "debug")]
             wireframe,
         );
-        self.entity_renderer
-            .recreate_pipeline(device.clone(), geometry_subpass.clone(), viewport.clone());
-        self.water_renderer
-            .recreate_pipeline(device.clone(), geometry_subpass.clone(), viewport.clone());
-        self.indicator_renderer
-            .recreate_pipeline(device.clone(), geometry_subpass, viewport.clone());
-        self.ambient_light_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.directional_light_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.point_light_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.water_light_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.overlay_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.rectangle_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.sprite_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        self.effect_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        #[cfg(feature = "debug")]
-        self.buffer_renderer
-            .recreate_pipeline(device.clone(), lighting_subpass.clone(), viewport.clone());
-        #[cfg(feature = "debug")]
-        self.box_renderer.recreate_pipeline(device, lighting_subpass, viewport);
+
+        if self.surface_format != surface_format {
+            self.surface_format = surface_format;
+
+            self.ambient_light_renderer.recreate_pipeline(surface_format);
+            self.directional_light_renderer.recreate_pipeline(surface_format);
+            self.point_light_renderer.recreate_pipeline(surface_format);
+            self.water_light_renderer.recreate_pipeline(surface_format);
+            self.overlay_renderer.recreate_pipeline(surface_format);
+            self.rectangle_renderer.recreate_pipeline(surface_format);
+            self.sprite_renderer.recreate_pipeline(surface_format);
+            self.effect_renderer.recreate_pipeline(surface_format);
+            #[cfg(feature = "debug")]
+            self.buffer_renderer.recreate_pipeline(surface_format);
+            #[cfg(feature = "debug")]
+            self.box_renderer.recreate_pipeline(surface_format);
+        }
+
         self.dimensions = dimensions;
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("create deferred render target"))]
-    pub fn create_render_target(&self, swapchain_image: Arc<Image>) -> <Self as Renderer>::Target {
-        <Self as Renderer>::Target::new(
-            self.memory_allocator.clone(),
-            self.queue.clone(),
-            self.render_pass.clone(),
-            swapchain_image,
-            self.dimensions,
-        )
+    pub fn create_render_target(&self) -> <Self as Renderer>::Target {
+        <Self as Renderer>::Target::new(&self.device, self.dimensions)
     }
 
     pub fn render_water(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[WaterVertex]>,
+        vertex_buffer: &Buffer<WaterVertex>,
         day_timer: f32,
     ) {
-        self.water_renderer.render(render_target, camera, vertex_buffer, day_timer);
+        self.water_renderer
+            .render(render_target, render_pass, camera, vertex_buffer, day_timer);
     }
 
-    pub fn ambient_light(&self, render_target: &mut <Self as Renderer>::Target, color: Color) {
-        self.ambient_light_renderer.render(render_target, color);
+    pub fn ambient_light(&self, render_target: &mut <Self as Renderer>::Target, render_pass: &mut RenderPass, color: Color) {
+        self.ambient_light_renderer.render(render_target, render_pass, color);
     }
 
     pub fn directional_light(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        light_image: Arc<ImageView>,
+        shadow_map: &Texture,
         light_matrix: Matrix4<f32>,
         direction: Vector3<f32>,
         color: Color,
         intensity: f32,
     ) {
-        self.directional_light_renderer
-            .render(render_target, camera, light_image, light_matrix, direction, color, intensity);
+        self.directional_light_renderer.render(
+            render_target,
+            render_pass,
+            camera,
+            shadow_map,
+            light_matrix,
+            direction,
+            color,
+            intensity,
+        );
     }
 
     pub fn point_light(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
         position: Vector3<f32>,
         color: Color,
         range: f32,
     ) {
-        self.point_light_renderer.render(render_target, camera, position, color, range);
+        self.point_light_renderer
+            .render(render_target, render_pass, camera, position, color, range);
     }
 
-    pub fn water_light(&self, render_target: &mut <Self as Renderer>::Target, camera: &dyn Camera, water_level: f32) {
-        self.water_light_renderer.render(render_target, camera, water_level);
+    pub fn water_light(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        camera: &dyn Camera,
+        water_level: f32,
+    ) {
+        self.water_light_renderer.render(render_target, render_pass, camera, water_level);
     }
 
-    pub fn overlay_interface(&self, render_target: &mut <Self as Renderer>::Target, interface_image: Arc<ImageView>) {
-        self.overlay_renderer.render(render_target, interface_image);
+    pub fn overlay_interface(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        interface_texture: &Texture,
+    ) {
+        self.overlay_renderer.render(render_target, render_pass, interface_texture);
     }
 
     fn get_window_size(&self) -> ScreenSize {
@@ -357,17 +321,21 @@ impl DeferredRenderer {
     pub fn render_rectangle(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         position: ScreenPosition,
         size: ScreenSize,
         color: Color,
     ) {
+        let window_size = self.get_window_size();
+
         self.rectangle_renderer
-            .render(render_target, self.get_window_size(), position, size, color);
+            .render(render_target, render_pass, window_size, position, size, color);
     }
 
     pub fn render_bar(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         position: ScreenPosition,
         size: ScreenSize,
         color: Color,
@@ -380,12 +348,13 @@ impl DeferredRenderer {
             height: size.height,
         };
 
-        self.render_rectangle(render_target, position - bar_offset, bar_size, color);
+        self.render_rectangle(render_target, render_pass, position - bar_offset, bar_size, color);
     }
 
     pub fn render_text(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         text: &str,
         mut position: ScreenPosition,
         color: Color,
@@ -397,7 +366,8 @@ impl DeferredRenderer {
             let index = (*character as usize).saturating_sub(31);
             self.sprite_renderer.render_indexed(
                 render_target,
-                self.font_map.clone(),
+                render_pass,
+                &self.font_map,
                 window_size,
                 position,
                 ScreenSize::uniform(font_size.get_value()),
@@ -413,6 +383,7 @@ impl DeferredRenderer {
     pub fn render_damage_text(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         text: &str,
         mut position: ScreenPosition,
         color: Color,
@@ -424,7 +395,8 @@ impl DeferredRenderer {
             let index = (*character as usize).saturating_sub(31);
             self.sprite_renderer.render_indexed(
                 render_target,
-                self.font_map.clone(),
+                render_pass,
+                &self.font_map,
                 window_size,
                 position,
                 ScreenSize::uniform(font_size),
@@ -440,8 +412,9 @@ impl DeferredRenderer {
     pub fn render_effect(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
-        texture: Arc<ImageView>,
-        screen_positions: [Vector2<f32>; 4],
+        render_pass: &mut RenderPass,
+        texture: &Texture,
+        corner_screen_position: [Vector2<f32>; 4],
         texture_coordinates: [Vector2<f32>; 4],
         screen_space_position: Vector2<f32>,
         offset: Vector2<f32>,
@@ -452,9 +425,10 @@ impl DeferredRenderer {
 
         self.effect_renderer.render(
             render_target,
+            render_pass,
             texture,
             window_size,
-            screen_positions,
+            corner_screen_position,
             texture_coordinates,
             screen_space_position,
             offset,
@@ -467,13 +441,15 @@ impl DeferredRenderer {
     pub fn render_overlay_tiles(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[ModelVertex]>,
+        vertex_buffer: &Buffer<ModelVertex>,
     ) {
         // FIX: This is broken on account of the TileTypes not storing their original
         // index. Should choose an index based on flags instead.
         self.render_geometry(
             render_target,
+            render_pass,
             camera,
             vertex_buffer,
             &self.tile_textures,
@@ -486,25 +462,34 @@ impl DeferredRenderer {
     pub fn render_bounding_box(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
         transform: &Transform,
         bounding_box: &BoundingBox,
         color: Color,
     ) {
-        self.box_renderer.render(render_target, camera, transform, bounding_box, color);
+        self.box_renderer
+            .render(render_target, render_pass, camera, transform, bounding_box, color);
     }
 
     #[cfg(feature = "debug")]
     pub fn overlay_buffers(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        picker_image: Arc<ImageView>,
-        light_image: Arc<ImageView>,
-        font_atlas: Arc<ImageView>,
+        render_pass: &mut RenderPass,
+        picker_texture: &Texture,
+        shadow_map: &Texture,
+        font_atlas: &Texture,
         render_settings: &RenderSettings,
     ) {
-        self.buffer_renderer
-            .render(render_target, picker_image, light_image, font_atlas, render_settings);
+        self.buffer_renderer.render(
+            render_target,
+            render_pass,
+            picker_texture,
+            shadow_map,
+            font_atlas,
+            render_settings,
+        );
     }
 }
 
@@ -516,16 +501,17 @@ impl GeometryRendererTrait for DeferredRenderer {
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        vertex_buffer: Subbuffer<[ModelVertex]>,
-        textures: &[Arc<ImageView>],
+        vertex_buffer: &Buffer<ModelVertex>,
+        textures: &TextureGroup,
         world_matrix: Matrix4<f32>,
         time: f32,
     ) where
         Self: Renderer,
     {
         self.geometry_renderer
-            .render(render_target, camera, vertex_buffer, textures, world_matrix, time);
+            .render(render_target, render_pass, camera, vertex_buffer, textures, world_matrix, time);
     }
 }
 
@@ -533,8 +519,9 @@ impl EntityRendererTrait for DeferredRenderer {
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        texture: Arc<ImageView>,
+        texture: &Texture,
         position: Vector3<f32>,
         origin: Vector3<f32>,
         scale: Vector2<f32>,
@@ -547,6 +534,7 @@ impl EntityRendererTrait for DeferredRenderer {
     {
         self.entity_renderer.render(
             render_target,
+            render_pass,
             camera,
             texture,
             position,
@@ -563,7 +551,8 @@ impl SpriteRendererTrait for DeferredRenderer {
     fn render_sprite(
         &self,
         render_target: &mut <Self as Renderer>::Target,
-        texture: Arc<ImageView>,
+        render_pass: &mut RenderPass,
+        texture: &Texture,
         position: ScreenPosition,
         size: ScreenSize,
         _screen_clip: ScreenClip,
@@ -572,10 +561,13 @@ impl SpriteRendererTrait for DeferredRenderer {
     ) where
         Self: Renderer,
     {
+        let window_size = self.get_window_size();
+
         self.sprite_renderer.render_indexed(
             render_target,
+            render_pass,
             texture,
-            self.get_window_size(),
+            window_size,
             position,
             size,
             color,
@@ -591,6 +583,7 @@ impl MarkerRenderer for DeferredRenderer {
     fn render_marker(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         position: Vector3<f32>,
@@ -601,10 +594,16 @@ impl MarkerRenderer for DeferredRenderer {
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
 
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
-            let (screen_position, screen_size) = camera.screen_position_size(bottom_right_position, top_left_position); // WHY ARE THESE INVERTED ???
+            let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
 
-            self.sprite_renderer
-                .render_marker(render_target, marker_identifier, screen_position, screen_size, hovered);
+            self.sprite_renderer.render_marker(
+                render_target,
+                render_pass,
+                marker_identifier,
+                screen_position,
+                screen_size,
+                hovered,
+            );
         }
     }
 }
@@ -613,6 +612,7 @@ impl IndicatorRendererTrait for DeferredRenderer {
     fn render_walk_indicator(
         &self,
         render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
         camera: &dyn Camera,
         color: Color,
         upper_left: Vector3<f32>,
@@ -624,8 +624,9 @@ impl IndicatorRendererTrait for DeferredRenderer {
     {
         self.indicator_renderer.render_ground_indicator(
             render_target,
+            render_pass,
             camera,
-            self.walk_indicator.clone(),
+            &self.walk_indicator,
             color,
             upper_left,
             upper_right,

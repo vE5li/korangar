@@ -7,11 +7,13 @@ use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
-use vulkano::buffer::Subbuffer;
+#[cfg(feature = "debug")]
+use wgpu::Buffer;
+use wgpu::RenderPass;
 
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
-use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, ModelVertex, Renderer};
+use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, Renderer};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
@@ -44,7 +46,7 @@ pub struct Movement {
     #[cfg(feature = "debug")]
     #[new(default)]
     #[hidden_element]
-    pub steps_vertex_buffer: Option<Subbuffer<[ModelVertex]>>,
+    pub steps_vertex_buffer: Option<Arc<Buffer>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -722,17 +724,18 @@ impl Common {
         active_movement.steps_vertex_buffer = Some(vertex_buffer);
     }*/
 
-    pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
+    pub fn render<T>(&self, render_target: &mut T::Target, render_pass: &mut RenderPass, renderer: &T, camera: &dyn Camera)
     where
         T: Renderer + EntityRenderer,
     {
-        let camera_direction = camera.get_camera_direction();
+        let camera_direction = camera.camera_direction();
         let (texture, position, mirror) = self
             .actions
             .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
 
         renderer.render_entity(
             render_target,
+            render_pass,
             camera,
             texture,
             self.position,
@@ -749,6 +752,7 @@ impl Common {
     pub fn render_marker<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
@@ -756,7 +760,7 @@ impl Common {
     ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, marker_identifier, self.position, hovered);
+        renderer.render_marker(render_target, render_pass, camera, marker_identifier, self.position, hovered);
     }
 }
 
@@ -827,6 +831,7 @@ impl Player {
     pub fn render_status(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         theme: &GameTheme,
@@ -834,11 +839,7 @@ impl Player {
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
-        let screen_position = Vector2::new(
-            clip_space_position.x / clip_space_position.w + 1.0,
-            clip_space_position.y / clip_space_position.w + 1.0,
-        );
-        let screen_position = screen_position / 2.0;
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
             top: screen_position.y * window_size.height + 5.0,
@@ -862,6 +863,7 @@ impl Player {
 
         renderer.render_rectangle(
             render_target,
+            render_pass,
             background_position,
             background_size,
             theme.status_bar.background_color.get(),
@@ -869,6 +871,7 @@ impl Player {
 
         renderer.render_bar(
             render_target,
+            render_pass,
             final_position,
             ScreenSize {
                 width: bar_width,
@@ -883,6 +886,7 @@ impl Player {
 
         renderer.render_bar(
             render_target,
+            render_pass,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
@@ -897,6 +901,7 @@ impl Player {
 
         renderer.render_bar(
             render_target,
+            render_pass,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
@@ -948,6 +953,7 @@ impl Npc {
     pub fn render_status(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         theme: &GameTheme,
@@ -959,20 +965,17 @@ impl Npc {
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
-        let screen_position = ScreenPosition {
-            left: clip_space_position.x / clip_space_position.w + 1.0,
-            top: clip_space_position.y / clip_space_position.w + 1.0,
-        };
-        let screen_position = screen_position / 2.0;
+        let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
-            left: screen_position.left * window_size.width,
-            top: screen_position.top * window_size.height + 5.0,
+            left: screen_position.x * window_size.width,
+            top: screen_position.y * window_size.height + 5.0,
         };
 
         let bar_width = theme.status_bar.enemy_bar_width.get();
 
         renderer.render_rectangle(
             render_target,
+            render_pass,
             final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
@@ -983,6 +986,7 @@ impl Npc {
 
         renderer.render_bar(
             render_target,
+            render_pass,
             final_position,
             ScreenSize {
                 width: bar_width,
@@ -1090,17 +1094,18 @@ impl Entity {
         self.get_common_mut().generate_steps_vertex_buffer(device, map);
     }*/
 
-    pub fn render<T>(&self, render_target: &mut T::Target, renderer: &T, camera: &dyn Camera)
+    pub fn render<T>(&self, render_target: &mut T::Target, render_pass: &mut RenderPass, renderer: &T, camera: &dyn Camera)
     where
         T: Renderer + EntityRenderer,
     {
-        self.get_common().render(render_target, renderer, camera);
+        self.get_common().render(render_target, render_pass, renderer, camera);
     }
 
     #[cfg(feature = "debug")]
     pub fn render_marker<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
@@ -1109,20 +1114,21 @@ impl Entity {
         T: Renderer + MarkerRenderer,
     {
         self.get_common()
-            .render_marker(render_target, renderer, camera, marker_identifier, hovered);
+            .render_marker(render_target, render_pass, renderer, camera, marker_identifier, hovered);
     }
 
     pub fn render_status(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         theme: &GameTheme,
         window_size: ScreenSize,
     ) {
         match self {
-            Self::Player(player) => player.render_status(render_target, renderer, camera, theme, window_size),
-            Self::Npc(npc) => npc.render_status(render_target, renderer, camera, theme, window_size),
+            Self::Player(player) => player.render_status(render_target, render_pass, renderer, camera, theme, window_size),
+            Self::Npc(npc) => npc.render_status(render_target, render_pass, renderer, camera, theme, window_size),
         }
     }
 }

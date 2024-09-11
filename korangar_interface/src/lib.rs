@@ -397,6 +397,7 @@ where
     pub fn render(
         &mut self,
         render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
+        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         hovered_element: Option<ElementCell<App>>,
@@ -416,6 +417,7 @@ where
 
                 window.render(
                     render_target,
+                    render_pass,
                     renderer,
                     application,
                     theme,
@@ -425,7 +427,7 @@ where
                 );
 
                 if mouse_mode.is_moving_window(index) {
-                    window.render_anchors(render_target, renderer, theme, self.available_space);
+                    window.render_anchors(render_target, render_pass, renderer, theme, self.available_space);
                 }
             }
         }

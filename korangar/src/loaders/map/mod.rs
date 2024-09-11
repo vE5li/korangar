@@ -3,6 +3,7 @@ mod vertices;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use bytemuck::Pod;
 use cgmath::Vector3;
 use derive_new::new;
 #[cfg(feature = "debug")]
@@ -10,10 +11,11 @@ use korangar_debug::logging::Timer;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
+use wgpu::{BufferUsages, Device, Queue};
 
 use self::vertices::{generate_tile_vertices, ground_water_vertices, load_textures};
 use super::error::LoadError;
-use crate::graphics::{BufferAllocator, NativeModelVertex};
+use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
 use crate::world::*;
 
@@ -34,6 +36,8 @@ fn assert_byte_stream_empty<Meta>(mut byte_stream: ByteStream<Meta>, file_name: 
 
 #[derive(new)]
 pub struct MapLoader {
+    device: Arc<Device>,
+    queue: Arc<Queue>,
     #[new(default)]
     cache: HashMap<String, Arc<Map>>,
 }
@@ -43,13 +47,12 @@ impl MapLoader {
         &mut self,
         resource_file: String,
         game_file_loader: &mut GameFileLoader,
-        buffer_allocator: &mut BufferAllocator,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, LoadError> {
         match self.cache.get(&resource_file) {
             Some(map) => Ok(map.clone()),
-            None => self.load(resource_file, game_file_loader, buffer_allocator, model_loader, texture_loader),
+            None => self.load(resource_file, game_file_loader, model_loader, texture_loader),
         }
     }
 
@@ -57,14 +60,13 @@ impl MapLoader {
         &mut self,
         resource_file: String,
         game_file_loader: &mut GameFileLoader,
-        buffer_allocator: &mut BufferAllocator,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let map_file = format!("data\\{}.rsw", resource_file);
+        let map_file = format!("data\\{}.rsw", &resource_file);
         let mut map_data: MapData = parse_generic_data(&map_file, game_file_loader)?;
 
         let ground_file = format!("data\\{}", map_data.ground_file);
@@ -85,13 +87,14 @@ impl MapLoader {
         let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
 
         let ground_vertices = NativeModelVertex::to_vertices(ground_vertices);
-        let ground_vertex_buffer = buffer_allocator.allocate_vertex_buffer(ground_vertices);
-        let water_vertex_buffer = (!water_vertices.is_empty()).then(|| buffer_allocator.allocate_vertex_buffer(water_vertices));
-        let tile_vertex_buffer = (!tile_vertices.is_empty()).then(|| buffer_allocator.allocate_vertex_buffer(tile_vertices));
-        let tile_picker_vertex_buffer =
-            (!tile_picker_vertices.is_empty()).then(|| buffer_allocator.allocate_vertex_buffer(tile_picker_vertices));
 
-        let textures = load_textures(&ground_data, texture_loader, game_file_loader);
+        let ground_vertex_buffer = self.create_vertex_buffer(&resource_file, "ground", &ground_vertices);
+        let water_vertex_buffer = (!water_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "water", &water_vertices));
+        let tile_vertex_buffer = (!tile_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile", &tile_vertices));
+        let tile_picker_vertex_buffer =
+            (!tile_picker_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile picker", &tile_picker_vertices));
+
+        let textures: Vec<Arc<Texture>> = load_textures(&ground_data, texture_loader, game_file_loader);
         apply_map_offset(&ground_data, &mut map_data.resources);
 
         // Loading object models
@@ -102,13 +105,7 @@ impl MapLoader {
             .map(|object_data| {
                 let array: [f32; 3] = object_data.transform.scale.into();
                 let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
-                let model = model_loader.get(
-                    buffer_allocator,
-                    game_file_loader,
-                    texture_loader,
-                    object_data.model_name.as_str(),
-                    reverse_order,
-                );
+                let model = model_loader.get(game_file_loader, texture_loader, object_data.model_name.as_str(), reverse_order);
 
                 Object::new(
                     object_data.name.to_owned(),
@@ -118,6 +115,8 @@ impl MapLoader {
                 )
             })
             .collect();
+
+        let textures = TextureGroup::new(&self.device, &map_file, textures);
 
         let map = Arc::new(Map::new(
             gat_data.map_width as usize,
@@ -144,6 +143,16 @@ impl MapLoader {
         timer.stop();
 
         Ok(map)
+    }
+
+    fn create_vertex_buffer<T: Pod>(&self, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {
+        Buffer::with_data(
+            &self.device,
+            &self.queue,
+            format!("{resource} {label}"),
+            BufferUsages::COPY_DST | BufferUsages::VERTEX,
+            vertices,
+        )
     }
 }
 

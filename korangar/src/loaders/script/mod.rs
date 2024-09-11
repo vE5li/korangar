@@ -3,14 +3,14 @@ use std::sync::Arc;
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
 use mlua::Lua;
 use ragnarok_packets::ItemId;
-use vulkano::image::view::ImageView;
 
 use super::TextureLoader;
+use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
 
 #[derive(Debug, Clone)]
 pub struct ResourceMetadata {
-    pub texture: Arc<ImageView>,
+    pub texture: Arc<Texture>,
     pub name: String,
 }
 
@@ -30,7 +30,6 @@ impl ScriptLoader {
         let data = game_file_loader
             .get("data\\luafiles514\\lua files\\datainfo\\iteminfo.lub")
             .unwrap();
-
         state.load(&data).exec()?;
 
         let job_id_function = r#"

@@ -18,6 +18,7 @@ mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
 option-ext = { workspace = true }
 pathfinding = { workspace = true }
+pollster = { workspace = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }
 ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
@@ -28,9 +29,8 @@ ron = { workspace = true }
 rusttype = { workspace = true, features = ["gpu_cache"] }
 serde = { workspace = true }
 serde-xml-rs = { workspace = true }
-vulkano = { workspace = true }
-vulkano-shaders = { workspace = true }
 walkdir = { workspace = true }
+wgpu = { workspace = true }
 winit = { workspace = true }
 xml-rs = { workspace = true }
 yazi = { workspace = true }

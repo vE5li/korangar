@@ -104,6 +104,20 @@ impl Color {
             ),
         }
     }
+
+    // TODO: NHA For this function we should have a sRGBA (4x u8) and linear color
+    //       type (4x f32).
+    pub fn components_linear(self) -> [f32; 4] {
+        let srgb = [self.red, self.green, self.blue];
+        let linear = srgb.map(|channel| {
+            if channel <= 0.04045 {
+                channel / 12.92
+            } else {
+                ((channel + 0.055) / 1.055).powf(2.4)
+            }
+        });
+        [linear[0], linear[1], linear[2], self.alpha]
+    }
 }
 
 impl From<Color> for [f32; 3] {

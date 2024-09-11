@@ -6,20 +6,12 @@ use korangar_interface::elements::ElementDisplay;
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use serde::{Deserialize, Serialize};
-use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
-use vulkano::command_buffer::{
-    AutoCommandBufferBuilder, BufferImageCopy, ClearColorImageInfo, CommandBufferUsage, CopyBufferToImageInfo, PrimaryCommandBufferAbstract,
+use wgpu::{
+    Device, Extent3d, ImageCopyTexture, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
 };
-use vulkano::device::Queue;
-use vulkano::format::Format;
-use vulkano::image::view::ImageView;
-use vulkano::image::{Image, ImageCreateInfo, ImageUsage};
-use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter};
-use vulkano::sync::future::FenceSignalFuture;
-use vulkano::sync::GpuFuture;
 
 use super::GameFileLoader;
-use crate::graphics::{Color, CommandBuilder, MemoryAllocator};
+use crate::graphics::{Color, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
 
@@ -47,7 +39,7 @@ impl ElementDisplay for FontSize {
     }
 }
 
-impl korangar_interface::application::FontSizeTrait for FontSize {
+impl FontSizeTrait for FontSize {
     fn new(value: f32) -> Self {
         Self(value)
     }
@@ -94,11 +86,9 @@ impl korangar_interface::application::ScalingTrait for Scaling {
 }
 
 pub struct FontLoader {
-    memory_allocator: Arc<MemoryAllocator>,
     queue: Arc<Queue>,
-    font_atlas: Arc<ImageView>,
+    font_atlas: Texture,
     cache: Box<Cache<'static>>,
-    load_buffer: Option<CommandBuilder>,
     font: Box<Font<'static>>,
 }
 
@@ -175,22 +165,24 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
 }
 
 impl FontLoader {
-    pub fn new(memory_allocator: Arc<MemoryAllocator>, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader) -> Self {
+    pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader) -> Self {
         let cache_size = Vector2::from_value(512);
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
 
-        let font_atlas_image = Image::new(
-            &*memory_allocator,
-            ImageCreateInfo {
-                format: Format::R8_UNORM,
-                extent: [cache_size.x, cache_size.y, 1],
-                usage: ImageUsage::TRANSFER_DST | ImageUsage::SAMPLED,
-                ..Default::default()
+        let font_atlas = Texture::new(device, &TextureDescriptor {
+            label: Some("Texture Atlas"),
+            size: Extent3d {
+                width: cache_size.x,
+                height: cache_size.y,
+                depth_or_array_layers: 1,
             },
-            AllocationCreateInfo::default(),
-        )
-        .unwrap();
-        let font_atlas = ImageView::new_default(font_atlas_image.clone()).unwrap();
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::R8Unorm,
+            usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
 
         let font_path = "data\\WenQuanYiMicroHei.ttf";
         let data = game_file_loader.get(font_path).unwrap();
@@ -198,26 +190,10 @@ impl FontLoader {
             panic!("error constructing a font from data at {font_path:?}");
         });
 
-        let mut builder = AutoCommandBufferBuilder::primary(
-            &*memory_allocator,
-            queue.queue_family_index(),
-            CommandBufferUsage::OneTimeSubmit,
-        )
-        .unwrap();
-
-        let clear_color_image_info = ClearColorImageInfo {
-            clear_value: [0f32].into(),
-            ..ClearColorImageInfo::image(font_atlas_image)
-        };
-
-        builder.clear_color_image(clear_color_image_info).unwrap();
-
         Self {
-            memory_allocator,
             queue,
             font_atlas,
             cache: Box::new(cache),
-            load_buffer: builder.into(),
             font: Box::new(font),
         }
     }
@@ -258,45 +234,29 @@ impl FontLoader {
 
         self.cache
             .cache_queued(|rect, data| {
-                let builder = self.load_buffer.get_or_insert_with(|| {
-                    AutoCommandBufferBuilder::primary(
-                        &*self.memory_allocator,
-                        self.queue.queue_family_index(),
-                        CommandBufferUsage::OneTimeSubmit,
-                    )
-                    .unwrap()
-                });
-
-                let pixels = data.iter().map(|&value| value as i8);
-                let buffer = Buffer::from_iter(
-                    &*self.memory_allocator,
-                    BufferCreateInfo {
-                        usage: BufferUsage::TRANSFER_SRC,
-                        ..Default::default()
+                self.queue.write_texture(
+                    ImageCopyTexture {
+                        texture: self.font_atlas.get_texture(),
+                        mip_level: 0,
+                        origin: Origin3d {
+                            x: rect.min.x,
+                            y: rect.min.y,
+                            z: 0,
+                        },
+                        aspect: TextureAspect::All,
                     },
-                    AllocationCreateInfo {
-                        memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                        ..Default::default()
+                    data,
+                    wgpu::ImageDataLayout {
+                        offset: 0,
+                        bytes_per_row: Some(rect.width()),
+                        rows_per_image: Some(rect.height()),
                     },
-                    pixels,
-                )
-                .unwrap();
-
-                let image = self.font_atlas.image().clone();
-
-                let region = BufferImageCopy {
-                    image_subresource: image.subresource_layers(),
-                    image_extent: [rect.width(), rect.height(), 1],
-                    image_offset: [rect.min.x, rect.min.y, 0],
-                    ..Default::default()
-                };
-
-                builder
-                    .copy_buffer_to_image(CopyBufferToImageInfo {
-                        regions: [region].into(),
-                        ..CopyBufferToImageInfo::buffer_image(buffer, image)
-                    })
-                    .unwrap();
+                    Extent3d {
+                        width: rect.width(),
+                        height: rect.height(),
+                        depth_or_array_layers: 1,
+                    },
+                );
             })
             .unwrap();
 
@@ -314,21 +274,8 @@ impl FontLoader {
         )
     }
 
-    pub fn submit_load_buffer(&mut self) -> Option<FenceSignalFuture<Box<dyn GpuFuture>>> {
-        self.load_buffer.take().map(|builder| {
-            builder
-                .build()
-                .unwrap()
-                .execute(self.queue.clone())
-                .unwrap()
-                .boxed()
-                .then_signal_fence_and_flush()
-                .unwrap()
-        })
-    }
-
-    pub fn get_font_atlas(&self) -> Arc<ImageView> {
-        self.font_atlas.clone()
+    pub fn get_font_atlas(&self) -> &Texture {
+        &self.font_atlas
     }
 }
 

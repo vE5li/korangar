@@ -7,6 +7,7 @@ use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
 use ragnarok_packets::EquipPosition;
+use wgpu::RenderPass;
 
 use crate::graphics::{Color, InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -172,6 +173,7 @@ impl Element<InterfaceSettings> for EquipmentContainer {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -182,10 +184,10 @@ impl Element<InterfaceSettings> for EquipmentContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+        let mut renderer =
+            self.state
+                .state
+                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

@@ -7,6 +7,7 @@ use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
+use wgpu::RenderPass;
 
 use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
@@ -46,7 +47,7 @@ impl FrameInspectorView {
     }
 
     fn render_lines(
-        renderer: &mut ElementRenderer<'_, InterfaceSettings>,
+        renderer: &mut ElementRenderer<'_, '_, InterfaceSettings>,
         theme: &InterfaceTheme,
         text: &str,
         text_width: f32,
@@ -79,6 +80,7 @@ impl FrameInspectorView {
                 korangar_interface::application::InterfaceRenderer::render_text(
                     renderer.renderer,
                     renderer.render_target,
+                    renderer.render_pass,
                     text,
                     renderer.position + offset,
                     renderer.clip,
@@ -92,7 +94,7 @@ impl FrameInspectorView {
     }
 
     fn render_measurement(
-        renderer: &mut ElementRenderer<'_, InterfaceSettings>,
+        renderer: &mut ElementRenderer<'_, '_, InterfaceSettings>,
         color_lookup: &mut super::ColorLookup,
         theme: &InterfaceTheme,
         frame_measurement: &FrameMeasurement,
@@ -161,6 +163,7 @@ impl FrameInspectorView {
             korangar_interface::application::InterfaceRenderer::render_text(
                 renderer.renderer,
                 renderer.render_target,
+                renderer.render_pass,
                 &text,
                 text_position,
                 screen_clip,
@@ -240,6 +243,7 @@ impl Element<InterfaceSettings> for FrameInspectorView {
     fn render(
         &self,
         render_target: &mut <InterfaceRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -256,7 +260,7 @@ impl Element<InterfaceSettings> for FrameInspectorView {
 
         let mut renderer = self
             .state
-            .element_renderer(render_target, renderer, application, parent_position, screen_clip);
+            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
 
         renderer.render_background(theme.profiler.corner_radius.get(), theme.profiler.background_color.get());
 

@@ -1,15 +1,12 @@
-use std::sync::Arc;
-
 use cgmath::{Array, Matrix4, SquareMatrix, Vector3, Vector4};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
-use vulkano::buffer::Subbuffer;
-use vulkano::image::view::ImageView;
+use wgpu::RenderPass;
 
-use crate::graphics::{Camera, GeometryRenderer, ModelVertex, Renderer};
+use crate::graphics::{Buffer, Camera, GeometryRenderer, ModelVertex, Renderer, TextureGroup};
 use crate::system::multiply_matrix4_and_vector3;
 
 #[derive(Copy, Clone, Debug, PrototypeElement)]
@@ -108,9 +105,9 @@ pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
     #[hidden_element]
-    pub vertex_buffer: Subbuffer<[ModelVertex]>,
+    pub vertex_buffer: Buffer<ModelVertex>,
     #[hidden_element]
-    pub textures: Vec<Arc<ImageView>>,
+    pub textures: TextureGroup,
     pub child_nodes: Vec<Node>,
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
@@ -165,6 +162,7 @@ impl Node {
     pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         transform: &Transform,
@@ -175,8 +173,9 @@ impl Node {
     {
         renderer.render_geometry(
             render_target,
+            render_pass,
             camera,
-            self.vertex_buffer.clone(),
+            &self.vertex_buffer,
             &self.textures,
             self.world_matrix(transform, client_tick),
             time,
@@ -184,6 +183,6 @@ impl Node {
 
         self.child_nodes
             .iter()
-            .for_each(|node| node.render_geometry(render_target, renderer, camera, transform, client_tick, time));
+            .for_each(|node| node.render_geometry(render_target, render_pass, renderer, camera, transform, client_tick, time));
     }
 }

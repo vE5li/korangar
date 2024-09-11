@@ -1,5 +1,7 @@
 use cgmath::Vector3;
 use ragnarok_formats::map::SoundSource;
+#[cfg(feature = "debug")]
+use wgpu::RenderPass;
 
 #[cfg(feature = "debug")]
 use crate::graphics::{Camera, MarkerRenderer, Renderer};
@@ -13,6 +15,7 @@ pub trait SoundSourceExt {
     fn render_marker<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
@@ -30,6 +33,7 @@ impl SoundSourceExt for SoundSource {
     fn render_marker<T>(
         &self,
         render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
         renderer: &T,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
@@ -37,6 +41,6 @@ impl SoundSourceExt for SoundSource {
     ) where
         T: Renderer + MarkerRenderer,
     {
-        renderer.render_marker(render_target, camera, marker_identifier, self.position, hovered);
+        renderer.render_marker(render_target, render_pass, camera, marker_identifier, self.position, hovered);
     }
 }

@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
-use vulkano::image::view::ImageView;
 
 use super::GroundTileExt;
-use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
 use crate::loaders::{GameFileLoader, TextureLoader};
 
 const TILE_SIZE: f32 = 10.0;
@@ -152,7 +151,7 @@ pub fn load_textures(
     ground_data: &GroundData,
     texture_loader: &mut TextureLoader,
     game_file_loader: &mut GameFileLoader,
-) -> Vec<Arc<ImageView>> {
+) -> Vec<Arc<Texture>> {
     ground_data
         .textures
         .iter()

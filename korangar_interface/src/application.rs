@@ -5,23 +5,24 @@ use crate::theme::InterfaceTheme;
 use crate::windows::Anchor;
 
 pub trait Application: Sized + 'static {
-    type ThemeKind: Default;
-    type Theme: InterfaceTheme<Settings = Self>;
-    type Color: ColorTrait;
-    type Renderer: InterfaceRenderer<Self>;
-    type Size: SizeTrait;
-    type PartialSize: PartialSizeTrait;
-    type Position: PositionTrait;
-    type Clip: ClipTrait;
-    type CornerRadius: CornerRadiusTrait;
-    type FontSize: FontSizeTrait;
-    type Scaling: ScalingTrait;
-    type FontLoader: FontLoaderTrait<Self>;
-    type MouseInputMode: MouseInputModeTrait<Self>;
     type Cache: WindowCache<Self>;
+    type Clip: ClipTrait;
+    type Color: ColorTrait;
+    type CornerRadius: CornerRadiusTrait;
+    type CustomEvent;
     type DropResource;
     type DropResult;
-    type CustomEvent;
+    type FontLoader: FontLoaderTrait<Self>;
+    type FontSize: FontSizeTrait;
+    type MouseInputMode: MouseInputModeTrait<Self>;
+    type PartialSize: PartialSizeTrait;
+    type Position: PositionTrait;
+    type RenderPass<'encoder>;
+    type Renderer: InterfaceRenderer<Self>;
+    type Scaling: ScalingTrait;
+    type Size: SizeTrait;
+    type Theme: InterfaceTheme<Settings = Self>;
+    type ThemeKind: Default;
 
     fn get_scaling(&self) -> Self::Scaling;
 
@@ -80,6 +81,7 @@ where
     fn render_rectangle(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut App::RenderPass<'_>,
         position: App::Position,
         size: App::Size,
         clip: App::Clip,
@@ -90,6 +92,7 @@ where
     fn render_text(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut App::RenderPass<'_>,
         text: &str,
         position: App::Position,
         clip: App::Clip,
@@ -100,6 +103,7 @@ where
     fn render_checkbox(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut App::RenderPass<'_>,
         position: App::Position,
         size: App::Size,
         clip: App::Clip,
@@ -110,6 +114,7 @@ where
     fn render_expand_arrow(
         &self,
         render_target: &mut Self::Target,
+        render_pass: &mut App::RenderPass<'_>,
         position: App::Position,
         size: App::Size,
         clip: App::Clip,

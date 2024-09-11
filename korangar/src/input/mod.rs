@@ -3,16 +3,20 @@ mod key;
 mod mode;
 
 use std::mem::variant_count;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
 
 use cgmath::Vector2;
 use korangar_interface::application::FocusState;
 use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
+#[cfg(feature = "debug")]
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
 use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta, VirtualKeyCode};
+use winit::event::{ElementState, MouseButton, MouseScrollDelta};
+use winit::keyboard::KeyCode;
 
 pub use self::event::UserEvent;
 pub use self::key::Key;
@@ -26,7 +30,7 @@ use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::PartialMove;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
-const KEY_COUNT: usize = variant_count::<VirtualKeyCode>();
+const KEY_COUNT: usize = variant_count::<KeyCode>();
 
 pub struct InputSystem {
     previous_mouse_position: ScreenPosition,
@@ -40,6 +44,7 @@ pub struct InputSystem {
     keys: [Key; KEY_COUNT],
     mouse_input_mode: MouseInputMode,
     input_buffer: Vec<char>,
+    picker_value: Arc<AtomicU32>,
 }
 
 impl InputSystem {
@@ -58,6 +63,7 @@ impl InputSystem {
 
         let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
+        let picker_value = Arc::new(AtomicU32::new(0));
 
         Self {
             previous_mouse_position,
@@ -71,6 +77,7 @@ impl InputSystem {
             keys,
             mouse_input_mode,
             input_buffer,
+            picker_value,
         }
     }
 
@@ -105,9 +112,9 @@ impl InputSystem {
         }
     }
 
-    pub fn update_keyboard(&mut self, virtual_code: VirtualKeyCode, state: ElementState) {
+    pub fn update_keyboard(&mut self, key_code: KeyCode, state: ElementState) {
         let pressed = matches!(state, ElementState::Pressed);
-        self.keys[virtual_code as usize].set_down(pressed);
+        self.keys[key_code as usize].set_down(pressed);
     }
 
     pub fn buffer_character(&mut self, character: char) {
@@ -126,7 +133,7 @@ impl InputSystem {
         self.keys.iter_mut().for_each(|key| key.update());
     }
 
-    fn get_key(&self, key_code: VirtualKeyCode) -> &Key {
+    fn get_key(&self, key_code: KeyCode) -> &Key {
         &self.keys[key_code as usize]
     }
 
@@ -139,7 +146,6 @@ impl InputSystem {
         picker_target: &mut PickerRenderTarget,
         mouse_cursor: &mut MouseCursor,
         #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
-        window_size: Vector2<usize>,
         client_tick: ClientTick,
     ) -> (
         Vec<UserEvent>,
@@ -151,7 +157,7 @@ impl InputSystem {
         let mut mouse_target = None;
         let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
 
-        let shift_down = self.get_key(VirtualKeyCode::LShift).down();
+        let shift_down = self.get_key(KeyCode::ShiftLeft).down();
 
         #[cfg(feature = "debug")]
         let lock_actions = render_settings.get().use_debug_camera;
@@ -350,12 +356,12 @@ impl InputSystem {
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
             // this will currently not affect the following statements, which is a bit
             // strange
-            if self.get_key(VirtualKeyCode::Escape).pressed() {
+            if self.get_key(KeyCode::Escape).pressed() {
                 focus_state.remove_focus();
                 process_keys = false;
             }
 
-            if self.get_key(VirtualKeyCode::Tab).pressed() {
+            if self.get_key(KeyCode::Tab).pressed() {
                 let new_focused_element = focused_element
                     .borrow()
                     .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
@@ -364,7 +370,7 @@ impl InputSystem {
                 process_keys = false;
             }
 
-            if self.get_key(VirtualKeyCode::Return).pressed() {
+            if self.get_key(KeyCode::Enter).pressed() {
                 let actions = interface.left_click_element(focused_element, *focused_window);
 
                 for action in actions {
@@ -383,10 +389,7 @@ impl InputSystem {
             }
         }
 
-        if self.get_key(VirtualKeyCode::LControl).down()
-            && self.get_key(VirtualKeyCode::Q).pressed()
-            && focus_state.focused_window().is_some()
-        {
+        if self.get_key(KeyCode::ControlLeft).down() && self.get_key(KeyCode::KeyQ).pressed() && focus_state.focused_window().is_some() {
             let window_index = focus_state.get_focused_window().unwrap();
 
             if interface.get_window(window_index).is_closable() {
@@ -451,80 +454,80 @@ impl InputSystem {
         }
 
         if process_keys {
-            let alt_down = self.get_key(VirtualKeyCode::LAlt).down();
-            let control_down = self.get_key(VirtualKeyCode::LControl).down();
+            let alt_down = self.get_key(KeyCode::AltLeft).down();
+            let control_down = self.get_key(KeyCode::ControlLeft).down();
 
-            if self.get_key(VirtualKeyCode::Tab).pressed() {
+            if self.get_key(KeyCode::Tab).pressed() {
                 interface.first_focused_element(focus_state);
             }
 
-            if self.get_key(VirtualKeyCode::Escape).pressed() {
+            if self.get_key(KeyCode::Escape).pressed() {
                 events.push(UserEvent::OpenMenuWindow);
             }
 
-            if alt_down && self.get_key(VirtualKeyCode::E).pressed() {
+            if alt_down && self.get_key(KeyCode::KeyE).pressed() {
                 events.push(UserEvent::OpenInventoryWindow);
             }
 
-            if control_down && self.get_key(VirtualKeyCode::H).pressed() {
+            if control_down && self.get_key(KeyCode::KeyH).pressed() {
                 events.push(UserEvent::ToggleShowInterface);
             }
 
-            if self.get_key(VirtualKeyCode::J).pressed() {
+            if self.get_key(KeyCode::KeyJ).pressed() {
                 events.push(UserEvent::CastSkill(HotbarSlot(0)));
             }
 
-            if self.get_key(VirtualKeyCode::J).released() {
+            if self.get_key(KeyCode::KeyJ).released() {
                 events.push(UserEvent::StopSkill(HotbarSlot(0)));
             }
 
-            if self.get_key(VirtualKeyCode::L).pressed() {
+            if self.get_key(KeyCode::KeyL).pressed() {
                 events.push(UserEvent::CastSkill(HotbarSlot(1)));
             }
 
-            if self.get_key(VirtualKeyCode::L).released() {
+            if self.get_key(KeyCode::KeyL).released() {
                 events.push(UserEvent::StopSkill(HotbarSlot(1)));
             }
 
-            if self.get_key(VirtualKeyCode::U).pressed() {
+            if self.get_key(KeyCode::KeyU).pressed() {
                 events.push(UserEvent::CastSkill(HotbarSlot(2)));
             }
 
-            if self.get_key(VirtualKeyCode::U).released() {
+            if self.get_key(KeyCode::KeyU).released() {
                 events.push(UserEvent::StopSkill(HotbarSlot(2)));
             }
 
-            if self.get_key(VirtualKeyCode::Return).pressed() {
+            if self.get_key(KeyCode::Enter).pressed() {
                 events.push(UserEvent::FocusChatWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(VirtualKeyCode::M).pressed() {
+            if control_down && self.get_key(KeyCode::KeyM).pressed() {
                 events.push(UserEvent::OpenMapsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(VirtualKeyCode::R).pressed() {
+            if control_down && self.get_key(KeyCode::KeyR).pressed() {
                 events.push(UserEvent::OpenRenderSettingsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(VirtualKeyCode::T).pressed() {
+            if control_down && self.get_key(KeyCode::KeyT).pressed() {
                 events.push(UserEvent::OpenTimeWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(VirtualKeyCode::P).pressed() {
+            if control_down && self.get_key(KeyCode::KeyP).pressed() {
                 events.push(UserEvent::OpenPacketWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::LShift).pressed() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::ShiftLeft).pressed() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraAccelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::LShift).released() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::ShiftLeft).released() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraDecelerate);
             }
 
@@ -541,73 +544,73 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::W).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyW).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveForward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::S).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyS).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveBackward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::A).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyA).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveLeft);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::D).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::KeyD).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveRight);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(VirtualKeyCode::Space).down() && render_settings.get().use_debug_camera {
+            if self.get_key(KeyCode::Space).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveUp);
             }
         }
 
+        // We queue the read for the next picker value. This essentially means that the
+        // value is always the value of the last rendered frame. We do it this
+        // way, to never stall the GPU by returning the control of the buffer to
+        // the GPU as soon as possible.
+        picker_target.queue_read_picker_value(
+            self.new_mouse_position.left,
+            self.new_mouse_position.top,
+            self.picker_value.clone(),
+        );
+
         if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
-            if let Some(fence) = picker_target.state.try_take_fence() {
-                fence.wait(None).unwrap();
-            }
+            let last_pixel_value = self.picker_value.load(Ordering::Acquire);
+            if last_pixel_value != 0 {
+                let picker_target = PickerTarget::from(last_pixel_value);
 
-            let sample_index = self.new_mouse_position.left as usize + self.new_mouse_position.top as usize * window_size.x;
-            let lock = picker_target.buffer.read().unwrap();
+                if self.left_mouse_button.pressed() {
+                    match picker_target {
+                        PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
+                        PickerTarget::Tile { x, y } => {
+                            let position = Vector2::new(x as usize, y as usize);
+                            self.mouse_input_mode = MouseInputMode::Walk(position);
 
-            if sample_index < lock.len() {
-                let pixel = lock[sample_index];
-
-                if pixel != 0 {
-                    let picker_target = PickerTarget::from(pixel);
-
-                    if self.left_mouse_button.pressed() {
-                        match picker_target {
-                            PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
-                            PickerTarget::Tile { x, y } => {
-                                let position = Vector2::new(x as usize, y as usize);
-                                self.mouse_input_mode = MouseInputMode::Walk(position);
-
-                                events.push(UserEvent::RequestPlayerMove(position));
-                            }
-                            #[cfg(feature = "debug")]
-                            PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
+                            events.push(UserEvent::RequestPlayerMove(position));
                         }
-                    } else if self.left_mouse_button.down()
-                        && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode
-                        && let PickerTarget::Tile { x, y } = picker_target
-                    {
-                        let new_position = Vector2::new(x as usize, y as usize);
-
-                        if new_position != *requested_position {
-                            *requested_position = new_position;
-
-                            events.push(UserEvent::RequestPlayerMove(new_position));
-                        }
+                        #[cfg(feature = "debug")]
+                        PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
                     }
+                } else if self.left_mouse_button.down()
+                    && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode
+                    && let PickerTarget::Tile { x, y } = picker_target
+                {
+                    let new_position = Vector2::new(x as usize, y as usize);
 
-                    if !self.mouse_input_mode.is_walk() {
-                        mouse_target = Some(picker_target);
+                    if new_position != *requested_position {
+                        *requested_position = new_position;
+
+                        events.push(UserEvent::RequestPlayerMove(new_position));
                     }
+                }
+
+                if !self.mouse_input_mode.is_walk() {
+                    mouse_target = Some(picker_target);
                 }
             }
         }

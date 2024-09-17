@@ -94,29 +94,6 @@ impl<T: ElementDisplay> ElementDisplay for cgmath::Rad<T> {
     }
 }
 
-/*impl ElementDisplay for ModelVertexBuffer {
-
-    fn display(&self) -> String {
-
-        use vulkano::buffer::BufferAccess;
-
-        let identifier = self.inner().buffer.key();
-        let size = self.inner().buffer.size();
-        format!("{} ({})", identifier, size)
-    }
-}
-
-impl ElementDisplay for Texture {
-
-    fn display(&self) -> String {
-
-        use vulkano::{Handle, VulkanObject};
-
-        let identifier = self.internal_object().as_raw();
-        format!("0x{:x}", identifier)
-    }
-}*/
-
 // workaround for not having negative trait bounds or better specialization
 auto trait NoPrototype {}
 impl<T> !NoPrototype for std::sync::Arc<T> {}

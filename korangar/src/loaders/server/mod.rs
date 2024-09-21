@@ -2,6 +2,7 @@ mod client_info;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
+use korangar_util::FileLoader;
 use serde::{Deserialize, Serialize};
 use serde_xml_rs::de::Deserializer;
 use xml::reader::{EventReader, ParserConfig};
@@ -12,7 +13,7 @@ use super::GameFileLoader;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ServiceId(pub usize);
 
-pub fn load_client_info(game_file_loader: &mut GameFileLoader) -> ClientInfo {
+pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {
     #[cfg(feature = "debug")]
     let timer = Timer::new("read clientinfo");
 

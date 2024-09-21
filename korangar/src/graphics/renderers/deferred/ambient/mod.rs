@@ -9,8 +9,7 @@ use wgpu::{
     TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::{DeferredRenderer, DeferredSubRenderer};
-use crate::graphics::*;
+use super::{Color, DeferredRenderer, DeferredSubRenderer, Renderer, LIGHT_ATTACHMENT_BLEND};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("ambient.wgsl");
 

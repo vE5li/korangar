@@ -8,7 +8,7 @@ use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
 use crate::input::Grabbed;
-use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, Sprite, SpriteLoader};
+use crate::loaders::{ActionLoader, Actions, AnimationState, Sprite, SpriteLoader};
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -37,9 +37,9 @@ pub struct MouseCursor {
 }
 
 impl MouseCursor {
-    pub fn new(game_file_loader: &mut GameFileLoader, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader) -> Self {
-        let sprite = sprite_loader.get("cursors.spr", game_file_loader).unwrap();
-        let actions = action_loader.get("cursors.act", game_file_loader).unwrap();
+    pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader) -> Self {
+        let sprite = sprite_loader.get("cursors.spr").unwrap();
+        let actions = action_loader.get("cursors.act").unwrap();
         let animation_state = AnimationState::new(ClientTick(0));
         let shown = true;
 

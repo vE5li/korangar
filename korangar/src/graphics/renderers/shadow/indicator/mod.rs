@@ -10,9 +10,8 @@ use wgpu::{
     VertexState,
 };
 
-use super::ShadowSubRenderer;
+use super::{Camera, Renderer, ShadowRenderer, ShadowSubRenderer, Texture};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::*;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("indicator.wgsl");
 

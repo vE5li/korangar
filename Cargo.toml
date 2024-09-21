@@ -7,12 +7,16 @@ bitflags = "2.6"
 bytemuck = "1.17"
 cgmath = "0.18"
 chrono = "0.4"
+cpal = "0.15"
 derive-new = "0.7"
-etherparse = "0.15"
+etherparse = "0.16"
 image = { version = "0.25", default-features = false }
+kira = { version = "0.9", default-features = false }
+korangar_audio = { path = "korangar_audio" }
 korangar_debug = { path = "korangar_debug" }
 korangar_interface = { path = "korangar_interface" }
 korangar_networking = { path = "korangar_networking" }
+korangar_util = { path = "korangar_util" }
 lunify = "1.1"
 mlua = "0.9"
 num = "0.4"
@@ -27,7 +31,7 @@ ragnarok_formats = { path = "ragnarok_formats" }
 ragnarok_packets = { path = "ragnarok_packets" }
 ragnarok_procedural = { path = "ragnarok_procedural" }
 rand = "0.8"
-random_color = "0.8"
+random_color = "1.0"
 rayon = "1.10"
 reqwest = "0.12"
 ron = "0.8"

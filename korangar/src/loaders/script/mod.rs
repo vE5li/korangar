@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use korangar_networking::{InventoryItem, NoMetadata, ShopItem};
+use korangar_util::FileLoader;
 use mlua::Lua;
 use ragnarok_packets::ItemId;
 
@@ -19,7 +20,7 @@ pub struct ScriptLoader {
 }
 
 impl ScriptLoader {
-    pub fn new(game_file_loader: &mut GameFileLoader) -> mlua::Result<Self> {
+    pub fn new(game_file_loader: &GameFileLoader) -> mlua::Result<Self> {
         let state = Lua::new();
 
         let data = game_file_loader
@@ -116,7 +117,6 @@ end
 
     pub fn load_inventory_item_metadata(
         &self,
-        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         item: InventoryItem<NoMetadata>,
     ) -> InventoryItem<ResourceMetadata> {
@@ -124,7 +124,7 @@ end
 
         let resource_name = self.get_item_resource_from_id(item.item_id, is_identified);
         let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
-        let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
+        let texture = texture_loader.get(&full_path).unwrap();
         let name = self.get_item_name_from_id(item.item_id, is_identified);
 
         let metadata = ResourceMetadata { texture, name };
@@ -132,15 +132,10 @@ end
         InventoryItem { metadata, ..item }
     }
 
-    pub fn load_market_item_metadata(
-        &self,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        item: ShopItem<NoMetadata>,
-    ) -> ShopItem<ResourceMetadata> {
+    pub fn load_market_item_metadata(&self, texture_loader: &mut TextureLoader, item: ShopItem<NoMetadata>) -> ShopItem<ResourceMetadata> {
         let resource_name = self.get_item_resource_from_id(item.item_id, true);
         let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
-        let texture = texture_loader.get(&full_path, game_file_loader).unwrap();
+        let texture = texture_loader.get(&full_path).unwrap();
         let name = self.get_item_name_from_id(item.item_id, true);
 
         let metadata = ResourceMetadata { texture, name };

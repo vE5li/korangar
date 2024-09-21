@@ -22,6 +22,8 @@ pub trait ElementDisplay {
 auto trait NoDisplay {}
 impl !NoDisplay for f32 {}
 #[cfg(feature = "cgmath")]
+impl<T> !NoDisplay for cgmath::Point3<T> {}
+#[cfg(feature = "cgmath")]
 impl<T> !NoDisplay for cgmath::Vector2<T> {}
 #[cfg(feature = "cgmath")]
 impl<T> !NoDisplay for cgmath::Vector3<T> {}
@@ -44,6 +46,13 @@ where
 impl ElementDisplay for f32 {
     fn display(&self) -> String {
         format!("{self:.1}")
+    }
+}
+
+#[cfg(feature = "cgmath")]
+impl<T: ElementDisplay> ElementDisplay for cgmath::Point3<T> {
+    fn display(&self) -> String {
+        format!("{}, {}", self.x.display(), self.y.display())
     }
 }
 

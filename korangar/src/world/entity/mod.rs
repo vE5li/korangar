@@ -18,7 +18,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{ActionLoader, Actions, AnimationState, GameFileLoader, ScriptLoader, Sprite, SpriteLoader};
+use crate::loaders::{ActionLoader, Actions, AnimationState, ScriptLoader, Sprite, SpriteLoader};
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -233,7 +233,6 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
 }
 
 fn get_sprite_and_actions(
-    game_file_loader: &mut GameFileLoader,
     sprite_loader: &mut SpriteLoader,
     action_loader: &mut ActionLoader,
     script_loader: &ScriptLoader,
@@ -259,14 +258,13 @@ fn get_sprite_and_actions(
     };
 
     (
-        sprite_loader.get(&format!("{file_path}.spr"), game_file_loader).unwrap(),
-        action_loader.get(&format!("{file_path}.act"), game_file_loader).unwrap(),
+        sprite_loader.get(&format!("{file_path}.spr")).unwrap(),
+        action_loader.get(&format!("{file_path}.act")).unwrap(),
     )
 }
 
 impl Common {
     pub fn new(
-        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         script_loader: &ScriptLoader,
@@ -298,15 +296,7 @@ impl Common {
             _ => EntityType::Npc,
         };
 
-        let (sprite, actions) = get_sprite_and_actions(
-            game_file_loader,
-            sprite_loader,
-            action_loader,
-            script_loader,
-            entity_type,
-            job_id,
-            sex,
-        );
+        let (sprite, actions) = get_sprite_and_actions(sprite_loader, action_loader, script_loader, entity_type, job_id, sex);
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(client_tick);
 
@@ -337,15 +327,8 @@ impl Common {
         common
     }
 
-    pub fn reload_sprite(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        script_loader: &ScriptLoader,
-    ) {
+    pub fn reload_sprite(&mut self, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, script_loader: &ScriptLoader) {
         (self.sprite, self.actions) = get_sprite_and_actions(
-            game_file_loader,
             sprite_loader,
             action_loader,
             script_loader,
@@ -775,7 +758,6 @@ pub struct Player {
 
 impl Player {
     pub fn new(
-        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         script_loader: &ScriptLoader,
@@ -790,7 +772,6 @@ impl Player {
         let maximum_spell_points = character_information.maximum_spell_points as usize;
         let maximum_activity_points = 0;
         let common = Common::new(
-            game_file_loader,
             sprite_loader,
             action_loader,
             script_loader,
@@ -921,7 +902,6 @@ pub struct Npc {
 
 impl Npc {
     pub fn new(
-        game_file_loader: &mut GameFileLoader,
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
         script_loader: &ScriptLoader,
@@ -929,15 +909,7 @@ impl Npc {
         entity_data: EntityData,
         client_tick: ClientTick,
     ) -> Self {
-        let common = Common::new(
-            game_file_loader,
-            sprite_loader,
-            action_loader,
-            script_loader,
-            map,
-            entity_data,
-            client_tick,
-        );
+        let common = Common::new(sprite_loader, action_loader, script_loader, map, entity_data, client_tick);
 
         Self { common }
     }
@@ -1040,15 +1012,8 @@ impl Entity {
         self.get_common_mut().job_id = job_id;
     }
 
-    pub fn reload_sprite(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        sprite_loader: &mut SpriteLoader,
-        action_loader: &mut ActionLoader,
-        script_loader: &ScriptLoader,
-    ) {
-        self.get_common_mut()
-            .reload_sprite(game_file_loader, sprite_loader, action_loader, script_loader);
+    pub fn reload_sprite(&mut self, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, script_loader: &ScriptLoader) {
+        self.get_common_mut().reload_sprite(sprite_loader, action_loader, script_loader);
     }
 
     pub fn set_details_requested(&mut self) {

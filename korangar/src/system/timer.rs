@@ -85,7 +85,7 @@ impl GameTimer {
 
 #[cfg(test)]
 mod increment {
-    use super::*;
+    use crate::system::GameTimer;
 
     #[test]
     fn update_increments_frame_counter() {

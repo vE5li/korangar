@@ -9,8 +9,8 @@ use wgpu::{
     RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
 };
 
-use super::DeferredSubRenderer;
-use crate::graphics::*;
+use super::{Camera, DeferredRenderer, DeferredSubRenderer, Renderer, WaterVertex};
+use crate::Buffer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("water.wgsl");
 

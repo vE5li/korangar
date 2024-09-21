@@ -5,14 +5,15 @@ edition = "2021"
 
 [dependencies]
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
-cgmath = { workspace = true, features = ["serde"] }
+cgmath = { workspace = true, features = ["mint", "serde"] }
 chrono = { workspace = true }
-collision = { git = "https://github.com/rustgd/collision-rs.git" }
 derive-new = { workspace = true }
 image = { workspace = true, features = ["bmp", "png", "tga", "rayon"] }
+korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
 korangar_networking = { workspace = true, features = ["debug"] }
+korangar_util = { workspace = true, features = ["interface"] }
 lunify = { workspace = true }
 mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
@@ -36,7 +37,8 @@ xml-rs = { workspace = true }
 yazi = { workspace = true }
 
 [features]
-debug = ["korangar_debug", "ragnarok_packets/debug", "random_color"]
+debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug", "random_color"]
 patched_as_folder = []
 plain = ["korangar_debug/plain"]
 unicode = ["korangar_debug/unicode"]
+flac = ["korangar_audio/flac"]

@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install build dependencies
+        run: sudo apt install libasound2-dev
+
       - name: Build Korangar (release)
         run: cargo build
 

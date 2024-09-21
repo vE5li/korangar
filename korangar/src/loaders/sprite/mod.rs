@@ -5,6 +5,7 @@ use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
 use ragnarok_formats::version::InternalVersion;
@@ -27,16 +28,20 @@ pub struct Sprite {
 pub struct SpriteLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
+    game_file_loader: Arc<GameFileLoader>,
     #[new(default)]
     cache: HashMap<String, Arc<Sprite>>,
 }
 
 impl SpriteLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, LoadError> {
+    fn load(&mut self, path: &str) -> Result<Arc<Sprite>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
-        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}")).map_err(LoadError::File)?;
+        let bytes = self
+            .game_file_loader
+            .get(&format!("data\\sprite\\{path}"))
+            .map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         let sprite_data = match SpriteData::from_bytes(&mut byte_stream) {
@@ -48,7 +53,7 @@ impl SpriteLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(FALLBACK_SPRITE_FILE, game_file_loader);
+                return self.get(FALLBACK_SPRITE_FILE);
             }
         };
 
@@ -128,10 +133,10 @@ impl SpriteLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Sprite>, LoadError> {
+    pub fn get(&mut self, path: &str) -> Result<Arc<Sprite>, LoadError> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path, game_file_loader),
+            None => self.load(path),
         }
     }
 }

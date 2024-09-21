@@ -1,0 +1,15 @@
+[package]
+name = "korangar_util"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cgmath = { workspace = true }
+derive-new = { workspace = true }
+korangar_interface = { workspace = true, optional = true }
+
+[dev-dependencies]
+rand = { workspace = true }
+
+[features]
+interface = ["korangar_interface"]

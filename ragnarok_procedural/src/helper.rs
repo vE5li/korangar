@@ -4,7 +4,7 @@ use proc_macro2::{Delimiter, TokenStream};
 use quote::{format_ident, quote};
 use syn::{DataStruct, Field};
 
-use crate::utils::*;
+use crate::utils::{get_unique_attribute, Version};
 
 pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<TokenStream>, Vec<TokenStream>, Vec<TokenStream>, Delimiter) {
     let mut from_bytes_implementations = vec![];

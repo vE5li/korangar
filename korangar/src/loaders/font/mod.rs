@@ -3,6 +3,7 @@ use std::sync::Arc;
 use cgmath::{Array, Vector2};
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::ElementDisplay;
+use korangar_util::FileLoader;
 use rusttype::gpu_cache::Cache;
 use rusttype::*;
 use serde::{Deserialize, Serialize};
@@ -165,7 +166,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
 }
 
 impl FontLoader {
-    pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader) -> Self {
+    pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &GameFileLoader) -> Self {
         let cache_size = Vector2::from_value(512);
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
 

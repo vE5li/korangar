@@ -6,8 +6,12 @@ use std::sync::Arc;
 use bytemuck::Pod;
 use cgmath::Vector3;
 use derive_new::new;
+use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
+use korangar_util::collision::{KDTree, AABB};
+use korangar_util::container::SimpleSlab;
+use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
@@ -17,7 +21,7 @@ use self::vertices::{generate_tile_vertices, ground_water_vertices, load_texture
 use super::error::LoadError;
 use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
-use crate::world::*;
+use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
 
@@ -25,7 +29,7 @@ const MAP_OFFSET: f32 = 5.0;
 fn assert_byte_stream_empty<Meta>(mut byte_stream: ByteStream<Meta>, file_name: &str) {
     use korangar_debug::logging::{print_debug, Colorize};
 
-    if byte_stream.is_empty() {
+    if !byte_stream.is_empty() {
         print_debug!(
             "incomplete read on file {}; {} bytes remaining",
             file_name.magenta(),
@@ -38,6 +42,8 @@ fn assert_byte_stream_empty<Meta>(mut byte_stream: ByteStream<Meta>, file_name: 
 pub struct MapLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
+    game_file_loader: Arc<GameFileLoader>,
+    audio_engine: Arc<AudioEngine<GameFileLoader>>,
     #[new(default)]
     cache: HashMap<String, Arc<Map>>,
 }
@@ -46,34 +52,32 @@ impl MapLoader {
     pub fn get(
         &mut self,
         resource_file: String,
-        game_file_loader: &mut GameFileLoader,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, LoadError> {
         match self.cache.get(&resource_file) {
             Some(map) => Ok(map.clone()),
-            None => self.load(resource_file, game_file_loader, model_loader, texture_loader),
+            None => self.load(resource_file, model_loader, texture_loader),
         }
     }
 
     fn load(
         &mut self,
         resource_file: String,
-        game_file_loader: &mut GameFileLoader,
         model_loader: &mut ModelLoader,
         texture_loader: &mut TextureLoader,
     ) -> Result<Arc<Map>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let map_file = format!("data\\{}.rsw", &resource_file);
-        let mut map_data: MapData = parse_generic_data(&map_file, game_file_loader)?;
+        let map_file_name = format!("data\\{}.rsw", resource_file);
+        let mut map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
 
         let ground_file = format!("data\\{}", map_data.ground_file);
-        let ground_data: GroundData = parse_generic_data(&ground_file, game_file_loader)?;
+        let ground_data: GroundData = parse_generic_data(&ground_file, &self.game_file_loader)?;
 
         let gat_file = format!("data\\{}", map_data.gat_file);
-        let mut gat_data: GatData = parse_generic_data(&gat_file, game_file_loader)?;
+        let mut gat_data: GatData = parse_generic_data(&gat_file, &self.game_file_loader)?;
 
         #[cfg(feature = "debug")]
         let map_data_clone = map_data.clone();
@@ -94,29 +98,39 @@ impl MapLoader {
         let tile_picker_vertex_buffer =
             (!tile_picker_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile picker", &tile_picker_vertices));
 
-        let textures: Vec<Arc<Texture>> = load_textures(&ground_data, texture_loader, game_file_loader);
+        let textures: Vec<Arc<Texture>> = load_textures(&ground_data, texture_loader);
         apply_map_offset(&ground_data, &mut map_data.resources);
 
-        // Loading object models
-        let objects: Vec<Object> = map_data
+        let mut objects = SimpleSlab::with_capacity(map_data.resources.objects.len() as u32);
+
+        let object_bounding_boxes: Vec<(ObjectKey, AABB)> = map_data
             .resources
             .objects
             .iter()
             .map(|object_data| {
                 let array: [f32; 3] = object_data.transform.scale.into();
                 let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
-                let model = model_loader.get(game_file_loader, texture_loader, object_data.model_name.as_str(), reverse_order);
+                let model = model_loader
+                    .get(texture_loader, object_data.model_name.as_str(), reverse_order)
+                    .expect("can't find model");
 
-                Object::new(
+                let object = Object::new(
                     object_data.name.to_owned(),
                     object_data.model_name.to_owned(),
-                    model.unwrap(),
+                    model,
                     object_data.transform,
-                )
+                );
+                let bounding_box_matrix = object.get_bounding_box_matrix();
+                let bounding_box = AABB::from_transformation_matrix(bounding_box_matrix);
+                let key = objects.insert(object).expect("objects slab is full");
+
+                (key, bounding_box)
             })
             .collect();
+        let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
-        let textures = TextureGroup::new(&self.device, &map_file, textures);
+        let textures = TextureGroup::new(&self.device, &map_file_name, textures);
+        let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
         let map = Arc::new(Map::new(
             gat_data.map_width as usize,
@@ -133,6 +147,8 @@ impl MapLoader {
             map_data.resources.effect_sources,
             tile_picker_vertex_buffer.unwrap(),
             tile_vertex_buffer.unwrap(),
+            object_kdtree,
+            background_music_track_name,
             #[cfg(feature = "debug")]
             map_data_clone,
         ));
@@ -178,7 +194,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
         .for_each(|effect_source| effect_source.offset(offset));
 }
 
-fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &mut GameFileLoader) -> Result<Data, LoadError> {
+fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &GameFileLoader) -> Result<Data, LoadError> {
     let bytes = game_file_loader.get(resource_file).map_err(LoadError::File)?;
     let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 

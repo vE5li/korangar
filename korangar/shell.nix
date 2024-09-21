@@ -2,11 +2,13 @@
 
 pkgs.mkShell {
   packages = with pkgs; [
+    alsa-lib
+    libxkbcommon
+    pkg-config
     shaderc
     vulkan-headers
     vulkan-loader
     vulkan-validation-layers
-    libxkbcommon
   ];
 
   LD_LIBRARY_PATH="${pkgs.wayland}/lib:${pkgs.vulkan-loader}/lib:${pkgs.libxkbcommon}/lib";

@@ -9,8 +9,8 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::DeferredSubRenderer;
-use crate::graphics::*;
+use super::{Camera, Color, DeferredRenderer, DeferredSubRenderer, Renderer, LIGHT_ATTACHMENT_BLEND};
+use crate::Buffer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("point.wgsl");
 

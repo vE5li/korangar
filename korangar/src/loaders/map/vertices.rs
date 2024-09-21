@@ -5,7 +5,7 @@ use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
 use super::GroundTileExt;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
-use crate::loaders::{GameFileLoader, TextureLoader};
+use crate::loaders::TextureLoader;
 
 const TILE_SIZE: f32 = 10.0;
 
@@ -147,15 +147,11 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
     (native_ground_vertices, water_vertices)
 }
 
-pub fn load_textures(
-    ground_data: &GroundData,
-    texture_loader: &mut TextureLoader,
-    game_file_loader: &mut GameFileLoader,
-) -> Vec<Arc<Texture>> {
+pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoader) -> Vec<Arc<Texture>> {
     ground_data
         .textures
         .iter()
-        .map(|texture_name| texture_loader.get(texture_name, game_file_loader).unwrap())
+        .map(|texture_name| texture_loader.get(texture_name).unwrap())
         .collect()
 }
 

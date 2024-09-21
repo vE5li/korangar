@@ -1,6 +1,5 @@
+use korangar_util::FileNotFoundError;
 use ragnarok_bytes::ConversionError;
-
-use super::FileNotFoundError;
 
 #[derive(Debug)]
 pub enum LoadError {

@@ -7,6 +7,7 @@ use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
 use ragnarok_formats::version::InternalVersion;
@@ -198,18 +199,27 @@ impl Actions {
         }
     }
 }
-
-#[derive(Default)]
 pub struct ActionLoader {
+    game_file_loader: Arc<GameFileLoader>,
     cache: HashMap<String, Arc<Actions>>,
 }
 
 impl ActionLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, LoadError> {
+    pub fn new(game_file_loader: Arc<GameFileLoader>) -> Self {
+        Self {
+            game_file_loader,
+            cache: HashMap::new(),
+        }
+    }
+
+    fn load(&mut self, path: &str) -> Result<Arc<Actions>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}", path.magenta()));
 
-        let bytes = game_file_loader.get(&format!("data\\sprite\\{path}")).map_err(LoadError::File)?;
+        let bytes = self
+            .game_file_loader
+            .get(&format!("data\\sprite\\{path}"))
+            .map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         let actions_data = match ActionsData::from_bytes(&mut byte_stream) {
@@ -221,7 +231,7 @@ impl ActionLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(FALLBACK_ACTIONS_FILE, game_file_loader);
+                return self.get(FALLBACK_ACTIONS_FILE);
             }
         };
 
@@ -247,10 +257,10 @@ impl ActionLoader {
         Ok(sprite)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Actions>, LoadError> {
+    pub fn get(&mut self, path: &str) -> Result<Arc<Actions>, LoadError> {
         match self.cache.get(path) {
             Some(sprite) => Ok(sprite.clone()),
-            None => self.load(path, game_file_loader),
+            None => self.load(path),
         }
     }
 }

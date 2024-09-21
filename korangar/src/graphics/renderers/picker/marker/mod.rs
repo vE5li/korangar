@@ -8,8 +8,7 @@ use wgpu::{
     RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
 };
 
-use super::PickerSubRenderer;
-use crate::graphics::*;
+use super::{PickerRenderer, PickerSubRenderer, PickerTarget, Renderer};
 use crate::world::MarkerIdentifier;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("marker.wgsl");

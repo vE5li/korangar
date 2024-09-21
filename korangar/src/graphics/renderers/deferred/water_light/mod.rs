@@ -8,8 +8,7 @@ use wgpu::{
     TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::DeferredSubRenderer;
-use crate::graphics::*;
+use super::{Camera, DeferredRenderer, DeferredSubRenderer, Renderer, WATER_ATTACHMENT_BLEND};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("water_light.wgsl");
 

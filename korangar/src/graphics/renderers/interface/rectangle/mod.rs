@@ -7,9 +7,9 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
 };
 
-use super::InterfaceSubRenderer;
-use crate::graphics::*;
+use super::{InterfaceRenderer, InterfaceSubRenderer};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+use crate::{Color, Renderer, INTERFACE_ATTACHMENT_BLEND};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("rectangle.wgsl");
 

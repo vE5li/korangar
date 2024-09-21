@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
+use std::sync::Mutex;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer};
@@ -22,7 +23,7 @@ type FileTable = HashMap<String, FileTableRow>;
 
 pub struct NativeArchive {
     file_table: FileTable,
-    os_file_handler: File,
+    file_handle: Mutex<File>,
 }
 
 impl Archive for NativeArchive {
@@ -66,11 +67,11 @@ impl Archive for NativeArchive {
         // aswell
         Self {
             file_table: assets,
-            os_file_handler: file,
+            file_handle: Mutex::new(file),
         }
     }
 
-    fn get_file_by_path(&mut self, asset_path: &str) -> Option<Vec<u8>> {
+    fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
         self.file_table.get(asset_path).and_then(|file_information| {
             let mut compressed_file_buffer = vec![0u8; file_information.compressed_size_aligned as usize];
 
@@ -81,10 +82,19 @@ impl Archive for NativeArchive {
             }
 
             let position = file_information.offset as u64 + Header::size_in_bytes() as u64;
-            self.os_file_handler.seek(SeekFrom::Start(position)).unwrap();
-            self.os_file_handler.read_exact(&mut compressed_file_buffer).unwrap();
 
-            let (uncompressed_file_buffer, _checksum) = decompress(&compressed_file_buffer, Format::Zlib).unwrap();
+            {
+                // Since the calling threads are sharing the IO bandwidth anyhow, I don't think
+                // we need to allow this to run in parallel.
+                let mut file_handle = self.file_handle.lock().unwrap();
+                file_handle.seek(SeekFrom::Start(position)).unwrap();
+                file_handle
+                    .read_exact(&mut compressed_file_buffer)
+                    .expect("Can't read archive content");
+            }
+
+            let (uncompressed_file_buffer, _checksum) =
+                decompress(&compressed_file_buffer, Format::Zlib).expect("Can't decompress archive content");
 
             Some(uncompressed_file_buffer)
         })

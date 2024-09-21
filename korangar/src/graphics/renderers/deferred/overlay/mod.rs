@@ -7,8 +7,7 @@ use wgpu::{
     TextureViewDimension, VertexState,
 };
 
-use super::DeferredSubRenderer;
-use crate::graphics::*;
+use super::{DeferredRenderer, DeferredSubRenderer, Renderer, Texture, ALPHA_BLEND};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("overlay.wgsl");
 

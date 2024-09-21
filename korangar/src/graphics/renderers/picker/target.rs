@@ -1,3 +1,5 @@
+#[cfg(feature = "debug")]
+use korangar_util::container::SimpleKey;
 use ragnarok_packets::EntityId;
 
 #[cfg(feature = "debug")]
@@ -48,7 +50,7 @@ impl From<u32> for PickerTarget {
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::Object as u32 {
-            return Self::Marker(MarkerIdentifier::Object(data as usize & 0xFFF));
+            return Self::Marker(MarkerIdentifier::Object(data & 0xFFF));
         }
 
         #[cfg(feature = "debug")]
@@ -86,7 +88,7 @@ impl From<PickerTarget> for u32 {
             PickerTarget::Entity(EntityId(entity_id)) => entity_id,
             #[cfg(feature = "debug")]
             PickerTarget::Marker(marker_identifier) => match marker_identifier {
-                MarkerIdentifier::Object(index) => ((MarkerEncoding::Object as u32) << 24) | (index as u32 & 0xFFF),
+                MarkerIdentifier::Object(index) => ((MarkerEncoding::Object as u32) << 24) | (index.key() & 0xFFF),
                 MarkerIdentifier::LightSource(index) => ((MarkerEncoding::LightSource as u32) << 24) | (index as u32 & 0xFFF),
                 MarkerIdentifier::SoundSource(index) => ((MarkerEncoding::SoundSource as u32) << 24) | (index as u32 & 0xFFF),
                 MarkerIdentifier::EffectSource(index) => ((MarkerEncoding::EffectSource as u32) << 24) | (index as u32 & 0xFFF),

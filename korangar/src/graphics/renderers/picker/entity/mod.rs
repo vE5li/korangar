@@ -11,10 +11,9 @@ use wgpu::{
     TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::PickerSubRenderer;
+use super::{Buffer, Camera, PickerRenderer, PickerSubRenderer, Renderer, Texture};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::renderers::PickerTarget;
-use crate::graphics::*;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("entity.wgsl");
 

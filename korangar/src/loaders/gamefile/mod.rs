@@ -5,10 +5,11 @@ mod list;
 
 use core::panic;
 use std::path::Path;
-use std::u8;
+use std::sync::RwLock;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::{FileLoader, FileNotFoundError};
 
 use self::list::GameArchiveList;
 use super::archive::folder::FolderArchive;
@@ -27,10 +28,7 @@ pub const FALLBACK_MODEL_FILE: &str = "data\\model\\missing.rsm";
 pub const FALLBACK_SPRITE_FILE: &str = "data\\sprite\\npc\\missing.spr";
 pub const FALLBACK_ACTIONS_FILE: &str = "data\\sprite\\npc\\missing.act";
 
-#[derive(Debug)]
-pub struct FileNotFoundError(String);
-
-/// Type implementing the game files loader.
+/// Type implementing the game file loader.
 ///
 /// Currently, there are two types implementing
 /// [`Archive`]:
@@ -38,12 +36,48 @@ pub struct FileNotFoundError(String);
 /// - [`FolderArchive`] - Retrieve assets from an OS folder.
 #[derive(Default)]
 pub struct GameFileLoader {
-    archives: Vec<Box<dyn Archive>>,
+    archives: RwLock<Vec<Box<dyn Archive>>>,
+}
+
+impl FileLoader for GameFileLoader {
+    fn get(&self, path: &str) -> Result<Vec<u8>, FileNotFoundError> {
+        let lowercase_path = path.to_lowercase();
+        let result = self
+            .archives
+            .read()
+            .unwrap()
+            .iter()
+            .find_map(|archive| archive.get_file_by_path(&lowercase_path))
+            .ok_or(FileNotFoundError::new(path.to_owned()));
+
+        // TODO: should this be removed in the future or left in for resilience?
+        if result.is_err() {
+            #[cfg(feature = "debug")]
+            print_debug!("failed to find file {}; tying to replace it with placeholder", path);
+
+            let delimiter_position = path.len() - 4;
+            let extension = path[delimiter_position..].to_ascii_lowercase();
+
+            let fallback_file = match extension.as_str() {
+                ".png" => FALLBACK_PNG_FILE,
+                ".bmp" => FALLBACK_BMP_FILE,
+                ".tga" => FALLBACK_TGA_FILE,
+                ".rsm" => FALLBACK_MODEL_FILE,
+                ".spr" => FALLBACK_SPRITE_FILE,
+                ".act" => FALLBACK_ACTIONS_FILE,
+                _other => return result,
+            };
+
+            return self.get(fallback_file);
+        }
+
+        result
+    }
 }
 
 impl GameFileLoader {
-    fn add_archive(&mut self, game_archive: Box<dyn Archive>) {
-        self.archives.insert(0, game_archive);
+    fn add_archive(&self, game_archive: Box<dyn Archive>) {
+        self.archives.write().unwrap().insert(0, game_archive);
     }
 
     fn get_archive_type_by_path(path: &Path) -> ArchiveType {
@@ -67,7 +101,7 @@ impl GameFileLoader {
         }
     }
 
-    pub fn load_archives_from_settings(&mut self) {
+    pub fn load_archives_from_settings(&self) {
         #[cfg(feature = "debug")]
         let timer = Timer::new("load game archives");
 
@@ -92,7 +126,7 @@ impl GameFileLoader {
         }
     }
 
-    pub fn load_patched_lua_files(&mut self) {
+    pub fn load_patched_lua_files(&self) {
         if !Path::new(LUA_GRF_FILE_NAME).exists() {
             self.patch_lua_files();
         }
@@ -101,11 +135,15 @@ impl GameFileLoader {
         self.add_archive(lua_archive);
     }
 
-    fn patch_lua_files(&mut self) {
+    fn patch_lua_files(&self) {
         use lunify::{unify, Format, Settings};
 
         let mut lua_files = Vec::new();
-        self.archives.iter().for_each(|archive| archive.get_lua_files(&mut lua_files));
+        self.archives
+            .read()
+            .unwrap()
+            .iter()
+            .for_each(|archive| archive.get_lua_files(&mut lua_files));
 
         let path = Path::new(LUA_GRF_FILE_NAME);
         let mut lua_archive: Box<dyn Writable> = match GameFileLoader::get_archive_type_by_path(path) {
@@ -165,37 +203,5 @@ impl GameFileLoader {
         );
 
         lua_archive.save();
-    }
-
-    pub fn get(&mut self, path: &str) -> Result<Vec<u8>, FileNotFoundError> {
-        let lowercase_path = path.to_lowercase();
-        let result = self
-            .archives
-            .iter_mut()
-            .find_map(|archive| archive.get_file_by_path(&lowercase_path))
-            .ok_or(FileNotFoundError(path.to_owned()));
-
-        // TODO: should this be removed in the future or left in for resilience?
-        if result.is_err() {
-            #[cfg(feature = "debug")]
-            print_debug!("failed to find file {}; tying to replace it with placeholder", path);
-
-            let delimiter_position = path.len() - 4;
-            let extension = path[delimiter_position..].to_ascii_lowercase();
-
-            let fallback_file = match extension.as_str() {
-                ".png" => FALLBACK_PNG_FILE,
-                ".bmp" => FALLBACK_BMP_FILE,
-                ".tga" => FALLBACK_TGA_FILE,
-                ".rsm" => FALLBACK_MODEL_FILE,
-                ".spr" => FALLBACK_SPRITE_FILE,
-                ".act" => FALLBACK_ACTIONS_FILE,
-                _other => return result,
-            };
-
-            return self.get(fallback_file);
-        }
-
-        result
     }
 }

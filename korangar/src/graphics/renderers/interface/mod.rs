@@ -16,7 +16,7 @@ use super::IntoFormat;
 use crate::graphics::{Color, Renderer, SingleRenderTarget, SpriteRenderer as SpriteRendererTrait, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, GameFileLoader, TextureLoader};
+use crate::loaders::{FontLoader, TextureLoader};
 
 #[derive(PartialEq, Eq)]
 pub enum InterfaceSubRenderer {
@@ -41,7 +41,6 @@ pub struct InterfaceRenderer {
 impl InterfaceRenderer {
     pub fn new(
         device: Arc<Device>,
-        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         font_loader: Rc<RefCell<FontLoader>>,
         dimensions: [u32; 2],
@@ -52,10 +51,10 @@ impl InterfaceRenderer {
         let sprite_renderer = SpriteRenderer::new(device.clone(), output_texture_format);
         let text_renderer = TextRenderer::new(device.clone(), output_texture_format, font_loader.clone());
 
-        let checked_box_texture = texture_loader.get("checked_box.png", game_file_loader).unwrap();
-        let unchecked_box_texture = texture_loader.get("unchecked_box.png", game_file_loader).unwrap();
-        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", game_file_loader).unwrap();
-        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", game_file_loader).unwrap();
+        let checked_box_texture = texture_loader.get("checked_box.png").unwrap();
+        let unchecked_box_texture = texture_loader.get("unchecked_box.png").unwrap();
+        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png").unwrap();
+        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png").unwrap();
 
         Self {
             device,

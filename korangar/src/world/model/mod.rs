@@ -5,13 +5,14 @@ use std::ops::Mul;
 use cgmath::{Matrix4, Vector3};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::collision::AABB;
 #[cfg(feature = "debug")]
 use ragnarok_formats::model::ModelData;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 use wgpu::RenderPass;
 
-pub use self::node::{BoundingBox, Node, OrientedBox};
+pub use self::node::Node;
 use crate::graphics::{Camera, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{Color, DeferredRenderer};
@@ -19,7 +20,7 @@ use crate::graphics::{Color, DeferredRenderer};
 #[derive(PrototypeElement, new)]
 pub struct Model {
     pub root_node: Node,
-    pub bounding_box: BoundingBox,
+    pub bounding_box: AABB,
     #[cfg(feature = "debug")]
     pub model_data: ModelData,
 }
@@ -42,7 +43,7 @@ impl Model {
     }
 
     #[cfg(feature = "debug")]
-    pub fn bounding_box_matrix(bounding_box: &BoundingBox, transform: &Transform) -> Matrix4<f32> {
+    pub fn bounding_box_matrix(bounding_box: &AABB, transform: &Transform) -> Matrix4<f32> {
         let size = bounding_box.size() / 2.0;
         let scale = size.zip(transform.scale, f32::mul);
         let position = transform.position;

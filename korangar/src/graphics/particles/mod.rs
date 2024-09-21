@@ -8,10 +8,10 @@ use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 use wgpu::RenderPass;
 
-use crate::graphics::*;
+use super::{Camera, Color, DeferredRenderer, Renderer, SpriteRenderer, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{GameFileLoader, TextureLoader};
-use crate::world::*;
+use crate::loaders::TextureLoader;
+use crate::{Entity, Map};
 
 pub trait Particle {
     fn update(&mut self, delta_time: f32) -> bool;
@@ -133,20 +133,15 @@ pub struct QuestIcon {
 }
 
 impl QuestIcon {
-    pub fn new(
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        map: &Map,
-        quest_effect: QuestEffectPacket,
-    ) -> Self {
+    pub fn new(texture_loader: &mut TextureLoader, map: &Map, quest_effect: QuestEffectPacket) -> Self {
         let position = map.get_world_position(Vector2::new(quest_effect.position.x as usize, quest_effect.position.y as usize))
             + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
-            .get(
-                &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1 /* 1 - 3 */),
-                game_file_loader,
-            )
+            .get(&format!(
+                "À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp",
+                effect_id, 1 /* 1 - 3 */
+            ))
             .unwrap();
         let color = match quest_effect.color {
             QuestColor::Yellow => Color::rgb_u8(200, 200, 30),
@@ -199,17 +194,9 @@ impl ParticleHolder {
         self.particles.push(particle);
     }
 
-    pub fn add_quest_icon(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        map: &Map,
-        quest_effect: QuestEffectPacket,
-    ) {
-        self.quest_icons.insert(
-            quest_effect.entity_id,
-            QuestIcon::new(game_file_loader, texture_loader, map, quest_effect),
-        );
+    pub fn add_quest_icon(&mut self, texture_loader: &mut TextureLoader, map: &Map, quest_effect: QuestEffectPacket) {
+        self.quest_icons
+            .insert(quest_effect.entity_id, QuestIcon::new(texture_loader, map, quest_effect));
     }
 
     pub fn remove_quest_icon(&mut self, entity_id: EntityId) {

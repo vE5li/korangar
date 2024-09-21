@@ -7,8 +7,7 @@ use wgpu::{
     TextureFormat, VertexState,
 };
 
-use super::DeferredSubRenderer;
-use crate::graphics::*;
+use super::{Color, DeferredRenderer, DeferredSubRenderer, Renderer, ALPHA_BLEND};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("rectangle.wgsl");

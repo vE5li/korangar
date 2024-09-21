@@ -11,9 +11,8 @@ use wgpu::{
     TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::ShadowSubRenderer;
+use super::{Buffer, Camera, Renderer, ShadowRenderer, ShadowSubRenderer, Texture, NEAR_PLANE};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::*;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("entity.wgsl");
 

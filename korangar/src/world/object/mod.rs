@@ -8,8 +8,12 @@ use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 use wgpu::RenderPass;
 
-use crate::graphics::*;
-use crate::world::*;
+#[cfg(feature = "debug")]
+use super::MarkerIdentifier;
+use super::Model;
+#[cfg(feature = "debug")]
+use crate::graphics::{DeferredRenderer, MarkerRenderer};
+use crate::{Camera, GeometryRenderer, Renderer};
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 pub struct Object {
@@ -35,7 +39,6 @@ impl Object {
             .render_geometry(render_target, render_pass, renderer, camera, &self.transform, client_tick, time);
     }
 
-    //#[korangar_debug::profile]
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {
         self.model.get_bounding_box_matrix(&self.transform)
     }

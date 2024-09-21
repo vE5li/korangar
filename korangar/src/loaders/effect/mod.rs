@@ -5,6 +5,7 @@ use cgmath::{Vector2, Vector3};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer};
+use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::effect::{EffectData, Frame};
 use ragnarok_formats::version::InternalVersion;
@@ -74,8 +75,8 @@ pub fn interpolate(first: &Frame, second: &Frame, frame_index: usize) -> Frame {
     }
 }
 
-#[derive(Default)]
 pub struct EffectLoader {
+    game_file_loader: Arc<GameFileLoader>,
     cache: HashMap<String, Arc<Effect>>,
 }
 
@@ -190,16 +191,19 @@ impl Effect {
 }
 
 impl EffectLoader {
-    fn load(
-        &mut self,
-        path: &str,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Effect>, LoadError> {
+    pub fn new(game_file_loader: Arc<GameFileLoader>) -> Self {
+        Self {
+            game_file_loader,
+            cache: HashMap::new(),
+        }
+    }
+
+    fn load(&mut self, path: &str, texture_loader: &mut TextureLoader) -> Result<Arc<Effect>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load effect from {}", path.magenta()));
 
-        let bytes = game_file_loader
+        let bytes = self
+            .game_file_loader
             .get(&format!("data\\texture\\effect\\{path}"))
             .map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -224,7 +228,7 @@ impl EffectLoader {
                         .into_iter()
                         .map(|name| {
                             let path = format!("effect\\{}{}", prefix, name.name);
-                            texture_loader.get(&path, game_file_loader).unwrap()
+                            texture_loader.get(&path).unwrap()
                         })
                         .collect(),
                     indices: {
@@ -273,15 +277,10 @@ impl EffectLoader {
         Ok(effect)
     }
 
-    pub fn get(
-        &mut self,
-        path: &str,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Effect>, LoadError> {
+    pub fn get(&mut self, path: &str, texture_loader: &mut TextureLoader) -> Result<Arc<Effect>, LoadError> {
         match self.cache.get(path) {
             Some(effect) => Ok(effect.clone()),
-            None => self.load(path, game_file_loader, texture_loader),
+            None => self.load(path, texture_loader),
         }
     }
 }

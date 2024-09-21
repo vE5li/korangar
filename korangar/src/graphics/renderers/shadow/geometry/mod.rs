@@ -10,9 +10,9 @@ use wgpu::{
     VertexState,
 };
 
+use super::{Buffer, Camera, ModelVertex, Renderer, ShadowRenderer, TextureGroup};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 use crate::graphics::renderers::shadow::ShadowSubRenderer;
-use crate::graphics::*;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("geometry.wgsl");
 

@@ -6,6 +6,7 @@ use derive_new::new;
 use image::{EncodableLayout, ImageFormat, ImageReader, Rgba};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::FileLoader;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
 use super::error::LoadError;
@@ -17,12 +18,13 @@ use crate::loaders::GameFileLoader;
 pub struct TextureLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
+    game_file_loader: Arc<GameFileLoader>,
     #[new(default)]
     cache: HashMap<String, Arc<Texture>>,
 }
 
 impl TextureLoader {
-    fn load(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Texture>, LoadError> {
+    fn load(&mut self, path: &str) -> Result<Arc<Texture>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}", path.magenta()));
 
@@ -33,7 +35,10 @@ impl TextureLoader {
             extension => return Err(LoadError::UnsupportedFormat(extension.to_owned())),
         };
 
-        let file_data = game_file_loader.get(&format!("data\\texture\\{path}")).map_err(LoadError::File)?;
+        let file_data = self
+            .game_file_loader
+            .get(&format!("data\\texture\\{path}"))
+            .map_err(LoadError::File)?;
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
 
         let mut image_buffer = match reader.decode() {
@@ -52,7 +57,7 @@ impl TextureLoader {
                     _ => unreachable!(),
                 };
 
-                return self.get(fallback_path, game_file_loader);
+                return self.get(fallback_path);
             }
         };
 
@@ -93,10 +98,10 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(&mut self, path: &str, game_file_loader: &mut GameFileLoader) -> Result<Arc<Texture>, LoadError> {
+    pub fn get(&mut self, path: &str) -> Result<Arc<Texture>, LoadError> {
         match self.cache.get(path) {
             Some(texture) => Ok(texture.clone()),
-            None => self.load(path, game_file_loader),
+            None => self.load(path),
         }
     }
 }

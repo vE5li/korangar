@@ -105,9 +105,9 @@ impl<T, const N: usize> RingBuffer<T, N> {
 
     /// Returns an iterator over all values that are stored inside the ring
     /// buffer.
-    pub fn iter(&self) -> RingBufferIter<'_, T> {
+    pub fn iter(&self) -> RingBufferIterator<'_, T> {
         let (front, back) = self.as_slices();
-        RingBufferIter { front, back }
+        RingBufferIterator { front, back }
     }
 
     /// Clears the ring buffer.
@@ -136,12 +136,12 @@ impl<T, const N: usize> RingBuffer<T, N> {
 }
 
 /// An iterator that iterates over all values of the ring buffer.
-pub struct RingBufferIter<'a, T> {
+pub struct RingBufferIterator<'a, T> {
     front: &'a [Option<T>],
     back: &'a [Option<T>],
 }
 
-impl<'a, T> Iterator for RingBufferIter<'a, T> {
+impl<'a, T> Iterator for RingBufferIterator<'a, T> {
     type Item = &'a T;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -161,7 +161,7 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
     }
 }
 
-impl<'a, T> ExactSizeIterator for RingBufferIter<'a, T> {
+impl<'a, T> ExactSizeIterator for RingBufferIterator<'a, T> {
     #[inline]
     fn len(&self) -> usize {
         self.front.len() + self.back.len()
@@ -185,7 +185,8 @@ const fn bounded_add<const M: usize>(x: usize, y: usize) -> usize {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use crate::profiling::ring_buffer::bounded_add;
+    use crate::profiling::RingBuffer;
 
     #[test]
     fn bounded_add_edge_cases() {

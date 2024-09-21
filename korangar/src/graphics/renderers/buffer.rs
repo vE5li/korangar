@@ -164,9 +164,9 @@ impl Buffer<u32> {
                     drop(mapped);
                     captured_buffer.unmap();
                 }
-                Err(_err) => {
+                Err(_error) => {
                     #[cfg(feature = "debug")]
-                    print_debug!("[{}] failed to map picker buffer: {:?}", "error".red(), _err);
+                    print_debug!("[{}] failed to map picker buffer: {:?}", "error".red(), _error);
                 }
             }
         });

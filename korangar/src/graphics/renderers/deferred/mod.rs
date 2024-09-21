@@ -22,6 +22,8 @@ use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Vector2, Vector3};
 use korangar_interface::application::FontSizeTrait;
 #[cfg(feature = "debug")]
+use korangar_util::collision::AABB;
+#[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::EntityId;
 use wgpu::{Device, Queue, RenderPass, TextureFormat};
@@ -47,9 +49,9 @@ use crate::graphics::{
     SpriteRenderer as SpriteRendererTrait, *,
 };
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontSize, GameFileLoader, TextureLoader};
+use crate::loaders::{FontSize, TextureLoader};
 #[cfg(feature = "debug")]
-use crate::world::{BoundingBox, MarkerIdentifier};
+use crate::world::MarkerIdentifier;
 
 #[derive(PartialEq, Eq)]
 pub enum DeferredSubRenderer {
@@ -101,7 +103,6 @@ impl DeferredRenderer {
     pub fn new(
         device: Arc<Device>,
         queue: Arc<Queue>,
-        game_file_loader: &mut GameFileLoader,
         texture_loader: &mut TextureLoader,
         surface_format: TextureFormat,
         dimensions: [u32; 2],
@@ -154,8 +155,6 @@ impl DeferredRenderer {
             device.clone(),
             surface_format,
             #[cfg(feature = "debug")]
-            game_file_loader,
-            #[cfg(feature = "debug")]
             texture_loader,
         );
         let effect_renderer = EffectRenderer::new(device.clone(), surface_format);
@@ -164,18 +163,18 @@ impl DeferredRenderer {
         #[cfg(feature = "debug")]
         let box_renderer = BoxRenderer::new(device.clone(), queue.clone(), surface_format);
 
-        let font_map = texture_loader.get("font.png", game_file_loader).unwrap();
-        let walk_indicator = texture_loader.get("grid.tga", game_file_loader).unwrap();
+        let font_map = texture_loader.get("font.png").unwrap();
+        let walk_indicator = texture_loader.get("grid.tga").unwrap();
 
         #[cfg(feature = "debug")]
         let tile_textures: Vec<Arc<Texture>> = vec![
-            texture_loader.get("0.png", game_file_loader).unwrap(),
-            texture_loader.get("1.png", game_file_loader).unwrap(),
-            texture_loader.get("2.png", game_file_loader).unwrap(),
-            texture_loader.get("3.png", game_file_loader).unwrap(),
-            texture_loader.get("4.png", game_file_loader).unwrap(),
-            texture_loader.get("5.png", game_file_loader).unwrap(),
-            texture_loader.get("6.png", game_file_loader).unwrap(),
+            texture_loader.get("0.png").unwrap(),
+            texture_loader.get("1.png").unwrap(),
+            texture_loader.get("2.png").unwrap(),
+            texture_loader.get("3.png").unwrap(),
+            texture_loader.get("4.png").unwrap(),
+            texture_loader.get("5.png").unwrap(),
+            texture_loader.get("6.png").unwrap(),
         ];
 
         #[cfg(feature = "debug")]
@@ -465,7 +464,7 @@ impl DeferredRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         transform: &Transform,
-        bounding_box: &BoundingBox,
+        bounding_box: &AABB,
         color: Color,
     ) {
         self.box_renderer

@@ -15,7 +15,7 @@ use self::indicator::IndicatorRenderer;
 use crate::graphics::{
     EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait, *,
 };
-use crate::loaders::{GameFileLoader, TextureLoader};
+use crate::loaders::TextureLoader;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ShadowDetail {
@@ -52,14 +52,14 @@ pub struct ShadowRenderer {
 }
 
 impl ShadowRenderer {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: &mut GameFileLoader, texture_loader: &mut TextureLoader) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, texture_loader: &mut TextureLoader) -> Self {
         let output_depth_format = <Self as Renderer>::Target::output_texture_format();
 
         let geometry_renderer = GeometryRenderer::new(device.clone(), queue.clone(), output_depth_format);
         let entity_renderer = EntityRenderer::new(device.clone(), queue.clone(), output_depth_format);
         let indicator_renderer = IndicatorRenderer::new(device.clone(), output_depth_format);
 
-        let walk_indicator = texture_loader.get("grid.tga", game_file_loader).unwrap();
+        let walk_indicator = texture_loader.get("grid.tga").unwrap();
 
         Self {
             device,

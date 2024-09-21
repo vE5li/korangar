@@ -9,7 +9,7 @@ use ragnarok_packets::{EquipPosition, InventoryIndex};
 
 pub use self::hotbar::Hotbar;
 pub use self::skills::{Skill, SkillTree};
-use crate::loaders::{GameFileLoader, ResourceMetadata, ScriptLoader, TextureLoader};
+use crate::loaders::{ResourceMetadata, ScriptLoader, TextureLoader};
 
 #[derive(Default)]
 pub struct Inventory {
@@ -17,28 +17,16 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn fill(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        script_loader: &ScriptLoader,
-        items: Vec<InventoryItem<NoMetadata>>,
-    ) {
+    pub fn fill(&mut self, texture_loader: &mut TextureLoader, script_loader: &ScriptLoader, items: Vec<InventoryItem<NoMetadata>>) {
         let items = items
             .into_iter()
-            .map(|item| script_loader.load_inventory_item_metadata(game_file_loader, texture_loader, item))
+            .map(|item| script_loader.load_inventory_item_metadata(texture_loader, item))
             .collect();
 
         self.items.set(items);
     }
 
-    pub fn add_item(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        script_loader: &ScriptLoader,
-        item: InventoryItem<NoMetadata>,
-    ) {
+    pub fn add_item(&mut self, texture_loader: &mut TextureLoader, script_loader: &ScriptLoader, item: InventoryItem<NoMetadata>) {
         self.items.with_mut(|items| {
             if let Some(found_item) = items.iter_mut().find(|inventory_item| inventory_item.index == item.index) {
                 let InventoryItemDetails::Regular { amount, .. } = &mut found_item.details else {
@@ -51,7 +39,7 @@ impl Inventory {
 
                 *amount += added_amount;
             } else {
-                let item = script_loader.load_inventory_item_metadata(game_file_loader, texture_loader, item);
+                let item = script_loader.load_inventory_item_metadata(texture_loader, item);
 
                 items.push(item);
             }

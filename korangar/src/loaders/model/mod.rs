@@ -5,6 +5,9 @@ use cgmath::{Matrix4, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::collision::AABB;
+use korangar_util::math::multiply_matrix4_and_vector3;
+use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
@@ -14,13 +17,13 @@ use super::error::LoadError;
 use super::FALLBACK_MODEL_FILE;
 use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, TextureLoader};
-use crate::system::multiply_matrix4_and_vector3;
-use crate::world::{BoundingBox, Model, Node};
+use crate::world::{Model, Node};
 
 #[derive(new)]
 pub struct ModelLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
+    game_file_loader: Arc<GameFileLoader>,
     #[new(default)]
     cache: HashMap<(String, bool), Arc<Model>>,
 }
@@ -137,7 +140,7 @@ impl ModelLoader {
         nodes: &Vec<NodeData>,
         textures: &Vec<Arc<Texture>>,
         parent_matrix: &Matrix4<f32>,
-        main_bounding_box: &mut BoundingBox,
+        main_bounding_box: &mut AABB,
         root_node_name: &ModelString<40>,
         reverse_order: bool,
     ) -> Node {
@@ -153,7 +156,7 @@ impl ModelLoader {
         );
 
         let box_matrix = box_transform_matrix * main_matrix;
-        let bounding_box = BoundingBox::new(
+        let bounding_box = AABB::from_vertices(
             current_node
                 .vertex_positions
                 .iter()
@@ -165,7 +168,7 @@ impl ModelLoader {
             true => {
                 Matrix4::from_translation(-Vector3::new(
                     bounding_box.center().x,
-                    bounding_box.biggest.y,
+                    bounding_box.max().y,
                     bounding_box.center().z,
                 )) * transform_matrix
             }
@@ -209,17 +212,12 @@ impl ModelLoader {
         )
     }
 
-    fn load(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        model_file: &str,
-        reverse_order: bool,
-    ) -> Result<Arc<Model>, LoadError> {
+    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}", model_file.magenta()));
 
-        let bytes = game_file_loader
+        let bytes = self
+            .game_file_loader
             .get(&format!("data\\model\\{model_file}"))
             .map_err(LoadError::File)?;
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
@@ -233,14 +231,14 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(game_file_loader, texture_loader, FALLBACK_MODEL_FILE, reverse_order);
+                return self.get(texture_loader, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
 
         let textures = model_data
             .texture_names
             .iter()
-            .map(|texture_name| texture_loader.get(&texture_name.inner, game_file_loader).unwrap())
+            .map(|texture_name| texture_loader.get(&texture_name.inner).unwrap())
             .collect();
 
         let root_node_name = &model_data.root_node_name;
@@ -251,7 +249,7 @@ impl ModelLoader {
             .find(|node_data| &node_data.node_name == root_node_name)
             .expect("failed to find main node");
 
-        let mut bounding_box = BoundingBox::uninitialized();
+        let mut bounding_box = AABB::uninitialized();
         let root_node = Self::process_node_mesh(
             &self.device,
             &self.queue,
@@ -278,17 +276,11 @@ impl ModelLoader {
         Ok(model)
     }
 
-    pub fn get(
-        &mut self,
-        game_file_loader: &mut GameFileLoader,
-        texture_loader: &mut TextureLoader,
-        model_file: &str,
-        reverse_order: bool,
-    ) -> Result<Arc<Model>, LoadError> {
+    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, LoadError> {
         match self.cache.get(&(model_file.to_string(), reverse_order)) {
             // kinda dirty
             Some(model) => Ok(model.clone()),
-            None => self.load(game_file_loader, texture_loader, model_file, reverse_order),
+            None => self.load(texture_loader, model_file, reverse_order),
         }
     }
 }

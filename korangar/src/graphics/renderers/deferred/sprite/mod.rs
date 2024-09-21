@@ -9,12 +9,11 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::DeferredSubRenderer;
+use super::{Color, DeferredRenderer, DeferredSubRenderer, Renderer, Texture, ALPHA_BLEND};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::*;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
-use crate::loaders::{GameFileLoader, TextureLoader};
+use crate::loaders::TextureLoader;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -50,24 +49,19 @@ pub struct SpriteRenderer {
 }
 
 impl SpriteRenderer {
-    pub fn new(
-        device: Arc<Device>,
-        surface_format: TextureFormat,
-        #[cfg(feature = "debug")] game_file_loader: &mut GameFileLoader,
-        #[cfg(feature = "debug")] texture_loader: &mut TextureLoader,
-    ) -> Self {
+    pub fn new(device: Arc<Device>, surface_format: TextureFormat, #[cfg(feature = "debug")] texture_loader: &mut TextureLoader) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         #[cfg(feature = "debug")]
-        let object_marker_texture = texture_loader.get("object.png", game_file_loader).unwrap();
+        let object_marker_texture = texture_loader.get("object.png").unwrap();
         #[cfg(feature = "debug")]
-        let light_source_marker_texture = texture_loader.get("light.png", game_file_loader).unwrap();
+        let light_source_marker_texture = texture_loader.get("light.png").unwrap();
         #[cfg(feature = "debug")]
-        let sound_source_marker_texture = texture_loader.get("sound.png", game_file_loader).unwrap();
+        let sound_source_marker_texture = texture_loader.get("sound.png").unwrap();
         #[cfg(feature = "debug")]
-        let effect_source_marker_texture = texture_loader.get("effect.png", game_file_loader).unwrap();
+        let effect_source_marker_texture = texture_loader.get("effect.png").unwrap();
         #[cfg(feature = "debug")]
-        let entity_marker_texture = texture_loader.get("entity.png", game_file_loader).unwrap();
+        let entity_marker_texture = texture_loader.get("entity.png").unwrap();
 
         let nearest_sampler = create_new_sampler(&device, "sprite nearest", SamplerType::Nearest);
         let linear_sampler = create_new_sampler(&device, "sprite linear", SamplerType::Linear);

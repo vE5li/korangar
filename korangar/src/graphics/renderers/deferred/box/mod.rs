@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use cgmath::Vector3;
+use cgmath::{Point3, Vector3};
+use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
@@ -10,9 +11,9 @@ use wgpu::{
     RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
 };
 
-use super::DeferredSubRenderer;
-use crate::graphics::*;
-use crate::world::{BoundingBox, Model};
+use super::{Camera, Color, DeferredRenderer, DeferredSubRenderer, Renderer, WaterVertex};
+use crate::world::Model;
+use crate::Buffer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("box.wgsl");
 
@@ -195,7 +196,7 @@ impl BoxRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         transform: &Transform,
-        bounding_box: &BoundingBox,
+        bounding_box: &AABB,
         color: Color,
     ) {
         if render_target.bound_sub_renderer(DeferredSubRenderer::BoundingBox) {

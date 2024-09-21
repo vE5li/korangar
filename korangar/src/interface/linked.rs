@@ -44,7 +44,9 @@ impl LinkedElement {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use std::rc::Rc;
+
+    use crate::interface::linked::LinkedElement;
 
     // Guard against unintended size increase.
     #[test]

@@ -9,8 +9,8 @@ use super::{Archive, Writable};
 
 pub struct FolderArchive {
     folder_path: PathBuf,
-    /// In the native archives, file names are case insensitive and use '\' as a
-    /// separator, but our file system might not. This mapping let's us do a
+    /// In the native archives, file names are case-insensitive and use '\' as a
+    /// separator, but our file system might not. This mapping lets us do a
     /// lookup from a unified format to the actual file name in the file system.
     ///
     /// Example:
@@ -58,7 +58,7 @@ impl Archive for FolderArchive {
         Self { folder_path, file_mapping }
     }
 
-    fn get_file_by_path(&mut self, asset_path: &str) -> Option<Vec<u8>> {
+    fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
         self.file_mapping.get(asset_path).and_then(|file_path| fs::read(file_path).ok())
     }
 

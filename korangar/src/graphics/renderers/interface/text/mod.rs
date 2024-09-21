@@ -10,11 +10,11 @@ use wgpu::{
     ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::InterfaceSubRenderer;
+use super::{InterfaceRenderer, InterfaceSubRenderer};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::*;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontLoader, FontSize};
+use crate::{Color, Renderer, INTERFACE_ATTACHMENT_BLEND};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("text.wgsl");
 

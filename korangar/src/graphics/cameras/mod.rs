@@ -7,7 +7,6 @@ mod start;
 use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Rad, Vector2, Vector3, Vector4};
-use ragnarok_formats::transform::Transform;
 
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
@@ -137,25 +136,10 @@ pub trait Camera {
         (screen_position, screen_size)
     }
 
-    fn transform_matrix(&self, transform: &Transform) -> Matrix4<f32> {
-        let translation_matrix = Matrix4::from_translation(transform.position);
-        let rotation_matrix = Matrix4::from_angle_x(transform.rotation.x)
-            * Matrix4::from_angle_y(transform.rotation.y)
-            * Matrix4::from_angle_z(transform.rotation.z);
-        let scale_matrix = Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z);
-
-        translation_matrix * rotation_matrix * scale_matrix
-    }
-
     fn view_direction(&self) -> Vector3<f32> {
-        let focus_position = self.focus_point();
-        let camera_position = self.camera_position();
-        Vector3::new(
-            focus_position.x - camera_position.x,
-            focus_position.y - camera_position.y,
-            focus_position.z - camera_position.z,
-        )
-        .normalize()
+        let focus_position = self.focus_point().to_vec();
+        let camera_position = self.camera_position().to_vec();
+        (focus_position - camera_position).normalize()
     }
 }
 

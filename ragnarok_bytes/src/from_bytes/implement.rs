@@ -105,8 +105,8 @@ impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
         //unsafe { mem::transmute::<_, [T; SIZE]>(data) }
 
         // workaround from: https://github.com/rust-lang/rust/issues/61956
-        let ptr = &mut data as *mut _ as *mut [T; SIZE];
-        let result = unsafe { ptr.read() };
+        let pointer = &mut data as *mut _ as *mut [T; SIZE];
+        let result = unsafe { pointer.read() };
 
         core::mem::forget(data);
 

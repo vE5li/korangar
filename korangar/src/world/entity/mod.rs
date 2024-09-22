@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Array, Vector2, Vector3, VectorSpace};
+use cgmath::{Array, EuclideanSpace, Point3, Vector2, VectorSpace};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
@@ -74,7 +74,7 @@ pub struct Common {
     pub sprite: Arc<Sprite>,
     pub actions: Arc<Actions>,
     pub grid_position: Vector2<usize>,
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     #[hidden_element]
     details: ResourceState<String>,
     #[hidden_element]
@@ -378,8 +378,8 @@ impl Common {
                     _ => panic!("impossible step"),
                 };
 
-                let last_step_position = map.get_world_position(last_step.0);
-                let next_step_position = map.get_world_position(next_step.0);
+                let last_step_position = map.get_world_position(last_step.0).to_vec();
+                let next_step_position = map.get_world_position(next_step.0).to_vec();
 
                 let clamped_tick = u32::max(last_step.1, client_tick.0);
                 let total = next_step.1 - last_step.1;
@@ -388,7 +388,7 @@ impl Common {
                 let movement_elapsed = (1.0 / total as f32) * offset as f32;
                 let position = last_step_position.lerp(next_step_position, movement_elapsed);
 
-                self.position = position;
+                self.position = Point3::from_vec(position);
                 self.active_movement = active_movement.into();
             }
         }
@@ -725,7 +725,7 @@ impl Common {
             camera,
             texture,
             self.position,
-            Vector3::new(position.x, position.y, 0.0),
+            Point3::new(position.x, position.y, 0.0),
             Vector2::from_value(0.7),
             Vector2::new(1, 1),
             Vector2::new(0, 0),
@@ -822,7 +822,7 @@ impl Player {
         window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
+        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -939,7 +939,7 @@ impl Npc {
         }
 
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.extend(1.0);
+        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -1035,7 +1035,7 @@ impl Entity {
         self.get_common().grid_position
     }
 
-    pub fn get_position(&self) -> Vector3<f32> {
+    pub fn get_position(&self) -> Point3<f32> {
         self.get_common().position
     }
 

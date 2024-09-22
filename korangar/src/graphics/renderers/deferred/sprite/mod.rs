@@ -42,6 +42,8 @@ pub struct SpriteRenderer {
     effect_source_marker_texture: Arc<Texture>,
     #[cfg(feature = "debug")]
     entity_marker_texture: Arc<Texture>,
+    #[cfg(feature = "debug")]
+    shadow_marker_texture: Arc<Texture>,
     nearest_sampler: Sampler,
     linear_sampler: Sampler,
     bind_group_layout: BindGroupLayout,
@@ -62,6 +64,8 @@ impl SpriteRenderer {
         let effect_source_marker_texture = texture_loader.get("effect.png").unwrap();
         #[cfg(feature = "debug")]
         let entity_marker_texture = texture_loader.get("entity.png").unwrap();
+        #[cfg(feature = "debug")]
+        let shadow_marker_texture = texture_loader.get("shadow.png").unwrap();
 
         let nearest_sampler = create_new_sampler(&device, "sprite nearest", SamplerType::Nearest);
         let linear_sampler = create_new_sampler(&device, "sprite linear", SamplerType::Linear);
@@ -102,6 +106,8 @@ impl SpriteRenderer {
             effect_source_marker_texture,
             #[cfg(feature = "debug")]
             entity_marker_texture,
+            #[cfg(feature = "debug")]
+            shadow_marker_texture,
             nearest_sampler,
             linear_sampler,
             bind_group_layout,
@@ -270,9 +276,12 @@ impl SpriteRenderer {
             MarkerIdentifier::SoundSource(..) => (&self.sound_source_marker_texture, Color::rgb_u8(235, 52, 140)),
             MarkerIdentifier::EffectSource(..) if hovered => (&self.effect_source_marker_texture, Color::rgb_u8(235, 52, 52)),
             MarkerIdentifier::EffectSource(..) => (&self.effect_source_marker_texture, Color::rgb_u8(52, 235, 156)),
+            MarkerIdentifier::Particle(..) if hovered => return,
+            MarkerIdentifier::Particle(..) => return,
             MarkerIdentifier::Entity(..) if hovered => (&self.entity_marker_texture, Color::rgb_u8(235, 92, 52)),
             MarkerIdentifier::Entity(..) => (&self.entity_marker_texture, Color::rgb_u8(189, 235, 52)),
-            _ => panic!(),
+            MarkerIdentifier::Shadow(..) if hovered => (&self.shadow_marker_texture, Color::rgb_u8(200, 200, 200)),
+            MarkerIdentifier::Shadow(..) => (&self.shadow_marker_texture, Color::rgb_u8(170, 170, 170)),
         };
 
         self.build(

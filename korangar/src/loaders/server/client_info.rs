@@ -12,6 +12,7 @@ use super::ServiceId;
 /// But it can use *sclientinfo.xml* if this one exists.
 ///
 /// See more: <https://github.com/rathena/rathena/wiki/Clientinfo.xml>
+#[allow(dead_code)]
 #[derive(Default, Debug, Deserialize)]
 pub struct ClientInfo {
     /// ClientInfo's description.
@@ -69,6 +70,7 @@ pub struct ClientInfo {
 }
 
 /// The ClientInfo's Service structure
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Service {
     /// Displays the name of the server at the Service Select screen.
@@ -131,6 +133,7 @@ impl Service {
 }
 
 /// The ClientInfo Service's Account ID structure.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct GameMasterAccount {
     /// GM's Account ID.
@@ -139,6 +142,7 @@ pub struct GameMasterAccount {
 }
 
 /// The ClientInfo Service's Loading Image structure.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct LoadingImage {
     /// File name.

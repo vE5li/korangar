@@ -72,6 +72,7 @@ fn markers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCe
         render_state_button("effect markers", settings.mapped(|settings| &settings.show_effect_markers)),
         render_state_button("particle markers", settings.mapped(|settings| &settings.show_particle_markers)),
         render_state_button("entity markers", settings.mapped(|settings| &settings.show_entity_markers)),
+        render_state_button("shadow markers", settings.mapped(|settings| &settings.show_shadow_markers)),
     ];
 
     Expandable::new("markers".to_string(), buttons, true).wrap()
@@ -95,6 +96,7 @@ fn buffers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCe
         render_state_button("shadow buffer", settings.mapped(|settings| &settings.show_shadow_buffer)),
         render_state_button("picker buffer", settings.mapped(|settings| &settings.show_picker_buffer)),
         render_state_button("font atlas", settings.mapped(|settings| &settings.show_font_atlas)),
+        render_state_button("point shadow", settings.mapped(|settings| &settings.show_point_shadow)),
     ];
 
     Expandable::new("buffers".to_string(), buttons, true).wrap()

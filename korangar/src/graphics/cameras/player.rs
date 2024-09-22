@@ -38,13 +38,13 @@ impl PlayerCamera {
         }
     }
 
-    pub fn set_focus_point(&mut self, position: Vector3<f32>) {
+    pub fn set_focus_point(&mut self, position: Point3<f32>) {
         self.focus_point.x.set(position.x);
         self.focus_point.y.set(position.y);
         self.focus_point.z.set(position.z);
     }
 
-    pub fn set_smoothed_focus_point(&mut self, position: Vector3<f32>) {
+    pub fn set_smoothed_focus_point(&mut self, position: Point3<f32>) {
         self.focus_point.x.set_desired(position.x);
         self.focus_point.y.set_desired(position.y);
         self.focus_point.z.set_desired(position.z);

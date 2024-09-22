@@ -1,40 +1,45 @@
 mod attachment;
 mod buffer;
 mod deferred;
+mod directional_shadow;
 mod interface;
 mod picker;
+mod point_shadow;
 mod sampler;
 #[cfg(feature = "debug")]
 mod settings;
-mod shadow;
 mod surface;
 mod texture;
 
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicU32;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use bytemuck::{Pod, Zeroable};
+use cgmath::{Matrix4, Point3, Vector2};
 use option_ext::OptionExt;
 use ragnarok_packets::EntityId;
 use wgpu::{
-    BlendComponent, BlendFactor, BlendOperation, BlendState, BufferUsages, CommandBuffer, CommandEncoder, ComputePass,
-    ComputePassDescriptor, Device, Extent3d, LoadOp, Operations, RenderPass, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
-    RenderPassDescriptor, StoreOp, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
+    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType,
+    BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferSize, BufferUsages, CommandBuffer, CommandEncoder,
+    ComputePass, ComputePassDescriptor, Device, Extent3d, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages, StoreOp, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages, TextureView,
 };
 
 use self::attachment::{AttachmentImageType, AttachmentTextureFactory};
 pub use self::buffer::Buffer;
 pub use self::deferred::DeferredRenderer;
 use self::deferred::DeferredSubRenderer;
+pub use self::directional_shadow::{DirectionalShadowRenderer, ShadowDetail};
 pub use self::interface::InterfaceRenderer;
 use self::picker::PickerSubRenderer;
 pub use self::picker::{PickerRenderer, PickerTarget};
+pub use self::point_shadow::PointShadowRenderer;
 #[cfg(feature = "debug")]
 pub use self::settings::RenderSettings;
-pub use self::shadow::{ShadowDetail, ShadowRenderer};
 pub use self::surface::{PresentModeInfo, Surface};
-pub use self::texture::{Texture, TextureGroup};
+pub use self::texture::{CubeTexture, Texture, TextureGroup};
 use super::{Color, ModelVertex};
 use crate::graphics::Camera;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -131,8 +136,8 @@ pub trait EntityRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         texture: &Texture,
-        position: Vector3<f32>,
-        origin: Vector3<f32>,
+        position: Point3<f32>,
+        origin: Point3<f32>,
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
@@ -149,10 +154,10 @@ pub trait IndicatorRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         color: Color,
-        upper_left: Vector3<f32>,
-        upper_right: Vector3<f32>,
-        lower_left: Vector3<f32>,
-        lower_right: Vector3<f32>,
+        upper_left: Point3<f32>,
+        upper_right: Point3<f32>,
+        lower_left: Point3<f32>,
+        lower_right: Point3<f32>,
     ) where
         Self: Renderer;
 }
@@ -180,7 +185,7 @@ pub trait MarkerRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
-        position: Vector3<f32>,
+        position: Point3<f32>,
         hovered: bool,
     ) where
         Self: Renderer;
@@ -458,7 +463,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         texture_usage: TextureUsages,
         clear_value: C,
     ) -> Self {
-        let texture = Texture::new(device, &TextureDescriptor {
+        let texture = Arc::new(Texture::new(device, &TextureDescriptor {
             label: Some(name),
             size: Extent3d {
                 width: dimensions[0],
@@ -471,8 +476,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
             format: F::into_format(),
             usage: texture_usage,
             view_formats: &[],
-        });
-        let texture = Arc::new(texture);
+        }));
 
         let bound_sub_renderer = None;
 
@@ -558,5 +562,159 @@ impl<F: IntoFormat, S: PartialEq> SingleRenderTarget<F, S, f32> {
     #[cfg_attr(feature = "debug", korangar_debug::profile("finalize buffer"))]
     pub fn finish(&mut self, encoder: CommandEncoder) -> CommandBuffer {
         encoder.finish()
+    }
+}
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+pub struct ViewProjectionMatrix([[f32; 4]; 4]);
+
+impl ViewProjectionMatrix {
+    const fn memory_size() -> u64 {
+        std::mem::size_of::<ViewProjectionMatrix>() as u64
+    }
+}
+
+pub struct CubeFaceBuffer {
+    buffer: Buffer<ViewProjectionMatrix>,
+    bind_group: BindGroup,
+}
+
+impl CubeFaceBuffer {
+    pub fn bind_group_layout(device: &Device) -> &BindGroupLayout {
+        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
+        LAYOUT.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("view projection matrix"),
+                entries: &[BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::VERTEX,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: BufferSize::new(ViewProjectionMatrix::memory_size()),
+                    },
+                    count: None,
+                }],
+            })
+        })
+    }
+
+    pub fn new(device: &Device, name: &'static str) -> Self {
+        let buffer = Buffer::with_capacity(
+            device,
+            name,
+            BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            ViewProjectionMatrix::memory_size(),
+        );
+
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("geometry"),
+            layout: Self::bind_group_layout(device),
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: buffer.as_entire_binding(),
+            }],
+        });
+
+        Self { buffer, bind_group }
+    }
+}
+
+pub struct CubeRenderTarget<S: PartialEq> {
+    pub texture: Arc<CubeTexture>,
+    faces: [CubeFaceBuffer; 6],
+    bound_sub_renderer: Option<S>,
+    name: &'static str,
+    index: usize,
+}
+
+impl<S: PartialEq> CubeRenderTarget<S> {
+    pub fn new(device: &Device, name: &'static str, dimensions: [u32; 2], texture_usage: TextureUsages) -> Self {
+        let texture = Arc::new(CubeTexture::new(device, &TextureDescriptor {
+            label: Some(name),
+            size: Extent3d {
+                width: dimensions[0],
+                height: dimensions[1],
+                depth_or_array_layers: 6,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::Depth32Float,
+            usage: texture_usage,
+            view_formats: &[],
+        }));
+
+        let matrix_buffers = [
+            CubeFaceBuffer::new(device, "cube face 0"),
+            CubeFaceBuffer::new(device, "cube face 1"),
+            CubeFaceBuffer::new(device, "cube face 2"),
+            CubeFaceBuffer::new(device, "cube face 3"),
+            CubeFaceBuffer::new(device, "cube face 4"),
+            CubeFaceBuffer::new(device, "cube face 5"),
+        ];
+
+        Self {
+            texture,
+            faces: matrix_buffers,
+            bound_sub_renderer: None,
+            name,
+            index: 0,
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
+    pub fn start<'encoder>(
+        &mut self,
+        queue: &Queue,
+        encoder: &'encoder mut CommandEncoder,
+        index: u32,
+        matrix: Matrix4<f32>,
+    ) -> RenderPass<'encoder> {
+        let render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some(self.name),
+            color_attachments: &[],
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                view: self.texture.get_texture_face_view(index as usize),
+                depth_ops: Some(Operations {
+                    load: LoadOp::Clear(1.0),
+                    store: StoreOp::Store,
+                }),
+                stencil_ops: None,
+            }),
+            timestamp_writes: None,
+            occlusion_query_set: None,
+        });
+
+        self.bound_sub_renderer = None;
+
+        self.faces[index as usize]
+            .buffer
+            .write_exact(queue, &[ViewProjectionMatrix(matrix.into())]);
+        self.index = index as usize;
+
+        render_pass
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn bind_sub_renderer(&mut self, sub_renderer: S) -> bool {
+        let already_bound = self.bound_sub_renderer.contains(&sub_renderer);
+        self.bound_sub_renderer = Some(sub_renderer);
+        !already_bound
+    }
+
+    #[must_use]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("finalize buffer"))]
+    pub fn finish(&mut self, encoder: CommandEncoder) -> CommandBuffer {
+        encoder.finish()
+    }
+
+    pub fn output_texture_format() -> TextureFormat {
+        TextureFormat::Depth32Float
+    }
+
+    pub fn face_bind_group(&self) -> &BindGroup {
+        &self.faces[self.index].bind_group
     }
 }

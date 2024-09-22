@@ -10,6 +10,7 @@ mod geometry;
 mod indicator;
 mod overlay;
 mod point;
+mod point_shadow;
 mod rectangle;
 mod sprite;
 mod water;
@@ -19,13 +20,14 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, Vector2, Vector3};
 use korangar_interface::application::FontSizeTrait;
 #[cfg(feature = "debug")]
 use korangar_util::collision::AABB;
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::EntityId;
+use renderers::texture::CubeTexture;
 use wgpu::{Device, Queue, RenderPass, TextureFormat};
 
 use self::ambient::AmbientLightRenderer;
@@ -40,6 +42,7 @@ use self::geometry::GeometryRenderer;
 use self::indicator::IndicatorRenderer;
 use self::overlay::OverlayRenderer;
 use self::point::PointLightRenderer;
+use self::point_shadow::PointLightWithShadowsRenderer;
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
 use self::water::WaterRenderer;
@@ -61,6 +64,7 @@ pub enum DeferredSubRenderer {
     AmbientLight,
     DirectionalLight,
     PointLight,
+    PointLightWithShadows,
     WaterLight,
     Indicator,
     #[cfg(feature = "debug")]
@@ -82,6 +86,7 @@ pub struct DeferredRenderer {
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     point_light_renderer: PointLightRenderer,
+    point_light_with_shadows_renderer: PointLightWithShadowsRenderer,
     water_light_renderer: WaterLightRenderer,
     overlay_renderer: OverlayRenderer,
     rectangle_renderer: RectangleRenderer,
@@ -148,6 +153,7 @@ impl DeferredRenderer {
         let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), surface_format);
         let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), queue.clone(), surface_format);
         let point_light_renderer = PointLightRenderer::new(device.clone(), queue.clone(), surface_format);
+        let point_light_with_shadows_renderer = PointLightWithShadowsRenderer::new(device.clone(), queue.clone(), surface_format);
         let water_light_renderer = WaterLightRenderer::new(device.clone(), surface_format);
         let overlay_renderer = OverlayRenderer::new(device.clone(), surface_format);
         let rectangle_renderer = RectangleRenderer::new(device.clone(), surface_format);
@@ -189,6 +195,7 @@ impl DeferredRenderer {
             ambient_light_renderer,
             directional_light_renderer,
             point_light_renderer,
+            point_light_with_shadows_renderer,
             water_light_renderer,
             overlay_renderer,
             rectangle_renderer,
@@ -220,6 +227,7 @@ impl DeferredRenderer {
             self.ambient_light_renderer.recreate_pipeline(surface_format);
             self.directional_light_renderer.recreate_pipeline(surface_format);
             self.point_light_renderer.recreate_pipeline(surface_format);
+            self.point_light_with_shadows_renderer.recreate_pipeline(surface_format);
             self.water_light_renderer.recreate_pipeline(surface_format);
             self.overlay_renderer.recreate_pipeline(surface_format);
             self.rectangle_renderer.recreate_pipeline(surface_format);
@@ -283,12 +291,26 @@ impl DeferredRenderer {
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
-        position: Vector3<f32>,
+        position: Point3<f32>,
         color: Color,
         range: f32,
     ) {
         self.point_light_renderer
             .render(render_target, render_pass, camera, position, color, range);
+    }
+
+    pub fn point_light_with_shadows(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        camera: &dyn Camera,
+        shadow_map: &CubeTexture,
+        position: Point3<f32>,
+        color: Color,
+        range: f32,
+    ) {
+        self.point_light_with_shadows_renderer
+            .render(render_target, render_pass, camera, shadow_map, position, color, range);
     }
 
     pub fn water_light(
@@ -479,6 +501,7 @@ impl DeferredRenderer {
         picker_texture: &Texture,
         shadow_map: &Texture,
         font_atlas: &Texture,
+        point_shadow: &CubeTexture,
         render_settings: &RenderSettings,
     ) {
         self.buffer_renderer.render(
@@ -487,6 +510,7 @@ impl DeferredRenderer {
             picker_texture,
             shadow_map,
             font_atlas,
+            point_shadow,
             render_settings,
         );
     }
@@ -521,8 +545,8 @@ impl EntityRendererTrait for DeferredRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         texture: &Texture,
-        position: Vector3<f32>,
-        origin: Vector3<f32>,
+        position: Point3<f32>,
+        origin: Point3<f32>,
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
@@ -585,7 +609,7 @@ impl MarkerRenderer for DeferredRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
-        position: Vector3<f32>,
+        position: Point3<f32>,
         hovered: bool,
     ) where
         Self: Renderer,
@@ -614,10 +638,10 @@ impl IndicatorRendererTrait for DeferredRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         color: Color,
-        upper_left: Vector3<f32>,
-        upper_right: Vector3<f32>,
-        lower_left: Vector3<f32>,
-        lower_right: Vector3<f32>,
+        upper_left: Point3<f32>,
+        upper_right: Point3<f32>,
+        lower_left: Point3<f32>,
+        lower_right: Point3<f32>,
     ) where
         Self: Renderer,
     {

@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use cgmath::Vector3;
+use cgmath::Point3;
 use wgpu::{vertex_attr_array, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
 #[repr(C)]
@@ -10,7 +10,7 @@ pub struct TileVertex {
 }
 
 impl TileVertex {
-    pub const fn new(position: Vector3<f32>, identifier: u32) -> Self {
+    pub const fn new(position: Point3<f32>, identifier: u32) -> Self {
         Self {
             position: [position.x, position.y, position.z],
             identifier,

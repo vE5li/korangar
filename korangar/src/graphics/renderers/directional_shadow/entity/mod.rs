@@ -1,19 +1,18 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::{Point3, Vector2};
-use ragnarok_packets::EntityId;
 use wgpu::{
     include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, FragmentState,
-    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PushConstantRange, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType, ShaderModule, ShaderModuleDescriptor, ShaderStages,
-    TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
+    BindingType, BufferBindingType, BufferUsages, CompareFunction, DepthStencilState, Device, FragmentState, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, PushConstantRange, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, Sampler, SamplerBindingType, ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat,
+    TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::{Buffer, Camera, PickerRenderer, PickerSubRenderer, Renderer, Texture};
+use super::{Buffer, Camera, DirectionalShadowRenderer, DirectionalShadowSubRenderer, Renderer, Texture, NEAR_PLANE};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::renderers::PickerTarget;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("entity.wgsl");
 
@@ -30,7 +29,8 @@ struct Constants {
     world: [[f32; 4]; 4],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
-    identifier: u32,
+    depth_offset: f32,
+    curvature: f32,
     mirror: u32,
 }
 
@@ -44,7 +44,7 @@ pub struct EntityRenderer {
 }
 
 impl EntityRenderer {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, output_color_format: TextureFormat, output_depth_format: TextureFormat) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, output_depth_format: TextureFormat) -> Self {
         let shader_module = device.create_shader_module(SHADER);
         let matrices_buffer = Buffer::with_capacity(
             &device,
@@ -84,14 +84,7 @@ impl EntityRenderer {
                 },
             ],
         });
-
-        let pipeline = Self::create_pipeline(
-            &device,
-            &shader_module,
-            &bind_group_layout,
-            output_color_format,
-            output_depth_format,
-        );
+        let pipeline = Self::create_pipeline(&device, &shader_module, &bind_group_layout, output_depth_format);
 
         Self {
             device,
@@ -107,7 +100,6 @@ impl EntityRenderer {
         device: &Device,
         shader_module: &ShaderModule,
         bind_group_layout: &BindGroupLayout,
-        output_color_format: TextureFormat,
         output_depth_format: TextureFormat,
     ) -> RenderPipeline {
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -119,32 +111,37 @@ impl EntityRenderer {
             }],
         });
 
+        let mut constants = HashMap::new();
+        constants.insert("near_plane".to_string(), NEAR_PLANE as f64);
+
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("entity"),
             layout: Some(&layout),
             vertex: VertexState {
                 module: shader_module,
                 entry_point: "vs_main",
-                compilation_options: PipelineCompilationOptions::default(),
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
                 buffers: &[],
             },
             fragment: Some(FragmentState {
                 module: shader_module,
                 entry_point: "fs_main",
-                compilation_options: PipelineCompilationOptions::default(),
-                targets: &[Some(ColorTargetState {
-                    format: output_color_format,
-                    blend: None,
-                    write_mask: ColorWrites::default(),
-                })],
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
+                targets: &[],
             }),
             multiview: None,
             primitive: PrimitiveState::default(),
             multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: output_depth_format,
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Less,
                 stencil: Default::default(),
                 bias: Default::default(),
             }),
@@ -153,7 +150,12 @@ impl EntityRenderer {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn bind_pipeline(&self, render_pass: &mut RenderPass, camera: &dyn Camera) {
+    fn bind_pipeline(
+        &self,
+        render_target: &<DirectionalShadowRenderer as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        camera: &dyn Camera,
+    ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let uniform_data = Matrices {
             view: view_matrix.into(),
@@ -161,13 +163,16 @@ impl EntityRenderer {
         };
         self.matrices_buffer.write_exact(&self.queue, &[uniform_data]);
 
+        let extent = render_target.texture.get_extent();
+
         render_pass.set_pipeline(&self.pipeline);
+        render_pass.set_viewport(0.0, 0.0, extent.width as f32, extent.height as f32, 0.0, 1.0);
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("render entity"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("entity renderer"))]
     pub fn render(
         &self,
-        render_target: &mut <PickerRenderer as Renderer>::Target,
+        render_target: &mut <DirectionalShadowRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         texture: &Texture,
@@ -176,23 +181,22 @@ impl EntityRenderer {
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
-        entity_id: EntityId,
         mirror: bool,
     ) {
-        if render_target.bound_sub_renderer(PickerSubRenderer::Entity) {
-            self.bind_pipeline(render_pass, camera);
+        if render_target.bind_sub_renderer(DirectionalShadowSubRenderer::Entity) {
+            self.bind_pipeline(render_target, render_pass, camera);
         }
 
-        let texture_dimensions = texture.get_extent();
+        let texture_extent = texture.get_extent();
         let size = Vector2::new(
-            texture_dimensions.width as f32 * scale.x / 10.0,
-            texture_dimensions.height as f32 * scale.y / 10.0,
+            texture_extent.width as f32 * scale.x / 10.0,
+            texture_extent.height as f32 * scale.y / 10.0,
         );
 
         let world_matrix = camera.billboard_matrix(position, origin, size);
         let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
         let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
-        let picker_target = PickerTarget::Entity(entity_id);
+        let (depth_offset, curvature) = camera.calculate_depth_offset_and_curvature(&world_matrix, scale.x, scale.y);
 
         let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
             label: Some("entity"),
@@ -217,7 +221,8 @@ impl EntityRenderer {
             world: world_matrix.into(),
             texture_position: texture_position.into(),
             texture_size: texture_size.into(),
-            identifier: picker_target.into(),
+            depth_offset,
+            curvature,
             mirror: mirror as u32,
         };
 

@@ -10,9 +10,8 @@ use wgpu::{
     VertexState,
 };
 
-use super::{Buffer, Camera, ModelVertex, Renderer, ShadowRenderer, TextureGroup};
+use super::{Buffer, Camera, DirectionalShadowRenderer, DirectionalShadowSubRenderer, ModelVertex, Renderer, TextureGroup};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::renderers::shadow::ShadowSubRenderer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("geometry.wgsl");
 
@@ -154,7 +153,7 @@ impl GeometryRenderer {
     #[cfg_attr(feature = "debug", korangar_debug::profile("geometry renderer"))]
     pub fn render(
         &self,
-        render_target: &mut <ShadowRenderer as Renderer>::Target,
+        render_target: &mut <DirectionalShadowRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         vertex_buffer: &Buffer<ModelVertex>,
@@ -162,7 +161,7 @@ impl GeometryRenderer {
         world_matrix: Matrix4<f32>,
         time: f32,
     ) {
-        if render_target.bind_sub_renderer(ShadowSubRenderer::Geometry) {
+        if render_target.bind_sub_renderer(DirectionalShadowSubRenderer::Geometry) {
             self.bind_pipeline(render_pass, camera, time)
         }
 

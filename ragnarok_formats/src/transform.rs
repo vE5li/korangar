@@ -1,12 +1,12 @@
 use std::ops::Add;
 
-use cgmath::{Deg, Rad, Vector3};
+use cgmath::{Deg, EuclideanSpace, Point3, Rad, Vector3};
 use ragnarok_bytes::{ByteStream, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct Transform {
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     #[cfg_attr(feature = "interface", hidden_element)] // TODO: unhide
     pub rotation: Vector3<Rad<f32>>,
     pub scale: Vector3<f32>,
@@ -14,7 +14,7 @@ pub struct Transform {
 
 impl FromBytes for Transform {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let mut position = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
+        let mut position = <Point3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
         let rotation = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
         let scale = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
 
@@ -45,12 +45,12 @@ impl ToBytes for Transform {
 }
 
 impl Transform {
-    pub fn from(position: Vector3<f32>, rotation: Vector3<Deg<f32>>, scale: Vector3<f32>) -> Self {
+    pub fn from(position: Point3<f32>, rotation: Vector3<Deg<f32>>, scale: Vector3<f32>) -> Self {
         let rotation = rotation.map(|degrees| degrees.into());
         Self { position, rotation, scale }
     }
 
-    pub fn position(position: Vector3<f32>) -> Self {
+    pub fn position(position: Point3<f32>) -> Self {
         Self {
             position,
             rotation: Vector3::new(Rad(0.0), Rad(0.0), Rad(0.0)),
@@ -64,7 +64,7 @@ impl Add for Transform {
 
     fn add(self, other: Self) -> Self {
         Self {
-            position: self.position + other.position,
+            position: self.position + other.position.to_vec(),
             rotation: Vector3::new(
                 self.rotation.x + other.rotation.x,
                 self.rotation.y + other.rotation.y,

@@ -17,7 +17,6 @@ pub struct Buffer<T: ?Sized> {
     label: String,
     size: AtomicU64,
     capacity: u64,
-    usage: BufferUsages,
     buffer: Arc<wgpu::Buffer>,
     _marker: PhantomData<T>,
 }
@@ -42,7 +41,6 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
             label,
             size: AtomicU64::new(0),
             capacity,
-            usage,
             buffer,
             _marker: PhantomData,
         }
@@ -62,7 +60,6 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
             label,
             size: AtomicU64::new(size),
             capacity: size,
-            usage,
             buffer,
             _marker: PhantomData,
         };

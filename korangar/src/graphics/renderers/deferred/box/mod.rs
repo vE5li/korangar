@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use cgmath::{Point3, Vector3};
+use cgmath::Point3;
 use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
 use wgpu::{
@@ -48,14 +48,14 @@ impl BoxRenderer {
 
         // Vertices are defined in world coordinates (Same as WGPU's NDC).
         let vertex_data = [
-            WaterVertex::new(Vector3::new(-1.0, -1.0, -1.0)), // bottom left front
-            WaterVertex::new(Vector3::new(-1.0, 1.0, -1.0)),  // top left front
-            WaterVertex::new(Vector3::new(1.0, -1.0, -1.0)),  // bottom right front
-            WaterVertex::new(Vector3::new(1.0, 1.0, -1.0)),   // top right front
-            WaterVertex::new(Vector3::new(-1.0, -1.0, 1.0)),  // bottom left back
-            WaterVertex::new(Vector3::new(-1.0, 1.0, 1.0)),   // top left back
-            WaterVertex::new(Vector3::new(1.0, -1.0, 1.0)),   // bottom right back
-            WaterVertex::new(Vector3::new(1.0, 1.0, 1.0)),    // top right back
+            WaterVertex::new(Point3::new(-1.0, -1.0, -1.0)), // bottom left front
+            WaterVertex::new(Point3::new(-1.0, 1.0, -1.0)),  // top left front
+            WaterVertex::new(Point3::new(1.0, -1.0, -1.0)),  // bottom right front
+            WaterVertex::new(Point3::new(1.0, 1.0, -1.0)),   // top right front
+            WaterVertex::new(Point3::new(-1.0, -1.0, 1.0)),  // bottom left back
+            WaterVertex::new(Point3::new(-1.0, 1.0, 1.0)),   // top left back
+            WaterVertex::new(Point3::new(1.0, -1.0, 1.0)),   // bottom right back
+            WaterVertex::new(Point3::new(1.0, 1.0, 1.0)),    // top right back
         ];
 
         let index_data = [

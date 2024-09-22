@@ -1,14 +1,12 @@
 #[cfg(feature = "debug")]
 use std::collections::HashSet;
 
-use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{Array, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
-use korangar_debug::profiling::Profiler;
-#[cfg(feature = "debug")]
 use korangar_interface::windows::PrototypeWindow;
-use korangar_util::collision::{Frustum, KDTree, AABB};
+use korangar_util::collision::{Frustum, KDTree, Sphere, AABB};
 #[cfg(feature = "debug")]
 use korangar_util::container::SimpleKey;
 use korangar_util::container::SimpleSlab;
@@ -23,7 +21,9 @@ use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 use wgpu::RenderPass;
 
-use super::{Entity, LightSourceExt, Object};
+use super::{point_light_extent, Entity, Object, ObjectSet, ObjectSetBuffer, PointLightId, PointLightManager};
+#[cfg(feature = "debug")]
+use super::{LightSourceExt, PointLightSet};
 use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{MarkerRenderer, RenderSettings};
@@ -103,6 +103,7 @@ pub enum MarkerIdentifier {
     EffectSource(usize),
     Particle(usize, usize),
     Entity(usize),
+    Shadow(usize),
 }
 
 #[cfg(feature = "debug")]
@@ -141,9 +142,9 @@ impl Map {
         y <= self.height
     }
 
-    pub fn get_world_position(&self, position: Vector2<usize>) -> Vector3<f32> {
+    pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {
         let height = average_tile_height(self.get_tile(position));
-        Vector3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
+        Point3::new(position.x as f32 * 5.0 + 2.5, height, position.y as f32 * 5.0 + 2.5)
     }
 
     // TODO: Make this private once path finding is properly implemented
@@ -168,7 +169,7 @@ impl Map {
 
             audio_engine.add_ambient_sound(
                 sound_effect_key,
-                Point3::from_vec(sound.position),
+                sound.position,
                 sound.range * AMBIENT_SOUND_MULTIPLIER,
                 sound.volume,
                 sound.cycle,
@@ -200,6 +201,51 @@ impl Map {
         );
     }
 
+    // We want to make sure that the object set also caputres the lifetime of the
+    // map, so we never have a stale object set.
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn cull_objects_with_frustum<'a>(
+        &'a self,
+        camera: &dyn Camera,
+        object_set: &'a mut ObjectSetBuffer,
+        #[cfg(feature = "debug")] enabled: bool,
+    ) -> ObjectSet<'a> {
+        #[cfg(feature = "debug")]
+        if !enabled {
+            return object_set.create_set(|visible_objects| {
+                self.objects.iter().for_each(|(object_key, _)| visible_objects.push(object_key));
+            });
+        }
+
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let frustum = Frustum::new(projection_matrix * view_matrix);
+
+        object_set.create_set(|visible_objects| {
+            self.object_kdtree.query(&frustum, visible_objects);
+        })
+    }
+
+    // We want to make sure that the object set also caputres the lifetime of the
+    // map, so we never have a stale object set.
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn cull_objects_in_sphere<'a>(
+        &'a self,
+        sphere: Sphere,
+        object_set: &'a mut ObjectSetBuffer,
+        #[cfg(feature = "debug")] enabled: bool,
+    ) -> ObjectSet<'a> {
+        #[cfg(feature = "debug")]
+        if !enabled {
+            return object_set.create_set(|visible_objects| {
+                self.objects.iter().for_each(|(object_key, _)| visible_objects.push(object_key));
+            });
+        }
+
+        object_set.create_set(|visible_objects| {
+            self.object_kdtree.query(&sphere, visible_objects);
+        })
+    }
+
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_objects<T>(
         &self,
@@ -209,33 +255,11 @@ impl Map {
         camera: &dyn Camera,
         client_tick: ClientTick,
         time: f32,
-        frustum_query_result: &mut Vec<ObjectKey>,
-        #[cfg(feature = "debug")] frustum_culling: bool,
+        object_set: &ObjectSet,
     ) where
         T: Renderer + GeometryRenderer,
     {
-        #[cfg(feature = "debug")]
-        let culling_measurement = Profiler::start_measurement("frustum culling");
-
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let frustum = Frustum::new(projection_matrix * view_matrix);
-
-        frustum_query_result.clear();
-        self.object_kdtree.query(&frustum, frustum_query_result);
-
-        #[cfg(feature = "debug")]
-        culling_measurement.stop();
-
-        #[cfg(feature = "debug")]
-        if !frustum_culling {
-            self.objects.iter().for_each(|(_, object)| {
-                object.render_geometry(render_target, render_pass, renderer, camera, client_tick, time);
-            });
-
-            return;
-        }
-
-        for object_key in frustum_query_result.iter().copied() {
+        for object_key in object_set.iterate_visible().copied() {
             if let Some(object) = self.objects.get(object_key) {
                 object.render_geometry(render_target, render_pass, renderer, camera, client_tick, time);
             }
@@ -268,20 +292,10 @@ impl Map {
         render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
-        player_camera: &dyn Camera,
         frustum_culling: bool,
-        frustum_query_result: &mut Vec<ObjectKey>,
+        object_set: &ObjectSet,
     ) {
-        let (view_matrix, projection_matrix) = player_camera.view_projection_matrices();
-        let frustum = Frustum::new(projection_matrix * view_matrix);
-
-        frustum_query_result.clear();
-        self.object_kdtree.query(&frustum, frustum_query_result);
-
-        let mut intersection_set = HashSet::new();
-        frustum_query_result.iter().for_each(|&key| {
-            intersection_set.insert(key);
-        });
+        let intersection_set: HashSet<ObjectKey> = object_set.iterate_visible().copied().collect();
 
         self.objects.iter().for_each(|(object_key, object)| {
             let bounding_box_matrix = object.get_bounding_box_matrix();
@@ -295,7 +309,7 @@ impl Map {
 
             let offset = bounding_box.size().y / 2.0;
             let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
-            let transform = Transform::position(position.to_vec());
+            let transform = Transform::position(position);
 
             renderer.render_bounding_box(render_target, render_pass, camera, &transform, &bounding_box, color);
         });
@@ -333,10 +347,10 @@ impl Map {
             let base_x = position.x as f32 * TILE_SIZE;
             let base_y = position.y as f32 * TILE_SIZE;
 
-            let upper_left = Vector3::new(base_x, tile.upper_left_height + OFFSET, base_y);
-            let upper_right = Vector3::new(base_x + TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
-            let lower_left = Vector3::new(base_x, tile.lower_left_height + OFFSET, base_y + TILE_SIZE);
-            let lower_right = Vector3::new(base_x + TILE_SIZE, tile.lower_right_height + OFFSET, base_y + TILE_SIZE);
+            let upper_left = Point3::new(base_x, tile.upper_left_height + OFFSET, base_y);
+            let upper_right = Point3::new(base_x + TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
+            let lower_left = Point3::new(base_x, tile.lower_left_height + OFFSET, base_y + TILE_SIZE);
+            let lower_right = Point3::new(base_x + TILE_SIZE, tile.lower_right_height + OFFSET, base_y + TILE_SIZE);
 
             renderer.render_walk_indicator(
                 render_target,
@@ -408,16 +422,23 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn point_lights(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-    ) {
-        self.light_sources
-            .iter()
-            .for_each(|light_source| light_source.render_light(render_target, render_pass, renderer, camera));
+    pub fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let frustum = Frustum::new(projection_matrix * view_matrix);
+
+        self.light_sources.iter().enumerate().for_each(|(index, light_source)| {
+            let color = light_source.color.clone().into();
+            let extent = point_light_extent(color, light_source.range);
+
+            if frustum.intersects_sphere(&Sphere::new(light_source.position, extent)) {
+                point_light_manager.register(
+                    PointLightId::new(index as u32),
+                    light_source.position,
+                    color,
+                    light_source.range,
+                )
+            }
+        });
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -465,9 +486,9 @@ impl Map {
             MarkerIdentifier::LightSource(index) => &self.light_sources[index],
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
-            MarkerIdentifier::Particle(..) => panic!(),
-            // TODO: implement properly
+            MarkerIdentifier::Particle(..) => todo!(),
             MarkerIdentifier::Entity(index) => &entities[index],
+            MarkerIdentifier::Shadow(..) => todo!(),
         }
     }
 
@@ -481,6 +502,7 @@ impl Map {
         camera: &dyn Camera,
         render_settings: &RenderSettings,
         entities: &[Entity],
+        point_light_set: &PointLightSet,
         hovered_marker_identifier: Option<MarkerIdentifier>,
     ) where
         T: Renderer + MarkerRenderer,
@@ -562,6 +584,24 @@ impl Map {
                 )
             });
         }
+
+        if render_settings.show_shadow_markers {
+            point_light_set
+                .with_shadow_iterator()
+                .enumerate()
+                .for_each(|(index, light_source)| {
+                    let marker_identifier = MarkerIdentifier::Shadow(index);
+
+                    renderer.render_marker(
+                        render_target,
+                        render_pass,
+                        camera,
+                        marker_identifier,
+                        light_source.position,
+                        hovered_marker_identifier.contains(&marker_identifier),
+                    );
+                });
+        }
     }
 
     #[cfg(feature = "debug")]
@@ -586,6 +626,7 @@ impl Map {
             MarkerIdentifier::EffectSource(_index) => {}
             MarkerIdentifier::Particle(_index, _particle_index) => {}
             MarkerIdentifier::Entity(_index) => {}
+            MarkerIdentifier::Shadow(_index) => {}
         }
     }
 }

@@ -1,4 +1,4 @@
-use cgmath::Vector3;
+use cgmath::{Point3, Vector3};
 use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
@@ -318,6 +318,12 @@ impl FromBytes for MapResources {
                 ResourceType::LightSource => {
                     let mut light_source = LightSource::from_bytes(byte_stream).trace::<Self>()?;
                     light_source.position.y = -light_source.position.y;
+
+                    // Some light sources have color channels with values bigger than 1.0 (255), so
+                    // we need to clamp them.
+                    // TODO: Does this maybe have a special meaning?
+                    light_source.color.clamp_color_channels();
+
                     light_sources.push(light_source);
                 }
                 ResourceType::SoundSource => {
@@ -413,7 +419,7 @@ pub struct LightSettings {
 pub struct LightSource {
     #[length(80)]
     pub name: String,
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     pub color: ColorRGB,
     pub range: f32,
 }
@@ -425,7 +431,7 @@ pub struct LightSource {
 pub struct EffectSource {
     #[length(80)]
     pub name: String,
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     pub effect_type: u32, // TODO: fix this
     pub emit_speed: f32,
     pub _param0: f32,
@@ -443,7 +449,7 @@ pub struct SoundSource {
     pub name: String,
     #[length(80)]
     pub sound_file: String,
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     pub volume: f32,
     pub width: u32,
     pub height: u32,

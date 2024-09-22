@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use cgmath::Vector3;
+use cgmath::Point3;
 use wgpu::{vertex_attr_array, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
 #[repr(C)]
@@ -9,7 +9,7 @@ pub struct WaterVertex {
 }
 
 impl WaterVertex {
-    pub fn new(position: Vector3<f32>) -> Self {
+    pub fn new(position: Point3<f32>) -> Self {
         Self { position: position.into() }
     }
 

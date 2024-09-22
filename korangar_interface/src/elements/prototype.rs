@@ -52,7 +52,7 @@ impl ElementDisplay for f32 {
 #[cfg(feature = "cgmath")]
 impl<T: ElementDisplay> ElementDisplay for cgmath::Point3<T> {
     fn display(&self) -> String {
-        format!("{}, {}", self.x.display(), self.y.display())
+        format!("{}, {}, {}", self.x.display(), self.y.display(), self.z.display())
     }
 }
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bytemuck::checked::cast_slice;
 use bytemuck::{Pod, Zeroable};
-use cgmath::Vector3;
+use cgmath::Point3;
 use wgpu::{
     include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, Face,
@@ -222,10 +222,10 @@ impl IndicatorRenderer {
         camera: &dyn Camera,
         texture: &Texture,
         color: Color,
-        upper_left: Vector3<f32>,
-        upper_right: Vector3<f32>,
-        lower_left: Vector3<f32>,
-        lower_right: Vector3<f32>,
+        upper_left: Point3<f32>,
+        upper_right: Point3<f32>,
+        lower_left: Point3<f32>,
+        lower_right: Point3<f32>,
     ) {
         if render_target.bound_sub_renderer(DeferredSubRenderer::Indicator) {
             self.bind_pipeline(render_pass, camera);
@@ -241,10 +241,10 @@ impl IndicatorRenderer {
         });
 
         let push_constants = Constants {
-            upper_left: upper_left.extend(1.0).into(),
-            upper_right: upper_right.extend(1.0).into(),
-            lower_left: lower_left.extend(1.0).into(),
-            lower_right: lower_right.extend(1.0).into(),
+            upper_left: upper_left.to_homogeneous().into(),
+            upper_right: upper_right.to_homogeneous().into(),
+            lower_left: lower_left.to_homogeneous().into(),
+            lower_right: lower_right.to_homogeneous().into(),
             color: color.components_linear(),
         };
 

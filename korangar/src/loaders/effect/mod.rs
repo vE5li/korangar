@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector3};
-use derive_new::new;
+use cgmath::{Point3, Vector2, Vector3};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, Timer};
+use korangar_util::collision::{Frustum, Sphere};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::effect::{EffectData, Frame};
@@ -16,6 +16,7 @@ use super::error::LoadError;
 use super::TextureLoader;
 use crate::graphics::{Camera, Color, DeferredRenderer, Renderer, Texture};
 use crate::loaders::GameFileLoader;
+use crate::{point_light_extent, PointLightId, PointLightManager};
 
 fn ease_interpolate(start_value: f32, end_value: f32, time: f32, bias: f32, sub_multiplier: f32) -> f32 {
     if bias > 0.0 {
@@ -146,10 +147,10 @@ impl Effect {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         frame_timer: &FrameTimer,
-        position: Vector3<f32>,
+        position: Point3<f32>,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = projection_matrix * view_matrix * position.extend(1.0);
+        let clip_space_position = projection_matrix * view_matrix * position.to_homogeneous();
         let screen_space_position = camera.clip_to_screen_space(clip_space_position);
         for layer in &self.layers {
             let Some(frame) = layer.interpolate(frame_timer) else {
@@ -286,12 +287,12 @@ impl EffectLoader {
 }
 
 pub enum EffectCenter {
-    Entity(EntityId, Vector3<f32>),
-    Position(Vector3<f32>),
+    Entity(EntityId, Point3<f32>),
+    Position(Point3<f32>),
 }
 
 impl EffectCenter {
-    fn to_position(&self) -> Vector3<f32> {
+    fn to_position(&self) -> Point3<f32> {
         match self {
             EffectCenter::Entity(_, position) | EffectCenter::Position(position) => *position,
         }
@@ -303,6 +304,8 @@ pub trait EffectBase {
 
     fn mark_for_deletion(&mut self);
 
+    fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera);
+
     fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -312,20 +315,46 @@ pub trait EffectBase {
     );
 }
 
-#[derive(new)]
 pub struct EffectWithLight {
     effect: Arc<Effect>,
     frame_timer: FrameTimer,
     center: EffectCenter,
     effect_offset: Vector3<f32>,
+    point_light_id: PointLightId,
     light_offset: Vector3<f32>,
     light_color: Color,
     light_intensity: f32,
     repeating: bool,
-    #[new(default)]
     current_light_intensity: f32,
-    #[new(default)]
     gets_deleted: bool,
+}
+
+impl EffectWithLight {
+    pub fn new(
+        effect: Arc<Effect>,
+        frame_timer: FrameTimer,
+        center: EffectCenter,
+        effect_offset: Vector3<f32>,
+        point_light_id: PointLightId,
+        light_offset: Vector3<f32>,
+        light_color: Color,
+        light_intensity: f32,
+        repeating: bool,
+    ) -> Self {
+        Self {
+            effect,
+            frame_timer,
+            center,
+            effect_offset,
+            point_light_id,
+            light_offset,
+            light_color,
+            light_intensity,
+            repeating,
+            current_light_intensity: 0.0,
+            gets_deleted: false,
+        }
+    }
 }
 
 impl EffectBase for EffectWithLight {
@@ -358,6 +387,24 @@ impl EffectBase for EffectWithLight {
         self.gets_deleted = true;
     }
 
+    fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let frustum = Frustum::new(projection_matrix * view_matrix);
+
+        let extent = point_light_extent(self.light_color, self.current_light_intensity);
+        let light_position = self.center.to_position() + self.light_offset;
+
+        if frustum.intersects_sphere(&Sphere::new(light_position, extent)) {
+            point_light_manager.register_fading(
+                self.point_light_id,
+                light_position,
+                self.light_color,
+                self.current_light_intensity,
+                self.light_intensity,
+            )
+        }
+    }
+
     fn render(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -375,15 +422,6 @@ impl EffectBase for EffectWithLight {
                 self.center.to_position() + self.effect_offset,
             );
         }
-
-        renderer.point_light(
-            render_target,
-            render_pass,
-            camera,
-            self.center.to_position() + self.light_offset,
-            self.light_color,
-            self.current_light_intensity,
-        );
     }
 }
 
@@ -414,6 +452,12 @@ impl EffectHolder {
 
     pub fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) {
         self.effects.retain_mut(|(effect, _)| effect.update(entities, delta_time));
+    }
+
+    pub fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
+        self.effects
+            .iter()
+            .for_each(|(effect, _)| effect.register_point_lights(point_light_manager, camera));
     }
 
     pub fn render(

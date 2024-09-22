@@ -106,7 +106,7 @@ impl Actions {
         let fs = &a.motions[frame as usize % a.motions.len()];
 
         let texture = &sprite.textures[fs.sprite_clips[0].sprite_number as usize];
-        let texture_size = texture.get_extend();
+        let texture_size = texture.get_extent();
         let offset = fs.sprite_clips[0].position.map(|component| component as f32);
 
         (
@@ -159,7 +159,7 @@ impl Actions {
             let dimesions = sprite_clip
                 .size
                 .unwrap_or_else(|| {
-                    let image_size = texture.get_extend();
+                    let image_size = texture.get_extent();
                     Vector2::new(image_size.width, image_size.height)
                 })
                 .map(|component| component as f32);

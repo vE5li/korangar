@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::sync::Arc;
 
 use bytemuck::checked::cast_slice;
@@ -9,6 +10,7 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
+use super::renderers::texture::CubeTexture;
 use super::{DeferredRenderer, DeferredSubRenderer, RenderSettings, Renderer, Texture};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
 
@@ -24,6 +26,7 @@ struct Constants {
     show_picker_texture: u32,
     show_shadow_texture: u32,
     show_font_atlas: u32,
+    show_point_shadow: u32,
 }
 
 pub struct BufferRenderer {
@@ -117,6 +120,16 @@ impl BufferRenderer {
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
+                BindGroupLayoutEntry {
+                    binding: 8,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Depth,
+                        view_dimension: TextureViewDimension::D2Array,
+                        multisampled: false,
+                    },
+                    count: NonZeroU32::new(6),
+                },
             ],
         });
 
@@ -186,6 +199,7 @@ impl BufferRenderer {
         picker_texture: &Texture,
         shadow_map: &Texture,
         font_atlas: &Texture,
+        point_shadow: &CubeTexture,
     ) {
         let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
             label: Some("buffer"),
@@ -223,6 +237,10 @@ impl BufferRenderer {
                     binding: 7,
                     resource: BindingResource::Sampler(&self.nearest_sampler),
                 },
+                BindGroupEntry {
+                    binding: 8,
+                    resource: BindingResource::TextureView(point_shadow.get_texture_array_view()),
+                },
             ],
         });
 
@@ -238,10 +256,11 @@ impl BufferRenderer {
         picker_texture: &Texture,
         shadow_map: &Texture,
         font_atlas: &Texture,
+        point_shadow: &CubeTexture,
         render_settings: &RenderSettings,
     ) {
         if render_target.bound_sub_renderer(DeferredSubRenderer::Buffers) {
-            self.bind_pipeline(render_target, render_pass, picker_texture, shadow_map, font_atlas);
+            self.bind_pipeline(render_target, render_pass, picker_texture, shadow_map, font_atlas, point_shadow);
         }
 
         let push_constants = Constants {
@@ -252,6 +271,7 @@ impl BufferRenderer {
             show_picker_texture: render_settings.show_picker_buffer as u32,
             show_shadow_texture: render_settings.show_shadow_buffer as u32,
             show_font_atlas: render_settings.show_font_atlas as u32,
+            show_point_shadow: render_settings.show_point_shadow as u32,
         };
 
         render_pass.set_push_constants(ShaderStages::FRAGMENT, 0, cast_slice(&[push_constants]));

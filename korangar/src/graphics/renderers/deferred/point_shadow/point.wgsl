@@ -19,6 +19,8 @@ struct VertexOutput {
 @group(0) @binding(1) var normal_buffer: texture_multisampled_2d<f32>;
 @group(0) @binding(2) var depth_buffer: texture_depth_multisampled_2d;
 @group(0) @binding(3) var<uniform> matrices: Matrices;
+@group(0) @binding(4) var shadow_sampler: sampler;
+@group(1) @binding(0) var shadow_map: texture_depth_cube;
 
 var<push_constant> constants: Constants;
 
@@ -62,7 +64,16 @@ fn calculate_sample(position: vec4<f32>, fragment_position: vec2<f32>, sample_in
     var light_percent = max(dot(light_direction, normal), 0.0);
     let light_distance = length(constants.position.xyz - pixel_position_world_space.xyz);
 
-    light_percent *= min(constants.range / exp(light_distance / 10.0), 0.7);
+    let flipped_light_direction = vec3<f32>(light_direction.x, -light_direction.y, light_direction.z);
+    let shadow_map_depth = textureSample(shadow_map, shadow_sampler, flipped_light_direction);
+
+    var bias = 0.05 * tan(acos(light_percent));
+    bias = clamp(bias, 0.0, 0.005);
+
+    let mapped_distance = light_distance / 255.9;
+    let visibility = mapped_distance - bias < shadow_map_depth;
+
+    light_percent *= min(constants.range / exp(light_distance / 10.0), 0.7) * f32(visibility);
 
     let diffuse = textureLoad(diffuse_buffer, pixel_coord, sample_index).rgb;
     return light_percent * constants.color.rgb * diffuse;

@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Rad, SquareMatrix, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::collision::AABB;
-use korangar_util::math::multiply_matrix4_and_vector3;
+use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
@@ -31,7 +31,7 @@ pub struct ModelLoader {
 impl ModelLoader {
     fn add_vertices(
         native_vertices: &mut Vec<NativeModelVertex>,
-        vertex_positions: &[Vector3<f32>],
+        vertex_positions: &[Point3<f32>],
         texture_coordinates: &[Vector2<f32>],
         texture_index: u16,
         reverse_vertices: bool,
@@ -77,12 +77,12 @@ impl ModelLoader {
 
         for face in &node.faces {
             // collect into tiny vec instead ?
-            let vertex_positions: Vec<Vector3<f32>> = face
+            let vertex_positions: Vec<Point3<f32>> = face
                 .vertex_position_indices
                 .iter()
                 .copied()
                 .map(|index| node.vertex_positions[index as usize])
-                .map(|position| multiply_matrix4_and_vector3(main_matrix, position))
+                .map(|position| multiply_matrix4_and_point3(main_matrix, position))
                 .collect();
 
             let texture_coordinates: Vec<Vector2<f32>> = face
@@ -160,7 +160,7 @@ impl ModelLoader {
             current_node
                 .vertex_positions
                 .iter()
-                .map(|position| multiply_matrix4_and_vector3(&box_matrix, *position)),
+                .map(|position| multiply_matrix4_and_point3(&box_matrix, *position)),
         );
         main_bounding_box.extend(&bounding_box);
 

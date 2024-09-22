@@ -4,7 +4,7 @@ use korangar_interface::elements::PrototypeElement;
 
 use crate::collision::aligned_plane::{AlignedPlane, Axis};
 use crate::collision::{Insertable, Query, Sphere};
-use crate::math::multiply_matrix4_and_vector3;
+use crate::math::multiply_matrix4_and_point3;
 
 /// An axis aligned bounding box.
 #[derive(Debug, Clone, Copy)]
@@ -26,17 +26,14 @@ impl AABB {
     /// Calculates the axis aligned bounding box from a list of vertices.
     pub fn from_vertices<T>(vertex_positions: T) -> Self
     where
-        T: IntoIterator<Item = Vector3<f32>>,
+        T: IntoIterator<Item = Point3<f32>>,
     {
         let (min, max) = vertex_positions.into_iter().fold(
-            (Vector3::from_value(f32::MAX), Vector3::from_value(f32::MIN)),
+            (Point3::from_value(f32::MAX), Point3::from_value(f32::MIN)),
             |(min, max), position| (min.zip(position, f32::min), max.zip(position, f32::max)),
         );
 
-        Self {
-            min: Point3::from_vec(min),
-            max: Point3::from_vec(max),
-        }
+        Self { min, max }
     }
 
     /// Create an AABB from a center point and half-extents.
@@ -52,13 +49,13 @@ impl AABB {
         // Define 4 corners of the unit cube that cover
         // all combinations of min/max per axis.
         let corners = [
-            Vector3::new(-1.0, -1.0, -1.0),
-            Vector3::new(-1.0, 1.0, 1.0),
-            Vector3::new(1.0, -1.0, 1.0),
-            Vector3::new(1.0, 1.0, -1.0),
+            Point3::new(-1.0, -1.0, -1.0),
+            Point3::new(-1.0, 1.0, 1.0),
+            Point3::new(1.0, -1.0, 1.0),
+            Point3::new(1.0, 1.0, -1.0),
         ];
 
-        let transformed_corners = corners.map(|corner| multiply_matrix4_and_vector3(&transformation, corner));
+        let transformed_corners = corners.map(|corner| multiply_matrix4_and_point3(&transformation, corner));
 
         Self::from_vertices(transformed_corners)
     }
@@ -294,11 +291,7 @@ mod tests {
 
     #[test]
     fn test_from_vertices() {
-        let vertices = vec![
-            Vector3::new(1.0, 2.0, 3.0),
-            Vector3::new(-1.0, 4.0, 0.0),
-            Vector3::new(2.0, -2.0, 5.0),
-        ];
+        let vertices = vec![Point3::new(1.0, 2.0, 3.0), Point3::new(-1.0, 4.0, 0.0), Point3::new(2.0, -2.0, 5.0)];
         let aabb = AABB::from_vertices(vertices);
 
         assert_eq!(aabb.min(), Point3::new(-1.0, -2.0, 0.0));

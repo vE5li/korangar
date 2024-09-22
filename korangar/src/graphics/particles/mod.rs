@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{Point3, Vector2, Vector3};
 use derive_new::new;
 use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
@@ -28,7 +28,7 @@ pub trait Particle {
 
 #[derive(new)]
 pub struct DamageNumber {
-    position: Vector3<f32>,
+    position: Point3<f32>,
     damage_amount: String,
     #[new(value = "50.0")]
     velocity_y: f32,
@@ -61,7 +61,7 @@ impl Particle for DamageNumber {
         window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
+        let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -81,7 +81,7 @@ impl Particle for DamageNumber {
 
 #[derive(new)]
 pub struct HealNumber {
-    position: Vector3<f32>,
+    position: Point3<f32>,
     heal_amount: String,
     #[new(value = "50.0")]
     velocity_y: f32,
@@ -108,7 +108,7 @@ impl Particle for HealNumber {
         window_size: ScreenSize,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
+        let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -127,7 +127,7 @@ impl Particle for HealNumber {
 }
 
 pub struct QuestIcon {
-    position: Vector3<f32>,
+    position: Point3<f32>,
     texture: Arc<Texture>,
     color: Color,
 }
@@ -163,7 +163,7 @@ impl QuestIcon {
         scaling_factor: f32,
     ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.position.extend(1.0);
+        let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,

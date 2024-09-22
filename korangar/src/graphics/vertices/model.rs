@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use cgmath::{Vector2, Vector3};
+use cgmath::{Point3, Vector2, Vector3};
 use wgpu::{vertex_attr_array, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
 #[repr(C)]
@@ -14,7 +14,7 @@ pub struct ModelVertex {
 
 impl ModelVertex {
     pub const fn new(
-        position: Vector3<f32>,
+        position: Point3<f32>,
         normal: Vector3<f32>,
         texture_coordinates: Vector2<f32>,
         texture_index: i32,

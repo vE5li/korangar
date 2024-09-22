@@ -1,5 +1,5 @@
 #[cfg(feature = "cgmath")]
-use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
+use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3, Vector4};
 
 use super::{FixedByteSize, FixedByteSizeCollection};
 
@@ -87,6 +87,13 @@ impl<T: FixedByteSize> FixedByteSize for Vector3<T> {
 impl<T: FixedByteSize> FixedByteSize for Vector4<T> {
     fn size_in_bytes() -> usize {
         T::size_in_bytes() * 4
+    }
+}
+
+#[cfg(feature = "cgmath")]
+impl<T: FixedByteSize> FixedByteSize for Point3<T> {
+    fn size_in_bytes() -> usize {
+        T::size_in_bytes() * 3
     }
 }
 

@@ -42,6 +42,8 @@ use korangar_interface::Interface;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem, SellItem, ShopItem,
 };
+use korangar_util::collision::Sphere;
+use num::Zero;
 use ragnarok_packets::{
     BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
     SkillType, TilePosition, UnitId, WorldPosition,
@@ -79,6 +81,7 @@ korangar_debug::create_profiler_threads!(threads, {
     Main,
     Picker,
     Shadow,
+    PointShadow,
     Deferred,
 });
 
@@ -86,6 +89,11 @@ fn main() {
     const DEFAULT_MAP: &str = "geffen";
     const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
     const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
+
+    // TODO: The number of point lights that can cast shadows should be configurable
+    // through the graphics settings. For now I just chose an arbitrary smaller
+    // number that should be playable on most devices.
+    const NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS: usize = 6;
 
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
@@ -105,7 +113,7 @@ fn main() {
     }
 
     time_phase!("create global thread pool", {
-        rayon::ThreadPoolBuilder::new().num_threads(3).build_global().unwrap();
+        rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
     });
 
     time_phase!("create window", {
@@ -277,7 +285,8 @@ fn main() {
 
         let mut picker_renderer = PickerRenderer::new(device.clone(), queue.clone(), dimensions);
 
-        let shadow_renderer = ShadowRenderer::new(device.clone(), queue.clone(), &mut texture_loader);
+        let directional_shadow_renderer = DirectionalShadowRenderer::new(device.clone(), queue.clone(), &mut texture_loader);
+        let mut point_shadow_renderer = PointShadowRenderer::new(device.clone(), &mut texture_loader);
     });
 
     time_phase!("load settings", {
@@ -307,9 +316,22 @@ fn main() {
             .map(|_| picker_renderer.create_render_target())
             .collect::<Vec<<PickerRenderer as Renderer>::Target>>();
 
-        let mut shadow_targets = (0..max_frame_count)
-            .map(|_| shadow_renderer.create_render_target(shadow_detail.get().into_resolution()))
-            .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
+        let mut directional_shadow_targets = (0..max_frame_count)
+            .map(|_| directional_shadow_renderer.create_render_target(shadow_detail.get().directional_shadow_resolution()))
+            .collect::<Vec<<DirectionalShadowRenderer as Renderer>::Target>>();
+
+        let mut point_shadow_targets = (0..max_frame_count)
+            .map(|_| {
+                (0..NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
+                    .map(|_| point_shadow_renderer.create_render_target(shadow_detail.get().point_shadow_resolution()))
+                    .collect::<Vec<<PointShadowRenderer as Renderer>::Target>>()
+            })
+            .collect::<Vec<Vec<_>>>();
+
+        let mut point_shadow_maps: Vec<Vec<Arc<CubeTexture>>> = point_shadow_targets
+            .iter()
+            .map(|target| target.iter().map(|target| target.texture.clone()).collect())
+            .collect();
     });
 
     time_phase!("initialize interface", {
@@ -330,7 +352,8 @@ fn main() {
         let mut debug_camera = DebugCamera::new();
         let mut start_camera = StartCamera::new();
         let mut player_camera = PlayerCamera::new();
-        let mut directional_shadow_camera = ShadowCamera::new();
+        let mut directional_shadow_camera = DirectionalShadowCamera::new();
+        let mut point_shadow_camera = PointShadowCamera::new();
 
         start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
         directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
@@ -365,13 +388,17 @@ fn main() {
 
     time_phase!("create resources", {
         let mut particle_holder = ParticleHolder::default();
+        let mut point_light_manager = PointLightManager::new();
         let mut effect_holder = EffectHolder::default();
         let mut entities = Vec::<Entity>::new();
         let mut player_inventory = Inventory::default();
         let mut player_skill_tree = SkillTree::default();
         let mut hotbar = Hotbar::default();
-        let mut frustum_query_result: Vec<ObjectKey> = Vec::default();
-        let mut shadow_query_result: Vec<ObjectKey> = Vec::default();
+
+        let mut directional_shadow_object_set_buffer = ObjectSetBuffer::default();
+        let mut point_shadow_object_set_buffer = ObjectSetBuffer::default();
+        let mut deferred_object_set_buffer = ObjectSetBuffer::default();
+        let mut bounding_box_object_set_buffer = ObjectSetBuffer::default();
 
         let welcome_string = format!(
             "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
@@ -575,6 +602,7 @@ fn main() {
                             entities.clear();
                             particle_holder.clear();
                             effect_holder.clear();
+                            point_light_manager.clear();
                             audio_engine.play_background_music_track(None);
 
                             map = map_loader
@@ -757,6 +785,7 @@ fn main() {
 
                             particle_holder.clear();
                             effect_holder.clear();
+                            point_light_manager.clear();
                             let _ = networking_system.map_loaded();
 
                             // TODO: This is just a workaround until I find a better solution to make the
@@ -879,8 +908,14 @@ fn main() {
                             effect_holder.add_effect(Box::new(EffectWithLight::new(
                                 effect,
                                 frame_timer,
-                                EffectCenter::Entity(entity_id, cgmath::Vector3::new(0.0, 0.0, 0.0)),
+                                EffectCenter::Entity(entity_id, cgmath::Point3::new(0.0, 0.0, 0.0)),
                                 Vector3::new(0.0, 9.0, 0.0),
+                                // FIX: The point light ID needs to be unique.
+                                // The point light manager uses the ID to decide which point light
+                                // renders with a shadow. Having duplicate IDs might cause some
+                                // visual artifacts, such as flickering, as the point lights switch
+                                // between shadows and no shadows.
+                                PointLightId::new(entity_id.0),
                                 Vector3::new(0.0, 12.0, 0.0),
                                 Color::monochrome_u8(255),
                                 50.0,
@@ -902,6 +937,7 @@ fn main() {
                                         frame_timer,
                                         EffectCenter::Position(position),
                                         Vector3::new(0.0, 0.0, 0.0),
+                                        PointLightId::new(unit_id as u32),
                                         Vector3::new(0.0, 3.0, 0.0),
                                         Color::rgb_u8(255, 30, 0),
                                         20.0,
@@ -924,6 +960,7 @@ fn main() {
                                         frame_timer,
                                         EffectCenter::Position(position),
                                         Vector3::new(0.0, 0.0, 0.0),
+                                        PointLightId::new(unit_id as u32),
                                         Vector3::new(0.0, 3.0, 0.0),
                                         Color::rgb_u8(83, 220, 108),
                                         40.0,
@@ -1436,9 +1473,22 @@ fn main() {
 
                     let new_shadow_detail = shadow_detail.get();
 
-                    shadow_targets = (0..max_frame_count)
-                        .map(|_| shadow_renderer.create_render_target(new_shadow_detail.into_resolution()))
-                        .collect::<Vec<<ShadowRenderer as Renderer>::Target>>();
+                    directional_shadow_targets = (0..max_frame_count)
+                        .map(|_| directional_shadow_renderer.create_render_target(new_shadow_detail.directional_shadow_resolution()))
+                        .collect::<Vec<<DirectionalShadowRenderer as Renderer>::Target>>();
+
+                    point_shadow_targets = (0..max_frame_count)
+                        .map(|_| {
+                            (0..NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
+                                .map(|_| point_shadow_renderer.create_render_target(new_shadow_detail.point_shadow_resolution()))
+                                .collect::<Vec<<PointShadowRenderer as Renderer>::Target>>()
+                        })
+                    .collect::<Vec<Vec<_>>>();
+
+                    point_shadow_maps = point_shadow_targets
+                        .iter()
+                        .map(|target| target.iter().map(|target| target.texture.clone()).collect())
+                        .collect();
                 }
 
                 if framerate_limit.consume_changed() {
@@ -1501,11 +1551,12 @@ fn main() {
                 };
 
                 let picker_target = &mut picker_targets[frame_number];
-                let shadow_target = &mut shadow_targets[frame_number];
+                let directional_shadow_target = &mut directional_shadow_targets[frame_number];
+                let point_shadow_target = &mut point_shadow_targets[frame_number];
                 let deferred_target = &mut screen_targets[frame_number];
 
                 // TODO: NHA Lifetime limitation
-                let shadow_map = shadow_target.texture.clone();
+                let directional_shadow_map = directional_shadow_target.texture.clone();
 
                 #[cfg(feature = "debug")]
                 let command_buffer_measurement = Profiler::start_measurement("allocate command buffer");
@@ -1523,25 +1574,30 @@ fn main() {
                 let mut picker_compute_pass = picker_target.start_compute_pass(&mut picker_compute_command_encoder);
 
                 let mut interface_command_encoder = device.create_command_encoder(
-                    &CommandEncoderDescriptor{
+                    &CommandEncoderDescriptor {
                         label: Some("Interface")
                     });
                 let mut interface_render_pass = interface_target.start(&mut interface_command_encoder, clear_interface);
 
-                let mut shadow_command_encoder = device.create_command_encoder(
-                    &CommandEncoderDescriptor{
+                let mut directional_shadow_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor {
                         label: Some("Shadow")
                     });
-                let mut shadow_render_pass = shadow_target.start(&mut shadow_command_encoder);
+                let mut directional_shadow_render_pass = directional_shadow_target.start(&mut directional_shadow_command_encoder);
+
+                let mut point_shadow_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor {
+                        label: Some("Point Light")
+                    });
 
                 let mut geometry_command_encoder = device.create_command_encoder(
-                    &CommandEncoderDescriptor{
+                    &CommandEncoderDescriptor {
                         label: Some("Geometry")
                     });
                 let mut geometry_render_pass = deferred_target.start_geometry_pass(&mut geometry_command_encoder);
 
                 let mut screen_command_encoder = device.create_command_encoder(
-                    &CommandEncoderDescriptor{
+                    &CommandEncoderDescriptor {
                         label: Some("Screen")
                     });
                 let mut screen_render_pass = deferred_target.start_screen_pass(&frame_view, &mut screen_command_encoder);
@@ -1551,6 +1607,15 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 prepare_frame_measurement.stop();
+
+                let point_light_set = {
+                    point_light_manager.prepare();
+
+                    effect_holder.register_point_lights(&mut point_light_manager, current_camera);
+                    map.register_point_lights(&mut point_light_manager, current_camera);
+
+                    point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
+                };
 
                 in_place_scope(|scope| {
                     scope.spawn(|_| {
@@ -1571,6 +1636,7 @@ fn main() {
                             current_camera,
                             render_settings,
                             entities,
+                            &point_light_set,
                             hovered_marker_identifier,
                         );
 
@@ -1583,32 +1649,36 @@ fn main() {
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         map.render_ground(
-                            shadow_target,
-                            &mut shadow_render_pass,
-                            &shadow_renderer,
+                            directional_shadow_target,
+                            &mut directional_shadow_render_pass,
+                            &directional_shadow_renderer,
                             &directional_shadow_camera,
                             animation_timer,
                         );
 
+                        let object_set = map.cull_objects_with_frustum(
+                            &directional_shadow_camera,
+                            &mut directional_shadow_object_set_buffer,
+                            #[cfg(feature = "debug")] render_settings.frustum_culling
+                        );
+
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         map.render_objects(
-                            shadow_target,
-                            &mut shadow_render_pass,
-                            &shadow_renderer,
+                            directional_shadow_target,
+                            &mut directional_shadow_render_pass,
+                            &directional_shadow_renderer,
                             &directional_shadow_camera,
                             client_tick,
                             animation_timer,
-                            &mut shadow_query_result,
-                            #[cfg(feature = "debug")]
-                            render_settings.frustum_culling,
+                            &object_set,
                         );
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                         map.render_entities(
                             entities,
-                            shadow_target,
-                            &mut shadow_render_pass,
-                            &shadow_renderer,
+                            directional_shadow_target,
+                            &mut directional_shadow_render_pass,
+                            &directional_shadow_renderer,
                             &directional_shadow_camera,
                             true,
                         );
@@ -1618,13 +1688,87 @@ fn main() {
                         {
                             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                             map.render_walk_indicator(
-                                shadow_target,
-                                &mut shadow_render_pass,
-                                &shadow_renderer,
+                                directional_shadow_target,
+                                &mut directional_shadow_render_pass,
+                                &directional_shadow_renderer,
                                 &directional_shadow_camera,
                                 walk_indicator_color,
                                 Vector2::new(x as usize, y as usize),
                             );
+                        }
+                    });
+
+                    scope.spawn(|_| {
+                        #[cfg(feature = "debug")]
+                        let _measurement = threads::PointShadow::start_frame();
+
+                        for (light_index, point_light) in point_light_set.with_shadow_iterator().enumerate() {
+                            let Some(point_shadow_target) = point_shadow_target.get_mut(light_index) else {
+                                break;
+                            };
+
+                            point_shadow_camera.set_camera_position(point_light.position);
+                            point_shadow_renderer.set_light_position(point_light.position);
+
+                            let extent = point_light_extent(point_light.color, point_light.range);
+                            let object_set = map.cull_objects_in_sphere(
+                                Sphere::new(point_light.position, extent),
+                                &mut point_shadow_object_set_buffer,
+                                #[cfg(feature = "debug")] render_settings.frustum_culling
+                            );
+                            // TODO: Create an entity set, similar to the object set for better
+                            // performance.
+
+                            for index in 0..6 {
+                                point_shadow_camera.change_direction(index);
+                                point_shadow_camera.generate_view_projection(Vector2::zero());
+
+                                let (view_matrix, projection_matrix) = point_shadow_camera.view_projection_matrices();
+                                let mut point_shadow_render_pass = point_shadow_target.start(&queue, &mut point_shadow_command_encoder, index, projection_matrix * view_matrix);
+
+                                /* #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
+                                entity_set.render(
+                                    point_shadow_target,
+                                    &mut point_shadow_render_pass,
+                                    &point_shadow_renderer,
+                                    &point_shadow_camera,
+                                    true,
+                                ); */
+
+                                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                                map.render_objects(
+                                    point_shadow_target,
+                                    &mut point_shadow_render_pass,
+                                    &point_shadow_renderer,
+                                    &point_shadow_camera,
+                                    client_tick,
+                                    animation_timer,
+                                    &object_set,
+                                );
+
+                                if let Some(PickerTarget::Tile { x, y }) = mouse_target
+                                    && !entities.is_empty()
+                                {
+                                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
+                                    map.render_walk_indicator(
+                                        point_shadow_target,
+                                        &mut point_shadow_render_pass,
+                                        &point_shadow_renderer,
+                                        &point_shadow_camera,
+                                        walk_indicator_color,
+                                        Vector2::new(x as usize, y as usize),
+                                    );
+                                }
+
+                                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                                map.render_ground(
+                                    point_shadow_target,
+                                    &mut point_shadow_render_pass,
+                                    &point_shadow_renderer,
+                                    &point_shadow_camera,
+                                    animation_timer,
+                                );
+                            }
                         }
                     });
 
@@ -1640,6 +1784,12 @@ fn main() {
                             map.render_overlay_tiles(deferred_target, &mut geometry_render_pass, &deferred_renderer, current_camera);
                         }
 
+                        let object_set = map.cull_objects_with_frustum(
+                            current_camera,
+                            &mut deferred_object_set_buffer,
+                            #[cfg(feature = "debug")] render_settings.frustum_culling
+                        );
+
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         map.render_objects(
                             deferred_target,
@@ -1648,9 +1798,7 @@ fn main() {
                             current_camera,
                             client_tick,
                             animation_timer,
-                            &mut frustum_query_result,
-                            #[cfg(feature = "debug")]
-                            render_settings.frustum_culling,
+                            &object_set,
                         );
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
@@ -1687,13 +1835,13 @@ fn main() {
                             &mut screen_render_pass,
                             &deferred_renderer,
                             current_camera,
-                            &shadow_map,
+                            &directional_shadow_map,
                             light_matrix,
                             day_timer,
                         );
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
-                        map.point_lights(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera);
+                        point_light_set.render_point_lights(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera, &point_shadow_maps[frame_number]);
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers()))]
                         map.water_light(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera);
@@ -1706,19 +1854,25 @@ fn main() {
                             current_camera,
                             render_settings,
                             entities,
+                            &point_light_set,
                             hovered_marker_identifier,
                         );
 
                         #[cfg(feature = "debug")]
                         if render_settings.show_bounding_boxes {
+                            let object_set = map.cull_objects_with_frustum(
+                                &player_camera,
+                                &mut bounding_box_object_set_buffer,
+                                #[cfg(feature = "debug")] render_settings.frustum_culling
+                            );
+
                             map.render_bounding(
                                 deferred_target,
                                 &mut screen_render_pass,
                                 &deferred_renderer,
                                 current_camera,
-                                &player_camera,
                                 render_settings.frustum_culling,
-                                &mut frustum_query_result,
+                                &object_set,
                             );
                         }
 
@@ -1749,12 +1903,16 @@ fn main() {
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_buffers() {
+                    // TODO: Make configurable through the UI
+                    let point_light_id = 0;
+
                     deferred_renderer.overlay_buffers(
                         deferred_target,
                         &mut screen_render_pass,
                         &picker_target.texture,
-                        &shadow_map,
+                        &directional_shadow_map,
                         font_loader.borrow().get_font_atlas(),
+                        &point_shadow_maps[frame_number][point_light_id],
                         render_settings,
                     );
                 }
@@ -1853,12 +2011,16 @@ fn main() {
                 drop(picker_render_pass);
                 drop(picker_compute_pass);
                 drop(interface_render_pass);
-                drop(shadow_render_pass);
+                drop(directional_shadow_render_pass);
                 drop(geometry_render_pass);
                 drop(screen_render_pass);
                 let (picker_render_command_buffer, picker_compute_command_buffer) = picker_target.finish(picker_render_command_encoder, picker_compute_command_encoder);
                 let interface_command_buffer = interface_target.finish(interface_command_encoder);
-                let shadow_command_buffer = shadow_target.finish(shadow_command_encoder);
+                let directional_shadow_command_buffer = directional_shadow_target.finish(directional_shadow_command_encoder);
+                // HACK: `point_shadow_target[0].finish` internally only calls
+                // `point_shadow_command_encoder.finish()`. The fact that we use index `0` here is
+                // completely arbitrary and a bit ugly.
+                let point_shadow_command_buffer = point_shadow_target[0].finish(point_shadow_command_encoder);
                 let (deferred_command_buffer, screen_command_buffer) = deferred_target.finish(geometry_command_encoder, screen_command_encoder);
 
                 #[cfg(feature = "debug")]
@@ -1869,7 +2031,15 @@ fn main() {
 
                 // We need to wait for the last submission to finish to be able to resolve all outstanding mapping callback.
                 device.poll(Maintain::Wait);
-                queue.submit([picker_render_command_buffer, picker_compute_command_buffer, interface_command_buffer, shadow_command_buffer, deferred_command_buffer, screen_command_buffer]);
+                queue.submit([
+                    picker_render_command_buffer,
+                    picker_compute_command_buffer,
+                    interface_command_buffer,
+                    directional_shadow_command_buffer,
+                    point_shadow_command_buffer,
+                    deferred_command_buffer,
+                    screen_command_buffer,
+                ]);
 
                 #[cfg(feature = "debug")]
                 queue_measurement.stop();

@@ -1,7 +1,8 @@
 #[cfg(feature = "debug")]
 mod debug;
+mod directional_shadow;
 mod player;
-mod shadow;
+mod point_shadow;
 mod start;
 
 use std::f32::consts::FRAC_PI_2;
@@ -10,8 +11,9 @@ use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Poi
 
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
+pub use self::directional_shadow::DirectionalShadowCamera;
 pub use self::player::PlayerCamera;
-pub use self::shadow::ShadowCamera;
+pub use self::point_shadow::PointShadowCamera;
 pub use self::start::StartCamera;
 use crate::graphics::SmoothedValue;
 
@@ -32,7 +34,7 @@ pub trait Camera {
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);
     fn world_to_screen_matrix(&self) -> Matrix4<f32>;
 
-    fn billboard_matrix(&self, position: Vector3<f32>, origin: Vector3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
+    fn billboard_matrix(&self, position: Point3<f32>, origin: Point3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
         let view_direction = self.view_direction();
         let right_vector = self.look_up_vector().cross(view_direction).normalize();
         let up_vector = view_direction.cross(right_vector).normalize();
@@ -44,14 +46,14 @@ pub trait Camera {
             Vector3::from_value(0.0).extend(1.0),
         );
 
-        let translation_matrix = Matrix4::from_translation(position);
-        let origin_matrix = Matrix4::from_translation(-origin);
+        let translation_matrix = Matrix4::from_translation(position.to_vec());
+        let origin_matrix = Matrix4::from_translation(-origin.to_vec());
         let scale_matrix = Matrix4::from_nonuniform_scale(size.x, size.y, 1.0);
 
         translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix
     }
 
-    fn billboard_coordinates(&self, position: Vector3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {
+    fn billboard_coordinates(&self, position: Point3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {
         let view_direction = self.view_direction();
         let right_vector = self.look_up_vector().cross(view_direction).normalize();
         let up_vector = view_direction.cross(right_vector).normalize();
@@ -61,8 +63,8 @@ pub trait Camera {
         let top_left_vector = up_vector - right_vector;
         let bottom_right_vector = right_vector - up_vector;
 
-        let top_left_position = world_to_screen_matrix * (position + top_left_vector * size).extend(1.0);
-        let bottom_right_position = world_to_screen_matrix * (position + bottom_right_vector * size).extend(1.0);
+        let top_left_position = world_to_screen_matrix * (position + top_left_vector * size).to_homogeneous();
+        let bottom_right_position = world_to_screen_matrix * (position + bottom_right_vector * size).to_homogeneous();
 
         (top_left_position, bottom_right_position)
     }
@@ -116,8 +118,8 @@ pub trait Camera {
         Vector2::new((x + 1.0) * 0.5, (1.0 - y) * 0.5)
     }
 
-    fn distance_to(&self, position: Vector3<f32>) -> f32 {
-        self.camera_position().distance(Point3::from_vec(position))
+    fn distance_to(&self, position: Point3<f32>) -> f32 {
+        self.camera_position().distance(position)
     }
 
     fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (Vector2<f32>, Vector2<f32>) {

@@ -44,7 +44,6 @@ fn vs_main(
 
 @fragment
 fn fs_main(fragment: FragmentInput) -> @location(0) vec4<f32> {
-
     var diffuse_color = textureSample(textures[fragment.texture_index], texture_sampler, fragment.texture_coordinates);
 
     if (diffuse_color.a != 1.0) {

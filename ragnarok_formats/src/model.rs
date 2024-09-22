@@ -1,4 +1,4 @@
-use cgmath::{Matrix3, Quaternion, Vector2, Vector3};
+use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3};
 use ragnarok_bytes::{
     ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
 };
@@ -53,7 +53,7 @@ where
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct PositionKeyframeData {
     pub frame: u32,
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
@@ -100,7 +100,7 @@ pub struct NodeData {
     #[new_derive]
     pub vertex_position_count: u32,
     #[repeating(vertex_position_count)]
-    pub vertex_positions: Vec<Vector3<f32>>,
+    pub vertex_positions: Vec<Point3<f32>>,
     #[new_derive]
     pub texture_coordinate_count: u32,
     #[repeating(texture_coordinate_count)]

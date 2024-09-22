@@ -12,6 +12,7 @@ enum MarkerEncoding {
     SoundSource = 12,
     EffectSource = 13,
     Entity = 14,
+    Shadow = 15,
 }
 
 /// Encoding a `PickerTarget` as `u32` has the following format:
@@ -73,6 +74,11 @@ impl From<u32> for PickerTarget {
             return Self::Marker(MarkerIdentifier::Entity(data as usize & 0xFFF));
         }
 
+        #[cfg(feature = "debug")]
+        if data >> 24 == MarkerEncoding::Shadow as u32 {
+            return Self::Marker(MarkerIdentifier::Shadow(data as usize & 0xFFF));
+        }
+
         Self::Entity(EntityId(data))
     }
 }
@@ -93,6 +99,7 @@ impl From<PickerTarget> for u32 {
                 MarkerIdentifier::SoundSource(index) => ((MarkerEncoding::SoundSource as u32) << 24) | (index as u32 & 0xFFF),
                 MarkerIdentifier::EffectSource(index) => ((MarkerEncoding::EffectSource as u32) << 24) | (index as u32 & 0xFFF),
                 MarkerIdentifier::Entity(index) => ((MarkerEncoding::Entity as u32) << 24) | (index as u32 & 0xFFF),
+                MarkerIdentifier::Shadow(index) => ((MarkerEncoding::Shadow as u32) << 24) | (index as u32 & 0xFFF),
                 _ => panic!(),
             },
         }
@@ -125,6 +132,8 @@ mod encoding {
     #[cfg(feature = "debug")]
     const ENTITY_MARKER: MarkerIdentifier = MarkerIdentifier::Entity(7);
     #[cfg(feature = "debug")]
+    const SHADOW_MARKER: MarkerIdentifier = MarkerIdentifier::Shadow(7);
+    #[cfg(feature = "debug")]
     const ENCODED_OBJECT_MARKER: u32 = 0b00001010_000000000000000000000111;
     #[cfg(feature = "debug")]
     const ENCODED_LIGHT_SOURCE_MARKER: u32 = 0b00001011_000000000000000000000111;
@@ -134,6 +143,8 @@ mod encoding {
     const ENCODED_EFFECT_SOURCE_MARKER: u32 = 0b00001101_000000000000000000000111;
     #[cfg(feature = "debug")]
     const ENCODED_ENTITY_MARKER: u32 = 0b00001110_000000000000000000000111;
+    #[cfg(feature = "debug")]
+    const ENCODED_SHADOW_MARKER: u32 = 0b00001111_000000000000000000000111;
 
     // Entity
     const ENTITY_ID: EntityId = EntityId(7);
@@ -225,6 +236,18 @@ mod encoding {
     #[cfg(feature = "debug")]
     fn decode_entity_marker() {
         assert_eq!(PickerTarget::from(ENCODED_ENTITY_MARKER), PickerTarget::Marker(ENTITY_MARKER));
+    }
+
+    #[test]
+    #[cfg(feature = "debug")]
+    fn encode_shadow_marker() {
+        assert_eq!(u32::from(PickerTarget::Marker(SHADOW_MARKER)), ENCODED_SHADOW_MARKER);
+    }
+
+    #[test]
+    #[cfg(feature = "debug")]
+    fn decode_shadow_marker() {
+        assert_eq!(PickerTarget::from(ENCODED_SHADOW_MARKER), PickerTarget::Marker(SHADOW_MARKER));
     }
 
     #[test]

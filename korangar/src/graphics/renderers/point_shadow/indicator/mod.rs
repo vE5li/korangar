@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use cgmath::Vector3;
+use cgmath::Point3;
 use wgpu::{
     include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, CompareFunction, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
@@ -10,15 +10,16 @@ use wgpu::{
     VertexState,
 };
 
-use super::{Camera, Renderer, ShadowRenderer, ShadowSubRenderer, Texture};
+use super::PointShadowSubRenderer;
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
+use crate::graphics::*;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("indicator.wgsl");
 
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
 struct Constants {
-    view_projection: [[f32; 4]; 4],
+    light_position: [f32; 4],
     upper_left: [f32; 4],
     upper_right: [f32; 4],
     lower_left: [f32; 4],
@@ -76,7 +77,7 @@ impl IndicatorRenderer {
     ) -> RenderPipeline {
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("indicator"),
-            bind_group_layouts: &[bind_group_layout],
+            bind_group_layouts: &[bind_group_layout, CubeFaceBuffer::bind_group_layout(device)],
             push_constant_ranges: &[PushConstantRange {
                 stages: ShaderStages::VERTEX,
                 range: 0..size_of::<Constants>() as _,
@@ -120,16 +121,17 @@ impl IndicatorRenderer {
     #[cfg_attr(feature = "debug", korangar_debug::profile("render ground indicator"))]
     pub fn render_ground_indicator(
         &self,
-        render_target: &mut <ShadowRenderer as Renderer>::Target,
+        render_target: &mut <PointShadowRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
-        camera: &dyn Camera,
+        _camera: &dyn Camera,
+        light_position: Point3<f32>,
         texture: &Texture,
-        upper_left: Vector3<f32>,
-        upper_right: Vector3<f32>,
-        lower_left: Vector3<f32>,
-        lower_right: Vector3<f32>,
+        upper_left: Point3<f32>,
+        upper_right: Point3<f32>,
+        lower_left: Point3<f32>,
+        lower_right: Point3<f32>,
     ) {
-        if render_target.bind_sub_renderer(ShadowSubRenderer::Indicator) {
+        if render_target.bind_sub_renderer(PointShadowSubRenderer::Indicator) {
             self.bind_pipeline(render_pass);
         }
 
@@ -148,17 +150,17 @@ impl IndicatorRenderer {
             ],
         });
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let push_constants = Constants {
-            view_projection: (projection_matrix * view_matrix).into(),
-            upper_left: upper_left.extend(1.0).into(),
-            upper_right: upper_right.extend(1.0).into(),
-            lower_left: lower_left.extend(1.0).into(),
-            lower_right: lower_right.extend(1.0).into(),
+            light_position: light_position.to_homogeneous().into(),
+            upper_left: upper_left.to_homogeneous().into(),
+            upper_right: upper_right.to_homogeneous().into(),
+            lower_left: lower_left.to_homogeneous().into(),
+            lower_right: lower_right.to_homogeneous().into(),
         };
 
         render_pass.set_push_constants(ShaderStages::VERTEX, 0, cast_slice(&[push_constants]));
         render_pass.set_bind_group(0, &bind_group, &[]);
+        render_pass.set_bind_group(1, render_target.face_bind_group(), &[]);
         render_pass.draw(0..6, 0..1);
     }
 }

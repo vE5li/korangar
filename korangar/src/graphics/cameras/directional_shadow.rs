@@ -4,7 +4,7 @@ use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2,
 
 use super::{orthographic_lh, Camera};
 
-pub struct ShadowCamera {
+pub struct DirectionalShadowCamera {
     focus_point: Point3<f32>,
     look_up_vector: Vector3<f32>,
     view_matrix: Matrix4<f32>,
@@ -14,7 +14,7 @@ pub struct ShadowCamera {
     day_timer: f32,
 }
 
-impl ShadowCamera {
+impl DirectionalShadowCamera {
     const FAR_PLANE: f32 = 500.0;
     const NEAR_PLANE: f32 = -1000.0;
 
@@ -39,7 +39,7 @@ impl ShadowCamera {
     }
 }
 
-impl Camera for ShadowCamera {
+impl Camera for DirectionalShadowCamera {
     fn camera_position(&self) -> Point3<f32> {
         let direction = crate::world::get_light_direction(self.day_timer).normalize();
         let scaled_direction = direction * 100.0;

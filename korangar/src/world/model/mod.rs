@@ -2,7 +2,7 @@ mod node;
 
 use std::ops::Mul;
 
-use cgmath::{Matrix4, Vector3};
+use cgmath::{EuclideanSpace, Matrix4, Vector3};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::collision::AABB;
@@ -54,7 +54,10 @@ impl Model {
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
 
-        Matrix4::from_translation(position) * rotation_matrix * offset_matrix * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
+        Matrix4::from_translation(position.to_vec())
+            * rotation_matrix
+            * offset_matrix
+            * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
     }
 
     pub fn get_bounding_box_matrix(&self, transform: &Transform) -> Matrix4<f32> {
@@ -68,7 +71,10 @@ impl Model {
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
 
-        Matrix4::from_translation(position) * rotation_matrix * offset_matrix * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
+        Matrix4::from_translation(position.to_vec())
+            * rotation_matrix
+            * offset_matrix
+            * Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z)
     }
 
     #[cfg(feature = "debug")]

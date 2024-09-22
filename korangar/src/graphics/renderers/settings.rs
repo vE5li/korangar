@@ -49,6 +49,8 @@ pub struct RenderSettings {
     #[new(default)]
     pub show_entity_markers: bool,
     #[new(default)]
+    pub show_shadow_markers: bool,
+    #[new(default)]
     pub show_map_tiles: bool,
     #[new(default)]
     pub show_pathing: bool,
@@ -66,6 +68,8 @@ pub struct RenderSettings {
     pub show_picker_buffer: bool,
     #[new(default)]
     pub show_font_atlas: bool,
+    #[new(default)]
+    pub show_point_shadow: bool,
 }
 
 impl RenderSettings {
@@ -77,5 +81,6 @@ impl RenderSettings {
             || self.show_shadow_buffer
             || self.show_picker_buffer
             || self.show_font_atlas
+            || self.show_point_shadow
     }
 }

@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, SquareMatrix, Vector4};
+use cgmath::{EuclideanSpace, Matrix4, SquareMatrix, Vector4};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
@@ -53,7 +53,7 @@ impl Node {
             * Matrix4::from_angle_x(-transform.rotation.x)
             * Matrix4::from_angle_y(transform.rotation.y);
 
-        Matrix4::from_translation(transform.position)
+        Matrix4::from_translation(transform.position.to_vec())
             * rotation_matrix
             * Matrix4::from_nonuniform_scale(transform.scale.x, transform.scale.y, transform.scale.z)
             * Matrix4::from_cols(

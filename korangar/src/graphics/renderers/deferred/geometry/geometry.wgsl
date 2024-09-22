@@ -56,7 +56,6 @@ fn vs_main(
 
 @fragment
 fn fs_main(fragment: FragmentInput) -> FragmentOutput {
-
     let diffuse_color = textureSample(textures[fragment.texture_index], linear_sampler, fragment.texture_coordinates);
     let alpha_channel = textureSample(textures[fragment.texture_index], nearest_sampler, fragment.texture_coordinates).a;
 

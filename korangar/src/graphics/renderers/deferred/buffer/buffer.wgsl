@@ -6,6 +6,7 @@ struct Constants {
     show_picker_texture: u32,
     show_shadow_texture: u32,
     show_font_atlas: u32,
+    show_point_shadow: u32,
 }
 
 struct VertexOutput {
@@ -22,6 +23,7 @@ struct VertexOutput {
 @group(0) @binding(5) var shadow_texture: texture_depth_2d;
 @group(0) @binding(6) var font_atlas: texture_2d<f32>;
 @group(0) @binding(7) var nearest_sampler: sampler;
+@group(0) @binding(8) var point_shadow: texture_depth_2d_array;
 
 var<push_constant> constants: Constants;
 
@@ -84,6 +86,21 @@ fn fs_main(
     if (constants.show_font_atlas != 0u) {
         let color = textureSample(font_atlas, nearest_sampler, clip_to_uv(fragment_position));
         output_color += vec3<f32>(color.r);
+    }
+
+    if (constants.show_point_shadow != 0u) {
+        var sample_position = clip_to_uv(fragment_position);
+        sample_position.y = 1.0 - sample_position.y;
+
+        let index = i32(floor(sample_position.x / (1.0 / 3.0)) + floor(sample_position.y / (1.0 / 2.0)) * 3);
+
+        sample_position.x %= (1.0 / 3.0);
+        sample_position.y %= (1.0 / 2.0);
+        sample_position.x *= 3.0;
+        sample_position.y *= 2.0;
+
+        let depth = textureSample(point_shadow, nearest_sampler, sample_position, index);
+        output_color += vec3<f32>(depth);
     }
 
     return vec4<f32>(output_color, 1.0);

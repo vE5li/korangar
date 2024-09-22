@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use cgmath::{Vector2, Vector3};
+use cgmath::{Point3, Vector2};
 use wgpu::{
     include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState, Device, Face,
@@ -234,8 +234,8 @@ impl EntityRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         texture: &Texture,
-        position: Vector3<f32>,
-        origin: Vector3<f32>,
+        position: Point3<f32>,
+        origin: Point3<f32>,
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
@@ -245,7 +245,7 @@ impl EntityRenderer {
             self.bind_pipeline(render_pass, camera);
         }
 
-        let image_dimensions = texture.get_extend();
+        let image_dimensions = texture.get_extent();
         let size = Vector2::new(
             image_dimensions.width as f32 * scale.x / 10.0,
             image_dimensions.height as f32 * scale.y / 10.0,

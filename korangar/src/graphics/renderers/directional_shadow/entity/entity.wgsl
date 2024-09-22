@@ -74,6 +74,8 @@ fn fs_main(
     let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
 
     return position.z;
+    // FIX: we don't even use any of the calculated values here! should it not be:
+    // return clamped_depth;
 }
 
 // Optimized version of the following truth table:

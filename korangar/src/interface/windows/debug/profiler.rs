@@ -119,6 +119,7 @@ impl PrototypeWindow<InterfaceSettings> for ProfilerWindow {
                     ("Main thread", crate::threads::Enum::Main),
                     ("Picker thread", crate::threads::Enum::Picker),
                     ("Shadow thread", crate::threads::Enum::Shadow),
+                    ("Point shadow thread", crate::threads::Enum::PointShadow),
                     ("Deferred thread", crate::threads::Enum::Deferred),
                 ])
                 .with_selected(self.visible_thread.clone())

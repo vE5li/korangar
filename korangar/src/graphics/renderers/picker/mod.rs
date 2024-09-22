@@ -8,7 +8,7 @@ mod tile;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, Vector2};
 use ragnarok_packets::EntityId;
 use wgpu::{ComputePass, Device, Queue, RenderPass};
 
@@ -135,8 +135,8 @@ impl EntityRendererTrait for PickerRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         texture: &Texture,
-        position: Vector3<f32>,
-        origin: Vector3<f32>,
+        position: Point3<f32>,
+        origin: Point3<f32>,
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
@@ -169,7 +169,7 @@ impl MarkerRendererTrait for PickerRenderer {
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
-        position: Vector3<f32>,
+        position: Point3<f32>,
         _hovered: bool,
     ) where
         Self: Renderer,

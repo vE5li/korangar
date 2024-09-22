@@ -10,7 +10,7 @@ use wgpu::RenderPass;
 
 #[cfg(feature = "debug")]
 use super::MarkerIdentifier;
-use super::Model;
+use super::{Model, ObjectKey};
 #[cfg(feature = "debug")]
 use crate::graphics::{DeferredRenderer, MarkerRenderer};
 use crate::{Camera, GeometryRenderer, Renderer};
@@ -75,5 +75,33 @@ impl Object {
             self.transform.position,
             hovered,
         );
+    }
+}
+
+#[derive(Default)]
+pub struct ObjectSetBuffer {
+    visible_objects: Vec<ObjectKey>,
+}
+
+impl ObjectSetBuffer {
+    pub(super) fn create_set(&mut self, initializer: impl FnOnce(&mut Vec<ObjectKey>)) -> ObjectSet<'_> {
+        self.visible_objects.clear();
+
+        initializer(&mut self.visible_objects);
+
+        ObjectSet {
+            visible_objects: &self.visible_objects,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ObjectSet<'a> {
+    visible_objects: &'a [ObjectKey],
+}
+
+impl ObjectSet<'_> {
+    pub(super) fn iterate_visible(&self) -> std::slice::Iter<'_, ObjectKey> {
+        self.visible_objects.iter()
     }
 }

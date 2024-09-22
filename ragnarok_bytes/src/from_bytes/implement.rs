@@ -1,5 +1,5 @@
 #[cfg(feature = "cgmath")]
-use cgmath::{Matrix3, Quaternion, Vector2, Vector3, Vector4};
+use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3, Vector4};
 
 use crate::{ByteStream, ConversionResult, ConversionResultExt, FromBytes};
 
@@ -172,6 +172,17 @@ impl<T: FromBytes> FromBytes for Vector4<T> {
         let fourth = T::from_bytes(byte_stream).trace::<Self>()?;
 
         Ok(Vector4::new(first, second, third, fourth))
+    }
+}
+
+#[cfg(feature = "cgmath")]
+impl<T: FromBytes> FromBytes for Point3<T> {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        let first = T::from_bytes(byte_stream).trace::<Self>()?;
+        let second = T::from_bytes(byte_stream).trace::<Self>()?;
+        let third = T::from_bytes(byte_stream).trace::<Self>()?;
+
+        Ok(Point3::new(first, second, third))
     }
 }
 

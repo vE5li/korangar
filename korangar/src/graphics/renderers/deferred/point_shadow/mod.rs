@@ -2,15 +2,18 @@ use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
 use cgmath::Point3;
+use renderers::sampler::{create_new_sampler, SamplerType};
+use renderers::texture::CubeTexture;
 use wgpu::{
     include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, Device, FragmentState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PushConstantRange, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
+    PipelineLayoutDescriptor, PushConstantRange, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+    ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension, VertexState,
 };
 
-use super::{Camera, Color, DeferredRenderer, DeferredSubRenderer, Renderer, LIGHT_ATTACHMENT_BLEND};
-use crate::{point_light_extent, Buffer};
+use super::DeferredSubRenderer;
+use crate::graphics::*;
+use crate::point_light_extent;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("point.wgsl");
 
@@ -30,16 +33,17 @@ struct Constants {
     range: f32,
 }
 
-pub struct PointLightRenderer {
+pub struct PointLightWithShadowsRenderer {
     device: Arc<Device>,
     queue: Arc<Queue>,
     shader_module: ShaderModule,
     matrices_buffer: Buffer<Matrices>,
+    linear_sampler: Sampler,
     bind_group_layout: BindGroupLayout,
     pipeline: RenderPipeline,
 }
 
-impl PointLightRenderer {
+impl PointLightWithShadowsRenderer {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, surface_format: TextureFormat) -> Self {
         let shader_module = device.create_shader_module(SHADER);
         let matrices_buffer = Buffer::with_capacity(
@@ -48,6 +52,7 @@ impl PointLightRenderer {
             BufferUsages::COPY_DST | BufferUsages::UNIFORM,
             size_of::<Matrices>() as _,
         );
+        let linear_sampler = create_new_sampler(&device, "point shadow light linear", SamplerType::Linear);
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: Some("directional light"),
             entries: &[
@@ -91,6 +96,12 @@ impl PointLightRenderer {
                     },
                     count: None,
                 },
+                BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         });
         let pipeline = Self::create_pipeline(&device, &shader_module, &bind_group_layout, surface_format);
@@ -100,6 +111,7 @@ impl PointLightRenderer {
             queue,
             shader_module,
             matrices_buffer,
+            linear_sampler,
             bind_group_layout,
             pipeline,
         }
@@ -117,8 +129,8 @@ impl PointLightRenderer {
         surface_format: TextureFormat,
     ) -> RenderPipeline {
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("point light"),
-            bind_group_layouts: &[bind_group_layout],
+            label: Some("point light with shadows"),
+            bind_group_layouts: &[bind_group_layout, CubeTexture::bind_group_layout(device)],
             push_constant_ranges: &[PushConstantRange {
                 stages: ShaderStages::VERTEX_FRAGMENT,
                 range: 0..size_of::<Constants>() as _,
@@ -126,7 +138,7 @@ impl PointLightRenderer {
         });
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("point light"),
+            label: Some("point light with shadows"),
             layout: Some(&layout),
             vertex: VertexState {
                 module: shader_module,
@@ -160,7 +172,7 @@ impl PointLightRenderer {
         self.matrices_buffer.write_exact(&self.queue, &[matrices]);
 
         let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
-            label: Some("point light"),
+            label: Some("point light with shadows"),
             layout: &self.bind_group_layout,
             entries: &[
                 BindGroupEntry {
@@ -179,6 +191,10 @@ impl PointLightRenderer {
                     binding: 3,
                     resource: self.matrices_buffer.as_entire_binding(),
                 },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: BindingResource::Sampler(&self.linear_sampler),
+                },
             ],
         });
 
@@ -192,11 +208,12 @@ impl PointLightRenderer {
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
+        shadow_map: &CubeTexture,
         position: Point3<f32>,
         color: Color,
         range: f32,
     ) {
-        if render_target.bound_sub_renderer(DeferredSubRenderer::PointLight) {
+        if render_target.bound_sub_renderer(DeferredSubRenderer::PointLightWithShadows) {
             self.bind_pipeline(render_target, render_pass, camera);
         }
 
@@ -221,6 +238,7 @@ impl PointLightRenderer {
             range,
         };
 
+        render_pass.set_bind_group(1, shadow_map.get_bind_group(), &[]);
         render_pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, cast_slice(&[push_constants]));
         render_pass.draw(0..6, 0..1);
     }

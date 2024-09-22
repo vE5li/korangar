@@ -1,11 +1,11 @@
-use cgmath::{InnerSpace, Vector2, Vector3};
+use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 use derive_new::new;
 
 use crate::graphics::ModelVertex;
 
 #[derive(new)]
 pub struct NativeModelVertex {
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     pub normal: Vector3<f32>,
     pub texture_coordinates: Vector2<f32>,
     pub texture_index: i32,
@@ -43,7 +43,7 @@ impl NativeModelVertex {
         vertices
     }
 
-    pub fn calculate_normal(first_position: Vector3<f32>, second_position: Vector3<f32>, third_position: Vector3<f32>) -> Vector3<f32> {
+    pub fn calculate_normal(first_position: Point3<f32>, second_position: Point3<f32>, third_position: Point3<f32>) -> Vector3<f32> {
         let delta_position_1 = second_position - first_position;
         let delta_position_2 = third_position - first_position;
         delta_position_1.cross(delta_position_2)

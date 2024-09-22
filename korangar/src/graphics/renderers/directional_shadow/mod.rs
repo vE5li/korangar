@@ -4,7 +4,7 @@ mod indicator;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, Vector2};
 use ragnarok_packets::EntityId;
 use serde::{Deserialize, Serialize};
 use wgpu::{Device, Queue, RenderPass, TextureFormat, TextureUsages};
@@ -26,7 +26,7 @@ pub enum ShadowDetail {
 }
 
 impl ShadowDetail {
-    pub fn into_resolution(self) -> u32 {
+    pub fn directional_shadow_resolution(self) -> u32 {
         match self {
             ShadowDetail::Low => 512,
             ShadowDetail::Medium => 1024,
@@ -34,16 +34,25 @@ impl ShadowDetail {
             ShadowDetail::Ultra => 8192,
         }
     }
+
+    pub fn point_shadow_resolution(self) -> u32 {
+        match self {
+            ShadowDetail::Low => 64,
+            ShadowDetail::Medium => 128,
+            ShadowDetail::High => 256,
+            ShadowDetail::Ultra => 512,
+        }
+    }
 }
 
 #[derive(PartialEq, Eq)]
-pub enum ShadowSubRenderer {
+pub enum DirectionalShadowSubRenderer {
     Geometry,
     Entity,
     Indicator,
 }
 
-pub struct ShadowRenderer {
+pub struct DirectionalShadowRenderer {
     device: Arc<Device>,
     geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
@@ -51,7 +60,7 @@ pub struct ShadowRenderer {
     walk_indicator: Arc<Texture>,
 }
 
-impl ShadowRenderer {
+impl DirectionalShadowRenderer {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, texture_loader: &mut TextureLoader) -> Self {
         let output_depth_format = <Self as Renderer>::Target::output_texture_format();
 
@@ -90,11 +99,11 @@ impl IntoFormat for ShadowFormat {
     }
 }
 
-impl Renderer for ShadowRenderer {
-    type Target = SingleRenderTarget<ShadowFormat, ShadowSubRenderer, f32>;
+impl Renderer for DirectionalShadowRenderer {
+    type Target = SingleRenderTarget<ShadowFormat, DirectionalShadowSubRenderer, f32>;
 }
 
-impl GeometryRendererTrait for ShadowRenderer {
+impl GeometryRendererTrait for DirectionalShadowRenderer {
     fn render_geometry(
         &self,
         render_target: &mut <Self as Renderer>::Target,
@@ -112,15 +121,15 @@ impl GeometryRendererTrait for ShadowRenderer {
     }
 }
 
-impl EntityRendererTrait for ShadowRenderer {
+impl EntityRendererTrait for DirectionalShadowRenderer {
     fn render_entity(
         &self,
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         texture: &Texture,
-        position: Vector3<f32>,
-        origin: Vector3<f32>,
+        position: Point3<f32>,
+        origin: Point3<f32>,
         scale: Vector2<f32>,
         cell_count: Vector2<usize>,
         cell_position: Vector2<usize>,
@@ -144,17 +153,17 @@ impl EntityRendererTrait for ShadowRenderer {
     }
 }
 
-impl IndicatorRendererTrait for ShadowRenderer {
+impl IndicatorRendererTrait for DirectionalShadowRenderer {
     fn render_walk_indicator(
         &self,
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         _color: Color,
-        upper_left: Vector3<f32>,
-        upper_right: Vector3<f32>,
-        lower_left: Vector3<f32>,
-        lower_right: Vector3<f32>,
+        upper_left: Point3<f32>,
+        upper_right: Point3<f32>,
+        lower_left: Point3<f32>,
+        lower_right: Point3<f32>,
     ) where
         Self: Renderer,
     {

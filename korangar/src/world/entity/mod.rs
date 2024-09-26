@@ -361,7 +361,10 @@ impl Common {
                 let last_step = active_movement.steps[last_step_index];
                 let next_step = active_movement.steps[last_step_index + 1];
 
-                let array = (last_step.0 - next_step.0).map(|c| c as isize);
+                let last_step_position = last_step.0.map(|value| value as isize);
+                let next_step_position = next_step.0.map(|value| value as isize);
+
+                let array = last_step_position - next_step_position;
                 let array: &[isize; 2] = array.as_ref();
                 self.head_direction = match array {
                     [0, 1] => 0,

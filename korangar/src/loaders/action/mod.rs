@@ -50,7 +50,7 @@ impl AnimationState {
     }
 
     pub fn update(&mut self, client_tick: ClientTick) {
-        let mut time = client_tick.0 - self.start_time.0;
+        let mut time = client_tick.0.saturating_sub(self.start_time.0);
 
         // TODO: make everything have a duration so that we can update the start_time
         // from time to time so that animations won't start to drop frames as

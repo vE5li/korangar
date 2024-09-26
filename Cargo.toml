@@ -45,3 +45,39 @@ wgpu = "22.1"
 winit = "0.30"
 xml-rs = "0.8"
 yazi = "0.2"
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.korangar]
+opt-level = 0
+
+[profile.dev.package.korangar_audio]
+opt-level = 3
+
+[profile.dev.package.korangar_debug]
+opt-level = 3
+
+[profile.dev.package.korangar_interface]
+opt-level = 3
+
+[profile.dev.package.korangar_networking]
+opt-level = 3
+
+[profile.dev.package.korangar_util]
+opt-level = 3
+
+[profile.dev.package.ragnarok_bytes]
+opt-level = 3
+
+[profile.dev.package.ragnarok_formats]
+opt-level = 3
+
+[profile.dev.package.ragnarok_packets]
+opt-level = 3
+
+[profile.dev.package.ragnarok_procedural]
+opt-level = 3

@@ -84,7 +84,7 @@ korangar_debug::create_profiler_threads!(threads, {
 
 fn main() {
     const DEFAULT_MAP: &str = "geffen";
-    const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("background_music\\01.mp3");
+    const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
     const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
 
     // We start a frame so that functions trying to start a measurement don't panic.

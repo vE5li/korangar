@@ -1878,7 +1878,7 @@ fn main() {
 
                         #[cfg(feature = "debug")]
                         if let Some(marker_identifier) = hovered_marker_identifier {
-                            map.render_marker_box(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera, marker_identifier);
+                            map.render_marker_overlay(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera, marker_identifier, &point_light_set);
                         }
 
                         particle_holder.render(deferred_target, &mut screen_render_pass, &deferred_renderer, current_camera, window_size, application.get_scaling_factor(), entities);

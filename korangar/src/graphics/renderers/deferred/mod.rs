@@ -3,6 +3,8 @@ mod ambient;
 mod r#box;
 #[cfg(feature = "debug")]
 mod buffer;
+#[cfg(feature = "debug")]
+mod circle;
 mod directional;
 mod effect;
 mod entity;
@@ -21,6 +23,8 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Point3, Vector2, Vector3};
+#[cfg(feature = "debug")]
+use circle::CircleRenderer;
 use korangar_interface::application::FontSizeTrait;
 #[cfg(feature = "debug")]
 use korangar_util::collision::AABB;
@@ -70,6 +74,8 @@ pub enum DeferredSubRenderer {
     #[cfg(feature = "debug")]
     BoundingBox,
     #[cfg(feature = "debug")]
+    Circle,
+    #[cfg(feature = "debug")]
     Buffers,
     Overlay,
     Rectangle,
@@ -96,6 +102,8 @@ pub struct DeferredRenderer {
     buffer_renderer: BufferRenderer,
     #[cfg(feature = "debug")]
     box_renderer: BoxRenderer,
+    #[cfg(feature = "debug")]
+    circle_renderer: CircleRenderer,
     #[cfg(feature = "debug")]
     tile_textures: TextureGroup,
     font_map: Arc<Texture>,
@@ -168,6 +176,8 @@ impl DeferredRenderer {
         let buffer_renderer = BufferRenderer::new(device.clone(), surface_format);
         #[cfg(feature = "debug")]
         let box_renderer = BoxRenderer::new(device.clone(), queue.clone(), surface_format);
+        #[cfg(feature = "debug")]
+        let circle_renderer = CircleRenderer::new(device.clone(), surface_format);
 
         let font_map = texture_loader.get("font.png").unwrap();
         let walk_indicator = texture_loader.get("grid.tga").unwrap();
@@ -205,6 +215,8 @@ impl DeferredRenderer {
             buffer_renderer,
             #[cfg(feature = "debug")]
             box_renderer,
+            #[cfg(feature = "debug")]
+            circle_renderer,
             #[cfg(feature = "debug")]
             tile_textures,
             font_map,
@@ -491,6 +503,20 @@ impl DeferredRenderer {
     ) {
         self.box_renderer
             .render(render_target, render_pass, camera, transform, bounding_box, color);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_circle(
+        &self,
+        render_target: &mut <Self as Renderer>::Target,
+        render_pass: &mut RenderPass,
+        camera: &dyn Camera,
+        position: Point3<f32>,
+        color: Color,
+        range: f32,
+    ) {
+        self.circle_renderer
+            .render(render_target, render_pass, camera, position, color, range);
     }
 
     #[cfg(feature = "debug")]

@@ -52,6 +52,15 @@ impl Color {
         Color::rgb_u8(channel(0..2), channel(2..4), channel(4..6))
     }
 
+    pub fn monochrome(brightness: f32) -> Self {
+        Self {
+            red: brightness,
+            green: brightness,
+            blue: brightness,
+            alpha: 1.0,
+        }
+    }
+
     pub fn monochrome_u8(brightness: u8) -> Self {
         let brightness = (brightness as f32) / 255.0;
         Self {

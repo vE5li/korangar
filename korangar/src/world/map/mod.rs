@@ -436,7 +436,7 @@ impl Map {
                     light_source.position,
                     color,
                     light_source.range,
-                )
+                );
             }
         });
     }
@@ -606,13 +606,14 @@ impl Map {
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
-    pub fn render_marker_box(
+    pub fn render_marker_overlay(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
+        point_light_set: &PointLightSet,
     ) {
         match marker_identifier {
             MarkerIdentifier::Object(key) => {
@@ -621,12 +622,49 @@ impl Map {
                     .unwrap()
                     .render_bounding_box(render_target, render_pass, renderer, camera)
             }
-            MarkerIdentifier::LightSource(_index) => {}
-            MarkerIdentifier::SoundSource(_index) => {}
+            MarkerIdentifier::LightSource(index) => {
+                let light_source = &self.light_sources[index];
+                let color = light_source.color.clone().into();
+                let extent = point_light_extent(color, light_source.range);
+
+                renderer.render_circle(
+                    render_target,
+                    render_pass,
+                    camera,
+                    light_source.position,
+                    Color::monochrome(0.0),
+                    extent,
+                );
+            }
+            MarkerIdentifier::SoundSource(index) => {
+                let sound_source = &self.sound_sources[index];
+                let extent = sound_source.range;
+
+                renderer.render_circle(
+                    render_target,
+                    render_pass,
+                    camera,
+                    sound_source.position,
+                    Color::monochrome(0.0),
+                    extent,
+                );
+            }
             MarkerIdentifier::EffectSource(_index) => {}
             MarkerIdentifier::Particle(_index, _particle_index) => {}
             MarkerIdentifier::Entity(_index) => {}
-            MarkerIdentifier::Shadow(_index) => {}
+            MarkerIdentifier::Shadow(index) => {
+                let point_light = point_light_set.with_shadow_iterator().nth(index).unwrap();
+                let extent = point_light_extent(point_light.color, point_light.range);
+
+                renderer.render_circle(
+                    render_target,
+                    render_pass,
+                    camera,
+                    point_light.position,
+                    Color::monochrome(0.0),
+                    extent,
+                );
+            }
         }
     }
 }

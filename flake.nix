@@ -32,6 +32,7 @@
                 darwin.apple_sdk.frameworks.CoreGraphics
                 darwin.moltenvk
               ] ++ lib.optional stdenv.isLinux [
+                alsa-lib.dev
                 libxkbcommon
                 vulkan-validation-layers
               ];

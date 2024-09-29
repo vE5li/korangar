@@ -2,6 +2,7 @@ mod entity;
 mod geometry;
 #[cfg(feature = "debug")]
 mod marker;
+mod selector;
 mod target;
 mod tile;
 
@@ -9,17 +10,19 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2, Vector3};
 use ragnarok_packets::EntityId;
-use wgpu::{Device, Queue, RenderPass};
+use wgpu::{ComputePass, Device, Queue, RenderPass};
 
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
 #[cfg(feature = "debug")]
 use self::marker::MarkerRenderer;
+use self::selector::Selector;
 pub use self::target::PickerTarget;
 use self::tile::TileRenderer;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;
 use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
@@ -30,6 +33,7 @@ pub enum PickerSubRenderer {
     Tile,
     #[cfg(feature = "debug")]
     Marker,
+    Selector,
 }
 
 pub struct PickerRenderer {
@@ -39,6 +43,7 @@ pub struct PickerRenderer {
     tile_renderer: TileRenderer,
     #[cfg(feature = "debug")]
     marker_renderer: MarkerRenderer,
+    selector: Selector,
     dimensions: [u32; 2],
 }
 
@@ -52,6 +57,7 @@ impl PickerRenderer {
         let tile_renderer = TileRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
         #[cfg(feature = "debug")]
         let marker_renderer = MarkerRenderer::new(device.clone(), output_color_format, output_depth_format);
+        let selector = Selector::new(device.clone());
 
         Self {
             device,
@@ -60,6 +66,7 @@ impl PickerRenderer {
             tile_renderer,
             #[cfg(feature = "debug")]
             marker_renderer,
+            selector,
             dimensions,
         }
     }
@@ -82,6 +89,20 @@ impl PickerRenderer {
         vertex_buffer: &Buffer<TileVertex>,
     ) {
         self.tile_renderer.render(render_target, render_pass, camera, vertex_buffer);
+    }
+
+    pub fn dispatch_selector(
+        &self,
+        render_target: &mut <PickerRenderer as Renderer>::Target,
+        compute_pass: &mut ComputePass,
+        window_size: ScreenSize,
+        pointer_position: ScreenPosition,
+    ) {
+        let clamped_pointer_position = Vector2::new(
+            pointer_position.left.clamp(0.0, window_size.width) as u32,
+            pointer_position.top.clamp(0.0, window_size.height) as u32,
+        );
+        self.selector.dispatch(render_target, compute_pass, clamped_pointer_position);
     }
 }
 

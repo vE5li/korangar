@@ -16,9 +16,7 @@
         devShell = pkgs.mkShell
           {
             nativeBuildInputs = with pkgs; [
-              (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-                extensions = [ "rust-src" "rust-analyzer" "miri" ];
-              }))
+              (rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
               pkg-config
             ];
             buildInputs = with pkgs;
@@ -27,6 +25,8 @@
                 shaderc
                 vulkan-headers
                 vulkan-loader
+                openssl
+                libpcap
               ] ++ lib.optional stdenv.isDarwin [
                 darwin.apple_sdk.frameworks.AppKit
                 darwin.apple_sdk.frameworks.CoreGraphics

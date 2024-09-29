@@ -1802,6 +1802,21 @@ pub struct ObjectiveDetails1 {
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x008A)]
+pub struct NotificationPacket {
+    pub entity_id: EntityId,
+    pub target_id: u32,
+    pub server_tick: u32,
+    pub src_speed: u32,
+    pub dmg_speed: u32,
+    pub damage: i16,
+    pub div: u16,
+    pub p_type: u8,
+    pub damage2: i16,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x09F9)]
 pub struct QuestNotificationPacket1 {
     pub quest_id: u32,

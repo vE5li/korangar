@@ -482,7 +482,7 @@ fn main() {
 
                 let network_events = networking_system.get_events();
 
-                let (user_events, hovered_element, focused_element, mouse_target) = input_system.user_events(
+                let (user_events, hovered_element, focused_element, mouse_target, mouse_position) = input_system.user_events(
                     &mut interface,
                     &application,
                     &mut focus_state,
@@ -1510,11 +1510,17 @@ fn main() {
                 #[cfg(feature = "debug")]
                 let command_buffer_measurement = Profiler::start_measurement("allocate command buffer");
 
-                let mut picker_command_encoder = device.create_command_encoder(
+                let mut picker_render_command_encoder = device.create_command_encoder(
                     &CommandEncoderDescriptor{
-                        label: Some("Picker")
+                        label: Some("Picker render")
                     });
-                let mut picker_render_pass = picker_target.start(&mut picker_command_encoder);
+                let mut picker_render_pass = picker_target.start_render_pass(&mut picker_render_command_encoder);
+
+                let mut picker_compute_command_encoder = device.create_command_encoder(
+                    &CommandEncoderDescriptor{
+                        label: Some("Picker compute")
+                    });
+                let mut picker_compute_pass = picker_target.start_compute_pass(&mut picker_compute_command_encoder);
 
                 let mut interface_command_encoder = device.create_command_encoder(
                     &CommandEncoderDescriptor{
@@ -1567,6 +1573,8 @@ fn main() {
                             entities,
                             hovered_marker_identifier,
                         );
+
+                        picker_renderer.dispatch_selector(picker_target, &mut picker_compute_pass, window_size, mouse_position);
                     });
 
                     scope.spawn(|_| {
@@ -1780,7 +1788,7 @@ fn main() {
                                 deferred_target,
                                 &mut screen_render_pass,
                                 name,
-                                input_system.get_mouse_position() + offset + ScreenPosition::uniform(1.0),
+                                mouse_position + offset + ScreenPosition::uniform(1.0),
                                 Color::monochrome_u8(0),
                                 FontSize::new(12.0),
                             );
@@ -1789,7 +1797,7 @@ fn main() {
                                 deferred_target,
                                 &mut screen_render_pass,
                                 name,
-                                input_system.get_mouse_position() + offset,
+                                mouse_position + offset,
                                 Color::monochrome_u8(255),
                                 FontSize::new(12.0),
                             );
@@ -1832,7 +1840,7 @@ fn main() {
                         deferred_target,
                         &mut screen_render_pass,
                         &deferred_renderer,
-                        input_system.get_mouse_position(),
+                        mouse_position,
                         input_system.get_mouse_mode().grabbed(),
                         application.get_game_theme().cursor.color.get(),
                         &application,
@@ -1843,11 +1851,12 @@ fn main() {
                 let finalize_frame_measurement = Profiler::start_measurement("finishing command encoders");
 
                 drop(picker_render_pass);
+                drop(picker_compute_pass);
                 drop(interface_render_pass);
                 drop(shadow_render_pass);
                 drop(geometry_render_pass);
                 drop(screen_render_pass);
-                let picker_command_buffer = picker_target.finish(picker_command_encoder);
+                let (picker_render_command_buffer, picker_compute_command_buffer) = picker_target.finish(picker_render_command_encoder, picker_compute_command_encoder);
                 let interface_command_buffer = interface_target.finish(interface_command_encoder);
                 let shadow_command_buffer = shadow_target.finish(shadow_command_encoder);
                 let (deferred_command_buffer, screen_command_buffer) = deferred_target.finish(geometry_command_encoder, screen_command_encoder);
@@ -1860,7 +1869,7 @@ fn main() {
 
                 // We need to wait for the last submission to finish to be able to resolve all outstanding mapping callback.
                 device.poll(Maintain::Wait);
-                queue.submit([picker_command_buffer, interface_command_buffer, shadow_command_buffer, deferred_command_buffer, screen_command_buffer]);
+                queue.submit([picker_render_command_buffer, picker_compute_command_buffer, interface_command_buffer, shadow_command_buffer, deferred_command_buffer, screen_command_buffer]);
 
                 #[cfg(feature = "debug")]
                 queue_measurement.stop();

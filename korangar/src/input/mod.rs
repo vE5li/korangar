@@ -152,6 +152,7 @@ impl InputSystem {
         Option<ElementCell<InterfaceSettings>>,
         Option<ElementCell<InterfaceSettings>>,
         Option<PickerTarget>,
+        ScreenPosition,
     ) {
         let mut events = Vec::new();
         let mut mouse_target = None;
@@ -573,11 +574,7 @@ impl InputSystem {
         // value is always the value of the last rendered frame. We do it this
         // way, to never stall the GPU by returning the control of the buffer to
         // the GPU as soon as possible.
-        picker_target.queue_read_picker_value(
-            self.new_mouse_position.left,
-            self.new_mouse_position.top,
-            self.picker_value.clone(),
-        );
+        picker_target.queue_read_picker_value(self.picker_value.clone());
 
         if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
             let last_pixel_value = self.picker_value.load(Ordering::Acquire);
@@ -644,11 +641,7 @@ impl InputSystem {
 
         let focused_element = focus_state.update(&hovered_element, window_index);
 
-        (events, hovered_element, focused_element, mouse_target)
-    }
-
-    pub fn get_mouse_position(&self) -> ScreenPosition {
-        self.new_mouse_position
+        (events, hovered_element, focused_element, mouse_target, self.new_mouse_position)
     }
 
     pub fn get_mouse_mode(&self) -> &MouseInputMode {

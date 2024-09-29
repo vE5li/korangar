@@ -17,12 +17,10 @@ use std::sync::Arc;
 use cgmath::{Matrix4, Vector2, Vector3};
 use option_ext::OptionExt;
 use ragnarok_packets::EntityId;
-use wgpu::util::align_to;
 use wgpu::{
-    BlendComponent, BlendFactor, BlendOperation, BlendState, BufferUsages, CommandBuffer, CommandEncoder, Device, Extent3d,
-    ImageCopyBuffer, ImageCopyTexture, ImageDataLayout, LoadOp, Operations, Origin3d, RenderPass, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureUsages, TextureView,
+    BlendComponent, BlendFactor, BlendOperation, BlendState, BufferUsages, CommandBuffer, CommandEncoder, ComputePass,
+    ComputePassDescriptor, Device, Extent3d, LoadOp, Operations, RenderPass, RenderPassColorAttachment, RenderPassDepthStencilAttachment,
+    RenderPassDescriptor, StoreOp, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages, TextureView,
 };
 
 use self::attachment::{AttachmentImageType, AttachmentTextureFactory};
@@ -331,28 +329,20 @@ pub struct PickerRenderTarget {
     depth_texture: Texture,
     buffer: Buffer<u32>,
     bound_sub_renderer: Option<PickerSubRenderer>,
-    dimensions: [u32; 2],
-    aligned_dimensions: [u32; 2],
 }
 
 impl PickerRenderTarget {
     pub fn new(device: &Device, dimensions: [u32; 2]) -> Self {
-        // We need to align the width of the textures to a multiple of 256 bytes, so
-        // that we can copy it into a buffer. I think this was mainly a DX12 limitation.
-        let width = align_to(dimensions[0], 256 / Self::output_color_size());
-        let height = dimensions[1];
-        let aligned_dimensions = [width, height];
-
-        let texture_factory = AttachmentTextureFactory::new("picker render", device, aligned_dimensions, 1);
+        let texture_factory = AttachmentTextureFactory::new("picker render", device, dimensions, 1);
 
         let texture = texture_factory.new_texture("color", Self::output_color_format(), AttachmentImageType::CopyColor);
         let depth_texture = texture_factory.new_texture("depth", Self::depth_texture_format(), AttachmentImageType::Depth);
 
         let buffer = Buffer::with_capacity(
             device,
-            "picker render",
-            BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-            u64::from(aligned_dimensions[0]) * u64::from(aligned_dimensions[1]) * u64::from(Self::output_color_size()),
+            "picker value",
+            BufferUsages::STORAGE | BufferUsages::MAP_READ,
+            Self::picker_value_size() as _,
         );
 
         let bound_sub_renderer = None;
@@ -362,22 +352,17 @@ impl PickerRenderTarget {
             depth_texture,
             buffer,
             bound_sub_renderer,
-            dimensions,
-            aligned_dimensions,
         }
     }
 
-    /// Reads the picker value at the given position inside the window. The
-    /// coordinates are mapped to the picker target, which might have a
-    /// different resolution.
+    /// Reads the picker value.
     #[cfg_attr(feature = "debug", korangar_debug::profile("queue read for picker value"))]
-    pub fn queue_read_picker_value(&mut self, window_x: f32, window_y: f32, return_value: Arc<AtomicU32>) {
-        let sample_index = (window_x as usize) + (window_y as usize) * self.aligned_dimensions[0] as usize;
-        self.buffer.queue_read_u32(sample_index, return_value);
+    pub fn queue_read_picker_value(&mut self, return_value: Arc<AtomicU32>) {
+        self.buffer.queue_read_u32(return_value);
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
-    pub fn start<'encoder>(&mut self, encoder: &'encoder mut CommandEncoder) -> RenderPass<'encoder> {
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start render pass"))]
+    pub fn start_render_pass<'encoder>(&mut self, encoder: &'encoder mut CommandEncoder) -> RenderPass<'encoder> {
         let clear_color = wgpu::Color {
             r: 0.0,
             g: 0.0,
@@ -385,7 +370,7 @@ impl PickerRenderTarget {
             a: 0.0,
         };
 
-        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+        let render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("picker render"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: self.texture.get_texture_view(),
@@ -407,8 +392,17 @@ impl PickerRenderTarget {
             occlusion_query_set: None,
         });
 
-        // We remove the padding by setting the viewport.
-        render_pass.set_viewport(0.0, 0.0, self.dimensions[0] as f32, self.dimensions[1] as f32, 0.0, 1.0);
+        self.bound_sub_renderer = None;
+
+        render_pass
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile("start compute pass"))]
+    pub fn start_compute_pass<'encoder>(&mut self, encoder: &'encoder mut CommandEncoder) -> ComputePass<'encoder> {
+        let render_pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+            label: Some("picker compute"),
+            timestamp_writes: None,
+        });
 
         self.bound_sub_renderer = None;
 
@@ -424,34 +418,16 @@ impl PickerRenderTarget {
 
     #[must_use]
     #[cfg_attr(feature = "debug", korangar_debug::profile("finish buffer"))]
-    pub fn finish(&mut self, mut encoder: CommandEncoder) -> CommandBuffer {
-        let size = self.texture.get_extend();
-        encoder.copy_texture_to_buffer(
-            ImageCopyTexture {
-                texture: self.texture.get_texture(),
-                mip_level: 0,
-                origin: Origin3d::ZERO,
-                aspect: TextureAspect::All,
-            },
-            ImageCopyBuffer {
-                buffer: self.buffer.get_buffer(),
-                layout: ImageDataLayout {
-                    offset: 0,
-                    bytes_per_row: Some(size.width * Self::output_color_size()),
-                    rows_per_image: Some(size.height),
-                },
-            },
-            size,
-        );
-
-        encoder.finish()
+    pub fn finish(&mut self, render_encoder: CommandEncoder, compute_encoder: CommandEncoder) -> (CommandBuffer, CommandBuffer) {
+        (render_encoder.finish(), compute_encoder.finish())
     }
 
-    const fn output_color_size() -> u32 {
-        size_of::<u32>() as u32
+    pub fn picker_value_size() -> u32 {
+        Self::output_color_format().target_pixel_byte_cost().unwrap()
     }
 
     pub const fn output_color_format() -> TextureFormat {
+        // TODO: NHA We could use Rg32Uint for 64 bit range.
         TextureFormat::R32Uint
     }
 

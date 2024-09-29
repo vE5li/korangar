@@ -105,11 +105,6 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
         buffer.copy_from_slice(data);
     }
 
-    /// Returns a reference to the backing GPU buffer.
-    pub fn get_buffer(&self) -> &wgpu::Buffer {
-        &self.buffer
-    }
-
     /// Returns a sliced view into the buffer.
     pub fn slice(&self, bounds: impl RangeBounds<usize>) -> BufferSlice<'_> {
         let start = match bounds.start_bound() {
@@ -140,10 +135,8 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
 
 impl Buffer<u32> {
     /// This function is a special case for the picker, where we want to read
-    /// one specific pixel of a special picker buffer (to know where the
-    /// cursor is located). This function makes sure that we never stall the
-    /// GPU because of this.
-    pub fn queue_read_u32(&self, read_index: usize, output: Arc<AtomicU32>) {
+    /// back the picker value.
+    pub fn queue_read_u32(&self, output: Arc<AtomicU32>) {
         const VALUE_SIZE: usize = size_of::<u32>();
 
         let captured_buffer = Arc::clone(&self.buffer);
@@ -151,12 +144,11 @@ impl Buffer<u32> {
             match result {
                 Ok(_) => {
                     let mapped = captured_buffer.slice(..).get_mapped_range_mut();
-                    let offset = read_index * VALUE_SIZE;
 
-                    if (offset + VALUE_SIZE) <= mapped.len() {
+                    if VALUE_SIZE <= mapped.len() {
                         // The mapped memory is not guaranteed to be aligned to u32.
                         let mut buffer = [0u8; VALUE_SIZE];
-                        buffer.copy_from_slice(&mapped[offset..offset + VALUE_SIZE]);
+                        buffer.copy_from_slice(&mapped[..VALUE_SIZE]);
                         let value = u32::from_ne_bytes(buffer);
                         output.store(value, Ordering::Release)
                     }

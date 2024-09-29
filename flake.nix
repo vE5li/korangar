@@ -36,6 +36,7 @@
                 libxkbcommon
                 vulkan-validation-layers
               ];
+
             # For any tools that need to see the rust toolchain src
             RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
             shellHook =
@@ -51,6 +52,16 @@
                     pkgs.darwin.apple_sdk.frameworks.CoreGraphics
                     pkgs.darwin.moltenvk
                   ]}
+              '')
+              + (pkgs.lib.strings.optionalString pkgs.stdenv.isLinux ''
+                export VULKAN_SDK="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d:${pkgs.vulkan-headers}";
+                export LD_LIBRARY_PATH=${
+                  pkgs.lib.strings.makeLibraryPath
+                  [
+                    pkgs.wayland
+                    pkgs.vulkan-loader
+                    pkgs.libxkbcommon
+                  ]};
               '');
           };
         # If we want to `nix build` and provide a derivation, we can use

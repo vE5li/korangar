@@ -21,12 +21,12 @@
             ];
             buildInputs = with pkgs;
               [
+                libpcap
                 nixpkgs-fmt
+                openssl
                 shaderc
                 vulkan-headers
                 vulkan-loader
-                openssl
-                libpcap
               ] ++ lib.optional stdenv.isDarwin [
                 darwin.apple_sdk.frameworks.AppKit
                 darwin.apple_sdk.frameworks.CoreGraphics
@@ -41,7 +41,6 @@
             RUST_SRC_PATH = pkgs.rustPlatform.rustLibSrc;
             shellHook =
               ''
-                alias nixmft=nixpkgs-fmt
               ''
               # For darwin, explicitly set our LD_LIBRARY_PATH, otherwise `cargo run` will not find paths in e.g. `/nix/store`
               + (pkgs.lib.strings.optionalString pkgs.stdenv.isDarwin ''
@@ -51,11 +50,11 @@
                     pkgs.darwin.apple_sdk.frameworks.AppKit
                     pkgs.darwin.apple_sdk.frameworks.CoreGraphics
                     pkgs.darwin.moltenvk
-                  ]}
+                  ]};
               '')
               + (pkgs.lib.strings.optionalString pkgs.stdenv.isLinux ''
-                export VULKAN_SDK="${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d:${pkgs.vulkan-headers}";
-                export LD_LIBRARY_PATH=${
+                export VULKAN_SDK="$VULKAN_SDK:${pkgs.vulkan-validation-layers}/share/vulkan/explicit_layer.d:${pkgs.vulkan-headers}";
+                export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${
                   pkgs.lib.strings.makeLibraryPath
                   [
                     pkgs.wayland

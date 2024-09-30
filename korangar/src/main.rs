@@ -206,11 +206,12 @@ struct Client {
     player_skill_tree: SkillTree,
     hotbar: Hotbar,
 
-    directional_shadow_object_set_buffer: ObjectSetBuffer,
-    point_shadow_object_set_buffer: ObjectSetBuffer,
-    deferred_object_set_buffer: ObjectSetBuffer,
+    point_light_set_buffer: ResourceSetBuffer<LightSourceKey>,
+    directional_shadow_object_set_buffer: ResourceSetBuffer<ObjectKey>,
+    point_shadow_object_set_buffer: ResourceSetBuffer<ObjectKey>,
+    deferred_object_set_buffer: ResourceSetBuffer<ObjectKey>,
     #[cfg(feature = "debug")]
-    bounding_box_object_set_buffer: ObjectSetBuffer,
+    bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
@@ -438,11 +439,12 @@ impl Client {
             let player_skill_tree = SkillTree::default();
             let hotbar = Hotbar::default();
 
-            let directional_shadow_object_set_buffer = ObjectSetBuffer::default();
-            let point_shadow_object_set_buffer = ObjectSetBuffer::default();
-            let deferred_object_set_buffer = ObjectSetBuffer::default();
+            let point_light_set_buffer = ResourceSetBuffer::default();
+            let directional_shadow_object_set_buffer = ResourceSetBuffer::default();
+            let point_shadow_object_set_buffer = ResourceSetBuffer::default();
+            let deferred_object_set_buffer = ResourceSetBuffer::default();
             #[cfg(feature = "debug")]
-            let bounding_box_object_set_buffer = ObjectSetBuffer::default();
+            let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
             let welcome_string = format!(
                 "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
@@ -526,6 +528,7 @@ impl Client {
             player_inventory,
             player_skill_tree,
             hotbar,
+            point_light_set_buffer,
             directional_shadow_object_set_buffer,
             point_shadow_object_set_buffer,
             deferred_object_set_buffer,
@@ -1776,18 +1779,25 @@ impl Client {
         command_buffer_measurement.stop();
 
         #[cfg(feature = "debug")]
-        prepare_frame_measurement.stop();
+        let point_light_manager_measurement = Profiler::start_measurement("point light manager");
 
         let point_light_set = {
             self.point_light_manager.prepare();
 
             self.effect_holder
                 .register_point_lights(&mut self.point_light_manager, current_camera);
-            self.map.register_point_lights(&mut self.point_light_manager, current_camera);
+            self.map
+                .register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
 
             self.point_light_manager
                 .create_point_light_set(crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
         };
+
+        #[cfg(feature = "debug")]
+        point_light_manager_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        prepare_frame_measurement.stop();
 
         in_place_scope(|scope| {
             scope.spawn(|_| {

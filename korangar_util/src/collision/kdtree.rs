@@ -103,13 +103,13 @@ impl<K: SimpleKey + Ord + Hash, O: Insertable> KDTree<K, O> {
     /// Constructs a new KD-tree from a slice of key-object pairs.
     ///
     /// This method is using a O(N log N) construction algorithm.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the input slice is empty.
     pub fn from_objects(insertable_objects: &[(K, O)]) -> KDTree<K, O> {
         if insertable_objects.is_empty() {
-            panic!("objects slice is empty");
+            return KDTree {
+                nodes: Vec::new(),
+                objects: SecondarySimpleSlab::default(),
+                root_boundary: AABB::uninitialized(),
+            };
         }
 
         let mut objects = SecondarySimpleSlab::default();
@@ -381,6 +381,10 @@ impl<K: SimpleKey + Ord + Hash, O: Insertable> KDTree<K, O> {
     /// This method implements an efficient traversal of the tree, pruning
     /// branches that don't intersect with the query's bounding box.
     pub fn query(&self, query: &impl Query<O>, result: &mut Vec<K>) {
+        if self.nodes.is_empty() {
+            return;
+        }
+
         self.query_recursive(0, query, &self.root_boundary, result);
 
         result.sort_unstable();
@@ -390,11 +394,11 @@ impl<K: SimpleKey + Ord + Hash, O: Insertable> KDTree<K, O> {
     }
 
     fn query_recursive(&self, node_index: usize, query: &impl Query<O>, node_boundary: &AABB, result: &mut Vec<K>) {
-        let node = &self.nodes[node_index];
-
         if !query.intersects_aabb(node_boundary) {
             return;
         }
+
+        let node = &self.nodes[node_index];
 
         match node {
             KDTreeNode::Node {

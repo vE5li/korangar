@@ -92,14 +92,7 @@ impl PointLight {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
     ) {
-        renderer.point_light(
-            render_target,
-            render_pass,
-            camera,
-            self.position,
-            self.color.to_owned(),
-            self.range,
-        );
+        renderer.point_light(render_target, render_pass, camera, self.position, self.color, self.range);
     }
 
     fn render_with_shadows(
@@ -116,7 +109,7 @@ impl PointLight {
             camera,
             shadow_map,
             self.position,
-            self.color.to_owned(),
+            self.color,
             self.range,
         );
     }

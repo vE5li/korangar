@@ -9,7 +9,7 @@ use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
-use korangar_util::collision::{KDTree, AABB};
+use korangar_util::collision::{KDTree, Sphere, AABB};
 use korangar_util::container::SimpleSlab;
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
@@ -21,6 +21,7 @@ use self::vertices::{generate_tile_vertices, ground_water_vertices, load_texture
 use super::error::LoadError;
 use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
+use crate::world::{point_light_extent, LightSourceKey};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -102,7 +103,6 @@ impl MapLoader {
         apply_map_offset(&ground_data, &mut map_data.resources);
 
         let mut objects = SimpleSlab::with_capacity(map_data.resources.objects.len() as u32);
-
         let object_bounding_boxes: Vec<(ObjectKey, AABB)> = map_data
             .resources
             .objects
@@ -129,6 +129,21 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
+        let mut light_sources = SimpleSlab::with_capacity(map_data.resources.light_sources.len() as u32);
+        let light_source_spheres: Vec<(LightSourceKey, Sphere)> = map_data
+            .resources
+            .light_sources
+            .drain(..)
+            .map(|light_source| {
+                let clone = light_source.clone();
+                let extent = point_light_extent(light_source.color.into(), light_source.range);
+                let sphere = Sphere::new(light_source.position, extent);
+                let key = light_sources.insert(clone).expect("light sources slab is full");
+                (key, sphere)
+            })
+            .collect();
+        let light_sources_kdtree = KDTree::from_objects(&light_source_spheres);
+
         let textures = TextureGroup::new(&self.device, &map_file_name, textures);
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
@@ -142,12 +157,13 @@ impl MapLoader {
             water_vertex_buffer,
             textures,
             objects,
-            map_data.resources.light_sources,
+            light_sources,
             map_data.resources.sound_sources,
             map_data.resources.effect_sources,
             tile_picker_vertex_buffer.unwrap(),
             tile_vertex_buffer.unwrap(),
             object_kdtree,
+            light_sources_kdtree,
             background_music_track_name,
             #[cfg(feature = "debug")]
             map_data_clone,

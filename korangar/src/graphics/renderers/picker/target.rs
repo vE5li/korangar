@@ -56,7 +56,7 @@ impl From<u32> for PickerTarget {
 
         #[cfg(feature = "debug")]
         if data >> 24 == MarkerEncoding::LightSource as u32 {
-            return Self::Marker(MarkerIdentifier::LightSource(data as usize & 0xFFF));
+            return Self::Marker(MarkerIdentifier::LightSource(data & 0xFFF));
         }
 
         #[cfg(feature = "debug")]

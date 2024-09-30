@@ -7,9 +7,7 @@ use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_interface::windows::PrototypeWindow;
 use korangar_util::collision::{Frustum, KDTree, Sphere, AABB};
-#[cfg(feature = "debug")]
-use korangar_util::container::SimpleKey;
-use korangar_util::container::SimpleSlab;
+use korangar_util::container::{SimpleKey, SimpleSlab};
 use korangar_util::create_simple_key;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
@@ -21,9 +19,9 @@ use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 use wgpu::RenderPass;
 
-use super::{point_light_extent, Entity, Object, ObjectSet, ObjectSetBuffer, PointLightId, PointLightManager};
 #[cfg(feature = "debug")]
-use super::{LightSourceExt, PointLightSet};
+use super::{point_light_extent, LightSourceExt, PointLightSet};
+use super::{Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{MarkerRenderer, RenderSettings};
@@ -34,6 +32,7 @@ use crate::{
 };
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
+create_simple_key!(LightSourceKey, "Key to an light source inside the map");
 
 fn average_tile_height(tile: &Tile) -> f32 {
     (tile.upper_left_height + tile.upper_right_height + tile.lower_left_height + tile.lower_right_height) / 4.0
@@ -98,7 +97,7 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MarkerIdentifier {
     Object(u32),
-    LightSource(usize),
+    LightSource(u32),
     SoundSource(usize),
     EffectSource(usize),
     Particle(usize, usize),
@@ -122,12 +121,13 @@ pub struct Map {
     water_vertex_buffer: Option<Buffer<WaterVertex>>,
     ground_textures: TextureGroup,
     objects: SimpleSlab<ObjectKey, Object>,
-    light_sources: Vec<LightSource>,
+    light_sources: SimpleSlab<LightSourceKey, LightSource>,
     sound_sources: Vec<SoundSource>,
     effect_sources: Vec<EffectSource>,
     tile_picker_vertex_buffer: Buffer<TileVertex>,
     tile_vertex_buffer: Buffer<ModelVertex>,
     object_kdtree: KDTree<ObjectKey, AABB>,
+    light_source_kdtree: KDTree<LightSourceKey, Sphere>,
     background_music_track_name: Option<String>,
     #[cfg(feature = "debug")]
     map_data: MapData,
@@ -207,9 +207,9 @@ impl Map {
     pub fn cull_objects_with_frustum<'a>(
         &'a self,
         camera: &dyn Camera,
-        object_set: &'a mut ObjectSetBuffer,
+        object_set: &'a mut ResourceSetBuffer<ObjectKey>,
         #[cfg(feature = "debug")] enabled: bool,
-    ) -> ObjectSet<'a> {
+    ) -> ResourceSet<'a, ObjectKey> {
         #[cfg(feature = "debug")]
         if !enabled {
             return object_set.create_set(|visible_objects| {
@@ -231,9 +231,9 @@ impl Map {
     pub fn cull_objects_in_sphere<'a>(
         &'a self,
         sphere: Sphere,
-        object_set: &'a mut ObjectSetBuffer,
+        object_set: &'a mut ResourceSetBuffer<ObjectKey>,
         #[cfg(feature = "debug")] enabled: bool,
-    ) -> ObjectSet<'a> {
+    ) -> ResourceSet<'a, ObjectKey> {
         #[cfg(feature = "debug")]
         if !enabled {
             return object_set.create_set(|visible_objects| {
@@ -255,7 +255,7 @@ impl Map {
         camera: &dyn Camera,
         client_tick: ClientTick,
         time: f32,
-        object_set: &ObjectSet,
+        object_set: &ResourceSet<ObjectKey>,
     ) where
         T: Renderer + GeometryRenderer,
     {
@@ -293,7 +293,7 @@ impl Map {
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
         frustum_culling: bool,
-        object_set: &ObjectSet,
+        object_set: &ResourceSet<ObjectKey>,
     ) {
         let intersection_set: HashSet<ObjectKey> = object_set.iterate_visible().copied().collect();
 
@@ -422,23 +422,29 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
+    pub fn register_point_lights(
+        &self,
+        point_light_manager: &mut PointLightManager,
+        light_source_set_buffer: &mut ResourceSetBuffer<LightSourceKey>,
+        camera: &dyn Camera,
+    ) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let frustum = Frustum::new(projection_matrix * view_matrix);
 
-        self.light_sources.iter().enumerate().for_each(|(index, light_source)| {
-            let color = light_source.color.clone().into();
-            let extent = point_light_extent(color, light_source.range);
-
-            if frustum.intersects_sphere(&Sphere::new(light_source.position, extent)) {
-                point_light_manager.register(
-                    PointLightId::new(index as u32),
-                    light_source.position,
-                    color,
-                    light_source.range,
-                );
-            }
+        let set = light_source_set_buffer.create_set(|buffer| {
+            self.light_source_kdtree.query(&frustum, buffer);
         });
+
+        for light_source_key in set.iterate_visible().copied() {
+            let light_source = self.light_sources.get(light_source_key).unwrap();
+
+            point_light_manager.register(
+                PointLightId::new(light_source_key.key()),
+                light_source.position,
+                light_source.color.clone().into(),
+                light_source.range,
+            );
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -483,7 +489,7 @@ impl Map {
     ) -> &dyn PrototypeWindow<InterfaceSettings> {
         match marker_identifier {
             MarkerIdentifier::Object(key) => self.objects.get(ObjectKey::new(key)).unwrap(),
-            MarkerIdentifier::LightSource(index) => &self.light_sources[index],
+            MarkerIdentifier::LightSource(key) => self.light_sources.get(LightSourceKey::new(key)).unwrap(),
             MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
             MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
             MarkerIdentifier::Particle(..) => todo!(),
@@ -526,8 +532,8 @@ impl Map {
         }
 
         if render_settings.show_light_markers {
-            self.light_sources.iter().enumerate().for_each(|(index, light_source)| {
-                let marker_identifier = MarkerIdentifier::LightSource(index);
+            self.light_sources.iter().for_each(|(key, light_source)| {
+                let marker_identifier = MarkerIdentifier::LightSource(key.key());
 
                 light_source.render_marker(
                     render_target,
@@ -622,8 +628,8 @@ impl Map {
                     .unwrap()
                     .render_bounding_box(render_target, render_pass, renderer, camera)
             }
-            MarkerIdentifier::LightSource(index) => {
-                let light_source = &self.light_sources[index];
+            MarkerIdentifier::LightSource(key) => {
+                let light_source = self.light_sources.get(LightSourceKey::new(key)).unwrap();
                 let color = light_source.color.clone().into();
                 let extent = point_light_extent(color, light_source.range);
 

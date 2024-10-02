@@ -44,11 +44,11 @@ pub struct PickerRenderer {
     #[cfg(feature = "debug")]
     marker_renderer: MarkerRenderer,
     selector: Selector,
-    dimensions: [u32; 2],
+    dimensions: ScreenSize,
 }
 
 impl PickerRenderer {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, dimensions: [u32; 2]) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, dimensions: ScreenSize) -> Self {
         let output_color_format = <Self as Renderer>::Target::output_color_format();
         let output_depth_format = <Self as Renderer>::Target::depth_texture_format();
 
@@ -72,7 +72,7 @@ impl PickerRenderer {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("reconfigure picker pipeline"))]
-    pub fn reconfigure_pipeline(&mut self, dimensions: [u32; 2]) {
+    pub fn reconfigure_pipeline(&mut self, dimensions: ScreenSize) {
         self.dimensions = dimensions;
     }
 

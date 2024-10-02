@@ -15,6 +15,7 @@ use self::indicator::IndicatorRenderer;
 use crate::graphics::{
     EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, IndicatorRenderer as IndicatorRendererTrait, *,
 };
+use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -83,7 +84,7 @@ impl DirectionalShadowRenderer {
         <Self as Renderer>::Target::new(
             &self.device,
             "shadow",
-            [size; 2],
+            ScreenSize::uniform(size as f32),
             1,
             TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
             1.0,

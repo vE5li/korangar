@@ -1,6 +1,8 @@
+use cgmath::Vector2;
 use derive_new::new;
 use korangar_interface::elements::ElementDisplay;
 use serde::{Deserialize, Serialize};
+use winit::dpi::PhysicalSize;
 
 pub trait ArrayType {
     type Element;
@@ -152,6 +154,24 @@ impl std::ops::AddAssign<ScreenSize> for ScreenPosition {
 pub struct ScreenSize {
     pub width: f32,
     pub height: f32,
+}
+
+impl From<PhysicalSize<u32>> for ScreenSize {
+    fn from(value: PhysicalSize<u32>) -> Self {
+        Self {
+            width: value.width as f32,
+            height: value.height as f32,
+        }
+    }
+}
+
+impl From<Vector2<usize>> for ScreenSize {
+    fn from(value: Vector2<usize>) -> Self {
+        Self {
+            width: value.x as f32,
+            height: value.y as f32,
+        }
+    }
 }
 
 impl ScreenSize {

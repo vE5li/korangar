@@ -109,7 +109,7 @@ pub struct DeferredRenderer {
     font_map: Arc<Texture>,
     walk_indicator: Arc<Texture>,
     surface_format: TextureFormat,
-    dimensions: [u32; 2],
+    dimensions: ScreenSize,
 }
 
 impl DeferredRenderer {
@@ -118,7 +118,7 @@ impl DeferredRenderer {
         queue: Arc<Queue>,
         texture_loader: &mut TextureLoader,
         surface_format: TextureFormat,
-        dimensions: [u32; 2],
+        dimensions: ScreenSize,
     ) -> Self {
         let output_diffuse_format = <Self as Renderer>::Target::output_diffuse_format();
         let output_normal_format = <Self as Renderer>::Target::output_normal_format();
@@ -227,7 +227,12 @@ impl DeferredRenderer {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("reconfigure deferred pipeline"))]
-    pub fn reconfigure_pipeline(&mut self, surface_format: TextureFormat, dimensions: [u32; 2], #[cfg(feature = "debug")] wireframe: bool) {
+    pub fn reconfigure_pipeline(
+        &mut self,
+        surface_format: TextureFormat,
+        dimensions: ScreenSize,
+        #[cfg(feature = "debug")] wireframe: bool,
+    ) {
         self.geometry_renderer.recreate_pipeline(
             #[cfg(feature = "debug")]
             wireframe,
@@ -345,10 +350,7 @@ impl DeferredRenderer {
     }
 
     fn get_window_size(&self) -> ScreenSize {
-        ScreenSize {
-            width: self.dimensions[0] as f32,
-            height: self.dimensions[1] as f32,
-        }
+        self.dimensions
     }
 
     pub fn render_rectangle(

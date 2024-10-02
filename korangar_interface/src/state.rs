@@ -101,20 +101,20 @@ impl<Value> PlainTrackedState<Value> {
         self.0.borrow().version
     }
 
-    pub fn mapped<As, F>(&self, mapping: F) -> MappedTrackedState<Value, As, F>
+    pub fn mapped<As, F>(&self, mapping: F) -> MappedTrackedState<Value, As>
     where
-        F: Fn(&Value) -> &As,
+        F: Fn(&Value) -> &As + 'static,
     {
         MappedTrackedState {
             state: self.clone(),
-            mapping,
+            mapping: Rc::new(mapping),
             marker: PhantomData,
         }
     }
 
-    pub fn mapped_remote<As, F>(&self, mapping: F) -> MappedRemote<Value, As, F>
+    pub fn mapped_remote<As, F>(&self, mapping: F) -> MappedRemote<Value, As>
     where
-        F: Fn(&Value) -> &As,
+        F: Fn(&Value) -> &As + 'static,
     {
         let tracked_state = self.mapped(mapping);
 
@@ -174,30 +174,23 @@ where
     }
 }
 
-pub struct MappedTrackedState<Value, As, F>
+pub struct MappedTrackedState<Value, As>
 where
     Value: 'static,
     As: 'static,
-    F: Fn(&Value) -> &As + 'static,
 {
     state: PlainTrackedState<Value>,
-    mapping: F,
+    mapping: Rc<dyn Fn(&Value) -> &As + 'static>,
     marker: PhantomData<As>,
 }
 
-impl<Value, As, F> MappedTrackedState<Value, As, F>
-where
-    F: Fn(&Value) -> &As,
-{
+impl<Value, As> MappedTrackedState<Value, As> {
     fn get_version(&self) -> Version {
         self.state.get_version()
     }
 }
 
-impl<Value, As, F> Clone for MappedTrackedState<Value, As, F>
-where
-    F: Clone + Fn(&Value) -> &As,
-{
+impl<Value, As> Clone for MappedTrackedState<Value, As> {
     fn clone(&self) -> Self {
         Self {
             state: self.state.clone(),
@@ -207,13 +200,12 @@ where
     }
 }
 
-impl<Value, As, F> TrackedState<As> for MappedTrackedState<Value, As, F>
+impl<Value, As> TrackedState<As> for MappedTrackedState<Value, As>
 where
     Value: 'static,
     As: 'static,
-    F: Clone + Fn(&Value) -> &As + 'static,
 {
-    type RemoteType = MappedRemote<Value, As, F>;
+    type RemoteType = MappedRemote<Value, As>;
 
     fn set(&mut self, value: As) {
         let mut inner = self.state.0.borrow_mut();
@@ -229,7 +221,7 @@ where
     }
 
     fn get(&self) -> Ref<'_, As> {
-        Ref::map(self.state.get(), &self.mapping)
+        Ref::map(self.state.get(), self.mapping.as_ref())
     }
 
     fn with_mut<Closure, Return>(&mut self, closure: Closure) -> Return
@@ -468,23 +460,21 @@ impl<Value> Clone for PlainRemote<Value> {
     }
 }
 
-pub struct MappedRemote<Value, As, F>
+pub struct MappedRemote<Value, As>
 where
     Value: 'static,
     As: 'static,
-    F: Fn(&Value) -> &As + 'static,
 {
-    tracked_state: MappedTrackedState<Value, As, F>,
+    tracked_state: MappedTrackedState<Value, As>,
     version: Version,
 }
 
-impl<Value, As, F> Remote<As> for MappedRemote<Value, As, F>
+impl<Value, As> Remote<As> for MappedRemote<Value, As>
 where
     Value: 'static,
     As: 'static,
-    F: Clone + Fn(&Value) -> &As + 'static,
 {
-    type State = MappedTrackedState<Value, As, F>;
+    type State = MappedTrackedState<Value, As>;
 
     fn clone_state(&self) -> Self::State {
         self.tracked_state.clone()
@@ -503,10 +493,7 @@ where
     }
 }
 
-impl<Value, As, F> Clone for MappedRemote<Value, As, F>
-where
-    F: Clone + Fn(&Value) -> &As,
-{
+impl<Value, As> Clone for MappedRemote<Value, As> {
     fn clone(&self) -> Self {
         let tracked_state = self.tracked_state.clone();
         let version = self.version;

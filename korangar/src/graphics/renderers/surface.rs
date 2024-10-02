@@ -36,9 +36,9 @@ impl PresentModeInfo {
     }
 }
 
-pub struct Surface<'window> {
+pub struct Surface {
     device: Arc<Device>,
-    surface: wgpu::Surface<'window>,
+    surface: wgpu::Surface<'static>,
     config: SurfaceConfiguration,
     present_mode_info: PresentModeInfo,
     frame_number: usize,
@@ -48,15 +48,15 @@ pub struct Surface<'window> {
     invalid: bool,
 }
 
-impl<'window> Surface<'window> {
-    pub fn new(adapter: Adapter, device: Arc<Device>, surface: wgpu::Surface<'window>, window_width: u32, window_height: u32) -> Self {
+impl Surface {
+    pub fn new(adapter: &Adapter, device: Arc<Device>, surface: wgpu::Surface<'static>, window_width: u32, window_height: u32) -> Self {
         let window_width = window_width.max(1);
         let window_height = window_height.max(1);
 
-        let mut config = surface.get_default_config(&adapter, window_width, window_height).unwrap();
+        let mut config = surface.get_default_config(adapter, window_width, window_height).unwrap();
         let recreate = false;
 
-        let surfaces_formats: Vec<TextureFormat> = surface.get_capabilities(&adapter).formats;
+        let surfaces_formats: Vec<TextureFormat> = surface.get_capabilities(adapter).formats;
 
         #[cfg(feature = "debug")]
         {
@@ -69,11 +69,13 @@ impl<'window> Surface<'window> {
         let srgb_formats: Vec<TextureFormat> = surfaces_formats.iter().copied().filter(|format| format.is_srgb()).collect();
         let srgb_format = *srgb_formats.first().expect("Surface does not support sRGB");
 
+        // TODO: NHA make the frame latency configurable.
+        config.desired_maximum_frame_latency = 2;
         config.format = srgb_format;
         config.view_formats.push(srgb_format);
 
         // Fifo is supported on all platforms.
-        let present_mode_info = PresentModeInfo::from_adapter(&adapter, &surface);
+        let present_mode_info = PresentModeInfo::from_adapter(adapter, &surface);
         config.present_mode = PresentMode::Fifo;
 
         #[cfg(feature = "debug")]
@@ -138,8 +140,8 @@ impl<'window> Surface<'window> {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn reconfigure(&mut self) {
         self.invalid = false;
-        self.config.width = self.window_width.max(1);
-        self.config.height = self.window_height.max(1);
+        self.config.width = self.window_width;
+        self.config.height = self.window_height;
         self.surface.configure(&self.device, &self.config);
     }
 
@@ -156,9 +158,9 @@ impl<'window> Surface<'window> {
         self.invalidate();
     }
 
-    pub fn update_window_size(&mut self, window_size: [u32; 2]) {
-        self.window_width = window_size[0];
-        self.window_height = window_size[1];
+    pub fn update_window_size(&mut self, window_size: ScreenSize) {
+        self.window_width = window_size.width as u32;
+        self.window_height = window_size.height as u32;
         self.invalidate();
     }
 
@@ -167,10 +169,6 @@ impl<'window> Surface<'window> {
             x: self.window_width as usize,
             y: self.window_height as usize,
         }
-    }
-
-    pub fn max_frame_count(&self) -> usize {
-        self.max_frame_count
     }
 
     pub fn frame_number(&self) -> usize {
@@ -183,10 +181,6 @@ impl<'window> Surface<'window> {
 
     pub fn format(&self) -> TextureFormat {
         self.config.format
-    }
-
-    pub fn window_size_u32(&self) -> [u32; 2] {
-        [self.window_width, self.window_height]
     }
 
     pub fn window_screen_size(&self) -> ScreenSize {

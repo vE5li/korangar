@@ -35,7 +35,7 @@ pub struct InterfaceRenderer {
     unchecked_box_texture: Arc<Texture>,
     expanded_arrow_texture: Arc<Texture>,
     collapsed_arrow_texture: Arc<Texture>,
-    dimensions: [u32; 2],
+    dimensions: ScreenSize,
 }
 
 impl InterfaceRenderer {
@@ -43,7 +43,7 @@ impl InterfaceRenderer {
         device: Arc<Device>,
         texture_loader: &mut TextureLoader,
         font_loader: Rc<RefCell<FontLoader>>,
-        dimensions: [u32; 2],
+        dimensions: ScreenSize,
     ) -> Self {
         let output_texture_format = <Self as Renderer>::Target::output_texture_format();
 
@@ -71,7 +71,7 @@ impl InterfaceRenderer {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("reconfigure interface pipeline"))]
-    pub fn reconfigure_pipeline(&mut self, dimensions: [u32; 2]) {
+    pub fn reconfigure_pipeline(&mut self, dimensions: ScreenSize) {
         self.dimensions = dimensions;
     }
 
@@ -93,10 +93,7 @@ impl InterfaceRenderer {
     }
 
     fn get_window_size(&self) -> ScreenSize {
-        ScreenSize {
-            width: self.dimensions[0] as f32,
-            height: self.dimensions[1] as f32,
-        }
+        self.dimensions
     }
 }
 

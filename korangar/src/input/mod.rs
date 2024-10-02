@@ -2,7 +2,7 @@ mod event;
 mod key;
 mod mode;
 
-use std::mem::variant_count;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -14,9 +14,8 @@ use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
 use korangar_interface::Interface;
 use ragnarok_packets::{ClientTick, HotbarSlot};
-use winit::dpi::PhysicalPosition;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta};
-use winit::keyboard::KeyCode;
+use sdl2::keyboard::Keycode;
+use sdl2::mouse::MouseButton;
 
 pub use self::event::UserEvent;
 pub use self::key::Key;
@@ -29,9 +28,6 @@ use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::PartialMove;
 
-const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
-const KEY_COUNT: usize = variant_count::<KeyCode>();
-
 pub struct InputSystem {
     previous_mouse_position: ScreenPosition,
     new_mouse_position: ScreenPosition,
@@ -41,7 +37,7 @@ pub struct InputSystem {
     scroll_delta: f32,
     left_mouse_button: Key,
     right_mouse_button: Key,
-    keys: [Key; KEY_COUNT],
+    keys: HashMap<Keycode, Key>,
     mouse_input_mode: MouseInputMode,
     input_buffer: Vec<char>,
     picker_value: Arc<AtomicU32>,
@@ -59,7 +55,7 @@ impl InputSystem {
 
         let left_mouse_button = Key::default();
         let right_mouse_button = Key::default();
-        let keys = [Key::default(); KEY_COUNT];
+        let keys = HashMap::default();
 
         let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
@@ -84,20 +80,18 @@ impl InputSystem {
     pub fn reset(&mut self) {
         self.left_mouse_button.reset();
         self.right_mouse_button.reset();
-        self.keys.iter_mut().for_each(|key| key.reset());
+        self.keys.clear();
         self.mouse_input_mode = MouseInputMode::None;
     }
 
-    pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
+    pub fn update_mouse_position(&mut self, x: i32, y: i32) {
         self.new_mouse_position = ScreenPosition {
-            left: position.x as f32,
-            top: position.y as f32,
+            left: x as f32,
+            top: y as f32,
         };
     }
 
-    pub fn update_mouse_buttons(&mut self, button: MouseButton, state: ElementState) {
-        let pressed = matches!(state, ElementState::Pressed);
-
+    pub fn update_mouse_buttons(&mut self, button: MouseButton, pressed: bool) {
         match button {
             MouseButton::Left => self.left_mouse_button.set_down(pressed),
             MouseButton::Right => self.right_mouse_button.set_down(pressed),
@@ -105,16 +99,16 @@ impl InputSystem {
         }
     }
 
-    pub fn update_mouse_wheel(&mut self, delta: MouseScrollDelta) {
-        match delta {
-            MouseScrollDelta::LineDelta(_x, y) => self.new_scroll_position += y * MOUSE_SCOLL_MULTIPLIER,
-            MouseScrollDelta::PixelDelta(position) => self.new_scroll_position += position.y as f32,
-        }
+    pub fn update_mouse_wheel(&mut self, delta_y: f32) {
+        self.new_scroll_position += delta_y;
     }
 
-    pub fn update_keyboard(&mut self, key_code: KeyCode, state: ElementState) {
-        let pressed = matches!(state, ElementState::Pressed);
-        self.keys[key_code as usize].set_down(pressed);
+    pub fn update_keyboard(&mut self, key_code: Keycode, pressed: bool) {
+        self.keys.entry(key_code).and_modify(|key| key.set_down(pressed)).or_insert({
+            let mut key = Key::default();
+            key.set_down(pressed);
+            key
+        });
     }
 
     pub fn buffer_character(&mut self, character: char) {
@@ -130,11 +124,11 @@ impl InputSystem {
 
         self.left_mouse_button.update();
         self.right_mouse_button.update();
-        self.keys.iter_mut().for_each(|key| key.update());
+        self.keys.iter_mut().for_each(|(_, key)| key.update());
     }
 
-    fn get_key(&self, key_code: KeyCode) -> &Key {
-        &self.keys[key_code as usize]
+    fn get_key(&mut self, key_code: Keycode) -> &Key {
+        self.keys.entry(key_code).or_insert(Key::default())
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("update user input"))]
@@ -158,7 +152,7 @@ impl InputSystem {
         let mut mouse_target = None;
         let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
 
-        let shift_down = self.get_key(KeyCode::ShiftLeft).down();
+        let shift_down = self.get_key(Keycode::LSHIFT).down();
 
         #[cfg(feature = "debug")]
         let lock_actions = render_settings.get().use_debug_camera;
@@ -357,12 +351,12 @@ impl InputSystem {
         if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
             // this will currently not affect the following statements, which is a bit
             // strange
-            if self.get_key(KeyCode::Escape).pressed() {
+            if self.get_key(Keycode::ESCAPE).pressed() {
                 focus_state.remove_focus();
                 process_keys = false;
             }
 
-            if self.get_key(KeyCode::Tab).pressed() {
+            if self.get_key(Keycode::TAB).pressed() {
                 let new_focused_element = focused_element
                     .borrow()
                     .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
@@ -371,7 +365,7 @@ impl InputSystem {
                 process_keys = false;
             }
 
-            if self.get_key(KeyCode::Enter).pressed() {
+            if self.get_key(Keycode::KP_ENTER).pressed() {
                 let actions = interface.left_click_element(focused_element, *focused_window);
 
                 for action in actions {
@@ -390,7 +384,7 @@ impl InputSystem {
             }
         }
 
-        if self.get_key(KeyCode::ControlLeft).down() && self.get_key(KeyCode::KeyQ).pressed() && focus_state.focused_window().is_some() {
+        if self.get_key(Keycode::LCTRL).down() && self.get_key(Keycode::Q).pressed() && focus_state.focused_window().is_some() {
             let window_index = focus_state.get_focused_window().unwrap();
 
             if interface.get_window(window_index).is_closable() {
@@ -455,80 +449,80 @@ impl InputSystem {
         }
 
         if process_keys {
-            let alt_down = self.get_key(KeyCode::AltLeft).down();
-            let control_down = self.get_key(KeyCode::ControlLeft).down();
+            let alt_down = self.get_key(Keycode::LALT).down();
+            let control_down = self.get_key(Keycode::LCTRL).down();
 
-            if self.get_key(KeyCode::Tab).pressed() {
+            if self.get_key(Keycode::TAB).pressed() {
                 interface.first_focused_element(focus_state);
             }
 
-            if self.get_key(KeyCode::Escape).pressed() {
+            if self.get_key(Keycode::ESCAPE).pressed() {
                 events.push(UserEvent::OpenMenuWindow);
             }
 
-            if alt_down && self.get_key(KeyCode::KeyE).pressed() {
+            if alt_down && self.get_key(Keycode::E).pressed() {
                 events.push(UserEvent::OpenInventoryWindow);
             }
 
-            if control_down && self.get_key(KeyCode::KeyH).pressed() {
+            if control_down && self.get_key(Keycode::H).pressed() {
                 events.push(UserEvent::ToggleShowInterface);
             }
 
-            if self.get_key(KeyCode::KeyJ).pressed() {
+            if self.get_key(Keycode::J).pressed() {
                 events.push(UserEvent::CastSkill(HotbarSlot(0)));
             }
 
-            if self.get_key(KeyCode::KeyJ).released() {
+            if self.get_key(Keycode::J).released() {
                 events.push(UserEvent::StopSkill(HotbarSlot(0)));
             }
 
-            if self.get_key(KeyCode::KeyL).pressed() {
+            if self.get_key(Keycode::L).pressed() {
                 events.push(UserEvent::CastSkill(HotbarSlot(1)));
             }
 
-            if self.get_key(KeyCode::KeyL).released() {
+            if self.get_key(Keycode::L).released() {
                 events.push(UserEvent::StopSkill(HotbarSlot(1)));
             }
 
-            if self.get_key(KeyCode::KeyU).pressed() {
+            if self.get_key(Keycode::U).pressed() {
                 events.push(UserEvent::CastSkill(HotbarSlot(2)));
             }
 
-            if self.get_key(KeyCode::KeyU).released() {
+            if self.get_key(Keycode::U).released() {
                 events.push(UserEvent::StopSkill(HotbarSlot(2)));
             }
 
-            if self.get_key(KeyCode::Enter).pressed() {
+            if self.get_key(Keycode::KP_ENTER).pressed() {
                 events.push(UserEvent::FocusChatWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyM).pressed() {
+            if control_down && self.get_key(Keycode::M).pressed() {
                 events.push(UserEvent::OpenMapsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyR).pressed() {
+            if control_down && self.get_key(Keycode::R).pressed() {
                 events.push(UserEvent::OpenRenderSettingsWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyT).pressed() {
+            if control_down && self.get_key(Keycode::T).pressed() {
                 events.push(UserEvent::OpenTimeWindow);
             }
 
             #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyP).pressed() {
+            if control_down && self.get_key(Keycode::P).pressed() {
                 events.push(UserEvent::OpenPacketWindow);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::ShiftLeft).pressed() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::LSHIFT).pressed() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraAccelerate);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::ShiftLeft).released() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::LSHIFT).released() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraDecelerate);
             }
 
@@ -545,27 +539,27 @@ impl InputSystem {
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyW).down() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::W).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveForward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyS).down() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::S).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveBackward);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyA).down() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::A).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveLeft);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyD).down() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::D).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveRight);
             }
 
             #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::Space).down() && render_settings.get().use_debug_camera {
+            if self.get_key(Keycode::Space).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveUp);
             }
         }

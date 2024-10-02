@@ -200,7 +200,7 @@ pub struct DeferredRenderTarget {
 }
 
 impl DeferredRenderTarget {
-    pub fn new(device: &Device, dimensions: [u32; 2]) -> Self {
+    pub fn new(device: &Device, dimensions: ScreenSize) -> Self {
         let image_factory = AttachmentTextureFactory::new("deferred render", device, dimensions, 4);
 
         let diffuse_buffer = image_factory.new_texture("diffuse", Self::output_diffuse_format(), AttachmentImageType::InputColor);
@@ -337,7 +337,7 @@ pub struct PickerRenderTarget {
 }
 
 impl PickerRenderTarget {
-    pub fn new(device: &Device, dimensions: [u32; 2]) -> Self {
+    pub fn new(device: &Device, dimensions: ScreenSize) -> Self {
         let texture_factory = AttachmentTextureFactory::new("picker render", device, dimensions, 1);
 
         let texture = texture_factory.new_texture("color", Self::output_color_format(), AttachmentImageType::CopyColor);
@@ -458,7 +458,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
     pub fn new(
         device: &Device,
         name: &'static str,
-        dimensions: [u32; 2],
+        dimensions: ScreenSize,
         sample_count: u32,
         texture_usage: TextureUsages,
         clear_value: C,
@@ -466,8 +466,8 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
         let texture = Arc::new(Texture::new(device, &TextureDescriptor {
             label: Some(name),
             size: Extent3d {
-                width: dimensions[0],
-                height: dimensions[1],
+                width: dimensions.width as u32,
+                height: dimensions.height as u32,
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,

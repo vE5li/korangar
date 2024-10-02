@@ -172,7 +172,7 @@ impl SizeBound {
     {
         let half_size = size.halved();
         let left = f32::clamp(position.left(), -half_size.width(), available.width() - half_size.width());
-        let top = f32::clamp(position.top(), 0.0, available.height() - 30.0);
+        let top = f32::clamp(position.top(), 0.0, (available.height() - 30.0).max(0.0));
 
         Position::new(left, top)
     }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
-use cgmath::{ElementWise, Matrix2, Vector2};
+use cgmath::{Matrix2, Point3, Vector2};
 use wgpu::{
     include_wgsl, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, ColorTargetState, ColorWrites, Device, FragmentState, PipelineCompilationOptions, PipelineLayoutDescriptor,
@@ -11,7 +11,7 @@ use wgpu::{
 
 use super::{DeferredRenderer, DeferredSubRenderer};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::{Color, Renderer, Texture, EFFECT_ATTACHMENT_BLEND};
+use crate::graphics::{Camera, Color, Renderer, Texture, EFFECT_ATTACHMENT_BLEND};
 use crate::interface::layout::ScreenSize;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("effect.wgsl");
@@ -136,32 +136,39 @@ impl EffectRenderer {
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
+        camera: &dyn Camera,
+        position: Point3<f32>,
         texture: &Texture,
         window_size: ScreenSize,
         corner_screen_position: [Vector2<f32>; 4],
         texture_coordinates: [Vector2<f32>; 4],
-        screen_space_position: Vector2<f32>,
         offset: Vector2<f32>,
         angle: f32,
         color: Color,
     ) {
+        const EFFECT_ORIGIN: Vector2<f32> = Vector2::new(319.0, 291.0);
+
         if render_target.bound_sub_renderer(DeferredSubRenderer::Effect) {
             self.bind_pipeline(render_pass);
         }
 
+        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
+        let clip_space_position = projection_matrix * view_matrix * position.to_homogeneous();
+        let screen_space_position = camera.clip_to_screen_space(clip_space_position);
+
         let half_screen = Vector2::new(window_size.width / 2.0, window_size.height / 2.0);
-        // TODO: move this calculation to the loading
         let rotation_matrix = Matrix2::from_angle(cgmath::Deg(angle / (1024.0 / 360.0)));
 
-        let clip_positions = corner_screen_position.map(|position| {
-            // TODO: NHA Black magic calculation of the "corner_position". Later this should
-            //       not render in screen space, but properly in world space.
-            const EFFECT_ORIGIN: Vector2<f32> = Vector2::new(-1600.0, -700.0);
-            let corner_position = ((rotation_matrix * position) + offset - EFFECT_ORIGIN - half_screen).div_element_wise(half_screen);
+        let corner_screen_position =
+            corner_screen_position.map(|position| (rotation_matrix * position) + offset - EFFECT_ORIGIN - half_screen);
 
-            // This converts the screen space coordinate to the clip space.
-            let position = (screen_space_position * 2.0) + corner_position;
-            [position.x - 1.0, -position.y + 1.0]
+        let clip_space_positions = corner_screen_position.map(|position| {
+            let normalized_screen_position = Vector2::new(
+                (position.x / half_screen.x) * 0.5 + 0.5 + screen_space_position.x,
+                (position.y / half_screen.y) * 0.5 + 0.5 + screen_space_position.y,
+            );
+            let clip_space_position = camera.screen_to_clip_space(normalized_screen_position);
+            [clip_space_position.x, clip_space_position.y]
         });
 
         let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
@@ -181,12 +188,11 @@ impl EffectRenderer {
 
         let color = color.components_linear();
 
-        // TODO: apply angle
         let push_constants = Constants {
-            top_left: clip_positions[0],
-            bottom_left: clip_positions[2],
-            top_right: clip_positions[1],
-            bottom_right: clip_positions[3],
+            top_left: clip_space_positions[0],
+            bottom_left: clip_space_positions[2],
+            top_right: clip_space_positions[1],
+            bottom_right: clip_space_positions[3],
             texture_top_left: texture_coordinates[2].into(),
             texture_bottom_left: texture_coordinates[3].into(),
             texture_top_right: texture_coordinates[1].into(),

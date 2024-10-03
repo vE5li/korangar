@@ -118,6 +118,16 @@ pub trait Camera {
         Vector2::new((x + 1.0) * 0.5, (1.0 - y) * 0.5)
     }
 
+    /// Converts screen space coordinates (UV) into a clip space location (NDC).
+    ///                 UV          NDC
+    /// Top Left       0,0         -1,1
+    /// Bottom Right   1,1         1,-1
+    fn screen_to_clip_space(&self, screen_space_position: Vector2<f32>) -> Vector4<f32> {
+        let x = screen_space_position.x * 2.0 - 1.0;
+        let y = -(screen_space_position.y * 2.0 - 1.0);
+        Vector4::new(x, y, 0.0, 1.0)
+    }
+
     fn distance_to(&self, position: Point3<f32>) -> f32 {
         self.camera_position().distance(position)
     }
@@ -193,4 +203,25 @@ fn perspective_reverse_lh(vertical_fov: Rad<f32>, aspect_ratio: f32) -> Matrix4<
         Vector4::new(0.0, 0.0, 0.0, 1.0),
         Vector4::new(0.0, 0.0, NEAR_PLANE, 0.0),
     )
+}
+
+#[cfg(test)]
+mod conversion {
+    use cgmath::{assert_relative_eq, Vector4};
+
+    use crate::graphics::{Camera, PlayerCamera};
+
+    #[test]
+    fn clip_to_screen_space() {
+        let camera = PlayerCamera::new();
+
+        let original = Vector4::new(0.5, -0.3, 0.0, 1.0);
+        let screen_space = camera.clip_to_screen_space(original);
+        let converted = camera.screen_to_clip_space(screen_space);
+
+        assert_relative_eq!(original.x, converted.x, epsilon = 1e-6);
+        assert_relative_eq!(original.y, converted.y, epsilon = 1e-6);
+        assert_relative_eq!(original.z, converted.z, epsilon = 1e-6);
+        assert_relative_eq!(original.w, converted.w, epsilon = 1e-6);
+    }
 }

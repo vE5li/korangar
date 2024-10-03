@@ -149,9 +149,6 @@ impl Effect {
         frame_timer: &FrameTimer,
         position: Point3<f32>,
     ) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = projection_matrix * view_matrix * position.to_homogeneous();
-        let screen_space_position = camera.clip_to_screen_space(clip_space_position);
         for layer in &self.layers {
             let Some(frame) = layer.interpolate(frame_timer) else {
                 continue;
@@ -164,6 +161,8 @@ impl Effect {
             renderer.render_effect(
                 render_target,
                 render_pass,
+                camera,
+                position,
                 &layer.textures[frame.texture_index as usize],
                 [
                     Vector2::new(frame.xy[0], frame.xy[4]),
@@ -177,7 +176,6 @@ impl Effect {
                     Vector2::new(frame.uv[0], frame.uv[1]),
                     Vector2::new(frame.uv[0], frame.uv[3] + frame.uv[1]),
                 ],
-                screen_space_position,
                 frame.offset,
                 frame.angle,
                 Color::rgba(

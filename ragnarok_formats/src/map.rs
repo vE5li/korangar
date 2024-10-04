@@ -1,14 +1,14 @@
+use std::collections::{HashMap, VecDeque};
+
 use cgmath::{Point3, Vector3};
+use korangar_interface::elements::PrototypeElement;
+
 use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
 use crate::signature::Signature;
 use crate::transform::Transform;
 use crate::version::{InternalVersion, MajorFirst, Version};
-
-use korangar_interface::elements::PrototypeElement;
-
-use std::collections::VecDeque;
 
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
@@ -56,12 +56,12 @@ pub struct MapData {
 }
 
 #[derive(Clone, PrototypeElement)]
-pub struct QuadTreeData{
+pub struct QuadTreeData {
     pub max: [f32; 3],
     pub min: [f32; 3],
     pub half_size: [f32; 3],
     pub center: [f32; 3],
-    pub child: Vec<QuadTreeData>,
+    pub children: Vec<QuadTreeData>,
 }
 
 bitflags::bitflags! {
@@ -73,54 +73,79 @@ bitflags::bitflags! {
         const CLIFF = 0b00001000;
     }
 }
-
-impl FromBytes for QuadTreeData  {
+// An internal dfs function needs generics, doesn't know how to put using dfs.
+// TODO: find a easier way to parse QuadTreeData
+impl FromBytes for QuadTreeData {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        const MAX_DEPTH: usize = 5;
+        const CHILD_COUNT: usize = 4;
 
-        let mut stack = VecDeque::<(i32, i32)>::new();
-        let mut quadtree_vec: Vec<QuadTreeData> = Vec::new();
-        let mut quadtree_parent: Vec<i32> = Vec::new();
-        let mut child_index: i32 = 0;
+        // You can check in the Map Viewer in Debugging
+        // Simulate a DFS using a stack.
+        let mut stack = VecDeque::<(usize, usize)>::from([(0, 0)]);
+        let mut nodes = HashMap::new();
+        let mut node_parents: Vec<usize> = Vec::new();
 
-        // simulate a dfs using a stack
-        stack.push_back((0, 0));
-        // the node 0 doesn't have parent
-        quadtree_parent.push(-1);
-        while let Some((node,depth)) = stack.pop_front(){
-            let max = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
-            let min = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
-            let half_size = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
-            let center = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
-            let child: Vec<QuadTreeData> = Vec::new();
-            
-            quadtree_vec.push(QuadTreeData{
+        while let Some((parent_node, depth)) = stack.pop_back() {
+            // Read the input
+            let max: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let min: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let half_size: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let center: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+
+            // Allocate the vector to get a limited amount of child and crash if there is
+            // more children.
+            let children: Vec<QuadTreeData> = match depth < MAX_DEPTH {
+                true => Vec::with_capacity(CHILD_COUNT),
+                false => Vec::new(),
+            };
+
+            // Put the position of index parent_node in the set
+            nodes.insert(parent_node, QuadTreeData {
                 max,
                 min,
                 half_size,
                 center,
-                child,
+                children,
             });
-            if depth < 5 {
-                for _counter in 0..4 {
-                    child_index+=1;
-                    quadtree_parent.push(node);
-                    stack.push_back((child_index, depth+1));
+
+            if depth < MAX_DEPTH {
+                let self_index = node_parents.len();
+                // First add the nodes and the corresponding parents
+                for _counter in 0..CHILD_COUNT {
+                    node_parents.push(parent_node);
+                }
+                // Observe that we are inserting the position in reverse order.
+                // This is because the first element that we want to insert to the stack is the
+                // last to enter the stack.
+                for counter in 0..CHILD_COUNT {
+                    let revert_position = CHILD_COUNT - counter;
+                    stack.push_back((self_index + revert_position, depth + 1));
                 }
             }
         }
-        // go from back to start to set the quadtree children in correct order
-        for index in (1..child_index as usize).rev() {
-            let quadtree = quadtree_vec.pop().unwrap();
-            quadtree_vec[quadtree_parent[index] as usize].child.push(quadtree);
-            if quadtree_vec[quadtree_parent[index] as usize].child.len() == 4 {
-                quadtree_vec[quadtree_parent[index] as usize].child.reverse();
-            }
+
+        // Iterate nodes backwards and assign them the their parents.
+        let mut child_index = node_parents.len();
+        for parent_index in node_parents.into_iter().rev() {
+            // Get the children by their index and corresponding parent
+            let mut child = nodes.remove(&child_index).unwrap();
+            child.children.reverse();
+            child_index -= 1;
+            let mut parent = nodes.remove(&parent_index).unwrap();
+            parent.children.push(child);
+            nodes.insert(parent_index, parent);
         }
-        quadtree_vec[0].child.reverse();
-        Ok(quadtree_vec.first().unwrap().clone())
+
+        // The root haven't reverse yet, so we need to reverse it
+        // Observe that the root isn't in parent_index, only the childs of root.
+        assert_eq!(nodes.len(), 1);
+        let mut root: QuadTreeData = nodes.remove(&0).unwrap();
+        root.children.reverse();
+
+        Ok(root)
     }
 }
-
 
 impl FromBytes for TileFlags {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {

@@ -135,10 +135,9 @@ impl MapLoader {
             .light_sources
             .drain(..)
             .map(|light_source| {
-                let clone = light_source.clone();
                 let extent = point_light_extent(light_source.color.into(), light_source.range);
                 let sphere = Sphere::new(light_source.position, extent);
-                let key = light_sources.insert(clone).expect("light sources slab is full");
+                let key = light_sources.insert(light_source).expect("light sources slab is full");
                 (key, sphere)
             })
             .collect();

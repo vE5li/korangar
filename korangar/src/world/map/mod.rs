@@ -441,7 +441,7 @@ impl Map {
             point_light_manager.register(
                 PointLightId::new(light_source_key.key()),
                 light_source.position,
-                light_source.color.clone().into(),
+                light_source.color.into(),
                 light_source.range,
             );
         }
@@ -630,7 +630,7 @@ impl Map {
             }
             MarkerIdentifier::LightSource(key) => {
                 let light_source = self.light_sources.get(LightSourceKey::new(key)).unwrap();
-                let color = light_source.color.clone().into();
+                let color = light_source.color.into();
                 let extent = point_light_extent(color, light_source.range);
 
                 renderer.render_circle(

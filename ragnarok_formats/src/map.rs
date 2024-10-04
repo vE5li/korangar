@@ -2,7 +2,6 @@ use std::collections::{HashMap, VecDeque};
 
 use cgmath::{Point3, Vector3};
 use korangar_interface::elements::PrototypeElement;
-
 use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
@@ -44,7 +43,7 @@ pub struct MapData {
     pub ground_left: Option<i32>,
     #[version_equals_or_above(1, 6)]
     pub ground_right: Option<i32>,
-    // TODO: verify version
+    // TODO: Parse remaining fields
     //#[version_equals_or_above(2, 7)]
     //#[new_derive]
     //pub something_count: Option<u32>,
@@ -73,77 +72,67 @@ bitflags::bitflags! {
         const CLIFF = 0b00001000;
     }
 }
-// An internal dfs function needs generics, doesn't know how to put using dfs.
-// TODO: find a easier way to parse QuadTreeData
+
 impl FromBytes for QuadTreeData {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         const MAX_DEPTH: usize = 5;
         const CHILD_COUNT: usize = 4;
 
-        // You can check in the Map Viewer in Debugging
+        // Helper struct to keep node accesses readable.
+        struct Node {
+            data: QuadTreeData,
+            parent_index: usize,
+        }
+
         // Simulate a DFS using a stack.
-        let mut stack = VecDeque::<(usize, usize)>::from([(0, 0)]);
-        let mut nodes = HashMap::new();
-        let mut node_parents: Vec<usize> = Vec::new();
+        let mut stack = VecDeque::from([(0, 0)]);
+        let mut nodes = Vec::new();
 
-        while let Some((parent_node, depth)) = stack.pop_back() {
-            // Read the input
-            let max: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
-            let min: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
-            let half_size: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
-            let center: [f32; 3] = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+        while let Some((parent_index, depth)) = stack.pop_back() {
+            let max = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let min = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let half_size = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let center = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
 
-            // Allocate the vector to get a limited amount of child and crash if there is
-            // more children.
-            let children: Vec<QuadTreeData> = match depth < MAX_DEPTH {
+            let children = match depth < MAX_DEPTH {
                 true => Vec::with_capacity(CHILD_COUNT),
                 false => Vec::new(),
             };
 
-            // Put the position of index parent_node in the set
-            nodes.insert(parent_node, QuadTreeData {
+            // Add next node lookups to the stack.
+            if depth < MAX_DEPTH {
+                let self_index = nodes.len();
+
+                for _counter in 0..CHILD_COUNT {
+                    stack.push_back((self_index, depth + 1));
+                }
+            }
+
+            let data = QuadTreeData {
                 max,
                 min,
                 half_size,
                 center,
                 children,
-            });
-
-            if depth < MAX_DEPTH {
-                let self_index = node_parents.len();
-                // First add the nodes and the corresponding parents
-                for _counter in 0..CHILD_COUNT {
-                    node_parents.push(parent_node);
-                }
-                // Observe that we are inserting the position in reverse order.
-                // This is because the first element that we want to insert to the stack is the
-                // last to enter the stack.
-                for counter in 0..CHILD_COUNT {
-                    let revert_position = CHILD_COUNT - counter;
-                    stack.push_back((self_index + revert_position, depth + 1));
-                }
-            }
+            };
+            nodes.push(Node { data, parent_index });
         }
 
-        // Iterate nodes backwards and assign them the their parents.
-        let mut child_index = node_parents.len();
-        for parent_index in node_parents.into_iter().rev() {
-            // Get the children by their index and corresponding parent
-            let mut child = nodes.remove(&child_index).unwrap();
-            child.children.reverse();
-            child_index -= 1;
-            let mut parent = nodes.remove(&parent_index).unwrap();
-            parent.children.push(child);
-            nodes.insert(parent_index, parent);
+        // Go back to front and assign nodes to their parents. Node 0 is the root
+        // node so we skip that.
+        while nodes.len() > 1 {
+            let mut node = nodes.pop().unwrap();
+            // As we are inserting the elements one by one from last to begin, we need to
+            // reverse the array.
+            node.data.children.reverse();
+            nodes[node.parent_index].data.children.push(node.data);
         }
 
-        // The root haven't reverse yet, so we need to reverse it
-        // Observe that the root isn't in parent_index, only the childs of root.
-        assert_eq!(nodes.len(), 1);
-        let mut root: QuadTreeData = nodes.remove(&0).unwrap();
-        root.children.reverse();
-
-        Ok(root)
+        let mut root_node = nodes.pop().unwrap().data;
+        // As we are inserting the elements one by one from last to begin, we need to
+        // reverse the array.
+        root_node.children.reverse();
+        Ok(root_node)
     }
 }
 

@@ -49,6 +49,13 @@ impl AnimationState {
         self.factor = Some(movement_speed as f32 * 100.0 / 150.0);
     }
 
+    pub fn dead(&mut self, client_tick: ClientTick) {
+        self.action = 8;
+        self.start_time = client_tick;
+        self.duration = None;
+        self.factor = None;
+    }
+
     pub fn update(&mut self, client_tick: ClientTick) {
         let mut time = client_tick.0.saturating_sub(self.start_time.0);
 

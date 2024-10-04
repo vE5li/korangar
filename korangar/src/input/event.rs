@@ -21,6 +21,7 @@ pub enum UserEvent {
         password: String,
     },
     SelectServer(CharacterServerInformation),
+    Respawn,
     LogOut,
     Exit,
     CameraZoom(f32),

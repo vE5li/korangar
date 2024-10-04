@@ -1794,13 +1794,11 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let _measurement = threads::Picker::start_frame();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                 self.map
                     .render_tiles(picker_target, &mut picker_render_pass, &context.picker_renderer, current_camera);
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                 self.map.render_entities(
                     entities,
                     picker_target,
@@ -1831,8 +1829,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let _measurement = threads::Shadow::start_frame();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                 self.map.render_ground(
                     directional_shadow_target,
                     &mut directional_shadow_render_pass,
@@ -1848,8 +1845,7 @@ impl Client {
                     render_settings.frustum_culling,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                 self.map.render_objects(
                     directional_shadow_target,
                     &mut directional_shadow_render_pass,
@@ -1860,8 +1856,7 @@ impl Client {
                     &object_set,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                 self.map.render_entities(
                     entities,
                     directional_shadow_target,
@@ -1874,8 +1869,7 @@ impl Client {
                 if let Some(PickerTarget::Tile { x, y }) = mouse_target
                     && !entities.is_empty()
                 {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators
-                    ))]
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                     self.map.render_walk_indicator(
                         directional_shadow_target,
                         &mut directional_shadow_render_pass,
@@ -1930,8 +1924,7 @@ impl Client {
                             true,
                         ); */
 
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects
-                        ))]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         self.map.render_objects(
                             point_shadow_target,
                             &mut point_shadow_render_pass,
@@ -1945,8 +1938,7 @@ impl Client {
                         if let Some(PickerTarget::Tile { x, y }) = mouse_target
                             && !entities.is_empty()
                         {
-                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators
-                            ))]
+                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                             self.map.render_walk_indicator(
                                 point_shadow_target,
                                 &mut point_shadow_render_pass,
@@ -1957,8 +1949,7 @@ impl Client {
                             );
                         }
 
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map
-                        ))]
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         self.map.render_ground(
                             point_shadow_target,
                             &mut point_shadow_render_pass,
@@ -1974,8 +1965,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let _measurement = threads::Deferred::start_frame();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                 self.map.render_ground(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);
 
                 #[cfg(feature = "debug")]
@@ -1989,8 +1979,7 @@ impl Client {
                     #[cfg(feature = "debug")] render_settings.frustum_culling
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                 self.map.render_objects(
                     deferred_target,
                     &mut geometry_render_pass,
@@ -2001,19 +1990,16 @@ impl Client {
                     &object_set,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                 self.map.render_entities(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, true);
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
                 self.map.render_water(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);
 
                 if let Some(PickerTarget::Tile { x, y }) = mouse_target
                     && !entities.is_empty()
                 {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators
-                    ))]
+                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                     self.map.render_walk_indicator(
                         deferred_target,
                         &mut geometry_render_pass,
@@ -2026,15 +2012,13 @@ impl Client {
 
                 // We switch to record the screen render pass.
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers()
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers()))]
                 self.map.ambient_light(deferred_target, &mut screen_render_pass, &context.deferred_renderer, day_timer);
 
                 let (view_matrix, projection_matrix) = self.directional_shadow_camera.view_projection_matrices();
                 let light_matrix = projection_matrix * view_matrix;
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light && !render_settings.show_buffers()
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light && !render_settings.show_buffers()))]
                 self.map.directional_light(
                     deferred_target,
                     &mut screen_render_pass,
@@ -2045,12 +2029,10 @@ impl Client {
                     day_timer,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
                 point_light_set.render_point_lights(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, &context.point_shadow_maps[frame_number]);
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers()
-                ))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers()))]
                 self.map.water_light(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera);
 
                 #[cfg(feature = "debug")]
@@ -2391,9 +2373,11 @@ impl ApplicationHandler for Client {
                 if let Some(window) = self.window.as_ref() {
                     let screen_size: ScreenSize = window.inner_size().max(PhysicalSize::new(1, 1)).into();
                     self.interface.update_window_size(screen_size);
+
                     if let Some(surface) = self.surface.as_mut() {
                         surface.update_window_size(screen_size);
                     }
+
                     window.request_redraw();
                 }
             }
@@ -2412,6 +2396,7 @@ impl ApplicationHandler for Client {
                 if let PhysicalKey::Code(keycode) = event.physical_key {
                     self.input_system.update_keyboard(keycode, event.state);
                 }
+
                 // TODO: NHA We should also support IME in the long term (winit::event::Ime)
                 if let Some(text) = event.text
                     && event.state.is_pressed()
@@ -2425,6 +2410,7 @@ impl ApplicationHandler for Client {
                 if self.window.is_some() && self.surface.is_some() {
                     self.render_frame(event_loop);
                 }
+
                 if let Some(window) = self.window.as_ref() {
                     window.request_redraw();
                 }

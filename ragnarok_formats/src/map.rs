@@ -6,6 +6,10 @@ use crate::signature::Signature;
 use crate::transform::Transform;
 use crate::version::{InternalVersion, MajorFirst, Version};
 
+use korangar_interface::elements::PrototypeElement;
+
+use std::collections::VecDeque;
+
 #[derive(Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
@@ -41,9 +45,23 @@ pub struct MapData {
     #[version_equals_or_above(1, 6)]
     pub ground_right: Option<i32>,
     // TODO: verify version
-    //`#[version_equals_or_above(2, 6)]
-    //pub quad_tree: QuadTree,
+    //#[version_equals_or_above(2, 7)]
+    //#[new_derive]
+    //pub something_count: Option<u32>,
+    //#[repeating(something_count)]
+    //pub something: Vec<i32>,
     pub resources: MapResources,
+    #[version_equals_or_above(2, 1)]
+    pub quadtree: Option<QuadTreeData>,
+}
+
+#[derive(Clone, PrototypeElement)]
+pub struct QuadTreeData{
+    pub max: [f32; 3],
+    pub min: [f32; 3],
+    pub half_size: [f32; 3],
+    pub center: [f32; 3],
+    pub child: Vec<QuadTreeData>,
 }
 
 bitflags::bitflags! {
@@ -55,6 +73,54 @@ bitflags::bitflags! {
         const CLIFF = 0b00001000;
     }
 }
+
+impl FromBytes for QuadTreeData  {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+
+        let mut stack = VecDeque::<(i32, i32)>::new();
+        let mut quadtree_vec: Vec<QuadTreeData> = Vec::new();
+        let mut quadtree_parent: Vec<i32> = Vec::new();
+        let mut child_index: i32 = 0;
+
+        // simulate a dfs using a stack
+        stack.push_back((0, 0));
+        // the node 0 doesn't have parent
+        quadtree_parent.push(-1);
+        while let Some((node,depth)) = stack.pop_front(){
+            let max = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
+            let min = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
+            let half_size = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
+            let center = <[f32;3]>::from_bytes(byte_stream).trace::<Self>()?;
+            let child: Vec<QuadTreeData> = Vec::new();
+            
+            quadtree_vec.push(QuadTreeData{
+                max,
+                min,
+                half_size,
+                center,
+                child,
+            });
+            if depth < 5 {
+                for _counter in 0..4 {
+                    child_index+=1;
+                    quadtree_parent.push(node);
+                    stack.push_back((child_index, depth+1));
+                }
+            }
+        }
+        // go from back to start to set the quadtree children in correct order
+        for index in (1..child_index as usize).rev() {
+            let quadtree = quadtree_vec.pop().unwrap();
+            quadtree_vec[quadtree_parent[index] as usize].child.push(quadtree);
+            if quadtree_vec[quadtree_parent[index] as usize].child.len() == 4 {
+                quadtree_vec[quadtree_parent[index] as usize].child.reverse();
+            }
+        }
+        quadtree_vec[0].child.reverse();
+        Ok(quadtree_vec.first().unwrap().clone())
+    }
+}
+
 
 impl FromBytes for TileFlags {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {

@@ -724,6 +724,10 @@ fn main() {
                         NetworkEvent::CharacterSlotSwitchFailed => {
                             interface.open_window(&application, &mut focus_state, &ErrorWindow::new("Failed to switch character slots".to_owned()));
                         },
+                        NetworkEvent::ResurrectPlayer(data) => {
+                            entities[0].set_idle(client_tick);
+                            interface.close_window_with_class(&mut focus_state, RespawnWindow::WINDOW_CLASS);
+                        }
                         NetworkEvent::AddEntity(entity_appeared_data) => {
                             // Sometimes (like after a job change) the server will tell the client
                             // that a new entity appeared, even though it was already on screen. So
@@ -743,7 +747,12 @@ fn main() {
                             entities.push(npc);
                         }
                         NetworkEvent::RemoveEntity(entity_id) => {
-                            entities.retain(|entity| entity.get_entity_id() != entity_id);
+                            if entities[0].get_entity_id() == entity_id {
+                                entities[0].set_death(client_tick);
+                                interface.open_window(&application, &mut focus_state, &RespawnWindow);
+                            } else {
+                                entities.retain(|entity| entity.get_entity_id() != entity_id);
+                            }
                         }
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -1111,6 +1120,10 @@ fn main() {
                             let login_data = saved_login_data.as_ref().unwrap();
                             networking_system.connect_to_character_server(login_data, server);
                         }
+                        UserEvent::Respawn => {
+                            let _ = networking_system.respawn();
+                            interface.close_window_with_class(&mut focus_state, RespawnWindow::WINDOW_CLASS);
+                        },
                         UserEvent::LogOut => {
                             let _ = networking_system.log_out();
                         },

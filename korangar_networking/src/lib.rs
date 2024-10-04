@@ -665,6 +665,7 @@ where
             NetworkEvent::PlayerMove(origin, destination, packet.timestamp)
         })?;
         packet_handler.register(|packet: ChangeMapPacket| NetworkEvent::ChangeMap(packet.map_name.replace(".gat", ""), packet.position))?;
+        packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer(packet.entity_id))?;
         packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
@@ -819,6 +820,7 @@ where
         })?;
         packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
         packet_handler.register_noop::<StatusChangePacket>()?;
+        packet_handler.register_noop::<NotificationPacket>()?;
         packet_handler.register_noop::<QuestNotificationPacket1>()?;
         packet_handler.register_noop::<HuntingQuestNotificationPacket>()?;
         packet_handler.register_noop::<HuntingQuestUpdateObjectivePacket>()?;
@@ -1051,6 +1053,10 @@ where
 
     pub fn map_loaded(&mut self) -> Result<(), NotConnectedError> {
         self.send_map_server_packet(&MapLoadedPacket::default())
+    }
+
+    pub fn respawn(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&RestartPacket::new(RestartType::Respawn))
     }
 
     pub fn log_out(&mut self) -> Result<(), NotConnectedError> {

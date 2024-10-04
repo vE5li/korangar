@@ -1,6 +1,6 @@
 use ragnarok_bytes::ByteConvertable;
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Clone, Copy, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ColorRGB {
     pub red: f32,
@@ -16,7 +16,7 @@ impl ColorRGB {
     }
 }
 
-#[derive(Clone, Debug, ByteConvertable)]
+#[derive(Clone, Copy, Debug, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct ColorBGRA {
     pub blue: u8,

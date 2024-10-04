@@ -341,6 +341,10 @@ impl Map {
         const OFFSET: f32 = 1.0;
         const TILE_SIZE: f32 = 5.0;
 
+        if !(0 <= position.x && position.x < self.width && 0 <= position.y && position.y < self.height) {
+            return;
+        }
+
         let tile = self.get_tile(position);
 
         if tile.flags.contains(TileFlags::WALKABLE) {

@@ -220,6 +220,7 @@ fn main() {
         EntityStopMovePacket,
         PlayerMovePacket,
         ChangeMapPacket,
+        ResurrectionPacket,
         EntityAppearedPacket,
         EntityAppeared2Packet,
         MovingEntityAppearedPacket,

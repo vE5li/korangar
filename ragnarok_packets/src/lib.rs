@@ -1460,6 +1460,13 @@ pub struct MovingEntityAppearedPacket {
     #[length(24)]
     pub name: String,
 }
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0148)]
+pub struct ResurrectionPacket {
+    pub entity_id: EntityId,
+    pub p_type: u16,
+}
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]

@@ -665,6 +665,7 @@ where
             NetworkEvent::PlayerMove(origin, destination, packet.timestamp)
         })?;
         packet_handler.register(|packet: ChangeMapPacket| NetworkEvent::ChangeMap(packet.map_name.replace(".gat", ""), packet.position))?;
+        packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer(packet.entity_id))?;
         packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;

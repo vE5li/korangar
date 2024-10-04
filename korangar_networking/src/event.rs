@@ -58,6 +58,8 @@ pub enum NetworkEvent {
     MapServerDisconnected {
         reason: DisconnectReason,
     },
+    /// Resurrect the player.
+    ResurrectPlayer(EntityId),
     /// Add an entity to the list of entities that the client is aware of.
     AddEntity(EntityData),
     /// Remove an entity from the list of entities that the client is aware of

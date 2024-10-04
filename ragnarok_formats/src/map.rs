@@ -1,4 +1,7 @@
+use std::collections::VecDeque;
+
 use cgmath::{Point3, Vector3};
+use korangar_interface::elements::PrototypeElement;
 use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
@@ -40,10 +43,19 @@ pub struct MapData {
     pub ground_left: Option<i32>,
     #[version_equals_or_above(1, 6)]
     pub ground_right: Option<i32>,
-    // TODO: verify version
-    //`#[version_equals_or_above(2, 6)]
-    //pub quad_tree: QuadTree,
+    // TODO: Parse remaining fields
     pub resources: MapResources,
+    #[version_equals_or_above(2, 1)]
+    pub quadtree: Option<QuadTreeData>,
+}
+
+#[derive(Clone, PrototypeElement)]
+pub struct QuadTreeData {
+    pub max: [f32; 3],
+    pub min: [f32; 3],
+    pub half_size: [f32; 3],
+    pub center: [f32; 3],
+    pub children: Vec<QuadTreeData>,
 }
 
 bitflags::bitflags! {
@@ -53,6 +65,72 @@ bitflags::bitflags! {
         const WATER = 0b00000010;
         const SNIPABLE = 0b00000100;
         const CLIFF = 0b00001000;
+    }
+}
+
+impl FromBytes for QuadTreeData {
+    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+        const MAX_DEPTH: usize = 5;
+        const CHILD_COUNT: usize = 4;
+
+        // Helper struct to keep node accesses readable.
+        struct Node {
+            data: QuadTreeData,
+            parent_index: usize,
+        }
+
+        // Simulate a DFS using a stack.
+        let mut stack = VecDeque::from([(0, 0)]);
+        let mut nodes = Vec::new();
+
+        while let Some((parent_index, depth)) = stack.pop_back() {
+            let max = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let min = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let half_size = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let center = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+
+            let children = match depth < MAX_DEPTH {
+                true => Vec::with_capacity(CHILD_COUNT),
+                false => Vec::new(),
+            };
+
+            // Add next node lookups to the stack.
+            if depth < MAX_DEPTH {
+                let self_index = nodes.len();
+
+                for _counter in 0..CHILD_COUNT {
+                    stack.push_back((self_index, depth + 1));
+                }
+            }
+
+            let data = QuadTreeData {
+                max,
+                min,
+                half_size,
+                center,
+                children,
+            };
+            nodes.push(Node { data, parent_index });
+        }
+
+        // Go back to front and assign nodes to their parents. Node 0 is the root
+        // node so we skip that.
+        while nodes.len() > 1 {
+            let node = nodes.pop().unwrap();
+
+            let children = &mut nodes[node.parent_index].data.children;
+            children.push(node.data);
+
+            // We reverse the nodes once all of them are collected rather than inserting
+            // them at the start of the vector to avoid unnecessary shifting of
+            // other items. This is purely an optimization.
+            if children.len() == 4 {
+                children.reverse();
+            }
+        }
+
+        let root_node = nodes.pop().unwrap().data;
+        Ok(root_node)
     }
 }
 

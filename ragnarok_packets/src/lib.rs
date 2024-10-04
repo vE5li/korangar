@@ -1336,14 +1336,46 @@ pub struct UpdateEntityHealthPointsPacket {
     pub maximum_health_points: u32,
 }
 
-/*#[derive(Debug, Clone, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[numeric_type(u8)]
 pub enum DamageType {
-}*/
+    Damage,
+    PickUpItem,
+    SitDown,
+    StandUp,
+    DamageEndure, // Not confirmed
+    Splash,       // Not confirmed
+    Skill,        // Not confirmed
+    RepeatDamage, // Not confirmed
+    MultiHitDamage,
+    MultiHitDamageEndure, // Not confirmed
+    CriticalHit,
+    LuckyDodge,
+    TouchSkill, // Not confirmed
+    CriticalMultiHit,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x008A)]
+pub struct DamagePacket1 {
+    pub source_entity_id: EntityId,
+    pub destination_entity_id: EntityId,
+    pub client_tick: ClientTick,
+    pub source_movement_speed: u32,
+    pub destination_movement_speed: u32,
+    pub damage_amount: i16,
+    pub number_of_hits: u16,
+    pub damage_type: DamageType,
+    /// Assassin dual wield damage.
+    pub damage_amount_2: i16,
+}
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x08C8)]
-pub struct DamagePacket {
+pub struct DamagePacket3 {
     pub source_entity_id: EntityId,
     pub destination_entity_id: EntityId,
     pub client_tick: ClientTick,
@@ -1351,10 +1383,10 @@ pub struct DamagePacket {
     pub destination_movement_speed: u32,
     pub damage_amount: u32,
     pub is_special_damage: u8,
-    pub amount_of_hits: u16,
-    pub damage_type: u8,
-    /// Assassin dual wield damage
-    pub damage_amount2: u32,
+    pub number_of_hits: u16,
+    pub damage_type: DamageType,
+    /// Assassin dual wield damage.
+    pub damage_amount_2: u32,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1400,9 +1432,9 @@ pub struct ChangeMapPacket {
     pub position: TilePosition,
 }
 
-#[derive(Debug, Clone, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable, PartialEq)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-pub enum DissapearanceReason {
+pub enum DisappearanceReason {
     OutOfSight,
     Died,
     LoggedOut,
@@ -1415,7 +1447,7 @@ pub enum DissapearanceReason {
 #[header(0x0080)]
 pub struct EntityDisappearedPacket {
     pub entity_id: EntityId,
-    pub reason: DissapearanceReason,
+    pub reason: DisappearanceReason,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1459,6 +1491,16 @@ pub struct MovingEntityAppearedPacket {
     pub body: u16,
     #[length(24)]
     pub name: String,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x0148)]
+pub struct ResurrectionPacket {
+    pub entity_id: EntityId,
+    /// Always 0 in rAthena.
+    #[new_default]
+    pub packet_type: u16,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1803,7 +1845,7 @@ pub struct QuestNotificationPacket1 {
     pub expire_time: u32,
     pub objective_count: u16,
     /// For some reason this packet always has space for three objective
-    /// details, even if none are sent
+    /// details, even if none are sent.
     pub objective_details: [ObjectiveDetails1; 3],
 }
 

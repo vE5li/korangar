@@ -50,8 +50,8 @@ use num::Zero;
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
-    SkillType, TilePosition, UnitId, WorldPosition,
+    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, DisappearanceReason, Friend, HotbarSlot,
+    SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use rayon::in_place_scope;
 use wgpu::{
@@ -717,6 +717,18 @@ impl Client {
                     self.directional_shadow_camera
                         .set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
                 }
+                NetworkEvent::ResurrectPlayer { entity_id } => {
+                    // If the resurrected player is us, close the resurrect window.
+                    if self.entities[0].get_entity_id() == entity_id {
+                        self.interface
+                            .close_window_with_class(&mut self.focus_state, RespawnWindow::WINDOW_CLASS);
+                    }
+                }
+                NetworkEvent::PlayerStandUp { entity_id } => {
+                    if let Some(entity) = self.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
+                        entity.set_idle(client_tick);
+                    }
+                }
                 NetworkEvent::AccountId(..) => {}
                 NetworkEvent::CharacterList { characters } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
@@ -851,8 +863,28 @@ impl Client {
                     let npc = Entity::Npc(npc);
                     self.entities.push(npc);
                 }
-                NetworkEvent::RemoveEntity(entity_id) => {
-                    self.entities.retain(|entity| entity.get_entity_id() != entity_id);
+                NetworkEvent::RemoveEntity { entity_id, reason } => {
+                    //If the motive is dead, you need to set the player to dead
+                    if reason == DisappearanceReason::Died {
+                        if let Some(entity) = self.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id) {
+                            let entity_type = entity.get_entity_type();
+
+                            if entity_type == EntityType::Monster {
+                                // TODO: If the entity is a monster, it will just disappear. This
+                                // is not the desired behavior and should be updated at some point.
+                                self.entities.retain(|entity| entity.get_entity_id() != entity_id);
+                            } else if entity_type == EntityType::Player {
+                                entity.set_dead(client_tick);
+
+                                // If the player is us, we need to open the respawn window.
+                                if entity_id == self.entities[0].get_entity_id() {
+                                    self.interface.open_window(&self.application, &mut self.focus_state, &RespawnWindow);
+                                }
+                            }
+                        }
+                    } else {
+                        self.entities.retain(|entity| entity.get_entity_id() != entity_id);
+                    }
                 }
                 NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
                     let entity = self.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -917,7 +949,7 @@ impl Client {
                         entity.set_details(name);
                     }
                 }
-                NetworkEvent::DamageEffect(entity_id, damage_amount) => {
+                NetworkEvent::DamageEffect { entity_id, damage_amount } => {
                     let entity = self
                         .entities
                         .iter()
@@ -1249,6 +1281,11 @@ impl Client {
                     // unwrap here.
                     let login_data = self.saved_login_data.as_ref().unwrap();
                     self.networking_system.connect_to_character_server(login_data, server);
+                }
+                UserEvent::Respawn => {
+                    let _ = self.networking_system.respawn();
+                    self.interface
+                        .close_window_with_class(&mut self.focus_state, RespawnWindow::WINDOW_CLASS);
                 }
                 UserEvent::LogOut => {
                     let _ = self.networking_system.log_out();

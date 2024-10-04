@@ -1057,6 +1057,14 @@ impl Entity {
         self.get_common_mut().set_position(map, position, client_tick);
     }
 
+    pub fn set_dead(&mut self, client_tick: ClientTick) {
+        self.get_common_mut().animation_state.dead(client_tick);
+    }
+
+    pub fn set_idle(&mut self, client_tick: ClientTick) {
+        self.get_common_mut().animation_state.idle(client_tick);
+    }
+
     pub fn update_health(&mut self, health_points: usize, maximum_health_points: usize) {
         let common = self.get_common_mut();
         common.health_points = health_points;

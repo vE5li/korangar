@@ -675,10 +675,16 @@ where
             NetworkEvent::PlayerMove(origin, destination, packet.timestamp)
         })?;
         packet_handler.register(|packet: ChangeMapPacket| NetworkEvent::ChangeMap(packet.map_name.replace(".gat", ""), packet.position))?;
+        packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer {
+            entity_id: packet.entity_id,
+        })?;
         packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
-        packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity(packet.entity_id))?;
+        packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity {
+            entity_id: packet.entity_id,
+            reason: packet.reason,
+        })?;
         packet_handler.register(|packet: UpdateStatusPacket| NetworkEvent::UpdateStatus(packet.status_type))?;
         packet_handler.register(|packet: UpdateStatusPacket1| NetworkEvent::UpdateStatus(packet.status_type))?;
         packet_handler.register(|packet: UpdateStatusPacket2| NetworkEvent::UpdateStatus(packet.status_type))?;
@@ -945,8 +951,26 @@ where
             )
         })?;
         packet_handler.register_noop::<RequestPlayerAttackFailedPacket>()?;
-        packet_handler
-            .register(|packet: DamagePacket| NetworkEvent::DamageEffect(packet.destination_entity_id, packet.damage_amount as usize))?;
+        packet_handler.register(|packet: DamagePacket1| match packet.damage_type {
+            DamageType::Damage => Some(NetworkEvent::DamageEffect {
+                entity_id: packet.destination_entity_id,
+                damage_amount: packet.damage_amount as usize,
+            }),
+            DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
+                entity_id: packet.destination_entity_id,
+            }),
+            _ => None,
+        })?;
+        packet_handler.register(|packet: DamagePacket3| match packet.damage_type {
+            DamageType::Damage => Some(NetworkEvent::DamageEffect {
+                entity_id: packet.destination_entity_id,
+                damage_amount: packet.damage_amount as usize,
+            }),
+            DamageType::StandUp => Some(NetworkEvent::PlayerStandUp {
+                entity_id: packet.destination_entity_id,
+            }),
+            _ => None,
+        })?;
         packet_handler.register(|packet: NpcDialogPacket| NetworkEvent::OpenDialog(packet.text, packet.npc_id))?;
         packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
             RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
@@ -1061,6 +1085,10 @@ where
 
     pub fn map_loaded(&mut self) -> Result<(), NotConnectedError> {
         self.send_map_server_packet(&MapLoadedPacket::default())
+    }
+
+    pub fn respawn(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&RestartPacket::new(RestartType::Respawn))
     }
 
     pub fn log_out(&mut self) -> Result<(), NotConnectedError> {

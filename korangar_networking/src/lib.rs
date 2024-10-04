@@ -820,6 +820,7 @@ where
         })?;
         packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
         packet_handler.register_noop::<StatusChangePacket>()?;
+        packet_handler.register_noop::<NotificationPacket>()?;
         packet_handler.register_noop::<QuestNotificationPacket1>()?;
         packet_handler.register_noop::<HuntingQuestNotificationPacket>()?;
         packet_handler.register_noop::<HuntingQuestUpdateObjectivePacket>()?;
@@ -1052,6 +1053,10 @@ where
 
     pub fn map_loaded(&mut self) -> Result<(), NotConnectedError> {
         self.send_map_server_packet(&MapLoadedPacket::default())
+    }
+
+    pub fn respawn(&mut self) -> Result<(), NotConnectedError> {
+        self.send_map_server_packet(&RestartPacket::new(RestartType::Respawn))
     }
 
     pub fn log_out(&mut self) -> Result<(), NotConnectedError> {

@@ -79,7 +79,7 @@ impl IndicatorRenderer {
             label: Some("indicator"),
             bind_group_layouts: &[bind_group_layout, CubeFaceBuffer::bind_group_layout(device)],
             push_constant_ranges: &[PushConstantRange {
-                stages: ShaderStages::VERTEX,
+                stages: ShaderStages::VERTEX_FRAGMENT,
                 range: 0..size_of::<Constants>() as _,
             }],
         });
@@ -158,7 +158,7 @@ impl IndicatorRenderer {
             lower_right: lower_right.to_homogeneous().into(),
         };
 
-        render_pass.set_push_constants(ShaderStages::VERTEX, 0, cast_slice(&[push_constants]));
+        render_pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, cast_slice(&[push_constants]));
         render_pass.set_bind_group(0, &bind_group, &[]);
         render_pass.set_bind_group(1, render_target.face_bind_group(), &[]);
         render_pass.draw(0..6, 0..1);

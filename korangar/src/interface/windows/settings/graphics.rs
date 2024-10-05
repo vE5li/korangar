@@ -8,36 +8,53 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 
-pub struct GraphicsSettingsWindow<Shadow, Framerate>
+pub struct GraphicsSettingsWindow<Vsync, LimitFramerate, TripleBuffering, Shadow>
 where
+    Vsync: TrackedStateBinary<bool>,
+    LimitFramerate: TrackedStateBinary<bool>,
+    TripleBuffering: TrackedStateBinary<bool>,
     Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
 {
     present_mode_info: PresentModeInfo,
+    vsync: Vsync,
+    limit_framerate: LimitFramerate,
+    triple_buffering: TripleBuffering,
     shadow_detail: Shadow,
-    framerate_limit: Framerate,
 }
 
-impl<Shadow, Framerate> GraphicsSettingsWindow<Shadow, Framerate>
+impl<Vsync, LimitFramerate, TripleBuffering, Shadow> GraphicsSettingsWindow<Vsync, LimitFramerate, TripleBuffering, Shadow>
 where
+    Vsync: TrackedStateBinary<bool>,
+    LimitFramerate: TrackedStateBinary<bool>,
+    TripleBuffering: TrackedStateBinary<bool>,
     Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
-    pub fn new(present_mode_info: PresentModeInfo, shadow_detail: Shadow, framerate_limit: Framerate) -> Self {
+    pub fn new(
+        present_mode_info: PresentModeInfo,
+        vsync: Vsync,
+        limit_framerate: LimitFramerate,
+        triple_buffering: TripleBuffering,
+        shadow_detail: Shadow,
+    ) -> Self {
         Self {
             present_mode_info,
+            vsync,
+            limit_framerate,
+            triple_buffering,
             shadow_detail,
-            framerate_limit,
         }
     }
 }
 
-impl<Shadow, Framerate> PrototypeWindow<InterfaceSettings> for GraphicsSettingsWindow<Shadow, Framerate>
+impl<Vsync, LimitFramerate, TripleBuffering, Shadow> PrototypeWindow<InterfaceSettings>
+    for GraphicsSettingsWindow<Vsync, LimitFramerate, TripleBuffering, Shadow>
 where
+    Vsync: TrackedStateBinary<bool>,
+    LimitFramerate: TrackedStateBinary<bool>,
+    TripleBuffering: TrackedStateBinary<bool>,
     Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
 {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
@@ -50,6 +67,12 @@ where
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let mut elements = vec![
+            StateButtonBuilder::new()
+                .with_text("Triple buffering")
+                .with_event(self.triple_buffering.toggle_action())
+                .with_remote(self.triple_buffering.new_remote())
+                .build()
+                .wrap(),
             Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(vec![
@@ -65,15 +88,24 @@ where
             application.to_element("Interface settings".to_string()),
         ];
 
-        // TODO: Instead of not showing this option, disable the checkbox and add a
-        // tooltip
+        // TODO: Instead of not showing these options, disable the checkboxes and add a
+        //       tooltip
         if self.present_mode_info.supports_immediate || self.present_mode_info.supports_mailbox {
             elements.insert(
                 0,
                 StateButtonBuilder::new()
-                    .with_text("Framerate limit")
-                    .with_event(self.framerate_limit.toggle_action())
-                    .with_remote(self.framerate_limit.new_remote())
+                    .with_text("Enable VSYNC")
+                    .with_event(self.vsync.toggle_action())
+                    .with_remote(self.vsync.new_remote())
+                    .build()
+                    .wrap(),
+            );
+            elements.insert(
+                1,
+                StateButtonBuilder::new()
+                    .with_text("Limit framerate")
+                    .with_event(self.limit_framerate.toggle_action())
+                    .with_remote(self.limit_framerate.new_remote())
                     .build()
                     .wrap(),
             );

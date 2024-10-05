@@ -3,8 +3,6 @@ use derive_new::new;
 #[derive(new)]
 pub struct RenderSettings {
     #[new(value = "true")]
-    pub frame_limit: bool,
-    #[new(value = "true")]
     pub show_frames_per_second: bool,
     #[new(value = "true")]
     pub frustum_culling: bool,
@@ -20,8 +18,6 @@ pub struct RenderSettings {
     pub show_water: bool,
     #[new(value = "true")]
     pub show_indicators: bool,
-    #[new(value = "true")]
-    pub show_interface: bool,
     #[new(value = "true")]
     pub show_ambient_light: bool,
     #[new(value = "true")]

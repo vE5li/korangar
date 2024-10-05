@@ -7,7 +7,9 @@ mod start;
 
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Rad, Vector2, Vector3, Vector4};
+#[cfg(feature = "debug")]
+use cgmath::MetricSpace;
+use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
 
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
@@ -128,6 +130,7 @@ pub trait Camera {
         Vector4::new(x, y, 0.0, 1.0)
     }
 
+    #[cfg(feature = "debug")]
     fn distance_to(&self, position: Point3<f32>) -> f32 {
         self.camera_position().distance(position)
     }

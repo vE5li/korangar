@@ -93,7 +93,7 @@ impl RectangleRenderer {
         corner_radius: CornerRadius,
         color: Color,
     ) {
-        if render_target.bind_sub_renderer(InterfaceSubRenderer::Rectangle) {
+        if render_target.bound_sub_renderer(InterfaceSubRenderer::Rectangle) {
             self.bind_pipeline(render_pass);
         }
 

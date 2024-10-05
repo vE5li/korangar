@@ -1,20 +1,20 @@
 use std::sync::Arc;
 
-use bytemuck::{cast_slice, Pod, Zeroable};
-use cgmath::Matrix4;
+use bytemuck::{Pod, Zeroable};
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CompareFunction, DepthStencilState,
-    Device, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
-    PushConstantRange, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, SamplerBindingType, ShaderModule,
-    ShaderModuleDescriptor, ShaderStages, TextureFormat, VertexState,
+    Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, SamplerBindingType, ShaderModule, ShaderModuleDescriptor, ShaderStages, TextureFormat,
+    VertexState,
 };
 
-use crate::graphics::renderers::picker::PickerSubRenderer;
+use super::{Buffer, Camera, DeferredSubRenderer, Renderer};
 use crate::graphics::renderers::sampler::{create_new_sampler, SamplerType};
-use crate::graphics::{Buffer, *};
+use crate::graphics::{DeferredRenderer, ModelVertex, Texture, TextureGroup};
+use crate::loaders::TextureLoader;
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("geometry.wgsl");
+const SHADER: ShaderModuleDescriptor = include_wgsl!("title.wgsl");
 
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
@@ -22,31 +22,35 @@ struct Matrices {
     view_projection: [[f32; 4]; 4],
 }
 
-#[derive(Copy, Clone, Pod, Zeroable)]
-#[repr(C)]
-struct Constants {
-    world: [[f32; 4]; 4],
-}
-
-pub struct GeometryRenderer {
+pub struct TileRenderer {
     queue: Arc<Queue>,
     matrices_buffer: Buffer<Matrices>,
+    tile_textures: TextureGroup,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
-impl GeometryRenderer {
-    pub fn new(device: Arc<Device>, queue: Arc<Queue>, output_color_format: TextureFormat, output_depth_format: TextureFormat) -> Self {
+impl TileRenderer {
+    pub fn new(
+        device: Arc<Device>,
+        queue: Arc<Queue>,
+        texture_loader: &mut TextureLoader,
+        output_diffuse_format: TextureFormat,
+        output_normal_format: TextureFormat,
+        output_water_format: TextureFormat,
+        output_depth_format: TextureFormat,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
         let matrices_buffer = Buffer::with_capacity(
             &device,
-            "geometry",
+            "tile",
             BufferUsages::COPY_DST | BufferUsages::UNIFORM,
             size_of::<Matrices>() as _,
         );
-        let linear_sampler = create_new_sampler(&device, "geometry linear", SamplerType::Linear);
+        let nearest_sampler = create_new_sampler(&device, "tile nearest", SamplerType::Nearest);
+        let linear_sampler = create_new_sampler(&device, "tile anisotropic", SamplerType::LinearAnisotropic(4));
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some("geometry"),
+            label: Some("tile"),
             entries: &[
                 BindGroupLayoutEntry {
                     binding: 0,
@@ -64,10 +68,16 @@ impl GeometryRenderer {
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
                     count: None,
                 },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         });
         let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("geometry"),
+            label: Some("tile uniform"),
             layout: &bind_group_layout,
             entries: &[
                 BindGroupEntry {
@@ -76,6 +86,10 @@ impl GeometryRenderer {
                 },
                 BindGroupEntry {
                     binding: 1,
+                    resource: BindingResource::Sampler(&nearest_sampler),
+                },
+                BindGroupEntry {
+                    binding: 2,
                     resource: BindingResource::Sampler(&linear_sampler),
                 },
             ],
@@ -85,13 +99,30 @@ impl GeometryRenderer {
             &device,
             &shader_module,
             &bind_group_layout,
-            output_color_format,
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
             output_depth_format,
         );
+
+        #[cfg(feature = "debug")]
+        let tile_textures: Vec<Arc<Texture>> = vec![
+            texture_loader.get("0.png").unwrap(),
+            texture_loader.get("1.png").unwrap(),
+            texture_loader.get("2.png").unwrap(),
+            texture_loader.get("3.png").unwrap(),
+            texture_loader.get("4.png").unwrap(),
+            texture_loader.get("5.png").unwrap(),
+            texture_loader.get("6.png").unwrap(),
+        ];
+
+        #[cfg(feature = "debug")]
+        let tile_textures = TextureGroup::new(&device, "tile textures", tile_textures);
 
         Self {
             queue,
             matrices_buffer,
+            tile_textures,
             bind_group,
             pipeline,
         }
@@ -101,20 +132,19 @@ impl GeometryRenderer {
         device: &Device,
         shader_module: &ShaderModule,
         bind_group_layout: &BindGroupLayout,
-        output_color_format: TextureFormat,
+        output_diffuse_format: TextureFormat,
+        output_normal_format: TextureFormat,
+        output_water_format: TextureFormat,
         output_depth_format: TextureFormat,
     ) -> RenderPipeline {
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("geometry"),
+            label: Some("tile"),
             bind_group_layouts: &[bind_group_layout, TextureGroup::bind_group_layout(device)],
-            push_constant_ranges: &[PushConstantRange {
-                stages: ShaderStages::VERTEX,
-                range: 0..size_of::<Constants>() as _,
-            }],
+            push_constant_ranges: &[],
         });
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("geometry"),
+            label: Some("tile"),
             layout: Some(&layout),
             vertex: VertexState {
                 module: shader_module,
@@ -126,19 +156,30 @@ impl GeometryRenderer {
                 module: shader_module,
                 entry_point: "fs_main",
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[Some(ColorTargetState {
-                    format: output_color_format,
-                    blend: None,
-                    write_mask: ColorWrites::default(),
-                })],
+                targets: &[
+                    Some(ColorTargetState {
+                        format: output_diffuse_format,
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                    Some(ColorTargetState {
+                        format: output_normal_format,
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                    Some(ColorTargetState {
+                        format: output_water_format,
+                        blend: None,
+                        write_mask: ColorWrites::default(),
+                    }),
+                ],
             }),
             multiview: None,
-            primitive: PrimitiveState {
-                cull_mode: Some(Face::Back),
-                front_face: FrontFace::Ccw,
+            primitive: PrimitiveState::default(),
+            multisample: MultisampleState {
+                count: 4,
                 ..Default::default()
             },
-            multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: output_depth_format,
                 depth_write_enabled: true,
@@ -160,28 +201,21 @@ impl GeometryRenderer {
 
         render_pass.set_pipeline(&self.pipeline);
         render_pass.set_bind_group(0, &self.bind_group, &[]);
+        render_pass.set_bind_group(1, self.tile_textures.bind_group(), &[]);
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("render geometry"))]
+    #[cfg_attr(feature = "debug", korangar_debug::profile("render tiles"))]
     pub fn render(
         &self,
-        render_target: &mut <PickerRenderer as Renderer>::Target,
+        render_target: &mut <DeferredRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
         vertex_buffer: &Buffer<ModelVertex>,
-        textures: &TextureGroup,
-        world_matrix: Matrix4<f32>,
     ) {
-        if render_target.bound_sub_renderer(PickerSubRenderer::Geometry) {
+        if render_target.bound_sub_renderer(DeferredSubRenderer::Tile) {
             self.bind_pipeline(render_pass, camera);
         }
 
-        let push_constants = Constants {
-            world: world_matrix.into(),
-        };
-
-        render_pass.set_push_constants(ShaderStages::VERTEX, 0, cast_slice(&[push_constants]));
-        render_pass.set_bind_group(1, textures.bind_group(), &[]);
         render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
         render_pass.draw(0..vertex_buffer.count(), 0..1);
     }

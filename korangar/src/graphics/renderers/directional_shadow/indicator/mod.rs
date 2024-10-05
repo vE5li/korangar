@@ -129,7 +129,7 @@ impl IndicatorRenderer {
         lower_left: Point3<f32>,
         lower_right: Point3<f32>,
     ) {
-        if render_target.bind_sub_renderer(DirectionalShadowSubRenderer::Indicator) {
+        if render_target.bound_sub_renderer(DirectionalShadowSubRenderer::Indicator) {
             self.bind_pipeline(render_pass);
         }
 

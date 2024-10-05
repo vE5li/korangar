@@ -15,13 +15,13 @@ mod point;
 mod point_shadow;
 mod rectangle;
 mod sprite;
+#[cfg(feature = "debug")]
+mod tile;
 mod water;
 mod water_light;
 
 use std::sync::Arc;
 
-#[cfg(feature = "debug")]
-use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Point3, Vector2, Vector3};
 #[cfg(feature = "debug")]
 use circle::CircleRenderer;
@@ -49,6 +49,8 @@ use self::point::PointLightRenderer;
 use self::point_shadow::PointLightWithShadowsRenderer;
 use self::rectangle::RectangleRenderer;
 use self::sprite::SpriteRenderer;
+#[cfg(feature = "debug")]
+use self::tile::TileRenderer;
 use self::water::WaterRenderer;
 use self::water_light::WaterLightRenderer;
 use crate::graphics::{
@@ -80,6 +82,8 @@ pub enum DeferredSubRenderer {
     Overlay,
     Rectangle,
     Sprite,
+    #[cfg(feature = "debug")]
+    Tile,
     Effect,
 }
 
@@ -89,6 +93,8 @@ pub struct DeferredRenderer {
     entity_renderer: EntityRenderer,
     water_renderer: WaterRenderer,
     indicator_renderer: IndicatorRenderer,
+    #[cfg(feature = "debug")]
+    tile_renderer: TileRenderer,
     ambient_light_renderer: AmbientLightRenderer,
     directional_light_renderer: DirectionalLightRenderer,
     point_light_renderer: PointLightRenderer,
@@ -104,8 +110,6 @@ pub struct DeferredRenderer {
     box_renderer: BoxRenderer,
     #[cfg(feature = "debug")]
     circle_renderer: CircleRenderer,
-    #[cfg(feature = "debug")]
-    tile_textures: TextureGroup,
     font_map: Arc<Texture>,
     walk_indicator: Arc<Texture>,
     surface_format: TextureFormat,
@@ -157,6 +161,16 @@ impl DeferredRenderer {
             output_water_format,
             output_depth_format,
         );
+        #[cfg(feature = "debug")]
+        let tile_renderer = TileRenderer::new(
+            device.clone(),
+            queue.clone(),
+            texture_loader,
+            output_diffuse_format,
+            output_normal_format,
+            output_water_format,
+            output_depth_format,
+        );
 
         let ambient_light_renderer = AmbientLightRenderer::new(device.clone(), surface_format);
         let directional_light_renderer = DirectionalLightRenderer::new(device.clone(), queue.clone(), surface_format);
@@ -182,26 +196,14 @@ impl DeferredRenderer {
         let font_map = texture_loader.get("font.png").unwrap();
         let walk_indicator = texture_loader.get("grid.tga").unwrap();
 
-        #[cfg(feature = "debug")]
-        let tile_textures: Vec<Arc<Texture>> = vec![
-            texture_loader.get("0.png").unwrap(),
-            texture_loader.get("1.png").unwrap(),
-            texture_loader.get("2.png").unwrap(),
-            texture_loader.get("3.png").unwrap(),
-            texture_loader.get("4.png").unwrap(),
-            texture_loader.get("5.png").unwrap(),
-            texture_loader.get("6.png").unwrap(),
-        ];
-
-        #[cfg(feature = "debug")]
-        let tile_textures = TextureGroup::new(&device, "tile textures", tile_textures);
-
         Self {
             device,
             geometry_renderer,
             entity_renderer,
             water_renderer,
             indicator_renderer,
+            #[cfg(feature = "debug")]
+            tile_renderer,
             ambient_light_renderer,
             directional_light_renderer,
             point_light_renderer,
@@ -217,8 +219,6 @@ impl DeferredRenderer {
             box_renderer,
             #[cfg(feature = "debug")]
             circle_renderer,
-            #[cfg(feature = "debug")]
-            tile_textures,
             font_map,
             walk_indicator,
             surface_format,
@@ -482,17 +482,10 @@ impl DeferredRenderer {
         camera: &dyn Camera,
         vertex_buffer: &Buffer<ModelVertex>,
     ) {
-        // FIX: This is broken on account of the TileTypes not storing their original
-        // index. Should choose an index based on flags instead.
-        self.render_geometry(
-            render_target,
-            render_pass,
-            camera,
-            vertex_buffer,
-            &self.tile_textures,
-            Matrix4::identity(),
-            0.0,
-        );
+        // FIX: This is broken on account of the TileTypes not storing their
+        // original index. Should choose an index based on flags
+        // instead.
+        self.tile_renderer.render(render_target, render_pass, camera, vertex_buffer);
     }
 
     #[cfg(feature = "debug")]
@@ -552,19 +545,19 @@ impl Renderer for DeferredRenderer {
 
 impl GeometryRendererTrait for DeferredRenderer {
     fn render_geometry(
-        &self,
+        &mut self,
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
+        instructions: &[GeometryInstruction],
         vertex_buffer: &Buffer<ModelVertex>,
         textures: &TextureGroup,
-        world_matrix: Matrix4<f32>,
         time: f32,
     ) where
         Self: Renderer,
     {
         self.geometry_renderer
-            .render(render_target, render_pass, camera, vertex_buffer, textures, world_matrix, time);
+            .render(render_target, render_pass, camera, instructions, vertex_buffer, textures, time);
     }
 }
 

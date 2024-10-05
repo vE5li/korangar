@@ -189,7 +189,7 @@ impl EntityRenderer {
 
         render_pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, cast_slice(&[push_constants]));
         render_pass.set_bind_group(0, &bind_group, &[]);
-        render_pass.set_bind_group(1, render_target.face_bind_group(), &[]);
+        render_pass.set_bind_group(1, &render_target.face_bind_group(&self.device), &[]);
         render_pass.draw(0..6, 0..1);
     }
 }

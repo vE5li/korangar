@@ -105,3 +105,28 @@ impl TextureLoader {
         }
     }
 }
+
+/// We need to map the model texture indices to the indices of the textures
+/// buffer.
+pub fn map_model_texture_to_texture_buffer(
+    texture_loader: &mut TextureLoader,
+    texture_cache: &mut HashMap<String, i32>,
+    texture_buffer: &mut Vec<Arc<Texture>>,
+    texture_names: &[impl AsRef<str>],
+) -> Vec<i32> {
+    texture_names
+        .iter()
+        .map(|texture_name| {
+            let texture_name = texture_name.as_ref();
+            let offset = if let Some(texture_offset) = texture_cache.get(texture_name).copied() {
+                texture_offset
+            } else {
+                let texture_offset = texture_buffer.len() as i32;
+                texture_buffer.push(texture_loader.get(texture_name).expect("can't load model texture"));
+                texture_cache.insert(texture_name.to_string(), texture_offset);
+                texture_offset
+            };
+            offset
+        })
+        .collect()
+}

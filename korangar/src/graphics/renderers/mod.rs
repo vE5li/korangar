@@ -12,6 +12,7 @@ mod surface;
 mod texture;
 
 use std::marker::PhantomData;
+use std::num::NonZeroU64;
 use std::sync::atomic::AtomicU32;
 use std::sync::{Arc, OnceLock};
 
@@ -40,11 +41,21 @@ pub use self::point_shadow::PointShadowRenderer;
 pub use self::settings::RenderSettings;
 pub use self::surface::{PresentModeInfo, Surface};
 pub use self::texture::{CubeTexture, Texture, TextureGroup};
-use super::{Color, ModelVertex};
+use super::{Color, GeometryInstruction, ModelVertex};
 use crate::graphics::Camera;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
+
+/// We reimplement the wgpu type, since we want to have bytemuck support.
+#[repr(C)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+pub struct DrawIndirectArgs {
+    vertex_count: u32,
+    instance_count: u32,
+    first_vertex: u32,
+    first_instance: u32,
+}
 
 pub const LIGHT_ATTACHMENT_BLEND: BlendState = BlendState {
     color: BlendComponent {
@@ -117,13 +128,13 @@ pub trait Renderer {
 
 pub trait GeometryRenderer {
     fn render_geometry(
-        &self,
+        &mut self,
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
+        instructions: &[GeometryInstruction],
         vertex_buffer: &Buffer<ModelVertex>,
         textures: &TextureGroup,
-        world_matrix: Matrix4<f32>,
         time: f32,
     ) where
         Self: Renderer;
@@ -490,7 +501,7 @@ impl<F: IntoFormat, S: PartialEq, C> SingleRenderTarget<F, S, C> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn bind_sub_renderer(&mut self, sub_renderer: S) -> bool {
+    pub fn bound_sub_renderer(&mut self, sub_renderer: S) -> bool {
         let already_bound = self.bound_sub_renderer.contains(&sub_renderer);
         self.bound_sub_renderer = Some(sub_renderer);
         !already_bound
@@ -571,13 +582,22 @@ pub struct ViewProjectionMatrix([[f32; 4]; 4]);
 
 impl ViewProjectionMatrix {
     const fn memory_size() -> u64 {
-        std::mem::size_of::<ViewProjectionMatrix>() as u64
+        size_of::<ViewProjectionMatrix>() as u64
     }
 }
 
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+pub struct CubeFaceInstanceData {
+    world: [[f32; 4]; 4],
+    light_position: [f32; 4],
+}
+
 pub struct CubeFaceBuffer {
-    buffer: Buffer<ViewProjectionMatrix>,
-    bind_group: BindGroup,
+    uniform_buffer: Buffer<ViewProjectionMatrix>,
+    instance_buffer: Buffer<CubeFaceInstanceData>,
+    draw_command_buffer: Buffer<DrawIndirectArgs>,
+    instance_index_vertex_buffer: Buffer<u32>,
 }
 
 impl CubeFaceBuffer {
@@ -586,38 +606,84 @@ impl CubeFaceBuffer {
         LAYOUT.get_or_init(|| {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some("view projection matrix"),
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: BufferSize::new(ViewProjectionMatrix::memory_size()),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::VERTEX,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: BufferSize::new(ViewProjectionMatrix::memory_size()),
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::VERTEX_FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(size_of::<CubeFaceInstanceData>() as _),
+                        },
+                        count: None,
+                    },
+                ],
             })
         })
     }
 
+    pub fn bind_group(&self, device: &Device) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+            label: Some("geometry"),
+            layout: Self::bind_group_layout(device),
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: self.instance_buffer.as_entire_binding(),
+                },
+            ],
+        })
+    }
+
     pub fn new(device: &Device, name: &'static str) -> Self {
-        let buffer = Buffer::with_capacity(
+        const INITIAL_INSTRUCTION_SIZE: usize = 512;
+
+        let uniform_buffer = Buffer::with_capacity(
             device,
             name,
             BufferUsages::UNIFORM | BufferUsages::COPY_DST,
             ViewProjectionMatrix::memory_size(),
         );
+        let instance_buffer = Buffer::with_capacity(
+            &device,
+            "instance data",
+            BufferUsages::COPY_DST | BufferUsages::STORAGE,
+            (size_of::<CubeFaceInstanceData>() * INITIAL_INSTRUCTION_SIZE) as _,
+        );
+        let draw_command_buffer = Buffer::with_capacity(
+            &device,
+            "indirect draw",
+            BufferUsages::COPY_DST | BufferUsages::INDIRECT,
+            (size_of::<DrawIndirectArgs>() * INITIAL_INSTRUCTION_SIZE) as _,
+        );
+        // TODO: NHA This instance index vertex buffer is only needed until this issue is fixed for DX12: https://github.com/gfx-rs/wgpu/issues/2471
+        let instance_index_vertex_buffer = Buffer::with_capacity(
+            &device,
+            "instance index vertex",
+            BufferUsages::COPY_DST | BufferUsages::VERTEX,
+            (size_of::<u32>() * INITIAL_INSTRUCTION_SIZE) as _,
+        );
 
-        let bind_group = device.create_bind_group(&BindGroupDescriptor {
-            label: Some("geometry"),
-            layout: Self::bind_group_layout(device),
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        });
-
-        Self { buffer, bind_group }
+        Self {
+            uniform_buffer,
+            instance_buffer,
+            draw_command_buffer,
+            instance_index_vertex_buffer,
+        }
     }
 }
 
@@ -690,7 +756,7 @@ impl<S: PartialEq> CubeRenderTarget<S> {
         self.bound_sub_renderer = None;
 
         self.faces[index as usize]
-            .buffer
+            .uniform_buffer
             .write_exact(queue, &[ViewProjectionMatrix(matrix.into())]);
         self.index = index as usize;
 
@@ -714,7 +780,19 @@ impl<S: PartialEq> CubeRenderTarget<S> {
         TextureFormat::Depth32Float
     }
 
-    pub fn face_bind_group(&self) -> &BindGroup {
-        &self.faces[self.index].bind_group
+    pub fn face_instance_buffer(&mut self) -> &mut Buffer<CubeFaceInstanceData> {
+        &mut self.faces[self.index].instance_buffer
+    }
+
+    pub fn face_draw_command_buffer(&mut self) -> &mut Buffer<DrawIndirectArgs> {
+        &mut self.faces[self.index].draw_command_buffer
+    }
+
+    pub fn face_instance_index_vertex_buffer(&mut self) -> &mut Buffer<u32> {
+        &mut self.faces[self.index].instance_index_vertex_buffer
+    }
+
+    pub fn face_bind_group(&self, device: &Device) -> BindGroup {
+        self.faces[self.index].bind_group(device)
     }
 }

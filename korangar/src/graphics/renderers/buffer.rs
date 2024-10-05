@@ -17,6 +17,7 @@ pub struct Buffer<T: ?Sized> {
     label: String,
     size: AtomicU64,
     capacity: u64,
+    usage: BufferUsages,
     buffer: Arc<wgpu::Buffer>,
     _marker: PhantomData<T>,
 }
@@ -41,6 +42,7 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
             label,
             size: AtomicU64::new(0),
             capacity,
+            usage,
             buffer,
             _marker: PhantomData,
         }
@@ -60,6 +62,7 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
             label,
             size: AtomicU64::new(size),
             capacity: size,
+            usage,
             buffer,
             _marker: PhantomData,
         };
@@ -100,6 +103,37 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
         //       fulfill.
         let mut buffer = queue.write_buffer_with(&self.buffer, 0, data_size).unwrap();
         buffer.copy_from_slice(data);
+    }
+
+    /// Used when the user wants to write data. Can re-allocate the buffer if
+    /// it's not big enough.
+    pub fn write(&mut self, device: &Device, queue: &Queue, data: &[T]) {
+        let data: &[u8] = cast_slice(data);
+
+        let Some(data_size) = NonZeroU64::new(data.len() as u64) else {
+            return;
+        };
+
+        if self.capacity < data_size.get() {
+            let size = data_size.get();
+            self.capacity = size;
+
+            self.buffer = Arc::new(device.create_buffer(&BufferDescriptor {
+                label: Some(&self.label),
+                size,
+                usage: self.usage,
+                mapped_at_creation: false,
+            }));
+        }
+        self.size.store(data_size.get(), Ordering::Release);
+
+        let mut buffer = queue.write_buffer_with(&self.buffer, 0, data_size).unwrap();
+        buffer.copy_from_slice(data);
+    }
+
+    /// Returns a reference to the backing GPU buffer.
+    pub fn get_buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
     }
 
     /// Returns a sliced view into the buffer.

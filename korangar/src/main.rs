@@ -25,7 +25,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::{Vector2, Vector3};
+use cgmath::{Point3, Vector2, Vector3};
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
@@ -84,7 +84,7 @@ const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
 // The real limiting factor is WGPUs
 // "Limit::max_sampled_textures_per_shader_stage".
-const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = 30;
+const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = 1800;
 const DEFAULT_MAP: &str = "geffen";
 const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
 const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
@@ -213,10 +213,14 @@ struct Client {
     #[cfg(feature = "debug")]
     bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
+    deferred_geometry_instructions: Vec<GeometryInstruction>,
+    directional_shadow_geometry_instructions: Vec<GeometryInstruction>,
+    point_shadow_geometry_instructions: Vec<GeometryInstruction>,
+
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
 
-    map: Arc<Map>,
+    map: Map,
 }
 
 struct RenderContext {
@@ -268,7 +272,10 @@ impl Client {
         });
 
         time_phase!("create device", {
-            let required_features = Features::PUSH_CONSTANTS | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
+            let required_features = Features::INDIRECT_FIRST_INSTANCE
+                | Features::MULTI_DRAW_INDIRECT
+                | Features::PUSH_CONSTANTS
+                | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
             #[cfg(feature = "debug")]
             let required_features = required_features | Features::POLYGON_MODE_LINE;
 
@@ -335,7 +342,7 @@ impl Client {
             std::fs::create_dir_all("client/themes").unwrap();
             let font_loader = Rc::new(RefCell::new(FontLoader::new(&device, queue.clone(), &game_file_loader)));
 
-            let mut model_loader = ModelLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
+            let mut model_loader = ModelLoader::new(game_file_loader.clone());
             let mut texture_loader = TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
             let mut map_loader = MapLoader::new(device.clone(), queue.clone(), game_file_loader.clone(), audio_engine.clone());
             let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
@@ -399,8 +406,8 @@ impl Client {
             let mut directional_shadow_camera = DirectionalShadowCamera::new();
             let point_shadow_camera = PointShadowCamera::new();
 
-            start_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
-            directional_shadow_camera.set_focus_point(cgmath::Point3::new(600.0, 0.0, 240.0));
+            start_camera.set_focus_point(Point3::new(600.0, 0.0, 240.0));
+            directional_shadow_camera.set_focus_point(Point3::new(600.0, 0.0, 240.0));
         });
 
         time_phase!("initialize networking", {
@@ -446,6 +453,10 @@ impl Client {
             #[cfg(feature = "debug")]
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
+            let deferred_geometry_instructions = Vec::default();
+            let directional_shadow_geometry_instructions = Vec::default();
+            let point_shadow_geometry_instructions = Vec::default();
+
             let welcome_string = format!(
                 "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
                 env!("CARGO_PKG_VERSION")
@@ -460,7 +471,7 @@ impl Client {
 
         time_phase!("load default map", {
             let map = map_loader
-                .get(DEFAULT_MAP.to_string(), &mut model_loader, &mut texture_loader)
+                .load(DEFAULT_MAP.to_string(), &mut model_loader, &mut texture_loader)
                 .expect("failed to load initial map");
 
             map.set_ambient_sound_sources(&audio_engine);
@@ -534,6 +545,9 @@ impl Client {
             deferred_object_set_buffer,
             #[cfg(feature = "debug")]
             bounding_box_object_set_buffer,
+            deferred_geometry_instructions,
+            directional_shadow_geometry_instructions,
+            point_shadow_geometry_instructions,
             chat_messages,
             main_menu_click_sound_effect,
             map,
@@ -667,7 +681,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .get(crate::DEFAULT_MAP.to_string(), &mut self.model_loader, &mut self.texture_loader)
+                        .load(DEFAULT_MAP.to_string(), &mut self.model_loader, &mut self.texture_loader)
                         .expect("failed to load initial map");
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -734,7 +748,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .get(map_name, &mut self.model_loader, &mut self.texture_loader)
+                        .load(map_name, &mut self.model_loader, &mut self.texture_loader)
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -849,7 +863,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .get(map_name, &mut self.model_loader, &mut self.texture_loader)
+                        .load(map_name, &mut self.model_loader, &mut self.texture_loader)
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -1786,11 +1800,11 @@ impl Client {
 
             self.effect_holder
                 .register_point_lights(&mut self.point_light_manager, current_camera);
+
             self.map
                 .register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
 
-            self.point_light_manager
-                .create_point_light_set(crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
+            self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
         };
 
         #[cfg(feature = "debug")]
@@ -1839,14 +1853,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let _measurement = threads::Shadow::start_frame();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                self.map.render_ground(
-                    directional_shadow_target,
-                    &mut directional_shadow_render_pass,
-                    &context.directional_shadow_renderer,
-                    &self.directional_shadow_camera,
-                    animation_timer,
-                );
+                self.directional_shadow_geometry_instructions.clear();
 
                 let object_set = self.map.cull_objects_with_frustum(
                     &self.directional_shadow_camera,
@@ -1856,14 +1863,19 @@ impl Client {
                 );
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                self.map.render_objects(
+                self.map
+                    .render_objects(&mut self.directional_shadow_geometry_instructions, &object_set, client_tick);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                self.map.render_ground(&mut self.directional_shadow_geometry_instructions);
+
+                self.map.render_geometry(
                     directional_shadow_target,
                     &mut directional_shadow_render_pass,
-                    &context.directional_shadow_renderer,
+                    &mut context.directional_shadow_renderer,
                     &self.directional_shadow_camera,
-                    client_tick,
+                    &self.directional_shadow_geometry_instructions,
                     animation_timer,
-                    &object_set,
                 );
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
@@ -1896,6 +1908,9 @@ impl Client {
                 let _measurement = threads::PointShadow::start_frame();
 
                 for (light_index, point_light) in point_light_set.with_shadow_iterator().enumerate() {
+                    #[cfg(feature = "debug")]
+                    let render_point_light_measurement = Profiler::start_measurement("render point light");
+
                     let Some(point_shadow_target) = point_shadow_target.get_mut(light_index) else {
                         break;
                     };
@@ -1914,6 +1929,8 @@ impl Client {
                     // performance.
 
                     for index in 0..6 {
+                        self.point_shadow_geometry_instructions.clear();
+
                         self.point_shadow_camera.change_direction(index);
                         self.point_shadow_camera.generate_view_projection(Vector2::zero());
 
@@ -1925,6 +1942,22 @@ impl Client {
                             projection_matrix * view_matrix,
                         );
 
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+                        self.map
+                            .render_objects(&mut self.point_shadow_geometry_instructions, &object_set, client_tick);
+
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                        self.map.render_ground(&mut self.point_shadow_geometry_instructions);
+
+                        self.map.render_geometry(
+                            point_shadow_target,
+                            &mut point_shadow_render_pass,
+                            &mut context.point_shadow_renderer,
+                            &self.point_shadow_camera,
+                            &self.point_shadow_geometry_instructions,
+                            animation_timer,
+                        );
+
                         /* #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                         self.entity_set.render(
                             context.point_shadow_target,
@@ -1933,17 +1966,6 @@ impl Client {
                             &self.point_shadow_camera,
                             true,
                         ); */
-
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                        self.map.render_objects(
-                            point_shadow_target,
-                            &mut point_shadow_render_pass,
-                            &context.point_shadow_renderer,
-                            &self.point_shadow_camera,
-                            client_tick,
-                            animation_timer,
-                            &object_set,
-                        );
 
                         if let Some(PickerTarget::Tile { x, y }) = mouse_target
                             && !entities.is_empty()
@@ -1959,15 +1981,11 @@ impl Client {
                             );
                         }
 
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                        self.map.render_ground(
-                            point_shadow_target,
-                            &mut point_shadow_render_pass,
-                            &context.point_shadow_renderer,
-                            &self.point_shadow_camera,
-                            animation_timer,
-                        );
+                        drop_pass(point_shadow_render_pass);
                     }
+
+                    #[cfg(feature = "debug")]
+                    render_point_light_measurement.stop();
                 }
             });
 
@@ -1975,13 +1993,7 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let _measurement = threads::Deferred::start_frame();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                self.map.render_ground(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);
-
-                #[cfg(feature = "debug")]
-                if render_settings.show_map_tiles {
-                    self.map.render_overlay_tiles(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera);
-                }
+                self.deferred_geometry_instructions.clear();
 
                 let object_set = self.map.cull_objects_with_frustum(
                     current_camera,
@@ -1990,15 +2002,25 @@ impl Client {
                 );
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                self.map.render_objects(
+                self.map
+                    .render_objects(&mut self.deferred_geometry_instructions, &object_set, client_tick);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                self.map.render_ground(&mut self.deferred_geometry_instructions);
+
+                self.map.render_geometry(
                     deferred_target,
                     &mut geometry_render_pass,
-                    &context.deferred_renderer,
+                    &mut context.deferred_renderer,
                     current_camera,
-                    client_tick,
+                    &self.deferred_geometry_instructions,
                     animation_timer,
-                    &object_set,
                 );
+
+                #[cfg(feature = "debug")]
+                if render_settings.show_map_tiles {
+                    self.map.render_overlay_tiles(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera);
+                }
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                 self.map.render_entities(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, true);
@@ -2209,12 +2231,12 @@ impl Client {
         #[cfg(feature = "debug")]
         let finalize_frame_measurement = Profiler::start_measurement("finishing command encoders");
 
-        drop(picker_render_pass);
-        drop(picker_compute_pass);
-        drop(interface_render_pass);
-        drop(directional_shadow_render_pass);
-        drop(geometry_render_pass);
-        drop(screen_render_pass);
+        drop_pass(picker_render_pass);
+        drop_pass(picker_compute_pass);
+        drop_pass(interface_render_pass);
+        drop_pass(directional_shadow_render_pass);
+        drop_pass(geometry_render_pass);
+        drop_pass(screen_render_pass);
 
         let (picker_render_command_buffer, picker_compute_command_buffer) =
             picker_target.finish(picker_render_command_encoder, picker_compute_command_encoder);
@@ -2324,7 +2346,8 @@ impl ApplicationHandler for Client {
                         let picker_renderer = PickerRenderer::new(self.device.clone(), self.queue.clone(), inner_size);
                         let directional_shadow_renderer =
                             DirectionalShadowRenderer::new(self.device.clone(), self.queue.clone(), &mut self.texture_loader);
-                        let point_shadow_renderer = PointShadowRenderer::new(self.device.clone(), &mut self.texture_loader);
+                        let point_shadow_renderer =
+                            PointShadowRenderer::new(self.device.clone(), self.queue.clone(), &mut self.texture_loader);
                     });
 
                     time_phase!("create render targets", {
@@ -2435,4 +2458,9 @@ impl ApplicationHandler for Client {
             self.surface = None;
         }
     }
+}
+
+#[cfg_attr(feature = "debug", korangar_debug::profile)]
+fn drop_pass<T>(pass: T) {
+    drop(pass);
 }

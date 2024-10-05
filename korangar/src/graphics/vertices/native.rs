@@ -13,17 +13,17 @@ pub struct NativeModelVertex {
 }
 
 impl NativeModelVertex {
-    fn convert_to_vertex(self) -> ModelVertex {
+    fn convert_to_vertex(self, texture_index_mapping: &[i32]) -> ModelVertex {
         ModelVertex::new(
             self.position,
             self.normal,
             self.texture_coordinates,
-            self.texture_index,
+            texture_index_mapping[self.texture_index as usize],
             self.wind_affinity,
         )
     }
 
-    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
+    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_index_mapping: &[i32]) -> Vec<ModelVertex> {
         let mut vertices = Vec::new();
         let mut drain_iterator = native_vertices.drain(..);
 
@@ -35,9 +35,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.convert_to_vertex());
-            vertices.push(second_partial.convert_to_vertex());
-            vertices.push(third_partial.convert_to_vertex());
+            vertices.push(first_partial.convert_to_vertex(texture_index_mapping));
+            vertices.push(second_partial.convert_to_vertex(texture_index_mapping));
+            vertices.push(third_partial.convert_to_vertex(texture_index_mapping));
         }
 
         vertices

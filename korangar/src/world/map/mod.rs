@@ -12,8 +12,8 @@ use korangar_util::create_simple_key;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
-use ragnarok_formats::map::MapData;
-use ragnarok_formats::map::{EffectSource, LightSettings, LightSource, SoundSource, Tile, TileFlags, WaterSettings};
+use ragnarok_formats::map::{EffectSource, MapData};
+use ragnarok_formats::map::{LightSettings, LightSource, SoundSource, Tile, TileFlags, WaterSettings};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
@@ -22,7 +22,7 @@ use wgpu::RenderPass;
 #[cfg(feature = "debug")]
 use super::{point_light_extent, LightSourceExt, PointLightSet};
 use super::{Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
-use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, GeometryRenderer, Renderer};
+use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, GeometryInstruction, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
 use crate::graphics::{MarkerRenderer, RenderSettings};
 #[cfg(feature = "debug")]
@@ -117,14 +117,18 @@ pub struct Map {
     water_settings: Option<WaterSettings>,
     light_settings: LightSettings,
     tiles: Vec<Tile>,
-    ground_vertex_buffer: Buffer<ModelVertex>,
+    ground_vertex_offset: u32,
+    ground_vertex_count: u32,
+    vertex_buffer: Buffer<ModelVertex>,
     water_vertex_buffer: Option<Buffer<WaterVertex>>,
-    ground_textures: TextureGroup,
+    textures: TextureGroup,
     objects: SimpleSlab<ObjectKey, Object>,
     light_sources: SimpleSlab<LightSourceKey, LightSource>,
     sound_sources: Vec<SoundSource>,
+    #[cfg(feature = "debug")]
     effect_sources: Vec<EffectSource>,
     tile_picker_vertex_buffer: Buffer<TileVertex>,
+    #[cfg(feature = "debug")]
     tile_vertex_buffer: Buffer<ModelVertex>,
     object_kdtree: KDTree<ObjectKey, AABB>,
     light_source_kdtree: KDTree<LightSourceKey, Sphere>,
@@ -179,29 +183,7 @@ impl Map {
         audio_engine.prepare_ambient_sound_world();
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_ground<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        time: f32,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        renderer.render_geometry(
-            render_target,
-            render_pass,
-            camera,
-            &self.ground_vertex_buffer,
-            &self.ground_textures,
-            Matrix4::identity(),
-            time,
-        );
-    }
-
-    // We want to make sure that the object set also caputres the lifetime of the
+    // We want to make sure that the object set also captures the lifetime of the
     // map, so we never have a stale object set.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn cull_objects_with_frustum<'a>(
@@ -225,7 +207,7 @@ impl Map {
         })
     }
 
-    // We want to make sure that the object set also caputres the lifetime of the
+    // We want to make sure that the object set also captures the lifetime of the
     // map, so we never have a stale object set.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn cull_objects_in_sphere<'a>(
@@ -247,23 +229,49 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_objects<T>(
+    pub fn render_objects(
+        &self,
+        instructions: &mut Vec<GeometryInstruction>,
+        object_set: &ResourceSet<ObjectKey>,
+        client_tick: ClientTick,
+    ) {
+        for object_key in object_set.iterate_visible().copied() {
+            if let Some(object) = self.objects.get(object_key) {
+                object.render_geometry(instructions, client_tick);
+            }
+        }
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn render_ground(&self, instructions: &mut Vec<GeometryInstruction>) {
+        instructions.push(GeometryInstruction {
+            world_matrix: Matrix4::identity(),
+            vertex_offset: self.ground_vertex_offset,
+            vertex_count: self.ground_vertex_count,
+        });
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn render_geometry<T>(
         &self,
         render_target: &mut T::Target,
         render_pass: &mut RenderPass,
-        renderer: &T,
+        renderer: &mut T,
         camera: &dyn Camera,
-        client_tick: ClientTick,
+        instructions: &[GeometryInstruction],
         time: f32,
-        object_set: &ResourceSet<ObjectKey>,
     ) where
         T: Renderer + GeometryRenderer,
     {
-        for object_key in object_set.iterate_visible().copied() {
-            if let Some(object) = self.objects.get(object_key) {
-                object.render_geometry(render_target, render_pass, renderer, camera, client_tick, time);
-            }
-        }
+        renderer.render_geometry(
+            render_target,
+            render_pass,
+            camera,
+            instructions,
+            &self.vertex_buffer,
+            &self.textures,
+            time,
+        )
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

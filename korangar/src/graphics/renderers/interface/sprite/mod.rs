@@ -133,7 +133,7 @@ impl SpriteRenderer {
         color: Color,
         smooth: bool,
     ) {
-        if render_target.bind_sub_renderer(InterfaceSubRenderer::Sprite) {
+        if render_target.bound_sub_renderer(InterfaceSubRenderer::Sprite) {
             self.bind_pipeline(render_pass);
         }
 

@@ -4,9 +4,9 @@ mod indicator;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Vector2};
+use cgmath::{Point3, Vector2};
 use ragnarok_packets::EntityId;
-use wgpu::{Device, RenderPass, TextureFormat, TextureUsages};
+use wgpu::{Device, Queue, RenderPass, TextureFormat, TextureUsages};
 
 use self::entity::EntityRenderer;
 use self::geometry::GeometryRenderer;
@@ -33,10 +33,10 @@ pub struct PointShadowRenderer {
 }
 
 impl PointShadowRenderer {
-    pub fn new(device: Arc<Device>, texture_loader: &mut TextureLoader) -> Self {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, texture_loader: &mut TextureLoader) -> Self {
         let output_depth_format = <Self as Renderer>::Target::output_texture_format();
 
-        let geometry_renderer = GeometryRenderer::new(device.clone(), output_depth_format);
+        let geometry_renderer = GeometryRenderer::new(device.clone(), queue, output_depth_format);
         let entity_renderer = EntityRenderer::new(device.clone(), output_depth_format);
         let indicator_renderer = IndicatorRenderer::new(device.clone(), output_depth_format);
 
@@ -81,13 +81,13 @@ impl Renderer for PointShadowRenderer {
 
 impl GeometryRendererTrait for PointShadowRenderer {
     fn render_geometry(
-        &self,
+        &mut self,
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
-        camera: &dyn Camera,
+        _camera: &dyn Camera,
+        instructions: &[GeometryInstruction],
         vertex_buffer: &Buffer<ModelVertex>,
         textures: &TextureGroup,
-        world_matrix: Matrix4<f32>,
         time: f32,
     ) where
         Self: Renderer,
@@ -95,11 +95,10 @@ impl GeometryRendererTrait for PointShadowRenderer {
         self.geometry_renderer.render(
             render_target,
             render_pass,
-            camera,
             self.light_position,
+            instructions,
             vertex_buffer,
             textures,
-            world_matrix,
             time,
         );
     }

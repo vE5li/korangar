@@ -197,7 +197,7 @@ impl CubeTexture {
             texture.create_view(&TextureViewDescriptor {
                 label: Some("cube map single view"),
                 format: Some(wgpu::TextureFormat::Depth32Float),
-                dimension: Some(wgpu::TextureViewDimension::D2Array),
+                dimension: Some(wgpu::TextureViewDimension::D2),
                 aspect: wgpu::TextureAspect::All,
                 base_mip_level: 0,
                 mip_level_count: None,

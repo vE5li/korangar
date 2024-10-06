@@ -85,19 +85,6 @@ pub const INTERFACE_ATTACHMENT_BLEND: BlendState = BlendState {
     },
 };
 
-pub const EFFECT_ATTACHMENT_BLEND: BlendState = BlendState {
-    color: BlendComponent {
-        src_factor: BlendFactor::One,
-        dst_factor: BlendFactor::One,
-        operation: BlendOperation::Max,
-    },
-    alpha: BlendComponent {
-        src_factor: BlendFactor::One,
-        dst_factor: BlendFactor::One,
-        operation: BlendOperation::Max,
-    },
-};
-
 pub const ALPHA_BLEND: BlendState = BlendState {
     color: BlendComponent {
         src_factor: BlendFactor::SrcAlpha,

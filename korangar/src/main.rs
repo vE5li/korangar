@@ -2081,7 +2081,7 @@ impl Client {
                 }
 
                 self.particle_holder.render(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, screen_size, self.application.get_scaling_factor(), entities);
-                self.effect_holder.render(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera);
+                self.effect_holder.render(deferred_target, &mut screen_render_pass, &mut context.deferred_renderer, current_camera);
             });
 
             if render_interface {

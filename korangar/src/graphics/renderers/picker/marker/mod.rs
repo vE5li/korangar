@@ -18,7 +18,8 @@ const SHADER: ShaderModuleDescriptor = include_wgsl!("marker.wgsl");
 struct Constants {
     screen_position: [f32; 2],
     screen_size: [f32; 2],
-    identifier: u32,
+    identifier_high: u32,
+    identifier_low: u32,
 }
 
 pub struct MarkerRenderer {
@@ -100,11 +101,13 @@ impl MarkerRenderer {
         }
 
         let picker_target = PickerTarget::Marker(marker_identifier);
+        let (identifier_high, identifier_low) = picker_target.into();
 
         let push_constants = Constants {
             screen_position: screen_position.into(),
             screen_size: screen_size.into(),
-            identifier: picker_target.into(),
+            identifier_high,
+            identifier_low,
         };
 
         render_pass.set_push_constants(ShaderStages::VERTEX_FRAGMENT, 0, cast_slice(&[push_constants]));

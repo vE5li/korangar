@@ -7,7 +7,8 @@ struct Constants {
     world: mat4x4<f32>,
     texture_position: vec2<f32>,
     texture_size: vec2<f32>,
-    identifier: u32,
+    identifier_high: u32,
+    identifier_low: u32,
     mirror: u32,
 }
 
@@ -43,14 +44,14 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(@location(0) texture_coordinates: vec2<f32>) -> @location(0) u32 {
+fn fs_main(@location(0) texture_coordinates: vec2<f32>) -> @location(0) vec2<u32> {
     let diffuse_color = textureSample(sampled_texture, texture_sampler, texture_coordinates);
 
     if (diffuse_color.a != 1.0) {
         discard;
     }
 
-    return constants.identifier;
+    return vec2<u32>(constants.identifier_low, constants.identifier_high);
 }
 
 // Optimized version of the following truth table:

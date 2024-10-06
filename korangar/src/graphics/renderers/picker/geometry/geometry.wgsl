@@ -35,12 +35,12 @@ fn vs_main(
 fn fs_main(
     @location(0) texture_coordinates: vec2<f32>,
     @location(1) texture_index: i32
-) -> @location(0) u32 {
+) -> @location(0) vec2<u32> {
     let diffuse_color = textureSample(textures[texture_index], texture_sampler, texture_coordinates);
 
     if (diffuse_color.a != 1.0) {
         discard;
     }
 
-    return 0u;
+    return vec2<u32>(0u);
 }

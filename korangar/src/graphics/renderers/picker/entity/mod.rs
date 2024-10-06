@@ -30,7 +30,8 @@ struct Constants {
     world: [[f32; 4]; 4],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
-    identifier: u32,
+    identifier_high: u32,
+    identifier_low: u32,
     mirror: u32,
 }
 
@@ -192,7 +193,6 @@ impl EntityRenderer {
         let world_matrix = camera.billboard_matrix(position, origin, size);
         let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
         let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
-        let picker_target = PickerTarget::Entity(entity_id);
 
         let bind_group = self.device.create_bind_group(&BindGroupDescriptor {
             label: Some("entity"),
@@ -213,11 +213,15 @@ impl EntityRenderer {
             ],
         });
 
+        let picker_target = PickerTarget::Entity(entity_id);
+        let (identifier_high, identifier_low) = picker_target.into();
+
         let push_constants = Constants {
             world: world_matrix.into(),
             texture_position: texture_position.into(),
             texture_size: texture_size.into(),
-            identifier: picker_target.into(),
+            identifier_high,
+            identifier_low,
             mirror: mirror as u32,
         };
 

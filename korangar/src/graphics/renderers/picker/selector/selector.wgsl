@@ -9,6 +9,7 @@ var<push_constant> constants: Constants;
 @compute
 @workgroup_size(1)
 fn cs_main() {
-    let texel_value = textureLoad(texture, constants.pointer_position, 0);
-    buffer[0] = texel_value.x;
+    let texel_value = textureLoad(texture, constants.pointer_position, 0).rg;
+    buffer[0] = texel_value.r;
+    buffer[1] = texel_value.g;
 }

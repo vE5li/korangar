@@ -258,7 +258,7 @@ fn main() {
         DisplaySkillEffectNoDamagePacket,
         DisplayPlayerHealEffect,
         StatusChangePacket,
-        NotificationPacket,
+        ActionNotificationPacket,
         QuestNotificationPacket1,
         HuntingQuestNotificationPacket,
         HuntingQuestUpdateObjectivePacket,

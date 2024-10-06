@@ -823,7 +823,7 @@ where
         })?;
         packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
         packet_handler.register_noop::<StatusChangePacket>()?;
-        packet_handler.register_noop::<NotificationPacket>()?;
+        packet_handler.register_noop::<ActionNotificationPacket>()?;
         packet_handler.register_noop::<QuestNotificationPacket1>()?;
         packet_handler.register_noop::<HuntingQuestNotificationPacket>()?;
         packet_handler.register_noop::<HuntingQuestUpdateObjectivePacket>()?;

@@ -1460,6 +1460,7 @@ pub struct MovingEntityAppearedPacket {
     #[length(24)]
     pub name: String,
 }
+
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x0148)]
@@ -1804,16 +1805,16 @@ pub struct ObjectiveDetails1 {
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x008A)]
-pub struct NotificationPacket {
+pub struct ActionNotificationPacket {
     pub entity_id: EntityId,
     pub target_id: EntityId,
     pub server_tick: u32,
-    pub src_speed: u32,
-    pub dmg_speed: u32,
+    pub source_speed: u32,
+    pub damage_speed: u32,
     pub damage: i16,
     pub div: u16,
-    pub p_type: u8,
-    pub damage2: i16,
+    pub packet_type: u8, // type of action
+    pub damage_2: i16,   // damage from dual assassin
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]

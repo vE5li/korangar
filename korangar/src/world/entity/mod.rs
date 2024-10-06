@@ -1043,8 +1043,9 @@ impl Entity {
         self.get_common_mut().set_position(map, position, client_tick);
     }
 
-    pub fn set_death(&mut self, client_tick: ClientTick) {
-        self.get_common_mut().animation_state.death(client_tick);
+    pub fn set_dead(&mut self, client_tick: ClientTick) -> EntityType {
+        self.get_common_mut().animation_state.dead(client_tick);
+        self.get_common_mut().entity_type
     }
 
     pub fn set_idle(&mut self, client_tick: ClientTick) {

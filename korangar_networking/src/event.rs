@@ -64,7 +64,10 @@ pub enum NetworkEvent {
     AddEntity(EntityData),
     /// Remove an entity from the list of entities that the client is aware of
     /// by its id.
-    RemoveEntity(EntityId),
+    RemoveEntity {
+        entity_id: EntityId,
+        reason: DisappearanceReason,
+    },
     /// The player is pathing to a new position.
     PlayerMove(WorldPosition, WorldPosition, ClientTick),
     /// An Entity nearby is pathing to a new position.

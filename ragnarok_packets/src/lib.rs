@@ -1400,9 +1400,9 @@ pub struct ChangeMapPacket {
     pub position: TilePosition,
 }
 
-#[derive(Debug, Clone, ByteConvertable)]
+#[derive(Debug, Clone, ByteConvertable, PartialEq)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-pub enum DissapearanceReason {
+pub enum DisappearanceReason {
     OutOfSight,
     Died,
     LoggedOut,
@@ -1415,7 +1415,7 @@ pub enum DissapearanceReason {
 #[header(0x0080)]
 pub struct EntityDisappearedPacket {
     pub entity_id: EntityId,
-    pub reason: DissapearanceReason,
+    pub reason: DisappearanceReason,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1465,7 +1465,8 @@ pub struct MovingEntityAppearedPacket {
 #[header(0x0148)]
 pub struct ResurrectionPacket {
     pub entity_id: EntityId,
-    pub p_type: u16,
+    #[new_default]
+    pub packet_type: u16, // always 0 in rAthena
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]
@@ -1805,7 +1806,7 @@ pub struct ObjectiveDetails1 {
 #[header(0x008A)]
 pub struct NotificationPacket {
     pub entity_id: EntityId,
-    pub target_id: u32,
+    pub target_id: EntityId,
     pub server_tick: u32,
     pub src_speed: u32,
     pub dmg_speed: u32,

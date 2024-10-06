@@ -669,7 +669,10 @@ where
         packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity(packet.into()))?;
         packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
-        packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity(packet.entity_id))?;
+        packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity {
+            entity_id: packet.entity_id,
+            reason: packet.reason,
+        })?;
         packet_handler.register(|packet: UpdateStatusPacket| NetworkEvent::UpdateStatus(packet.status_type))?;
         packet_handler.register(|packet: UpdateStatusPacket1| NetworkEvent::UpdateStatus(packet.status_type))?;
         packet_handler.register(|packet: UpdateStatusPacket2| NetworkEvent::UpdateStatus(packet.status_type))?;

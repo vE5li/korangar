@@ -49,7 +49,7 @@ impl AnimationState {
         self.factor = Some(movement_speed as f32 * 100.0 / 150.0);
     }
 
-    pub fn death(&mut self, client_tick: ClientTick) {
+    pub fn dead(&mut self, client_tick: ClientTick) {
         self.action = 8;
         self.start_time = client_tick;
         self.duration = None;

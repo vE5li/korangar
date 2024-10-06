@@ -45,8 +45,8 @@ use korangar_networking::{
 use korangar_util::collision::Sphere;
 use num::Zero;
 use ragnarok_packets::{
-    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Friend, HotbarSlot, SellItemsResult, SkillId,
-    SkillType, TilePosition, UnitId, WorldPosition,
+    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, DisappearanceReason, Friend, HotbarSlot,
+    SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use rayon::in_place_scope;
 use wgpu::{CommandEncoderDescriptor, Features, Instance, InstanceFlags, Limits, Maintain, MemoryHints, TextureViewDescriptor};
@@ -724,9 +724,16 @@ fn main() {
                         NetworkEvent::CharacterSlotSwitchFailed => {
                             interface.open_window(&application, &mut focus_state, &ErrorWindow::new("Failed to switch character slots".to_owned()));
                         },
-                        NetworkEvent::ResurrectPlayer(data) => {
-                            entities[0].set_idle(client_tick);
-                            interface.close_window_with_class(&mut focus_state, RespawnWindow::WINDOW_CLASS);
+                        NetworkEvent::ResurrectPlayer(entity_id) => {
+                            // Close the painel if it is the entity_id is the current player
+                            if entities[0].get_entity_id() == entity_id {
+                                interface.close_window_with_class(&mut focus_state, RespawnWindow::WINDOW_CLASS);
+                            }
+                            // Resurrect the player with entity_id
+                            let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
+                            if let Some(entity) = entity {
+                                entity.set_idle(client_tick);
+                            }
                         }
                         NetworkEvent::AddEntity(entity_appeared_data) => {
                             // Sometimes (like after a job change) the server will tell the client
@@ -746,14 +753,26 @@ fn main() {
                             let npc = Entity::Npc(npc);
                             entities.push(npc);
                         }
-                        NetworkEvent::RemoveEntity(entity_id) => {
-                            if entities[0].get_entity_id() == entity_id {
-                                entities[0].set_death(client_tick);
-                                interface.open_window(&application, &mut focus_state, &RespawnWindow);
+                        NetworkEvent::RemoveEntity{entity_id, reason} => {
+                            //If the motive is dead, you need to set the player to dead
+                            if reason == DisappearanceReason::Died {
+                                if entities[0].get_entity_id() == entity_id {
+                                    entities[0].set_dead(client_tick);
+                                    interface.open_window(&application, &mut focus_state, &RespawnWindow);
+                                } else {
+                                    let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
+                                    if let Some(entity) = entity {
+                                        let entity_type = entity.set_dead(client_tick);
+                                        // If is a monster, the monster disappear
+                                        if entity_type == EntityType::Monster {
+                                            entities.retain(|entity| entity.get_entity_id() != entity_id);
+                                        }
+                                    }
+                                }
                             } else {
                                 entities.retain(|entity| entity.get_entity_id() != entity_id);
                             }
-                        }
+                        },
                         NetworkEvent::EntityMove(entity_id, position_from, position_to, starting_timestamp) => {
                             let entity = entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
 

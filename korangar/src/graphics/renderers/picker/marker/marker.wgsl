@@ -1,7 +1,8 @@
 struct Constants {
     screen_position: vec2<f32>,
     screen_size: vec2<f32>,
-    identifier: u32,
+    identifier_high: u32,
+    identifier_low: u32,
 }
 
 var<push_constant> constants: Constants;
@@ -15,8 +16,8 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<
 }
 
 @fragment
-fn fs_main() -> @location(0) u32 {
-    return constants.identifier;
+fn fs_main() -> @location(0) vec2<u32> {
+    return vec2<u32>(constants.identifier_low, constants.identifier_high);
 }
 
 // Optimized version of the following truth table:

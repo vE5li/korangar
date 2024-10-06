@@ -98,11 +98,11 @@ pub fn get_light_direction(day_timer: f32) -> Vector3<f32> {
 pub enum MarkerIdentifier {
     Object(u32),
     LightSource(u32),
-    SoundSource(usize),
-    EffectSource(usize),
-    Particle(usize, usize),
-    Entity(usize),
-    Shadow(usize),
+    SoundSource(u32),
+    EffectSource(u32),
+    Particle(u16, u16),
+    Entity(u32),
+    Shadow(u32),
 }
 
 #[cfg(feature = "debug")]
@@ -490,10 +490,10 @@ impl Map {
         match marker_identifier {
             MarkerIdentifier::Object(key) => self.objects.get(ObjectKey::new(key)).unwrap(),
             MarkerIdentifier::LightSource(key) => self.light_sources.get(LightSourceKey::new(key)).unwrap(),
-            MarkerIdentifier::SoundSource(index) => &self.sound_sources[index],
-            MarkerIdentifier::EffectSource(index) => &self.effect_sources[index],
+            MarkerIdentifier::SoundSource(index) => &self.sound_sources[index as usize],
+            MarkerIdentifier::EffectSource(index) => &self.effect_sources[index as usize],
             MarkerIdentifier::Particle(..) => todo!(),
-            MarkerIdentifier::Entity(index) => &entities[index],
+            MarkerIdentifier::Entity(index) => &entities[index as usize],
             MarkerIdentifier::Shadow(..) => todo!(),
         }
     }
@@ -548,7 +548,7 @@ impl Map {
 
         if render_settings.show_sound_markers {
             self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| {
-                let marker_identifier = MarkerIdentifier::SoundSource(index);
+                let marker_identifier = MarkerIdentifier::SoundSource(index as u32);
 
                 sound_source.render_marker(
                     render_target,
@@ -563,7 +563,7 @@ impl Map {
 
         if render_settings.show_effect_markers {
             self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| {
-                let marker_identifier = MarkerIdentifier::EffectSource(index);
+                let marker_identifier = MarkerIdentifier::EffectSource(index as u32);
 
                 effect_source.render_marker(
                     render_target,
@@ -578,7 +578,7 @@ impl Map {
 
         if render_settings.show_entity_markers {
             entities.iter().enumerate().for_each(|(index, entity)| {
-                let marker_identifier = MarkerIdentifier::Entity(index);
+                let marker_identifier = MarkerIdentifier::Entity(index as u32);
 
                 entity.render_marker(
                     render_target,
@@ -596,7 +596,7 @@ impl Map {
                 .with_shadow_iterator()
                 .enumerate()
                 .for_each(|(index, light_source)| {
-                    let marker_identifier = MarkerIdentifier::Shadow(index);
+                    let marker_identifier = MarkerIdentifier::Shadow(index as u32);
 
                     renderer.render_marker(
                         render_target,
@@ -643,7 +643,7 @@ impl Map {
                 );
             }
             MarkerIdentifier::SoundSource(index) => {
-                let sound_source = &self.sound_sources[index];
+                let sound_source = &self.sound_sources[index as usize];
                 let extent = sound_source.range;
 
                 renderer.render_circle(
@@ -659,7 +659,7 @@ impl Map {
             MarkerIdentifier::Particle(_index, _particle_index) => {}
             MarkerIdentifier::Entity(_index) => {}
             MarkerIdentifier::Shadow(index) => {
-                let point_light = point_light_set.with_shadow_iterator().nth(index).unwrap();
+                let point_light = point_light_set.with_shadow_iterator().nth(index as usize).unwrap();
                 let extent = point_light_extent(point_light.color, point_light.range);
 
                 renderer.render_circle(

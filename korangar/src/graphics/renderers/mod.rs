@@ -12,7 +12,7 @@ mod surface;
 mod texture;
 
 use std::marker::PhantomData;
-use std::sync::atomic::AtomicU32;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, OnceLock};
 
 use bytemuck::{Pod, Zeroable};
@@ -332,7 +332,7 @@ impl DeferredRenderTarget {
 pub struct PickerRenderTarget {
     pub texture: Texture,
     depth_texture: Texture,
-    buffer: Buffer<u32>,
+    buffer: Buffer<u64>,
     bound_sub_renderer: Option<PickerSubRenderer>,
 }
 
@@ -362,15 +362,16 @@ impl PickerRenderTarget {
 
     /// Reads the picker value.
     #[cfg_attr(feature = "debug", korangar_debug::profile("queue read for picker value"))]
-    pub fn queue_read_picker_value(&mut self, return_value: Arc<AtomicU32>) {
-        self.buffer.queue_read_u32(return_value);
+    pub fn queue_read_picker_value(&mut self, return_value: Arc<AtomicU64>) {
+        self.buffer.queue_read_u64(return_value);
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("start render pass"))]
     pub fn start_render_pass<'encoder>(&mut self, encoder: &'encoder mut CommandEncoder) -> RenderPass<'encoder> {
+        let (clear_high, clear_low) = <(u32, u32)>::from(PickerTarget::Nothing);
         let clear_color = wgpu::Color {
-            r: 0.0,
-            g: 0.0,
+            r: f64::from(clear_high),
+            g: f64::from(clear_low),
             b: 0.0,
             a: 0.0,
         };
@@ -432,8 +433,7 @@ impl PickerRenderTarget {
     }
 
     pub const fn output_color_format() -> TextureFormat {
-        // TODO: NHA We could use Rg32Uint for 64 bit range.
-        TextureFormat::R32Uint
+        TextureFormat::Rg32Uint
     }
 
     pub const fn depth_texture_format() -> TextureFormat {

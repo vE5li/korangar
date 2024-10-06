@@ -3,7 +3,7 @@ use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::RangeBounds;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use bytemuck::{cast_slice, Pod, Zeroable};
@@ -130,11 +130,11 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
     }
 }
 
-impl Buffer<u32> {
+impl Buffer<u64> {
     /// This function is a special case for the picker, where we want to read
     /// back the picker value.
-    pub fn queue_read_u32(&self, output: Arc<AtomicU32>) {
-        const VALUE_SIZE: usize = size_of::<u32>();
+    pub fn queue_read_u64(&self, output: Arc<AtomicU64>) {
+        const VALUE_SIZE: usize = size_of::<u64>();
 
         let captured_buffer = Arc::clone(&self.buffer);
         self.buffer.slice(..).map_async(wgpu::MapMode::Read, move |result| {
@@ -143,10 +143,10 @@ impl Buffer<u32> {
                     let mapped = captured_buffer.slice(..).get_mapped_range_mut();
 
                     if VALUE_SIZE <= mapped.len() {
-                        // The mapped memory is not guaranteed to be aligned to u32.
+                        // The mapped memory is not guaranteed to be aligned to u64.
                         let mut buffer = [0u8; VALUE_SIZE];
                         buffer.copy_from_slice(&mapped[..VALUE_SIZE]);
-                        let value = u32::from_ne_bytes(buffer);
+                        let value = u64::from_le_bytes(buffer);
                         output.store(value, Ordering::Release)
                     }
 

@@ -3,7 +3,7 @@ mod key;
 mod mode;
 
 use std::mem::variant_count;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use cgmath::Vector2;
@@ -44,7 +44,7 @@ pub struct InputSystem {
     keys: [Key; KEY_COUNT],
     mouse_input_mode: MouseInputMode,
     input_buffer: Vec<char>,
-    picker_value: Arc<AtomicU32>,
+    picker_value: Arc<AtomicU64>,
 }
 
 impl InputSystem {
@@ -63,7 +63,7 @@ impl InputSystem {
 
         let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
-        let picker_value = Arc::new(AtomicU32::new(0));
+        let picker_value = Arc::new(AtomicU64::new(0));
 
         Self {
             previous_mouse_position,
@@ -578,9 +578,9 @@ impl InputSystem {
 
         if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
             let last_pixel_value = self.picker_value.load(Ordering::Acquire);
-            if last_pixel_value != 0 {
-                let picker_target = PickerTarget::from(last_pixel_value);
+            let picker_target = PickerTarget::from(last_pixel_value);
 
+            if picker_target != PickerTarget::Nothing {
                 if self.left_mouse_button.pressed() {
                     match picker_target {
                         PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
@@ -592,6 +592,9 @@ impl InputSystem {
                         }
                         #[cfg(feature = "debug")]
                         PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
+                        PickerTarget::Nothing => {
+                            unreachable!()
+                        }
                     }
                 } else if self.left_mouse_button.down()
                     && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode
@@ -615,7 +618,7 @@ impl InputSystem {
         // TODO: this will fail if the user hovers over an entity that changes the
         // cursor and then immediately over a different one that doesn't,
         // because main wont set the default cursor
-        if self.mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(_))) {
+        if self.mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(..))) {
             mouse_cursor.set_state(MouseCursorState::Default, client_tick);
         }
 

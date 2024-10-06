@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
@@ -9,8 +10,9 @@ use wgpu::{
 };
 
 use super::{Buffer, Camera, PickerRenderer, PickerSubRenderer, Renderer, TileVertex};
+use crate::graphics::renderers::picker::target::PickerValueType;
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("title.wgsl");
+const SHADER: ShaderModuleDescriptor = include_wgsl!("tile.wgsl");
 
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
@@ -79,19 +81,28 @@ impl TileRenderer {
             push_constant_ranges: &[],
         });
 
+        let mut constants = HashMap::new();
+        constants.insert("tile_enum_value".to_owned(), PickerValueType::Tile as u32 as f64);
+
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some("tile"),
             layout: Some(&layout),
             vertex: VertexState {
                 module: shader_module,
                 entry_point: "vs_main",
-                compilation_options: PipelineCompilationOptions::default(),
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
                 buffers: &[TileVertex::buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: shader_module,
                 entry_point: "fs_main",
-                compilation_options: PipelineCompilationOptions::default(),
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
                 targets: &[Some(ColorTargetState {
                     format: output_color_format,
                     blend: None,

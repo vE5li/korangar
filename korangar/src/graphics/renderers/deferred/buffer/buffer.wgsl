@@ -69,10 +69,10 @@ fn fs_main(
     }
 
     if (constants.show_picker_texture != 0u) {
-        let picker = textureLoad(picker_texture, pixel_coord, 0).r;
-        let red = f32(picker & 0xfu) / 100.0;
-        let green = f32((picker >> 8u) & 0xfu) / 100.0;
-        let blue = f32((picker >> 16u) & 0xfu) / 100.0;
+        let picker = textureLoad(picker_texture, pixel_coord, 0).rg;
+        let red = f32(picker.r & 0xfu) / 100.0;
+        let green = f32((picker.r >> 8u) & 0xfu) / 100.0;
+        let blue = f32((picker.r >> 16u) & 0xfu) / 100.0;
         output_color += vec3<f32>(red, green, blue);
     }
 

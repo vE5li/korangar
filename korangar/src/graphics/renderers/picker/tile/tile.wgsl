@@ -9,6 +9,8 @@ struct VertexOutput {
 
 @group(0) @binding(0) var<uniform> matrices: Matrices;
 
+override tile_enum_value: f32;
+
 @vertex
 fn vs_main(
     @location(0) position: vec3<f32>,
@@ -21,6 +23,6 @@ fn vs_main(
 }
 
 @fragment
-fn fs_main(@location(0) @interpolate(flat) identifier: u32) -> @location(0) u32 {
-    return identifier;
+fn fs_main(@location(0) @interpolate(flat) identifier: u32) -> @location(0) vec2<u32> {
+    return vec2<u32>(identifier, u32(tile_enum_value));
 }

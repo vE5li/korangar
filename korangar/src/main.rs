@@ -42,7 +42,8 @@ use korangar_interface::state::{
 };
 use korangar_interface::Interface;
 use korangar_networking::{
-    DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkingSystem, SellItem, ShopItem,
+    DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
+    ShopItem,
 };
 use korangar_util::collision::Sphere;
 use num::Zero;
@@ -183,6 +184,7 @@ struct Client {
     directional_shadow_camera: DirectionalShadowCamera,
     point_shadow_camera: PointShadowCamera,
 
+    network_event_buffer: NetworkEventBuffer,
     client_info: ClientInfo,
     friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>>,
     saved_login_data: Option<LoginServerLoginData>,
@@ -407,11 +409,11 @@ impl Client {
             let client_info = load_client_info(&game_file_loader);
 
             #[cfg(not(feature = "debug"))]
-            let networking_system = NetworkingSystem::spawn();
+            let (networking_system, network_event_buffer) = NetworkingSystem::spawn();
             #[cfg(feature = "debug")]
             let packet_history_callback = PacketHistoryCallback::get_static_instance();
             #[cfg(feature = "debug")]
-            let networking_system = NetworkingSystem::spawn_with_callback(packet_history_callback.clone());
+            let (networking_system, network_event_buffer) = NetworkingSystem::spawn_with_callback(packet_history_callback.clone());
 
             let friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>> = PlainTrackedState::default();
             let saved_login_data: Option<LoginServerLoginData> = None;
@@ -507,6 +509,7 @@ impl Client {
             player_camera,
             directional_shadow_camera,
             point_shadow_camera,
+            network_event_buffer,
             client_info,
             friend_list,
             saved_login_data,
@@ -557,7 +560,7 @@ impl Client {
         #[cfg(feature = "debug")]
         timer_measurement.stop();
 
-        let network_events = self.networking_system.get_events();
+        self.networking_system.get_events(&mut self.network_event_buffer);
 
         let (user_events, hovered_element, focused_element, mouse_target, mouse_position) = self.input_system.user_events(
             &mut self.interface,
@@ -594,7 +597,7 @@ impl Client {
         #[cfg(feature = "debug")]
         let network_event_measurement = Profiler::start_measurement("process network events");
 
-        for event in network_events {
+        for event in self.network_event_buffer.drain() {
             match event {
                 NetworkEvent::LoginServerConnected {
                     character_servers,

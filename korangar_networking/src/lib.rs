@@ -34,6 +34,16 @@ pub use self::server::{
 };
 use crate::server::NetworkTaskError;
 
+/// Buffer for networking events. This struct exists to reduce heap allocations
+/// and is purely an optimization.
+pub struct NetworkEventBuffer(Vec<NetworkEvent>);
+
+impl NetworkEventBuffer {
+    pub fn drain(&mut self) -> std::vec::Drain<'_, NetworkEvent> {
+        self.0.drain(..)
+    }
+}
+
 pub struct NetworkingSystem<Callback> {
     command_sender: UnboundedSender<ServerConnectCommand>,
     login_server_connection: ServerConnection,
@@ -43,7 +53,7 @@ pub struct NetworkingSystem<Callback> {
 }
 
 impl NetworkingSystem<NoPacketCallback> {
-    pub fn spawn() -> Self {
+    pub fn spawn() -> (Self, NetworkEventBuffer) {
         let command_sender = Self::spawn_networking_thread(NoPacketCallback);
 
         Self::inner_new(command_sender, NoPacketCallback)
@@ -54,17 +64,20 @@ impl<Callback> NetworkingSystem<Callback>
 where
     Callback: PacketCallback + Send,
 {
-    fn inner_new(command_sender: UnboundedSender<ServerConnectCommand>, packet_callback: Callback) -> Self {
-        Self {
+    fn inner_new(command_sender: UnboundedSender<ServerConnectCommand>, packet_callback: Callback) -> (Self, NetworkEventBuffer) {
+        let networking_system = Self {
             command_sender,
             login_server_connection: ServerConnection::Disconnected,
             character_server_connection: ServerConnection::Disconnected,
             map_server_connection: ServerConnection::Disconnected,
             packet_callback,
-        }
+        };
+        let event_buffer = NetworkEventBuffer(Vec::new());
+
+        (networking_system, event_buffer)
     }
 
-    pub fn spawn_with_callback(packet_callback: Callback) -> Self {
+    pub fn spawn_with_callback(packet_callback: Callback) -> (Self, NetworkEventBuffer) {
         let command_sender = Self::spawn_networking_thread(packet_callback.clone());
 
         Self::inner_new(command_sender, packet_callback)
@@ -165,7 +178,7 @@ where
         command_sender
     }
 
-    fn handle_connection<Event>(connection: &mut ServerConnection, events: &mut Vec<NetworkEvent>)
+    fn handle_connection<Event>(connection: &mut ServerConnection, event_buffer: &mut NetworkEventBuffer)
     where
         Event: DisconnectedEvent,
     {
@@ -176,7 +189,7 @@ where
             } => loop {
                 match event_receiver.try_recv() {
                     Ok(login_event) => {
-                        events.push(login_event);
+                        event_buffer.0.push(login_event);
                     }
                     Err(TryRecvError::Empty) => {
                         *connection = ServerConnection::Connected {
@@ -186,28 +199,24 @@ where
                         break;
                     }
                     Err(..) => {
-                        events.push(Event::create_event(DisconnectReason::ConnectionError));
+                        event_buffer.0.push(Event::create_event(DisconnectReason::ConnectionError));
                         *connection = ServerConnection::Disconnected;
                         break;
                     }
                 }
             },
             ServerConnection::ClosingManually => {
-                events.push(Event::create_event(DisconnectReason::ClosedByClient));
+                event_buffer.0.push(Event::create_event(DisconnectReason::ClosedByClient));
                 *connection = ServerConnection::Disconnected;
             }
             _ => (),
         };
     }
 
-    pub fn get_events(&mut self) -> Vec<NetworkEvent> {
-        let mut events = Vec::new();
-
-        Self::handle_connection::<LoginServerDisconnectedEvent>(&mut self.login_server_connection, &mut events);
-        Self::handle_connection::<CharacterServerDisconnectedEvent>(&mut self.character_server_connection, &mut events);
-        Self::handle_connection::<MapServerDisconnectedEvent>(&mut self.map_server_connection, &mut events);
-
-        events
+    pub fn get_events(&mut self, events: &mut NetworkEventBuffer) {
+        Self::handle_connection::<LoginServerDisconnectedEvent>(&mut self.login_server_connection, events);
+        Self::handle_connection::<CharacterServerDisconnectedEvent>(&mut self.character_server_connection, events);
+        Self::handle_connection::<MapServerDisconnectedEvent>(&mut self.map_server_connection, events);
     }
 
     async fn handle_server_connection<PingPacket>(
@@ -230,6 +239,7 @@ where
         let mut interval = tokio::time::interval(ping_frequency);
         let mut buffer = [0u8; 8192];
         let mut cut_off_buffer_base = 0;
+        let mut events = Vec::new();
 
         loop {
             tokio::select! {
@@ -257,7 +267,7 @@ where
 
                     let data = &buffer[..cut_off_buffer_base + received_bytes];
                     let mut byte_stream = ByteStream::without_metadata(data);
-                    let mut events = Vec::new();
+
 
                     if read_account_id {
                         let account_id = AccountId::from_bytes(&mut byte_stream).unwrap();
@@ -297,7 +307,7 @@ where
                         }
                     }
 
-                    for event in events {
+                    for event in events.drain(..) {
                         event_sender.send(event).map_err(|_| NetworkTaskError::ConnectionClosed)?;
                     }
                 }
@@ -433,7 +443,7 @@ where
         self.map_server_connection = ServerConnection::ClosingManually;
     }
 
-    pub fn send_login_server_packet(&mut self, packet: &(impl Packet + LoginServerPacket)) -> Result<(), NotConnectedError> {
+    pub fn send_login_server_packet(&mut self, packet: &impl LoginServerPacket) -> Result<(), NotConnectedError> {
         match &mut self.login_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -445,7 +455,7 @@ where
         }
     }
 
-    pub fn send_character_server_packet(&mut self, packet: &(impl Packet + CharacterServerPacket)) -> Result<(), NotConnectedError> {
+    pub fn send_character_server_packet(&mut self, packet: &impl CharacterServerPacket) -> Result<(), NotConnectedError> {
         match &mut self.character_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);
@@ -457,7 +467,7 @@ where
         }
     }
 
-    pub fn send_map_server_packet(&mut self, packet: &(impl Packet + MapServerPacket)) -> Result<(), NotConnectedError> {
+    pub fn send_map_server_packet(&mut self, packet: &impl MapServerPacket) -> Result<(), NotConnectedError> {
         match &mut self.map_server_connection {
             ServerConnection::Connected { action_sender, .. } => {
                 self.packet_callback.outgoing_packet(packet);

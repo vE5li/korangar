@@ -70,7 +70,7 @@ async fn main() {
     const CHARACTER_NAME: &str = "character name";
 
     // Create the networking system and HTTP client.
-    let mut networking_system = NetworkingSystem::spawn();
+    let (mut networking_system, mut network_event_buffer) = NetworkingSystem::spawn();
     let client = reqwest::Client::new();
 
     // Persistent data.
@@ -81,7 +81,9 @@ async fn main() {
     networking_system.connect_to_login_server(SOCKET_ADDR, USERNAME.to_owned(), PASSWORD.to_owned());
 
     loop {
-        for event in networking_system.get_events() {
+        networking_system.get_events(&mut network_event_buffer);
+
+        for event in network_event_buffer.drain() {
             match event {
                 NetworkEvent::LoginServerConnected {
                     character_servers,

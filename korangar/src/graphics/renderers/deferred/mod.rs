@@ -20,8 +20,6 @@ mod water_light;
 
 use std::sync::Arc;
 
-#[cfg(feature = "debug")]
-use cgmath::SquareMatrix;
 use cgmath::{Matrix4, Point3, Vector2, Vector3};
 #[cfg(feature = "debug")]
 use circle::CircleRenderer;
@@ -104,8 +102,6 @@ pub struct DeferredRenderer {
     box_renderer: BoxRenderer,
     #[cfg(feature = "debug")]
     circle_renderer: CircleRenderer,
-    #[cfg(feature = "debug")]
-    tile_textures: TextureGroup,
     font_map: Arc<Texture>,
     walk_indicator: Arc<Texture>,
     surface_format: TextureFormat,
@@ -182,20 +178,6 @@ impl DeferredRenderer {
         let font_map = texture_loader.get("font.png").unwrap();
         let walk_indicator = texture_loader.get("grid.tga").unwrap();
 
-        #[cfg(feature = "debug")]
-        let tile_textures: Vec<Arc<Texture>> = vec![
-            texture_loader.get("0.png").unwrap(),
-            texture_loader.get("1.png").unwrap(),
-            texture_loader.get("2.png").unwrap(),
-            texture_loader.get("3.png").unwrap(),
-            texture_loader.get("4.png").unwrap(),
-            texture_loader.get("5.png").unwrap(),
-            texture_loader.get("6.png").unwrap(),
-        ];
-
-        #[cfg(feature = "debug")]
-        let tile_textures = TextureGroup::new(&device, "tile textures", tile_textures);
-
         Self {
             device,
             geometry_renderer,
@@ -217,8 +199,6 @@ impl DeferredRenderer {
             box_renderer,
             #[cfg(feature = "debug")]
             circle_renderer,
-            #[cfg(feature = "debug")]
-            tile_textures,
             font_map,
             walk_indicator,
             surface_format,
@@ -254,6 +234,8 @@ impl DeferredRenderer {
             self.buffer_renderer.recreate_pipeline(surface_format);
             #[cfg(feature = "debug")]
             self.box_renderer.recreate_pipeline(surface_format);
+            #[cfg(feature = "debug")]
+            self.circle_renderer.recreate_pipeline(surface_format);
         }
 
         self.dimensions = dimensions;
@@ -471,27 +453,6 @@ impl DeferredRenderer {
             offset,
             angle,
             color,
-        );
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn render_overlay_tiles(
-        &self,
-        render_target: &mut <Self as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        camera: &dyn Camera,
-        vertex_buffer: &Buffer<ModelVertex>,
-    ) {
-        // FIX: This is broken on account of the TileTypes not storing their original
-        // index. Should choose an index based on flags instead.
-        self.render_geometry(
-            render_target,
-            render_pass,
-            camera,
-            vertex_buffer,
-            &self.tile_textures,
-            Matrix4::identity(),
-            0.0,
         );
     }
 

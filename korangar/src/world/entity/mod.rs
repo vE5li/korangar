@@ -1,15 +1,15 @@
 use std::sync::Arc;
 
-use cgmath::{Array, EuclideanSpace, Point3, Vector2, VectorSpace};
+use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, VectorSpace};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
-#[cfg(feature = "debug")]
-use wgpu::Buffer;
 use wgpu::RenderPass;
+#[cfg(feature = "debug")]
+use wgpu::{BufferUsages, Device, Queue};
 
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer;
@@ -22,6 +22,9 @@ use crate::loaders::{ActionLoader, Actions, AnimationState, ScriptLoader, Sprite
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
+#[cfg(feature = "debug")]
+use crate::{Buffer, ModelVertex};
+use crate::{GeometryRenderer, TextureGroup};
 
 pub enum ResourceState<T> {
     Available(T),
@@ -38,7 +41,7 @@ impl<T> ResourceState<T> {
     }
 }
 
-#[derive(Clone, new, PrototypeElement)]
+#[derive(new, PrototypeElement)]
 pub struct Movement {
     #[hidden_element]
     steps: Vec<(Vector2<usize>, u32)>,
@@ -46,7 +49,7 @@ pub struct Movement {
     #[cfg(feature = "debug")]
     #[new(default)]
     #[hidden_element]
-    pub steps_vertex_buffer: Option<Arc<Buffer>>,
+    pub pathing_vertex_buffer: Option<Buffer<ModelVertex>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -530,12 +533,8 @@ impl Common {
         }
     }
 
-    /*#[cfg(feature = "debug")]
-    fn generate_step_texture_coordinates(
-        steps: &Vec<(Vector2<usize>, u32)>,
-        step: Vector2<usize>,
-        index: usize,
-    ) -> ([Vector2<f32>; 4], i32) {
+    #[cfg(feature = "debug")]
+    fn pathing_texture_coordinates(steps: &Vec<(Vector2<usize>, u32)>, step: Vector2<usize>, index: usize) -> ([Vector2<f32>; 4], i32) {
         if steps.len() - 1 == index {
             return (
                 [
@@ -628,39 +627,56 @@ impl Common {
     }
 
     #[cfg(feature = "debug")]
-    pub fn generate_steps_vertex_buffer(&mut self, device: Arc<Device>, map: &Map) {
-        let mut native_steps_vertices = Vec::new();
-        let mut active_movement = self.active_movement.as_mut().unwrap();
+    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map) {
+        use crate::{NativeModelVertex, MAP_TILE_SIZE};
+
+        const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
+        const PATHING_MESH_OFFSET: f32 = 1.0;
+
+        let mut native_pathing_vertices = Vec::new();
+        let active_movement = self.active_movement.as_mut().unwrap();
 
         for (index, (step, _)) in active_movement.steps.iter().cloned().enumerate() {
             let tile = map.get_tile(step);
-            let offset = Vector2::new(step.x as f32 * 5.0, step.y as f32 * 5.0);
+            let offset = Vector2::new(step.x as f32 * HALF_TILE_SIZE, step.y as f32 * HALF_TILE_SIZE);
 
-            let first_position = Vector3::new(offset.x, tile.upper_left_height + 1.0, offset.y);
-            let second_position = Vector3::new(offset.x + 5.0, tile.upper_right_height + 1.0, offset.y);
-            let third_position = Vector3::new(offset.x + 5.0, tile.lower_right_height + 1.0, offset.y + 5.0);
-            let fourth_position = Vector3::new(offset.x, tile.lower_left_height + 1.0, offset.y + 5.0);
+            let first_position = Point3::new(offset.x, tile.upper_left_height + PATHING_MESH_OFFSET, offset.y);
+            let second_position = Point3::new(
+                offset.x + HALF_TILE_SIZE,
+                tile.upper_right_height + PATHING_MESH_OFFSET,
+                offset.y,
+            );
+            let third_position = Point3::new(
+                offset.x + HALF_TILE_SIZE,
+                tile.lower_right_height + PATHING_MESH_OFFSET,
+                offset.y + HALF_TILE_SIZE,
+            );
+            let fourth_position = Point3::new(
+                offset.x,
+                tile.lower_left_height + PATHING_MESH_OFFSET,
+                offset.y + HALF_TILE_SIZE,
+            );
 
             let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
             let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
-            let (texture_coordinates, texture_index) = Self::generate_step_texture_coordinates(&active_movement.steps, step, index);
+            let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, step, index);
 
-            native_steps_vertices.push(NativeModelVertex::new(
+            native_pathing_vertices.push(NativeModelVertex::new(
                 first_position,
                 first_normal,
                 texture_coordinates[0],
                 texture_index,
                 0.0,
             ));
-            native_steps_vertices.push(NativeModelVertex::new(
+            native_pathing_vertices.push(NativeModelVertex::new(
                 second_position,
                 first_normal,
                 texture_coordinates[1],
                 texture_index,
                 0.0,
             ));
-            native_steps_vertices.push(NativeModelVertex::new(
+            native_pathing_vertices.push(NativeModelVertex::new(
                 third_position,
                 first_normal,
                 texture_coordinates[2],
@@ -668,21 +684,21 @@ impl Common {
                 0.0,
             ));
 
-            native_steps_vertices.push(NativeModelVertex::new(
+            native_pathing_vertices.push(NativeModelVertex::new(
                 first_position,
                 second_normal,
                 texture_coordinates[0],
                 texture_index,
                 0.0,
             ));
-            native_steps_vertices.push(NativeModelVertex::new(
+            native_pathing_vertices.push(NativeModelVertex::new(
                 third_position,
                 second_normal,
                 texture_coordinates[2],
                 texture_index,
                 0.0,
             ));
-            native_steps_vertices.push(NativeModelVertex::new(
+            native_pathing_vertices.push(NativeModelVertex::new(
                 fourth_position,
                 second_normal,
                 texture_coordinates[3],
@@ -691,24 +707,22 @@ impl Common {
             ));
         }
 
-        let vertex_buffer_usage = BufferUsage {
-            vertex_buffer: true,
-            ..Default::default()
-        };
+        let pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices);
 
-        let steps_vertices = NativeModelVertex::to_vertices(native_steps_vertices);
-        let vertex_buffer = CpuAccessibleBuffer::from_iter(
-            self.memory_allocator,
-            BufferUsage {
-                vertex_buffer: true,
-                ..Default::default()
-            },
-            false,
-            steps_vertices.into_iter(),
-        )
-        .unwrap();
-        active_movement.steps_vertex_buffer = Some(vertex_buffer);
-    }*/
+        if let Some(steps_vertex_buffer) = &active_movement.pathing_vertex_buffer {
+            steps_vertex_buffer.write_exact(queue, pathing_vertices.as_slice());
+        } else {
+            let vertex_buffer = Buffer::with_data(
+                &device,
+                queue,
+                "pathing vertex buffer",
+                BufferUsages::VERTEX | BufferUsages::COPY_DST,
+                &pathing_vertices,
+            );
+
+            active_movement.pathing_vertex_buffer = Some(vertex_buffer);
+        }
+    }
 
     pub fn render<T>(&self, render_target: &mut T::Target, render_pass: &mut RenderPass, renderer: &T, camera: &dyn Camera)
     where
@@ -1057,16 +1071,45 @@ impl Entity {
         self.get_common_mut().move_from_to(map, from, to, starting_timestamp);
     }
 
-    /*#[cfg(feature = "debug")]
-    pub fn generate_steps_vertex_buffer(&mut self, device: Arc<Device>, map: &Map) {
-        self.get_common_mut().generate_steps_vertex_buffer(device, map);
-    }*/
+    #[cfg(feature = "debug")]
+    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map) {
+        self.get_common_mut().generate_pathing_mesh(device, queue, map);
+    }
 
     pub fn render<T>(&self, render_target: &mut T::Target, render_pass: &mut RenderPass, renderer: &T, camera: &dyn Camera)
     where
         T: Renderer + EntityRenderer,
     {
         self.get_common().render(render_target, render_pass, renderer, camera);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_pathing<T>(
+        &self,
+        render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
+        renderer: &T,
+        camera: &dyn Camera,
+        pathing_textures: &TextureGroup,
+    ) where
+        T: Renderer + GeometryRenderer,
+    {
+        if let Some(vertex_buffer) = self
+            .get_common()
+            .active_movement
+            .as_ref()
+            .and_then(|movement| movement.pathing_vertex_buffer.as_ref())
+        {
+            renderer.render_geometry(
+                render_target,
+                render_pass,
+                camera,
+                vertex_buffer,
+                pathing_textures,
+                Matrix4::identity(),
+                0.0,
+            );
+        }
     }
 
     #[cfg(feature = "debug")]

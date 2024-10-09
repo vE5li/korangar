@@ -286,6 +286,24 @@ impl Map {
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
+    pub fn render_pathing<T>(
+        &self,
+        entities: &[Entity],
+        render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
+        renderer: &T,
+        camera: &dyn Camera,
+        pathing_textures: &TextureGroup,
+    ) where
+        T: Renderer + GeometryRenderer,
+    {
+        entities
+            .iter()
+            .for_each(|entity| entity.render_pathing(render_target, render_pass, renderer, camera, pathing_textures));
+    }
+
+    #[cfg(feature = "debug")]
+    #[korangar_debug::profile]
     pub fn render_bounding(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,

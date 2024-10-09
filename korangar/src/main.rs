@@ -215,6 +215,9 @@ struct Client {
     #[cfg(feature = "debug")]
     bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
+    #[cfg(feature = "debug")]
+    pathing_texture_group: TextureGroup,
+
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
 
@@ -469,6 +472,14 @@ impl Client {
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
         });
 
+        let textures = vec![
+            texture_loader.get("goal.png").unwrap(),
+            texture_loader.get("straight.png").unwrap(),
+            texture_loader.get("diagonal.png").unwrap(),
+        ];
+
+        let pathing_texture_group = TextureGroup::new(&device, "pathing textures", textures);
+
         Self {
             instance,
             adapter,
@@ -537,6 +548,8 @@ impl Client {
             deferred_object_set_buffer,
             #[cfg(feature = "debug")]
             bounding_box_object_set_buffer,
+            #[cfg(feature = "debug")]
+            pathing_texture_group,
             chat_messages,
             main_menu_click_sound_effect,
             map,
@@ -835,8 +848,8 @@ impl Client {
                         let position_to = Vector2::new(position_to.x, position_to.y);
 
                         entity.move_from_to(&self.map, position_from, position_to, starting_timestamp);
-                        /*#[cfg(feature = "debug")]
-                        entity.generate_steps_vertex_buffer(device.clone(), &map);*/
+                        #[cfg(feature = "debug")]
+                        entity.generate_pathing_mesh(&self.device, &self.queue, &self.map);
                     }
                 }
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
@@ -844,8 +857,8 @@ impl Client {
                     let position_to = Vector2::new(position_to.x, position_to.y);
                     self.entities[0].move_from_to(&self.map, position_from, position_to, starting_timestamp);
 
-                    /*#[cfg(feature = "debug")]
-                    entities[0].generate_steps_vertex_buffer(device.clone(), &map);*/
+                    #[cfg(feature = "debug")]
+                    self.entities[0].generate_pathing_mesh(&self.device, &self.queue, &self.map);
                 }
                 NetworkEvent::ChangeMap(map_name, player_position) => {
                     self.entities.truncate(1);
@@ -1879,6 +1892,16 @@ impl Client {
                     true,
                 );
 
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                self.map.render_pathing(
+                    entities,
+                    directional_shadow_target,
+                    &mut directional_shadow_render_pass,
+                    &context.directional_shadow_renderer,
+                    &self.directional_shadow_camera,
+                    &self.pathing_texture_group,
+                );
+
                 if let Some(PickerTarget::Tile { x, y }) = mouse_target
                     && !entities.is_empty()
                 {
@@ -1936,6 +1959,16 @@ impl Client {
                             &self.point_shadow_camera,
                             true,
                         ); */
+
+                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                        self.map.render_pathing(
+                            entities,
+                            point_shadow_target,
+                            &mut point_shadow_render_pass,
+                            &context.point_shadow_renderer,
+                            &self.point_shadow_camera,
+                            &self.pathing_texture_group,
+                        );
 
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         self.map.render_objects(
@@ -2005,6 +2038,9 @@ impl Client {
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                 self.map.render_entities(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, true);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+                self.map.render_pathing(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, &self.pathing_texture_group);
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
                 self.map.render_water(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);

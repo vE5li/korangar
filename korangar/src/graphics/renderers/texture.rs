@@ -134,6 +134,7 @@ impl TextureGroup {
 pub struct CubeTexture {
     label: Option<String>,
     texture: wgpu::Texture,
+    #[cfg(feature = "debug")]
     texture_array_view: TextureView,
     texture_face_views: [TextureView; 6],
     bind_group: BindGroup,
@@ -171,6 +172,8 @@ impl CubeTexture {
     pub fn new(device: &Device, descriptor: &TextureDescriptor) -> Self {
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(descriptor);
+
+        #[cfg(feature = "debug")]
         let texture_array_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
             format: Some(wgpu::TextureFormat::Depth32Float),
@@ -240,6 +243,7 @@ impl CubeTexture {
         Self {
             label,
             texture,
+            #[cfg(feature = "debug")]
             texture_array_view,
             texture_face_views,
             bind_group,
@@ -250,6 +254,7 @@ impl CubeTexture {
         self.texture.size()
     }
 
+    #[cfg(feature = "debug")]
     pub fn get_texture_array_view(&self) -> &TextureView {
         &self.texture_array_view
     }

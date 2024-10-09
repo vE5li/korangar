@@ -23,8 +23,6 @@ struct Constants {
 }
 
 pub struct CircleRenderer {
-    device: Arc<Device>,
-    shader_module: ShaderModule,
     pipeline: RenderPipeline,
 }
 
@@ -33,16 +31,7 @@ impl CircleRenderer {
         let shader_module = device.create_shader_module(SHADER);
         let pipeline = Self::create_pipeline(&device, &shader_module, surface_format);
 
-        Self {
-            device,
-            shader_module,
-            pipeline,
-        }
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn recreate_pipeline(&mut self, surface_format: TextureFormat) {
-        self.pipeline = Self::create_pipeline(&self.device, &self.shader_module, surface_format);
+        Self { pipeline }
     }
 
     fn create_pipeline(device: &Device, shader_module: &ShaderModule, surface_format: TextureFormat) -> RenderPipeline {

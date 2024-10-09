@@ -6,14 +6,17 @@ use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::PrototypeWindow;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
+#[cfg(feature = "debug")]
 use wgpu::RenderPass;
 
 #[cfg(feature = "debug")]
 use super::MarkerIdentifier;
 use super::Model;
+use crate::graphics::GeometryInstruction;
 #[cfg(feature = "debug")]
 use crate::graphics::{DeferredRenderer, MarkerRenderer};
-use crate::{Camera, GeometryRenderer, Renderer};
+#[cfg(feature = "debug")]
+use crate::{Camera, Renderer};
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
 pub struct Object {
@@ -24,19 +27,8 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn render_geometry<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        client_tick: ClientTick,
-        time: f32,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        self.model
-            .render_geometry(render_target, render_pass, renderer, camera, &self.transform, client_tick, time);
+    pub fn render_geometry(&self, instructions: &mut Vec<GeometryInstruction>, client_tick: ClientTick) {
+        self.model.render_geometry(instructions, &self.transform, client_tick);
     }
 
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {

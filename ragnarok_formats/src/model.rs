@@ -39,6 +39,12 @@ impl<const LENGTH: usize> ToBytes for ModelString<LENGTH> {
     }
 }
 
+impl<const LENGTH: usize> AsRef<str> for ModelString<LENGTH> {
+    fn as_ref(&self) -> &str {
+        self.inner.as_str()
+    }
+}
+
 #[cfg(feature = "interface")]
 impl<App, const LENGTH: usize> korangar_interface::elements::PrototypeElement<App> for ModelString<LENGTH>
 where

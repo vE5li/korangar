@@ -183,7 +183,7 @@ impl EntityRenderer {
         cell_position: Vector2<usize>,
         mirror: bool,
     ) {
-        if render_target.bind_sub_renderer(DirectionalShadowSubRenderer::Entity) {
+        if render_target.bound_sub_renderer(DirectionalShadowSubRenderer::Entity) {
             self.bind_pipeline(render_target, render_pass, camera);
         }
 

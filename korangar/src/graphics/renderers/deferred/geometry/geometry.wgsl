@@ -3,7 +3,7 @@ struct Matrices {
     time: f32,
 }
 
-struct Constants {
+struct InstanceData {
     world: mat4x4<f32>,
     inv_world: mat4x4<f32>,
 }
@@ -29,9 +29,9 @@ struct FragmentOutput {
 @group(0) @binding(0) var<uniform> matrices: Matrices;
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
-@group(1) @binding(0) var textures: binding_array<texture_2d<f32>>;
+@group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
+@group(2) @binding(0) var textures: binding_array<texture_2d<f32>>;
 
-var<push_constant> constants: Constants;
 override additional_color: f32;
 
 @vertex
@@ -41,14 +41,17 @@ fn vs_main(
     @location(2) texture_coordinates: vec2<f32>,
     @location(3) texture_index: i32,
     @location(4) wind_affinity: f32,
+    @location(5) instance_id: u32
 ) -> VertexOutput {
-    let world_position = constants.world * vec4<f32>(position, 1.0);
+    let instance = instance_data[instance_id];
+
+    let world_position = instance.world * vec4<f32>(position, 1.0);
     let wind_position = world_position + vec4<f32>(matrices.time);
     let offset = vec4<f32>(sin(wind_position.x), 0.0, sin(wind_position.z), 0.0) * wind_affinity;
 
     var output: VertexOutput;
     output.position = matrices.view_projection * (world_position + offset);
-    output.normal = constants.inv_world * vec4<f32>(normal, 1.0);
+    output.normal = instance.inv_world * vec4<f32>(normal, 1.0);
     output.texture_coordinates = texture_coordinates;
     output.texture_index = texture_index;
     return output;

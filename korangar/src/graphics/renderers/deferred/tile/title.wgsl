@@ -1,0 +1,54 @@
+struct Matrices {
+    view_projection: mat4x4<f32>,
+}
+
+struct VertexOutput {
+    @builtin(position) position: vec4<f32>,
+    @location(0) texture_coordinates: vec2<f32>,
+    @location(1) @interpolate(flat) texture_index: i32,
+}
+
+struct FragmentInput {
+    @location(0) texture_coordinates: vec2<f32>,
+    @location(1) @interpolate(flat) texture_index: i32,
+}
+
+struct FragmentOutput {
+    @location(0) fragment_color: vec4<f32>,
+}
+
+@group(0) @binding(0) var<uniform> matrices: Matrices;
+@group(0) @binding(1) var nearest_sampler: sampler;
+@group(0) @binding(2) var linear_sampler: sampler;
+@group(1) @binding(0) var textures: binding_array<texture_2d<f32>>;
+
+@vertex
+fn vs_main(
+    @location(0) position: vec3<f32>,
+    @location(2) texture_coordinates: vec2<f32>,
+    @location(3) texture_index: i32,
+) -> VertexOutput {
+
+    let world_position = vec4<f32>(position, 1.0);
+
+    var output: VertexOutput;
+    output.position = matrices.view_projection * world_position;
+    output.texture_coordinates = texture_coordinates;
+    output.texture_index = texture_index;
+    return output;
+}
+
+@fragment
+fn fs_main(fragment: FragmentInput) -> FragmentOutput {
+
+    let diffuse_color = textureSample(textures[fragment.texture_index], linear_sampler, fragment.texture_coordinates);
+    let alpha_channel = textureSample(textures[fragment.texture_index], nearest_sampler, fragment.texture_coordinates).a;
+
+    if (alpha_channel < 1.0) {
+        discard;
+    }
+
+    var output: FragmentOutput;
+    output.fragment_color = vec4<f32>(diffuse_color.rgb, diffuse_color.a);
+    return output;
+}

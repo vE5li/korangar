@@ -4,7 +4,7 @@ mod indicator;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Vector2};
+use cgmath::{Point3, Vector2};
 use ragnarok_packets::EntityId;
 use serde::{Deserialize, Serialize};
 use wgpu::{Device, Queue, RenderPass, TextureFormat, TextureUsages};
@@ -106,19 +106,19 @@ impl Renderer for DirectionalShadowRenderer {
 
 impl GeometryRendererTrait for DirectionalShadowRenderer {
     fn render_geometry(
-        &self,
+        &mut self,
         render_target: &mut <Self as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
+        instructions: &[GeometryInstruction],
         vertex_buffer: &Buffer<ModelVertex>,
         textures: &TextureGroup,
-        world_matrix: Matrix4<f32>,
         time: f32,
     ) where
         Self: Renderer,
     {
         self.geometry_renderer
-            .render(render_target, render_pass, camera, vertex_buffer, textures, world_matrix, time);
+            .render(render_target, render_pass, camera, instructions, vertex_buffer, textures, time);
     }
 }
 

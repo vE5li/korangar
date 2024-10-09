@@ -1,11 +1,8 @@
-use std::sync::Arc;
-
 use cgmath::{Point3, Vector2};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
 use super::GroundTileExt;
-use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
-use crate::loaders::TextureLoader;
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
 
 const TILE_SIZE: f32 = 10.0;
 
@@ -145,14 +142,6 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
         }
     }
     (native_ground_vertices, water_vertices)
-}
-
-pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoader) -> Vec<Arc<Texture>> {
-    ground_data
-        .textures
-        .iter()
-        .map(|texture_name| texture_loader.get(texture_name).unwrap())
-        .collect()
 }
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {

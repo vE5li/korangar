@@ -1,5 +1,4 @@
 mod entity;
-mod geometry;
 #[cfg(feature = "debug")]
 mod marker;
 mod selector;
@@ -8,12 +7,11 @@ mod tile;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Vector2};
+use cgmath::{Point3, Vector2};
 use ragnarok_packets::EntityId;
 use wgpu::{ComputePass, Device, Queue, RenderPass};
 
 use self::entity::EntityRenderer;
-use self::geometry::GeometryRenderer;
 #[cfg(feature = "debug")]
 use self::marker::MarkerRenderer;
 use self::selector::Selector;
@@ -21,14 +19,13 @@ pub use self::target::PickerTarget;
 use self::tile::TileRenderer;
 #[cfg(feature = "debug")]
 use crate::graphics::MarkerRenderer as MarkerRendererTrait;
-use crate::graphics::{EntityRenderer as EntityRendererTrait, GeometryRenderer as GeometryRendererTrait, *};
+use crate::graphics::{EntityRenderer as EntityRendererTrait, *};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
 #[derive(PartialEq, Eq)]
 pub enum PickerSubRenderer {
-    Geometry,
     Entity,
     Tile,
     #[cfg(feature = "debug")]
@@ -38,7 +35,6 @@ pub enum PickerSubRenderer {
 
 pub struct PickerRenderer {
     device: Arc<Device>,
-    geometry_renderer: GeometryRenderer,
     entity_renderer: EntityRenderer,
     tile_renderer: TileRenderer,
     #[cfg(feature = "debug")]
@@ -52,7 +48,6 @@ impl PickerRenderer {
         let output_color_format = <Self as Renderer>::Target::output_color_format();
         let output_depth_format = <Self as Renderer>::Target::depth_texture_format();
 
-        let geometry_renderer = GeometryRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
         let entity_renderer = EntityRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
         let tile_renderer = TileRenderer::new(device.clone(), queue.clone(), output_color_format, output_depth_format);
         #[cfg(feature = "debug")]
@@ -61,7 +56,6 @@ impl PickerRenderer {
 
         Self {
             device,
-            geometry_renderer,
             entity_renderer,
             tile_renderer,
             #[cfg(feature = "debug")]
@@ -108,24 +102,6 @@ impl PickerRenderer {
 
 impl Renderer for PickerRenderer {
     type Target = PickerRenderTarget;
-}
-
-impl GeometryRendererTrait for PickerRenderer {
-    fn render_geometry(
-        &self,
-        render_target: &mut <Self as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        camera: &dyn Camera,
-        vertex_buffer: &Buffer<ModelVertex>,
-        textures: &TextureGroup,
-        world_matrix: Matrix4<f32>,
-        _time: f32,
-    ) where
-        Self: Renderer,
-    {
-        self.geometry_renderer
-            .render(render_target, render_pass, camera, vertex_buffer, textures, world_matrix);
-    }
 }
 
 impl EntityRendererTrait for PickerRenderer {

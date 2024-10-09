@@ -215,6 +215,11 @@ struct Client {
     #[cfg(feature = "debug")]
     bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
+    #[cfg(feature = "debug")]
+    pathing_texture_group: TextureGroup,
+    #[cfg(feature = "debug")]
+    tile_texture_group: TextureGroup,
+
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
 
@@ -448,6 +453,24 @@ impl Client {
             #[cfg(feature = "debug")]
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
+            #[cfg(feature = "debug")]
+            let pathing_texture_group = TextureGroup::new(&device, "pathing textures", vec![
+                texture_loader.get("pathing_goal.png").unwrap(),
+                texture_loader.get("pathing_straight.png").unwrap(),
+                texture_loader.get("pathing_diagonal.png").unwrap(),
+            ]);
+
+            #[cfg(feature = "debug")]
+            let tile_texture_group = TextureGroup::new(&device, "tile textures", vec![
+                texture_loader.get("tile_0.png").unwrap(),
+                texture_loader.get("tile_1.png").unwrap(),
+                texture_loader.get("tile_2.png").unwrap(),
+                texture_loader.get("tile_3.png").unwrap(),
+                texture_loader.get("tile_4.png").unwrap(),
+                texture_loader.get("tile_5.png").unwrap(),
+                texture_loader.get("tile_6.png").unwrap(),
+            ]);
+
             let welcome_string = format!(
                 "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
                 env!("CARGO_PKG_VERSION")
@@ -537,6 +560,10 @@ impl Client {
             deferred_object_set_buffer,
             #[cfg(feature = "debug")]
             bounding_box_object_set_buffer,
+            #[cfg(feature = "debug")]
+            pathing_texture_group,
+            #[cfg(feature = "debug")]
+            tile_texture_group,
             chat_messages,
             main_menu_click_sound_effect,
             map,
@@ -835,8 +862,8 @@ impl Client {
                         let position_to = Vector2::new(position_to.x, position_to.y);
 
                         entity.move_from_to(&self.map, position_from, position_to, starting_timestamp);
-                        /*#[cfg(feature = "debug")]
-                        entity.generate_steps_vertex_buffer(device.clone(), &map);*/
+                        #[cfg(feature = "debug")]
+                        entity.generate_pathing_mesh(&self.device, &self.queue, &self.map);
                     }
                 }
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
@@ -844,8 +871,8 @@ impl Client {
                     let position_to = Vector2::new(position_to.x, position_to.y);
                     self.entities[0].move_from_to(&self.map, position_from, position_to, starting_timestamp);
 
-                    /*#[cfg(feature = "debug")]
-                    entities[0].generate_steps_vertex_buffer(device.clone(), &map);*/
+                    #[cfg(feature = "debug")]
+                    self.entities[0].generate_pathing_mesh(&self.device, &self.queue, &self.map);
                 }
                 NetworkEvent::ChangeMap(map_name, player_position) => {
                     self.entities.truncate(1);
@@ -1879,6 +1906,29 @@ impl Client {
                     true,
                 );
 
+                #[cfg(feature = "debug")]
+                if render_settings.show_pathing {
+                    self.map.render_pathing(
+                        entities,
+                        directional_shadow_target,
+                        &mut directional_shadow_render_pass,
+                        &context.directional_shadow_renderer,
+                        &self.directional_shadow_camera,
+                        &self.pathing_texture_group,
+                    );
+                }
+
+                #[cfg(feature = "debug")]
+                if render_settings.show_map_tiles {
+                    self.map.render_overlay_tiles(
+                        directional_shadow_target,
+                        &mut directional_shadow_render_pass,
+                        &context.directional_shadow_renderer,
+                        &self.directional_shadow_camera,
+                        &self.tile_texture_group,
+                    );
+                }
+
                 if let Some(PickerTarget::Tile { x, y }) = mouse_target
                     && !entities.is_empty()
                 {
@@ -1937,6 +1987,18 @@ impl Client {
                             true,
                         ); */
 
+                        #[cfg(feature = "debug")]
+                        if render_settings.show_pathing {
+                            self.map.render_pathing(
+                                entities,
+                                point_shadow_target,
+                                &mut point_shadow_render_pass,
+                                &context.point_shadow_renderer,
+                                &self.point_shadow_camera,
+                                &self.pathing_texture_group,
+                            );
+                        }
+
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                         self.map.render_objects(
                             point_shadow_target,
@@ -1962,6 +2024,17 @@ impl Client {
                             );
                         }
 
+                        #[cfg(feature = "debug")]
+                        if render_settings.show_map_tiles {
+                            self.map.render_overlay_tiles(
+                                point_shadow_target,
+                                &mut point_shadow_render_pass,
+                                &context.point_shadow_renderer,
+                                &self.point_shadow_camera,
+                                &self.tile_texture_group,
+                            );
+                        }
+
                         #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                         self.map.render_ground(
                             point_shadow_target,
@@ -1983,7 +2056,13 @@ impl Client {
 
                 #[cfg(feature = "debug")]
                 if render_settings.show_map_tiles {
-                    self.map.render_overlay_tiles(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera);
+                    self.map.render_overlay_tiles(
+                        deferred_target,
+                        &mut geometry_render_pass,
+                        &context.deferred_renderer,
+                        current_camera,
+                        &self.tile_texture_group,
+                    );
                 }
 
                 let object_set = self.map.cull_objects_with_frustum(
@@ -2005,6 +2084,11 @@ impl Client {
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
                 self.map.render_entities(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, true);
+
+                #[cfg(feature = "debug")]
+                if render_settings.show_pathing {
+                    self.map.render_pathing(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, &self.pathing_texture_group);
+                }
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
                 self.map.render_water(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);

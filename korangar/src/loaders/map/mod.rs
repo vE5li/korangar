@@ -17,6 +17,7 @@ use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResourc
 use ragnarok_formats::version::InternalVersion;
 use wgpu::{BufferUsages, Device, Queue};
 
+pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_water_vertices, load_textures};
 use super::error::LoadError;
 use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};

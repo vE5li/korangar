@@ -55,17 +55,17 @@ impl SpriteRenderer {
         let shader_module = device.create_shader_module(SHADER);
 
         #[cfg(feature = "debug")]
-        let object_marker_texture = texture_loader.get("object.png").unwrap();
+        let object_marker_texture = texture_loader.get("marker_object.png").unwrap();
         #[cfg(feature = "debug")]
-        let light_source_marker_texture = texture_loader.get("light.png").unwrap();
+        let light_source_marker_texture = texture_loader.get("marker_light.png").unwrap();
         #[cfg(feature = "debug")]
-        let sound_source_marker_texture = texture_loader.get("sound.png").unwrap();
+        let sound_source_marker_texture = texture_loader.get("marker_sound.png").unwrap();
         #[cfg(feature = "debug")]
-        let effect_source_marker_texture = texture_loader.get("effect.png").unwrap();
+        let effect_source_marker_texture = texture_loader.get("marker_effect.png").unwrap();
         #[cfg(feature = "debug")]
-        let entity_marker_texture = texture_loader.get("entity.png").unwrap();
+        let entity_marker_texture = texture_loader.get("marker_entity.png").unwrap();
         #[cfg(feature = "debug")]
-        let shadow_marker_texture = texture_loader.get("shadow.png").unwrap();
+        let shadow_marker_texture = texture_loader.get("marker_shadow.png").unwrap();
 
         let nearest_sampler = create_new_sampler(&device, "sprite nearest", SamplerType::Nearest);
         let linear_sampler = create_new_sampler(&device, "sprite linear", SamplerType::Linear);

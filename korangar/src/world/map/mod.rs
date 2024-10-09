@@ -29,6 +29,7 @@ use crate::graphics::{MarkerRenderer, RenderSettings};
 use crate::interface::application::InterfaceSettings;
 use crate::{
     Buffer, Color, GameFileLoader, IndicatorRenderer, ModelVertex, PickerRenderer, Texture, TextureGroup, TileVertex, WaterVertex,
+    MAP_TILE_SIZE,
 };
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
@@ -286,6 +287,24 @@ impl Map {
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
+    pub fn render_pathing<T>(
+        &self,
+        entities: &[Entity],
+        render_target: &mut T::Target,
+        render_pass: &mut RenderPass,
+        renderer: &T,
+        camera: &dyn Camera,
+        pathing_textures: &TextureGroup,
+    ) where
+        T: Renderer + GeometryRenderer,
+    {
+        entities
+            .iter()
+            .for_each(|entity| entity.render_pathing(render_target, render_pass, renderer, camera, pathing_textures));
+    }
+
+    #[cfg(feature = "debug")]
+    #[korangar_debug::profile]
     pub fn render_bounding(
         &self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
@@ -339,18 +358,22 @@ impl Map {
         T: Renderer + IndicatorRenderer,
     {
         const OFFSET: f32 = 1.0;
-        const TILE_SIZE: f32 = 5.0;
+        const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
 
         let tile = self.get_tile(position);
 
         if tile.flags.contains(TileFlags::WALKABLE) {
-            let base_x = position.x as f32 * TILE_SIZE;
-            let base_y = position.y as f32 * TILE_SIZE;
+            let base_x = position.x as f32 * HALF_TILE_SIZE;
+            let base_y = position.y as f32 * HALF_TILE_SIZE;
 
             let upper_left = Point3::new(base_x, tile.upper_left_height + OFFSET, base_y);
-            let upper_right = Point3::new(base_x + TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
-            let lower_left = Point3::new(base_x, tile.lower_left_height + OFFSET, base_y + TILE_SIZE);
-            let lower_right = Point3::new(base_x + TILE_SIZE, tile.lower_right_height + OFFSET, base_y + TILE_SIZE);
+            let upper_right = Point3::new(base_x + HALF_TILE_SIZE, tile.upper_right_height + OFFSET, base_y);
+            let lower_left = Point3::new(base_x, tile.lower_left_height + OFFSET, base_y + HALF_TILE_SIZE);
+            let lower_right = Point3::new(
+                base_x + HALF_TILE_SIZE,
+                tile.lower_right_height + OFFSET,
+                base_y + HALF_TILE_SIZE,
+            );
 
             renderer.render_walk_indicator(
                 render_target,
@@ -471,14 +494,25 @@ impl Map {
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
-    pub fn render_overlay_tiles(
+    pub fn render_overlay_tiles<T>(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
+        render_target: &mut T::Target,
         render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
+        renderer: &T,
         camera: &dyn Camera,
-    ) {
-        renderer.render_overlay_tiles(render_target, render_pass, camera, &self.tile_vertex_buffer);
+        tile_terxture_group: &TextureGroup,
+    ) where
+        T: Renderer + GeometryRenderer,
+    {
+        renderer.render_geometry(
+            render_target,
+            render_pass,
+            camera,
+            &self.tile_vertex_buffer,
+            tile_terxture_group,
+            Matrix4::identity(),
+            0.0,
+        );
     }
 
     #[cfg(feature = "debug")]

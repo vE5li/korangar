@@ -16,7 +16,7 @@ pub use self::action::*;
 pub use self::effect::{EffectHolder, EffectLoader, *};
 pub use self::font::{FontLoader, FontSize, Scaling};
 pub use self::gamefile::*;
-pub use self::map::MapLoader;
+pub use self::map::{MapLoader, MAP_TILE_SIZE};
 pub use self::model::*;
 pub use self::script::{ResourceMetadata, ScriptLoader};
 pub use self::server::{load_client_info, ClientInfo, ServiceId};

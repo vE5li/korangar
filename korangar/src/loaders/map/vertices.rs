@@ -7,7 +7,7 @@ use super::GroundTileExt;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
 use crate::loaders::TextureLoader;
 
-const TILE_SIZE: f32 = 10.0;
+pub const MAP_TILE_SIZE: f32 = 10.0;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Heights {
@@ -43,33 +43,33 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                     let (surface_offset, surface_height) = surface_alignment[0];
                     let height = get_tile_height_at(current_tile, surface_height);
                     let first_position = Point3::new(
-                        (x + surface_offset.x) as f32 * TILE_SIZE,
+                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * TILE_SIZE,
+                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
                     );
 
                     let (surface_offset, surface_height) = surface_alignment[1];
                     let height = get_tile_height_at(current_tile, surface_height);
                     let second_position = Point3::new(
-                        (x + surface_offset.x) as f32 * TILE_SIZE,
+                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * TILE_SIZE,
+                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
                     );
 
                     let (surface_offset, surface_height) = surface_alignment[2];
                     let height = get_tile_height_at(neighbor_tile, surface_height);
                     let third_position = Point3::new(
-                        (x + surface_offset.x) as f32 * TILE_SIZE,
+                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * TILE_SIZE,
+                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
                     );
 
                     let (surface_offset, surface_height) = surface_alignment[3];
                     let height = get_tile_height_at(neighbor_tile, surface_height);
                     let fourth_position = Point3::new(
-                        (x + surface_offset.x) as f32 * TILE_SIZE,
+                        (x + surface_offset.x) as f32 * MAP_TILE_SIZE,
                         -height,
-                        (y + surface_offset.y) as f32 * TILE_SIZE,
+                        (y + surface_offset.y) as f32 * MAP_TILE_SIZE,
                     );
 
                     let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
@@ -129,10 +129,14 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
             }
 
             if -current_tile.get_lowest_point() < water_level {
-                let first_position = Point3::new(x as f32 * TILE_SIZE, water_level, y as f32 * TILE_SIZE);
-                let second_position = Point3::new(TILE_SIZE + x as f32 * TILE_SIZE, water_level, y as f32 * TILE_SIZE);
-                let third_position = Point3::new(TILE_SIZE + x as f32 * TILE_SIZE, water_level, TILE_SIZE + y as f32 * TILE_SIZE);
-                let fourth_position = Point3::new(x as f32 * TILE_SIZE, water_level, TILE_SIZE + y as f32 * TILE_SIZE);
+                let first_position = Point3::new(x as f32 * MAP_TILE_SIZE, water_level, y as f32 * MAP_TILE_SIZE);
+                let second_position = Point3::new(MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE, water_level, y as f32 * MAP_TILE_SIZE);
+                let third_position = Point3::new(
+                    MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE,
+                    water_level,
+                    MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE,
+                );
+                let fourth_position = Point3::new(x as f32 * MAP_TILE_SIZE, water_level, MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE);
 
                 water_vertices.push(WaterVertex::new(first_position));
                 water_vertices.push(WaterVertex::new(second_position));
@@ -156,6 +160,9 @@ pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoade
 }
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {
+    const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
+    const TILE_MESH_OFFSET: f32 = 1.0;
+
     let mut tile_vertices = Vec::new();
     let mut tile_picker_vertices = Vec::new();
 
@@ -174,12 +181,16 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 continue;
             }
 
-            let offset = Vector2::new(x as f32 * 5.0, y as f32 * 5.0);
+            let offset = Vector2::new(x as f32 * HALF_TILE_SIZE, y as f32 * HALF_TILE_SIZE);
 
-            let first_position = Point3::new(offset.x, tile.upper_left_height + 1.0, offset.y);
-            let second_position = Point3::new(offset.x + 5.0, tile.upper_right_height + 1.0, offset.y);
-            let third_position = Point3::new(offset.x + 5.0, tile.lower_right_height + 1.0, offset.y + 5.0);
-            let fourth_position = Point3::new(offset.x, tile.lower_left_height + 1.0, offset.y + 5.0);
+            let first_position = Point3::new(offset.x, tile.upper_left_height + TILE_MESH_OFFSET, offset.y);
+            let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height + TILE_MESH_OFFSET, offset.y);
+            let third_position = Point3::new(
+                offset.x + HALF_TILE_SIZE,
+                tile.lower_right_height + TILE_MESH_OFFSET,
+                offset.y + HALF_TILE_SIZE,
+            );
+            let fourth_position = Point3::new(offset.x, tile.lower_left_height + TILE_MESH_OFFSET, offset.y + HALF_TILE_SIZE);
 
             let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
             let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
@@ -236,9 +247,9 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             ));
 
             let first_position = Point3::new(offset.x, tile.upper_left_height, offset.y);
-            let second_position = Point3::new(offset.x + 5.0, tile.upper_right_height, offset.y);
-            let third_position = Point3::new(offset.x + 5.0, tile.lower_right_height, offset.y + 5.0);
-            let fourth_position = Point3::new(offset.x, tile.lower_left_height, offset.y + 5.0);
+            let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height, offset.y);
+            let third_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.lower_right_height, offset.y + HALF_TILE_SIZE);
+            let fourth_position = Point3::new(offset.x, tile.lower_left_height, offset.y + HALF_TILE_SIZE);
 
             let (_, color) = PickerTarget::Tile { x: x as u16, y: y as u16 }.into();
             tile_picker_vertices.push(TileVertex::new(first_position, color));

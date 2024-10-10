@@ -2164,7 +2164,7 @@ impl Client {
 
                 #[cfg(feature = "debug")]
                 if let Some(marker_identifier) = hovered_marker_identifier {
-                    self.map.render_marker_overlay(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, marker_identifier, &point_light_set);
+                    self.map.render_marker_overlay(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, marker_identifier, &point_light_set, animation_timer);
                 }
 
                 self.particle_holder.render(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, screen_size, self.application.get_scaling_factor(), entities);

@@ -39,7 +39,7 @@ fn fs_main(
 fn gaussian_peak(x: f32, scaling_factor: f32) -> f32 {
     // The variance defines how steep the peek is.
     // A larger number will make it fuzzier, a smaller number will make the circle sharper.
-    let variance = 0.0003 / scaling_factor;
+    let variance = 0.0002 / scaling_factor;
 
     // The expected value defines the position of the peek.
     // Since x ranges from 0.0 at the center to 0.5 at the closest edge we want a little less than 0.5 to not cut off the edges.

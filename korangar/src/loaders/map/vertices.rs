@@ -161,7 +161,7 @@ pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoade
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {
     const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
-    const TILE_MESH_OFFSET: f32 = 1.0;
+    const TILE_MESH_OFFSET: f32 = 0.9;
 
     let mut tile_vertices = Vec::new();
     let mut tile_picker_vertices = Vec::new();

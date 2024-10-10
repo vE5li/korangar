@@ -631,7 +631,7 @@ impl Common {
         use crate::{NativeModelVertex, MAP_TILE_SIZE};
 
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
-        const PATHING_MESH_OFFSET: f32 = 1.0;
+        const PATHING_MESH_OFFSET: f32 = 0.95;
 
         let mut native_pathing_vertices = Vec::new();
         let active_movement = self.active_movement.as_mut().unwrap();

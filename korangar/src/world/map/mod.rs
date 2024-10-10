@@ -357,8 +357,8 @@ impl Map {
     ) where
         T: Renderer + IndicatorRenderer,
     {
-        const OFFSET: f32 = 1.0;
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
+        const OFFSET: f32 = 1.0;
 
         let tile = self.get_tile(position);
 

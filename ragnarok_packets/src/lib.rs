@@ -1338,7 +1338,6 @@ pub struct UpdateEntityHealthPointsPacket {
 
 #[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[numeric_type(u8)]
 pub enum DamageType {
     Damage,
     PickUpItem,
@@ -2831,7 +2830,6 @@ pub struct BuyOrSellPacket {
 
 #[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[numeric_type(u8)]
 pub enum BuyOrSellOption {
     Buy,
     Sell,
@@ -2847,7 +2845,6 @@ pub struct SelectBuyOrSellPacket {
 
 #[derive(Debug, Clone, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[numeric_type(u8)]
 pub enum BuyItemResult {
     #[numeric_value(0)]
     Successful,
@@ -2970,7 +2967,6 @@ pub struct SellItemsPacket {
 
 #[derive(Debug, Clone, Copy, ByteConvertable)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[numeric_type(u8)]
 pub enum SellItemsResult {
     Success,
     Error,

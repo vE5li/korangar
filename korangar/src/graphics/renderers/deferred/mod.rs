@@ -254,6 +254,8 @@ impl DeferredRenderer {
             self.buffer_renderer.recreate_pipeline(surface_format);
             #[cfg(feature = "debug")]
             self.box_renderer.recreate_pipeline(surface_format);
+            #[cfg(feature = "debug")]
+            self.circle_renderer.recreate_pipeline(surface_format);
         }
 
         self.dimensions = dimensions;

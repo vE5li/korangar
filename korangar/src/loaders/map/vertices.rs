@@ -200,7 +200,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             let third_texture_coordinates = Vector2::new(1.0, 1.0);
             let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
 
-            let tile_type_index = tile.flags.bits() as i32;
+            let tile_type_index = TryInto::<u8>::try_into(tile.flags).unwrap() as i32;
 
             tile_vertices.push(ModelVertex::new(
                 first_position,

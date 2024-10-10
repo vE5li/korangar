@@ -71,25 +71,35 @@ impl FromBytes for TileFlags {
     }
 }
 
-impl ToBytes for TileFlags {
-    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
-        if *self == Self::WALKABLE {
-            Ok((0 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
-        } else if *self == Self::empty() {
-            Ok((1 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
-        } else if *self == Self::WATER {
-            Ok((2 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
-        } else if *self == Self::WATER | Self::WALKABLE {
-            Ok((3 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
-        } else if *self == Self::WATER | Self::SNIPABLE {
-            Ok((4 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
-        } else if *self == Self::CLIFF | Self::SNIPABLE {
-            Ok((5 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
-        } else if *self == Self::CLIFF {
-            Ok((6 as <Self as bitflags::Flags>::Bits).to_bytes().trace::<Self>()?)
+impl TryInto<<Self as bitflags::Flags>::Bits> for TileFlags {
+    type Error = Box<ConversionError>;
+
+    fn try_into(self) -> Result<<Self as bitflags::Flags>::Bits, Self::Error> {
+        if self == Self::WALKABLE {
+            Ok(0 as <Self as bitflags::Flags>::Bits)
+        } else if self == Self::empty() {
+            Ok(1 as <Self as bitflags::Flags>::Bits)
+        } else if self == Self::WATER {
+            Ok(2 as <Self as bitflags::Flags>::Bits)
+        } else if self == Self::WATER | Self::WALKABLE {
+            Ok(3 as <Self as bitflags::Flags>::Bits)
+        } else if self == Self::WATER | Self::SNIPABLE {
+            Ok(4 as <Self as bitflags::Flags>::Bits)
+        } else if self == Self::CLIFF | Self::SNIPABLE {
+            Ok(5 as <Self as bitflags::Flags>::Bits)
+        } else if self == Self::CLIFF {
+            Ok(6 as <Self as bitflags::Flags>::Bits)
         } else {
             Err(ConversionError::from_message(format!("invalid tile encoding {:?}", self)))
         }
+    }
+}
+
+impl ToBytes for TileFlags {
+    fn to_bytes(&self) -> ConversionResult<Vec<u8>> {
+        TryInto::<<Self as bitflags::Flags>::Bits>::try_into(*self)?
+            .to_bytes()
+            .trace::<Self>()
     }
 }
 

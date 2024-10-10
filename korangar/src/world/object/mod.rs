@@ -12,7 +12,7 @@ use wgpu::RenderPass;
 use super::MarkerIdentifier;
 use super::Model;
 #[cfg(feature = "debug")]
-use crate::graphics::{DeferredRenderer, MarkerRenderer};
+use crate::graphics::{Color, DeferredRenderer, MarkerRenderer};
 use crate::{Camera, GeometryRenderer, Renderer};
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
@@ -50,9 +50,10 @@ impl Object {
         render_pass: &mut RenderPass,
         renderer: &DeferredRenderer,
         camera: &dyn Camera,
+        color: Color,
     ) {
         self.model
-            .render_bounding_box(render_target, render_pass, renderer, camera, &self.transform);
+            .render_bounding_box(render_target, render_pass, renderer, camera, &self.transform, color);
     }
 
     #[cfg(feature = "debug")]

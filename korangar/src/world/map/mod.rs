@@ -654,40 +654,30 @@ impl Map {
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         point_light_set: &PointLightSet,
+        animation_time: f32,
     ) {
+        let offset = (f32::sin(animation_time * 5.0) + 0.5).clamp(0.0, 1.0);
+        let box_color = Color::rgb(1.0, offset, 1.0 - offset);
+
         match marker_identifier {
             MarkerIdentifier::Object(key) => {
                 self.objects
                     .get(ObjectKey::new(key))
                     .unwrap()
-                    .render_bounding_box(render_target, render_pass, renderer, camera)
+                    .render_bounding_box(render_target, render_pass, renderer, camera, box_color)
             }
             MarkerIdentifier::LightSource(key) => {
                 let light_source = self.light_sources.get(LightSourceKey::new(key)).unwrap();
                 let color = light_source.color.into();
                 let extent = point_light_extent(color, light_source.range);
 
-                renderer.render_circle(
-                    render_target,
-                    render_pass,
-                    camera,
-                    light_source.position,
-                    Color::monochrome(0.0),
-                    extent,
-                );
+                renderer.render_circle(render_target, render_pass, camera, light_source.position, box_color, extent);
             }
             MarkerIdentifier::SoundSource(index) => {
                 let sound_source = &self.sound_sources[index as usize];
                 let extent = sound_source.range;
 
-                renderer.render_circle(
-                    render_target,
-                    render_pass,
-                    camera,
-                    sound_source.position,
-                    Color::monochrome(0.0),
-                    extent,
-                );
+                renderer.render_circle(render_target, render_pass, camera, sound_source.position, box_color, extent);
             }
             MarkerIdentifier::EffectSource(_index) => {}
             MarkerIdentifier::Particle(_index, _particle_index) => {}
@@ -696,14 +686,7 @@ impl Map {
                 let point_light = point_light_set.with_shadow_iterator().nth(index as usize).unwrap();
                 let extent = point_light_extent(point_light.color, point_light.range);
 
-                renderer.render_circle(
-                    render_target,
-                    render_pass,
-                    camera,
-                    point_light.position,
-                    Color::monochrome(0.0),
-                    extent,
-                );
+                renderer.render_circle(render_target, render_pass, camera, point_light.position, box_color, extent);
             }
         }
     }

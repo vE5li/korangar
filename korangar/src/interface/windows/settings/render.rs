@@ -55,15 +55,6 @@ fn lighting_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementC
     Expandable::new("lighting".to_string(), buttons, true).wrap()
 }
 
-fn shadows_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCell<InterfaceSettings> {
-    let buttons = vec![render_state_button(
-        "directional shadows",
-        settings.mapped(|settings| &settings.show_directional_shadows),
-    )];
-
-    Expandable::new("shadows".to_string(), buttons, true).wrap()
-}
-
 fn markers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCell<InterfaceSettings> {
     let buttons = vec![
         render_state_button("object markers", settings.mapped(|settings| &settings.show_object_markers)),
@@ -129,7 +120,6 @@ impl PrototypeWindow<InterfaceSettings> for RenderSettingsWindow {
             general_expandable(&self.render_settings),
             map_expandable(&self.render_settings),
             lighting_expandable(&self.render_settings),
-            shadows_expandable(&self.render_settings),
             markers_expandable(&self.render_settings),
             grid_expandable(&self.render_settings),
             buffers_expandable(&self.render_settings),

@@ -30,8 +30,6 @@ pub struct RenderSettings {
     pub show_point_lights: bool,
     #[new(value = "true")]
     pub show_particle_lights: bool,
-    #[new(value = "true")]
-    pub show_directional_shadows: bool,
     #[new(default)]
     pub use_debug_camera: bool,
     #[new(default)]

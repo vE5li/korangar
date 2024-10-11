@@ -280,7 +280,7 @@ impl DeferredRenderTarget {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("start frame"))]
-    pub fn start_screen_pass<'encoder>(&mut self, frame_view: &TextureView, encoder: &'encoder mut CommandEncoder) -> RenderPass<'encoder> {
+    pub fn start_screen_pass<'encoder>(&mut self, frame_view: TextureView, encoder: &'encoder mut CommandEncoder) -> RenderPass<'encoder> {
         let clear_color = wgpu::Color {
             r: 0.0,
             g: 0.0,
@@ -291,7 +291,7 @@ impl DeferredRenderTarget {
         let render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("deferred render screen"),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: frame_view,
+                view: &frame_view,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(clear_color),

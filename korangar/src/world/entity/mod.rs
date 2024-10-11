@@ -634,7 +634,9 @@ impl Common {
         const PATHING_MESH_OFFSET: f32 = 0.95;
 
         let mut native_pathing_vertices = Vec::new();
-        let active_movement = self.active_movement.as_mut().unwrap();
+        let Some(active_movement) = self.active_movement.as_mut() else {
+            return;
+        };
 
         for (index, (step, _)) in active_movement.steps.iter().cloned().enumerate() {
             let tile = map.get_tile(step);

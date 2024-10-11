@@ -20,7 +20,7 @@ mod water_light;
 
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, Rad, Vector2, Vector3};
 #[cfg(feature = "debug")]
 use circle::CircleRenderer;
 use korangar_interface::application::FontSizeTrait;
@@ -30,7 +30,7 @@ use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::EntityId;
 use renderers::texture::CubeTexture;
-use wgpu::{Device, Queue, RenderPass, TextureFormat};
+use wgpu::{BlendFactor, Device, Queue, RenderPass, TextureFormat};
 
 use self::ambient::AmbientLightRenderer;
 #[cfg(feature = "debug")]
@@ -78,7 +78,10 @@ pub enum DeferredSubRenderer {
     Overlay,
     Rectangle,
     Sprite,
-    Effect,
+    Effect {
+        source_blend_factor: BlendFactor,
+        destination_blend_factor: BlendFactor,
+    },
 }
 
 pub struct DeferredRenderer {
@@ -427,7 +430,7 @@ impl DeferredRenderer {
     }
 
     pub fn render_effect(
-        &self,
+        &mut self,
         render_target: &mut <DeferredRenderer as Renderer>::Target,
         render_pass: &mut RenderPass,
         camera: &dyn Camera,
@@ -436,8 +439,10 @@ impl DeferredRenderer {
         corner_screen_positions: [Vector2<f32>; 4],
         texture_coordinates: [Vector2<f32>; 4],
         offset: Vector2<f32>,
-        angle: f32,
+        angle: Rad<f32>,
         color: Color,
+        source_blend_factor: BlendFactor,
+        destination_blend_factor: BlendFactor,
     ) {
         let window_size = self.get_window_size();
 
@@ -453,6 +458,8 @@ impl DeferredRenderer {
             offset,
             angle,
             color,
+            source_blend_factor,
+            destination_blend_factor,
         );
     }
 

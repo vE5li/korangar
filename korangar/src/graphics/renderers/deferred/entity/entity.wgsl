@@ -30,6 +30,7 @@ struct VertexOutput {
 struct FragmentOutput {
     @location(0) fragment_color: vec4<f32>,
     @location(1) fragment_normal: vec4<f32>,
+    @location(2) fragment_water: vec4<f32>,
     @builtin(frag_depth) frag_depth: f32,
 }
 
@@ -74,19 +75,21 @@ fn fs_main(
         discard;
     }
 
-    let scaled_depth_offset = pow(depth_offset, 2.0) * constants.depth_offset;
-    let scaled_curvature_offset = (0.5 - pow(curvature, 2.0)) * constants.curvature;
-
     let linear_z: f32 = nonLinearToLinear(position.z);
+    let scaled_depth_offset = pow(depth_offset, 2.0) * constants.depth_offset;
     // We add the offsets in linear view space.
-    let adjusted_linear_z: f32 = -2.0 + linear_z - scaled_depth_offset - scaled_curvature_offset;
+    let adjusted_linear_z: f32 = -2.0 + linear_z - scaled_depth_offset;
     let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
     let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
+
+    let scaled_curvature_offset = (0.5 - pow(curvature, 2.0)) * constants.curvature;
+    let curvature_difference = linearToNonLinear(scaled_curvature_offset);
 
     var output: FragmentOutput;
     output.fragment_color = diffuse_color;
     output.fragment_normal = vec4<f32>(normalize(normal), 1.0);
     output.frag_depth = clamped_depth;
+    output.fragment_water = vec4<f32>(0.0, curvature_difference, 0.0, 0.0);
     return output;
 }
 

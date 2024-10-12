@@ -12,10 +12,11 @@ struct VertexOutput {
 
 @group(0) @binding(0) var diffuse_buffer: texture_multisampled_2d<f32>;
 @group(0) @binding(1) var normal_buffer: texture_multisampled_2d<f32>;
-@group(0) @binding(2) var depth_buffer: texture_depth_multisampled_2d;
-@group(0) @binding(3) var shadow_map: texture_depth_2d;
-@group(0) @binding(4) var shadow_sampler: sampler;
-@group(0) @binding(5) var<uniform> matrices: Matrices;
+@group(0) @binding(2) var water_buffer: texture_multisampled_2d<f32>;
+@group(0) @binding(3) var depth_buffer: texture_depth_multisampled_2d;
+@group(0) @binding(4) var shadow_map: texture_depth_2d;
+@group(0) @binding(5) var shadow_sampler: sampler;
+@group(0) @binding(6) var<uniform> matrices: Matrices;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
@@ -35,9 +36,11 @@ fn fs_main(
     @location(0) fragment_position: vec2<f32>,
 ) -> @location(0) vec4<f32> {
     var blended = vec3<f32>(0.0);
+
     for (var sample_id: i32 = 0; sample_id < 4; sample_id++) {
         blended += calculate_sample(position, fragment_position, sample_id);
     }
+
     return vec4<f32>(blended / 4.0, 1.0);
 }
 
@@ -45,7 +48,9 @@ fn calculate_sample(position: vec4<f32>, fragment_position: vec2<f32>, sample_in
     let pixel_coord = vec2<i32>(position.xy);
 
     let depth: f32 = textureLoad(depth_buffer, pixel_coord, sample_index);
-    var pixel_position_world_space: vec4<f32> = matrices.screen_to_world * vec4<f32>(fragment_position, depth, 1.0);
+    let depth_offset: f32 = textureLoad(water_buffer, pixel_coord, sample_index).g;
+
+    var pixel_position_world_space: vec4<f32> = matrices.screen_to_world * vec4<f32>(fragment_position, depth - depth_offset, 1.0);
     pixel_position_world_space /= pixel_position_world_space.w;
 
     var normal: vec3<f32> = normalize(textureLoad(normal_buffer, pixel_coord, sample_index).rgb);

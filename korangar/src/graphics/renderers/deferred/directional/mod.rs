@@ -71,7 +71,7 @@ impl DirectionalLightRenderer {
                     binding: 2,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Texture {
-                        sample_type: TextureSampleType::Depth,
+                        sample_type: TextureSampleType::Float { filterable: false },
                         view_dimension: TextureViewDimension::D2,
                         multisampled: true,
                     },
@@ -83,18 +83,28 @@ impl DirectionalLightRenderer {
                     ty: BindingType::Texture {
                         sample_type: TextureSampleType::Depth,
                         view_dimension: TextureViewDimension::D2,
-                        multisampled: false,
+                        multisampled: true,
                     },
                     count: None,
                 },
                 BindGroupLayoutEntry {
                     binding: 4,
                     visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Depth,
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
                     count: None,
                 },
                 BindGroupLayoutEntry {
                     binding: 5,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 6,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
@@ -208,18 +218,22 @@ impl DirectionalLightRenderer {
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: BindingResource::TextureView(render_target.depth_buffer.get_texture_view()),
+                    resource: BindingResource::TextureView(render_target.water_buffer.get_texture_view()),
                 },
                 BindGroupEntry {
                     binding: 3,
-                    resource: BindingResource::TextureView(shadow_map.get_texture_view()),
+                    resource: BindingResource::TextureView(render_target.depth_buffer.get_texture_view()),
                 },
                 BindGroupEntry {
                     binding: 4,
-                    resource: BindingResource::Sampler(&self.linear_sampler),
+                    resource: BindingResource::TextureView(shadow_map.get_texture_view()),
                 },
                 BindGroupEntry {
                     binding: 5,
+                    resource: BindingResource::Sampler(&self.linear_sampler),
+                },
+                BindGroupEntry {
+                    binding: 6,
                     resource: self.matrices_buffer.as_entire_binding(),
                 },
             ],

@@ -60,7 +60,7 @@ fn fs_main(
 
     if (constants.show_water_buffer != 0u) {
         let water = textureLoad(water_buffer, pixel_coord, 0);
-        output_color += vec3<f32>(0.0, 0.0, water.r);
+        output_color += vec3<f32>(water.g, 0.0, water.r);
     }
 
     if (constants.show_depth_buffer != 0u) {

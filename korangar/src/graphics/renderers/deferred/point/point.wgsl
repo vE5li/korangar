@@ -17,8 +17,9 @@ struct VertexOutput {
 
 @group(0) @binding(0) var diffuse_buffer: texture_multisampled_2d<f32>;
 @group(0) @binding(1) var normal_buffer: texture_multisampled_2d<f32>;
-@group(0) @binding(2) var depth_buffer: texture_depth_multisampled_2d;
-@group(0) @binding(3) var<uniform> matrices: Matrices;
+@group(0) @binding(2) var water_buffer: texture_multisampled_2d<f32>;
+@group(0) @binding(3) var depth_buffer: texture_depth_multisampled_2d;
+@group(0) @binding(4) var<uniform> matrices: Matrices;
 
 var<push_constant> constants: Constants;
 
@@ -52,8 +53,9 @@ fn calculate_sample(position: vec4<f32>, fragment_position: vec2<f32>, sample_in
     let pixel_coord = vec2<i32>(position.xy);
 
     let depth = textureLoad(depth_buffer, pixel_coord, sample_index);
+    let depth_offset: f32 = textureLoad(water_buffer, pixel_coord, sample_index).g;
 
-    var pixel_position_world_space = matrices.screen_to_world * vec4<f32>(fragment_position, depth, 1.0);
+    var pixel_position_world_space = matrices.screen_to_world * vec4<f32>(fragment_position, depth - depth_offset, 1.0);
     pixel_position_world_space /= pixel_position_world_space.w;
 
     let normal = normalize(textureLoad(normal_buffer, pixel_coord, sample_index).rgb);

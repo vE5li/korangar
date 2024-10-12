@@ -13,12 +13,14 @@ struct VertexOutput {
     @location(0) normal: vec4<f32>,
     @location(1) texture_coordinates: vec2<f32>,
     @location(2) @interpolate(flat) texture_index: i32,
+    @location(3) color: vec3<f32>,
 }
 
 struct FragmentInput {
     @location(0) normal: vec4<f32>,
     @location(1) texture_coordinates: vec2<f32>,
     @location(2) @interpolate(flat) texture_index: i32,
+    @location(3) color: vec3<f32>,
 }
 
 struct FragmentOutput {
@@ -40,7 +42,8 @@ fn vs_main(
     @location(1) normal: vec3<f32>,
     @location(2) texture_coordinates: vec2<f32>,
     @location(3) texture_index: i32,
-    @location(4) wind_affinity: f32,
+    @location(4) color: vec3<f32>,
+    @location(5) wind_affinity: f32,
 ) -> VertexOutput {
     let world_position = constants.world * vec4<f32>(position, 1.0);
     let wind_position = world_position + vec4<f32>(matrices.time);
@@ -51,6 +54,7 @@ fn vs_main(
     output.normal = constants.inv_world * vec4<f32>(normal, 1.0);
     output.texture_coordinates = texture_coordinates;
     output.texture_index = texture_index;
+    output.color = color;
     return output;
 }
 
@@ -64,7 +68,7 @@ fn fs_main(fragment: FragmentInput) -> FragmentOutput {
     }
 
     var output: FragmentOutput;
-    output.fragment_color = vec4<f32>(diffuse_color.rgb + additional_color, diffuse_color.a);
+    output.fragment_color = vec4<f32>(diffuse_color.rgb * fragment.color + additional_color, 1.0);
     output.fragment_normal = fragment.normal;
     return output;
 }

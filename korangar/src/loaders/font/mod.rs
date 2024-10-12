@@ -205,7 +205,7 @@ impl FontLoader {
             Scale::uniform(font_size.get_value()),
             available_width,
             text,
-            Color::monochrome_u8(0),
+            Color::BLACK,
         );
 
         ScreenSize {

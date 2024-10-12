@@ -112,7 +112,7 @@ impl Element<InterfaceSettings> for ItemBox {
                 renderer.position,
                 ScreenSize::uniform(30.0).scaled(Scaling::new(application.get_scaling_factor())),
                 renderer.clip,
-                Color::monochrome_u8(255),
+                Color::WHITE,
                 false,
             );
 

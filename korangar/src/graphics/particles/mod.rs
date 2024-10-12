@@ -73,7 +73,7 @@ impl Particle for DamageNumber {
             render_pass,
             &self.damage_amount,
             final_position,
-            Color::monochrome_u8(255),
+            Color::WHITE,
             16.0,
         );
     }

@@ -103,7 +103,7 @@ impl MouseCursor {
                     mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
                     ScreenSize::uniform(30.0 * application.get_scaling_factor()),
                     ScreenClip::unbound(),
-                    Color::monochrome_u8(255),
+                    Color::WHITE,
                     false,
                 ),
                 Grabbed::Action(sprite, actions, animation_state) => actions.render2(
@@ -114,7 +114,7 @@ impl MouseCursor {
                     &animation_state,
                     mouse_position,
                     0,
-                    Color::monochrome_u8(255),
+                    Color::WHITE,
                     application,
                 ),
             }

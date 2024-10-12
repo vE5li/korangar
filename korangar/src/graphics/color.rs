@@ -1,4 +1,4 @@
-use ragnarok_formats::color::ColorRGB;
+use ragnarok_formats::color::{ColorBGRA, ColorRGB};
 use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -10,6 +10,9 @@ pub struct Color {
 }
 
 impl Color {
+    pub const BLACK: Self = Self::monochrome(0.0);
+    pub const WHITE: Self = Self::monochrome(1.0);
+
     pub const fn rgb(red: f32, green: f32, blue: f32) -> Self {
         Self {
             red,
@@ -52,7 +55,7 @@ impl Color {
         Color::rgb_u8(channel(0..2), channel(2..4), channel(4..6))
     }
 
-    pub fn monochrome(brightness: f32) -> Self {
+    pub const fn monochrome(brightness: f32) -> Self {
         Self {
             red: brightness,
             green: brightness,
@@ -150,5 +153,12 @@ impl From<ColorRGB> for Color {
             blue,
             alpha: 1.0,
         }
+    }
+}
+
+impl From<ColorBGRA> for Color {
+    fn from(value: ColorBGRA) -> Self {
+        let ColorBGRA { red, blue, green, alpha } = value;
+        Color::rgba_u8(red, green, blue, alpha)
     }
 }

@@ -31,7 +31,7 @@ impl DialogContainer {
         match dialog_element {
             DialogElement::Text(text) => Text::default()
                 .with_text(text.clone())
-                .with_foreground_color(|_| Color::monochrome_u8(255))
+                .with_foreground_color(|_| Color::WHITE)
                 .wrap(),
             DialogElement::NextButton => ButtonBuilder::new()
                 .with_text("next")

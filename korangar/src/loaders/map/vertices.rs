@@ -6,6 +6,7 @@ use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 use super::GroundTileExt;
 use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
 use crate::loaders::TextureLoader;
+use crate::Color;
 
 pub const MAP_TILE_SIZE: f32 = 10.0;
 
@@ -82,11 +83,30 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                     let third_texture_coordinates = Vector2::new(ground_surface.u[3], ground_surface.v[3]);
                     let fourth_texture_coordinates = Vector2::new(ground_surface.u[2], ground_surface.v[2]);
 
+                    let neightbor_color = |x_offset, y_offset| {
+                        let Some(neighbor_tile) = ground_tiles.get(x + x_offset + (y + y_offset) * width) else {
+                            return ground_surface.color.into();
+                        };
+
+                        // FIX: It is alomst certainly incorrect to use the top face in all cases.
+                        let neighbor_surface_index = tile_surface_index(neighbor_tile, SurfaceType::Top);
+                        let Some(neighbor_surface) = ground_data.surfaces.get(neighbor_surface_index as usize) else {
+                            return ground_surface.color.into();
+                        };
+
+                        neighbor_surface.color.into()
+                    };
+
+                    let color_right = neightbor_color(1, 0);
+                    let color_top_right = neightbor_color(1, 1);
+                    let color_top = neightbor_color(0, 1);
+
                     native_ground_vertices.push(NativeModelVertex::new(
                         first_position,
                         first_normal,
                         first_texture_coordinates,
                         ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.color.into(),
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
@@ -94,6 +114,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         first_normal,
                         second_texture_coordinates,
                         ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        color_right,
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
@@ -101,6 +122,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         first_normal,
                         third_texture_coordinates,
                         ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        color_top_right,
                         0.0,
                     ));
 
@@ -109,6 +131,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         second_normal,
                         first_texture_coordinates,
                         ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.color.into(),
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
@@ -116,6 +139,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         second_normal,
                         third_texture_coordinates,
                         ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        color_top_right,
                         0.0,
                     ));
                     native_ground_vertices.push(NativeModelVertex::new(
@@ -123,6 +147,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         second_normal,
                         fourth_texture_coordinates,
                         ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        color_top,
                         0.0,
                     ));
                 }
@@ -207,6 +232,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 first_normal,
                 first_texture_coordinates,
                 tile_type_index,
+                Color::WHITE,
                 0.0,
             ));
             tile_vertices.push(ModelVertex::new(
@@ -214,6 +240,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 first_normal,
                 second_texture_coordinates,
                 tile_type_index,
+                Color::WHITE,
                 0.0,
             ));
             tile_vertices.push(ModelVertex::new(
@@ -221,6 +248,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 first_normal,
                 third_texture_coordinates,
                 tile_type_index,
+                Color::WHITE,
                 0.0,
             ));
 
@@ -229,6 +257,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 second_normal,
                 first_texture_coordinates,
                 tile_type_index,
+                Color::WHITE,
                 0.0,
             ));
             tile_vertices.push(ModelVertex::new(
@@ -236,6 +265,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 second_normal,
                 third_texture_coordinates,
                 tile_type_index,
+                Color::WHITE,
                 0.0,
             ));
             tile_vertices.push(ModelVertex::new(
@@ -243,6 +273,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
                 second_normal,
                 fourth_texture_coordinates,
                 tile_type_index,
+                Color::WHITE,
                 0.0,
             ));
 

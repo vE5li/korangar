@@ -102,7 +102,7 @@ impl Element<InterfaceSettings> for Chat {
                     left: 0.2,
                     top: offset + 0.2,
                 },
-                Color::monochrome_u8(0),
+                Color::BLACK,
                 theme.chat.font_size.get(),
             );
 

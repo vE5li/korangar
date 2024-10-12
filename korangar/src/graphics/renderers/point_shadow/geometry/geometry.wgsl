@@ -28,7 +28,7 @@ fn vs_main(
     @location(0) position: vec3<f32>,
     @location(2) texture_coordinates: vec2<f32>,
     @location(3) texture_index: i32,
-    @location(4) wind_affinity: f32,
+    @location(5) wind_affinity: f32,
 ) -> VertexOutput {
     let world_position = constants.world * vec4<f32>(position, 1.0);
     let wind_position = world_position + vec4<f32>(constants.light_position.w);

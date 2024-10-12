@@ -113,20 +113,20 @@ impl Element<InterfaceSettings> for SkillBox {
                 &skill.animation_state,
                 renderer.position + ScreenPosition::uniform(15.0 * application.get_scaling_factor()),
                 0,
-                Color::monochrome_u8(255),
+                Color::WHITE,
                 application,
             );
 
             renderer.render_text(
                 &format!("{}", skill.skill_level.0),
                 ScreenPosition::uniform(1.0),
-                Color::monochrome_u8(0),
+                Color::BLACK,
                 FontSize::new(15.0),
             );
             renderer.render_text(
                 &format!("{}", skill.skill_level.0),
                 ScreenPosition::default(),
-                Color::monochrome_u8(255),
+                Color::WHITE,
                 FontSize::new(15.0),
             );
         }

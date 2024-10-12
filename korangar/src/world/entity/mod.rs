@@ -628,7 +628,7 @@ impl Common {
 
     #[cfg(feature = "debug")]
     pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map) {
-        use crate::{NativeModelVertex, MAP_TILE_SIZE};
+        use crate::{Color, NativeModelVertex, MAP_TILE_SIZE};
 
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const PATHING_MESH_OFFSET: f32 = 0.95;
@@ -636,6 +636,13 @@ impl Common {
         let mut native_pathing_vertices = Vec::new();
         let Some(active_movement) = self.active_movement.as_mut() else {
             return;
+        };
+
+        let mesh_color = match self.entity_type {
+            EntityType::Player => Color::rgb_u8(25, 250, 225),
+            EntityType::Npc => Color::rgb_u8(170, 250, 25),
+            EntityType::Monster => Color::rgb_u8(250, 100, 25),
+            _ => Color::WHITE,
         };
 
         for (index, (step, _)) in active_movement.steps.iter().cloned().enumerate() {
@@ -669,6 +676,7 @@ impl Common {
                 first_normal,
                 texture_coordinates[0],
                 texture_index,
+                mesh_color,
                 0.0,
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
@@ -676,6 +684,7 @@ impl Common {
                 first_normal,
                 texture_coordinates[1],
                 texture_index,
+                mesh_color,
                 0.0,
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
@@ -683,6 +692,7 @@ impl Common {
                 first_normal,
                 texture_coordinates[2],
                 texture_index,
+                mesh_color,
                 0.0,
             ));
 
@@ -691,6 +701,7 @@ impl Common {
                 second_normal,
                 texture_coordinates[0],
                 texture_index,
+                mesh_color,
                 0.0,
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
@@ -698,6 +709,7 @@ impl Common {
                 second_normal,
                 texture_coordinates[2],
                 texture_index,
+                mesh_color,
                 0.0,
             ));
             native_pathing_vertices.push(NativeModelVertex::new(
@@ -705,6 +717,7 @@ impl Common {
                 second_normal,
                 texture_coordinates[3],
                 texture_index,
+                mesh_color,
                 0.0,
             ));
         }

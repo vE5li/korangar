@@ -1065,7 +1065,7 @@ impl Client {
                         // between shadows and no shadows.
                         PointLightId::new(entity_id.0),
                         Vector3::new(0.0, 12.0, 0.0),
-                        Color::monochrome_u8(255),
+                        Color::WHITE,
                         50.0,
                         false,
                     )));
@@ -2270,7 +2270,7 @@ impl Client {
                         &mut screen_render_pass,
                         name,
                         mouse_position + offset + ScreenPosition::uniform(1.0),
-                        Color::monochrome_u8(0),
+                        Color::BLACK,
                         FontSize::new(12.0),
                     );
 
@@ -2279,7 +2279,7 @@ impl Client {
                         &mut screen_render_pass,
                         name,
                         mouse_position + offset,
-                        Color::monochrome_u8(255),
+                        Color::WHITE,
                         FontSize::new(12.0),
                     );
                 }

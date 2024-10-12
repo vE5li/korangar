@@ -160,7 +160,7 @@ impl Element<InterfaceSettings> for FrameView {
             let shadow_position = text_position + ScreenSize::uniform(1.0);
 
             // Drop shadow.
-            renderer.render_text(&text, shadow_position, Color::monochrome_u8(0), FontSize::new(14.0));
+            renderer.render_text(&text, shadow_position, Color::BLACK, FontSize::new(14.0));
             // Colored text.
             renderer.render_text(&text, text_position, color, FontSize::new(14.0));
 

@@ -18,6 +18,7 @@ use super::FALLBACK_MODEL_FILE;
 use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::world::{Model, Node};
+use crate::Color;
 
 #[derive(new)]
 pub struct ModelLoader {
@@ -49,6 +50,7 @@ impl ModelLoader {
                     normal,
                     *texture_coordinates,
                     texture_index as i32,
+                    Color::WHITE,
                     0.0, // TODO: actually add wind affinity
                 ));
             }
@@ -59,6 +61,7 @@ impl ModelLoader {
                     normal,
                     *texture_coordinates,
                     texture_index as i32,
+                    Color::WHITE,
                     0.0, // TODO: actually add wind affinity
                 ));
             }

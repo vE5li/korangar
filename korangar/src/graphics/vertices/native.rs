@@ -2,6 +2,7 @@ use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 use derive_new::new;
 
 use crate::graphics::ModelVertex;
+use crate::Color;
 
 #[derive(new)]
 pub struct NativeModelVertex {
@@ -9,6 +10,7 @@ pub struct NativeModelVertex {
     pub normal: Vector3<f32>,
     pub texture_coordinates: Vector2<f32>,
     pub texture_index: i32,
+    pub color: Color,
     pub wind_affinity: f32,
 }
 
@@ -19,6 +21,7 @@ impl NativeModelVertex {
             self.normal,
             self.texture_coordinates,
             self.texture_index,
+            self.color,
             self.wind_affinity,
         )
     }

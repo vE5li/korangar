@@ -164,17 +164,6 @@ impl ModelLoader {
         );
         main_bounding_box.extend(&bounding_box);
 
-        let final_matrix = match current_node.node_name == *root_node_name {
-            true => {
-                Matrix4::from_translation(-Vector3::new(
-                    bounding_box.center().x,
-                    bounding_box.max().y,
-                    bounding_box.center().z,
-                )) * transform_matrix
-            }
-            false => transform_matrix,
-        };
-
         let node_textures: Vec<Arc<Texture>> = current_node
             .texture_indices
             .iter()
@@ -204,12 +193,31 @@ impl ModelLoader {
         let node_textures = TextureGroup::new(device, &root_node_name.inner, node_textures);
 
         Node::new(
-            final_matrix,
+            transform_matrix,
             vertex_buffer,
             node_textures,
             child_nodes,
             current_node.rotation_keyframes.clone(),
         )
+    }
+
+    pub fn calculate_transformation_matrix(node: &mut Node, is_root: bool, bounding_box: AABB, parent_matrix: Matrix4<f32>) {
+        node.transform_matrix = match is_root {
+            true => {
+                let translation_matrix = Matrix4::from_translation(-Vector3::new(
+                    bounding_box.center().x,
+                    bounding_box.max().y,
+                    bounding_box.center().z,
+                ));
+
+                parent_matrix * translation_matrix * node.transform_matrix
+            }
+            false => parent_matrix * node.transform_matrix,
+        };
+
+        node.child_nodes
+            .iter_mut()
+            .for_each(|child_node| Self::calculate_transformation_matrix(child_node, false, bounding_box, node.transform_matrix));
     }
 
     fn load(&mut self, texture_loader: &mut TextureLoader, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, LoadError> {
@@ -249,8 +257,13 @@ impl ModelLoader {
             .find(|node_data| &node_data.node_name == root_node_name)
             .expect("failed to find main node");
 
+        // TODO: Temporary check until we support more versions.
+        if InternalVersion::from(model_data.version).equals_or_above(2, 2) {
+            return Err(LoadError::UnsupportedFormat("rsm >= 2.2".to_owned()));
+        }
+
         let mut bounding_box = AABB::uninitialized();
-        let root_node = Self::process_node_mesh(
+        let mut root_node = Self::process_node_mesh(
             &self.device,
             &self.queue,
             root_node,
@@ -261,6 +274,8 @@ impl ModelLoader {
             root_node_name,
             reverse_order,
         );
+        Self::calculate_transformation_matrix(&mut root_node, true, bounding_box, Matrix4::identity());
+
         let model = Arc::new(Model::new(
             root_node,
             bounding_box,

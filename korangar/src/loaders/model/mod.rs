@@ -243,6 +243,18 @@ impl ModelLoader {
             }
         };
 
+        // TODO: Temporary check until we support more versions.
+        let version: InternalVersion = model_data.version.into();
+        if version.equals_or_above(2, 2) {
+            #[cfg(feature = "debug")]
+            {
+                print_debug!("Failed to load model because version {} is unsupported", version);
+                print_debug!("Replacing with fallback");
+            }
+
+            return self.get(texture_loader, FALLBACK_MODEL_FILE, reverse_order);
+        }
+
         let textures = model_data
             .texture_names
             .iter()
@@ -256,11 +268,6 @@ impl ModelLoader {
             .iter()
             .find(|node_data| &node_data.node_name == root_node_name)
             .expect("failed to find main node");
-
-        // TODO: Temporary check until we support more versions.
-        if InternalVersion::from(model_data.version).equals_or_above(2, 2) {
-            return Err(LoadError::UnsupportedFormat("rsm >= 2.2".to_owned()));
-        }
 
         let mut bounding_box = AABB::uninitialized();
         let mut root_node = Self::process_node_mesh(

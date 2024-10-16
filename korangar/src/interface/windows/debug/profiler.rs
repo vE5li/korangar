@@ -1,7 +1,7 @@
 use korangar_debug::profiling::Profiler;
-use korangar_interface::elements::{ElementWrap, PickList, StateButtonBuilder};
+use korangar_interface::element::{ElementWrap, PickList, StateButtonBuilder};
 use korangar_interface::state::{PlainTrackedState, Remote, TrackedState, TrackedStateBinary, ValueState};
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::interface::application::InterfaceSettings;

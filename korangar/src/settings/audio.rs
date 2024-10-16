@@ -1,9 +1,10 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use ron::ser::PrettyConfig;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, RustState, Serialize, Deserialize)]
 pub struct AudioSettings {
     pub mute_on_focus_loss: bool,
 }

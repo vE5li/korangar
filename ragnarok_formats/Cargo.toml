@@ -6,8 +6,9 @@ edition = "2024"
 [dependencies]
 bitflags = { workspace = true }
 cgmath = { workspace = true }
+rust_state = { workspace = true, optional = true }
 korangar_interface = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 
 [features]
-interface = ["korangar_interface"]
+interface = ["korangar_interface", "rust_state"]

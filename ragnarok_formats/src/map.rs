@@ -9,8 +9,11 @@ use crate::transform::Transform;
 use crate::version::{InternalVersion, MajorFirst, Version};
 
 #[derive(Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::window::PrototypeWindow))]
 #[cfg_attr(feature = "interface", window_title("Map Viewer"))]
 #[cfg_attr(feature = "interface", window_class("map_viewer"))]
 pub struct MapData {
@@ -48,7 +51,10 @@ pub struct MapData {
     pub quadtree: Option<QuadTreeData>,
 }
 
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 #[derive(Clone)]
 pub struct QuadTreeData {
     pub max: [f32; 3],
@@ -331,7 +337,10 @@ impl FromBytes for ResourceType {
 }
 
 #[derive(Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct ObjectData {
     #[length(40)]
     #[version_equals_or_above(1, 3)]
@@ -354,7 +363,10 @@ pub struct ObjectData {
 }
 
 #[derive(Clone)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct MapResources {
     pub resources_amount: u32,
     pub objects: Vec<ObjectData>,
@@ -469,7 +481,10 @@ impl ToBytes for MapResources {
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct WaterSettings {
     #[version_equals_or_above(1, 3)]
     pub water_level: Option<f32>,
@@ -486,7 +501,10 @@ pub struct WaterSettings {
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct LightSettings {
     #[version_equals_or_above(1, 5)]
     pub light_longitude: Option<i32>,
@@ -501,8 +519,11 @@ pub struct LightSettings {
 }
 
 #[derive(Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::window::PrototypeWindow))]
 #[cfg_attr(feature = "interface", window_title("Light Source"))]
 pub struct LightSource {
     #[length(80)]
@@ -513,8 +534,11 @@ pub struct LightSource {
 }
 
 #[derive(Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::window::PrototypeWindow))]
 #[cfg_attr(feature = "interface", window_title("Effect Source"))]
 pub struct EffectSource {
     #[length(80)]
@@ -529,8 +553,11 @@ pub struct EffectSource {
 }
 
 #[derive(Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
-#[cfg_attr(feature = "interface", derive(korangar_interface::windows::PrototypeWindow))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::window::PrototypeWindow))]
 #[cfg_attr(feature = "interface", window_title("Sound Source"))]
 pub struct SoundSource {
     #[length(80)]

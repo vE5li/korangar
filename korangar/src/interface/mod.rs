@@ -4,7 +4,7 @@ pub mod theme;
 pub mod elements;
 pub mod application;
 pub mod cursor;
-pub mod dialog;
+// pub mod dialog;
 pub mod linked;
 pub mod resource;
 pub mod windows;

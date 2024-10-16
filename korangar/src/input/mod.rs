@@ -8,11 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use cgmath::Vector2;
 use korangar_interface::Interface;
-use korangar_interface::application::FocusState;
-use korangar_interface::elements::{ElementCell, Focus};
 use korangar_interface::event::ClickAction;
-#[cfg(feature = "debug")]
-use korangar_interface::state::{PlainTrackedState, TrackedState};
 use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
@@ -24,7 +20,6 @@ pub use self::mode::{Grabbed, MouseInputMode};
 use crate::graphics::PickerTarget;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::resource::PartialMove;
@@ -148,20 +143,18 @@ impl InputSystem {
         &self.keys[key_code as usize]
     }
 
-    #[allow(clippy::type_complexity)]
+    /*#[allow(clippy::type_complexity)]
     #[cfg_attr(feature = "debug", korangar_debug::profile("update user input"))]
     pub fn user_events(
         &mut self,
         interface: &mut Interface<InterfaceSettings>,
         application: &InterfaceSettings,
-        focus_state: &mut FocusState<InterfaceSettings>,
+        // focus_state: &mut FocusState<InterfaceSettings>,
         mouse_cursor: &mut MouseCursor,
         #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
         client_tick: ClientTick,
     ) -> (
         Vec<UserEvent>,
-        Option<ElementCell<InterfaceSettings>>,
-        Option<ElementCell<InterfaceSettings>>,
         Option<PickerTarget>,
         ScreenPosition,
     ) {
@@ -176,13 +169,13 @@ impl InputSystem {
         #[cfg(not(feature = "debug"))]
         let lock_actions = false;
 
-        if self.left_mouse_button.pressed() || self.right_mouse_button.pressed() {
-            focus_state.remove_focus();
-        }
+        // if self.left_mouse_button.pressed() || self.right_mouse_button.pressed() {
+        //     focus_state.remove_focus();
+        // }
 
         if shift_down {
             if let Some(window_index) = &mut window_index {
-                focus_state.set_focused_window(*window_index);
+                // focus_state.set_focused_window(*window_index);
 
                 if self.left_mouse_button.pressed() {
                     *window_index = interface.move_window_to_top(*window_index);
@@ -196,11 +189,11 @@ impl InputSystem {
             }
         }
 
-        if let Some(index) = window_index
-            && self.left_mouse_button.pressed()
-        {
-            focus_state.set_focused_window(index)
-        }
+        // if let Some(index) = window_index
+        //     && self.left_mouse_button.pressed()
+        // {
+        //     focus_state.set_focused_window(index)
+        // }
 
         let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;
         if let Some(window_index) = &mut window_index
@@ -208,7 +201,7 @@ impl InputSystem {
             && condition
         {
             *window_index = interface.move_window_to_top(*window_index);
-            focus_state.set_focused_window(*window_index);
+            // focus_state.set_focused_window(*window_index);
             self.mouse_input_mode = MouseInputMode::ClickInterface;
 
             if let Some(hovered_element) = &hovered_element {
@@ -222,15 +215,15 @@ impl InputSystem {
                         ClickAction::ChangeEvent(..) => {}
 
                         ClickAction::FocusElement => {
-                            let element_cell = hovered_element.clone();
-                            let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::downwards()); // TODO: check
-                            focus_state.set_focused_element(new_focused_element, *window_index);
+                            // let element_cell = hovered_element.clone();
+                            // let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::downwards()); // TODO: check
+                            // focus_state.set_focused_element(new_focused_element, *window_index);
                         }
 
                         ClickAction::FocusNext(focus_mode) => {
-                            let element_cell = hovered_element.clone();
-                            let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
-                            focus_state.update_focused_element(new_focused_element, *window_index);
+                            // let element_cell = hovered_element.clone();
+                            // let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
+                            // focus_state.update_focused_element(new_focused_element, *window_index);
                         }
 
                         ClickAction::Custom(event) => events.push(event),
@@ -390,116 +383,115 @@ impl InputSystem {
             }
         }
 
-        let characters = self.input_buffer.drain(..).collect::<Vec<_>>();
         let mut process_keys = true;
 
-        if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
-            // this will currently not affect the following statements, which is a bit
-            // strange
-            if self.get_key(KeyCode::Escape).pressed() {
-                focus_state.remove_focus();
-                process_keys = false;
-            }
+        // if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
+        //     // this will currently not affect the following statements, which is a bit
+        //     // strange
+        //     if self.get_key(KeyCode::Escape).pressed() {
+        //         focus_state.remove_focus();
+        //         process_keys = false;
+        //     }
+        //
+        //     if self.get_key(KeyCode::Tab).pressed() {
+        //         let new_focused_element = focused_element
+        //             .borrow()
+        //             .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
+        //
+        //         focus_state.update_focused_element(new_focused_element, *focused_window);
+        //         process_keys = false;
+        //     }
+        //
+        //     if self.get_key(KeyCode::Enter).pressed() {
+        //         let actions = interface.left_click_element(focused_element, *focused_window);
+        //
+        //         for action in actions {
+        //             // TODO: remove and replace with proper event
+        //             match action {
+        //                 ClickAction::Custom(event) => events.push(event),
+        //                 ClickAction::OpenWindow(prototype_window) => {
+        //                     interface.open_window(application, focus_state, prototype_window.as_ref())
+        //                 }
+        //                 ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
+        //                 _ => {}
+        //             }
+        //         }
+        //
+        //         process_keys = false;
+        //     }
+        // }
 
-            if self.get_key(KeyCode::Tab).pressed() {
-                let new_focused_element = focused_element
-                    .borrow()
-                    .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
+        // if self.get_key(KeyCode::ControlLeft).down() && self.get_key(KeyCode::KeyQ).pressed() && focus_state.focused_window().is_some() {
+        //     let window_index = focus_state.get_focused_window().unwrap();
+        //
+        //     if interface.get_window(window_index).is_closable() {
+        //         interface.close_window(focus_state, window_index);
+        //     }
+        //
+        //     process_keys = false;
+        // }
 
-                focus_state.update_focused_element(new_focused_element, *focused_window);
-                process_keys = false;
-            }
-
-            if self.get_key(KeyCode::Enter).pressed() {
-                let actions = interface.left_click_element(focused_element, *focused_window);
-
-                for action in actions {
-                    // TODO: remove and replace with proper event
-                    match action {
-                        ClickAction::Custom(event) => events.push(event),
-                        ClickAction::OpenWindow(prototype_window) => {
-                            interface.open_window(application, focus_state, prototype_window.as_ref())
-                        }
-                        ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
-                        _ => {}
-                    }
-                }
-
-                process_keys = false;
-            }
-        }
-
-        if self.get_key(KeyCode::ControlLeft).down() && self.get_key(KeyCode::KeyQ).pressed() && focus_state.focused_window().is_some() {
-            let window_index = focus_state.get_focused_window().unwrap();
-
-            if interface.get_window(window_index).is_closable() {
-                interface.close_window(focus_state, window_index);
-            }
-
-            process_keys = false;
-        }
-
-        if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
-            for character in characters {
-                match character {
-                    // ignore since we need to handle tab knowing the state of shift
-                    '\t' => {}
-                    '\x1b' => {}
-                    valid => {
-                        let (key_handled, actions) = interface.input_character_element(focused_element, *focused_window, valid);
-
-                        if key_handled {
-                            process_keys = false;
-                        }
-
-                        for action in actions {
-                            match action {
-                                // is handled in the interface
-                                ClickAction::ChangeEvent(..) => {}
-                                ClickAction::FocusElement => {
-                                    let element_cell = focused_element.clone();
-                                    let new_focused_element = focused_element.borrow().focus_next(element_cell, None, Focus::downwards());
-
-                                    focus_state.set_focused_element(new_focused_element, *focused_window);
-                                }
-                                ClickAction::FocusNext(focus_mode) => {
-                                    let element_cell = focused_element.clone();
-                                    let new_focused_element =
-                                        focused_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
-
-                                    focus_state.update_focused_element(new_focused_element, *focused_window);
-                                }
-                                ClickAction::Custom(event) => events.push(event),
-                                ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
-                                ClickAction::DragElement => {
-                                    self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
-                                }
-                                // TODO: should just move immediately ?
-                                ClickAction::Move(..) => {}
-                                ClickAction::OpenWindow(prototype_window) => {
-                                    interface.open_window(application, focus_state, prototype_window.as_ref())
-                                }
-                                ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
-                                ClickAction::OpenPopup {
-                                    element,
-                                    position_tracker,
-                                    size_tracker,
-                                } => interface.open_popup(element, position_tracker, size_tracker, *focused_window),
-                                ClickAction::ClosePopup => interface.close_popup(*focused_window),
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
+        //     for character in characters {
+        //         match character {
+        //             // ignore since we need to handle tab knowing the state of shift
+        //             '\t' => {}
+        //             '\x1b' => {}
+        //             valid => {
+        //                 let (key_handled, actions) = interface.input_character_element(focused_element, *focused_window, valid);
+        //
+        //                 if key_handled {
+        //                     process_keys = false;
+        //                 }
+        //
+        //                 for action in actions {
+        //                     match action {
+        //                         // is handled in the interface
+        //                         ClickAction::ChangeEvent(..) => {}
+        //                         ClickAction::FocusElement => {
+        //                             let element_cell = focused_element.clone();
+        //                             let new_focused_element = focused_element.borrow().focus_next(element_cell, None, Focus::downwards());
+        //
+        //                             focus_state.set_focused_element(new_focused_element, *focused_window);
+        //                         }
+        //                         ClickAction::FocusNext(focus_mode) => {
+        //                             let element_cell = focused_element.clone();
+        //                             let new_focused_element =
+        //                                 focused_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
+        //
+        //                             focus_state.update_focused_element(new_focused_element, *focused_window);
+        //                         }
+        //                         ClickAction::Custom(event) => events.push(event),
+        //                         ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
+        //                         ClickAction::DragElement => {
+        //                             self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
+        //                         }
+        //                         // TODO: should just move immediately ?
+        //                         ClickAction::Move(..) => {}
+        //                         ClickAction::OpenWindow(prototype_window) => {
+        //                             interface.open_window(application, focus_state, prototype_window.as_ref())
+        //                         }
+        //                         ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
+        //                         ClickAction::OpenPopup {
+        //                             element,
+        //                             position_tracker,
+        //                             size_tracker,
+        //                         } => interface.open_popup(element, position_tracker, size_tracker, *focused_window),
+        //                         ClickAction::ClosePopup => interface.close_popup(*focused_window),
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         if process_keys {
             let alt_down = self.get_key(KeyCode::AltLeft).down();
             let control_down = self.get_key(KeyCode::ControlLeft).down();
 
-            if self.get_key(KeyCode::Tab).pressed() {
-                interface.first_focused_element(focus_state);
-            }
+            // if self.get_key(KeyCode::Tab).pressed() {
+            //     interface.first_focused_element(focus_state);
+            // }
 
             if self.get_key(KeyCode::Escape).pressed() {
                 events.push(UserEvent::OpenMenuWindow);
@@ -655,32 +647,51 @@ impl InputSystem {
             mouse_cursor.set_state(MouseCursorState::Default, client_tick);
         }
 
-        if focus_state.did_hovered_element_change(&hovered_element) {
-            if let Some(window_index) = focus_state.previous_hovered_window() {
-                interface.schedule_render_window(window_index);
-            }
+        // if focus_state.did_hovered_element_change(&hovered_element) {
+        //     if let Some(window_index) = focus_state.previous_hovered_window() {
+        //         interface.schedule_render_window(window_index);
+        //     }
+        //
+        //     if let Some(window_index) = window_index {
+        //         interface.schedule_render_window(window_index);
+        //     }
+        // }
+        //
+        // if focus_state.did_focused_element_change() {
+        //     if let Some(window_index) = focus_state.previous_focused_window() {
+        //         interface.schedule_render_window(window_index);
+        //     }
+        //
+        //     if let Some(window_index) = focus_state.focused_window() {
+        //         interface.schedule_render_window(window_index);
+        //     }
+        // }
 
-            if let Some(window_index) = window_index {
-                interface.schedule_render_window(window_index);
-            }
-        }
-
-        if focus_state.did_focused_element_change() {
-            if let Some(window_index) = focus_state.previous_focused_window() {
-                interface.schedule_render_window(window_index);
-            }
-
-            if let Some(window_index) = focus_state.focused_window() {
-                interface.schedule_render_window(window_index);
-            }
-        }
-
-        let focused_element = focus_state.update(&hovered_element, window_index);
+        // let focused_element = focus_state.update(&hovered_element, window_index);
 
         (events, hovered_element, focused_element, mouse_target, self.new_mouse_position)
-    }
+    }*/
 
     pub fn get_mouse_mode(&self) -> &MouseInputMode {
         &self.mouse_input_mode
+    }
+
+    // TODO: Temp
+    pub fn get_left_click_position(&self) -> Option<ScreenPosition> {
+        self.left_mouse_button.pressed().then_some(self.new_mouse_position)
+    }
+
+    // TODO: Temp
+    pub fn get_scroll_delta(&self) -> Option<(ScreenPosition, f32)> {
+        (self.scroll_delta != 0.0).then_some((self.new_mouse_position, self.scroll_delta))
+    }
+
+    // TODO: Temp
+    pub fn get_input_characters(&mut self) -> Option<Vec<char>> {
+        (!self.input_buffer.is_empty()).then(|| self.input_buffer.drain(..).collect())
+    }
+
+    pub fn get_mouse(&self) -> (Option<PickerTarget>, ScreenPosition) {
+        (None, self.new_mouse_position)
     }
 }

@@ -5,7 +5,7 @@ use std::sync::{LazyLock, Mutex, MutexGuard};
 
 use korangar_debug::profiling::RingBuffer;
 use korangar_interface::application::Application;
-use korangar_interface::elements::{ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus, PrototypeElement};
+use korangar_interface::element::{ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus, PrototypeElement};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;

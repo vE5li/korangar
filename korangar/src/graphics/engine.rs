@@ -941,11 +941,10 @@ impl GraphicsEngine {
 
             // Interface Pass
             scope.spawn(|_| {
-                let mut render_pass = engine_context.interface_render_pass_context.create_pass(
-                    &mut interface_encoder,
-                    &engine_context.global_context,
-                    instruction.clear_interface,
-                );
+                let mut render_pass =
+                    engine_context
+                        .interface_render_pass_context
+                        .create_pass(&mut interface_encoder, &engine_context.global_context, ());
 
                 engine_context
                     .interface_rectangle_drawer

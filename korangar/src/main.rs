@@ -11,6 +11,9 @@
 #![feature(type_changing_struct_update)]
 #![feature(unsized_const_params)]
 #![feature(variant_count)]
+#![feature(associated_type_defaults)]
+#![feature(macro_metavar_expr)]
+#![feature(unsafe_cell_access)]
 
 // Helper macro to time and print the startup time of Korangar
 macro_rules! time_phase {
@@ -45,6 +48,8 @@ use cgmath::{Point3, Vector2, Vector3};
 #[cfg(feature = "debug")]
 use graphics::RenderSettings;
 use image::{EncodableLayout, ImageFormat, ImageReader};
+use interface::layout::CornerRadius;
+use interface::theme::{CursorThemePathExt, GameTheme, GameThemePathExt, IndicatorThemePathExt};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
@@ -53,10 +58,9 @@ use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_interface::Interface;
-use korangar_interface::application::{Application, FocusState, FontSizeTrait, PositionTraitExt};
-use korangar_interface::state::{
-    MappedRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec, ValueState,
-};
+use korangar_interface::application::{FontSizeTrait, PositionTrait, ScalingTrait};
+use korangar_interface::element::id::ElementId;
+use korangar_interface::event::EventQueue;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
@@ -69,7 +73,9 @@ use ragnarok_packets::{
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
-use settings::AudioSettings;
+use rust_state::{Context, RustState};
+use settings::{AudioSettings, AudioSettingsPathExt, GraphicsSettingsPathExt};
+use state::{ClientState, ClientStatePathExt, ClientStateRootExt, ClientTheme, DefaultGame, DefaultMenu, LoginWindowState, ThemeDefault};
 #[cfg(feature = "debug")]
 use wgpu::Device;
 use wgpu::util::initialize_adapter_from_env_or_default;
@@ -86,9 +92,8 @@ use winit::window::{Icon, Window, WindowId};
 
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
-use crate::interface::dialog::DialogSystem;
+// use crate::interface::dialog::DialogSystem;
 #[cfg(feature = "debug")]
 use crate::interface::elements::PacketHistoryCallback;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
@@ -180,6 +185,394 @@ fn initialize_shutdown_signal() {
     .expect("Error setting Ctrl-C handler");
 }
 
+// TODO: Move
+#[derive(Debug, Clone)]
+pub struct ChatMessage {
+    pub text: String,
+    pub color: MessageColor,
+}
+
+mod state {
+    use korangar_interface::application::{Appli, RenderLayer};
+    use korangar_interface::components::button::ButtonTheme;
+    use korangar_interface::components::collapsable::CollapsableTheme;
+    use korangar_interface::components::state_button::StateButtonTheme;
+    use korangar_interface::components::text::TextTheme;
+    use korangar_interface::components::text_box::TextBoxTheme;
+    use korangar_interface::layout::alignment::{HorizontalAlignment, VerticalAlignment};
+    use korangar_interface::theme::ThemePathGetter;
+    use korangar_interface::window::WindowTheme;
+    use korangar_networking::{SellItem, ShopItem};
+    use ragnarok_packets::{CharacterId, CharacterInformation, CharacterServerInformation, Friend};
+    use rust_state::{Path, RustState, Selector};
+
+    use crate::graphics::Color;
+    #[cfg(feature = "debug")]
+    use crate::graphics::RenderSettings;
+    use crate::input::UserEvent;
+    use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+    use crate::interface::theme::GameTheme;
+    use crate::interface::windows::WindowCache;
+    use crate::loaders::{ClientInfo, FontSize, Scaling, ServiceId};
+    use crate::settings::LoginSettings;
+    use crate::world::ResourceMetadata;
+    use crate::{AudioSettings, ChatMessage, GraphicsSettings};
+
+    // TODO: Make all of these private and load them internally
+    #[derive(RustState)]
+    #[state_root]
+    pub struct ClientState {
+        pub menu_theme: ClientTheme,
+        pub game_theme: ClientTheme,
+        pub game_theme_2: GameTheme,
+        pub interface_scale: Scaling,
+
+        pub client_info: ClientInfo,
+        pub login_window: LoginWindowState,
+        pub login_settings: LoginSettings,
+        pub character_servers: Vec<CharacterServerInformation>,
+
+        // TODO: This should be a TrackedVec or something.
+        pub chat_messages: Vec<ChatMessage>,
+
+        // TODO: This should be a TrackedVec or something.
+        pub friend_list: Vec<Friend>,
+        // saved_login_data: Option<LoginServerLoginData>,
+        // saved_character_server: Option<CharacterServerInformation>,
+        // TODO: This should be a TrackedVec or something.
+        pub saved_characters: Vec<CharacterInformation>,
+        // TODO: This should be a TrackedVec or something.
+        pub shop_items: Vec<ShopItem<ResourceMetadata>>,
+        // TODO: This should be a TrackedVec or something.
+        pub sell_items: Vec<SellItem<(ResourceMetadata, u16)>>,
+        pub currently_deleting: Option<CharacterId>,
+        pub saved_player_name: String,
+        pub move_request: Option<usize>,
+        pub saved_slot_count: usize,
+
+        pub audio_settings: AudioSettings,
+        pub graphics_settings: GraphicsSettings,
+        #[cfg(feature = "debug")]
+        pub render_settings: RenderSettings,
+    }
+
+    #[derive(RustState)]
+    pub struct LoginWindowState {
+        pub username: String,
+        pub password: String,
+        pub remember_username: bool,
+        pub remember_password: bool,
+        pub selected_service: ServiceId,
+    }
+
+    #[derive(RustState)]
+    pub struct ClientTheme {
+        pub window_theme: WindowTheme<ClientState>,
+        pub text_theme: TextTheme<ClientState>,
+        pub button_theme: ButtonTheme<ClientState>,
+        pub state_button_theme: StateButtonTheme<ClientState>,
+        pub text_box_theme: TextBoxTheme<ClientState>,
+        pub collapsable_theme: CollapsableTheme<ClientState>,
+    }
+
+    /// Marker trait to specialize the [`ThemeDefault`] trait.
+    pub trait ThemeKindMarker {}
+
+    /// Default theme in the menu.
+    pub struct DefaultMenu;
+    impl ThemeKindMarker for DefaultMenu {}
+
+    /// Default theme when in game.
+    pub struct DefaultGame;
+    impl ThemeKindMarker for DefaultGame {}
+
+    pub trait ThemeDefault<T: ThemeKindMarker> {
+        fn default() -> Self;
+    }
+
+    impl ThemeDefault<DefaultMenu> for ClientTheme {
+        fn default() -> Self {
+            Self {
+                window_theme: WindowTheme {
+                    title_color: Color::rgb_u8(200, 150, 150),
+                    hovered_title_color: Color::rgb_u8(250, 200, 200),
+                    background_color: Color::monochrome_u8(30),
+                    gaps: 15.0,
+                    border: 20.0,
+                    corner_radius: CornerRadius::uniform(20.0),
+                    title_height: 25.0,
+                    font_size: FontSize(20.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                    anchor_color: Color::WHITE,
+                    closest_anchor_color: Color::WHITE,
+                },
+                text_theme: TextTheme {
+                    color: Color::monochrome_u8(220),
+                    height: 15.0,
+                    font_size: FontSize(14.0),
+                    horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                },
+                button_theme: ButtonTheme {
+                    background_color: Color::monochrome_u8(80),
+                    foreground_color: Color::monochrome_u8(180),
+                    hovered_background_color: Color::monochrome_u8(120),
+                    hovered_foreground_color: Color::monochrome_u8(220),
+                    height: 30.0,
+                    corner_radius: CornerRadius::uniform(20.0),
+                    font_size: FontSize(16.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                state_button_theme: StateButtonTheme {
+                    background_color: Color::monochrome_u8(80),
+                    foreground_color: Color::monochrome_u8(180),
+                    hovered_background_color: Color::monochrome_u8(120),
+                    hovered_foreground_color: Color::monochrome_u8(220),
+                    checkbox_color: Color::rgb_u8(255, 100, 100),
+                    height: 26.0,
+                    corner_radius: CornerRadius::uniform(20.0),
+                    font_size: FontSize(16.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                text_box_theme: TextBoxTheme {
+                    background_color: Color::monochrome_u8(80),
+                    foreground_color: Color::monochrome_u8(180),
+                    hovered_background_color: Color::monochrome_u8(120),
+                    hovered_foreground_color: Color::monochrome_u8(220),
+                    height: 30.0,
+                    corner_radius: CornerRadius::uniform(20.0),
+                    font_size: FontSize(20.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                collapsable_theme: CollapsableTheme {
+                    background_color: Color::monochrome_u8(50),
+                    foreground_color: Color::monochrome_u8(200),
+                    hovered_foreground_color: Color::rgb_u8(250, 200, 200),
+                    corner_radius: CornerRadius::uniform(20.0),
+                    gaps: 5.0,
+                    border: 10.0,
+                    title_height: 30.0,
+                    font_size: FontSize(16.0),
+                    text_alignment: HorizontalAlignment::Left { offset: 20.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+            }
+        }
+    }
+
+    impl ThemeDefault<DefaultGame> for ClientTheme {
+        fn default() -> Self {
+            Self {
+                window_theme: WindowTheme {
+                    title_color: Color::rgb_u8(200, 150, 150),
+                    hovered_title_color: Color::rgb_u8(250, 200, 200),
+                    background_color: Color::monochrome_u8(50),
+                    gaps: 8.0,
+                    border: 15.0,
+                    corner_radius: CornerRadius::uniform(14.0),
+                    title_height: 14.0,
+                    font_size: FontSize(14.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                    anchor_color: Color::WHITE,
+                    closest_anchor_color: Color::WHITE,
+                },
+                text_theme: TextTheme {
+                    color: Color::monochrome_u8(220),
+                    height: 15.0,
+                    font_size: FontSize(14.0),
+                    horizontal_alignment: HorizontalAlignment::Left { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: 0.0 },
+                },
+                button_theme: ButtonTheme {
+                    background_color: Color::monochrome_u8(120),
+                    foreground_color: Color::monochrome_u8(220),
+                    hovered_background_color: Color::monochrome_u8(150),
+                    hovered_foreground_color: Color::monochrome_u8(250),
+                    height: 20.0,
+                    corner_radius: CornerRadius::uniform(10.0),
+                    font_size: FontSize(16.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                state_button_theme: StateButtonTheme {
+                    background_color: Color::monochrome_u8(120),
+                    foreground_color: Color::monochrome_u8(220),
+                    hovered_background_color: Color::monochrome_u8(150),
+                    hovered_foreground_color: Color::monochrome_u8(250),
+                    checkbox_color: Color::rgb_u8(255, 100, 100),
+                    height: 20.0,
+                    corner_radius: CornerRadius::uniform(10.0),
+                    font_size: FontSize(15.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                text_box_theme: TextBoxTheme {
+                    background_color: Color::monochrome_u8(120),
+                    foreground_color: Color::monochrome_u8(220),
+                    hovered_background_color: Color::monochrome_u8(150),
+                    hovered_foreground_color: Color::monochrome_u8(250),
+                    height: 20.0,
+                    corner_radius: CornerRadius::uniform(10.0),
+                    font_size: FontSize(15.0),
+                    text_alignment: HorizontalAlignment::Center { offset: 0.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+                collapsable_theme: CollapsableTheme {
+                    background_color: Color::monochrome_u8(80),
+                    foreground_color: Color::monochrome_u8(200),
+                    hovered_foreground_color: Color::rgb_u8(250, 200, 200),
+                    corner_radius: CornerRadius::uniform(10.0),
+                    gaps: 3.0,
+                    border: 5.0,
+                    title_height: 20.0,
+                    font_size: FontSize(14.0),
+                    text_alignment: HorizontalAlignment::Left { offset: 15.0 },
+                    vertical_alignment: VerticalAlignment::Center { offset: -2.0 },
+                },
+            }
+        }
+    }
+
+    static mut CURRENT_THEME: ClientThemeType = ClientThemeType::Game;
+
+    // TODO: This should be implemented for the main game state instead
+    impl Appli for ClientState {
+        type Cache = WindowCache;
+        type Clip = ScreenClip;
+        type Color = Color;
+        type CornerRadius = CornerRadius;
+        type Event = UserEvent;
+        type FontSize = FontSize;
+        type Position = ScreenPosition;
+        type Renderer = crate::renderer::InterfaceRenderer;
+        type Size = ScreenSize;
+        type ThemeGetter = ClientThemeGetter;
+        type ThemeType = ClientThemeType;
+
+        // fn get_scaling_path() -> impl Path<Self, Scaling> {
+        //     ClientState::path().interface_scale()
+        // }
+
+        fn set_current_theme_type(theme: ClientThemeType) {
+            unsafe {
+                CURRENT_THEME = theme;
+            }
+        }
+    }
+
+    // impl Drop for ClientState {
+    //     fn drop(&mut self) {
+    //         InterfaceSettingsStorage {
+    //             fonts: self.fonts.to_owned(),
+    //             menu_theme: self.menu_theme.get_file().to_owned(),
+    //             main_theme: self.main_theme.get_file().to_owned(),
+    //             game_theme: self.game_theme.get_file().to_owned(),
+    //             scaling: self.scaling.get(),
+    //         }
+    //         .save();
+    //     }
+    // }
+
+    #[derive(Default, Debug, Clone, Copy)]
+    pub enum ClientThemeType {
+        Menu,
+        #[default]
+        Game,
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct ThemePath;
+
+    impl Path<ClientState, ClientTheme> for ThemePath {
+        fn follow<'a>(&self, state: &'a ClientState) -> Option<&'a ClientTheme> {
+            match unsafe { CURRENT_THEME } {
+                ClientThemeType::Menu => Some(&state.menu_theme),
+                ClientThemeType::Game => Some(&state.game_theme),
+            }
+        }
+
+        fn follow_mut<'a>(&self, state: &'a mut ClientState) -> Option<&'a mut ClientTheme> {
+            match unsafe { CURRENT_THEME } {
+                ClientThemeType::Menu => Some(&mut state.menu_theme),
+                ClientThemeType::Game => Some(&mut state.game_theme),
+            }
+        }
+    }
+
+    impl Selector<ClientState, ClientTheme> for ThemePath {
+        fn select<'a>(&'a self, state: &'a ClientState) -> Option<&'a ClientTheme> {
+            self.follow(state)
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    pub struct ClientThemeGetter;
+
+    impl ThemePathGetter<ClientState> for ClientThemeGetter {
+        fn new() -> Self {
+            Self
+        }
+
+        fn window(self) -> impl Path<ClientState, WindowTheme<ClientState>> {
+            ThemePath.window_theme()
+        }
+
+        fn text(self) -> impl Path<ClientState, TextTheme<ClientState>> {
+            ThemePath.text_theme()
+        }
+
+        fn button(self) -> impl Path<ClientState, ButtonTheme<ClientState>> {
+            ThemePath.button_theme()
+        }
+
+        fn state_button(self) -> impl Path<ClientState, StateButtonTheme<ClientState>> {
+            ThemePath.state_button_theme()
+        }
+
+        fn text_box(self) -> impl Path<ClientState, TextBoxTheme<ClientState>> {
+            ThemePath.text_box_theme()
+        }
+
+        fn collapsable(self) -> impl Path<ClientState, CollapsableTheme<ClientState>> {
+            ThemePath.collapsable_theme()
+        }
+    }
+
+    impl RenderLayer<ClientState> for crate::renderer::InterfaceRenderer {
+        fn render_rectangle(
+            &self,
+            position: ScreenPosition,
+            size: ScreenSize,
+            clip: ScreenClip,
+            corner_radius: CornerRadius,
+            color: Color,
+        ) {
+            self.render_rectangle(position, size, clip, corner_radius, color);
+        }
+
+        fn render_checkbox(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, state: bool) {
+            self.render_checkbox(position, size, clip, color, state);
+        }
+
+        fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
+            self.get_text_dimensions(text, font_size, available_width)
+        }
+
+        fn render_text(&self, text: &str, position: ScreenPosition, clip: ScreenClip, color: Color, font_size: FontSize) {
+            self.render_text(text, position, clip, color, font_size);
+        }
+
+        fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
+            todo!()
+        }
+    }
+}
+
 struct Client {
     action_loader: Arc<ActionLoader>,
     async_loader: Arc<AsyncLoader>,
@@ -215,26 +608,11 @@ struct Client {
     point_light_instructions: Vec<PointLightInstruction>,
 
     input_system: InputSystem,
-    lighting_mode: MappedRemote<GraphicsSettings, LightingMode>,
-    vsync: MappedRemote<GraphicsSettings, bool>,
-    limit_framerate: MappedRemote<GraphicsSettings, LimitFramerate>,
-    triple_buffering: MappedRemote<GraphicsSettings, bool>,
-    texture_filtering: MappedRemote<GraphicsSettings, TextureSamplerType>,
-    shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
-    shadow_quality: MappedRemote<GraphicsSettings, ShadowQuality>,
-    msaa: MappedRemote<GraphicsSettings, Msaa>,
-    ssaa: MappedRemote<GraphicsSettings, Ssaa>,
-    screen_space_anti_aliasing: MappedRemote<GraphicsSettings, ScreenSpaceAntiAliasing>,
-    high_quality_interface: MappedRemote<GraphicsSettings, bool>,
-    #[cfg(feature = "debug")]
-    render_settings: PlainTrackedState<RenderSettings>,
-    mute_on_focus_loss: MappedRemote<AudioSettings, bool>,
 
-    application: InterfaceSettings,
-    interface: Interface<InterfaceSettings>,
-    focus_state: FocusState<InterfaceSettings>,
+    interface: Interface<ClientState>,
+    // focus_state: FocusState<InterfaceSettings>,
     mouse_cursor: MouseCursor,
-    dialog_system: DialogSystem,
+    // dialog_system: DialogSystem,
     show_interface: bool,
     game_timer: GameTimer,
 
@@ -246,20 +624,19 @@ struct Client {
     point_shadow_camera: PointShadowCamera,
 
     network_event_buffer: NetworkEventBuffer,
-    client_info: ClientInfo,
-    friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>>,
+    // client_info: ClientInfo,
+    // friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>>,
     saved_login_data: Option<LoginServerLoginData>,
     saved_character_server: Option<CharacterServerInformation>,
-    saved_characters: PlainTrackedState<Vec<CharacterInformation>>,
-    shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>>,
-    sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
+    // saved_characters: PlainTrackedState<Vec<CharacterInformation>>,
+    // shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>>,
+    // sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>>,
     currently_deleting: Option<CharacterId>,
-    saved_player_name: String,
-    move_request: PlainTrackedState<Option<usize>>,
+    // saved_player_name: String,
+    // move_request: PlainTrackedState<Option<usize>>,
     saved_login_server_address: Option<SocketAddr>,
     saved_password: String,
     saved_username: String,
-    saved_slot_count: usize,
 
     particle_holder: ParticleHolder,
     point_light_manager: PointLightManager,
@@ -282,7 +659,7 @@ struct Client {
     #[cfg(feature = "debug")]
     tile_texture_set: Arc<TextureSet>,
 
-    chat_messages: PlainTrackedState<Vec<ChatMessage>>,
+    // chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
 
     map: Option<Box<Map>>,
@@ -299,6 +676,8 @@ struct Client {
     #[cfg(feature = "debug")]
     device: Arc<Device>,
     window: Option<Arc<Window>>,
+
+    client_state: Context<ClientState>,
 }
 
 impl Client {
@@ -306,25 +685,10 @@ impl Client {
         time_phase!("load settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
-            let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
-            let application = InterfaceSettings::load_or_default();
-
-            let lighting_mode = graphics_settings.mapped(|settings| &settings.lighting_mode).new_remote();
-            let vsync = graphics_settings.mapped(|settings| &settings.vsync).new_remote();
-            let limit_framerate = graphics_settings.mapped(|settings| &settings.limit_framerate).new_remote();
-            let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
-            let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
-            let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
-            let shadow_quality = graphics_settings.mapped(|settings| &settings.shadow_quality).new_remote();
-            let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
-            let ssaa = graphics_settings.mapped(|settings| &settings.ssaa).new_remote();
-            let screen_space_anti_aliasing = graphics_settings
-                .mapped(|settings| &settings.screen_space_anti_aliasing)
-                .new_remote();
-            let high_quality_interface = graphics_settings.mapped(|settings| &settings.high_quality_interface).new_remote();
+            let graphics_settings = GraphicsSettings::new();
 
             #[cfg(feature = "debug")]
-            let render_settings = PlainTrackedState::new(RenderSettings::new());
+            let render_settings = RenderSettings::new();
         });
 
         time_phase!("create adapter", {
@@ -394,8 +758,7 @@ impl Client {
         });
 
         time_phase!("create audio engine", {
-            let audio_settings = PlainTrackedState::new(AudioSettings::new());
-            let mute_on_focus_loss = audio_settings.mapped(|settings| &settings.mute_on_focus_loss).new_remote();
+            let audio_settings = AudioSettings::new();
 
             let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone()));
             audio_engine.set_background_music_volume(0.1);
@@ -412,7 +775,11 @@ impl Client {
                 game_file_loader.clone(),
             ));
             let video_loader = Arc::new(VideoLoader::new(game_file_loader.clone(), texture_loader.clone()));
-            let font_loader = Arc::new(FontLoader::new(application.get_fonts(), &game_file_loader, &texture_loader));
+            let font_loader = Arc::new(FontLoader::new(
+                &["NotoSans".to_owned(), "NotoSansKR".to_owned()],
+                &game_file_loader,
+                &texture_loader,
+            ));
             let map_loader = Arc::new(MapLoader::new(
                 device.clone(),
                 queue.clone(),
@@ -465,7 +832,7 @@ impl Client {
                 INITIAL_SCREEN_SIZE,
                 font_loader.clone(),
                 &texture_loader,
-                *high_quality_interface.get(),
+                graphics_settings.high_quality_interface,
             );
             let bottom_interface_renderer = GameInterfaceRenderer::new(
                 INITIAL_SCREEN_SIZE,
@@ -513,9 +880,9 @@ impl Client {
 
         time_phase!("initialize interface", {
             let mut interface = Interface::new(INITIAL_SCREEN_SIZE);
-            let mut focus_state = FocusState::default();
+            // let mut focus_state = FocusState::default();
             let mouse_cursor = MouseCursor::new(&sprite_loader, &action_loader);
-            let dialog_system = DialogSystem::default();
+            // let dialog_system = DialogSystem::default();
             let show_interface = true;
         });
 
@@ -535,6 +902,29 @@ impl Client {
             directional_shadow_camera.set_focus_point(start_camera.focus_point(), start_camera.view_direction());
         });
 
+        let friend_list: Vec<Friend> = Vec::default();
+        let saved_login_data: Option<LoginServerLoginData> = None;
+        let saved_character_server: Option<CharacterServerInformation> = None;
+        let saved_characters: Vec<CharacterInformation> = Vec::default();
+        let shop_items: Vec<ShopItem<ResourceMetadata>> = Vec::default();
+        let sell_items: Vec<SellItem<(ResourceMetadata, u16)>> = Vec::default();
+        let currently_deleting: Option<CharacterId> = None;
+        let saved_player_name = String::new();
+        let move_request: Option<usize> = None;
+        let saved_login_server_address = None;
+        let saved_password = String::new();
+        let saved_username = String::new();
+        let saved_slot_count = 0;
+
+        let welcome_string = format!(
+            "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
+            env!("CARGO_PKG_VERSION")
+        );
+        let chat_messages = vec![ChatMessage {
+            text: welcome_string,
+            color: MessageColor::Server,
+        }];
+
         time_phase!("initialize networking", {
             let client_info = load_client_info(&game_file_loader);
 
@@ -544,23 +934,17 @@ impl Client {
             let packet_history_callback = PacketHistoryCallback::get_static_instance();
             #[cfg(feature = "debug")]
             let (networking_system, network_event_buffer) = NetworkingSystem::spawn_with_callback(packet_history_callback.clone());
-
-            let friend_list: PlainTrackedState<Vec<(Friend, LinkedElement)>> = PlainTrackedState::default();
-            let saved_login_data: Option<LoginServerLoginData> = None;
-            let saved_character_server: Option<CharacterServerInformation> = None;
-            let saved_characters: PlainTrackedState<Vec<CharacterInformation>> = PlainTrackedState::default();
-            let shop_items: PlainTrackedState<Vec<ShopItem<ResourceMetadata>>> = PlainTrackedState::default();
-            let sell_items: PlainTrackedState<Vec<SellItem<(ResourceMetadata, u16)>>> = PlainTrackedState::default();
-            let currently_deleting: Option<CharacterId> = None;
-            let saved_player_name = String::new();
-            let move_request: PlainTrackedState<Option<usize>> = PlainTrackedState::default();
-            let saved_login_server_address = None;
-            let saved_password = String::new();
-            let saved_username = String::new();
-            let saved_slot_count = 0;
-
-            interface.open_window(&application, &mut focus_state, &LoginWindow::new(&client_info));
         });
+
+        let login_settings = settings::LoginSettings::new();
+        // TODO: Obviously rework
+        let login_window = LoginWindowState {
+            username: String::new(),
+            password: String::new(),
+            remember_username: true,
+            remember_password: true,
+            selected_service: client_info.services[0].service_id(),
+        };
 
         time_phase!("create resources", {
             let particle_holder = ParticleHolder::default();
@@ -601,15 +985,6 @@ impl Client {
             #[cfg(feature = "debug")]
             let tile_texture_set = Arc::new(tile_texture_set);
 
-            let welcome_string = format!(
-                "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
-                env!("CARGO_PKG_VERSION")
-            );
-            let chat_messages = PlainTrackedState::new(vec![ChatMessage {
-                text: welcome_string,
-                color: MessageColor::Server,
-            }]);
-
             let main_menu_click_sound_effect = audio_engine.load(MAIN_MENU_CLICK_SOUND_EFFECT);
         });
 
@@ -627,6 +1002,43 @@ impl Client {
             audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
             map.set_ambient_sound_sources(&audio_engine);
         });
+
+        let client_state = Context::new(ClientState {
+            menu_theme: <ClientTheme as ThemeDefault<DefaultMenu>>::default(),
+            game_theme: <ClientTheme as ThemeDefault<DefaultGame>>::default(),
+            game_theme_2: GameTheme::default(),
+            interface_scale: Scaling::new(1.0),
+
+            client_info,
+            login_settings,
+            login_window,
+            character_servers: Vec::new(),
+
+            chat_messages,
+            friend_list,
+            saved_characters,
+            shop_items,
+            sell_items,
+            currently_deleting,
+            saved_player_name,
+            move_request: None,
+            saved_slot_count,
+
+            audio_settings,
+
+            graphics_settings,
+            #[cfg(feature = "debug")]
+            render_settings,
+        });
+
+        interface.open_window(
+            &client_state,
+            LoginWindow::new(
+                ClientState::path().login_window(),
+                ClientState::path().login_settings(),
+                ClientState::path().client_info(),
+            ),
+        );
 
         Some(Self {
             action_loader,
@@ -661,25 +1073,10 @@ impl Client {
             point_light_with_shadow_instructions,
             point_light_instructions,
             input_system,
-            lighting_mode,
-            vsync,
-            limit_framerate,
-            triple_buffering,
-            texture_filtering,
-            shadow_detail,
-            shadow_quality,
-            msaa,
-            ssaa,
-            screen_space_anti_aliasing,
-            high_quality_interface,
-            #[cfg(feature = "debug")]
-            render_settings,
-            mute_on_focus_loss,
-            application,
             interface,
-            focus_state,
+            // focus_state,
             mouse_cursor,
-            dialog_system,
+            // dialog_system,
             show_interface,
             game_timer,
             #[cfg(feature = "debug")]
@@ -689,20 +1086,14 @@ impl Client {
             directional_shadow_camera,
             point_shadow_camera,
             network_event_buffer,
-            client_info,
-            friend_list,
+            // client_info,
             saved_login_data,
             saved_character_server,
-            saved_characters,
-            shop_items,
-            sell_items,
             currently_deleting,
-            saved_player_name,
-            move_request,
+            // saved_player_name,
             saved_login_server_address,
             saved_password,
             saved_username,
-            saved_slot_count,
             particle_holder,
             point_light_manager,
             effect_holder,
@@ -721,7 +1112,7 @@ impl Client {
             pathing_texture_set,
             #[cfg(feature = "debug")]
             tile_texture_set,
-            chat_messages,
+            // chat_messages,
             main_menu_click_sound_effect,
             map: Some(map),
             #[cfg(feature = "debug")]
@@ -733,6 +1124,8 @@ impl Client {
             #[cfg(feature = "debug")]
             device,
             window: None,
+
+            client_state,
         })
     }
 
@@ -784,7 +1177,8 @@ impl Client {
 
         // TODO: NHA We want to have an event or a remote setting that the scaling
         //       changed.
-        let scaling = self.application.get_scaling();
+
+        let scaling = *self.client_state.get(&ClientState::path().interface_scale());
         self.bottom_interface_renderer.update_scaling(scaling);
         self.middle_interface_renderer.update_scaling(scaling);
         self.top_interface_renderer.update_scaling(scaling);
@@ -806,15 +1200,7 @@ impl Client {
 
         self.networking_system.get_events(&mut self.network_event_buffer);
 
-        let (user_events, hovered_element, focused_element, mouse_target, mouse_position) = self.input_system.user_events(
-            &mut self.interface,
-            &self.application,
-            &mut self.focus_state,
-            &mut self.mouse_cursor,
-            #[cfg(feature = "debug")]
-            &self.render_settings,
-            client_tick,
-        );
+        let (mouse_target, mouse_position) = self.input_system.get_mouse();
 
         #[cfg(feature = "debug")]
         let picker_measurement = Profiler::start_measurement("update picker target");
@@ -850,18 +1236,19 @@ impl Client {
 
                     self.saved_login_data = Some(login_data);
 
-                    self.interface.close_all_windows_except(&mut self.focus_state);
+                    self.client_state
+                        .update_value(ClientState::path().character_servers(), character_servers);
+
+                    self.interface.close_all_windows_except();
                     self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &SelectServerWindow::new(character_servers),
+                        &self.client_state,
+                        SelectServerWindow::new(ClientState::path().character_servers()),
                     );
                 }
                 NetworkEvent::LoginServerConnectionFailed { message, .. } => {
                     self.networking_system.disconnect_from_login_server();
 
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &ErrorWindow::new(message.to_owned()));
+                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
                 }
                 NetworkEvent::LoginServerDisconnected { reason } => {
                     if reason != DisconnectReason::ClosedByClient {
@@ -875,13 +1262,13 @@ impl Client {
                     }
                 }
                 NetworkEvent::CharacterServerConnected { normal_slot_count } => {
-                    self.saved_slot_count = normal_slot_count;
+                    self.client_state
+                        .update_value(ClientState::path().saved_slot_count(), normal_slot_count);
                     let _ = self.networking_system.request_character_list();
                 }
                 NetworkEvent::CharacterServerConnectionFailed { message, .. } => {
                     self.networking_system.disconnect_from_character_server();
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &ErrorWindow::new(message.to_owned()));
+                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
                 }
                 NetworkEvent::CharacterServerDisconnected { reason } => {
                     if reason != DisconnectReason::ClosedByClient {
@@ -915,7 +1302,7 @@ impl Client {
 
                     self.audio_engine.play_background_music_track(None);
 
-                    self.interface.close_all_windows_except(&mut self.focus_state);
+                    self.interface.close_all_windows_except();
 
                     self.async_loader
                         .request_map_load(DEFAULT_MAP.to_string(), Some(TilePosition::new(0, 0)));
@@ -923,8 +1310,9 @@ impl Client {
                 NetworkEvent::ResurrectPlayer { entity_id } => {
                     // If the resurrected player is us, close the resurrect window.
                     if self.entities[0].get_entity_id() == entity_id {
-                        self.interface
-                            .close_window_with_class(&mut self.focus_state, RespawnWindow::WINDOW_CLASS);
+                        // self.interface
+                        //     .close_window_with_class(&mut self.focus_state,
+                        // RespawnWindow::WINDOW_CLASS);
                     }
                 }
                 NetworkEvent::PlayerStandUp { entity_id } => {
@@ -936,31 +1324,32 @@ impl Client {
                 NetworkEvent::CharacterList { characters } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
 
-                    self.saved_characters.set(characters);
-                    let character_selection_window = CharacterSelectionWindow::new(
-                        self.saved_characters.new_remote(),
-                        self.move_request.new_remote(),
-                        self.saved_slot_count,
-                    );
+                    self.client_state.update_value(ClientState::path().saved_characters(), characters);
 
-                    // TODO: this will do one unnecessary restore_focus. check if
-                    // that will be problematic
-                    self.interface.close_all_windows_except(&mut self.focus_state);
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &character_selection_window);
+                    // TODO: this will do one unnecessary restore_focus. check
+                    // if that will be problematic
+                    self.interface.close_all_windows_except();
+                    self.interface.open_window(
+                        &self.client_state,
+                        CharacterSelectionWindow::new(
+                            ClientState::path().saved_characters(),
+                            ClientState::path().move_request(),
+                            ClientState::path().saved_slot_count(),
+                        ),
+                    );
                 }
                 NetworkEvent::CharacterSelectionFailed { message, .. } => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &ErrorWindow::new(message.to_owned()))
+                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
                 }
                 NetworkEvent::CharacterDeleted => {
-                    let character_id = self.currently_deleting.take().unwrap();
-                    self.saved_characters.retain(|character| character.character_id != character_id);
+                    // let character_id =
+                    // self.currently_deleting.take().unwrap();
+                    // self.saved_characters.retain(|character|
+                    // character.character_id != character_id);
                 }
                 NetworkEvent::CharacterDeletionFailed { message, .. } => {
                     self.currently_deleting = None;
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &ErrorWindow::new(message.to_owned()))
+                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()))
                 }
                 NetworkEvent::CharacterSelected { login_data, .. } => {
                     self.audio_engine.play_sound_effect(self.main_menu_click_sound_effect);
@@ -973,14 +1362,14 @@ impl Client {
                     let _ = self.networking_system.request_client_tick();
 
                     let character_information = self
-                        .saved_characters
-                        .get()
+                        .client_state
+                        .get(&ClientState::path().saved_characters())
                         .iter()
                         .find(|character| character.character_id == login_data.character_id)
                         .cloned()
                         .unwrap();
 
-                    self.saved_player_name = character_information.name.clone();
+                    // self.saved_player_name = character_information.name.clone();
 
                     let mut player = Entity::Player(Player::new(saved_login_data.account_id, &character_information, client_tick));
 
@@ -997,25 +1386,22 @@ impl Client {
 
                     self.entities.push(player);
 
-                    // TODO: This will do one unnecessary restore_focus. Check if
-                    //       that will be problematic.
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, CharacterSelectionWindow::WINDOW_CLASS);
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &CharacterOverviewWindow::new());
-                    self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &ChatWindow::new(self.chat_messages.new_remote(), self.font_loader.clone()),
-                    );
-                    self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &HotbarWindow::new(self.hotbar.get_skills()),
-                    );
+                    // TODO: Don't hardcode
+                    self.interface.close_window_with_class("character_selection");
+                    self.interface.open_window(&self.client_state, CharacterOverviewWindow::new());
+                    // self.interface.open_window(
+                    //     &self.client_state,
+                    //     &mut self.focus_state,
+                    //     &ChatWindow::new(ClientState::path().chat_messages(),
+                    // self.font_loader.clone()), );
+                    // self.interface.open_window(
+                    //     &self.client_state,
+                    //     &mut self.focus_state,
+                    //     &HotbarWindow::new(self.hotbar.get_skills()),
+                    // );
 
                     // Put the dialog system in a well-defined state.
-                    self.dialog_system.close_dialog();
+                    // self.dialog_system.close_dialog();
 
                     self.map = None;
                     self.particle_holder.clear();
@@ -1024,20 +1410,19 @@ impl Client {
                     self.audio_engine.clear_ambient_sound();
                 }
                 NetworkEvent::CharacterCreated { character_information } => {
-                    self.saved_characters.push(character_information);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, CharacterCreationWindow::WINDOW_CLASS);
+                    // self.saved_characters.push(character_information);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // CharacterCreationWindow::WINDOW_CLASS);
                 }
                 NetworkEvent::CharacterCreationFailed { message, .. } => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &ErrorWindow::new(message.to_owned()));
+                    self.interface.open_window(&self.client_state, ErrorWindow::new(message.to_owned()));
                 }
                 NetworkEvent::CharacterSlotSwitched => {}
                 NetworkEvent::CharacterSlotSwitchFailed => {
                     self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &ErrorWindow::new("Failed to switch character slots".to_owned()),
+                        &self.client_state,
+                        ErrorWindow::new("Failed to switch character slots".to_owned()),
                     );
                 }
                 NetworkEvent::AddEntity(entity_data) => {
@@ -1081,7 +1466,8 @@ impl Client {
 
                                 // If the player is us, we need to open the respawn window.
                                 if entity_id == self.entities[0].get_entity_id() {
-                                    self.interface.open_window(&self.application, &mut self.focus_state, &RespawnWindow);
+                                    // self.interface.open_window(&self.
+                                    // application, RespawnWindow);
                                 }
                             }
                         }
@@ -1129,7 +1515,8 @@ impl Client {
                     self.game_timer.set_client_tick(client_tick, received_at);
                 }
                 NetworkEvent::ChatMessage { text, color } => {
-                    self.chat_messages.push(ChatMessage { text, color });
+                    self.client_state
+                        .vec_push(ClientState::path().chat_messages(), ChatMessage { text, color });
                 }
                 NetworkEvent::UpdateEntityDetails(entity_id, name) => {
                     let entity = self.entities.iter_mut().find(|entity| entity.get_entity_id() == entity_id);
@@ -1173,13 +1560,14 @@ impl Client {
                     player.update_status(status_type);
                 }
                 NetworkEvent::OpenDialog(text, npc_id) => {
-                    if let Some(dialog_window) = self.dialog_system.open_dialog_window(text, npc_id) {
-                        self.interface.open_window(&self.application, &mut self.focus_state, &dialog_window);
-                    }
+                    // if let Some(dialog_window) =
+                    // self.dialog_system.open_dialog_window(text, npc_id) {
+                    //     self.interface.open_window(&self.client_state,
+                    // dialog_window); }
                 }
-                NetworkEvent::AddNextButton => self.dialog_system.add_next_button(),
-                NetworkEvent::AddCloseButton => self.dialog_system.add_close_button(),
-                NetworkEvent::AddChoiceButtons(choices) => self.dialog_system.add_choice_buttons(choices),
+                NetworkEvent::AddNextButton => {}             // self.dialog_system.add_next_button(),
+                NetworkEvent::AddCloseButton => {}            // self.dialog_system.add_close_button(),
+                NetworkEvent::AddChoiceButtons(choices) => {} //self.dialog_system.add_choice_buttons(choices),
                 NetworkEvent::AddQuestEffect(quest_effect) => {
                     if let Some(map) = self.map.as_ref() {
                         self.particle_holder.add_quest_icon(&self.texture_loader, map, quest_effect)
@@ -1253,15 +1641,17 @@ impl Client {
                     self.networking_system.disconnect_from_map_server();
                 }
                 NetworkEvent::FriendRequest { requestee } => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &FriendRequestWindow::new(requestee))
+                    // self.interface
+                    //     .open_window(&self.client_state, &mut
+                    // self.focus_state, &FriendRequestWindow::new(requestee))
                 }
                 NetworkEvent::FriendRemoved { account_id, character_id } => {
-                    self.friend_list
-                        .retain(|(friend, _)| !(friend.account_id == account_id && friend.character_id == character_id));
+                    // self.friend_list
+                    //     .retain(|(friend, _)| !(friend.account_id ==
+                    // account_id && friend.character_id == character_id));
                 }
                 NetworkEvent::FriendAdded { friend } => {
-                    self.friend_list.push((friend, LinkedElement::new()));
+                    // self.friend_list.push((friend, LinkedElement::new()));
                 }
                 NetworkEvent::VisualEffect(path, entity_id) => {
                     let effect = self.effect_loader.get_or_load(path, &self.texture_loader).unwrap();
@@ -1337,9 +1727,10 @@ impl Client {
                     self.effect_holder.remove_unit(entity_id);
                 }
                 NetworkEvent::SetFriendList { friends } => {
-                    self.friend_list.mutate(|friend_list| {
-                        *friend_list = friends.into_iter().map(|friend| (friend, LinkedElement::new())).collect();
-                    });
+                    // self.friend_list.mutate(|friend_list| {
+                    //     *friend_list = friends.into_iter().map(|friend|
+                    // (friend, LinkedElement::new())).collect();
+                    // });
                 }
                 NetworkEvent::SetHotkeyData { tab, hotkeys } => {
                     // FIX: Since we only have one hotbar at the moment, we ignore
@@ -1364,38 +1755,41 @@ impl Client {
                     }
                 }
                 NetworkEvent::OpenShop { items } => {
-                    self.shop_items.mutate(|shop_items| {
-                        *shop_items = items
-                            .into_iter()
-                            .map(|item| self.library.load_shop_item_metadata(&self.async_loader, item))
-                            .collect()
-                    });
+                    // self.shop_items.mutate(|shop_items| {
+                    //     *shop_items = items
+                    //         .into_iter()
+                    //         .map(|item|
+                    // self.library.load_shop_item_metadata(&self.async_loader,
+                    // item))         .collect()
+                    // });
 
-                    let cart = PlainTrackedState::default();
-
-                    self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &BuyWindow::new(self.shop_items.new_remote(), cart.clone()),
-                    );
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &BuyCartWindow::new(cart));
+                    // self.interface.open_window(
+                    //     &self.client_state,
+                    //     &mut self.focus_state,
+                    //     &BuyWindow::new(self.shop_items.new_remote(),
+                    // cart.clone()), );
+                    // self.interface
+                    //     .open_window(&self.client_state, &mut
+                    // self.focus_state, &BuyCartWindow::new(cart));
                 }
                 NetworkEvent::AskBuyOrSell { shop_id } => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &BuyOrSellWindow::new(shop_id));
+                    // self.interface
+                    //     .open_window(&self.client_state, &mut
+                    // self.focus_state, &BuyOrSellWindow::new(shop_id));
                 }
                 NetworkEvent::BuyingCompleted { result } => match result {
                     BuyShopItemsResult::Success => {
                         let _ = self.networking_system.close_shop();
 
-                        self.interface
-                            .close_window_with_class(&mut self.focus_state, BuyWindow::WINDOW_CLASS);
-                        self.interface
-                            .close_window_with_class(&mut self.focus_state, BuyCartWindow::WINDOW_CLASS);
+                        // self.interface
+                        //     .close_window_with_class(&mut self.focus_state,
+                        // BuyWindow::WINDOW_CLASS);
+                        // self.interface
+                        //     .close_window_with_class(&mut self.focus_state,
+                        // BuyCartWindow::WINDOW_CLASS);
                     }
                     BuyShopItemsResult::Error => {
-                        self.chat_messages.push(ChatMessage {
+                        self.client_state.vec_push(ClientState::path().chat_messages(), ChatMessage {
                             text: "Failed to buy items".to_owned(),
                             color: MessageColor::Error,
                         });
@@ -1404,51 +1798,57 @@ impl Client {
                 NetworkEvent::SellItemList { items } => {
                     let inventory_items = self.player_inventory.get_items();
 
-                    self.sell_items.mutate(|sell_items| {
-                        *sell_items = items
-                            .into_iter()
-                            .map(|item| {
-                                let inventory_item = &inventory_items
-                                    .iter()
-                                    .find(|inventory_item| inventory_item.index == item.inventory_index)
-                                    .expect("item not in inventory");
+                    // self.sell_items.mutate(|sell_items| {
+                    //     *sell_items = items
+                    //         .into_iter()
+                    //         .map(|item| {
+                    //             let inventory_item = &inventory_items
+                    //                 .iter()
+                    //                 .find(|inventory_item|
+                    // inventory_item.index == item.inventory_index)
+                    //                 .expect("item not in inventory");
+                    //
+                    //             let name =
+                    // inventory_item.metadata.name.clone();
+                    //             let texture =
+                    // inventory_item.metadata.texture.clone();
+                    //             let quantity = match &inventory_item.details
+                    // {
+                    // korangar_networking::InventoryItemDetails::Regular {
+                    // amount, .. } => *amount,
+                    // korangar_networking::InventoryItemDetails::Equippable {
+                    // .. } => 1,             };
+                    //
+                    //             SellItem {
+                    //                 metadata: (ResourceMetadata { name,
+                    // texture }, quantity),
+                    // inventory_index: item.inventory_index,
+                    //                 price: item.price,
+                    //                 overcharge_price: item.overcharge_price,
+                    //             }
+                    //         })
+                    //         .collect()
+                    // });
 
-                                let name = inventory_item.metadata.name.clone();
-                                let texture = inventory_item.metadata.texture.clone();
-                                let quantity = match &inventory_item.details {
-                                    korangar_networking::InventoryItemDetails::Regular { amount, .. } => *amount,
-                                    korangar_networking::InventoryItemDetails::Equippable { .. } => 1,
-                                };
-
-                                SellItem {
-                                    metadata: (ResourceMetadata { name, texture }, quantity),
-                                    inventory_index: item.inventory_index,
-                                    price: item.price,
-                                    overcharge_price: item.overcharge_price,
-                                }
-                            })
-                            .collect()
-                    });
-
-                    let cart = PlainTrackedState::default();
-
-                    self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &SellWindow::new(self.sell_items.new_remote(), cart.clone()),
-                    );
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &SellCartWindow::new(cart.clone()));
+                    // self.interface.open_window(
+                    //     &self.client_state,
+                    //     &mut self.focus_state,
+                    //     &SellWindow::new(self.sell_items.new_remote(),
+                    // cart.clone()), );
+                    // self.interface
+                    //     .open_prototype_window(&self.client_state,
+                    // ClientState::path().sell_cart());
                 }
                 NetworkEvent::SellingCompleted { result } => match result {
                     SellItemsResult::Success => {
-                        self.interface
-                            .close_window_with_class(&mut self.focus_state, SellWindow::WINDOW_CLASS);
-                        self.interface
-                            .close_window_with_class(&mut self.focus_state, SellCartWindow::WINDOW_CLASS);
+                        // self.interface
+                        //     .close_window_with_class(&mut self.focus_state,
+                        // SellWindow::WINDOW_CLASS);
+                        // self.interface.close_window_with_class(&mut
+                        // self.focus_state, "sell_cart");
                     }
                     SellItemsResult::Error => {
-                        self.chat_messages.push(ChatMessage {
+                        self.client_state.vec_push(ClientState::path().chat_messages(), ChatMessage {
                             text: "Failed to sell items".to_owned(),
                             color: MessageColor::Error,
                         });
@@ -1463,6 +1863,8 @@ impl Client {
         #[cfg(feature = "debug")]
         let user_event_measurement = Profiler::start_measurement("process user events");
 
+        let user_events = self.interface.process_events();
+
         for event in user_events {
             match event {
                 UserEvent::LogIn {
@@ -1470,9 +1872,10 @@ impl Client {
                     username,
                     password,
                 } => {
+                    let client_info_path = ClientState::path().client_info().services();
                     let service = self
-                        .client_info
-                        .services
+                        .client_state
+                        .get(&client_info_path)
                         .iter()
                         .find(|service| service.service_id() == service_id)
                         .unwrap();
@@ -1489,8 +1892,10 @@ impl Client {
 
                     self.networking_system.connect_to_login_server(socket_address, username, password);
                 }
-                UserEvent::SelectServer(server) => {
-                    self.saved_character_server = Some(server.clone());
+                UserEvent::SelectServer {
+                    character_server_information,
+                } => {
+                    self.saved_character_server = Some(character_server_information.clone());
 
                     self.networking_system.disconnect_from_login_server();
 
@@ -1498,12 +1903,14 @@ impl Client {
                     // server before it logged in to the login server, so it's fine to
                     // unwrap here.
                     let login_data = self.saved_login_data.as_ref().unwrap();
-                    self.networking_system.connect_to_character_server(login_data, server);
+                    self.networking_system
+                        .connect_to_character_server(login_data, character_server_information);
                 }
                 UserEvent::Respawn => {
                     let _ = self.networking_system.respawn();
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, RespawnWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // RespawnWindow::WINDOW_CLASS);
                 }
                 UserEvent::LogOut => {
                     let _ = self.networking_system.log_out();
@@ -1514,79 +1921,64 @@ impl Client {
                 UserEvent::CameraResetRotation => self.player_camera.reset_rotation(),
                 UserEvent::OpenMenuWindow => {
                     if !self.entities.is_empty() {
-                        self.interface.open_window(&self.application, &mut self.focus_state, &MenuWindow)
+                        self.interface.open_window(&self.client_state, MenuWindow)
                     }
                 }
                 UserEvent::OpenInventoryWindow => {
                     if !self.entities.is_empty() {
-                        self.interface.open_window(
-                            &self.application,
-                            &mut self.focus_state,
-                            &InventoryWindow::new(self.player_inventory.item_remote()),
-                        )
+                        // self.interface.open_window(
+                        //     &self.client_state,
+                        //     &mut self.focus_state,
+                        //     &InventoryWindow::new(self.player_inventory.
+                        // item_remote()), )
                     }
                 }
                 UserEvent::OpenEquipmentWindow => {
                     if !self.entities.is_empty() {
-                        self.interface.open_window(
-                            &self.application,
-                            &mut self.focus_state,
-                            &EquipmentWindow::new(self.player_inventory.item_remote()),
-                        )
+                        // self.interface.open_window(
+                        //     &self.client_state,
+                        //     &mut self.focus_state,
+                        //     &EquipmentWindow::new(self.player_inventory.
+                        // item_remote()), )
                     }
                 }
                 UserEvent::OpenSkillTreeWindow => {
                     if !self.entities.is_empty() {
-                        self.interface.open_window(
-                            &self.application,
-                            &mut self.focus_state,
-                            &SkillTreeWindow::new(self.player_skill_tree.get_skills()),
-                        )
+                        // self.interface.open_window(
+                        //     &self.client_state,
+                        //     &mut self.focus_state,
+                        //     &SkillTreeWindow::new(self.player_skill_tree.
+                        // get_skills()), )
                     }
                 }
                 UserEvent::OpenGraphicsSettingsWindow => self.interface.open_window(
-                    &self.application,
-                    &mut self.focus_state,
-                    &GraphicsSettingsWindow::new(
-                        self.graphics_engine.get_present_mode_info(),
-                        self.graphics_engine.get_supported_msaa(),
-                        self.lighting_mode.clone_state(),
-                        self.vsync.clone_state(),
-                        self.limit_framerate.clone_state(),
-                        self.triple_buffering.clone_state(),
-                        self.texture_filtering.clone_state(),
-                        self.msaa.clone_state(),
-                        self.ssaa.clone_state(),
-                        self.screen_space_anti_aliasing.clone_state(),
-                        self.shadow_detail.clone_state(),
-                        self.shadow_quality.clone_state(),
-                        self.high_quality_interface.clone_state(),
-                    ),
+                    &self.client_state,
+                    GraphicsSettingsWindow::new(ClientState::path().graphics_settings()),
                 ),
                 UserEvent::OpenAudioSettingsWindow => self.interface.open_window(
-                    &self.application,
-                    &mut self.focus_state,
-                    &AudioSettingsWindow::new(self.mute_on_focus_loss.clone_state()),
+                    &self.client_state,
+                    AudioSettingsWindow::new(ClientState::path().audio_settings()),
                 ),
                 UserEvent::OpenFriendsWindow => {
-                    self.interface.open_window(
-                        &self.application,
-                        &mut self.focus_state,
-                        &FriendsWindow::new(self.friend_list.new_remote()),
-                    );
+                    // self.interface.open_window(
+                    //     &self.client_state,
+                    //     &mut self.focus_state,
+                    //     &FriendsWindow::new(self.friend_list.new_remote()),
+                    // );
                 }
                 UserEvent::ToggleShowInterface => self.show_interface = !self.show_interface,
-                UserEvent::SetThemeFile { theme_file, theme_kind } => self.application.set_theme_file(theme_file, theme_kind),
-                UserEvent::SaveTheme { theme_kind } => self.application.save_theme(theme_kind),
-                UserEvent::ReloadTheme { theme_kind } => self.application.reload_theme(theme_kind),
-                UserEvent::SelectCharacter(character_slot) => {
-                    let _ = self.networking_system.select_character(character_slot);
+                // UserEvent::SetThemeFile { theme_file, theme_kind } => {} //self.client_state.set_theme_file(theme_file, theme_kind),
+                // UserEvent::SaveTheme { theme_kind } => {}                //self.client_state.save_theme(theme_kind),
+                // UserEvent::ReloadTheme { theme_kind } => {}              //self.client_state.reload_theme(theme_kind),
+                UserEvent::SelectCharacter { slot } => {
+                    let _ = self.networking_system.select_character(slot);
                 }
-                UserEvent::OpenCharacterCreationWindow(character_slot) => self.interface.open_window(
-                    &self.application,
-                    &mut self.focus_state,
-                    &CharacterCreationWindow::new(character_slot),
-                ),
+                UserEvent::OpenCharacterCreationWindow(slot) => {}
+                //     self.interface.open_window(
+                //     &self.client_state,
+                //     &mut self.focus_state,
+                //     &CharacterCreationWindow::new(character_slot),
+                // ),
                 UserEvent::CreateCharacter(character_slot, name) => {
                     let _ = self.networking_system.create_character(character_slot, name);
                 }
@@ -1596,12 +1988,13 @@ impl Client {
                         self.currently_deleting = Some(character_id);
                     }
                 }
-                UserEvent::RequestSwitchCharacterSlot(origin_slot) => self.move_request.set(Some(origin_slot)),
-                UserEvent::CancelSwitchCharacterSlot => self.move_request.set(None),
+                UserEvent::RequestSwitchCharacterSlot(origin_slot) => {} //self.move_request.set(Some(origin_slot)),
+                UserEvent::CancelSwitchCharacterSlot => {}               // self.move_request.set(None),
                 UserEvent::SwitchCharacterSlot(destination_slot) => {
-                    let _ = self
-                        .networking_system
-                        .switch_character_slot(self.move_request.take().unwrap(), destination_slot);
+                    // let _ = self
+                    //     .networking_system
+                    //     .switch_character_slot(self.move_request.take().
+                    // unwrap(), destination_slot);
                 }
                 UserEvent::RequestPlayerMove(destination) => {
                     if !self.entities.is_empty() {
@@ -1617,7 +2010,7 @@ impl Client {
 
                     if let Some(entity) = entity {
                         let _ = match entity.get_entity_type() {
-                            EntityType::Npc => self.networking_system.start_dialog(entity_id),
+                            EntityType::Npc => Ok(()), // self.networking_system.start_dialog(entity_id),
                             EntityType::Monster => self.networking_system.player_attack(entity_id),
                             EntityType::Warp => self.networking_system.player_move({
                                 let position = entity.get_grid_position();
@@ -1635,27 +2028,31 @@ impl Client {
                     let _ = self.networking_system.warp_to_map(map_name, position);
                 }
                 UserEvent::SendMessage(message) => {
-                    let _ = self.networking_system.send_chat_message(&self.saved_player_name, &message);
-                    // TODO: maybe find a better solution for unfocusing the message box if
-                    // this becomes problematic
-                    self.focus_state.remove_focus();
+                    // let _ = self.networking_system.send_chat_message(&self.
+                    // saved_player_name, &message);
+                    // TODO: maybe find a better solution for unfocusing the
+                    // message box if this becomes
+                    // problematic self.focus_state.
+                    // remove_focus();
                 }
                 UserEvent::NextDialog(npc_id) => {
-                    let _ = self.networking_system.next_dialog(npc_id);
+                    // let _ = self.networking_system.next_dialog(npc_id);
                 }
                 UserEvent::CloseDialog(npc_id) => {
                     let _ = self.networking_system.close_dialog(npc_id);
-                    self.dialog_system.close_dialog();
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, DialogWindow::WINDOW_CLASS);
+                    // self.dialog_system.close_dialog();
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // DialogWindow::WINDOW_CLASS);
                 }
                 UserEvent::ChooseDialogOption(npc_id, option) => {
                     let _ = self.networking_system.choose_dialog_option(npc_id, option);
 
                     if option == -1 {
-                        self.dialog_system.close_dialog();
-                        self.interface
-                            .close_window_with_class(&mut self.focus_state, DialogWindow::WINDOW_CLASS);
+                        // self.dialog_system.close_dialog();
+                        // self.interface
+                        //     .close_window_with_class(&mut self.focus_state,
+                        // DialogWindow::WINDOW_CLASS);
                     }
                 }
                 UserEvent::MoveResource(r#move) => match r#move {
@@ -1748,13 +2145,15 @@ impl Client {
                 }
                 UserEvent::RejectFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.reject_friend_request(account_id, character_id);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, FriendRequestWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // FriendRequestWindow::WINDOW_CLASS);
                 }
                 UserEvent::AcceptFriendRequest { account_id, character_id } => {
                     let _ = self.networking_system.accept_friend_request(account_id, character_id);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, FriendRequestWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // FriendRequestWindow::WINDOW_CLASS);
                 }
                 UserEvent::BuyItems { items } => {
                     let _ = self.networking_system.purchase_items(items);
@@ -1762,58 +2161,55 @@ impl Client {
                 UserEvent::CloseShop => {
                     let _ = self.networking_system.close_shop();
 
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, BuyWindow::WINDOW_CLASS);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, BuyCartWindow::WINDOW_CLASS);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, SellWindow::WINDOW_CLASS);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, SellCartWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // BuyWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // BuyCartWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // SellWindow::WINDOW_CLASS);
+                    // self.interface.close_window_with_class(&mut
+                    // self.focus_state, "sell_cart");
                 }
                 UserEvent::BuyOrSell { shop_id, buy_or_sell } => {
                     let _ = self.networking_system.select_buy_or_sell(shop_id, buy_or_sell);
-                    self.interface
-                        .close_window_with_class(&mut self.focus_state, BuyOrSellWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .close_window_with_class(&mut self.focus_state,
+                    // BuyOrSellWindow::WINDOW_CLASS);
                 }
                 UserEvent::SellItems { items } => {
                     let _ = self.networking_system.sell_items(items);
                 }
                 UserEvent::FocusChatWindow => {
-                    self.interface
-                        .focus_window_with_class(&mut self.focus_state, ChatWindow::WINDOW_CLASS);
+                    // self.interface
+                    //     .focus_window_with_class(&mut self.focus_state,
+                    // ChatWindow::WINDOW_CLASS);
                 }
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMarkerDetails(marker_identifier) => {
                     if let Some(map) = self.map.as_ref() {
-                        self.interface.open_window(
-                            &self.application,
-                            &mut self.focus_state,
-                            map.resolve_marker(&self.entities, marker_identifier),
-                        );
+                        self.interface
+                            .open_window(&self.client_state, map.resolve_marker(&self.entities, marker_identifier));
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenRenderSettingsWindow => self.interface.open_window(
-                    &self.application,
-                    &mut self.focus_state,
-                    &RenderSettingsWindow::new(self.render_settings.clone()),
-                ),
+                UserEvent::OpenRenderSettingsWindow => self
+                    .interface
+                    .open_window(&self.client_state, RenderSettingsWindow::new(self.render_settings.clone())),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenMapDataWindow => {
                     if let Some(map) = self.map.as_ref() {
-                        self.interface
-                            .open_window(&self.application, &mut self.focus_state, map.to_prototype_window());
+                        self.interface.open_window(&self.client_state, map.to_prototype_window());
                     }
                 }
                 #[cfg(feature = "debug")]
-                UserEvent::OpenMapsWindow => self.interface.open_window(&self.application, &mut self.focus_state, &MapsWindow),
+                UserEvent::OpenMapsWindow => self.interface.open_window(&self.client_state, MapsWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenCommandsWindow => self
-                    .interface
-                    .open_window(&self.application, &mut self.focus_state, &CommandsWindow),
+                UserEvent::OpenCommandsWindow => self.interface.open_window(&self.client_state, CommandsWindow),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenTimeWindow => self.interface.open_window(&self.application, &mut self.focus_state, &TimeWindow),
+                UserEvent::OpenTimeWindow => self.interface.open_window(&self.client_state, TimeWindow),
                 #[cfg(feature = "debug")]
                 UserEvent::SetDawn => self.game_timer.set_day_timer(5.0 * 3600.0),
                 #[cfg(feature = "debug")]
@@ -1823,20 +2219,13 @@ impl Client {
                 #[cfg(feature = "debug")]
                 UserEvent::SetMidnight => self.game_timer.set_day_timer(24.0 * 3600.0),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenThemeViewerWindow => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, self.application.theme_window())
-                }
+                UserEvent::OpenThemeViewerWindow => self.interface.open_window(&self.client_state, self.client_state.theme_window()),
                 #[cfg(feature = "debug")]
-                UserEvent::OpenProfilerWindow => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &ProfilerWindow::new())
-                }
+                UserEvent::OpenProfilerWindow => self.interface.open_window(&self.client_state, ProfilerWindow::new()),
                 #[cfg(feature = "debug")]
                 UserEvent::OpenPacketWindow => self.interface.open_window(
-                    &self.application,
-                    &mut self.focus_state,
-                    &PacketWindow::new(self.packet_history_callback.remote(), PlainTrackedState::default()),
+                    &self.client_state,
+                    PacketWindow::new(self.packet_history_callback.remote(), PlainTrackedState::default()),
                 ),
                 #[cfg(feature = "debug")]
                 UserEvent::ClearPacketHistory => self.packet_history_callback.clear_all(),
@@ -1877,14 +2266,15 @@ impl Client {
                         self.player_inventory.update_item_sprite(item_id, texture);
                     }
                     ItemLocation::Shop => {
-                        self.shop_items.mutate(|items| {
-                            items
-                                .iter_mut()
-                                .filter(|item| item.item_id == item_id)
-                                .for_each(|item| item.metadata.texture = Some(texture.clone()));
-
-                            ValueState::Mutated(())
-                        });
+                        // self.shop_items.mutate(|items| {
+                        //     items
+                        //         .iter_mut()
+                        //         .filter(|item| item.item_id == item_id)
+                        //         .for_each(|item| item.metadata.texture =
+                        // Some(texture.clone()));
+                        //
+                        //     ValueState::Mutated(())
+                        // });
                     }
                 },
                 (LoaderId::Map(..), LoadableResource::Map { map, player_position }) => match self.entities.is_empty() {
@@ -1895,13 +2285,14 @@ impl Client {
                         map.set_ambient_sound_sources(&self.audio_engine);
                         self.audio_engine.play_background_music_track(DEFAULT_BACKGROUND_MUSIC);
 
-                        let character_selection_window = CharacterSelectionWindow::new(
-                            self.saved_characters.new_remote(),
-                            self.move_request.new_remote(),
-                            self.saved_slot_count,
-                        );
-                        self.interface
-                            .open_window(&self.application, &mut self.focus_state, &character_selection_window);
+                        // let character_selection_window = CharacterSelectionWindow::new(
+                        //     self.saved_characters.new_remote(),
+                        //     self.move_request.new_remote(),
+                        //     self.saved_slot_count,
+                        // );
+                        // self.interface
+                        //     .open_window(&self.client_state, &mut self.focus_state,
+                        // &character_selection_window);
 
                         self.start_camera.set_focus_point(START_CAMERA_FOCUS_POINT);
                         self.directional_shadow_camera
@@ -1920,7 +2311,6 @@ impl Client {
                             self.player_camera.set_focus_point(self.entities[0].get_position());
                         }
 
-                        self.interface.schedule_render();
                         let _ = self.networking_system.map_loaded();
                     }
                 },
@@ -1930,6 +2320,27 @@ impl Client {
 
         #[cfg(feature = "debug")]
         loads_measurement.stop();
+
+        let mut built_ui = {
+            #[cfg(feature = "debug")]
+            profile_block!("user interface");
+
+            let mut built_ui = self.interface.do_layouts(&self.client_state, mouse_position);
+
+            if let Some(click_position) = self.input_system.get_left_click_position() {
+                built_ui.click(&self.client_state, click_position);
+            }
+
+            if let Some((mouse_position, delta)) = self.input_system.get_scroll_delta() {
+                built_ui.scroll(mouse_position, delta);
+            }
+
+            if let Some(characters) = self.input_system.get_input_characters() {
+                built_ui.input_characters(&self.client_state, &characters);
+            }
+
+            built_ui
+        };
 
         // Main map update and render loop
         match self.map.as_ref() {
@@ -2009,9 +2420,10 @@ impl Client {
                 #[cfg(feature = "debug")]
                 let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
 
-                let lighting_mode = *self.lighting_mode.get();
-                let shadow_detail = *self.shadow_detail.get();
-                let shadow_quality = *self.shadow_quality.get();
+                let lighting_mode = *self.client_state.get(&ClientState::path().graphics_settings().lighting_mode());
+                let shadow_detail = *self.client_state.get(&ClientState::path().graphics_settings().shadow_detail());
+                let shadow_quality = *self.client_state.get(&ClientState::path().graphics_settings().shadow_quality());
+
                 let shadow_map_size = shadow_detail.directional_shadow_resolution();
                 let ambient_light_color = map.ambient_light_color(lighting_mode, day_timer);
 
@@ -2048,14 +2460,11 @@ impl Client {
                 self.particle_holder.update(delta_time as f32);
                 self.effect_holder.update(&self.entities, delta_time as f32);
 
-                let (clear_interface, render_interface) =
-                    self.interface
-                        .update(&self.application, self.font_loader.clone(), &mut self.focus_state);
                 self.mouse_cursor.update(client_tick);
 
                 #[cfg(feature = "debug")]
                 let render_settings = &*self.render_settings.get();
-                let walk_indicator_color = self.application.get_game_theme().indicator.walking.get();
+                let walk_indicator_color = *self.client_state.get(&ClientState::path().game_theme_2().indicator().walking());
 
                 #[cfg(feature = "debug")]
                 let hovered_marker_identifier = match mouse_target {
@@ -2302,20 +2711,23 @@ impl Client {
                             entity.render_status(
                                 &self.middle_interface_renderer,
                                 current_camera,
-                                self.application.get_game_theme(),
+                                self.client_state.get(&ClientState::path().game_theme_2()),
                                 screen_size,
                             );
 
                             if let Some(name) = &entity.get_details() {
                                 let name = name.split('#').next().unwrap();
 
-                                let offset = ScreenPosition { left: 15.0, top: 15.0 }.scaled(scaling);
+                                let offset = ScreenPosition {
+                                    left: 15.0 * scaling.get_factor(),
+                                    top: 15.0 * scaling.get_factor(),
+                                };
 
                                 self.middle_interface_renderer.render_text(
                                     name,
                                     mouse_position + offset,
                                     Color::WHITE,
-                                    FontSize::new(16.0),
+                                    FontSize(16.0),
                                     AlignHorizontal::Mid,
                                 );
                             }
@@ -2329,27 +2741,16 @@ impl Client {
                         self.entities[0].render_status(
                             &self.middle_interface_renderer,
                             current_camera,
-                            self.application.get_game_theme(),
+                            self.client_state.get(&ClientState::path().game_theme_2()),
                             screen_size,
                         );
                     }
 
-                    if render_interface {
-                        #[cfg(feature = "debug")]
-                        profile_block!("render user interface");
-
-                        self.interface.render(
-                            &self.interface_renderer,
-                            &self.application,
-                            hovered_element,
-                            focused_element,
-                            self.input_system.get_mouse_mode(),
-                        );
-                    }
+                    built_ui.render(&self.interface_renderer);
 
                     #[cfg(feature = "debug")]
                     if render_settings.show_frames_per_second {
-                        let game_theme = self.application.get_game_theme();
+                        let game_theme = self.client_state.get_game_theme();
 
                         self.top_interface_renderer.render_text(
                             &self.game_timer.last_frames_per_second().to_string(),
@@ -2365,8 +2766,8 @@ impl Client {
                             &self.top_interface_renderer,
                             mouse_position,
                             self.input_system.get_mouse_mode().grabbed(),
-                            self.application.get_game_theme().cursor.color.get(),
-                            &self.application,
+                            *self.client_state.get(&ClientState::path().game_theme_2().cursor().color()),
+                            self.client_state.get(&ClientState::path().interface_scale()).get_factor(),
                         );
                     }
                 }
@@ -2383,7 +2784,6 @@ impl Client {
                 let top_layer_instructions = self.top_interface_renderer.get_instructions();
 
                 let render_instruction = RenderInstruction {
-                    clear_interface,
                     show_interface: self.show_interface,
                     picker_position,
                     uniforms: Uniforms {
@@ -2448,62 +2848,57 @@ impl Client {
                 render_frame_measurement.stop();
             }
         }
+
+        // Apply the game state after all the UI work + rendering is done.
+        self.client_state.apply();
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     fn update_graphic_settings(&mut self) {
         // For some reason the interface buffer becomes messed up when
         // recreating the surface, so we need to render it again.
-        let mut update_interface = false;
 
-        if self.vsync.consume_changed() {
-            self.graphics_engine.set_vsync(*self.vsync.get());
-            update_interface = true;
-        }
+        let graphics_settings = self.client_state.get(&ClientState::path().graphics_settings());
 
-        if self.limit_framerate.consume_changed() {
-            self.graphics_engine.set_limit_framerate(*self.limit_framerate.get());
-        }
-
-        if self.triple_buffering.consume_changed() {
-            self.graphics_engine.set_triple_buffering(*self.triple_buffering.get());
-            update_interface = true;
-        }
-
-        if self.texture_filtering.consume_changed() {
-            self.graphics_engine.set_texture_sampler_type(*self.texture_filtering.get());
-            update_interface = true;
-        }
-
-        if self.msaa.consume_changed() {
-            self.graphics_engine.set_msaa(*self.msaa.get());
-            update_interface = true;
-        }
-
-        if self.ssaa.consume_changed() {
-            self.graphics_engine.set_ssaa(*self.ssaa.get());
-            update_interface = true;
-        }
-
-        if self.screen_space_anti_aliasing.consume_changed() {
-            self.graphics_engine
-                .set_screen_space_anti_aliasing(*self.screen_space_anti_aliasing.get());
-        }
-
-        if self.shadow_detail.consume_changed() {
-            self.graphics_engine.set_shadow_detail(*self.shadow_detail.get());
-        }
-
-        if self.high_quality_interface.consume_changed() {
-            let high_quality_interface = *self.high_quality_interface.get();
-            self.interface_renderer.update_high_quality_interface(high_quality_interface);
-            self.graphics_engine.set_high_quality_interface(high_quality_interface);
-            update_interface = true;
-        }
-
-        if update_interface {
-            self.interface.schedule_render();
-        }
+        // if self.vsync.consume_changed() {
+        //     self.graphics_engine.set_vsync(*self.vsync.get());
+        // }
+        //
+        // if self.limit_framerate.consume_changed() {
+        //     self.graphics_engine.set_limit_framerate(*self.limit_framerate.
+        // get()); }
+        //
+        // if self.triple_buffering.consume_changed() {
+        //     self.graphics_engine.set_triple_buffering(*self.triple_buffering.
+        // get()); }
+        //
+        // if self.texture_filtering.consume_changed() {
+        //     self.graphics_engine.set_texture_sampler_type(*self.
+        // texture_filtering.get()); }
+        //
+        // if self.msaa.consume_changed() {
+        //     self.graphics_engine.set_msaa(*self.msaa.get());
+        // }
+        //
+        // if self.ssaa.consume_changed() {
+        //     self.graphics_engine.set_ssaa(*self.ssaa.get());
+        // }
+        //
+        // if self.screen_space_anti_aliasing.consume_changed() {
+        //     self.graphics_engine
+        //         .set_screen_space_anti_aliasing(*self.
+        // screen_space_anti_aliasing.get()); }
+        //
+        // if self.shadow_detail.consume_changed() {
+        //     self.graphics_engine.set_shadow_detail(*self.shadow_detail.
+        // get()); }
+        //
+        // if self.high_quality_interface.consume_changed() {
+        //     let high_quality_interface = *self.high_quality_interface.get();
+        //     self.interface_renderer.
+        // update_high_quality_interface(high_quality_interface);
+        //     self.graphics_engine.
+        // set_high_quality_interface(high_quality_interface); }
     }
 }
 
@@ -2544,23 +2939,26 @@ impl ApplicationHandler for Client {
         // Android devices need to drop the surface on suspend, so we might need to
         // re-create it.
         if let Some(window) = self.window.as_ref() {
+            let path = ClientState::path().graphics_settings();
+            let graphics_settings = self.client_state.get(&path);
+
             self.graphics_engine.on_resume(
                 window.clone(),
-                *self.triple_buffering.get(),
-                *self.vsync.get(),
-                *self.limit_framerate.get(),
-                *self.shadow_detail.get(),
-                *self.texture_filtering.get(),
-                *self.msaa.get(),
-                *self.ssaa.get(),
-                *self.screen_space_anti_aliasing.get(),
-                *self.high_quality_interface.get(),
+                graphics_settings.triple_buffering,
+                graphics_settings.vsync,
+                graphics_settings.limit_framerate,
+                graphics_settings.shadow_detail,
+                graphics_settings.texture_filtering,
+                graphics_settings.msaa,
+                graphics_settings.ssaa,
+                graphics_settings.screen_space_anti_aliasing,
+                graphics_settings.high_quality_interface,
             );
 
             window.set_visible(true);
         }
 
-        if *self.mute_on_focus_loss.get() {
+        if *self.client_state.get(&ClientState::path().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(false);
         }
     }
@@ -2587,10 +2985,10 @@ impl ApplicationHandler for Client {
             WindowEvent::Focused(focused) => {
                 if !focused {
                     self.input_system.reset();
-                    self.focus_state.remove_focus();
+                    // self.focus_state.remove_focus();
                 }
-                let mute_on_focus_loss = *self.mute_on_focus_loss.get();
-                if mute_on_focus_loss {
+
+                if *self.client_state.get(&ClientState::path().audio_settings().mute_on_focus_loss()) {
                     self.audio_engine.mute(!focused);
                 }
             }
@@ -2630,7 +3028,7 @@ impl ApplicationHandler for Client {
             window.set_visible(false);
         }
 
-        if *self.mute_on_focus_loss.get() {
+        if *self.client_state.get(&ClientState::path().audio_settings().mute_on_focus_loss()) {
             self.audio_engine.mute(true);
         }
     }

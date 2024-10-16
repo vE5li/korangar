@@ -43,31 +43,50 @@ impl<const LENGTH: usize> AsRef<str> for ModelString<LENGTH> {
 }
 
 #[cfg(feature = "interface")]
-impl<App, const LENGTH: usize> korangar_interface::elements::PrototypeElement<App> for ModelString<LENGTH>
+impl<App, const LENGTH: usize> korangar_interface::element::PrototypeElement<App> for ModelString<LENGTH>
 where
-    App: korangar_interface::application::Application,
+    App: korangar_interface::application::Appli,
 {
-    fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
-        self.inner.to_element(display)
+    fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+        use korangar_interface::prelude::*;
+
+        button! {
+            text: name,
+            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                println!("Just a dummy for now");
+            },
+        }
+
+        // self.inner.to_element(display)
     }
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct ScaleKeyframeData {
     pub frame: i32,
     pub scale: Vector3<f32>,
     reserved: f32,
 }
+
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct RotationKeyframeData {
     pub frame: i32,
     pub quaternions: Quaternion<f32>,
 }
 
 #[derive(Clone, Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct TranslationKeyframeData {
     pub frame: i32,
     pub translation: Vector3<f32>,
@@ -75,7 +94,10 @@ pub struct TranslationKeyframeData {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct TexturesKeyframeData {
     pub texture_index: u32,
     #[new_derive]
@@ -87,7 +109,10 @@ pub struct TexturesKeyframeData {
 /// List of texture operation types.
 /// See: https://rathena.org/board/topic/127587-rsm2-file-format/
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 #[numeric_type(u32)]
 pub enum TextureOperation {
     /// Texture translation on the X axis. The texture is tiled.
@@ -103,7 +128,10 @@ pub enum TextureOperation {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct TextureKeyframeData {
     pub operation_type: TextureOperation,
     #[new_derive]
@@ -113,14 +141,20 @@ pub struct TextureKeyframeData {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct TextureFrameData {
     pub frame: i32,
     pub operation_value: f32,
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct FaceData {
     #[version_equals_or_above(2, 2)]
     pub length: Option<u32>,
@@ -136,7 +170,10 @@ pub struct FaceData {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct TextureCoordinateData {
     #[version_equals_or_above(1, 2)]
     pub color: Option<u32>,
@@ -144,7 +181,10 @@ pub struct TextureCoordinateData {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct NodeData {
     pub node_name: ModelString<40>,
     pub parent_node_name: ModelString<40>,
@@ -203,7 +243,10 @@ pub struct NodeData {
 }
 
 #[derive(Debug, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct ModelData {
     #[new_default]
     pub signature: Signature<b"GRSM">,

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use korangar_interface::elements::{Container, ElementCell, ElementDisplay, ElementWrap, StaticLabel};
+use korangar_interface::element::{Container, ElementCell, ElementDisplay, ElementWrap, StaticLabel};
 use korangar_interface::event::ChangeEvent;
 use num::traits::NumOps;
 use num::{NumCast, Zero};

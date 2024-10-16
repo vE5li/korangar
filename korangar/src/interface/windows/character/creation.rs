@@ -1,8 +1,8 @@
 use derive_new::new;
-use korangar_interface::elements::{ButtonBuilder, ElementWrap, FocusMode, InputFieldBuilder};
+use korangar_interface::element::{ButtonBuilder, ElementWrap, FocusMode, InputFieldBuilder};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateClone};
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;

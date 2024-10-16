@@ -3,7 +3,7 @@ mod builder;
 use std::sync::Arc;
 
 use korangar_interface::application::{Application, FontSizeTraitExt};
-use korangar_interface::elements::{Element, ElementState};
+use korangar_interface::element::{Element, ElementState};
 use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{Dimension, PlacementResolver};
 use korangar_interface::size_bound;

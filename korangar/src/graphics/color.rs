@@ -4,7 +4,7 @@ use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Color {
     pub red: f32,
     pub blue: f32,
@@ -14,6 +14,7 @@ pub struct Color {
 
 impl Color {
     pub const BLACK: Self = Self::monochrome(0.0);
+    pub const TRANSPARENT: Self = Self::rgba_u8(0, 0, 0, 0);
     pub const WHITE: Self = Self::monochrome(1.0);
 
     pub const fn rgb(red: f32, green: f32, blue: f32) -> Self {

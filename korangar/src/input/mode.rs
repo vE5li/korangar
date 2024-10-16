@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use cgmath::Vector2;
 use korangar_interface::application::MouseInputModeTrait;
-use korangar_interface::elements::{Element, ElementCell};
+use korangar_interface::element::id::ElementId;
+// use korangar_interface::element::{Element, ElementCell};
 use korangar_networking::InventoryItem;
 
 use crate::graphics::Texture;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::inventory::Skill;
 use crate::loaders::Sprite;
@@ -18,7 +18,7 @@ pub enum MouseInputMode {
     MoveSkill(SkillSource, Skill),
     MoveInterface(usize),
     ResizeInterface(usize),
-    DragElement((ElementCell<InterfaceSettings>, usize)),
+    DragElement((ElementId, usize)),
     ClickInterface,
     RotateCamera,
     Walk(Vector2<usize>),
@@ -52,17 +52,18 @@ impl MouseInputMode {
         }
     }
 }
-
-impl MouseInputModeTrait<InterfaceSettings> for MouseInputMode {
-    fn is_none(&self) -> bool {
-        matches!(self, MouseInputMode::None)
-    }
-
-    fn is_self_dragged(&self, element: &dyn Element<InterfaceSettings>) -> bool {
-        matches!(self, Self::DragElement(dragged_element) if std::ptr::eq((&*dragged_element.0.borrow()) as *const _ as *const (), element as *const _ as *const ()))
-    }
-
-    fn is_moving_window(&self, window_index: usize) -> bool {
-        matches!(self, Self::MoveInterface(index) if *index == window_index)
-    }
-}
+//
+// impl MouseInputModeTrait<InterfaceSettings> for MouseInputMode {
+//     fn is_none(&self) -> bool {
+//         matches!(self, MouseInputMode::None)
+//     }
+//
+//     fn is_self_dragged(&self, element: &dyn Element<InterfaceSettings>) ->
+// bool {         matches!(self, Self::DragElement(dragged_element) if
+// std::ptr::eq((&*dragged_element.0.borrow()) as *const _ as *const (), element
+// as *const _ as *const ()))     }
+//
+//     fn is_moving_window(&self, window_index: usize) -> bool {
+//         matches!(self, Self::MoveInterface(index) if *index == window_index)
+//     }
+// }

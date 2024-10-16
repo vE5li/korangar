@@ -15,7 +15,6 @@ use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenS
 use crate::world::MarkerIdentifier;
 
 pub struct RenderInstruction<'a> {
-    pub clear_interface: bool,
     pub show_interface: bool,
     pub picker_position: ScreenPosition,
     pub uniforms: Uniforms,
@@ -57,7 +56,6 @@ pub struct RenderInstruction<'a> {
 impl Default for RenderInstruction<'static> {
     fn default() -> Self {
         Self {
-            clear_interface: true,
             show_interface: false,
             picker_position: ScreenPosition::default(),
             uniforms: Uniforms::default(),

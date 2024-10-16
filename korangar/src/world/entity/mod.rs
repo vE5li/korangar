@@ -5,11 +5,12 @@ use arrayvec::ArrayVec;
 use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
 use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
-use korangar_interface::elements::PrototypeElement;
-use korangar_interface::windows::{PrototypeWindow, Window};
+use korangar_interface::element::PrototypeElement;
+use korangar_interface::window::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
+use rust_state::RustState;
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
 #[cfg(feature = "debug")]
@@ -18,7 +19,6 @@ use wgpu::{BufferUsages, Device, Queue};
 use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
@@ -54,7 +54,7 @@ impl<T> ResourceState<T> {
     }
 }
 
-#[derive(new, PrototypeElement)]
+#[derive(RustState, PrototypeElement, new)]
 pub struct Movement {
     #[hidden_element]
     steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
@@ -129,7 +129,7 @@ impl SoundState {
     }
 }
 
-#[derive(PrototypeElement)]
+#[derive(RustState, PrototypeElement)]
 pub struct Common {
     pub entity_id: EntityId,
     pub job_id: usize,
@@ -784,7 +784,7 @@ impl Common {
     }
 }
 
-#[derive(PrototypeWindow)]
+#[derive(RustState, PrototypeWindow)]
 pub struct Player {
     common: Common,
     pub hair_id: usize,
@@ -850,57 +850,55 @@ impl Player {
             top: screen_position.y * window_size.height + 5.0,
         };
 
-        let bar_width = theme.status_bar.player_bar_width.get();
-        let gap = theme.status_bar.gap.get();
-        let total_height = theme.status_bar.health_height.get()
-            + theme.status_bar.spell_point_height.get()
-            + theme.status_bar.activity_point_height.get()
-            + gap * 2.0;
+        let bar_width = theme.status_bar.player_bar_width;
+        let gap = theme.status_bar.gap;
+        let total_height =
+            theme.status_bar.health_height + theme.status_bar.spell_point_height + theme.status_bar.activity_point_height + gap * 2.0;
 
         let mut offset = 0.0;
 
-        let background_position = final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0);
+        let background_position = final_position - theme.status_bar.border_size - ScreenSize::only_width(bar_width / 2.0);
 
         let background_size = ScreenSize {
             width: bar_width,
             height: total_height,
-        } + theme.status_bar.border_size.get() * 2.0;
+        } + theme.status_bar.border_size * 2.0;
 
-        renderer.render_rectangle(background_position, background_size, theme.status_bar.background_color.get());
+        renderer.render_rectangle(background_position, background_size, theme.status_bar.background_color);
 
         renderer.render_bar(
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.health_height.get(),
+                height: theme.status_bar.health_height,
             },
-            theme.status_bar.player_health_color.get(),
+            theme.status_bar.player_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
 
-        offset += gap + theme.status_bar.health_height.get();
+        offset += gap + theme.status_bar.health_height;
 
         renderer.render_bar(
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.spell_point_height.get(),
+                height: theme.status_bar.spell_point_height,
             },
-            theme.status_bar.spell_point_color.get(),
+            theme.status_bar.spell_point_color,
             self.maximum_spell_points as f32,
             self.spell_points as f32,
         );
 
-        offset += gap + theme.status_bar.spell_point_height.get();
+        offset += gap + theme.status_bar.spell_point_height;
 
         renderer.render_bar(
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.activity_point_height.get(),
+                height: theme.status_bar.activity_point_height,
             },
-            theme.status_bar.activity_point_color.get(),
+            theme.status_bar.activity_point_color,
             self.maximum_activity_points as f32,
             self.activity_points as f32,
         );
@@ -912,7 +910,7 @@ impl Player {
     }
 }
 
-#[derive(PrototypeWindow)]
+#[derive(RustState, PrototypeWindow)]
 pub struct Npc {
     common: Common,
 }
@@ -954,24 +952,24 @@ impl Npc {
             top: screen_position.y * window_size.height + 5.0,
         };
 
-        let bar_width = theme.status_bar.enemy_bar_width.get();
+        let bar_width = theme.status_bar.enemy_bar_width;
 
         renderer.render_rectangle(
-            final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0),
+            final_position - theme.status_bar.border_size - ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.enemy_health_height.get(),
-            } + (theme.status_bar.border_size.get() * 2.0),
-            theme.status_bar.background_color.get(),
+                height: theme.status_bar.enemy_health_height,
+            } + (theme.status_bar.border_size * 2.0),
+            theme.status_bar.background_color,
         );
 
         renderer.render_bar(
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.enemy_health_height.get(),
+                height: theme.status_bar.enemy_health_height,
             },
-            theme.status_bar.enemy_health_color.get(),
+            theme.status_bar.enemy_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
@@ -1132,16 +1130,16 @@ impl Entity {
     }
 }
 
-impl PrototypeWindow<InterfaceSettings> for Entity {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        match self {
-            Entity::Player(player) => player.to_window(window_cache, application, available_space),
-            Entity::Npc(npc) => npc.to_window(window_cache, application, available_space),
-        }
-    }
-}
+// impl PrototypeWindow<InterfaceSettings> for Entity {
+//     fn to_window(
+//         &self,
+//         window_cache: &WindowCache,
+//         application: &InterfaceSettings,
+//         available_space: ScreenSize,
+//     ) -> Window<InterfaceSettings> {
+//         match self {
+//             Entity::Player(player) => player.to_window(window_cache,
+// application, available_space),             Entity::Npc(npc) =>
+// npc.to_window(window_cache, application, available_space),         }
+//     }
+// }

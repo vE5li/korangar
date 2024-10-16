@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use korangar_interface::elements::{
+use korangar_interface::element::{
     ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, Headline, WeakElementCell,
 };
 use korangar_interface::event::HoverInformation;

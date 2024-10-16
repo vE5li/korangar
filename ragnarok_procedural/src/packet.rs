@@ -86,12 +86,14 @@ pub fn derive_packet_struct(
                 #final_to_bytes
             }
 
-            #[cfg(feature = "packet-to-prototype-element")]
-            fn to_prototype_element<App: korangar_interface::application::Application>(
-                &self,
-            ) -> Box<dyn korangar_interface::elements::PrototypeElement<App> + Send> {
-                Box::new(self.clone())
-            }
+            // TODO: Instead implement PrototypeElement?
+            // #[cfg(feature = "packet-to-prototype-element")]
+            // fn to_prototype_element<App: korangar_interface::application::Appli>(
+            //     self_path: impl Path<App, Self>
+            // ) -> &impl korangar_interface::element::PrototypeElement<App> {
+            //     Self::
+            //     Box::new(self.clone())
+            // }
         }
     }
     .into()

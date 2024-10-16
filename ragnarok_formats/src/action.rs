@@ -5,7 +5,10 @@ use crate::signature::Signature;
 use crate::version::{MinorFirst, Version};
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct SpriteClip {
     pub position: Vector2<i32>,
     pub sprite_number: i32,
@@ -25,7 +28,10 @@ pub struct SpriteClip {
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct AttachPoint {
     pub ignored: u32,
     pub position: Vector2<i32>,
@@ -33,7 +39,10 @@ pub struct AttachPoint {
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct Motion {
     pub range1: [i32; 4], // maybe just skip this?
     pub range2: [i32; 4], // maybe just skip this?
@@ -51,7 +60,10 @@ pub struct Motion {
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct Action {
     #[new_derive]
     pub motion_count: u32,
@@ -60,14 +72,20 @@ pub struct Action {
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct Event {
     #[length(40)]
     pub name: String,
 }
 
 #[derive(Debug, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(
+    feature = "interface",
+    derive(rust_state::RustState, korangar_interface::element::PrototypeElement)
+)]
 pub struct ActionsData {
     #[new_default]
     pub signature: Signature<b"AC">,

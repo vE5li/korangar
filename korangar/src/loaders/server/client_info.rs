@@ -1,5 +1,6 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use rust_state::RustState;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 
@@ -13,7 +14,7 @@ use super::ServiceId;
 ///
 /// See more: <https://github.com/rathena/rathena/wiki/Clientinfo.xml>
 #[allow(dead_code)]
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Debug, RustState, Deserialize)]
 pub struct ClientInfo {
     /// ClientInfo's description.
     #[serde(alias = "desc")]

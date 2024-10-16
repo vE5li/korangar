@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use derive_new::new;
-use korangar_interface::elements::{ElementCell, PrototypeElement};
+use korangar_interface::element::{ElementCell, PrototypeElement};
 use korangar_interface::event::{ChangeEvent, IntoChangeEvent};
 use serde::{Deserialize, Serialize};
 

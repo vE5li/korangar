@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-use korangar_interface::elements::{ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus};
+use korangar_interface::element::{ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Expandable, Focus};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;

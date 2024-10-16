@@ -4,7 +4,7 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::Point3;
 use cgmath::{EuclideanSpace, Vector2};
-use korangar_interface::application::FontSizeTraitExt;
+use korangar_interface::application::ScalingTrait;
 
 use crate::graphics::{Color, RectangleInstruction, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
@@ -183,7 +183,7 @@ impl GameInterfaceRenderer {
         font_size: FontSize,
         align_horizontal: AlignHorizontal,
     ) {
-        let font_size = font_size.scaled(self.scaling);
+        let font_size = FontSize(font_size.0 * self.scaling.get_factor());
 
         let mut glyphs = self.glyphs.borrow_mut();
 

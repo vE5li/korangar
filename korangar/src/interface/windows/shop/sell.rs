@@ -1,8 +1,8 @@
 use derive_new::new;
-use korangar_interface::elements::{ElementWrap, ScrollView};
+use korangar_interface::element::{ElementWrap, ScrollView};
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, PlainTrackedState};
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
 use korangar_networking::SellItem;
 
 use crate::interface::application::InterfaceSettings;

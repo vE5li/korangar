@@ -1,5 +1,5 @@
 use korangar_interface::application::{FontSizeTrait, SizeTraitExt};
-use korangar_interface::elements::{Element, ElementState};
+use korangar_interface::element::{Element, ElementState};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_networking::{SellItem, ShopItem};

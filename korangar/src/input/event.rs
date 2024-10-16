@@ -1,26 +1,31 @@
 use cgmath::Vector2;
-use korangar_interface::ElementEvent;
-use korangar_interface::event::ClickAction;
+use korangar_interface::event::{ClickAction, Event, EventQueue};
 use korangar_networking::ShopItem;
 use ragnarok_packets::{
     AccountId, BuyOrSellOption, CharacterId, CharacterServerInformation, EntityId, HotbarSlot, ShopId, SoldItemInformation, TilePosition,
 };
+use rust_state::Context;
 
-use crate::interface::application::{InterfaceSettings, InternalThemeKind};
 use crate::interface::resource::Move;
 use crate::loaders::ServiceId;
+use crate::state::ClientState;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
+// TODO: A lot of these are not user events, just a element events.
+//
+// TODO: Some of these don't need a special event anymore and can just modify
+// the state directly.
 #[derive(Clone, Debug)]
-// TODO: A lot of these are not user events, just a element events
 pub enum UserEvent {
     LogIn {
         service_id: ServiceId,
         username: String,
         password: String,
     },
-    SelectServer(CharacterServerInformation),
+    SelectServer {
+        character_server_information: CharacterServerInformation,
+    },
     Respawn,
     LogOut,
     Exit,
@@ -35,17 +40,19 @@ pub enum UserEvent {
     OpenAudioSettingsWindow,
     OpenFriendsWindow,
     ToggleShowInterface,
-    SetThemeFile {
-        theme_file: String,
-        theme_kind: InternalThemeKind,
+    // SetThemeFile {
+    //     theme_file: String,
+    //     theme_kind: InternalThemeKind,
+    // },
+    // SaveTheme {
+    //     theme_kind: InternalThemeKind,
+    // },
+    // ReloadTheme {
+    //     theme_kind: InternalThemeKind,
+    // },
+    SelectCharacter {
+        slot: usize,
     },
-    SaveTheme {
-        theme_kind: InternalThemeKind,
-    },
-    ReloadTheme {
-        theme_kind: InternalThemeKind,
-    },
-    SelectCharacter(usize),
     OpenCharacterCreationWindow(usize),
     CreateCharacter(usize, String),
     DeleteCharacter(CharacterId),
@@ -133,8 +140,14 @@ pub enum UserEvent {
     CameraDecelerate,
 }
 
-impl ElementEvent<InterfaceSettings> for UserEvent {
-    fn trigger(&mut self) -> Vec<ClickAction<InterfaceSettings>> {
-        vec![ClickAction::Custom(self.clone())]
+impl From<UserEvent> for Event<ClientState> {
+    fn from(event: UserEvent) -> Self {
+        Event::Application(event)
+    }
+}
+
+impl ClickAction<ClientState> for UserEvent {
+    fn execute(&self, _: &Context<ClientState>, queue: &mut EventQueue<ClientState>) {
+        queue.queue(self.clone());
     }
 }

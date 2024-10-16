@@ -1,7 +1,7 @@
-use korangar_interface::elements::ElementWrap;
+use korangar_interface::element::ElementWrap;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainTrackedState, TrackedState};
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder, WindowTrait};
 use ragnarok_packets::EntityId;
 
 use crate::interface::application::InterfaceSettings;
@@ -39,7 +39,7 @@ impl PrototypeWindow<InterfaceSettings> for DialogWindow {
         window_cache: &WindowCache,
         application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
+    ) -> impl WindowTrait<InterfaceSettings> {
         let elements = vec![DialogContainer::new(self.elements.new_remote(), self.npc_id).wrap()];
 
         WindowBuilder::new()

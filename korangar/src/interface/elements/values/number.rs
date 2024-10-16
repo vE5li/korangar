@@ -1,7 +1,7 @@
 use std::cmp::PartialOrd;
 use std::fmt::Display;
 
-use korangar_interface::elements::{Element, ElementState};
+use korangar_interface::element::{Element, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use num::traits::NumOps;

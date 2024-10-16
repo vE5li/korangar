@@ -43,8 +43,9 @@ pub fn prototype_element_helper(
             .map(|name: LitStr| name.value())
             .unwrap_or_else(|| str::replace(&field_variable.to_string(), "_", " "));
 
-        initializers
-            .push(quote!(korangar_interface::elements::PrototypeElement::to_element(&self.#field_identifier, #display_name.to_string())));
+        initializers.push(
+            quote!(korangar_interface::element::PrototypeElement::to_element(self_path.#field_identifier(), #display_name.to_string())),
+        );
     }
 
     (initializers, is_unnamed, window_title, window_class)

@@ -9,6 +9,7 @@ blake3 = { version = "1", default-features = true }
 block_compression = { version = "0.3", default-features = false }
 bumpalo = "3"
 bytemuck = "1"
+crabtime = "1.1"
 cgmath = "0.18"
 chrono = "0.4"
 cosmic-text = { version = "0.14", default-features = false }
@@ -21,6 +22,7 @@ etherparse = "0.17"
 fast-srgb8 = "1"
 flate2 = { version = "1", default-features = false }
 hashbrown = "0.15"
+heck = "0.5.0"
 image = { version = "0.25", default-features = false }
 kira = { version = "0.10", default-features = false }
 korangar_audio = { path = "korangar_audio" }
@@ -48,6 +50,8 @@ rav1d = { version = "1", git = "https://github.com/memorysafety/rav1d", rev = "f
 rayon = "1"
 reqwest = "0.12"
 ron = "0.9"
+# rust_state = { git = "https://github.com/vE5li/rust_state" }
+rust_state = { path = "/home/lucas/projects/rust_state" }
 serde = "1"
 sevenz-rust2 = { version = "0.13", default-features = false }
 smallvec = "1"

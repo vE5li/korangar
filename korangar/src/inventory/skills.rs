@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState};
 use ragnarok_packets::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
 
 use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
@@ -19,7 +18,7 @@ pub struct Skill {
 
 #[derive(Default)]
 pub struct SkillTree {
-    skills: PlainTrackedState<Vec<Skill>>,
+    skills: Vec<Skill>,
 }
 
 impl SkillTree {
@@ -30,7 +29,7 @@ impl SkillTree {
         skill_data: Vec<SkillInformation>,
         client_tick: ClientTick,
     ) {
-        let skills = skill_data
+        self.skills = skill_data
             .into_iter()
             .map(|skill_data| {
                 let file_path = format!("아이템\\{}", skill_data.skill_name);
@@ -48,15 +47,13 @@ impl SkillTree {
                 }
             })
             .collect();
-
-        self.skills.set(skills);
     }
 
-    pub fn get_skills(&self) -> PlainRemote<Vec<Skill>> {
-        self.skills.new_remote()
-    }
+    // pub fn get_skills(&self) -> &[Skill] {
+    //     &self.skills
+    // }
 
     pub fn find_skill(&self, skill_id: SkillId) -> Option<Skill> {
-        self.skills.get().iter().find(|skill| skill.skill_id == skill_id).cloned()
+        self.skills.iter().find(|skill| skill.skill_id == skill_id).cloned()
     }
 }

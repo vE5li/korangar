@@ -1,7 +1,7 @@
 use korangar_debug::profiling::FrameMeasurement;
-use korangar_interface::elements::ElementWrap;
+use korangar_interface::element::ElementWrap;
 use korangar_interface::size_bound;
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
 
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::FrameInspectorView;

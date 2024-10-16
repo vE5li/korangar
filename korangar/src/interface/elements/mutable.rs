@@ -1,4 +1,4 @@
-use korangar_interface::elements::{Container, ElementCell, ElementWrap, StaticLabel};
+use korangar_interface::element::{Container, ElementCell, ElementWrap, StaticLabel};
 use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{DimensionBound, SizeBound};
 

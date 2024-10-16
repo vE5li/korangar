@@ -7,9 +7,10 @@ use korangar_util::FileLoader;
 use quick_xml::Reader;
 use quick_xml::de::from_str;
 use quick_xml::events::Event;
+use rust_state::MapItem;
 use serde::{Deserialize, Serialize};
 
-pub use self::client_info::ClientInfo;
+pub use self::client_info::{ClientInfo, ClientInfoPathExt};
 use super::GameFileLoader;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]

@@ -7,7 +7,7 @@ use super::windows::DialogWindow;
 
 #[derive(new)]
 struct DialogHandle {
-    elements: PlainTrackedState<Vec<DialogElement>>,
+    elements: Vec<DialogElement>,
     clear: bool,
 }
 

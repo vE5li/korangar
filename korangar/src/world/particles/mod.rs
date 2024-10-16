@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use cgmath::{Point3, Vector2, Vector3};
 use derive_new::new;
-use korangar_interface::application::{ClipTraitExt, FontSizeTrait, ScalingTrait};
+use korangar_interface::application::{ClipTrait, FontSizeTrait, ScalingTrait};
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand_aes::tls::rand_f32;
 
@@ -58,7 +58,7 @@ impl Particle for DamageNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(&self.damage_amount, final_position, Color::WHITE, FontSize::new(16.0));
+        renderer.render_damage_text(&self.damage_amount, final_position, Color::WHITE, FontSize(16.0));
     }
 }
 
@@ -90,12 +90,7 @@ impl Particle for HealNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(
-            &self.heal_amount,
-            final_position,
-            Color::rgb_u8(30, 255, 30),
-            FontSize::new(16.0),
-        );
+        renderer.render_damage_text(&self.heal_amount, final_position, Color::rgb_u8(30, 255, 30), FontSize(16.0));
     }
 }
 

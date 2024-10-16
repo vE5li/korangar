@@ -1,11 +1,12 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use ron::ser::PrettyConfig;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType};
 
-#[derive(Serialize, Deserialize)]
+#[derive(RustState, Serialize, Deserialize)]
 pub struct GraphicsSettings {
     pub lighting_mode: LightingMode,
     pub vsync: bool,

@@ -1,7 +1,7 @@
-use korangar_interface::elements::{ButtonBuilder, ElementWrap, ScrollView, StateButtonBuilder};
+use korangar_interface::element::{ButtonBuilder, ElementWrap, ScrollView, StateButtonBuilder};
 use korangar_interface::event::ClickAction;
 use korangar_interface::state::{PlainTrackedState, TrackedState, TrackedStateBinary};
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;

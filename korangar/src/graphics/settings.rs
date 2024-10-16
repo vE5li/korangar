@@ -4,6 +4,7 @@ use std::num::NonZeroU32;
 
 #[cfg(feature = "debug")]
 use derive_new::new;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
 use crate::interface::layout::ScreenSize;
@@ -169,7 +170,7 @@ impl Display for ScreenSpaceAntiAliasing {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Copy, Clone, Default, new)]
+#[derive(Copy, Clone, Default, RustState, new)]
 pub struct RenderSettings {
     #[new(value = "true")]
     pub show_frames_per_second: bool,

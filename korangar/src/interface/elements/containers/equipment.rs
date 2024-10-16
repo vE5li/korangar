@@ -1,4 +1,4 @@
-use korangar_interface::elements::{
+use korangar_interface::element::{
     Container, ContainerState, Element, ElementCell, ElementState, ElementWrap, Focus, Text, WeakElementCell,
 };
 use korangar_interface::event::{ChangeEvent, HoverInformation};

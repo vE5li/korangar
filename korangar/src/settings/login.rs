@@ -3,19 +3,25 @@ use std::collections::HashMap;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
 use ron::ser::PrettyConfig;
+use rust_state::{MapItem, RustState};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::loaders::ServiceId;
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+// TODO: Can likely be removed.
+#[derive(Clone, Default, RustState, Serialize, Deserialize)]
 pub struct LoginSettings {
     pub service: String,
     pub service_settings: HashMap<ServiceId, ServiceSettings>,
     pub recent_service_id: Option<ServiceId>,
 }
 
-#[derive(Clone, Default, Deserialize)]
+impl MapItem for ServiceSettings {
+    type Id = ServiceId;
+}
+
+#[derive(Clone, Default, RustState, Deserialize)]
 pub struct ServiceSettings {
     pub username: String,
     pub password: String,

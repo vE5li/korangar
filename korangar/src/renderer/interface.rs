@@ -2,12 +2,10 @@ use std::cell::{Ref, RefCell};
 use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
-use korangar_interface::application::Application;
 
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, GlyphInstruction, ImageType, TextureLoader};
+use crate::loaders::{FontLoader, FontSize, GlyphInstruction, ImageType, TextureLoader};
 use crate::renderer::SpriteRenderer;
 
 /// Renders the interface provided by 'korangar_interface'.
@@ -80,15 +78,8 @@ impl InterfaceRenderer {
             self.window_size
         };
     }
-}
 
-impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for InterfaceRenderer {
-    fn get_text_dimensions(
-        &self,
-        text: &str,
-        mut font_size: <InterfaceSettings as Application>::FontSize,
-        mut available_width: f32,
-    ) -> <InterfaceSettings as Application>::Size {
+    pub fn get_text_dimensions(&self, text: &str, mut font_size: FontSize, mut available_width: f32) -> ScreenSize {
         if self.high_quality_interface {
             // We need to adjust the font size, or else we would create glyphs for a font
             // size, that we don't use.
@@ -105,13 +96,13 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         size
     }
 
-    fn render_rectangle(
+    pub fn render_rectangle(
         &self,
-        position: <InterfaceSettings as Application>::Position,
-        size: <InterfaceSettings as Application>::Size,
-        mut screen_clip: <InterfaceSettings as Application>::Clip,
-        mut corner_radius: <InterfaceSettings as Application>::CornerRadius,
-        color: <InterfaceSettings as Application>::Color,
+        position: ScreenPosition,
+        size: ScreenSize,
+        mut screen_clip: ScreenClip,
+        mut corner_radius: CornerRadius,
+        color: Color,
     ) {
         if self.high_quality_interface {
             screen_clip = screen_clip * 2.0;
@@ -131,13 +122,13 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         });
     }
 
-    fn render_text(
+    pub fn render_text(
         &self,
         text: &str,
-        mut text_position: <InterfaceSettings as Application>::Position,
-        mut screen_clip: <InterfaceSettings as Application>::Clip,
-        color: <InterfaceSettings as Application>::Color,
-        mut font_size: <InterfaceSettings as Application>::FontSize,
+        mut text_position: ScreenPosition,
+        mut screen_clip: ScreenClip,
+        color: Color,
+        mut font_size: FontSize,
     ) -> f32 {
         if self.high_quality_interface {
             text_position = text_position * 2.0;
@@ -195,14 +186,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         size.y
     }
 
-    fn render_checkbox(
-        &self,
-        position: <InterfaceSettings as Application>::Position,
-        size: <InterfaceSettings as Application>::Size,
-        clip: <InterfaceSettings as Application>::Clip,
-        color: <InterfaceSettings as Application>::Color,
-        checked: bool,
-    ) {
+    pub fn render_checkbox(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, checked: bool) {
         let texture = match checked {
             true => self.filled_box_texture.clone(),
             false => self.unfilled_box_texture.clone(),
@@ -211,14 +195,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         self.render_sdf(texture, position, size, clip, color);
     }
 
-    fn render_expand_arrow(
-        &self,
-        position: <InterfaceSettings as Application>::Position,
-        size: <InterfaceSettings as Application>::Size,
-        clip: <InterfaceSettings as Application>::Clip,
-        color: <InterfaceSettings as Application>::Color,
-        expanded: bool,
-    ) {
+    pub fn render_expand_arrow(&self, position: ScreenPosition, size: ScreenSize, clip: ScreenClip, color: Color, expanded: bool) {
         let texture = match expanded {
             true => self.expanded_arrow_texture.clone(),
             false => self.collapsed_arrow_texture.clone(),

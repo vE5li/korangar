@@ -30,10 +30,19 @@ impl<const MAGIC: &'static [u8]> ToBytes for Signature<MAGIC> {
 }
 
 #[cfg(feature = "interface")]
-impl<const MAGIC: &'static [u8], App: korangar_interface::application::Application> korangar_interface::elements::PrototypeElement<App>
+impl<const MAGIC: &'static [u8], App: korangar_interface::application::Appli> korangar_interface::element::PrototypeElement<App>
     for Signature<MAGIC>
 {
-    fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
-        std::str::from_utf8(MAGIC).unwrap().to_element(display)
+    fn to_element(self_path: impl rust_state::Path<App, Self>, name: String) -> impl korangar_interface::element::Element<App> {
+        use korangar_interface::prelude::*;
+
+        button! {
+            text: name,
+            event: |state: &rust_state::Context<App>, _: &mut korangar_interface::event::EventQueue<App>| {
+                println!("Just a dummy for now");
+            },
+        }
+
+        // std::str::from_utf8(MAGIC).unwrap().to_element(display)
     }
 }

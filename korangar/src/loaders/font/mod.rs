@@ -14,14 +14,13 @@ use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
 use korangar_interface::application::FontSizeTrait;
-use korangar_interface::elements::ElementDisplay;
+use korangar_interface::element::ElementDisplay;
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
 use super::{GameFileLoader, TextureLoader};
 use crate::graphics::{Color, MAX_TEXTURE_SIZE, Texture};
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
 use crate::loaders::font::font_file::FontFile;
 
@@ -50,9 +49,9 @@ impl ElementDisplay for FontSize {
 }
 
 impl FontSizeTrait for FontSize {
-    fn new(value: f32) -> Self {
-        Self(value)
-    }
+    // fn new(value: f32) -> Self {
+    //     Self(value)
+    // }
 
     fn get_value(&self) -> f32 {
         self.0
@@ -333,11 +332,5 @@ impl FontLoader {
     /// The texture of the static font map.
     pub fn get_font_map(&self) -> &Texture {
         &self.font_map
-    }
-}
-
-impl korangar_interface::application::FontLoaderTrait<InterfaceSettings> for Arc<FontLoader> {
-    fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
-        FontLoader::get_text_dimensions(self, text, font_size, 1.0, available_width)
     }
 }

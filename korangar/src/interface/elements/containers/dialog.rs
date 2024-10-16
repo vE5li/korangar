@@ -1,4 +1,4 @@
-use korangar_interface::elements::{ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Text, WeakElementCell};
+use korangar_interface::element::{ButtonBuilder, ContainerState, Element, ElementCell, ElementState, ElementWrap, Text, WeakElementCell};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;

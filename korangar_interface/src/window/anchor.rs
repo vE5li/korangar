@@ -1,20 +1,19 @@
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::application::{
-    Application, ClipTraitExt, CornerRadiusTrait, InterfaceRenderer, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt,
-};
-use crate::theme::{InterfaceTheme, WindowTheme};
+use crate::application::{Appli, PositionTrait};
 
 macro_rules! anchor_color {
     ($anchor_point:expr, $theme:expr, $name:ident) => {
         match $anchor_point {
-            AnchorPoint::$name => $theme.window().closest_anchor_color(),
-            _ => $theme.window().anchor_color(),
+            AnchorPoint::$name => $theme.closest_anchor_color,
+            _ => $theme.anchor_color,
         }
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AnchorPoint {
     Center,
     TopLeft,
@@ -27,10 +26,11 @@ pub enum AnchorPoint {
     CenterLeft,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Anchor<App>
 where
-    App: Application,
+    App: Appli,
 {
     anchor_point: AnchorPoint,
     offset: App::Position,
@@ -38,20 +38,20 @@ where
 
 impl<App> Default for Anchor<App>
 where
-    App: Application,
+    App: Appli,
 {
     fn default() -> Self {
         // By default, windows start out in the middle of the screen.
         Self {
             anchor_point: AnchorPoint::Center,
-            offset: App::Position::zero(),
+            offset: App::Position::new(0.0, 0.0),
         }
     }
 }
 
 impl<App> Clone for Anchor<App>
 where
-    App: Application,
+    App: Appli,
 {
     fn clone(&self) -> Self {
         Self {
@@ -61,9 +61,9 @@ where
     }
 }
 
-impl<App> Anchor<App>
+/* impl<App> Anchor<App>
 where
-    App: Application,
+    App: Appli,
 {
     pub fn update(&mut self, available_space: App::Size, position: App::Position, size: App::Size) {
         let center = Anchor {
@@ -157,8 +157,8 @@ where
 
     pub(super) fn render_window_anchors(
         &self,
+        theme: &WindowTheme<App>,
         renderer: &App::Renderer,
-        theme: &App::Theme,
         window_position: App::Position,
         window_size: App::Size,
     ) {
@@ -314,4 +314,4 @@ where
             anchor_color!(self.anchor_point, theme, CenterLeft),
         );
     }
-}
+} */

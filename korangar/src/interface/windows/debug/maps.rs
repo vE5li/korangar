@@ -1,6 +1,6 @@
-use korangar_interface::elements::{ButtonBuilder, ElementWrap};
+use korangar_interface::element::{ButtonBuilder, ElementWrap};
 use korangar_interface::size_bound;
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::window::{PrototypeWindow, Window, WindowBuilder};
 use ragnarok_packets::TilePosition;
 
 use crate::input::UserEvent;

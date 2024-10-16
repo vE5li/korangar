@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use korangar_interface::application::ClipTraitExt;
+use korangar_interface::application::ClipTrait;
 use ragnarok_packets::ClientTick;
 
-use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::graphics::Color;
 use crate::input::Grabbed;
@@ -87,7 +86,7 @@ impl MouseCursor {
         mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
         color: Color,
-        application: &InterfaceSettings,
+        scaling: f32,
     ) {
         if !self.shown {
             return;
@@ -97,21 +96,15 @@ impl MouseCursor {
             match grabbed {
                 Grabbed::Texture(texture) => renderer.render_sprite(
                     texture.clone(),
-                    mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
-                    ScreenSize::uniform(30.0 * application.get_scaling_factor()),
+                    mouse_position - ScreenSize::uniform(15.0 * scaling),
+                    ScreenSize::uniform(30.0 * scaling),
                     ScreenClip::unbound(),
                     Color::WHITE,
                     false,
                 ),
-                Grabbed::Action(sprite, actions, animation_state) => actions.render_sprite(
-                    renderer,
-                    &sprite,
-                    &animation_state,
-                    mouse_position,
-                    0,
-                    Color::WHITE,
-                    application,
-                ),
+                Grabbed::Action(sprite, actions, animation_state) => {
+                    actions.render_sprite(renderer, &sprite, &animation_state, mouse_position, 0, Color::WHITE, scaling)
+                }
             }
         }
 
@@ -128,7 +121,7 @@ impl MouseCursor {
             mouse_position,
             direction,
             color,
-            application,
+            scaling,
         );
     }
 }

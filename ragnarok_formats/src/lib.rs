@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
 #![feature(unsized_const_params)]
+#![cfg_attr(feature = "interface", feature(negative_impls))]
 
 pub mod action;
 pub mod archive;

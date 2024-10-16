@@ -8,7 +8,7 @@ use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
-use korangar_interface::windows::PrototypeWindow;
+use korangar_interface::window::PrototypeWindow;
 use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_util::container::{SimpleKey, SimpleSlab};
 use korangar_util::pathing::Traversable;

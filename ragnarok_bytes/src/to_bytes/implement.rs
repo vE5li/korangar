@@ -78,6 +78,10 @@ impl<T: ToBytes, const SIZE: usize> ToBytes for [T; SIZE] {
     }
 }
 
+// --------------------------------------------- TODO: Create an issue: This is
+// not correct. `to_n_bytes` will fail for a string with the correct length
+// because of the zero byte, but we also can't leave it out because of strign
+// serialized without `from_n_bytes`
 impl ToBytes for String {
     fn to_bytes(&self, byte_writer: &mut ByteWriter) -> ConversionResult<usize> {
         byte_writer.write_counted(|writer| {

@@ -1,60 +1,52 @@
-use korangar_interface::elements::{ElementWrap, StateButtonBuilder};
-use korangar_interface::size_bound;
-use korangar_interface::state::TrackedStateBinary;
-use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::event::Toggle;
+use korangar_interface::window::{CustomWindow, PrototypeWindow, Window, WindowTrait};
+use rust_state::{Context, Path};
 
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::settings::{AudioSettings, AudioSettingsPathExt};
+use crate::state::{ClientState, ClientThemeType};
 
 #[derive(Default)]
-pub struct AudioSettingsWindow<MuteOnFocusLoss>
-where
-    MuteOnFocusLoss: TrackedStateBinary<bool>,
-{
-    mute_on_focus_loss: MuteOnFocusLoss,
+pub struct AudioSettingsWindow<P> {
+    path: P,
 }
 
-impl<MuteOnFocusLoss> AudioSettingsWindow<MuteOnFocusLoss>
-where
-    MuteOnFocusLoss: TrackedStateBinary<bool>,
-{
+impl<P> AudioSettingsWindow<P> {
     pub const WINDOW_CLASS: &'static str = "audio_settings";
 
-    pub fn new(mute_on_focus_loss: MuteOnFocusLoss) -> Self {
-        Self { mute_on_focus_loss }
+    pub fn new(path: P) -> Self {
+        Self { path }
     }
 }
 
-impl<MuteOnFocusLoss> PrototypeWindow<InterfaceSettings> for AudioSettingsWindow<MuteOnFocusLoss>
+impl<P> CustomWindow<ClientState> for AudioSettingsWindow<P>
 where
-    MuteOnFocusLoss: TrackedStateBinary<bool>,
+    P: Path<ClientState, AudioSettings>,
 {
-    fn window_class(&self) -> Option<&str> {
+    fn window_class() -> Option<&'static str> {
         Self::WINDOW_CLASS.into()
     }
 
-    fn to_window(
-        &self,
+    fn to_window<'a>(
+        self,
+        state: &Context<ClientState>,
         window_cache: &WindowCache,
-        application: &InterfaceSettings,
         available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        let elements = vec![
-            StateButtonBuilder::new()
-                .with_text("Mute audio on focus loss")
-                .with_event(self.mute_on_focus_loss.toggle_action())
-                .with_remote(self.mute_on_focus_loss.new_remote())
-                .build()
-                .wrap(),
-        ];
+    ) -> impl WindowTrait<ClientState> + 'a {
+        use korangar_interface::prelude::*;
 
-        WindowBuilder::new()
-            .with_title("Audio Settings".to_string())
-            .with_class(Self::WINDOW_CLASS.to_string())
-            .with_size_bound(size_bound!(200 > 300 < 400, ?))
-            .with_elements(elements)
-            .closable()
-            .build(window_cache, application, available_space)
+        window! {
+            title: "Audio Settings",
+            theme: ClientThemeType::Game,
+            window_id: 0,
+            elements: (
+                state_button! {
+                    text: "Mute audio on focus loss",
+                    state: self.path.mute_on_focus_loss(),
+                    event: Toggle(self.path.mute_on_focus_loss()),
+                },
+            ),
+        }
     }
 }

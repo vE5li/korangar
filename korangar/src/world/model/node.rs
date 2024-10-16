@@ -1,14 +1,15 @@
 use cgmath::{Matrix, Matrix4, Point3, SquareMatrix, Transform as PointTransform, Vector4, VectorSpace};
 use derive_new::new;
-use korangar_interface::elements::PrototypeElement;
+use korangar_interface::element::PrototypeElement;
 use ragnarok_formats::model::{RotationKeyframeData, ScaleKeyframeData, TranslationKeyframeData};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
+use rust_state::RustState;
 
 use crate::graphics::ModelInstruction;
 use crate::world::Camera;
 
-#[derive(PrototypeElement, new)]
+#[derive(RustState, PrototypeElement, new)]
 pub struct Node {
     pub version: InternalVersion,
     #[hidden_element]
@@ -29,7 +30,7 @@ pub struct Node {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(PrototypeElement)]
+#[derive(RustState, PrototypeElement)]
 pub struct SubMesh {
     pub vertex_offset: usize,
     pub vertex_count: usize,

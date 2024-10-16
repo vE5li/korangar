@@ -1,4 +1,4 @@
-use korangar_interface::elements::{ButtonBuilder, Container, ElementCell, ElementWrap, Headline, PrototypeElement};
+use korangar_interface::element::{ButtonBuilder, Container, ElementCell, ElementWrap, Headline, PrototypeElement};
 use korangar_interface::{dimension_bound, size_bound};
 
 use crate::input::UserEvent;

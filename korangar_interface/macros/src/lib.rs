@@ -1,12 +1,12 @@
 #![feature(extract_if)]
+#![feature(box_into_inner)]
 
-mod bound;
+mod components;
 mod element;
 mod helper;
 mod utils;
 mod window;
 
-use bound::{DimensionBound, SizeBound};
 use proc_macro::TokenStream as InterfaceTokenStream;
 use syn::{Data, DeriveInput, parse};
 
@@ -14,13 +14,38 @@ use self::element::*;
 use self::window::*;
 
 #[proc_macro]
-pub fn dimension_bound(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    parse::<DimensionBound>(token_stream).unwrap().stream.into()
+pub fn window(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::window(token_stream)
 }
 
 #[proc_macro]
-pub fn size_bound(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
-    parse::<SizeBound>(token_stream).unwrap().stream.into()
+pub fn text(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::text(token_stream)
+}
+
+#[proc_macro]
+pub fn button(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::button(token_stream)
+}
+
+#[proc_macro]
+pub fn state_button(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::state_button(token_stream)
+}
+
+#[proc_macro]
+pub fn collapsable(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::collapsable(token_stream)
+}
+
+#[proc_macro]
+pub fn scroll_view(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::scroll_view(token_stream)
+}
+
+#[proc_macro]
+pub fn text_box(token_stream: InterfaceTokenStream) -> InterfaceTokenStream {
+    components::text_box(token_stream)
 }
 
 #[proc_macro_derive(PrototypeElement, attributes(name, hidden_element))]

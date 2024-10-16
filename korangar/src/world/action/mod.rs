@@ -3,18 +3,20 @@ use std::ops::Mul;
 use cgmath::{Array, Vector2};
 use derive_new::new;
 use korangar_audio::SoundEffectKey;
-use korangar_interface::elements::{ElementCell, PrototypeElement};
+use korangar_interface::application::ClipTrait;
+use korangar_interface::element::{Element, PrototypeElement};
 use korangar_util::container::Cacheable;
 use ragnarok_formats::action::Action;
 #[cfg(feature = "debug")]
 use ragnarok_formats::action::ActionsData;
 use ragnarok_packets::ClientTick;
+use rust_state::{Path, RustState};
 
 use crate::graphics::Color;
-use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
+use crate::state::ClientState;
 
 #[derive(Clone, Debug, new)]
 pub struct SpriteAnimationState {
@@ -41,17 +43,26 @@ pub enum ActionEvent {
     Unknown,
 }
 
-impl PrototypeElement<InterfaceSettings> for ActionEvent {
-    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
-        match self {
-            Self::Sound { .. } => PrototypeElement::to_element(&"Sound", display),
-            Self::Attack => PrototypeElement::to_element(&"Attack", display),
-            Self::Unknown => PrototypeElement::to_element(&"Unknown", display),
+impl PrototypeElement<ClientState> for ActionEvent {
+    fn to_element(self_path: impl Path<ClientState, Self>, name: String) -> impl Element<ClientState> {
+        use korangar_interface::prelude::*;
+
+        button! {
+            text: name,
+            event: |state: &rust_state::Context<ClientState>, _: &mut korangar_interface::event::EventQueue<ClientState>| {
+                println!("Just a dummy for now");
+            },
         }
+        // match self {
+        //     Self::Sound { .. } => PrototypeElement::to_element(&"Sound",
+        // display),     Self::Attack =>
+        // PrototypeElement::to_element(&"Attack", display),
+        //     Self::Unknown => PrototypeElement::to_element(&"Unknown",
+        // display), }
     }
 }
 
-#[derive(Debug, PrototypeElement)]
+#[derive(Debug, RustState, PrototypeElement)]
 pub struct Actions {
     pub actions: Vec<Action>,
     pub delays: Vec<f32>,
@@ -70,7 +81,7 @@ impl Actions {
         position: ScreenPosition,
         camera_direction: usize,
         color: Color,
-        application: &InterfaceSettings,
+        scaling: f32,
     ) {
         let direction = camera_direction % 8;
         let animation_action = animation_state.action_base_offset * 8 + direction;
@@ -98,7 +109,7 @@ impl Actions {
                     Vector2::new(image_size.width, image_size.height)
                 })
                 .map(|component| component as f32);
-            let zoom = sprite_clip.zoom.unwrap_or(1.0) * application.get_scaling_factor();
+            let zoom = sprite_clip.zoom.unwrap_or(1.0) * scaling;
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimensions.zip(zoom2, f32::mul) * zoom;
@@ -114,12 +125,7 @@ impl Actions {
                 top: final_position.y,
             };
 
-            let screen_clip = ScreenClip {
-                left: 0.0,
-                top: 0.0,
-                right: f32::MAX,
-                bottom: f32::MAX,
-            };
+            let screen_clip = ScreenClip::unbound();
 
             renderer.render_sprite(texture.clone(), final_position, final_size, screen_clip, color, false);
         }

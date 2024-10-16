@@ -1,6 +1,6 @@
 use cgmath::Vector2;
 use derive_new::new;
-use korangar_interface::elements::ElementDisplay;
+use korangar_interface::element::ElementDisplay;
 use serde::{Deserialize, Serialize};
 use winit::dpi::PhysicalSize;
 
@@ -267,6 +267,15 @@ pub struct ScreenClip {
     pub right: f32,
     pub top: f32,
     pub bottom: f32,
+}
+
+impl ScreenClip {
+    pub fn combine(&mut self, other: Self) {
+        self.left = self.left.max(other.left);
+        self.right = self.right.min(other.right);
+        self.top = self.top.max(other.top);
+        self.bottom = self.bottom.min(other.bottom);
+    }
 }
 
 impl From<ScreenClip> for [f32; 4] {

@@ -1,7 +1,7 @@
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
 use korangar_interface::application::FontSizeTrait;
-use korangar_interface::elements::{Element, ElementState};
+use korangar_interface::element::{Element, ElementState};
 use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;

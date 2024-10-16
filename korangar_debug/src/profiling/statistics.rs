@@ -60,10 +60,11 @@ pub struct FrameData {
     pub total_time: Duration,
 }
 
-pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>, Duration) {
+pub fn get_frame_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, Duration) {
     let profiler = thread.lock_profiler();
     let saved_frames = profiler.get_saved_frames();
     let frame_count = saved_frames.len();
+
     let mut longest_frame_time = Duration::default();
 
     let frame_data = saved_frames
@@ -73,6 +74,34 @@ pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, 
             let root_measurement = frame_measurement.root_measurement();
             let total_time = root_measurement.total_time_taken();
             longest_frame_time = longest_frame_time.max(total_time);
+
+            let frame_times = root_measurement
+                .indices
+                .iter()
+                .map(|index| {
+                    let measurement = &frame_measurement[*index];
+                    (measurement.name, measurement.total_time_taken())
+                })
+                .collect();
+
+            FrameData { frame_times, total_time }
+        })
+        .collect();
+
+    (frame_data, longest_frame_time)
+}
+
+pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, HashMap<&'static str, MeasurementStatistics>) {
+    let profiler = thread.lock_profiler();
+    let saved_frames = profiler.get_saved_frames();
+    let frame_count = saved_frames.len();
+
+    let frame_data = saved_frames
+        .iter()
+        .take(frame_count)
+        .map(|frame_measurement| {
+            let root_measurement = frame_measurement.root_measurement();
+            let total_time = root_measurement.total_time_taken();
 
             let frame_times = root_measurement
                 .indices
@@ -107,7 +136,7 @@ pub fn get_statistics_data(thread: impl LockThreadProfiler) -> (Vec<FrameData>, 
         })
         .collect();
 
-    (frame_data, statistics_map, longest_frame_time)
+    (frame_data, statistics_map)
 }
 
 pub fn get_number_of_saved_frames(thread: impl LockThreadProfiler) -> usize {

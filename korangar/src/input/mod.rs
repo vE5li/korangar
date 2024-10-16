@@ -6,36 +6,37 @@ use std::mem::variant_count;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use cgmath::Vector2;
-use korangar_interface::Interface;
-use korangar_interface::application::FocusState;
-use korangar_interface::elements::{ElementCell, Focus};
-use korangar_interface::event::ClickAction;
-#[cfg(feature = "debug")]
-use korangar_interface::state::{PlainTrackedState, TrackedState};
 use ragnarok_packets::{ClientTick, HotbarSlot};
 use winit::dpi::PhysicalPosition;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::KeyCode;
 
-pub use self::event::UserEvent;
+pub use self::event::InputEvent;
 pub use self::key::Key;
-pub use self::mode::{Grabbed, MouseInputMode};
-use crate::graphics::PickerTarget;
-#[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
-use crate::interface::application::InterfaceSettings;
-use crate::interface::cursor::{MouseCursor, MouseCursorState};
-use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::resource::PartialMove;
+pub use self::mode::{Grabbed, MouseInputMode, MouseModeExt};
+use crate::graphics::{PickerTarget, ScreenPosition, ScreenSize};
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<KeyCode>();
-const DOUBLE_CLICK_TIME_MS: u32 = 500;
+const DOUBLE_CLICK_TIME_MS: u32 = 250;
 
+#[derive(Debug, Clone, Copy)]
 struct PreviousMouseButton {
     button: MouseButton,
     tick: ClientTick,
+}
+
+// TODO: Rename
+pub struct InputReport {
+    pub mouse_click: Option<korangar_interface::layout::MouseButton>,
+    pub mouse_position: ScreenPosition,
+    pub mouse_delta: ScreenSize,
+    pub mouse_button_released: bool,
+    pub left_mouse_button_down: bool,
+    pub scroll: Option<f32>,
+    pub drag: Option<ScreenSize>,
+    pub characters: Vec<char>,
+    pub mouse_target: PickerTarget,
 }
 
 pub struct InputSystem {
@@ -48,10 +49,9 @@ pub struct InputSystem {
     left_mouse_button: Key,
     right_mouse_button: Key,
     keys: [Key; KEY_COUNT],
-    mouse_input_mode: MouseInputMode,
     input_buffer: Vec<char>,
     picker_value: Arc<AtomicU64>,
-    previous_mouse_button: PreviousMouseButton,
+    previous_mouse_button: Option<PreviousMouseButton>,
 }
 
 impl InputSystem {
@@ -68,12 +68,8 @@ impl InputSystem {
         let right_mouse_button = Key::default();
         let keys = [Key::default(); KEY_COUNT];
 
-        let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
-        let previous_mouse_button = PreviousMouseButton {
-            button: MouseButton::Left,
-            tick: ClientTick::new(0),
-        };
+        let previous_mouse_button = None;
 
         Self {
             previous_mouse_position,
@@ -85,7 +81,6 @@ impl InputSystem {
             left_mouse_button,
             right_mouse_button,
             keys,
-            mouse_input_mode,
             input_buffer,
             picker_value,
             previous_mouse_button,
@@ -96,7 +91,6 @@ impl InputSystem {
         self.left_mouse_button.reset();
         self.right_mouse_button.reset();
         self.keys.iter_mut().for_each(|key| key.reset());
-        self.mouse_input_mode = MouseInputMode::None;
     }
 
     pub fn update_mouse_position(&mut self, position: PhysicalPosition<f64>) {
@@ -132,7 +126,8 @@ impl InputSystem {
         self.input_buffer.push(character);
     }
 
-    pub fn update_delta(&mut self) {
+    #[cfg_attr(feature = "debug", korangar_debug::profile("update input system"))]
+    pub fn update_delta(&mut self, client_tick: ClientTick) -> InputReport {
         self.mouse_delta = self.new_mouse_position - self.previous_mouse_position;
         self.previous_mouse_position = self.new_mouse_position;
 
@@ -142,545 +137,211 @@ impl InputSystem {
         self.left_mouse_button.update();
         self.right_mouse_button.update();
         self.keys.iter_mut().for_each(|key| key.update());
+
+        let mouse_button_released = self.left_mouse_button.released() || self.right_mouse_button.released();
+
+        let last_pixel_value = self.picker_value.load(Ordering::Acquire);
+        let mouse_target = PickerTarget::from(last_pixel_value);
+
+        let mut mouse_click = None;
+
+        if self.left_mouse_button.pressed() {
+            if let Some(previous_mouse_button) = self.previous_mouse_button
+                && previous_mouse_button.button == MouseButton::Left
+                && client_tick.0.wrapping_sub(previous_mouse_button.tick.0) <= DOUBLE_CLICK_TIME_MS
+            {
+                self.previous_mouse_button = None;
+
+                mouse_click = Some(korangar_interface::layout::MouseButton::DoubleLeft);
+            } else {
+                self.previous_mouse_button = Some(PreviousMouseButton {
+                    button: MouseButton::Left,
+                    tick: client_tick,
+                });
+
+                mouse_click = Some(korangar_interface::layout::MouseButton::Left);
+            }
+        } else if self.right_mouse_button.pressed() {
+            if let Some(previous_mouse_button) = self.previous_mouse_button
+                && previous_mouse_button.button == MouseButton::Right
+                && client_tick.0.wrapping_sub(previous_mouse_button.tick.0) <= DOUBLE_CLICK_TIME_MS
+            {
+                self.previous_mouse_button = None;
+
+                mouse_click = Some(korangar_interface::layout::MouseButton::DoubleRight);
+            } else {
+                self.previous_mouse_button = Some(PreviousMouseButton {
+                    button: MouseButton::Right,
+                    tick: client_tick,
+                });
+
+                mouse_click = Some(korangar_interface::layout::MouseButton::Right);
+            }
+        }
+
+        InputReport {
+            mouse_click,
+            mouse_position: self.new_mouse_position,
+            mouse_delta: self.mouse_delta,
+            mouse_button_released,
+            left_mouse_button_down: self.left_mouse_button.down(),
+            scroll: (self.scroll_delta != 0.0).then_some(self.scroll_delta),
+            drag: self.left_mouse_button.down().then_some(self.mouse_delta),
+            characters: self.input_buffer.drain(..).collect(),
+            mouse_target,
+        }
     }
 
     fn get_key(&self, key_code: KeyCode) -> &Key {
         &self.keys[key_code as usize]
     }
 
-    #[allow(clippy::type_complexity)]
-    #[cfg_attr(feature = "debug", korangar_debug::profile("update user input"))]
-    pub fn user_events(
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn handle_keyboard_input(
         &mut self,
-        interface: &mut Interface<InterfaceSettings>,
-        application: &InterfaceSettings,
-        focus_state: &mut FocusState<InterfaceSettings>,
-        mouse_cursor: &mut MouseCursor,
-        #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
-        client_tick: ClientTick,
-    ) -> (
-        Vec<UserEvent>,
-        Option<ElementCell<InterfaceSettings>>,
-        Option<ElementCell<InterfaceSettings>>,
-        Option<PickerTarget>,
-        ScreenPosition,
+        events: &mut Vec<InputEvent>,
+        #[cfg(feature = "debug")] process_mouse: bool,
+        #[cfg(feature = "debug")] use_debug_camera: bool,
     ) {
-        let mut events = Vec::new();
-        let mut mouse_target = None;
-        let (hovered_element, mut window_index) = interface.hovered_element(self.new_mouse_position, &self.mouse_input_mode);
+        let alt_down = self.get_key(KeyCode::AltLeft).down();
+        let control_down = self.get_key(KeyCode::ControlLeft).down();
 
-        let shift_down = self.get_key(KeyCode::ShiftLeft).down();
+        if self.get_key(KeyCode::Escape).pressed() {
+            events.push(InputEvent::ToggleMenuWindow);
+        }
+
+        if alt_down && self.get_key(KeyCode::KeyE).pressed() {
+            events.push(InputEvent::ToggleInventoryWindow);
+        }
+
+        if alt_down && self.get_key(KeyCode::KeyS).pressed() {
+            events.push(InputEvent::ToggleSkillTreeWindow);
+        }
+
+        if alt_down && self.get_key(KeyCode::KeyZ).pressed() {
+            events.push(InputEvent::ToggleFriendListWindow);
+        }
+
+        if alt_down && self.get_key(KeyCode::KeyQ).pressed() {
+            events.push(InputEvent::ToggleEquipmentWindow);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyI).pressed() {
+            events.push(InputEvent::ToggleInterfaceSettingsWindow);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyG).pressed() {
+            events.push(InputEvent::ToggleGraphicsSettingsWindow);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyA).pressed() {
+            events.push(InputEvent::ToggleAudioSettingsWindow);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyH).pressed() {
+            events.push(InputEvent::ToggleShowInterface);
+        }
+
+        if control_down && self.get_key(KeyCode::KeyQ).pressed() {
+            events.push(InputEvent::CloseTopWindow);
+        }
+
+        if self.get_key(KeyCode::KeyJ).pressed() {
+            events.push(InputEvent::CastSkill { slot: HotbarSlot(0) });
+        }
+
+        if self.get_key(KeyCode::KeyJ).released() {
+            events.push(InputEvent::StopSkill { slot: HotbarSlot(0) });
+        }
+
+        if self.get_key(KeyCode::KeyL).pressed() {
+            events.push(InputEvent::CastSkill { slot: HotbarSlot(1) });
+        }
+
+        if self.get_key(KeyCode::KeyL).released() {
+            events.push(InputEvent::StopSkill { slot: HotbarSlot(1) });
+        }
+
+        if self.get_key(KeyCode::KeyU).pressed() {
+            events.push(InputEvent::CastSkill { slot: HotbarSlot(2) });
+        }
+
+        if self.get_key(KeyCode::KeyU).released() {
+            events.push(InputEvent::StopSkill { slot: HotbarSlot(2) });
+        }
 
         #[cfg(feature = "debug")]
-        let lock_actions = render_settings.get().use_debug_camera;
-        #[cfg(not(feature = "debug"))]
-        let lock_actions = false;
-
-        if self.left_mouse_button.pressed() || self.right_mouse_button.pressed() {
-            focus_state.remove_focus();
+        if control_down && self.get_key(KeyCode::KeyM).pressed() {
+            events.push(InputEvent::ToggleMapsWindow);
         }
 
-        if shift_down {
-            if let Some(window_index) = &mut window_index {
-                focus_state.set_focused_window(*window_index);
-
-                if self.left_mouse_button.pressed() {
-                    *window_index = interface.move_window_to_top(*window_index);
-                    self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index);
-                }
-
-                if self.right_mouse_button.pressed() {
-                    *window_index = interface.move_window_to_top(*window_index);
-                    self.mouse_input_mode = MouseInputMode::ResizeInterface(*window_index);
-                }
-            }
+        #[cfg(feature = "debug")]
+        if control_down && self.get_key(KeyCode::KeyC).pressed() {
+            events.push(InputEvent::ToggleClientStateInspectorWindow);
         }
 
-        if let Some(index) = window_index
-            && self.left_mouse_button.pressed()
-        {
-            focus_state.set_focused_window(index)
+        #[cfg(feature = "debug")]
+        if control_down && self.get_key(KeyCode::KeyR).pressed() {
+            events.push(InputEvent::ToggleRenderOptionsWindow);
         }
 
-        let condition = (self.left_mouse_button.pressed() || self.right_mouse_button.pressed()) && !shift_down;
-        if let Some(window_index) = &mut window_index
-            && self.mouse_input_mode.is_none()
-            && condition
-        {
-            *window_index = interface.move_window_to_top(*window_index);
-            focus_state.set_focused_window(*window_index);
-            self.mouse_input_mode = MouseInputMode::ClickInterface;
-
-            if let Some(hovered_element) = &hovered_element {
-                let actions = match self.left_mouse_button.pressed() {
-                    true => interface.left_click_element(hovered_element, *window_index),
-                    false => interface.right_click_element(hovered_element, *window_index),
-                };
-
-                for action in actions {
-                    match action {
-                        ClickAction::ChangeEvent(..) => {}
-
-                        ClickAction::FocusElement => {
-                            let element_cell = hovered_element.clone();
-                            let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::downwards()); // TODO: check
-                            focus_state.set_focused_element(new_focused_element, *window_index);
-                        }
-
-                        ClickAction::FocusNext(focus_mode) => {
-                            let element_cell = hovered_element.clone();
-                            let new_focused_element = hovered_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
-                            focus_state.update_focused_element(new_focused_element, *window_index);
-                        }
-
-                        ClickAction::Custom(event) => events.push(event),
-
-                        ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*window_index),
-
-                        ClickAction::DragElement => {
-                            self.mouse_input_mode = MouseInputMode::DragElement((hovered_element.clone(), *window_index))
-                        }
-
-                        ClickAction::Move(drop_resource) => {
-                            let input_mode = match drop_resource {
-                                PartialMove::Item { source, item } => MouseInputMode::MoveItem(source, item),
-                                PartialMove::Skill { source, skill } => MouseInputMode::MoveSkill(source, skill),
-                            };
-                            self.mouse_input_mode = input_mode;
-                            // Needs to re-render because some elements will
-                            // render differently
-                            // based on the mouse input mode.
-                            interface.schedule_render();
-                        }
-
-                        ClickAction::OpenWindow(prototype_window) => {
-                            interface.open_window(application, focus_state, prototype_window.as_ref())
-                        }
-                        ClickAction::CloseWindow => interface.close_window(focus_state, *window_index),
-
-                        ClickAction::OpenPopup {
-                            element,
-                            position_tracker,
-                            size_tracker,
-                        } => interface.open_popup(element, position_tracker, size_tracker, *window_index),
-
-                        ClickAction::ClosePopup => interface.close_popup(*window_index),
-                    }
-                }
-            }
+        #[cfg(feature = "debug")]
+        if control_down && self.get_key(KeyCode::KeyT).pressed() {
+            events.push(InputEvent::ToggleTimeWindow);
         }
 
-        if self.left_mouse_button.released() {
-            match self.mouse_input_mode {
-                MouseInputMode::MoveInterface(identifier) => {
-                    // We want to re-render to get rid of the anchor overlays.
-                    interface.schedule_render();
-
-                    match self.right_mouse_button.down() && !self.right_mouse_button.released() {
-                        true => self.mouse_input_mode = MouseInputMode::ResizeInterface(identifier),
-                        false => self.mouse_input_mode = MouseInputMode::None,
-                    }
-                }
-                _ => {
-                    let mouse_input_mode = std::mem::take(&mut self.mouse_input_mode);
-                    // Needs to re-render because some elements will render differently
-                    // based on the mouse input mode.
-                    interface.schedule_render();
-
-                    match mouse_input_mode {
-                        MouseInputMode::MoveItem(source, item) => {
-                            if let Some(hovered_element) = &hovered_element {
-                                if let Some(resource_move) = hovered_element.borrow_mut().drop_resource(PartialMove::Item { source, item })
-                                {
-                                    events.push(UserEvent::MoveResource(resource_move));
-                                }
-                            }
-                        }
-                        MouseInputMode::MoveSkill(source, skill) => {
-                            if let Some(hovered_element) = &hovered_element {
-                                if let Some(resource_move) =
-                                    hovered_element.borrow_mut().drop_resource(PartialMove::Skill { source, skill })
-                                {
-                                    events.push(UserEvent::MoveResource(resource_move));
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
+        #[cfg(feature = "debug")]
+        if control_down && self.get_key(KeyCode::KeyP).pressed() {
+            events.push(InputEvent::ToggleProfilerWindow);
         }
 
-        if self.right_mouse_button.released() {
-            match self.mouse_input_mode {
-                MouseInputMode::ResizeInterface(identifier) => match self.left_mouse_button.down() && !self.left_mouse_button.released() {
-                    true => self.mouse_input_mode = MouseInputMode::MoveInterface(identifier),
-                    false => self.mouse_input_mode = MouseInputMode::None,
-                },
-                _ => {
-                    self.mouse_input_mode = MouseInputMode::None;
-                }
-            }
+        #[cfg(feature = "debug")]
+        if control_down && self.get_key(KeyCode::KeyN).pressed() {
+            events.push(InputEvent::TogglePacketInspectorWindow);
         }
 
-        if self.right_mouse_button.down()
-            && !self.right_mouse_button.pressed()
-            && self.mouse_input_mode.is_none()
-            && self.mouse_delta.width != 0.0
-            && !lock_actions
-        {
-            self.mouse_input_mode = MouseInputMode::RotateCamera;
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::ShiftLeft).pressed() && use_debug_camera {
+            events.push(InputEvent::CameraAccelerate);
         }
 
-        if self.right_mouse_button.pressed()
-            && self.previous_mouse_button.button == MouseButton::Right
-            && client_tick.0.wrapping_sub(self.previous_mouse_button.tick.0) < DOUBLE_CLICK_TIME_MS
-        {
-            events.push(UserEvent::CameraResetRotation);
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::ShiftLeft).released() && use_debug_camera {
+            events.push(InputEvent::CameraDecelerate);
         }
 
-        if self.right_mouse_button.pressed() && !matches!(self.mouse_input_mode, MouseInputMode::RotateCamera) {
-            self.previous_mouse_button = PreviousMouseButton {
-                button: MouseButton::Right,
-                tick: client_tick,
-            };
+        // TODO: This should be moved.
+        #[cfg(feature = "debug")]
+        if self.right_mouse_button.down() && !self.right_mouse_button.pressed() && process_mouse && use_debug_camera {
+            let offset = -cgmath::Vector2::new(self.mouse_delta.width, self.mouse_delta.height);
+            events.push(InputEvent::CameraLookAround { offset });
         }
 
-        if self.left_mouse_button.pressed() {
-            self.previous_mouse_button = PreviousMouseButton {
-                button: MouseButton::Left,
-                tick: client_tick,
-            };
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::KeyW).down() && use_debug_camera {
+            events.push(InputEvent::CameraMoveForward);
         }
 
-        match &self.mouse_input_mode {
-            MouseInputMode::DragElement((element, window_index)) => {
-                if self.mouse_delta != ScreenSize::default() {
-                    interface.drag_element(element, *window_index, ScreenPosition::from_size(self.mouse_delta));
-                }
-                mouse_cursor.set_state(MouseCursorState::Grab, client_tick);
-            }
-            MouseInputMode::MoveInterface(identifier) => {
-                if self.mouse_delta != ScreenSize::default() {
-                    interface.move_window(*identifier, ScreenPosition::from_size(self.mouse_delta));
-                }
-                mouse_cursor.set_state(MouseCursorState::Grab, client_tick);
-            }
-            MouseInputMode::ResizeInterface(identifier) => {
-                if self.mouse_delta != ScreenSize::default() {
-                    interface.resize_window(application, *identifier, self.mouse_delta);
-                }
-            }
-            MouseInputMode::RotateCamera => {
-                events.push(UserEvent::CameraRotate(self.mouse_delta.width));
-                mouse_cursor.set_state(MouseCursorState::RotateCamera, client_tick);
-            }
-            MouseInputMode::ClickInterface => mouse_cursor.set_state(MouseCursorState::Click, client_tick),
-            MouseInputMode::None => {}
-            MouseInputMode::MoveItem(..) | MouseInputMode::MoveSkill(..) | MouseInputMode::Walk(..) => {}
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::KeyS).down() && use_debug_camera {
+            events.push(InputEvent::CameraMoveBackward);
         }
 
-        if self.scroll_delta != 0.0 {
-            if let Some(window_index) = window_index {
-                if let Some(element) = &hovered_element {
-                    interface.scroll_element(element, window_index, self.scroll_delta);
-                }
-            } else if !lock_actions {
-                events.push(UserEvent::CameraZoom(self.scroll_delta));
-            }
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::KeyA).down() && use_debug_camera {
+            events.push(InputEvent::CameraMoveLeft);
         }
 
-        let characters = self.input_buffer.drain(..).collect::<Vec<_>>();
-        let mut process_keys = true;
-
-        if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
-            // this will currently not affect the following statements, which is a bit
-            // strange
-            if self.get_key(KeyCode::Escape).pressed() {
-                focus_state.remove_focus();
-                process_keys = false;
-            }
-
-            if self.get_key(KeyCode::Tab).pressed() {
-                let new_focused_element = focused_element
-                    .borrow()
-                    .focus_next(focused_element.clone(), None, Focus::new(shift_down.into()));
-
-                focus_state.update_focused_element(new_focused_element, *focused_window);
-                process_keys = false;
-            }
-
-            if self.get_key(KeyCode::Enter).pressed() {
-                let actions = interface.left_click_element(focused_element, *focused_window);
-
-                for action in actions {
-                    // TODO: remove and replace with proper event
-                    match action {
-                        ClickAction::Custom(event) => events.push(event),
-                        ClickAction::OpenWindow(prototype_window) => {
-                            interface.open_window(application, focus_state, prototype_window.as_ref())
-                        }
-                        ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
-                        _ => {}
-                    }
-                }
-
-                process_keys = false;
-            }
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::KeyD).down() && use_debug_camera {
+            events.push(InputEvent::CameraMoveRight);
         }
 
-        if self.get_key(KeyCode::ControlLeft).down() && self.get_key(KeyCode::KeyQ).pressed() && focus_state.focused_window().is_some() {
-            let window_index = focus_state.get_focused_window().unwrap();
-
-            if interface.get_window(window_index).is_closable() {
-                interface.close_window(focus_state, window_index);
-            }
-
-            process_keys = false;
+        #[cfg(feature = "debug")]
+        if self.get_key(KeyCode::Space).down() && use_debug_camera {
+            events.push(InputEvent::CameraMoveUp);
         }
 
-        if let Some((focused_element, focused_window)) = &focus_state.get_focused_element() {
-            for character in characters {
-                match character {
-                    // ignore since we need to handle tab knowing the state of shift
-                    '\t' => {}
-                    '\x1b' => {}
-                    valid => {
-                        let (key_handled, actions) = interface.input_character_element(focused_element, *focused_window, valid);
-
-                        if key_handled {
-                            process_keys = false;
-                        }
-
-                        for action in actions {
-                            match action {
-                                // is handled in the interface
-                                ClickAction::ChangeEvent(..) => {}
-                                ClickAction::FocusElement => {
-                                    let element_cell = focused_element.clone();
-                                    let new_focused_element = focused_element.borrow().focus_next(element_cell, None, Focus::downwards());
-
-                                    focus_state.set_focused_element(new_focused_element, *focused_window);
-                                }
-                                ClickAction::FocusNext(focus_mode) => {
-                                    let element_cell = focused_element.clone();
-                                    let new_focused_element =
-                                        focused_element.borrow().focus_next(element_cell, None, Focus::new(focus_mode));
-
-                                    focus_state.update_focused_element(new_focused_element, *focused_window);
-                                }
-                                ClickAction::Custom(event) => events.push(event),
-                                ClickAction::MoveInterface => self.mouse_input_mode = MouseInputMode::MoveInterface(*focused_window),
-                                ClickAction::DragElement => {
-                                    self.mouse_input_mode = MouseInputMode::DragElement((focused_element.clone(), *focused_window))
-                                }
-                                // TODO: should just move immediately ?
-                                ClickAction::Move(..) => {}
-                                ClickAction::OpenWindow(prototype_window) => {
-                                    interface.open_window(application, focus_state, prototype_window.as_ref())
-                                }
-                                ClickAction::CloseWindow => interface.close_window(focus_state, *focused_window),
-                                ClickAction::OpenPopup {
-                                    element,
-                                    position_tracker,
-                                    size_tracker,
-                                } => interface.open_popup(element, position_tracker, size_tracker, *focused_window),
-                                ClickAction::ClosePopup => interface.close_popup(*focused_window),
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        if process_keys {
-            let alt_down = self.get_key(KeyCode::AltLeft).down();
-            let control_down = self.get_key(KeyCode::ControlLeft).down();
-
-            if self.get_key(KeyCode::Tab).pressed() {
-                interface.first_focused_element(focus_state);
-            }
-
-            if self.get_key(KeyCode::Escape).pressed() {
-                events.push(UserEvent::OpenMenuWindow);
-            }
-
-            if alt_down && self.get_key(KeyCode::KeyE).pressed() {
-                events.push(UserEvent::OpenInventoryWindow);
-            }
-
-            if control_down && self.get_key(KeyCode::KeyH).pressed() {
-                events.push(UserEvent::ToggleShowInterface);
-            }
-
-            if self.get_key(KeyCode::KeyJ).pressed() {
-                events.push(UserEvent::CastSkill(HotbarSlot(0)));
-            }
-
-            if self.get_key(KeyCode::KeyJ).released() {
-                events.push(UserEvent::StopSkill(HotbarSlot(0)));
-            }
-
-            if self.get_key(KeyCode::KeyL).pressed() {
-                events.push(UserEvent::CastSkill(HotbarSlot(1)));
-            }
-
-            if self.get_key(KeyCode::KeyL).released() {
-                events.push(UserEvent::StopSkill(HotbarSlot(1)));
-            }
-
-            if self.get_key(KeyCode::KeyU).pressed() {
-                events.push(UserEvent::CastSkill(HotbarSlot(2)));
-            }
-
-            if self.get_key(KeyCode::KeyU).released() {
-                events.push(UserEvent::StopSkill(HotbarSlot(2)));
-            }
-
-            if self.get_key(KeyCode::Enter).pressed() {
-                events.push(UserEvent::FocusChatWindow);
-            }
-
-            #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyM).pressed() {
-                events.push(UserEvent::OpenMapsWindow);
-            }
-
-            #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyR).pressed() {
-                events.push(UserEvent::OpenRenderSettingsWindow);
-            }
-
-            #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyT).pressed() {
-                events.push(UserEvent::OpenTimeWindow);
-            }
-
-            #[cfg(feature = "debug")]
-            if control_down && self.get_key(KeyCode::KeyP).pressed() {
-                events.push(UserEvent::OpenPacketWindow);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::ShiftLeft).pressed() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraAccelerate);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::ShiftLeft).released() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraDecelerate);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.right_mouse_button.down()
-                && !self.right_mouse_button.pressed()
-                && self.mouse_input_mode.is_none()
-                && render_settings.get().use_debug_camera
-            {
-                events.push(UserEvent::CameraLookAround(-Vector2::new(
-                    self.mouse_delta.width,
-                    self.mouse_delta.height,
-                )));
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyW).down() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraMoveForward);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyS).down() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraMoveBackward);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyA).down() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraMoveLeft);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::KeyD).down() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraMoveRight);
-            }
-
-            #[cfg(feature = "debug")]
-            if self.get_key(KeyCode::Space).down() && render_settings.get().use_debug_camera {
-                events.push(UserEvent::CameraMoveUp);
-            }
-        }
-
-        if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
-            let last_pixel_value = self.picker_value.load(Ordering::Acquire);
-            let picker_target = PickerTarget::from(last_pixel_value);
-
-            if picker_target != PickerTarget::Nothing {
-                if self.left_mouse_button.pressed() {
-                    match picker_target {
-                        PickerTarget::Entity(entity_id) => events.push(UserEvent::RequestPlayerInteract(entity_id)),
-                        PickerTarget::Tile { x, y } => {
-                            let position = Vector2::new(x as usize, y as usize);
-                            self.mouse_input_mode = MouseInputMode::Walk(position);
-
-                            events.push(UserEvent::RequestPlayerMove(position));
-                        }
-                        #[cfg(feature = "debug")]
-                        PickerTarget::Marker(marker_identifier) => events.push(UserEvent::OpenMarkerDetails(marker_identifier)),
-                        PickerTarget::Nothing => {
-                            unreachable!()
-                        }
-                    }
-                } else if self.left_mouse_button.down()
-                    && let MouseInputMode::Walk(requested_position) = &mut self.mouse_input_mode
-                    && let PickerTarget::Tile { x, y } = picker_target
-                {
-                    let new_position = Vector2::new(x as usize, y as usize);
-
-                    if new_position != *requested_position {
-                        *requested_position = new_position;
-
-                        events.push(UserEvent::RequestPlayerMove(new_position));
-                    }
-                }
-
-                if !self.mouse_input_mode.is_walk() {
-                    mouse_target = Some(picker_target);
-                }
-            }
-        }
-
-        // TODO: this will fail if the user hovers over an entity that changes the
-        // cursor and then immediately over a different one that doesn't,
-        // because main wont set the default cursor
-        if self.mouse_input_mode.is_none() && !matches!(mouse_target, Some(PickerTarget::Entity(..))) {
-            mouse_cursor.set_state(MouseCursorState::Default, client_tick);
-        }
-
-        if focus_state.did_hovered_element_change(&hovered_element) {
-            if let Some(window_index) = focus_state.previous_hovered_window() {
-                interface.schedule_render_window(window_index);
-            }
-
-            if let Some(window_index) = window_index {
-                interface.schedule_render_window(window_index);
-            }
-        }
-
-        if focus_state.did_focused_element_change() {
-            if let Some(window_index) = focus_state.previous_focused_window() {
-                interface.schedule_render_window(window_index);
-            }
-
-            if let Some(window_index) = focus_state.focused_window() {
-                interface.schedule_render_window(window_index);
-            }
-        }
-
-        let focused_element = focus_state.update(&hovered_element, window_index);
-
-        (events, hovered_element, focused_element, mouse_target, self.new_mouse_position)
-    }
-
-    pub fn get_mouse_mode(&self) -> &MouseInputMode {
-        &self.mouse_input_mode
+        self.input_buffer.clear();
     }
 }

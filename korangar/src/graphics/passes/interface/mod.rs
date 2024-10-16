@@ -19,7 +19,7 @@ pub(crate) struct InterfaceRenderPassContext {
 impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }>
     for InterfaceRenderPassContext
 {
-    type PassData<'data> = bool;
+    type PassData<'data> = ();
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
         let interface_texture_format = global_context.interface_buffer_texture.get_format();
@@ -31,7 +31,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
         &mut self,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
-        clear_interface: bool,
+        _: (),
     ) -> RenderPass<'encoder> {
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
@@ -39,11 +39,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
                 view: global_context.interface_buffer_texture.get_texture_view(),
                 resolve_target: None,
                 ops: Operations {
-                    load: if clear_interface {
-                        LoadOp::Clear(Color::TRANSPARENT)
-                    } else {
-                        LoadOp::Load
-                    },
+                    load: LoadOp::Clear(Color::TRANSPARENT),
                     store: StoreOp::Store,
                 },
             })],

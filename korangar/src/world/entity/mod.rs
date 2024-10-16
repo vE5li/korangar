@@ -5,31 +5,30 @@ use arrayvec::ArrayVec;
 use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace, Zero};
 use derive_new::new;
 use korangar_audio::{AudioEngine, SoundEffectKey};
-use korangar_interface::elements::PrototypeElement;
-use korangar_interface::windows::{PrototypeWindow, Window};
+use korangar_interface::element::StateElement;
+use korangar_interface::window::{StateWindow, Window};
 use korangar_networking::EntityData;
 use korangar_util::pathing::{MAX_WALK_PATH_SIZE, PathFinder};
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
+use rust_state::{Path, RustState, VecItem};
 #[cfg(feature = "debug")]
 use smallvec::smallvec_inline;
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
-use crate::graphics::EntityInstruction;
 #[cfg(feature = "debug")]
 use crate::graphics::reduce_vertices;
 #[cfg(feature = "debug")]
 use crate::graphics::{BindlessSupport, DebugRectangleInstruction};
-use crate::interface::application::InterfaceSettings;
-use crate::interface::layout::{ScreenPosition, ScreenSize};
-use crate::interface::theme::GameTheme;
-use crate::interface::windows::WindowCache;
+use crate::graphics::{EntityInstruction, ScreenPosition, ScreenSize};
 use crate::loaders::GameFileLoader;
 #[cfg(feature = "debug")]
 use crate::loaders::{GAT_TILE_SIZE, split_mesh_by_texture};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
+use crate::state::ClientState;
+use crate::state::theme::{GameTheme, InterfaceThemeType};
 use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Library, Map};
 #[cfg(feature = "debug")]
 use crate::world::{MarkerIdentifier, SubMesh};
@@ -41,6 +40,7 @@ const FEMALE_HAIR_LOOKUP: &[usize] = &[2, 2, 4, 7, 1, 5, 3, 6, 12, 10, 9, 11, 8]
 const SOUND_COOLDOWN_DURATION: u32 = 200;
 const SPATIAL_SOUND_RANGE: f32 = 250.0;
 
+#[derive(Clone)]
 pub enum ResourceState<T> {
     Available(T),
     Unavailable,
@@ -56,7 +56,7 @@ impl<T> ResourceState<T> {
     }
 }
 
-#[derive(new, PrototypeElement)]
+#[derive(Clone, RustState, StateElement, new)]
 pub struct Movement {
     #[hidden_element]
     steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
@@ -68,6 +68,7 @@ pub struct Movement {
 }
 
 #[cfg(feature = "debug")]
+#[derive(Clone)]
 pub struct Pathing {
     pub vertex_buffer: Arc<Buffer<ModelVertex>>,
     pub index_buffer: Arc<Buffer<u32>>,
@@ -132,7 +133,7 @@ impl SoundState {
     }
 }
 
-#[derive(PrototypeElement)]
+#[derive(Clone, RustState, StateElement)]
 pub struct Common {
     pub entity_id: EntityId,
     pub job_id: usize,
@@ -802,7 +803,7 @@ impl Common {
     }
 }
 
-#[derive(PrototypeWindow)]
+#[derive(Clone, RustState, StateWindow)]
 pub struct Player {
     common: Common,
     pub hair_id: usize,
@@ -810,6 +811,8 @@ pub struct Player {
     pub activity_points: usize,
     pub maximum_spell_points: usize,
     pub maximum_activity_points: usize,
+    pub base_level: usize,
+    pub job_level: usize,
 }
 
 impl Player {
@@ -822,6 +825,8 @@ impl Player {
         let activity_points = 0;
         let maximum_spell_points = character_information.maximum_spell_points as usize;
         let maximum_activity_points = 0;
+        let base_level = character_information.base_level as usize;
+        let job_level = character_information.job_level as usize;
 
         let entity_data = EntityData::from_character(account_id, character_information, WorldPosition::origin());
         let grid_position = Vector2::zero();
@@ -836,6 +841,8 @@ impl Player {
             activity_points,
             maximum_spell_points,
             maximum_activity_points,
+            base_level,
+            job_level,
         }
     }
 
@@ -856,6 +863,8 @@ impl Player {
             StatusType::ActivityPoints(value) => self.activity_points = value as usize,
             StatusType::MaximumActivityPoints(value) => self.maximum_activity_points = value as usize,
             StatusType::MovementSpeed(value) => self.common.movement_speed = value as usize,
+            StatusType::BaseLevel(value) => self.base_level = value as usize,
+            StatusType::JobLevel(value) => self.job_level = value as usize,
             _ => {}
         }
     }
@@ -868,57 +877,55 @@ impl Player {
             top: screen_position.y * window_size.height + 5.0,
         };
 
-        let bar_width = theme.status_bar.player_bar_width.get();
-        let gap = theme.status_bar.gap.get();
-        let total_height = theme.status_bar.health_height.get()
-            + theme.status_bar.spell_point_height.get()
-            + theme.status_bar.activity_point_height.get()
-            + gap * 2.0;
+        let bar_width = theme.status_bar.player_bar_width;
+        let gap = theme.status_bar.gap;
+        let total_height =
+            theme.status_bar.health_height + theme.status_bar.spell_point_height + theme.status_bar.activity_point_height + gap * 2.0;
 
         let mut offset = 0.0;
 
-        let background_position = final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0);
+        let background_position = final_position - theme.status_bar.border_size - ScreenSize::only_width(bar_width / 2.0);
 
         let background_size = ScreenSize {
             width: bar_width,
             height: total_height,
-        } + theme.status_bar.border_size.get() * 2.0;
+        } + theme.status_bar.border_size * 2.0;
 
-        renderer.render_rectangle(background_position, background_size, theme.status_bar.background_color.get());
+        renderer.render_rectangle(background_position, background_size, theme.status_bar.background_color);
 
         renderer.render_bar(
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.health_height.get(),
+                height: theme.status_bar.health_height,
             },
-            theme.status_bar.player_health_color.get(),
+            theme.status_bar.player_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
 
-        offset += gap + theme.status_bar.health_height.get();
+        offset += gap + theme.status_bar.health_height;
 
         renderer.render_bar(
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.spell_point_height.get(),
+                height: theme.status_bar.spell_point_height,
             },
-            theme.status_bar.spell_point_color.get(),
+            theme.status_bar.spell_point_color,
             self.maximum_spell_points as f32,
             self.spell_points as f32,
         );
 
-        offset += gap + theme.status_bar.spell_point_height.get();
+        offset += gap + theme.status_bar.spell_point_height;
 
         renderer.render_bar(
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.activity_point_height.get(),
+                height: theme.status_bar.activity_point_height,
             },
-            theme.status_bar.activity_point_color.get(),
+            theme.status_bar.activity_point_color,
             self.maximum_activity_points as f32,
             self.activity_points as f32,
         );
@@ -930,7 +937,7 @@ impl Player {
     }
 }
 
-#[derive(PrototypeWindow)]
+#[derive(Clone, RustState, StateWindow)]
 pub struct Npc {
     common: Common,
 }
@@ -972,32 +979,31 @@ impl Npc {
             top: screen_position.y * window_size.height + 5.0,
         };
 
-        let bar_width = theme.status_bar.enemy_bar_width.get();
+        let bar_width = theme.status_bar.enemy_bar_width;
 
         renderer.render_rectangle(
-            final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0),
+            final_position - theme.status_bar.border_size - ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.enemy_health_height.get(),
-            } + (theme.status_bar.border_size.get() * 2.0),
-            theme.status_bar.background_color.get(),
+                height: theme.status_bar.enemy_health_height,
+            } + (theme.status_bar.border_size * 2.0),
+            theme.status_bar.background_color,
         );
 
         renderer.render_bar(
             final_position,
             ScreenSize {
                 width: bar_width,
-                height: theme.status_bar.enemy_health_height.get(),
+                height: theme.status_bar.enemy_health_height,
             },
-            theme.status_bar.enemy_health_color.get(),
+            theme.status_bar.enemy_health_color,
             self.common.maximum_health_points as f32,
             self.common.health_points as f32,
         );
     }
 }
 
-// TODO:
-//#[derive(PrototypeWindow)]
+#[derive(Clone, StateElement)]
 pub enum Entity {
     Player(Player),
     Npc(Npc),
@@ -1150,16 +1156,39 @@ impl Entity {
     }
 }
 
-impl PrototypeWindow<InterfaceSettings> for Entity {
-    fn to_window(
-        &self,
-        window_cache: &WindowCache,
-        application: &InterfaceSettings,
-        available_space: ScreenSize,
-    ) -> Window<InterfaceSettings> {
-        match self {
-            Entity::Player(player) => player.to_window(window_cache, application, available_space),
-            Entity::Npc(npc) => npc.to_window(window_cache, application, available_space),
+impl VecItem for Entity {
+    type Id = EntityId;
+
+    fn get_id(&self) -> Self::Id {
+        self.get_entity_id()
+    }
+}
+
+// TODO: Derive this
+impl StateWindow<ClientState> for Entity {
+    fn to_window<'a>(_self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        window! {
+            title: "Entity",
+            theme: InterfaceThemeType::Game,
+            closable: true,
+            // TODO: This is gonna be a bit hacky but we want to have this save path possibly be
+            // None and dispaly a message if the entity disappeared.
+            elements: (),
+        }
+    }
+
+    fn to_window_mut<'a>(_self_path: impl Path<ClientState, Self>) -> impl Window<ClientState> + 'a {
+        use korangar_interface::prelude::*;
+
+        window! {
+            title: "Entity",
+            theme: InterfaceThemeType::Game,
+            closable: true,
+            // TODO: This is gonna be a bit hacky but we want to have this save path possibly be
+            // None and dispaly a message if the entity disappeared.
+            elements: (),
         }
     }
 }

@@ -1,4 +1,5 @@
-#![feature(let_chains)]
+#![cfg_attr(feature = "interface", feature(impl_trait_in_assoc_type))]
+#![cfg_attr(feature = "interface", feature(negative_impls))]
 
 mod entity;
 mod event;
@@ -326,7 +327,7 @@ where
 
                     if read_account_id {
                         let account_id = AccountId::from_bytes(&mut byte_reader).unwrap();
-                        events.push(NetworkEvent::AccountId(account_id));
+                        events.push(NetworkEvent::AccountId { account_id });
                         read_account_id = false;
                     }
 
@@ -740,29 +741,75 @@ where
         })?;
         packet_handler.register_noop::<DisplayEmotionPacket>()?;
         packet_handler.register(|packet: EntityMovePacket| {
-            let (origin, destination) = packet.from_to.to_origin_destination();
-            NetworkEvent::EntityMove(packet.entity_id, origin, destination, packet.timestamp)
+            let EntityMovePacket {
+                entity_id,
+                from_to,
+                starting_timestamp,
+            } = packet;
+
+            let (origin, destination) = from_to.to_origin_destination();
+
+            NetworkEvent::EntityMove {
+                entity_id,
+                origin,
+                destination,
+                starting_timestamp,
+            }
         })?;
         packet_handler.register_noop::<EntityStopMovePacket>()?;
         packet_handler.register(|packet: PlayerMovePacket| {
-            let (origin, destination) = packet.from_to.to_origin_destination();
-            NetworkEvent::PlayerMove(origin, destination, packet.timestamp)
+            let PlayerMovePacket {
+                starting_timestamp,
+                from_to,
+            } = packet;
+
+            let (origin, destination) = from_to.to_origin_destination();
+
+            NetworkEvent::PlayerMove {
+                origin,
+                destination,
+                starting_timestamp,
+            }
         })?;
-        packet_handler.register(|packet: ChangeMapPacket| NetworkEvent::ChangeMap(packet.map_name.replace(".gat", ""), packet.position))?;
+        packet_handler.register(|packet: ChangeMapPacket| {
+            let ChangeMapPacket { map_name, position } = packet;
+
+            let map_name = map_name.replace(".gat", "");
+
+            NetworkEvent::ChangeMap { map_name, position }
+        })?;
         packet_handler.register(|packet: ResurrectionPacket| NetworkEvent::ResurrectPlayer {
             entity_id: packet.entity_id,
         })?;
-        packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
-        packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity(packet.into()))?;
-        packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity(packet.into()))?;
+        packet_handler.register(|packet: EntityAppearedPacket| NetworkEvent::AddEntity {
+            entity_data: packet.into(),
+        })?;
+        packet_handler.register(|packet: EntityAppeared2Packet| NetworkEvent::AddEntity {
+            entity_data: packet.into(),
+        })?;
+        packet_handler.register(|packet: MovingEntityAppearedPacket| NetworkEvent::AddEntity {
+            entity_data: packet.into(),
+        })?;
         packet_handler.register(|packet: EntityDisappearedPacket| NetworkEvent::RemoveEntity {
             entity_id: packet.entity_id,
             reason: packet.reason,
         })?;
-        packet_handler.register(|packet: UpdateStatusPacket| NetworkEvent::UpdateStatus(packet.status_type))?;
-        packet_handler.register(|packet: UpdateStatusPacket1| NetworkEvent::UpdateStatus(packet.status_type))?;
-        packet_handler.register(|packet: UpdateStatusPacket2| NetworkEvent::UpdateStatus(packet.status_type))?;
-        packet_handler.register(|packet: UpdateStatusPacket3| NetworkEvent::UpdateStatus(packet.status_type))?;
+        packet_handler.register(|packet: UpdateStatusPacket| {
+            let UpdateStatusPacket { status_type } = packet;
+            NetworkEvent::UpdateStatus { status_type }
+        })?;
+        packet_handler.register(|packet: UpdateStatusPacket1| {
+            let UpdateStatusPacket1 { status_type } = packet;
+            NetworkEvent::UpdateStatus { status_type }
+        })?;
+        packet_handler.register(|packet: UpdateStatusPacket2| {
+            let UpdateStatusPacket2 { status_type } = packet;
+            NetworkEvent::UpdateStatus { status_type }
+        })?;
+        packet_handler.register(|packet: UpdateStatusPacket3| {
+            let UpdateStatusPacket3 { status_type } = packet;
+            NetworkEvent::UpdateStatus { status_type }
+        })?;
         packet_handler.register_noop::<UpdateAttackRangePacket>()?;
         packet_handler.register_noop::<NewMailStatusPacket>()?;
         packet_handler.register_noop::<AchievementUpdatePacket>()?;
@@ -879,7 +926,10 @@ where
         })?;
         packet_handler.register_noop::<EquippableSwitchItemListPacket>()?;
         packet_handler.register_noop::<MapTypePacket>()?;
-        packet_handler.register(|packet: UpdateSkillTreePacket| NetworkEvent::SkillTree(packet.skill_information))?;
+        packet_handler.register(|packet: UpdateSkillTreePacket| {
+            let UpdateSkillTreePacket { skill_information } = packet;
+            NetworkEvent::SkillTree { skill_information }
+        })?;
         packet_handler.register(|packet: UpdateHotkeysPacket| NetworkEvent::SetHotkeyData {
             tab: packet.tab,
             hotkeys: packet
@@ -907,13 +957,14 @@ where
                 .filter(|text| !text.is_empty())
                 .collect();
 
-            NetworkEvent::AddChoiceButtons(choices)
+            NetworkEvent::AddChoiceButtons { choices }
         })?;
         packet_handler.register_noop::<DisplaySpecialEffectPacket>()?;
         packet_handler.register_noop::<DisplaySkillCooldownPacket>()?;
         packet_handler.register_noop::<DisplaySkillEffectAndDamagePacket>()?;
-        packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| {
-            NetworkEvent::HealEffect(packet.destination_entity_id, packet.heal_amount as usize)
+        packet_handler.register(|packet: DisplaySkillEffectNoDamagePacket| NetworkEvent::HealEffect {
+            entity_id: packet.destination_entity_id,
+            heal_amount: packet.heal_amount as usize,
         })?;
         packet_handler.register_noop::<DisplayPlayerHealEffect>()?;
         packet_handler.register_noop::<StatusChangePacket>()?;
@@ -923,7 +974,9 @@ where
         packet_handler.register_noop::<QuestRemovedPacket>()?;
         packet_handler.register_noop::<QuestListPacket>()?;
         packet_handler.register(|packet: VisualEffectPacket| {
-            let path = match packet.effect {
+            let VisualEffectPacket { entity_id, effect } = packet;
+
+            let effect_path = match effect {
                 VisualEffect::BaseLevelUp => "angel.str",
                 VisualEffect::JobLevelUp => "joblvup.str",
                 VisualEffect::RefineFailure => "bs_refinefailed.str",
@@ -936,15 +989,17 @@ where
                 VisualEffect::BaseLevelUpTaekwon => "help_angel\\help_angel\\help_angel.str",
             };
 
-            NetworkEvent::VisualEffect(path, packet.entity_id)
+            NetworkEvent::VisualEffect { effect_path, entity_id }
         })?;
         packet_handler.register_noop::<DisplayGainedExperiencePacket>()?;
         packet_handler.register_noop::<DisplayImagePacket>()?;
         packet_handler.register_noop::<StateChangePacket>()?;
 
         packet_handler.register(|packet: QuestEffectPacket| match packet.effect {
-            QuestEffect::None => NetworkEvent::RemoveQuestEffect(packet.entity_id),
-            _ => NetworkEvent::AddQuestEffect(packet),
+            QuestEffect::None => NetworkEvent::RemoveQuestEffect {
+                entity_id: packet.entity_id,
+            },
+            _ => NetworkEvent::AddQuestEffect { quest_effect: packet },
         })?;
         packet_handler.register(|packet: ItemPickupPacket| {
             let ItemPickupPacket {
@@ -1023,17 +1078,26 @@ where
             client_tick: packet.client_tick,
             received_at: Instant::now(),
         })?;
-        packet_handler.register(|packet: RequestPlayerDetailsSuccessPacket| {
-            NetworkEvent::UpdateEntityDetails(EntityId(packet.character_id.0), packet.name)
+        packet_handler.register(|packet: RequestPlayerDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails {
+            entity_id: EntityId(packet.character_id.0),
+            name: packet.name,
         })?;
-        packet_handler
-            .register(|packet: RequestEntityDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails(packet.entity_id, packet.name))?;
+        packet_handler.register(|packet: RequestEntityDetailsSuccessPacket| NetworkEvent::UpdateEntityDetails {
+            entity_id: packet.entity_id,
+            name: packet.name,
+        })?;
         packet_handler.register(|packet: UpdateEntityHealthPointsPacket| {
-            NetworkEvent::UpdateEntityHealth(
-                packet.entity_id,
-                packet.health_points as usize,
-                packet.maximum_health_points as usize,
-            )
+            let UpdateEntityHealthPointsPacket {
+                entity_id,
+                health_points,
+                maximum_health_points,
+            } = packet;
+
+            NetworkEvent::UpdateEntityHealth {
+                entity_id,
+                health_points: health_points as usize,
+                maximum_health_points: maximum_health_points as usize,
+            }
         })?;
         packet_handler.register_noop::<RequestPlayerAttackFailedPacket>()?;
         packet_handler.register(|packet: DamagePacket1| match packet.damage_type {
@@ -1056,7 +1120,11 @@ where
             }),
             _ => None,
         })?;
-        packet_handler.register(|packet: NpcDialogPacket| NetworkEvent::OpenDialog(packet.text, packet.npc_id))?;
+        packet_handler.register(|packet: NpcDialogPacket| {
+            let NpcDialogPacket { npc_id, text } = packet;
+
+            NetworkEvent::OpenDialog { text, npc_id }
+        })?;
         packet_handler.register(|packet: RequestEquipItemStatusPacket| match packet.result {
             RequestEquipItemStatus::Success => Some(NetworkEvent::UpdateEquippedPosition {
                 index: packet.inventory_index,
@@ -1093,11 +1161,28 @@ where
         })?;
         packet_handler.register_noop::<UseSkillSuccessPacket>()?;
         packet_handler.register_noop::<ToUseSkillSuccessPacket>()?;
-        packet_handler
-            .register(|packet: NotifySkillUnitPacket| NetworkEvent::AddSkillUnit(packet.entity_id, packet.unit_id, packet.position))?;
-        packet_handler.register(|packet: SkillUnitDisappearPacket| NetworkEvent::RemoveSkillUnit(packet.entity_id))?;
+        packet_handler.register(|packet: NotifySkillUnitPacket| {
+            let NotifySkillUnitPacket {
+                entity_id,
+                position,
+                unit_id,
+                ..
+            } = packet;
+
+            NetworkEvent::AddSkillUnit {
+                entity_id,
+                unit_id,
+                position,
+            }
+        })?;
+        packet_handler.register(|packet: SkillUnitDisappearPacket| {
+            let SkillUnitDisappearPacket { entity_id } = packet;
+            NetworkEvent::RemoveSkillUnit { entity_id }
+        })?;
         packet_handler.register_noop::<NotifyGroundSkillPacket>()?;
-        packet_handler.register(|packet: FriendListPacket| NetworkEvent::SetFriendList { friends: packet.friends })?;
+        packet_handler.register(|packet: FriendListPacket| NetworkEvent::SetFriendList {
+            friend_list: packet.friend_list,
+        })?;
         packet_handler.register_noop::<FriendOnlineStatusPacket>()?;
         packet_handler.register(|packet: FriendRequestPacket| NetworkEvent::FriendRequest {
             requestee: packet.requestee,
@@ -1203,10 +1288,10 @@ where
         self.send_map_server_packet(&RequestActionPacket::new(entity_id, Action::Attack))
     }
 
-    pub fn send_chat_message(&mut self, player_name: &str, message: &str) -> Result<(), NotConnectedError> {
-        let complete_message = format!("{} : {}", player_name, message);
+    pub fn send_chat_message(&mut self, player_name: &str, text: &str) -> Result<(), NotConnectedError> {
+        let message = format!("{} : {}", player_name, text);
 
-        self.send_map_server_packet(&GlobalMessagePacket::new(complete_message))
+        self.send_map_server_packet(&GlobalMessagePacket::new(message))
     }
 
     pub fn start_dialog(&mut self, npc_id: EntityId) -> Result<(), NotConnectedError> {

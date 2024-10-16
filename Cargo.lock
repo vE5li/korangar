@@ -1576,9 +1576,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "interface_procedural"
+name = "interface_component_macros"
 version = "0.1.0"
 dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "interface_components"
+version = "0.1.0"
+dependencies = [
+ "interface_component_macros",
+ "proc-macro2",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "interface_macros"
+version = "0.1.0"
+dependencies = [
+ "heck",
  "proc-macro2",
  "quote",
  "syn 2.0.104",
@@ -1742,6 +1761,7 @@ dependencies = [
  "hashbrown",
  "image",
  "korangar_audio",
+ "korangar_components",
  "korangar_debug",
  "korangar_interface",
  "korangar_networking",
@@ -1759,6 +1779,7 @@ dependencies = [
  "rand_aes",
  "rayon",
  "ron",
+ "rust_state",
  "serde",
  "sevenz-rust2",
  "smallvec",
@@ -1782,6 +1803,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "korangar_components"
+version = "0.1.0"
+dependencies = [
+ "korangar_interface",
+ "proc-macro2",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "korangar_debug"
 version = "0.1.0"
 dependencies = [
@@ -1795,10 +1825,13 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.9.1",
  "cgmath",
- "interface_procedural",
+ "interface_component_macros",
+ "interface_components",
+ "interface_macros",
  "korangar_debug",
  "num",
  "option-ext",
+ "rust_state",
  "serde",
 ]
 
@@ -1807,9 +1840,11 @@ name = "korangar_networking"
 version = "0.1.0"
 dependencies = [
  "korangar_debug",
+ "korangar_interface",
  "ragnarok_bytes",
  "ragnarok_packets",
  "reqwest",
+ "rust_state",
  "serde",
  "tokio",
 ]
@@ -1824,6 +1859,7 @@ dependencies = [
  "image",
  "korangar_interface",
  "rand_aes",
+ "rust_state",
 ]
 
 [[package]]
@@ -1987,6 +2023,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d640282b302c0bb0a2a8e0233ead9035e3bed871f0b7e81fe4a1ec829765db44"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "macros"
+version = "0.1.0"
+source = "git+https://github.com/vE5li/rust_state#d56e443b7aea4646dab9c6737b799bbac3fba310"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
 ]
 
 [[package]]
@@ -2922,6 +2968,7 @@ dependencies = [
  "cgmath",
  "korangar_interface",
  "ragnarok_bytes",
+ "rust_state",
 ]
 
 [[package]]
@@ -2935,6 +2982,7 @@ dependencies = [
  "pcap",
  "ragnarok_bytes",
  "ragnarok_procedural",
+ "rust_state",
 ]
 
 [[package]]
@@ -3247,6 +3295,14 @@ name = "rtrb"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad8388ea1a9e0ea807e442e8263a699e7edcb320ecbcd21b4fa8ff859acce3ba"
+
+[[package]]
+name = "rust_state"
+version = "0.1.0"
+source = "git+https://github.com/vE5li/rust_state#d56e443b7aea4646dab9c6737b799bbac3fba310"
+dependencies = [
+ "macros",
+]
 
 [[package]]
 name = "rustc-demangle"

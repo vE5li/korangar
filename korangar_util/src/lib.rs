@@ -1,6 +1,7 @@
 //! Utility crate that contains useful, common functionality.
 #![warn(missing_docs)]
-#![feature(let_chains)]
+#![cfg_attr(feature = "interface", feature(negative_impls))]
+#![cfg_attr(feature = "interface", feature(impl_trait_in_assoc_type))]
 
 pub mod collision;
 pub mod color;

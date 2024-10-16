@@ -5,8 +5,7 @@ use wgpu::{
 
 use crate::graphics::passes::light_culling::LightCullingPassContext;
 use crate::graphics::passes::{BindGroupCount, ComputePassContext, Dispatch};
-use crate::graphics::{Capabilities, GlobalContext, calculate_light_tile_count};
-use crate::interface::layout::ScreenSize;
+use crate::graphics::{Capabilities, GlobalContext, ScreenSize, calculate_light_tile_count};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/light_culling.wgsl");
 const DISPATCHER_NAME: &str = "light culling";

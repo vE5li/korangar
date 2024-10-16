@@ -1,12 +1,10 @@
 use cgmath::{Array, InnerSpace, Matrix4, MetricSpace, Point3, Vector3};
-#[cfg(feature = "interface")]
-use korangar_interface::elements::PrototypeElement;
 
 use crate::collision::{AABB, Insertable, Query};
 
 /// A sphere.
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "interface", derive(PrototypeElement))]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Sphere {
     center: Point3<f32>,
     radius: f32,

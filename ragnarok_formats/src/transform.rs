@@ -3,8 +3,8 @@ use std::ops::Add;
 use cgmath::{Deg, EuclideanSpace, Point3, Rad, Vector3};
 use ragnarok_bytes::{ByteReader, ByteWriter, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
-#[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct Transform {
     pub position: Point3<f32>,
     #[cfg_attr(feature = "interface", hidden_element)] // TODO: unhide

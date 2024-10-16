@@ -13,8 +13,7 @@ use wgpu::{
     TextureViewDimension,
 };
 
-use crate::graphics::BindlessSupport;
-use crate::interface::layout::ScreenSize;
+use crate::graphics::{BindlessSupport, ScreenSize};
 
 static TEXTURE_ID: AtomicU64 = AtomicU64::new(0);
 

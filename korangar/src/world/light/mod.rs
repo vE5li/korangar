@@ -5,7 +5,7 @@ use korangar_util::collision::Sphere;
 use ragnarok_formats::map::LightSource;
 
 #[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
+use crate::graphics::RenderOptions;
 use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCasterInstruction, TextureSet};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -151,18 +151,16 @@ impl PointLightManager {
             .into_iter()
             .sum::<f32>();
 
-        let constistency_bonus = self
-            .had_shadows_last_frame
-            .iter()
-            .any(|id| *id == point_light.id)
-            .then_some(POINTS_FOR_CONSISTENCY)
-            .unwrap_or_default();
+        let constistency_bonus = match self.had_shadows_last_frame.contains(&point_light.id) {
+            true => POINTS_FOR_CONSISTENCY,
+            false => 0,
+        };
 
         (size * intensity) as usize + constistency_bonus
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn create_point_light_set(&mut self, shadow_map_count: usize) -> PointLightSet {
+    pub fn create_point_light_set(&mut self, shadow_map_count: usize) -> PointLightSet<'_> {
         for (index, point_light) in self.point_lights.iter().enumerate() {
             self.scored_point_lights
                 .push((index, point_light.id, self.score_point_light(point_light)))
@@ -225,7 +223,7 @@ impl PointLightSet<'_> {
         point_shadow_model_instructions: &mut Vec<ModelInstruction>,
         point_light_with_shadow_instructions: &mut Vec<PointShadowCasterInstruction>,
         animation_timer_ms: f32,
-        #[cfg(feature = "debug")] render_settings: &RenderSettings,
+        #[cfg(feature = "debug")] render_options: &RenderOptions,
     ) {
         for point_light in self.with_shadow_iterator() {
             point_shadow_camera.set_camera_position(point_light.position);
@@ -242,7 +240,7 @@ impl PointLightSet<'_> {
                 Sphere::new(point_light.position, point_light.range),
                 point_shadow_object_set_buffer,
                 #[cfg(feature = "debug")]
-                render_settings.frustum_culling,
+                render_options.frustum_culling,
             );
 
             // TODO: Create an entity set, similar to the object set for better performance.
@@ -255,7 +253,6 @@ impl PointLightSet<'_> {
 
                 let model_offset = point_shadow_model_instructions.len();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
                 map.render_objects(
                     point_shadow_model_instructions,
                     &object_set,
@@ -263,7 +260,7 @@ impl PointLightSet<'_> {
                     point_shadow_camera,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_options.show_map))]
                 map.render_ground(point_shadow_model_instructions);
 
                 model_offsets[face_index as usize] = model_offset;

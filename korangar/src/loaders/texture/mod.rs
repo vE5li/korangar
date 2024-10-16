@@ -861,7 +861,7 @@ pub fn calculate_valid_mip_level_count(width: u32, height: u32) -> u32 {
     let mut current_width = width;
     let mut current_height = height;
 
-    while current_width >= 4 && current_height >= 4 && current_width % 4 == 0 && current_height % 4 == 0 {
+    while current_width >= 4 && current_height >= 4 && current_width.is_multiple_of(4) && current_height.is_multiple_of(4) {
         mip_level += 1;
         current_width /= 2;
         current_height /= 2;

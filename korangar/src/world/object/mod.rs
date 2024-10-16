@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use derive_new::new;
-use korangar_interface::elements::PrototypeElement;
-use korangar_interface::windows::PrototypeWindow;
+use korangar_interface::element::StateElement;
+use korangar_interface::window::StateWindow;
 use korangar_util::collision::AABB;
 use ragnarok_formats::transform::Transform;
+use rust_state::RustState;
 
 #[cfg(feature = "debug")]
 use super::MarkerIdentifier;
@@ -18,7 +19,7 @@ use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 
-#[derive(PrototypeElement, PrototypeWindow, new)]
+#[derive(Clone, RustState, StateElement, StateWindow, new)]
 pub struct Object {
     pub name: Option<String>,
     pub model_name: String,

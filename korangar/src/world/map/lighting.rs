@@ -1,6 +1,8 @@
 use cgmath::{Deg, InnerSpace, Matrix3, Rad, Vector3};
+use korangar_interface::element::StateElement;
 use num::Signed;
 use ragnarok_formats::map::LightSettings;
+use rust_state::RustState;
 
 use crate::graphics::Color;
 use crate::settings::LightingMode;
@@ -15,6 +17,7 @@ const MOON_PHASE_SHIFT: f32 = SUN_PHASE_SHIFT + HOUR_RADIANS * 12.0;
 const TWILIGHT_HEIGHT: f32 = HOUR_RADIANS;
 const MOONLIGHT_COLOR: Color = Color::rgb_u8(150, 150, 255);
 
+#[derive(RustState, StateElement)]
 pub struct Lighting {
     ambient_color: Color,
     diffuse_color: Color,

@@ -8,6 +8,7 @@ mod frame_pacer;
 mod instruction;
 mod passes;
 mod picker_target;
+mod primitives;
 mod projection;
 mod sampler;
 mod settings;
@@ -39,6 +40,7 @@ pub use self::frame_pacer::*;
 pub use self::instruction::*;
 pub use self::passes::{Lanczos3Drawer, MipMapRenderPassContext};
 pub use self::picker_target::PickerTarget;
+pub use self::primitives::*;
 pub use self::projection::*;
 pub use self::settings::*;
 pub use self::surface::*;
@@ -46,7 +48,6 @@ pub use self::texture::*;
 pub use self::vertices::*;
 use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 use crate::graphics::sampler::{SamplerType, create_new_sampler};
-use crate::interface::layout::ScreenSize;
 use crate::loaders::{ImageType, TextureLoader};
 
 /// The size of a tile in pixel of the tile based light culling.
@@ -182,7 +183,7 @@ impl Prepare for GlobalContext {
         let mut ambient_light_color = instructions.uniforms.ambient_light_color;
 
         #[cfg(feature = "debug")]
-        if !instructions.render_settings.show_ambient_light {
+        if !instructions.render_options.enable_ambient_lighting {
             ambient_light_color = Color::BLACK;
         };
 
@@ -190,7 +191,7 @@ impl Prepare for GlobalContext {
         let mut directional_light_color = instructions.directional_light_with_shadow.color;
 
         #[cfg(feature = "debug")]
-        if !instructions.render_settings.show_directional_light {
+        if !instructions.render_options.enable_directional_lighting {
             directional_light_color = Color::BLACK;
         };
 
@@ -266,15 +267,15 @@ impl Prepare for GlobalContext {
         #[cfg(feature = "debug")]
         {
             self.debug_uniforms = DebugUniforms {
-                show_picker_buffer: instructions.render_settings.show_picker_buffer as u32,
-                show_directional_shadow_map: instructions.render_settings.show_directional_shadow_map as u32,
+                show_picker_buffer: instructions.render_options.show_picker_buffer as u32,
+                show_directional_shadow_map: instructions.render_options.show_directional_shadow_map as u32,
                 show_point_shadow_map: instructions
-                    .render_settings
+                    .render_options
                     .show_point_shadow_map
                     .map(|value| value.get())
                     .unwrap_or(0),
-                show_light_culling_count_buffer: instructions.render_settings.show_light_culling_count_buffer as u32,
-                show_font_map: instructions.render_settings.show_font_map as u32,
+                show_light_culling_count_buffer: instructions.render_options.show_light_culling_count_buffer as u32,
+                show_font_map: instructions.render_options.show_font_map as u32,
             };
         }
     }

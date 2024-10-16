@@ -7,8 +7,6 @@ use std::sync::{Arc, Mutex};
 use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
-#[cfg(feature = "debug")]
-use korangar_interface::windows::PrototypeWindow;
 use korangar_util::collision::{AABB, Frustum, KDTree, Sphere};
 use korangar_util::container::{SimpleKey, SimpleSlab};
 use korangar_util::create_simple_key;
@@ -22,6 +20,7 @@ use ragnarok_formats::map::MapData;
 use ragnarok_formats::map::{LightSource, SoundSource, Tile, TileFlags};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
+use rust_state::RustState;
 use wgpu::Queue;
 
 pub use self::lighting::Lighting;
@@ -29,16 +28,10 @@ use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
-use crate::graphics::ModelBatch;
-#[cfg(feature = "debug")]
-use crate::graphics::RenderSettings;
-#[cfg(feature = "debug")]
-use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
+use crate::graphics::{
+    DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction, ModelBatch, RenderOptions, ScreenPosition, ScreenSize,
+};
 use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, TextureSet, WaterInstruction, WaterVertex};
-#[cfg(feature = "debug")]
-use crate::interface::application::InterfaceSettings;
-#[cfg(feature = "debug")]
-use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::loaders::GAT_TILE_SIZE;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -78,7 +71,7 @@ pub struct WaterPlane {
     index_buffer: Arc<Buffer<u32>>,
 }
 
-#[derive(new)]
+#[derive(RustState, new)]
 pub struct Map {
     width: usize,
     height: usize,
@@ -276,7 +269,7 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &mut [Entity], camera: &dyn Camera) {
+    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
         entities.iter().enumerate().for_each(|(index, entity)| {
             entity.render(instructions, camera, index != 0);
         });
@@ -393,8 +386,30 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn to_prototype_window(&self) -> &dyn PrototypeWindow<InterfaceSettings> {
+    pub fn get_map_data(&self) -> &MapData {
         &self.map_data
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_object(&self, key: u32) -> &Object {
+        self.objects.get(ObjectKey::new(key)).expect("object key should be valid")
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_light_source(&self, key: u32) -> &LightSource {
+        self.light_sources
+            .get(LightSourceKey::new(key))
+            .expect("light source key should be valid")
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_sound_source(&self, index: u32) -> &SoundSource {
+        &self.sound_sources[index as usize]
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn get_effect_source(&self, index: u32) -> &EffectSource {
+        &self.effect_sources[index as usize]
     }
 
     #[cfg(feature = "debug")]
@@ -466,29 +481,12 @@ impl Map {
     }
 
     #[cfg(feature = "debug")]
-    pub fn resolve_marker<'a>(
-        &'a self,
-        entities: &'a [Entity],
-        marker_identifier: MarkerIdentifier,
-    ) -> &'a dyn PrototypeWindow<InterfaceSettings> {
-        match marker_identifier {
-            MarkerIdentifier::Object(key) => self.objects.get(ObjectKey::new(key)).unwrap(),
-            MarkerIdentifier::LightSource(key) => self.light_sources.get(LightSourceKey::new(key)).unwrap(),
-            MarkerIdentifier::SoundSource(index) => &self.sound_sources[index as usize],
-            MarkerIdentifier::EffectSource(index) => &self.effect_sources[index as usize],
-            MarkerIdentifier::Particle(..) => todo!(),
-            MarkerIdentifier::Entity(index) => &entities[index as usize],
-            MarkerIdentifier::Shadow(..) => todo!(),
-        }
-    }
-
-    #[cfg(feature = "debug")]
     #[korangar_debug::profile]
     pub fn render_markers(
         &self,
         renderer: &mut impl MarkerRenderer,
         camera: &dyn Camera,
-        render_settings: &RenderSettings,
+        render_options: &RenderOptions,
         entities: &[Entity],
         point_light_set: &PointLightSet,
         hovered_marker_identifier: Option<MarkerIdentifier>,
@@ -496,7 +494,7 @@ impl Map {
         use super::SoundSourceExt;
         use crate::EffectSourceExt;
 
-        if render_settings.show_object_markers {
+        if render_options.show_object_markers {
             self.objects.iter().for_each(|(object_key, object)| {
                 let marker_identifier = MarkerIdentifier::Object(object_key.key());
 
@@ -509,7 +507,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_light_markers {
+        if render_options.show_light_markers {
             self.light_sources.iter().for_each(|(key, light_source)| {
                 let marker_identifier = MarkerIdentifier::LightSource(key.key());
 
@@ -522,7 +520,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_sound_markers {
+        if render_options.show_sound_markers {
             self.sound_sources.iter().enumerate().for_each(|(index, sound_source)| {
                 let marker_identifier = MarkerIdentifier::SoundSource(index as u32);
 
@@ -535,7 +533,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_effect_markers {
+        if render_options.show_effect_markers {
             self.effect_sources.iter().enumerate().for_each(|(index, effect_source)| {
                 let marker_identifier = MarkerIdentifier::EffectSource(index as u32);
 
@@ -548,7 +546,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_entity_markers {
+        if render_options.show_entity_markers {
             entities.iter().enumerate().for_each(|(index, entity)| {
                 let marker_identifier = MarkerIdentifier::Entity(index as u32);
 
@@ -561,7 +559,7 @@ impl Map {
             });
         }
 
-        if render_settings.show_shadow_markers {
+        if render_options.show_shadow_markers {
             point_light_set
                 .with_shadow_iterator()
                 .enumerate()

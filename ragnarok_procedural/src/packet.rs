@@ -86,11 +86,12 @@ pub fn derive_packet_struct(
                 #final_to_bytes
             }
 
-            #[cfg(feature = "packet-to-prototype-element")]
-            fn to_prototype_element<App: korangar_interface::application::Application>(
-                &self,
-            ) -> Box<dyn korangar_interface::elements::PrototypeElement<App> + Send> {
-                Box::new(self.clone())
+            #[cfg(feature = "packet-to-state-element")]
+            fn to_element<App: korangar_interface::application::Application>(
+                self_path: impl rust_state::Path<App, Self>,
+                name: String,
+            ) -> Box<dyn korangar_interface::element::Element<App, LayoutInfo = ()>> {
+                korangar_interface::element::ErasedElement::new(<Self as korangar_interface::element::StateElement<App>>::to_element(self_path, name))
             }
         }
     }

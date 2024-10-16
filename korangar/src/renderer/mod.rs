@@ -12,12 +12,13 @@ use std::sync::Arc;
 use cgmath::Point3;
 pub use effect::EffectRenderer;
 pub use game_interface::{AlignHorizontal, GameInterfaceRenderer};
-pub use interface::InterfaceRenderer;
+#[cfg(feature = "debug")]
+pub use interface::InterfaceFrameExt;
+pub use interface::{InterfaceRenderer, LayoutExt};
 #[cfg(feature = "debug")]
 pub use marker::DebugMarkerRenderer;
 
-use crate::graphics::{Color, Texture};
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize, Texture};
 #[cfg(feature = "debug")]
 use crate::world::Camera;
 #[cfg(feature = "debug")]

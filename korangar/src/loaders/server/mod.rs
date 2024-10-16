@@ -3,16 +3,18 @@ mod client_info;
 use encoding_rs::Encoding;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
+use korangar_interface::element::StateElement;
 use korangar_util::FileLoader;
 use quick_xml::Reader;
 use quick_xml::de::from_str;
 use quick_xml::events::Event;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-pub use self::client_info::ClientInfo;
+pub use self::client_info::{ClientInfo, ClientInfoPathExt};
 use super::GameFileLoader;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, RustState, StateElement)]
 pub struct ServiceId(pub usize);
 
 pub fn load_client_info(game_file_loader: &GameFileLoader) -> ClientInfo {

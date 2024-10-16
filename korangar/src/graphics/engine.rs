@@ -22,9 +22,9 @@ use super::{
     AntiAliasingResources, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
     RENDER_TO_TEXTURE_FORMAT, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType,
 };
+use crate::graphics::ScreenSize;
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
-use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
 use crate::{NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS, init_tls_rand};
 
@@ -599,12 +599,8 @@ impl GraphicsEngine {
         self.surface.as_ref().unwrap().present_mode_info()
     }
 
-    pub fn get_supported_msaa(&self) -> Vec<(String, Msaa)> {
-        self.capabilities
-            .get_supported_msaa()
-            .iter()
-            .map(|msaa| (msaa.to_string(), *msaa))
-            .collect()
+    pub fn get_supported_msaa(&self) -> Vec<Msaa> {
+        self.capabilities.get_supported_msaa().to_vec()
     }
 
     pub fn get_window_size(&self) -> Vector2<usize> {
@@ -630,10 +626,11 @@ impl GraphicsEngine {
                 .map(|engine_context| engine_context.global_context.high_quality_interface)
                 .unwrap_or(false);
 
-            if high_quality_interface && !self.check_high_quality_interface_requirements(high_quality_interface, screen_size) {
-                if let Some(engine_context) = self.engine_context.as_mut() {
-                    engine_context.global_context.update_high_quality_interface(&self.device, false);
-                }
+            if high_quality_interface
+                && !self.check_high_quality_interface_requirements(high_quality_interface, screen_size)
+                && let Some(engine_context) = self.engine_context.as_mut()
+            {
+                engine_context.global_context.update_high_quality_interface(&self.device, false);
             }
 
             let ssaa = self
@@ -642,10 +639,11 @@ impl GraphicsEngine {
                 .map(|engine_context| engine_context.global_context.ssaa)
                 .unwrap_or(Ssaa::Off);
 
-            if ssaa.supersampling_activated() && !self.check_ssaa_requirements(ssaa, screen_size).supersampling_activated() {
-                if let Some(engine_context) = self.engine_context.as_mut() {
-                    engine_context.global_context.update_ssaa(&self.device, Ssaa::Off);
-                }
+            if ssaa.supersampling_activated()
+                && !self.check_ssaa_requirements(ssaa, screen_size).supersampling_activated()
+                && let Some(engine_context) = self.engine_context.as_mut()
+            {
+                engine_context.global_context.update_ssaa(&self.device, Ssaa::Off);
             }
 
             if let Some(engine_context) = self.engine_context.as_mut() {
@@ -942,11 +940,10 @@ impl GraphicsEngine {
 
             // Interface Pass
             scope.spawn(|_| {
-                let mut render_pass = engine_context.interface_render_pass_context.create_pass(
-                    &mut interface_encoder,
-                    &engine_context.global_context,
-                    instruction.clear_interface,
-                );
+                let mut render_pass =
+                    engine_context
+                        .interface_render_pass_context
+                        .create_pass(&mut interface_encoder, &engine_context.global_context, ());
 
                 engine_context
                     .interface_rectangle_drawer
@@ -1034,7 +1031,7 @@ impl GraphicsEngine {
                     batches: instruction.model_batches,
                     instructions: instruction.models,
                     #[cfg(feature = "debug")]
-                    show_wireframe: instruction.render_settings.show_wireframe,
+                    show_wireframe: instruction.render_options.show_wireframe,
                 };
 
                 // Opaque
@@ -1188,7 +1185,7 @@ impl GraphicsEngine {
                 #[cfg(feature = "debug")]
                 {
                     let buffer_data = DebugBufferDrawData {
-                        render_settings: &instruction.render_settings,
+                        render_options: &instruction.render_options,
                         debug_bind_group: &engine_context.global_context.debug_bind_group,
                     };
 

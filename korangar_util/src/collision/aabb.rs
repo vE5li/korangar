@@ -1,6 +1,4 @@
 use cgmath::{Array, EuclideanSpace, Matrix4, Point3, Vector3};
-#[cfg(feature = "interface")]
-use korangar_interface::elements::PrototypeElement;
 
 use crate::collision::aligned_plane::{AlignedPlane, Axis};
 use crate::collision::{Insertable, Query, Sphere};
@@ -8,7 +6,7 @@ use crate::math::multiply_matrix4_and_point3;
 
 /// An axis aligned bounding box.
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "interface", derive(PrototypeElement))]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct AABB {
     pub(super) min: Point3<f32>,
     pub(super) max: Point3<f32>,

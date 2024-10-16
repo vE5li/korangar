@@ -1,10 +1,17 @@
 use std::ops::{Add, Mul, Sub};
 
+use korangar_interface::element::store::{ElementStore, ElementStoreMut};
+use korangar_interface::element::{BaseLayoutInfo, Element, StateElement};
+use korangar_interface::layout::{Resolver, WindowLayout};
 use mlua::{Lua, Value};
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
+use rust_state::{Context, Path};
 use serde::{Deserialize, Serialize};
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+use crate::graphics::CornerDiameter;
+use crate::state::ClientState;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct Color {
     pub red: f32,
     pub blue: f32,
@@ -14,6 +21,7 @@ pub struct Color {
 
 impl Color {
     pub const BLACK: Self = Self::monochrome(0.0);
+    pub const TRANSPARENT: Self = Self::rgba_u8(0, 0, 0, 0);
     pub const WHITE: Self = Self::monochrome(1.0);
 
     pub const fn rgb(red: f32, green: f32, blue: f32) -> Self {
@@ -234,5 +242,114 @@ impl mlua::FromLua for Color {
             to: "Color".to_string(),
             message: Some("Could not convert color".to_string()),
         })
+    }
+}
+
+impl StateElement<ClientState> for Color {
+    type LayoutInfo = impl std::any::Any;
+    type LayoutInfoMut = impl std::any::Any;
+    type Return<P>
+        = impl Element<ClientState, LayoutInfo = Self::LayoutInfo>
+    where
+        P: rust_state::Path<ClientState, Self>;
+    type ReturnMut<P>
+        = impl Element<ClientState, LayoutInfo = Self::LayoutInfoMut>
+    where
+        P: rust_state::Path<ClientState, Self>;
+
+    fn to_element<P>(self_path: P, name: String) -> Self::Return<P>
+    where
+        P: rust_state::Path<ClientState, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        struct Inner<P> {
+            path: P,
+        }
+
+        impl<P> Element<ClientState> for Inner<P>
+        where
+            P: Path<ClientState, Color>,
+        {
+            type LayoutInfo = BaseLayoutInfo;
+
+            fn create_layout_info(
+                &mut self,
+                _: &Context<ClientState>,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
+            ) -> Self::LayoutInfo {
+                let area = resolver.with_height(18.0);
+
+                Self::LayoutInfo { area }
+            }
+
+            fn lay_out<'a>(
+                &'a self,
+                state: &'a Context<ClientState>,
+                _: ElementStore<'a>,
+                layout_info: &'a Self::LayoutInfo,
+                layout: &mut WindowLayout<'a, ClientState>,
+            ) {
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(5.0), *state.get(&self.path));
+            }
+        }
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                Inner { path: self_path }
+            ),
+        }
+    }
+
+    fn to_element_mut<P>(self_path: P, name: String) -> Self::ReturnMut<P>
+    where
+        P: rust_state::Path<ClientState, Self>,
+    {
+        use korangar_interface::prelude::*;
+
+        struct Inner<P> {
+            path: P,
+        }
+
+        impl<P> Element<ClientState> for Inner<P>
+        where
+            P: Path<ClientState, Color>,
+        {
+            type LayoutInfo = BaseLayoutInfo;
+
+            fn create_layout_info(
+                &mut self,
+                _: &Context<ClientState>,
+                _: ElementStoreMut<'_>,
+                resolver: &mut Resolver<'_, ClientState>,
+            ) -> Self::LayoutInfo {
+                let area = resolver.with_height(18.0);
+
+                Self::LayoutInfo { area }
+            }
+
+            fn lay_out<'a>(
+                &'a self,
+                state: &'a Context<ClientState>,
+                _: ElementStore<'a>,
+                layout_info: &'a Self::LayoutInfo,
+                layout: &mut WindowLayout<'a, ClientState>,
+            ) {
+                layout.add_rectangle(layout_info.area, CornerDiameter::uniform(5.0), *state.get(&self.path));
+            }
+        }
+
+        split! {
+            children: (
+                text! {
+                    text: name,
+                },
+                Inner { path: self_path }
+            ),
+        }
     }
 }

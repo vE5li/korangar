@@ -1,7 +1,5 @@
 mod action;
-mod change;
-mod hover;
+mod queue;
 
-pub use self::action::ClickAction;
-pub use self::change::*;
-pub use self::hover::HoverInformation;
+pub use self::action::{ClickHandler, Toggle};
+pub use self::queue::{Event, EventQueue};

@@ -2,20 +2,27 @@ use std::collections::HashMap;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
+use korangar_interface::element::StateElement;
 use ron::ser::PrettyConfig;
+use rust_state::{MapItem, RustState};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::loaders::ServiceId;
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Default, RustState, Serialize, Deserialize, StateElement)]
 pub struct LoginSettings {
-    pub service: String,
+    // TODO: Unhide this element.
+    #[hidden_element]
     pub service_settings: HashMap<ServiceId, ServiceSettings>,
     pub recent_service_id: Option<ServiceId>,
 }
 
-#[derive(Clone, Default, Deserialize)]
+impl MapItem for ServiceSettings {
+    type Id = ServiceId;
+}
+
+#[derive(Clone, Default, RustState, Deserialize)]
 pub struct ServiceSettings {
     pub username: String,
     pub password: String,
@@ -32,12 +39,12 @@ impl Serialize for ServiceSettings {
         SerializeStruct::serialize_field(
             &mut serde_state,
             "username",
-            self.remember_username.then_some(self.username.as_str()).unwrap_or_default(),
+            if self.remember_username { self.username.as_str() } else { "" },
         )?;
         SerializeStruct::serialize_field(
             &mut serde_state,
             "password",
-            self.remember_password.then_some(self.password.as_str()).unwrap_or_default(),
+            if self.remember_password { self.password.as_str() } else { "" },
         )?;
         SerializeStruct::serialize_field(&mut serde_state, "remember_username", &self.remember_username)?;
         SerializeStruct::serialize_field(&mut serde_state, "remember_password", &self.remember_password)?;

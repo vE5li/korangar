@@ -190,7 +190,7 @@ macro_rules! create_profiler_threads {
             }
 
             /// Enum of all the profiler threads.
-            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, rust_state::RustState, korangar_interface::element::StateElement)]
             pub enum Enum {
                 $($thread),*
             }

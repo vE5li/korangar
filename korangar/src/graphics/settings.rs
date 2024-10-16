@@ -4,24 +4,61 @@ use std::num::NonZeroU32;
 
 #[cfg(feature = "debug")]
 use derive_new::new;
+use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::StateElement;
 use serde::{Deserialize, Serialize};
 
-use crate::interface::layout::ScreenSize;
+use crate::graphics::ScreenSize;
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum LimitFramerate {
     Unlimited,
     Limit(u16),
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+impl DropDownItem<LimitFramerate> for LimitFramerate {
+    fn text(&self) -> &str {
+        match self {
+            LimitFramerate::Unlimited => "Unlimited",
+            LimitFramerate::Limit(30) => "30 Hz",
+            LimitFramerate::Limit(60) => "60 Hz",
+            LimitFramerate::Limit(120) => "120 Hz",
+            LimitFramerate::Limit(144) => "144 Hz",
+            LimitFramerate::Limit(240) => "240 Hz",
+            LimitFramerate::Limit(_) => unimplemented!(),
+        }
+    }
+
+    fn value(&self) -> LimitFramerate {
+        *self
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum TextureSamplerType {
     Nearest,
     Linear,
     Anisotropic(u16),
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+impl DropDownItem<TextureSamplerType> for TextureSamplerType {
+    fn text(&self) -> &str {
+        match self {
+            TextureSamplerType::Nearest => "Nearest",
+            TextureSamplerType::Linear => "Linear",
+            TextureSamplerType::Anisotropic(4) => "Anisotropic x4",
+            TextureSamplerType::Anisotropic(8) => "Anisotropic x8",
+            TextureSamplerType::Anisotropic(16) => "Anisotropic x16",
+            TextureSamplerType::Anisotropic(_) => unimplemented!(),
+        }
+    }
+
+    fn value(&self) -> TextureSamplerType {
+        *self
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum ShadowDetail {
     Normal,
     Ultra,
@@ -46,7 +83,21 @@ impl ShadowDetail {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+impl DropDownItem<ShadowDetail> for ShadowDetail {
+    fn text(&self) -> &str {
+        match self {
+            Self::Normal => "Normal",
+            Self::Ultra => "Ultra",
+            Self::Insane => "Insane",
+        }
+    }
+
+    fn value(&self) -> ShadowDetail {
+        *self
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, StateElement)]
 pub enum ShadowQuality {
     Hard,
     SoftPCF,
@@ -54,6 +105,23 @@ pub enum ShadowQuality {
     SoftPCSSx16,
     SoftPCSSx32,
     SoftPCSSx64,
+}
+
+impl DropDownItem<ShadowQuality> for ShadowQuality {
+    fn text(&self) -> &str {
+        match self {
+            Self::Hard => "Hard",
+            Self::SoftPCF => "Soft (PCF)",
+            Self::SoftPCSSx8 => "Soft (PCSS x8)",
+            Self::SoftPCSSx16 => "Soft (PCSS x16)",
+            Self::SoftPCSSx32 => "Soft (PCSS x32)",
+            Self::SoftPCSSx64 => "Soft (PCSS x64)",
+        }
+    }
+
+    fn value(&self) -> ShadowQuality {
+        *self
+    }
 }
 
 impl From<ShadowQuality> for u32 {
@@ -76,6 +144,22 @@ pub enum Msaa {
     X4,
     X8,
     X16,
+}
+
+impl DropDownItem<Msaa> for Msaa {
+    fn text(&self) -> &str {
+        match self {
+            Msaa::Off => "Off",
+            Msaa::X2 => "x2",
+            Msaa::X4 => "x4",
+            Msaa::X8 => "x8",
+            Msaa::X16 => "x16",
+        }
+    }
+
+    fn value(&self) -> Msaa {
+        *self
+    }
 }
 
 impl Display for Msaa {
@@ -127,6 +211,21 @@ pub enum Ssaa {
     X4,
 }
 
+impl DropDownItem<Ssaa> for Ssaa {
+    fn text(&self) -> &str {
+        match self {
+            Ssaa::Off => "Off",
+            Ssaa::X2 => "x2",
+            Ssaa::X3 => "x3",
+            Ssaa::X4 => "x4",
+        }
+    }
+
+    fn value(&self) -> Ssaa {
+        *self
+    }
+}
+
 impl Display for Ssaa {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -159,6 +258,19 @@ pub enum ScreenSpaceAntiAliasing {
     Fxaa,
 }
 
+impl DropDownItem<ScreenSpaceAntiAliasing> for ScreenSpaceAntiAliasing {
+    fn text(&self) -> &str {
+        match self {
+            ScreenSpaceAntiAliasing::Off => "Off",
+            ScreenSpaceAntiAliasing::Fxaa => "FXAA",
+        }
+    }
+
+    fn value(&self) -> ScreenSpaceAntiAliasing {
+        *self
+    }
+}
+
 impl Display for ScreenSpaceAntiAliasing {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -169,9 +281,9 @@ impl Display for ScreenSpaceAntiAliasing {
 }
 
 #[cfg(feature = "debug")]
-#[derive(Copy, Clone, Default, new)]
-pub struct RenderSettings {
-    #[new(value = "true")]
+#[derive(Copy, Clone, Default, rust_state::RustState, StateElement, new)]
+pub struct RenderOptions {
+    #[new(default)]
     pub show_frames_per_second: bool,
     #[new(value = "true")]
     pub frustum_culling: bool,
@@ -183,7 +295,7 @@ pub struct RenderSettings {
     pub show_objects: bool,
     #[new(value = "true")]
     pub show_entities: bool,
-    #[new(value = "true")]
+    #[new(default)]
     pub show_entities_paper: bool,
     #[new(default)]
     pub show_entities_debug: bool,
@@ -192,13 +304,13 @@ pub struct RenderSettings {
     #[new(value = "true")]
     pub show_indicators: bool,
     #[new(value = "true")]
-    pub show_ambient_light: bool,
+    pub enable_ambient_lighting: bool,
     #[new(value = "true")]
-    pub show_directional_light: bool,
+    pub enable_directional_lighting: bool,
     #[new(value = "true")]
-    pub show_point_lights: bool,
+    pub enable_point_lights: bool,
     #[new(value = "true")]
-    pub show_particle_lights: bool,
+    pub enable_particle_lighting: bool,
     #[new(default)]
     pub use_debug_camera: bool,
     #[new(default)]
@@ -231,15 +343,33 @@ pub struct RenderSettings {
     pub show_light_culling_count_buffer: bool,
     #[new(default)]
     pub show_font_map: bool,
+    #[new(default)]
+    pub show_rectangle_instructions: bool,
+    #[new(default)]
+    pub show_glyph_instructions: bool,
+    #[new(default)]
+    pub show_sprite_instructions: bool,
+    #[new(default)]
+    pub show_sdf_instructions: bool,
+    #[new(default)]
+    pub show_click_areas: bool,
+    #[new(default)]
+    pub show_drop_areas: bool,
+    #[new(default)]
+    pub show_scroll_areas: bool,
 }
 
 #[cfg(feature = "debug")]
-impl RenderSettings {
+impl RenderOptions {
     pub fn show_buffers(&self) -> bool {
         self.show_directional_shadow_map
             || self.show_picker_buffer
             || self.show_point_shadow_map.is_some()
             || self.show_light_culling_count_buffer
             || self.show_font_map
+    }
+
+    pub fn show_areas(&self) -> bool {
+        self.show_click_areas || self.show_drop_areas || self.show_scroll_areas
     }
 }

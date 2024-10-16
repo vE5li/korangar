@@ -6,15 +6,15 @@ use wgpu::BlendFactor;
 
 use super::color::Color;
 #[cfg(feature = "debug")]
-use super::settings::RenderSettings;
+use super::settings::RenderOptions;
 use super::vertices::ModelVertex;
 use super::{Buffer, ShadowQuality, Texture, TextureSet, TileVertex, WaterVertex};
-use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{CornerDiameter, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
+#[derive(Default)]
 pub struct RenderInstruction<'a> {
-    pub clear_interface: bool,
     pub show_interface: bool,
     pub picker_position: ScreenPosition,
     pub uniforms: Uniforms,
@@ -43,7 +43,7 @@ pub struct RenderInstruction<'a> {
     pub map_picker_tile_index_buffer: Option<&'a Buffer<u32>>,
     pub font_map_texture: Option<&'a Texture>,
     #[cfg(feature = "debug")]
-    pub render_settings: RenderSettings,
+    pub render_options: RenderOptions,
     #[cfg(feature = "debug")]
     pub aabb: &'a [DebugAabbInstruction],
     #[cfg(feature = "debug")]
@@ -52,48 +52,6 @@ pub struct RenderInstruction<'a> {
     pub rectangles: &'a [DebugRectangleInstruction],
     #[cfg(feature = "debug")]
     pub marker: &'a [MarkerInstruction],
-}
-
-impl Default for RenderInstruction<'static> {
-    fn default() -> Self {
-        Self {
-            clear_interface: true,
-            show_interface: false,
-            picker_position: ScreenPosition::default(),
-            uniforms: Uniforms::default(),
-            indicator: None,
-            interface: &[],
-            bottom_layer_rectangles: &[],
-            middle_layer_rectangles: &[],
-            top_layer_rectangles: &[],
-            directional_light_with_shadow: DirectionalShadowCasterInstruction::default(),
-            point_light_shadow_caster: &[],
-            point_light: &[],
-            model_batches: &[],
-            models: &mut [],
-            entities: &mut [],
-            directional_model_batches: &[],
-            directional_shadow_models: &[],
-            directional_shadow_entities: &[],
-            point_shadow_models: &[],
-            point_shadow_entities: &[],
-            effects: &[],
-            water: None,
-            map_picker_tile_vertex_buffer: None,
-            map_picker_tile_index_buffer: None,
-            font_map_texture: None,
-            #[cfg(feature = "debug")]
-            render_settings: RenderSettings::default(),
-            #[cfg(feature = "debug")]
-            aabb: &[],
-            #[cfg(feature = "debug")]
-            circles: &[],
-            #[cfg(feature = "debug")]
-            rectangles: &[],
-            #[cfg(feature = "debug")]
-            marker: &[],
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -223,14 +181,14 @@ pub enum InterfaceRectangleInstruction {
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        corner_radius: CornerRadius,
+        corner_diameter: CornerDiameter,
     },
     Sprite {
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        corner_radius: CornerRadius,
+        corner_diameter: CornerDiameter,
         texture: Arc<Texture>,
         smooth: bool,
     },
@@ -239,7 +197,7 @@ pub enum InterfaceRectangleInstruction {
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
-        corner_radius: CornerRadius,
+        corner_diameter: CornerDiameter,
         texture: Arc<Texture>,
     },
     Text {

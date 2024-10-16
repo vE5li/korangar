@@ -9,14 +9,14 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
-use crate::graphics::settings::RenderSettings;
+use crate::graphics::settings::RenderOptions;
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/debug_buffer.wgsl");
 const DRAWER_NAME: &str = "debug buffer";
 
 pub(crate) struct DebugBufferDrawData<'a> {
-    pub(crate) render_settings: &'a RenderSettings,
+    pub(crate) render_options: &'a RenderOptions,
     pub(crate) debug_bind_group: &'a BindGroup,
 }
 
@@ -101,7 +101,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if !draw_data.render_settings.show_buffers() {
+        if !draw_data.render_options.show_buffers() {
             return;
         }
 

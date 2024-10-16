@@ -127,12 +127,11 @@ impl Writable for FolderArchive {
         let full_path = self.folder_path.join(normalized_asset_path);
 
         // Create parent directories if needed
-        if let Some(parent) = full_path.parent() {
-            if !parent.exists() {
-                if let Err(err) = fs::create_dir_all(parent) {
-                    panic!("error creating directories: {}", err);
-                }
-            }
+        if let Some(parent) = full_path.parent()
+            && !parent.exists()
+            && let Err(err) = fs::create_dir_all(parent)
+        {
+            panic!("error creating directories: {}", err);
         }
 
         let (path, data) = match compression {

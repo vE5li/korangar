@@ -6,24 +6,17 @@ use derive_new::new;
 use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
-use wgpu::RenderPass;
 
-use super::{Camera, Color, DeferredRenderer, Renderer, SpriteRenderer, Texture};
+use super::{Camera, Color, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::TextureLoader;
+use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
 use crate::{Entity, Map};
 
 pub trait Particle {
     fn update(&mut self, delta_time: f32) -> bool;
 
-    fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        window_size: ScreenSize,
-    );
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize);
 }
 
 #[derive(new)]
@@ -52,14 +45,7 @@ impl Particle for DamageNumber {
         self.timer > 0.0
     }
 
-    fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        window_size: ScreenSize,
-    ) {
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
@@ -68,14 +54,7 @@ impl Particle for DamageNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(
-            render_target,
-            render_pass,
-            &self.damage_amount,
-            final_position,
-            Color::WHITE,
-            16.0,
-        );
+        renderer.render_damage_text(&self.damage_amount, final_position, Color::WHITE, 16.0);
     }
 }
 
@@ -99,14 +78,7 @@ impl Particle for HealNumber {
         self.timer > 0.0
     }
 
-    fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        window_size: ScreenSize,
-    ) {
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
@@ -115,14 +87,7 @@ impl Particle for HealNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(
-            render_target,
-            render_pass,
-            &self.heal_amount,
-            final_position,
-            Color::rgb_u8(30, 255, 30),
-            16.0,
-        );
+        renderer.render_damage_text(&self.heal_amount, final_position, Color::rgb_u8(30, 255, 30), 16.0);
     }
 }
 
@@ -133,7 +98,7 @@ pub struct QuestIcon {
 }
 
 impl QuestIcon {
-    pub fn new(texture_loader: &mut TextureLoader, map: &Map, quest_effect: QuestEffectPacket) -> Self {
+    pub fn new(texture_loader: &TextureLoader, map: &Map, quest_effect: QuestEffectPacket) -> Self {
         let position = map.get_world_position(Vector2::new(quest_effect.position.x as usize, quest_effect.position.y as usize))
             + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
@@ -153,15 +118,7 @@ impl QuestIcon {
         Self { position, texture, color }
     }
 
-    fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        window_size: ScreenSize,
-        scaling_factor: f32,
-    ) {
+    fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize, scaling_factor: f32) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
@@ -171,9 +128,7 @@ impl QuestIcon {
         };
 
         renderer.render_sprite(
-            render_target,
-            render_pass,
-            &self.texture,
+            self.texture.clone(),
             final_position - ScreenSize::uniform(15.0 * scaling_factor),
             ScreenSize::uniform(30.0 * scaling_factor),
             ScreenClip::unbound(),
@@ -194,7 +149,7 @@ impl ParticleHolder {
         self.particles.push(particle);
     }
 
-    pub fn add_quest_icon(&mut self, texture_loader: &mut TextureLoader, map: &Map, quest_effect: QuestEffectPacket) {
+    pub fn add_quest_icon(&mut self, texture_loader: &TextureLoader, map: &Map, quest_effect: QuestEffectPacket) {
         self.quest_icons
             .insert(quest_effect.entity_id, QuestIcon::new(texture_loader, map, quest_effect));
     }
@@ -216,9 +171,7 @@ impl ParticleHolder {
     #[cfg_attr(feature = "debug", korangar_debug::profile("render particles"))]
     pub fn render(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
+        renderer: &GameInterfaceRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
         scaling_factor: f32,
@@ -226,11 +179,11 @@ impl ParticleHolder {
     ) {
         self.particles
             .iter()
-            .for_each(|particle| particle.render(render_target, render_pass, renderer, camera, window_size));
+            .for_each(|particle| particle.render(renderer, camera, window_size));
 
         entities
             .iter()
             .filter_map(|entity| self.quest_icons.get(&entity.get_entity_id()))
-            .for_each(|quest_icon| quest_icon.render(render_target, render_pass, renderer, camera, window_size, scaling_factor));
+            .for_each(|quest_icon| quest_icon.render(renderer, camera, window_size, scaling_factor));
     }
 }

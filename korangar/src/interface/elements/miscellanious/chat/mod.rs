@@ -9,16 +9,16 @@ use korangar_interface::event::ChangeEvent;
 use korangar_interface::layout::{Dimension, PlacementResolver};
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use wgpu::RenderPass;
 
 pub use self::builder::ChatBuilder;
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::Color;
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition};
 use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::ChatMessage;
 use crate::loaders::FontLoader;
+use crate::renderer::InterfaceRenderer;
 
 pub struct Chat {
     messages: PlainRemote<Vec<ChatMessage>>,
@@ -75,8 +75,6 @@ impl Element<InterfaceSettings> for Chat {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -87,9 +85,7 @@ impl Element<InterfaceSettings> for Chat {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         let mut offset = 0.0;
 

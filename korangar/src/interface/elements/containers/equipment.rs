@@ -7,9 +7,8 @@ use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::{dimension_bound, size_bound};
 use korangar_networking::{InventoryItem, InventoryItemDetails};
 use ragnarok_packets::EquipPosition;
-use wgpu::RenderPass;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::Color;
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::elements::ItemBox;
@@ -17,6 +16,7 @@ use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::ItemSource;
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::ResourceMetadata;
+use crate::renderer::InterfaceRenderer;
 
 pub struct EquipmentContainer {
     items: PlainRemote<Vec<InventoryItem<ResourceMetadata>>>,
@@ -172,8 +172,6 @@ impl Element<InterfaceSettings> for EquipmentContainer {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -184,10 +182,10 @@ impl Element<InterfaceSettings> for EquipmentContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer =
-            self.state
-                .state
-                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(renderer, application, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

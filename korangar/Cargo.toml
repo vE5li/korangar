@@ -4,10 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bumpalo = { workspace = true, features = ["allocator_api"] }
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["mint", "serde"] }
 chrono = { workspace = true }
 derive-new = { workspace = true }
+hashbrown = { workspace = true }
 image = { workspace = true, features = ["bmp", "png", "tga", "rayon"] }
 korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }

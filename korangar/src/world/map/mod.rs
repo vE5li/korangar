@@ -1,5 +1,7 @@
 #[cfg(feature = "debug")]
 use std::collections::HashSet;
+#[cfg(feature = "debug")]
+use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
@@ -12,25 +14,29 @@ use korangar_util::create_simple_key;
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
+use ragnarok_formats::map::EffectSource;
+#[cfg(feature = "debug")]
 use ragnarok_formats::map::MapData;
-use ragnarok_formats::map::{EffectSource, LightSettings, LightSource, SoundSource, Tile, TileFlags, WaterSettings};
+use ragnarok_formats::map::{LightSettings, LightSource, SoundSource, Tile, TileFlags, WaterSettings};
 #[cfg(feature = "debug")]
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
-use wgpu::RenderPass;
 
 #[cfg(feature = "debug")]
-use super::{point_light_extent, LightSourceExt, PointLightSet};
+use super::{point_light_extent, LightSourceExt, Model, PointLightSet};
 use super::{Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
-use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
-use crate::graphics::{MarkerRenderer, RenderSettings};
+use crate::graphics::ModelBatch;
+use crate::graphics::{Camera, EntityInstruction, IndicatorInstruction, ModelInstruction};
+#[cfg(feature = "debug")]
+use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, RenderSettings};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
-use crate::{
-    Buffer, Color, GameFileLoader, IndicatorRenderer, ModelVertex, PickerRenderer, Texture, TextureGroup, TileVertex, WaterVertex,
-    MAP_TILE_SIZE,
-};
+#[cfg(feature = "debug")]
+use crate::interface::layout::{ScreenPosition, ScreenSize};
+#[cfg(feature = "debug")]
+use crate::renderer::MarkerRenderer;
+use crate::{Buffer, Color, GameFileLoader, ModelVertex, TextureGroup, TileVertex, WaterVertex, MAP_TILE_SIZE};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
 create_simple_key!(LightSourceKey, "Key to an light source inside the map");
@@ -58,12 +64,6 @@ fn color_from_channel(base_color: Color, channels: Vector3<f32>) -> Color {
         (base_color.green * channels.y) as u8,
         (base_color.blue * channels.z) as u8,
     )
-}
-
-fn get_ambient_light_color(ambient_color: Color, day_timer: f32) -> Color {
-    let sun_offset = 0.0;
-    let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
-    color_from_channel(ambient_color, ambient_channels)
 }
 
 fn get_directional_light_color_intensity(directional_color: Color, intensity: f32, day_timer: f32) -> (Color, f32) {
@@ -118,15 +118,19 @@ pub struct Map {
     water_settings: Option<WaterSettings>,
     light_settings: LightSettings,
     tiles: Vec<Tile>,
-    ground_vertex_buffer: Buffer<ModelVertex>,
+    ground_vertex_offset: usize,
+    ground_vertex_count: usize,
+    vertex_buffer: Buffer<ModelVertex>,
     water_vertex_buffer: Option<Buffer<WaterVertex>>,
-    ground_textures: TextureGroup,
+    textures: TextureGroup,
     objects: SimpleSlab<ObjectKey, Object>,
     light_sources: SimpleSlab<LightSourceKey, LightSource>,
     sound_sources: Vec<SoundSource>,
+    #[cfg(feature = "debug")]
     effect_sources: Vec<EffectSource>,
     tile_picker_vertex_buffer: Buffer<TileVertex>,
-    tile_vertex_buffer: Buffer<ModelVertex>,
+    #[cfg(feature = "debug")]
+    tile_vertex_buffer: Arc<Buffer<ModelVertex>>,
     object_kdtree: KDTree<ObjectKey, AABB>,
     light_source_kdtree: KDTree<LightSourceKey, Sphere>,
     background_music_track_name: Option<String>,
@@ -157,6 +161,18 @@ impl Map {
         self.background_music_track_name.as_deref()
     }
 
+    pub fn get_texture_group(&self) -> &TextureGroup {
+        &self.textures
+    }
+
+    pub fn get_model_vertex_buffer(&self) -> &Buffer<ModelVertex> {
+        &self.vertex_buffer
+    }
+
+    pub fn get_tile_picker_vertex_buffer(&self) -> &Buffer<TileVertex> {
+        &self.tile_picker_vertex_buffer
+    }
+
     pub fn set_ambient_sound_sources(&self, audio_engine: &AudioEngine<GameFileLoader>) {
         // We increase the range of the ambient sound,
         // so that it can ease better into the world.
@@ -180,29 +196,7 @@ impl Map {
         audio_engine.prepare_ambient_sound_world();
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_ground<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        time: f32,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        renderer.render_geometry(
-            render_target,
-            render_pass,
-            camera,
-            &self.ground_vertex_buffer,
-            &self.ground_textures,
-            Matrix4::identity(),
-            time,
-        );
-    }
-
-    // We want to make sure that the object set also caputres the lifetime of the
+    // We want to make sure that the object set also captures the lifetime of the
     // map, so we never have a stale object set.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn cull_objects_with_frustum<'a>(
@@ -248,69 +242,41 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_objects<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        client_tick: ClientTick,
-        time: f32,
-        object_set: &ResourceSet<ObjectKey>,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
+    pub fn render_objects(&self, instructions: &mut Vec<ModelInstruction>, object_set: &ResourceSet<ObjectKey>, client_tick: ClientTick) {
         for object_key in object_set.iterate_visible().copied() {
             if let Some(object) = self.objects.get(object_key) {
-                object.render_geometry(render_target, render_pass, renderer, camera, client_tick, time);
+                object.render_geometry(instructions, client_tick);
             }
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_entities<T>(
-        &self,
-        entities: &[Entity],
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        include_self: bool,
-    ) where
-        T: Renderer + EntityRenderer,
-    {
+    pub fn render_ground(&self, instructions: &mut Vec<ModelInstruction>) {
+        instructions.push(ModelInstruction {
+            model_matrix: Matrix4::identity(),
+            vertex_offset: self.ground_vertex_offset,
+            vertex_count: self.ground_vertex_count,
+        });
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn render_water<'a, 'b>(&'a self, water_vertex_buffer: &'b mut Option<&'a Buffer<WaterVertex>>) {
+        *water_vertex_buffer = self.water_vertex_buffer.as_ref();
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera, include_self: bool) {
         entities
             .iter()
             .skip(!include_self as usize)
-            .for_each(|entity| entity.render(render_target, render_pass, renderer, camera));
-    }
-
-    #[cfg(feature = "debug")]
-    #[korangar_debug::profile]
-    pub fn render_pathing<T>(
-        &self,
-        entities: &[Entity],
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        pathing_textures: &TextureGroup,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        entities
-            .iter()
-            .for_each(|entity| entity.render_pathing(render_target, render_pass, renderer, camera, pathing_textures));
+            .for_each(|entity| entity.render(instructions, camera));
     }
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
     pub fn render_bounding(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
+        instructions: &mut Vec<DebugAabbInstruction>,
         frustum_culling: bool,
         object_set: &ResourceSet<ObjectKey>,
     ) {
@@ -329,34 +295,17 @@ impl Map {
             let offset = bounding_box.size().y / 2.0;
             let position = bounding_box.center() - Vector3::new(0.0, offset, 0.0);
             let transform = Transform::position(position);
+            let world_matrix = Model::bounding_box_matrix(&bounding_box, &transform);
 
-            renderer.render_bounding_box(render_target, render_pass, camera, &transform, &bounding_box, color);
+            instructions.push(DebugAabbInstruction {
+                world: world_matrix,
+                color,
+            });
         });
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_tiles(
-        &self,
-        render_target: &mut <PickerRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &PickerRenderer,
-        camera: &dyn Camera,
-    ) {
-        renderer.render_tiles(render_target, render_pass, camera, &self.tile_picker_vertex_buffer);
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_walk_indicator<T>(
-        &self,
-        render_target: &mut <T>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        color: Color,
-        position: Vector2<usize>,
-    ) where
-        T: Renderer + IndicatorRenderer,
-    {
+    pub fn render_walk_indicator(&self, instruction: &mut Option<IndicatorInstruction>, color: Color, position: Vector2<usize>) {
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const OFFSET: f32 = 1.0;
 
@@ -375,73 +324,37 @@ impl Map {
                 base_y + HALF_TILE_SIZE,
             );
 
-            renderer.render_walk_indicator(
-                render_target,
-                render_pass,
-                camera,
-                color,
+            *instruction = Some(IndicatorInstruction {
                 upper_left,
                 upper_right,
                 lower_left,
                 lower_right,
-            );
+                color,
+            });
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_water(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        day_timer: f32,
-    ) {
-        if let Some(water_vertex_buffer) = &self.water_vertex_buffer {
-            renderer.render_water(render_target, render_pass, camera, water_vertex_buffer, day_timer);
-        }
+    pub fn get_ambient_light_color(&self, day_timer: f32) -> Color {
+        let sun_offset = 0.0;
+        let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
+        color_from_channel(self.light_settings.ambient_color.to_owned().unwrap().into(), ambient_channels)
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn ambient_light(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        day_timer: f32,
-    ) {
-        let ambient_color = get_ambient_light_color(self.light_settings.ambient_color.to_owned().unwrap().into(), day_timer);
-        renderer.ambient_light(render_target, render_pass, ambient_color);
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn directional_light(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        light_texture: &Texture,
-        light_matrix: Matrix4<f32>,
-        day_timer: f32,
-    ) {
+    pub fn get_directional_light(&self, day_timer: f32) -> (Vector3<f32>, Color) {
         let light_direction = get_light_direction(day_timer);
         let (directional_color, intensity) = get_directional_light_color_intensity(
             self.light_settings.diffuse_color.to_owned().unwrap().into(),
             self.light_settings.light_intensity.unwrap(),
             day_timer,
         );
-
-        renderer.directional_light(
-            render_target,
-            render_pass,
-            camera,
-            light_texture,
-            light_matrix,
-            light_direction,
-            directional_color,
-            intensity,
+        let color = Color::rgb(
+            directional_color.red * intensity,
+            directional_color.green * intensity,
+            directional_color.blue * intensity,
         );
+        (light_direction, color)
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -471,20 +384,11 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn water_light(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-    ) {
-        let water_level = self
-            .water_settings
+    pub fn get_water_light(&self) -> f32 {
+        self.water_settings
             .as_ref()
             .and_then(|settings| settings.water_level)
-            .unwrap_or_default();
-
-        renderer.water_light(render_target, render_pass, camera, water_level);
+            .unwrap_or_default()
     }
 
     #[cfg(feature = "debug")]
@@ -494,25 +398,57 @@ impl Map {
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
-    pub fn render_overlay_tiles<T>(
+    pub fn render_overlay_tiles(
         &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        tile_terxture_group: &TextureGroup,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        renderer.render_geometry(
-            render_target,
-            render_pass,
-            camera,
-            &self.tile_vertex_buffer,
-            tile_terxture_group,
-            Matrix4::identity(),
-            0.0,
-        );
+        model_instructions: &mut Vec<ModelInstruction>,
+        model_batches: &mut Vec<ModelBatch>,
+        tile_texture_group: &Arc<TextureGroup>,
+    ) {
+        let vertex_count = self.tile_vertex_buffer.count() as usize;
+        let offset = model_instructions.len();
+
+        model_instructions.push(ModelInstruction {
+            model_matrix: Matrix4::identity(),
+            vertex_offset: 0,
+            vertex_count,
+        });
+
+        model_batches.push(ModelBatch {
+            offset,
+            count: 1,
+            textures: Some(tile_texture_group.clone()),
+            vertex_buffer: Some(self.tile_vertex_buffer.clone()),
+        });
+    }
+
+    #[cfg(feature = "debug")]
+    #[korangar_debug::profile]
+    pub fn render_entity_pathing(
+        &self,
+        model_instructions: &mut Vec<ModelInstruction>,
+        model_batches: &mut Vec<ModelBatch>,
+        entities: &[Entity],
+        path_texture_group: &Arc<TextureGroup>,
+    ) {
+        entities.iter().for_each(|entity| {
+            if let Some(vertex_buffer) = entity.get_pathing_vertex_buffer() {
+                let vertex_count = self.tile_vertex_buffer.count() as usize;
+                let offset = model_instructions.len();
+
+                model_instructions.push(ModelInstruction {
+                    model_matrix: Matrix4::identity(),
+                    vertex_offset: 0,
+                    vertex_count,
+                });
+
+                model_batches.push(ModelBatch {
+                    offset,
+                    count: 1,
+                    textures: Some(path_texture_group.clone()),
+                    vertex_buffer: Some(vertex_buffer.clone()),
+                });
+            }
+        });
     }
 
     #[cfg(feature = "debug")]
@@ -534,19 +470,15 @@ impl Map {
 
     #[cfg(feature = "debug")]
     #[korangar_debug::profile]
-    pub fn render_markers<T>(
+    pub fn render_markers(
         &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
+        renderer: &mut impl MarkerRenderer,
         camera: &dyn Camera,
         render_settings: &RenderSettings,
         entities: &[Entity],
         point_light_set: &PointLightSet,
         hovered_marker_identifier: Option<MarkerIdentifier>,
-    ) where
-        T: Renderer + MarkerRenderer,
-    {
+    ) {
         use super::SoundSourceExt;
         use crate::EffectSourceExt;
 
@@ -555,8 +487,6 @@ impl Map {
                 let marker_identifier = MarkerIdentifier::Object(object_key.key());
 
                 object.render_marker(
-                    render_target,
-                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -570,8 +500,6 @@ impl Map {
                 let marker_identifier = MarkerIdentifier::LightSource(key.key());
 
                 light_source.render_marker(
-                    render_target,
-                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -585,8 +513,6 @@ impl Map {
                 let marker_identifier = MarkerIdentifier::SoundSource(index as u32);
 
                 sound_source.render_marker(
-                    render_target,
-                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -600,8 +526,6 @@ impl Map {
                 let marker_identifier = MarkerIdentifier::EffectSource(index as u32);
 
                 effect_source.render_marker(
-                    render_target,
-                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -615,8 +539,6 @@ impl Map {
                 let marker_identifier = MarkerIdentifier::Entity(index as u32);
 
                 entity.render_marker(
-                    render_target,
-                    render_pass,
                     renderer,
                     camera,
                     marker_identifier,
@@ -633,8 +555,6 @@ impl Map {
                     let marker_identifier = MarkerIdentifier::Shadow(index as u32);
 
                     renderer.render_marker(
-                        render_target,
-                        render_pass,
                         camera,
                         marker_identifier,
                         light_source.position,
@@ -648,9 +568,8 @@ impl Map {
     #[korangar_debug::profile]
     pub fn render_marker_overlay(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
+        aabb_instructions: &mut Vec<DebugAabbInstruction>,
+        circle_instructions: &mut Vec<DebugCircleInstruction>,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         point_light_set: &PointLightSet,
@@ -660,25 +579,41 @@ impl Map {
         let overlay_color = Color::rgb(1.0, offset, 1.0 - offset);
 
         match marker_identifier {
-            MarkerIdentifier::Object(key) => self.objects.get(ObjectKey::new(key)).unwrap().render_bounding_box(
-                render_target,
-                render_pass,
-                renderer,
-                camera,
-                overlay_color,
-            ),
+            MarkerIdentifier::Object(key) => self
+                .objects
+                .get(ObjectKey::new(key))
+                .unwrap()
+                .render_bounding_box(aabb_instructions, overlay_color),
+
             MarkerIdentifier::LightSource(key) => {
                 let light_source = self.light_sources.get(LightSourceKey::new(key)).unwrap();
                 let color = light_source.color.into();
                 let extent = point_light_extent(color, light_source.range);
 
-                renderer.render_circle(render_target, render_pass, camera, light_source.position, overlay_color, extent);
+                if let Some((screen_position, screen_size)) =
+                    Self::calculate_circle_screen_position_size(camera, light_source.position, extent)
+                {
+                    circle_instructions.push(DebugCircleInstruction {
+                        position: light_source.position,
+                        color: overlay_color,
+                        screen_position,
+                        screen_size,
+                    });
+                };
             }
             MarkerIdentifier::SoundSource(index) => {
                 let sound_source = &self.sound_sources[index as usize];
-                let extent = sound_source.range;
 
-                renderer.render_circle(render_target, render_pass, camera, sound_source.position, overlay_color, extent);
+                if let Some((screen_position, screen_size)) =
+                    Self::calculate_circle_screen_position_size(camera, sound_source.position, sound_source.range)
+                {
+                    circle_instructions.push(DebugCircleInstruction {
+                        position: sound_source.position,
+                        color: overlay_color,
+                        screen_position,
+                        screen_size,
+                    });
+                };
             }
             MarkerIdentifier::EffectSource(_index) => {}
             MarkerIdentifier::Particle(_index, _particle_index) => {}
@@ -687,8 +622,34 @@ impl Map {
                 let point_light = point_light_set.with_shadow_iterator().nth(index as usize).unwrap();
                 let extent = point_light_extent(point_light.color, point_light.range);
 
-                renderer.render_circle(render_target, render_pass, camera, point_light.position, overlay_color, extent);
+                if let Some((screen_position, screen_size)) =
+                    Self::calculate_circle_screen_position_size(camera, point_light.position, extent)
+                {
+                    circle_instructions.push(DebugCircleInstruction {
+                        position: point_light.position,
+                        color: overlay_color,
+                        screen_position,
+                        screen_size,
+                    });
+                };
             }
         }
+    }
+
+    #[cfg(feature = "debug")]
+    fn calculate_circle_screen_position_size(
+        camera: &dyn Camera,
+        position: Point3<f32>,
+        extent: f32,
+    ) -> Option<(ScreenPosition, ScreenSize)> {
+        let corner_offset = (extent.powf(2.0) * 2.0).sqrt();
+        let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, corner_offset);
+
+        if top_left_position.w < 0.1 && bottom_right_position.w < 0.1 && camera.distance_to(position) > extent {
+            return None;
+        }
+
+        let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
+        Some((screen_position, screen_size))
     }
 }

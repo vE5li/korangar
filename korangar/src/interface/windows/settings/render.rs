@@ -1,7 +1,9 @@
-use korangar_interface::elements::{ElementCell, ElementWrap, Expandable, StateButtonBuilder};
-use korangar_interface::size_bound;
+use std::num::NonZeroU32;
+
+use korangar_interface::elements::{ElementCell, ElementWrap, Expandable, PickList, StateButtonBuilder, Text};
 use korangar_interface::state::{PlainTrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
+use korangar_interface::{dimension_bound, size_bound};
 
 use crate::graphics::RenderSettings;
 use crate::interface::application::InterfaceSettings;
@@ -79,7 +81,7 @@ fn grid_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCell<
 }
 
 fn buffers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCell<InterfaceSettings> {
-    let buttons = vec![
+    let setting_elements = vec![
         render_state_button("diffuse buffer", settings.mapped(|settings| &settings.show_diffuse_buffer)),
         render_state_button("normal buffer", settings.mapped(|settings| &settings.show_normal_buffer)),
         render_state_button("water buffer", settings.mapped(|settings| &settings.show_water_buffer)),
@@ -87,10 +89,27 @@ fn buffers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCe
         render_state_button("shadow buffer", settings.mapped(|settings| &settings.show_shadow_buffer)),
         render_state_button("picker buffer", settings.mapped(|settings| &settings.show_picker_buffer)),
         render_state_button("font atlas", settings.mapped(|settings| &settings.show_font_atlas)),
-        render_state_button("point shadow", settings.mapped(|settings| &settings.show_point_shadow)),
+        Text::default()
+            .with_text("show point shadow")
+            .with_width(dimension_bound!(50%))
+            .wrap(),
+        PickList::default()
+            .with_options(vec![
+                ("off", None),
+                ("1", NonZeroU32::new(1)),
+                ("2", NonZeroU32::new(2)),
+                ("3", NonZeroU32::new(3)),
+                ("4", NonZeroU32::new(4)),
+                ("5", NonZeroU32::new(5)),
+                ("6", NonZeroU32::new(6)),
+            ])
+            .with_selected(settings.mapped(|settings| &settings.show_point_shadow))
+            .with_event(Box::new(Vec::new))
+            .with_width(dimension_bound!(!))
+            .wrap(),
     ];
 
-    Expandable::new("buffers".to_string(), buttons, true).wrap()
+    Expandable::new("buffers".to_string(), setting_elements, true).wrap()
 }
 
 pub struct RenderSettingsWindow {
@@ -120,9 +139,9 @@ impl PrototypeWindow<InterfaceSettings> for RenderSettingsWindow {
             general_expandable(&self.render_settings),
             map_expandable(&self.render_settings),
             lighting_expandable(&self.render_settings),
+            buffers_expandable(&self.render_settings),
             markers_expandable(&self.render_settings),
             grid_expandable(&self.render_settings),
-            buffers_expandable(&self.render_settings),
         ];
 
         WindowBuilder::new()

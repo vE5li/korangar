@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Weak;
 
 use super::ContainerState;
-use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
+use crate::application::{Application, MouseInputModeTrait, PositionTrait, PositionTraitExt, SizeTrait, SizeTraitExt};
 use crate::elements::{Element, ElementCell, ElementState, Focus};
 use crate::event::{ChangeEvent, HoverInformation};
 use crate::layout::{PlacementResolver, SizeBound};
@@ -127,8 +127,6 @@ where
 
     fn render(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -139,10 +137,10 @@ where
         mouse_mode: &App::MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer =
-            self.state
-                .state
-                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(renderer, application, parent_position, screen_clip);
 
         if let Some(color_selector) = &self.background_color {
             renderer.render_background(theme.button().corner_radius(), color_selector(theme));

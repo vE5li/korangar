@@ -12,14 +12,14 @@ use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
-use wgpu::RenderPass;
 
 use super::error::LoadError;
 use super::Sprite;
-use crate::graphics::{Color, Renderer, SpriteRenderer, Texture};
+use crate::graphics::{Color, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
+use crate::renderer::SpriteRenderer;
 
 #[derive(Clone, Debug, new)]
 pub struct AnimationState {
@@ -86,13 +86,13 @@ pub struct Actions {
 }
 
 impl Actions {
-    pub fn render<'a>(
+    pub fn render(
         &self,
-        sprite: &'a Sprite,
+        sprite: &Sprite,
         animation_state: &AnimationState,
         camera_direction: usize,
         head_direction: usize,
-    ) -> (&'a Texture, Vector2<f32>, bool) {
+    ) -> (Arc<Texture>, Vector2<f32>, bool) {
         let direction = (camera_direction + head_direction) % 8;
         let aa = animation_state.action * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
@@ -112,7 +112,7 @@ impl Actions {
 
         let fs = &a.motions[frame as usize % a.motions.len()];
 
-        let texture = &sprite.textures[fs.sprite_clips[0].sprite_number as usize];
+        let texture = sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone();
         let texture_size = texture.get_extent();
         let offset = fs.sprite_clips[0].position.map(|component| component as f32);
 
@@ -123,20 +123,16 @@ impl Actions {
         )
     }
 
-    pub fn render2<T>(
+    pub fn render2(
         &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
+        renderer: &impl SpriteRenderer,
         sprite: &Sprite,
         animation_state: &AnimationState,
         position: ScreenPosition,
         camera_direction: usize,
         color: Color,
         application: &InterfaceSettings,
-    ) where
-        T: Renderer + SpriteRenderer,
-    {
+    ) {
         let direction = camera_direction % 8;
         let aa = animation_state.action * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
@@ -193,16 +189,7 @@ impl Actions {
                 bottom: f32::MAX,
             };
 
-            renderer.render_sprite(
-                render_target,
-                render_pass,
-                texture,
-                final_position,
-                final_size,
-                screen_clip,
-                color,
-                false,
-            );
+            renderer.render_sprite(texture.clone(), final_position, final_size, screen_clip, color, false);
         }
     }
 }

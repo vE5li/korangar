@@ -117,7 +117,7 @@ end
 
     pub fn load_inventory_item_metadata(
         &self,
-        texture_loader: &mut TextureLoader,
+        texture_loader: &TextureLoader,
         item: InventoryItem<NoMetadata>,
     ) -> InventoryItem<ResourceMetadata> {
         let is_identified = item.is_identifed();
@@ -132,7 +132,7 @@ end
         InventoryItem { metadata, ..item }
     }
 
-    pub fn load_market_item_metadata(&self, texture_loader: &mut TextureLoader, item: ShopItem<NoMetadata>) -> ShopItem<ResourceMetadata> {
+    pub fn load_market_item_metadata(&self, texture_loader: &TextureLoader, item: ShopItem<NoMetadata>) -> ShopItem<ResourceMetadata> {
         let resource_name = self.get_item_resource_from_id(item.item_id, true);
         let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
         let texture = texture_loader.get(&full_path).unwrap();

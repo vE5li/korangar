@@ -1,4 +1,4 @@
-use crate::application::{Application, InterfaceRenderer, PartialSizeTrait, ScalingTrait, SizeTrait};
+use crate::application::{Application, PartialSizeTrait, ScalingTrait, SizeTrait};
 use crate::elements::{Element, ElementState};
 use crate::layout::{Dimension, PlacementResolver};
 use crate::theme::{InterfaceTheme, LabelTheme};
@@ -53,8 +53,6 @@ where
 
     fn render(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -65,9 +63,7 @@ where
         _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         renderer.render_background(theme.label().corner_radius(), theme.label().background_color());
 

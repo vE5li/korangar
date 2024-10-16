@@ -5,15 +5,15 @@ use korangar_interface::event::{ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_networking::{InventoryItem, InventoryItemDetails};
-use wgpu::RenderPass;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer, SpriteRenderer};
+use crate::graphics::Color;
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::resource::{ItemSource, Move, PartialMove};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::{FontSize, ResourceMetadata, Scaling};
+use crate::renderer::{InterfaceRenderer, SpriteRenderer};
 
 #[derive(new)]
 pub struct ItemBox {
@@ -78,8 +78,6 @@ impl Element<InterfaceSettings> for ItemBox {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -90,9 +88,7 @@ impl Element<InterfaceSettings> for ItemBox {
         mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         let highlight = (self.highlight)(mouse_mode);
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
@@ -106,9 +102,7 @@ impl Element<InterfaceSettings> for ItemBox {
 
         if let Some(item) = &self.item {
             renderer.renderer.render_sprite(
-                renderer.render_target,
-                renderer.render_pass,
-                &item.metadata.texture,
+                item.metadata.texture.clone(),
                 renderer.position,
                 ScreenSize::uniform(30.0).scaled(Scaling::new(application.get_scaling_factor())),
                 renderer.clip,

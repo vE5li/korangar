@@ -1,4 +1,4 @@
-use crate::application::{Application, FontSizeTrait, InterfaceRenderer, PositionTraitExt};
+use crate::application::{Application, FontSizeTrait, PositionTraitExt};
 use crate::elements::{Element, ElementState};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver};
 use crate::theme::{ButtonTheme, InterfaceTheme};
@@ -101,8 +101,6 @@ where
 
     fn render(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -113,9 +111,7 @@ where
         _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         let foreground_color = self
             .foreground_color

@@ -1,30 +1,29 @@
 use std::sync::Arc;
 
-use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Vector2, VectorSpace};
+use cgmath::{Array, EuclideanSpace, Point3, Vector2, VectorSpace};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
-use wgpu::RenderPass;
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
-#[cfg(feature = "debug")]
-use crate::graphics::MarkerRenderer;
-use crate::graphics::{Camera, DeferredRenderer, EntityRenderer, Renderer};
+use crate::graphics::{Camera, EntityInstruction};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
 use crate::loaders::{ActionLoader, Actions, AnimationState, ScriptLoader, Sprite, SpriteLoader};
+use crate::renderer::GameInterfaceRenderer;
+#[cfg(feature = "debug")]
+use crate::renderer::MarkerRenderer;
 use crate::world::Map;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 #[cfg(feature = "debug")]
 use crate::{Buffer, ModelVertex};
-use crate::{GeometryRenderer, TextureGroup};
 
 pub enum ResourceState<T> {
     Available(T),
@@ -49,7 +48,7 @@ pub struct Movement {
     #[cfg(feature = "debug")]
     #[new(default)]
     #[hidden_element]
-    pub pathing_vertex_buffer: Option<Buffer<ModelVertex>>,
+    pub pathing_vertex_buffer: Option<Arc<Buffer<ModelVertex>>>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -722,60 +721,65 @@ impl Common {
             ));
         }
 
-        let pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices);
+        let pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices, None);
 
         if let Some(steps_vertex_buffer) = &active_movement.pathing_vertex_buffer {
             steps_vertex_buffer.write_exact(queue, pathing_vertices.as_slice());
         } else {
-            let vertex_buffer = Buffer::with_data(
+            let vertex_buffer = Arc::new(Buffer::with_data(
                 &device,
                 queue,
                 "pathing vertex buffer",
                 BufferUsages::VERTEX | BufferUsages::COPY_DST,
                 &pathing_vertices,
-            );
+            ));
 
             active_movement.pathing_vertex_buffer = Some(vertex_buffer);
         }
     }
 
-    pub fn render<T>(&self, render_target: &mut T::Target, render_pass: &mut RenderPass, renderer: &T, camera: &dyn Camera)
-    where
-        T: Renderer + EntityRenderer,
-    {
+    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera) {
         let camera_direction = camera.camera_direction();
         let (texture, position, mirror) = self
             .actions
             .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
 
-        renderer.render_entity(
-            render_target,
-            render_pass,
-            camera,
-            texture,
-            self.position,
-            Point3::new(position.x, position.y, 0.0),
-            Vector2::from_value(0.7),
-            Vector2::new(1, 1),
-            Vector2::new(0, 0),
-            mirror,
-            self.entity_id,
+        let origin = Point3::new(position.x, position.y, 0.0);
+        let scale = Vector2::from_value(0.7);
+        let cell_count = Vector2::new(1, 1);
+        let cell_position = Vector2::new(0, 0);
+        let image_dimensions = texture.get_extent();
+        let size = Vector2::new(
+            image_dimensions.width as f32 * scale.x / 10.0,
+            image_dimensions.height as f32 * scale.y / 10.0,
         );
+
+        let world_matrix = camera.billboard_matrix(self.position, origin, size);
+        let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
+        let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
+        let (depth_offset, curvature) = camera.calculate_depth_offset_and_curvature(&world_matrix, scale.x, scale.y);
+
+        instructions.push(EntityInstruction {
+            world: world_matrix,
+            texture_position,
+            texture_size,
+            depth_offset,
+            curvature,
+            mirror,
+            entity_id: self.entity_id,
+            texture,
+        });
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(
+    pub fn render_marker(
         &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
+        renderer: &mut impl MarkerRenderer,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         hovered: bool,
-    ) where
-        T: Renderer + MarkerRenderer,
-    {
-        renderer.render_marker(render_target, render_pass, camera, marker_identifier, self.position, hovered);
+    ) {
+        renderer.render_marker(camera, marker_identifier, self.position, hovered);
     }
 }
 
@@ -841,15 +845,7 @@ impl Player {
         }
     }
 
-    pub fn render_status(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        theme: &GameTheme,
-        window_size: ScreenSize,
-    ) {
+    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let clip_space_position = (projection_matrix * view_matrix) * self.common.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
@@ -874,17 +870,9 @@ impl Player {
             height: total_height,
         } + theme.status_bar.border_size.get() * 2.0;
 
-        renderer.render_rectangle(
-            render_target,
-            render_pass,
-            background_position,
-            background_size,
-            theme.status_bar.background_color.get(),
-        );
+        renderer.render_rectangle(background_position, background_size, theme.status_bar.background_color.get());
 
         renderer.render_bar(
-            render_target,
-            render_pass,
             final_position,
             ScreenSize {
                 width: bar_width,
@@ -898,8 +886,6 @@ impl Player {
         offset += gap + theme.status_bar.health_height.get();
 
         renderer.render_bar(
-            render_target,
-            render_pass,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
@@ -913,8 +899,6 @@ impl Player {
         offset += gap + theme.status_bar.spell_point_height.get();
 
         renderer.render_bar(
-            render_target,
-            render_pass,
             final_position + ScreenPosition::only_top(offset),
             ScreenSize {
                 width: bar_width,
@@ -954,15 +938,7 @@ impl Npc {
         &mut self.common
     }
 
-    pub fn render_status(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        theme: &GameTheme,
-        window_size: ScreenSize,
-    ) {
+    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
         if self.common.entity_type != EntityType::Monster {
             return;
         }
@@ -978,8 +954,6 @@ impl Npc {
         let bar_width = theme.status_bar.enemy_bar_width.get();
 
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             final_position - theme.status_bar.border_size.get() - ScreenSize::only_width(bar_width / 2.0),
             ScreenSize {
                 width: bar_width,
@@ -989,8 +963,6 @@ impl Npc {
         );
 
         renderer.render_bar(
-            render_target,
-            render_pass,
             final_position,
             ScreenSize {
                 width: bar_width,
@@ -1099,70 +1071,33 @@ impl Entity {
         self.get_common_mut().generate_pathing_mesh(device, queue, map);
     }
 
-    pub fn render<T>(&self, render_target: &mut T::Target, render_pass: &mut RenderPass, renderer: &T, camera: &dyn Camera)
-    where
-        T: Renderer + EntityRenderer,
-    {
-        self.get_common().render(render_target, render_pass, renderer, camera);
+    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera) {
+        self.get_common().render(instructions, camera);
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_pathing<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        pathing_textures: &TextureGroup,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        if let Some(vertex_buffer) = self
-            .get_common()
+    pub fn get_pathing_vertex_buffer(&self) -> Option<&Arc<Buffer<ModelVertex>>> {
+        self.get_common()
             .active_movement
             .as_ref()
             .and_then(|movement| movement.pathing_vertex_buffer.as_ref())
-        {
-            renderer.render_geometry(
-                render_target,
-                render_pass,
-                camera,
-                vertex_buffer,
-                pathing_textures,
-                Matrix4::identity(),
-                0.0,
-            );
-        }
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_marker<T>(
+    pub fn render_marker(
         &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
+        renderer: &mut impl MarkerRenderer,
         camera: &dyn Camera,
         marker_identifier: MarkerIdentifier,
         hovered: bool,
-    ) where
-        T: Renderer + MarkerRenderer,
-    {
-        self.get_common()
-            .render_marker(render_target, render_pass, renderer, camera, marker_identifier, hovered);
+    ) {
+        self.get_common().render_marker(renderer, camera, marker_identifier, hovered);
     }
 
-    pub fn render_status(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        theme: &GameTheme,
-        window_size: ScreenSize,
-    ) {
+    pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
         match self {
-            Self::Player(player) => player.render_status(render_target, render_pass, renderer, camera, theme, window_size),
-            Self::Npc(npc) => npc.render_status(render_target, render_pass, renderer, camera, theme, window_size),
+            Self::Player(player) => player.render_status(renderer, camera, theme, window_size),
+            Self::Npc(npc) => npc.render_status(renderer, camera, theme, window_size),
         }
     }
 }

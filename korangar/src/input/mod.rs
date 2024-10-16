@@ -21,9 +21,9 @@ use winit::keyboard::KeyCode;
 pub use self::event::UserEvent;
 pub use self::key::Key;
 pub use self::mode::{Grabbed, MouseInputMode};
+use crate::graphics::PickerTarget;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
-use crate::graphics::{PickerRenderTarget, PickerTarget};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::cursor::{MouseCursor, MouseCursorState};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
@@ -48,7 +48,7 @@ pub struct InputSystem {
 }
 
 impl InputSystem {
-    pub fn new() -> Self {
+    pub fn new(picker_value: Arc<AtomicU64>) -> Self {
         let previous_mouse_position = ScreenPosition::default();
         let new_mouse_position = ScreenPosition::default();
         let mouse_delta = ScreenSize::default();
@@ -63,7 +63,6 @@ impl InputSystem {
 
         let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
-        let picker_value = Arc::new(AtomicU64::new(0));
 
         Self {
             previous_mouse_position,
@@ -143,7 +142,6 @@ impl InputSystem {
         interface: &mut Interface<InterfaceSettings>,
         application: &InterfaceSettings,
         focus_state: &mut FocusState<InterfaceSettings>,
-        picker_target: &mut PickerRenderTarget,
         mouse_cursor: &mut MouseCursor,
         #[cfg(feature = "debug")] render_settings: &PlainTrackedState<RenderSettings>,
         client_tick: ClientTick,
@@ -569,12 +567,6 @@ impl InputSystem {
                 events.push(UserEvent::CameraMoveUp);
             }
         }
-
-        // We queue the read for the next picker value. This essentially means that the
-        // value is always the value of the last rendered frame. We do it this
-        // way, to never stall the GPU by returning the control of the buffer to
-        // the GPU as soon as possible.
-        picker_target.queue_read_picker_value(self.picker_value.clone());
 
         if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {
             let last_pixel_value = self.picker_value.load(Ordering::Acquire);

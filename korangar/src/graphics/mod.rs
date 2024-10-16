@@ -3,6 +3,7 @@ mod color;
 #[cfg(feature = "debug")]
 mod error;
 mod features;
+mod frame_pacer;
 mod particles;
 mod renderers;
 mod settings;
@@ -14,6 +15,7 @@ pub use self::color::*;
 #[cfg(feature = "debug")]
 pub use self::error::error_handler;
 pub use self::features::*;
+pub use self::frame_pacer::{FramePacer, FrameStage};
 pub use self::particles::*;
 pub use self::renderers::*;
 pub use self::settings::GraphicsSettings;

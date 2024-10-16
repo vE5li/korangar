@@ -7,15 +7,19 @@ use super::ShadowDetail;
 
 #[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
+    pub vsync: bool,
     pub frame_limit: bool,
+    pub triple_buffering: bool,
     pub shadow_detail: ShadowDetail,
 }
 
 impl Default for GraphicsSettings {
     fn default() -> Self {
         Self {
-            frame_limit: true,
-            shadow_detail: ShadowDetail::Medium,
+            vsync: true,
+            frame_limit: false,
+            triple_buffering: true,
+            shadow_detail: ShadowDetail::High,
         }
     }
 }

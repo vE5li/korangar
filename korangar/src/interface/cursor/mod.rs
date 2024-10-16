@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::ClientTick;
-use wgpu::RenderPass;
 
 use super::application::InterfaceSettings;
 use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::graphics::{Color, DeferredRenderer, Renderer, SpriteRenderer};
+use crate::graphics::Color;
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Actions, AnimationState, Sprite, SpriteLoader};
+use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -82,9 +82,7 @@ impl MouseCursor {
     #[cfg_attr(feature = "debug", korangar_debug::profile("render mouse cursor"))]
     pub fn render(
         &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
+        renderer: &GameInterfaceRenderer,
         mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
         color: Color,
@@ -97,9 +95,7 @@ impl MouseCursor {
         if let Some(grabbed) = grabbed {
             match grabbed {
                 Grabbed::Texture(texture) => renderer.render_sprite(
-                    render_target,
-                    render_pass,
-                    &texture,
+                    texture.clone(),
                     mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
                     ScreenSize::uniform(30.0 * application.get_scaling_factor()),
                     ScreenClip::unbound(),
@@ -107,8 +103,6 @@ impl MouseCursor {
                     false,
                 ),
                 Grabbed::Action(sprite, actions, animation_state) => actions.render2(
-                    render_target,
-                    render_pass,
                     renderer,
                     &sprite,
                     &animation_state,
@@ -127,8 +121,6 @@ impl MouseCursor {
         };
 
         self.actions.render2(
-            render_target,
-            render_pass,
             renderer,
             &self.sprite,
             &self.animation_state,

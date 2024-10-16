@@ -1,12 +1,8 @@
-use std::sync::Arc;
-
 use cgmath::{Point3, Vector2};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
 use super::GroundTileExt;
-use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, Texture, TileVertex, WaterVertex};
-use crate::loaders::TextureLoader;
-use crate::Color;
+use crate::graphics::{Color, ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
 
 pub const MAP_TILE_SIZE: f32 = 10.0;
 
@@ -105,7 +101,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         first_position,
                         first_normal,
                         first_texture_coordinates,
-                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.texture_index as i32,
                         ground_surface.color.into(),
                         0.0,
                     ));
@@ -113,7 +109,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         second_position,
                         first_normal,
                         second_texture_coordinates,
-                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.texture_index as i32,
                         color_right,
                         0.0,
                     ));
@@ -121,7 +117,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         third_position,
                         first_normal,
                         third_texture_coordinates,
-                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.texture_index as i32,
                         color_top_right,
                         0.0,
                     ));
@@ -130,7 +126,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         first_position,
                         second_normal,
                         first_texture_coordinates,
-                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.texture_index as i32,
                         ground_surface.color.into(),
                         0.0,
                     ));
@@ -138,7 +134,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         third_position,
                         second_normal,
                         third_texture_coordinates,
-                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.texture_index as i32,
                         color_top_right,
                         0.0,
                     ));
@@ -146,7 +142,7 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                         fourth_position,
                         second_normal,
                         fourth_texture_coordinates,
-                        ground_surface.texture_index as i32 % 29, // TODO: remove when texture count is no longer an issue
+                        ground_surface.texture_index as i32,
                         color_top,
                         0.0,
                     ));
@@ -174,14 +170,6 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
         }
     }
     (native_ground_vertices, water_vertices)
-}
-
-pub fn load_textures(ground_data: &GroundData, texture_loader: &mut TextureLoader) -> Vec<Arc<Texture>> {
-    ground_data
-        .textures
-        .iter()
-        .map(|texture_name| texture_loader.get(texture_name).unwrap())
-        .collect()
 }
 
 pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {

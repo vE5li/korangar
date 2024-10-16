@@ -17,7 +17,7 @@ pub struct Inventory {
 }
 
 impl Inventory {
-    pub fn fill(&mut self, texture_loader: &mut TextureLoader, script_loader: &ScriptLoader, items: Vec<InventoryItem<NoMetadata>>) {
+    pub fn fill(&mut self, texture_loader: &TextureLoader, script_loader: &ScriptLoader, items: Vec<InventoryItem<NoMetadata>>) {
         let items = items
             .into_iter()
             .map(|item| script_loader.load_inventory_item_metadata(texture_loader, item))
@@ -26,7 +26,7 @@ impl Inventory {
         self.items.set(items);
     }
 
-    pub fn add_item(&mut self, texture_loader: &mut TextureLoader, script_loader: &ScriptLoader, item: InventoryItem<NoMetadata>) {
+    pub fn add_item(&mut self, texture_loader: &TextureLoader, script_loader: &ScriptLoader, item: InventoryItem<NoMetadata>) {
         self.items.with_mut(|items| {
             if let Some(found_item) = items.iter_mut().find(|inventory_item| inventory_item.index == item.index) {
                 let InventoryItemDetails::Regular { amount, .. } = &mut found_item.details else {

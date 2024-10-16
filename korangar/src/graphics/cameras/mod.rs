@@ -16,6 +16,7 @@ pub use self::player::PlayerCamera;
 pub use self::point_shadow::PointShadowCamera;
 pub use self::start::StartCamera;
 use crate::graphics::SmoothedValue;
+use crate::interface::layout::{ScreenPosition, ScreenSize};
 
 /// The near-plane we use for all perspective projections.
 pub(super) const NEAR_PLANE: f32 = 1.0;
@@ -132,17 +133,18 @@ pub trait Camera {
         self.camera_position().distance(position)
     }
 
-    fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (Vector2<f32>, Vector2<f32>) {
+    fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (ScreenPosition, ScreenSize) {
         let top_left_position = self.clip_to_screen_space(top_left_position);
         let bottom_right_position = self.clip_to_screen_space(bottom_right_position);
 
-        let screen_position = Vector2 {
-            x: top_left_position.x,
-            y: top_left_position.y,
+        let screen_position = ScreenPosition {
+            left: top_left_position.x,
+            top: top_left_position.y,
         };
-        let screen_size = Vector2 {
-            x: (bottom_right_position.x - top_left_position.x).abs(),
-            y: (top_left_position.y - bottom_right_position.y).abs(),
+
+        let screen_size = ScreenSize {
+            width: (bottom_right_position.x - top_left_position.x).abs(),
+            height: (top_left_position.y - bottom_right_position.y).abs(),
         };
 
         (screen_position, screen_size)

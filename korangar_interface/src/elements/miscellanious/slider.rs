@@ -4,8 +4,7 @@ use num::traits::NumOps;
 use num::{clamp, NumCast, Zero};
 
 use crate::application::{
-    Application, CornerRadiusTraitExt, InterfaceRenderer, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
-    SizeTraitExt,
+    Application, CornerRadiusTraitExt, MouseInputModeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait, SizeTraitExt,
 };
 use crate::elements::{Element, ElementState};
 use crate::event::{ChangeEvent, ClickAction, HoverInformation};
@@ -104,8 +103,6 @@ where
 
     fn render(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -116,9 +113,7 @@ where
         _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         if self.is_element_self(hovered_element) {
             renderer.render_background(theme.button().corner_radius(), theme.slider().background_color());

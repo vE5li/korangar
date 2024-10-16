@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::application::{Application, InterfaceRenderer, MouseInputModeTrait, PositionTraitExt, SizeTraitExt};
+use crate::application::{Application, MouseInputModeTrait, PositionTraitExt, SizeTraitExt};
 use crate::elements::{ButtonBuilder, Element, ElementState, ElementWrap, ScrollView};
 use crate::event::{ClickAction, HoverInformation};
 use crate::layout::{Dimension, DimensionBound, PlacementResolver, SizeBound};
@@ -169,8 +169,6 @@ where
 
     fn render(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -181,9 +179,7 @@ where
         _mouse_mode: &App::MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         let highlighted = self.is_element_self(hovered_element) || self.is_element_self(focused_element);
         let background_color = match highlighted {

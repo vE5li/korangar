@@ -157,8 +157,6 @@ where
 
     pub(super) fn render_window_anchors(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         theme: &App::Theme,
         window_position: App::Position,
@@ -170,8 +168,6 @@ where
         let screen_clip = App::Clip::unbound();
 
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(window_size.shrink(dot_size).halved()),
             dot_size,
             screen_clip,
@@ -179,8 +175,6 @@ where
             anchor_color!(self.anchor_point, theme, Center),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position,
             dot_size,
             screen_clip,
@@ -188,8 +182,6 @@ where
             anchor_color!(self.anchor_point, theme, TopLeft),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(App::Size::only_width(window_size.width() - wide_dot_width).halved()),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
@@ -197,8 +189,6 @@ where
             anchor_color!(self.anchor_point, theme, TopCenter),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(App::Size::only_width(window_size.width() - dot_width)),
             dot_size,
             screen_clip,
@@ -206,8 +196,6 @@ where
             anchor_color!(self.anchor_point, theme, TopRight),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(App::Size::new(
                 window_size.shrink(dot_size).width(),
                 window_size.shrink(App::Size::only_height(wide_dot_width)).halved().height(),
@@ -218,8 +206,6 @@ where
             anchor_color!(self.anchor_point, theme, CenterRight),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(window_size.shrink(dot_size)),
             dot_size,
             screen_clip,
@@ -227,8 +213,6 @@ where
             anchor_color!(self.anchor_point, theme, BottomRight),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(App::Size::new(
                 window_size.shrink(App::Size::only_width(wide_dot_width)).halved().width(),
                 window_size.shrink(dot_size).height(),
@@ -239,8 +223,6 @@ where
             anchor_color!(self.anchor_point, theme, BottomCenter),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(App::Size::only_height(window_size.height() - dot_width)),
             dot_size,
             screen_clip,
@@ -248,8 +230,6 @@ where
             anchor_color!(self.anchor_point, theme, BottomLeft),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             window_position.offset(App::Size::only_height(window_size.height() - wide_dot_width).halved()),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,
@@ -258,22 +238,13 @@ where
         );
     }
 
-    pub(super) fn render_screen_anchors(
-        &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
-        renderer: &App::Renderer,
-        theme: &App::Theme,
-        available_space: App::Size,
-    ) {
+    pub(super) fn render_screen_anchors(&self, renderer: &App::Renderer, theme: &App::Theme, available_space: App::Size) {
         let dot_width = 10.0;
         let wide_dot_width = 60.0;
         let dot_size = App::Size::uniform(dot_width);
         let screen_clip = App::Clip::unbound();
 
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::from_size(available_space.shrink(dot_size).halved()),
             dot_size,
             screen_clip,
@@ -281,8 +252,6 @@ where
             anchor_color!(self.anchor_point, theme, Center),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::zero(),
             dot_size,
             screen_clip,
@@ -290,8 +259,6 @@ where
             anchor_color!(self.anchor_point, theme, TopLeft),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::only_left(available_space.width() - wide_dot_width).halved(),
             App::Size::new(wide_dot_width, dot_width),
             screen_clip,
@@ -299,8 +266,6 @@ where
             anchor_color!(self.anchor_point, theme, TopCenter),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::only_left(available_space.width() - dot_width),
             dot_size,
             screen_clip,
@@ -308,8 +273,6 @@ where
             anchor_color!(self.anchor_point, theme, TopRight),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::new(
                 available_space.shrink(dot_size).width(),
                 available_space.shrink(App::Size::only_height(wide_dot_width)).halved().height(),
@@ -320,8 +283,6 @@ where
             anchor_color!(self.anchor_point, theme, CenterRight),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::from_size(available_space.shrink(dot_size)),
             dot_size,
             screen_clip,
@@ -329,8 +290,6 @@ where
             anchor_color!(self.anchor_point, theme, BottomRight),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::new(
                 available_space.shrink(App::Size::only_width(wide_dot_width)).halved().width(),
                 available_space.shrink(dot_size).height(),
@@ -341,8 +300,6 @@ where
             anchor_color!(self.anchor_point, theme, BottomCenter),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::only_top(available_space.height() - dot_width),
             dot_size,
             screen_clip,
@@ -350,8 +307,6 @@ where
             anchor_color!(self.anchor_point, theme, BottomLeft),
         );
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             App::Position::only_top(available_space.height() - wide_dot_width).halved(),
             App::Size::new(dot_width, wide_dot_width),
             screen_clip,

@@ -10,12 +10,12 @@ use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::effect::{EffectData, Frame};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::EntityId;
-use wgpu::RenderPass;
 
 use super::error::LoadError;
 use super::TextureLoader;
-use crate::graphics::{Camera, Color, DeferredRenderer, Renderer, Texture};
+use crate::graphics::{Camera, Color, Texture};
 use crate::loaders::GameFileLoader;
+use crate::renderer::EffectRenderer;
 use crate::{point_light_extent, PointLightId, PointLightManager};
 
 fn ease_interpolate(start_value: f32, end_value: f32, time: f32, bias: f32, sub_multiplier: f32) -> f32 {
@@ -140,15 +140,7 @@ impl Effect {
         }
     }
 
-    pub fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        frame_timer: &FrameTimer,
-        position: Point3<f32>,
-    ) {
+    pub fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera, frame_timer: &FrameTimer, position: Point3<f32>) {
         for layer in &self.layers {
             let Some(frame) = layer.interpolate(frame_timer) else {
                 continue;
@@ -159,11 +151,9 @@ impl Effect {
             }
 
             renderer.render_effect(
-                render_target,
-                render_pass,
                 camera,
                 position,
-                &layer.textures[frame.texture_index as usize],
+                layer.textures[frame.texture_index as usize].clone(),
                 [
                     Vector2::new(frame.xy[0], frame.xy[4]),
                     Vector2::new(frame.xy[1], frame.xy[5]),
@@ -197,7 +187,7 @@ impl EffectLoader {
         }
     }
 
-    fn load(&mut self, path: &str, texture_loader: &mut TextureLoader) -> Result<Arc<Effect>, LoadError> {
+    fn load(&mut self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load effect from {}", path.magenta()));
 
@@ -276,7 +266,7 @@ impl EffectLoader {
         Ok(effect)
     }
 
-    pub fn get(&mut self, path: &str, texture_loader: &mut TextureLoader) -> Result<Arc<Effect>, LoadError> {
+    pub fn get(&mut self, path: &str, texture_loader: &TextureLoader) -> Result<Arc<Effect>, LoadError> {
         match self.cache.get(path) {
             Some(effect) => Ok(effect.clone()),
             None => self.load(path, texture_loader),
@@ -304,13 +294,7 @@ pub trait EffectBase {
 
     fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera);
 
-    fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-    );
+    fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera);
 }
 
 pub struct EffectWithLight {
@@ -403,17 +387,9 @@ impl EffectBase for EffectWithLight {
         }
     }
 
-    fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-    ) {
+    fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
         if !self.gets_deleted {
             self.effect.render(
-                render_target,
-                render_pass,
                 renderer,
                 camera,
                 &self.frame_timer,
@@ -458,15 +434,7 @@ impl EffectHolder {
             .for_each(|(effect, _)| effect.register_point_lights(point_light_manager, camera));
     }
 
-    pub fn render(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-    ) {
-        self.effects
-            .iter()
-            .for_each(|(effect, _)| effect.render(render_target, render_pass, renderer, camera));
+    pub fn render(&self, renderer: &mut EffectRenderer, camera: &dyn Camera) {
+        self.effects.iter().for_each(|(effect, _)| effect.render(renderer, camera));
     }
 }

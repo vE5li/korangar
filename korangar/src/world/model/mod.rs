@@ -10,12 +10,13 @@ use korangar_util::collision::AABB;
 use ragnarok_formats::model::ModelData;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
-use wgpu::RenderPass;
 
 pub use self::node::Node;
-use crate::graphics::{Camera, GeometryRenderer, Renderer};
 #[cfg(feature = "debug")]
-use crate::graphics::{Color, DeferredRenderer};
+use crate::graphics::Color;
+#[cfg(feature = "debug")]
+use crate::graphics::DebugAabbInstruction;
+use crate::graphics::ModelInstruction;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
@@ -26,20 +27,8 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn render_geometry<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        root_transform: &Transform,
-        client_tick: ClientTick,
-        time: f32,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        self.root_node
-            .render_geometry(render_target, render_pass, renderer, camera, root_transform, client_tick, time);
+    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, transform: &Transform, client_tick: ClientTick) {
+        self.root_node.render_geometry(instructions, transform, client_tick);
     }
 
     #[cfg(feature = "debug")]
@@ -78,15 +67,11 @@ impl Model {
     }
 
     #[cfg(feature = "debug")]
-    pub fn render_bounding_box(
-        &self,
-        render_target: &mut <DeferredRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
-        renderer: &DeferredRenderer,
-        camera: &dyn Camera,
-        root_transform: &Transform,
-        color: Color,
-    ) {
-        renderer.render_bounding_box(render_target, render_pass, camera, root_transform, &self.bounding_box, color);
+    pub fn render_bounding_box(&self, instructions: &mut Vec<DebugAabbInstruction>, root_transform: &Transform, color: Color) {
+        let world_matrix = Model::bounding_box_matrix(&self.bounding_box, root_transform);
+        instructions.push(DebugAabbInstruction {
+            world: world_matrix,
+            color,
+        });
     }
 }

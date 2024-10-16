@@ -7,13 +7,12 @@ use korangar_interface::elements::{Element, ElementRenderer, ElementState};
 use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
-use wgpu::RenderPass;
 
-use crate::graphics::{InterfaceRenderer, Renderer};
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
+use crate::renderer::InterfaceRenderer;
 use crate::FontSize;
 
 const VISIBILITY_THRESHHOLD: f32 = 0.01;
@@ -47,7 +46,7 @@ impl FrameInspectorView {
     }
 
     fn render_lines(
-        renderer: &mut ElementRenderer<'_, '_, InterfaceSettings>,
+        renderer: &mut ElementRenderer<'_, InterfaceSettings>,
         theme: &InterfaceTheme,
         text: &str,
         text_width: f32,
@@ -79,8 +78,6 @@ impl FrameInspectorView {
 
                 korangar_interface::application::InterfaceRenderer::render_text(
                     renderer.renderer,
-                    renderer.render_target,
-                    renderer.render_pass,
                     text,
                     renderer.position + offset,
                     renderer.clip,
@@ -94,7 +91,7 @@ impl FrameInspectorView {
     }
 
     fn render_measurement(
-        renderer: &mut ElementRenderer<'_, '_, InterfaceSettings>,
+        renderer: &mut ElementRenderer<'_, InterfaceSettings>,
         color_lookup: &mut super::ColorLookup,
         theme: &InterfaceTheme,
         frame_measurement: &FrameMeasurement,
@@ -162,8 +159,6 @@ impl FrameInspectorView {
 
             korangar_interface::application::InterfaceRenderer::render_text(
                 renderer.renderer,
-                renderer.render_target,
-                renderer.render_pass,
                 &text,
                 text_position,
                 screen_clip,
@@ -242,8 +237,6 @@ impl Element<InterfaceSettings> for FrameInspectorView {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -258,9 +251,7 @@ impl Element<InterfaceSettings> for FrameInspectorView {
         // display the number
         const DISTANCE_NUMBER_SIZE: f32 = 1.5;
 
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         renderer.render_background(theme.profiler.corner_radius.get(), theme.profiler.background_color.get());
 

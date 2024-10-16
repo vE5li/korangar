@@ -4,10 +4,8 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use cgmath::Point3;
 use cgmath::{EuclideanSpace, Vector2};
-use korangar_interface::application::FontSizeTraitExt;
 
-use crate::graphics::{Color, RectangleInstruction, Texture};
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, RectangleInstruction, ScreenClip, ScreenPosition, ScreenSize, Texture};
 use crate::loaders::{FontLoader, FontSize, GlyphInstruction, Scaling};
 #[cfg(feature = "debug")]
 use crate::loaders::{ImageType, TextureLoader};
@@ -34,6 +32,7 @@ pub struct GameInterfaceRenderer {
     font_loader: Arc<FontLoader>,
     window_size: ScreenSize,
     scaling: Scaling,
+    highlight_color: Color,
     #[cfg(feature = "debug")]
     object_marker_texture: Arc<Texture>,
     #[cfg(feature = "debug")]
@@ -122,6 +121,7 @@ impl GameInterfaceRenderer {
             font_loader,
             window_size,
             scaling,
+            highlight_color: Color::rgb_u8(255, 200, 150),
             #[cfg(feature = "debug")]
             object_marker_texture,
             #[cfg(feature = "debug")]
@@ -144,6 +144,7 @@ impl GameInterfaceRenderer {
             font_loader: Arc::clone(&other.font_loader),
             window_size: other.window_size,
             scaling: other.scaling,
+            highlight_color: other.highlight_color,
             #[cfg(feature = "debug")]
             object_marker_texture: other.object_marker_texture.clone(),
             #[cfg(feature = "debug")]
@@ -163,7 +164,7 @@ impl GameInterfaceRenderer {
         self.instructions.borrow_mut().clear();
     }
 
-    pub fn get_instructions(&self) -> Ref<Vec<RectangleInstruction>> {
+    pub fn get_instructions(&self) -> Ref<'_, Vec<RectangleInstruction>> {
         self.instructions.borrow()
     }
 
@@ -183,13 +184,13 @@ impl GameInterfaceRenderer {
         font_size: FontSize,
         align_horizontal: AlignHorizontal,
     ) {
-        let font_size = font_size.scaled(self.scaling);
+        let font_size = FontSize(font_size.0 * self.scaling.get_factor());
 
         let mut glyphs = self.glyphs.borrow_mut();
 
         let size = self
             .font_loader
-            .layout_text(text, color, font_size, 1.0, f32::MAX, Some(&mut glyphs));
+            .layout_text(text, color, self.highlight_color, font_size, 1.0, None, Some(&mut glyphs));
 
         let horizontal_offset = match align_horizontal {
             AlignHorizontal::Left => 0.0,

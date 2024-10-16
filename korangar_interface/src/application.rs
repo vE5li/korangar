@@ -1,478 +1,283 @@
-use std::rc::{Rc, Weak};
+use crate::layout::{ClipLayer, Icon};
+use crate::theme::ThemePathGetter;
+use crate::window::Anchor;
 
-use crate::elements::{Element, ElementCell, WeakElementCell};
-use crate::theme::InterfaceTheme;
-use crate::windows::Anchor;
-
+/// Glue between [`korangar_interface`] and the application.
+///
+/// This trait mostly consists of associated types so the application can call
+/// and integrate with this crate using its own types. This was a design
+/// decision to reduce the number of types and type conversion in the
+/// application but it makes most types in this crate generic over
+/// a `App: Application`, which makes code inside this crate harder to write. I
+/// feel this is a worthwhile trade-off but I might revisit this in the future.
 pub trait Application: Sized + 'static {
+    /// Window cache used to store window position and size.
+    ///
+    /// This can be implemented in a volatile manner so window positions are
+    /// only saved until the application is close or in a persistent manner
+    /// where the cache is saved to and loaded from a file.
     type Cache: WindowCache<Self>;
-    type Clip: ClipTrait;
-    type Color: ColorTrait;
-    type CornerRadius: CornerRadiusTrait;
-    type CustomEvent;
-    type DropResource;
-    type DropResult;
-    type FontLoader: FontLoaderTrait<Self>;
-    type FontSize: FontSizeTrait;
-    type MouseInputMode: MouseInputModeTrait<Self>;
-    type PartialSize: PartialSizeTrait;
-    type Position: PositionTrait;
-    type Renderer: InterfaceRenderer<Self>;
-    type Scaling: ScalingTrait;
-    type Size: SizeTrait;
-    type Theme: InterfaceTheme<Settings = Self>;
-    type ThemeKind: Default;
 
-    fn get_scaling(&self) -> Self::Scaling;
+    /// Type to specify the theme when creating a window.
+    ///
+    /// Typically this would be an enum with each variant being one of the
+    /// application themes but can also be a unit type if the application
+    /// only has a single theme.
+    ///
+    /// The [`Default`] bound is used when deriving
+    /// [`StateWindow`](crate::window::StateWindow).
+    type ThemeType: Default + Copy;
 
-    fn get_theme(&self, kind: &Self::ThemeKind) -> &Self::Theme;
+    /// Glue between [`korangar_interface`] and the final application theme. See
+    /// [`ThemePathGetter`] for more information.
+    type ThemeGetter: ThemePathGetter<Self>;
+
+    /// Application color type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent color.
+    type Color: Copy;
+
+    /// Application corner diameter type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent corner diameter.
+    type CornerDiameter: CornerDiameter;
+
+    /// Application font size type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent font size.
+    type FontSize: FontSize;
+
+    /// Application 2D position type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent 2D positions. This might not be possible without conversion
+    /// if the application doesn't represent positions from the top left of
+    /// the screen.
+    type Position: Position;
+
+    /// Application 2D size type.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent 2D sizes.
+    type Size: Size;
+
+    /// Application clip type.
+    ///
+    /// The clip is used to avoid rendering outside the bounds of a parent
+    /// element or window.
+    ///
+    /// Ideally this should be the same type that the application renderer uses
+    /// to represent clips.
+    type Clip: Clip;
+
+    /// Renderer of the application.
+    type Renderer: RenderLayer<Self>;
+
+    /// Application window classes.
+    ///
+    /// The application can define classes for its windows to enable behaviour
+    /// such as allowing only one window of a given class to be open at any
+    /// point in time, restoring window position and size when the window is
+    /// opened again (see [`WindowCache`], checking if a window with a given
+    /// class is currently open, and closing windows with a given class.
+    type WindowClass: PartialEq + Copy;
+
+    /// Custom application event.
+    ///
+    /// When processing interface events (see
+    /// [`process_events`](crate::Interface::process_events)) the interface will
+    /// pass any custom events to the application.
+    ///
+    /// This allows components in the application to use the internal
+    /// [`EventQueue`](crate::event::EventQueue) to register application
+    /// specific events as well.
+    type CustomEvent: Clone;
+
+    /// Custom mouse mode.
+    ///
+    /// This allows the application to define additional mouse modes. E.g.
+    /// dragging a resource or rotating the camera.
+    type CustomMouseMode;
+
+    /// Application behavior when text overflows.
+    ///
+    /// Typically this would include options line inserting a line break and
+    /// shrinking the text.
+    type OverflowBehavior: Copy;
+
+    /// Application text layouter.
+    type TextLayouter: TextLayouter<Self>;
+
+    fn set_current_theme_type(theme: Self::ThemeType);
 }
 
-pub trait MouseInputModeTrait<App>
+/// A type for saving and loading window positions and sizes.
+///
+/// [`korangar_interface`] does not depend on any specific behavior of the
+/// window cache, therefore the actual logic of this is up to the implementer.
+/// The implementer may choose to only store the window data in RAM, to save it
+/// to a file, or to add extra logic for the position and size it returns.
+///
+/// All the operations on the cache require the window to have a
+/// [`WindowClass`](Application::WindowClass`), otherwise there is no way to
+/// identify them and they will not be cached.
+pub trait WindowCache<App>
 where
     App: Application,
 {
-    fn is_none(&self) -> bool;
+    /// Create or load a new instance of the window cache.
+    fn create() -> Self;
 
-    fn is_self_dragged(&self, element: &dyn Element<App>) -> bool;
+    /// Attempt to get the position and size for a given window class.
+    fn get_window_state(&self, window_class: App::WindowClass) -> Option<(Anchor<App>, App::Size)>;
 
-    fn is_moving_window(&self, window_index: usize) -> bool;
+    /// Register a new window with its size and position.
+    ///
+    /// This is only called if the window is not already cached but the
+    /// implementer should not rely on that.
+    fn register_window(&mut self, window_class: App::WindowClass, anchor: Anchor<App>, size: App::Size);
+
+    /// Update the anchor of a registered window.
+    fn update_anchor(&mut self, window_class: App::WindowClass, anchor: Anchor<App>);
+
+    /// Update the size of a registered window.
+    fn update_size(&mut self, window_class: App::WindowClass, size: App::Size);
 }
 
-pub trait FontSizeTrait: Copy {
-    fn new(value: f32) -> Self;
+/// Glue between [`korangar_interface`] and the renderer of the application.
+pub trait RenderLayer<App: Application> {
+    /// Application specific instruction.
+    ///
+    /// This allows extending the [`Layout`](crate::layout::Layout) to render
+    /// application specific graphics.
+    type CustomInstruction<'a>;
 
-    fn get_value(&self) -> f32;
-}
+    /// Application specific icons.
+    type CustomIcon: Clone + Copy;
 
-pub trait FontSizeTraitExt {
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self;
-}
-
-impl<T> FontSizeTraitExt for T
-where
-    T: FontSizeTrait,
-{
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self {
-        Self::new(self.get_value() * scaling.get_factor())
-    }
-}
-
-pub trait FontLoaderTrait<App>: Clone
-where
-    App: Application,
-{
-    fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
-}
-
-pub trait ScalingTrait: Copy {
-    fn get_factor(&self) -> f32;
-}
-
-pub trait InterfaceRenderer<App>
-where
-    App: Application,
-{
-    fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
-
+    /// Render a rectangle.
     fn render_rectangle(
         &self,
         position: App::Position,
         size: App::Size,
         clip: App::Clip,
-        corner_radius: App::CornerRadius,
+        corner_diameter: App::CornerDiameter,
         color: App::Color,
     );
 
-    fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize) -> f32;
+    /// Render a str as text.
+    fn render_text(
+        &self,
+        text: &str,
+        position: App::Position,
+        available_width: f32,
+        clip: App::Clip,
+        color: App::Color,
+        font_size: App::FontSize,
+    );
 
-    fn render_checkbox(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, checked: bool);
+    /// Render an icon.
+    fn render_icon(&self, position: App::Position, size: App::Size, clip: App::Clip, icon: Icon<App>, color: App::Color);
 
-    fn render_expand_arrow(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, expanded: bool);
+    /// Render a [`CustomInstruction`](RenderLayer::CustomInstruction).
+    fn render_custom(&self, instruction: Self::CustomInstruction<'_>, clip_layers: &[ClipLayer<App>]);
 }
 
-pub trait ColorTrait: Clone {
-    fn is_transparent(&self) -> bool;
+/// Glue between [`korangar_interface`] and the part of the application that
+/// handles layouting text. Many components change their size based on the
+/// displayed text to avoid clipping text.
+pub trait TextLayouter<App: Application>: Clone {
+    /// Calculate the size of a given string. Depending on the overflow
+    /// behavior, the text might shrink, so we also return a new font size.
+    fn get_text_dimensions(
+        &self,
+        text: &str,
+        font_size: App::FontSize,
+        available_width: f32,
+        overflow_behavior: App::OverflowBehavior,
+    ) -> (App::Size, App::FontSize);
 }
 
-pub trait CornerRadiusTrait: Clone {
-    fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
-
-    fn top_left(&self) -> f32;
-
-    fn top_right(&self) -> f32;
-
-    fn bottom_right(&self) -> f32;
-
-    fn bottom_left(&self) -> f32;
+/// Size for text elements.
+pub trait FontSize: Copy {
+    /// Scale the font size.
+    fn scaled(&self, scaling: f32) -> Self;
 }
 
-pub trait CornerRadiusTraitExt {
-    fn zero() -> Self;
-
-    fn uniform(value: f32) -> Self;
-
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self;
-}
-
-impl<T> CornerRadiusTraitExt for T
-where
-    T: CornerRadiusTrait,
-{
-    fn zero() -> Self {
-        Self::new(0.0, 0.0, 0.0, 0.0)
-    }
-
-    fn uniform(value: f32) -> Self {
-        Self::new(value, value, value, value)
-    }
-
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self {
-        let factor = scaling.get_factor();
-        Self::new(
-            self.top_left() * factor,
-            self.top_right() * factor,
-            self.bottom_right() * factor,
-            self.bottom_left() * factor,
-        )
-    }
-}
-
-// TODO: Rename
-pub trait PositionTrait: Copy {
+/// 2D position.
+pub trait Position: Copy {
+    /// Create new position from the left and top screen offset in pixels.
     fn new(left: f32, top: f32) -> Self;
+
+    /// Get position from the left of the screen in pixels.
     fn left(&self) -> f32;
+
+    /// Get position from the top of the screen in pixels.
     fn top(&self) -> f32;
 }
 
-pub trait PositionTraitExt {
-    fn zero() -> Self;
-
-    fn only_left(left: f32) -> Self;
-
-    fn only_top(top: f32) -> Self;
-
-    fn from_size(size: impl SizeTrait) -> Self;
-
-    fn offset(&self, size: impl SizeTrait) -> Self;
-
-    fn combined(&self, other: Self) -> Self;
-
-    fn remaining<Size>(&self, size: Size) -> Size
-    where
-        Size: SizeTrait;
-
-    fn relative_to(&self, other: Self) -> Self;
-
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self;
-
-    fn halved(&self) -> Self;
-
-    fn is_equal(&self, rhs: Self) -> bool;
-}
-
-impl<T> PositionTraitExt for T
-where
-    T: PositionTrait,
-{
-    fn zero() -> Self {
-        Self::new(0.0, 0.0)
-    }
-
-    fn only_left(left: f32) -> Self {
-        Self::new(left, 0.0)
-    }
-
-    fn only_top(top: f32) -> Self {
-        Self::new(0.0, top)
-    }
-
-    fn from_size(size: impl SizeTrait) -> Self {
-        Self::new(size.width(), size.height())
-    }
-
-    fn offset(&self, size: impl SizeTrait) -> Self {
-        Self::new(self.left() + size.width(), self.top() + size.height())
-    }
-
-    fn combined(&self, other: Self) -> Self {
-        Self::new(self.left() + other.left(), self.top() + other.top())
-    }
-
-    // TODO: Rename this given how it's used
-    fn remaining<Size>(&self, size: Size) -> Size
-    where
-        Size: SizeTrait,
-    {
-        Size::new(self.left() + size.width(), self.top() + size.height())
-    }
-
-    fn relative_to(&self, other: Self) -> Self {
-        Self::new(self.left() - other.left(), self.top() - other.top())
-    }
-
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self {
-        let factor = scaling.get_factor();
-        Self::new(self.left() * factor, self.top() * factor)
-    }
-
-    fn halved(&self) -> Self {
-        Self::new(self.left() / 2.0, self.top() / 2.0)
-    }
-
-    fn is_equal(&self, rhs: Self) -> bool {
-        self.left() == rhs.left() && self.top() == rhs.top()
-    }
-}
-
-pub trait SizeTrait: Copy {
+/// 2D size.
+pub trait Size: Copy {
+    /// Create a new size from the width and height in pixels.
     fn new(width: f32, height: f32) -> Self;
+
+    /// Get the width in pixels.
     fn width(&self) -> f32;
+
+    /// Get the height in pixels.
     fn height(&self) -> f32;
 }
 
-pub trait SizeTraitExt {
-    fn zero() -> Self;
+/// Rectangle corner diameter.
+pub trait CornerDiameter: Copy {
+    /// Create new corner diameter from the corner radii in pixels.
+    fn new(top_left: f32, top_right: f32, bottom_right: f32, bottom_left: f32) -> Self;
 
-    fn only_width(width: f32) -> Self;
+    /// Scale the corner diameter in pixels.
+    fn scaled(&self, scaling: f32) -> Self;
 
-    fn only_height(height: f32) -> Self;
+    /// Get the top left corner diameter in pixels.
+    fn top_left(&self) -> f32;
 
-    fn uniform(value: f32) -> Self;
+    /// Get the top right corner diameter in pixels.
+    fn top_right(&self) -> f32;
 
-    fn grow(&self, growth: Self) -> Self;
+    /// Get the bottom right corner diameter in pixels.
+    fn bottom_right(&self) -> f32;
 
-    fn shrink(&self, size: Self) -> Self;
-
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self;
-
-    fn halved(&self) -> Self;
-
-    fn doubled(&self) -> Self;
-
-    fn is_equal(&self, rhs: Self) -> bool;
+    /// Get the bottom left corner diameter in pixels.
+    fn bottom_left(&self) -> f32;
 }
 
-impl<T> SizeTraitExt for T
-where
-    T: SizeTrait,
-{
-    fn zero() -> Self {
-        Self::new(0.0, 0.0)
-    }
-
-    fn only_width(width: f32) -> Self {
-        Self::new(width, 0.0)
-    }
-
-    fn only_height(height: f32) -> Self {
-        Self::new(0.0, height)
-    }
-
-    fn uniform(value: f32) -> Self {
-        Self::new(value, value)
-    }
-
-    fn grow(&self, size: Self) -> Self {
-        Self::new(self.width() + size.width(), self.height() + size.height())
-    }
-
-    fn shrink(&self, size: Self) -> Self {
-        Self::new(self.width() - size.width(), self.height() - size.height())
-    }
-
-    fn scaled(&self, scaling: impl ScalingTrait) -> Self {
-        let factor = scaling.get_factor();
-        Self::new(self.width() * factor, self.height() * factor)
-    }
-
-    fn halved(&self) -> Self {
-        Self::new(self.width() / 2.0, self.height() / 2.0)
-    }
-
-    fn doubled(&self) -> Self {
-        Self::new(self.width() * 2.0, self.height() * 2.0)
-    }
-
-    fn is_equal(&self, rhs: Self) -> bool {
-        self.width() == rhs.width() && self.height() == rhs.height()
-    }
-}
-
-pub trait PartialSizeTrait: Copy {
-    fn new(width: f32, height: Option<f32>) -> Self;
-    fn width(&self) -> f32;
-    fn height(&self) -> Option<f32>;
-}
-
-pub trait PartialSizeTraitExt {
-    fn finalize<Size>(self) -> Size
-    where
-        Size: SizeTrait;
-
-    fn finalize_or<Size>(self, height: f32) -> Size
-    where
-        Size: SizeTrait;
-}
-
-impl<T> PartialSizeTraitExt for T
-where
-    T: PartialSizeTrait,
-{
-    fn finalize<Size>(self) -> Size
-    where
-        Size: SizeTrait,
-    {
-        let width = self.width();
-        let height = self.height().expect("element cannot have flexible height");
-
-        Size::new(width, height)
-    }
-
-    fn finalize_or<Size>(self, height: f32) -> Size
-    where
-        Size: SizeTrait,
-    {
-        let width = self.width();
-        let height = self.height().unwrap_or(height);
-
-        Size::new(width, height)
-    }
-}
-
-pub trait ClipTrait: Copy {
+/// A clip for masking rendering operations. The clip is defined by its four
+/// bounds (left, right, top, and bottom) and only pixels within this bound will
+/// be rendered.
+///
+/// This is important for components such as
+/// [`scroll_view`](crate::components::scroll_view)s.
+pub trait Clip: Copy {
+    /// Create a new clip from the boundaries in pixels.
     fn new(left: f32, top: f32, right: f32, bottom: f32) -> Self;
-    fn left(&self) -> f32;
-    fn right(&self) -> f32;
-    fn top(&self) -> f32;
-    fn bottom(&self) -> f32;
-}
 
-pub trait ClipTraitExt {
+    /// Create a new unbound clip.
     fn unbound() -> Self;
-}
 
-impl<T> ClipTraitExt for T
-where
-    T: ClipTrait,
-{
-    fn unbound() -> Self {
-        Self::new(0.0, 0.0, f32::MAX, f32::MAX)
-    }
-}
+    /// Get the left boundary. No pixel with an x coordinate smaller that this
+    /// will be rendered.
+    fn left(&self) -> f32;
 
-pub trait WindowCache<App>
-where
-    App: Application,
-{
-    fn create() -> Self;
+    /// Get the right boundary. No pixel with an x coordinate larger that this
+    /// will be rendered.
+    fn right(&self) -> f32;
 
-    fn register_window(&mut self, window_class: &str, anchor: Anchor<App>, size: App::Size);
+    /// Get the top boundary. No pixel with a y coordinate smaller that this
+    /// will be rendered.
+    fn top(&self) -> f32;
 
-    fn update_anchor(&mut self, window_class: &str, anchor: Anchor<App>);
-
-    fn update_size(&mut self, window_class: &str, size: App::Size);
-
-    fn get_window_state(&self, window_class: &str) -> Option<(Anchor<App>, App::Size)>;
-}
-
-pub struct FocusState<App>
-where
-    App: Application,
-{
-    focused_element: Option<WeakElementCell<App>>,
-    focused_window: Option<usize>,
-    previous_hovered_element: Option<WeakElementCell<App>>,
-    previous_hovered_window: Option<usize>,
-    previous_focused_element: Option<WeakElementCell<App>>,
-    previous_focused_window: Option<usize>,
-}
-
-impl<App> Default for FocusState<App>
-where
-    App: Application,
-{
-    fn default() -> Self {
-        Self {
-            focused_element: Default::default(),
-            focused_window: Default::default(),
-            previous_hovered_element: Default::default(),
-            previous_hovered_window: Default::default(),
-            previous_focused_element: Default::default(),
-            previous_focused_window: Default::default(),
-        }
-    }
-}
-
-impl<App> FocusState<App>
-where
-    App: Application,
-{
-    pub fn remove_focus(&mut self) {
-        self.focused_element = None;
-        self.focused_window = None;
-    }
-
-    pub fn set_focused_element(&mut self, element: Option<ElementCell<App>>, window_index: usize) {
-        self.focused_element = element.as_ref().map(Rc::downgrade);
-        self.focused_window = Some(window_index);
-    }
-
-    pub fn set_focused_window(&mut self, window_index: usize) {
-        self.focused_window = Some(window_index);
-    }
-
-    pub fn get_focused_window(&self) -> Option<usize> {
-        self.focused_window
-    }
-
-    pub fn update_focused_element(&mut self, element: Option<ElementCell<App>>, window_index: usize) {
-        if let Some(element) = element {
-            self.focused_element = Some(Rc::downgrade(&element));
-            self.focused_window = Some(window_index);
-        }
-    }
-
-    pub fn get_focused_element(&self) -> Option<(ElementCell<App>, usize)> {
-        let element = self.focused_element.clone();
-        element.as_ref().and_then(Weak::upgrade).zip(self.focused_window)
-    }
-
-    pub fn did_hovered_element_change(&self, hovered_element: &Option<ElementCell<App>>) -> bool {
-        self.previous_hovered_element
-            .as_ref()
-            .zip(hovered_element.as_ref())
-            .map(|(previous, current)| !Weak::ptr_eq(previous, &Rc::downgrade(current)))
-            .unwrap_or(self.previous_hovered_element.is_some() || hovered_element.is_some())
-    }
-
-    pub fn did_focused_element_change(&self) -> bool {
-        self.previous_focused_element
-            .as_ref()
-            .zip(self.focused_element.as_ref())
-            .map(|(previous, current)| !Weak::ptr_eq(previous, current))
-            .unwrap_or(self.previous_focused_element.is_some() || self.focused_element.is_some())
-    }
-
-    pub fn previous_hovered_window(&self) -> Option<usize> {
-        self.previous_hovered_window
-    }
-
-    pub fn focused_window(&self) -> Option<usize> {
-        self.focused_window
-    }
-
-    pub fn previous_focused_window(&self) -> Option<usize> {
-        self.previous_focused_window
-    }
-
-    pub fn update(&mut self, hovered_element: &Option<ElementCell<App>>, window_index: Option<usize>) -> Option<ElementCell<App>> {
-        self.previous_hovered_element = hovered_element.as_ref().map(Rc::downgrade);
-        self.previous_hovered_window = window_index;
-
-        self.previous_focused_element = self.focused_element.clone();
-        self.previous_focused_window = self.focused_window;
-
-        self.focused_element.clone().and_then(|weak_element| weak_element.upgrade())
-    }
+    /// Get the bottom boundary. No pixel with a y coordinate larger that this
+    /// will be rendered.
+    fn bottom(&self) -> f32;
 }

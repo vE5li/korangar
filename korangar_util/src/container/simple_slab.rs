@@ -139,7 +139,7 @@ impl<I: SimpleKey, T> SimpleSlab<I, T> {
 
     /// Iterates over all non-empty entries.
     #[must_use]
-    pub fn iter(&self) -> SimpleIterator<I, T> {
+    pub fn iter(&self) -> SimpleIterator<'_, I, T> {
         SimpleIterator {
             entries: self.entries.iter().enumerate(),
             size: self.entries.len(),
@@ -148,7 +148,7 @@ impl<I: SimpleKey, T> SimpleSlab<I, T> {
     }
 
     /// Removes all elements from the slab, returning them as an iterator.
-    pub fn drain(&mut self) -> DrainIter<I, T> {
+    pub fn drain(&mut self) -> DrainIter<'_, I, T> {
         let old_len = self.entries.len();
         self.next_free = None;
         self.count = 0;
@@ -282,7 +282,7 @@ impl<I: SimpleKey, V> SecondarySimpleSlab<I, V> {
 
     /// Iterates over all non-empty entries.
     #[must_use]
-    pub fn iter(&self) -> SecondarySimpleIterator<I, V> {
+    pub fn iter(&self) -> SecondarySimpleIterator<'_, I, V> {
         SecondarySimpleIterator {
             entries: self.entries.iter().enumerate(),
             size: self.entries.len(),

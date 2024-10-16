@@ -28,7 +28,7 @@ const INITIAL_INSTRUCTION_SIZE: usize = 1024;
 #[repr(C)]
 struct InstanceData {
     color: [f32; 4],
-    corner_radius: [f32; 4],
+    corner_diameter: [f32; 4],
     screen_clip: [f32; 4],
     screen_position: [f32; 2],
     screen_size: [f32; 2],
@@ -271,11 +271,11 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_size,
                         screen_clip,
                         color,
-                        corner_radius,
+                        corner_diameter,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
+                            corner_diameter: (*corner_diameter).into(),
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -291,7 +291,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_size,
                         screen_clip,
                         color,
-                        corner_radius,
+                        corner_diameter,
                         texture,
                         smooth,
                     } => {
@@ -310,7 +310,7 @@ impl Prepare for InterfaceRectangleDrawer {
 
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
+                            corner_diameter: (*corner_diameter).into(),
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -326,7 +326,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_size,
                         screen_clip,
                         color,
-                        corner_radius,
+                        corner_diameter,
                         texture,
                     } => {
                         let mut texture_index = texture_views.len() as i32;
@@ -342,7 +342,7 @@ impl Prepare for InterfaceRectangleDrawer {
 
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
+                            corner_diameter: (*corner_diameter).into(),
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -363,7 +363,7 @@ impl Prepare for InterfaceRectangleDrawer {
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: [0.0, 0.0, 0.0, 0.0],
+                            corner_diameter: [0.0, 0.0, 0.0, 0.0],
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -397,11 +397,11 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_size,
                         screen_clip,
                         color,
-                        corner_radius,
+                        corner_diameter,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
+                            corner_diameter: (*corner_diameter).into(),
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -418,7 +418,7 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_size,
                         screen_clip,
                         color,
-                        corner_radius,
+                        corner_diameter,
                         texture: _,
                         smooth,
                     } => {
@@ -426,7 +426,7 @@ impl Prepare for InterfaceRectangleDrawer {
 
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
+                            corner_diameter: (*corner_diameter).into(),
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -442,12 +442,12 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_size,
                         screen_clip,
                         color,
-                        corner_radius,
+                        corner_diameter,
                         texture: _,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
+                            corner_diameter: (*corner_diameter).into(),
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),
@@ -468,7 +468,7 @@ impl Prepare for InterfaceRectangleDrawer {
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
-                            corner_radius: [0.0, 0.0, 0.0, 0.0],
+                            corner_diameter: [0.0, 0.0, 0.0, 0.0],
                             screen_clip: (*screen_clip).into(),
                             screen_position: (*screen_position).into(),
                             screen_size: (*screen_size).into(),

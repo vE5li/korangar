@@ -3,20 +3,19 @@ use std::ops::Mul;
 use cgmath::{Array, Vector2};
 use derive_new::new;
 use korangar_audio::SoundEffectKey;
-use korangar_interface::elements::{ElementCell, PrototypeElement};
+use korangar_interface::element::StateElement;
 use korangar_util::container::Cacheable;
 use ragnarok_formats::action::Action;
 #[cfg(feature = "debug")]
 use ragnarok_formats::action::ActionsData;
 use ragnarok_packets::ClientTick;
+use rust_state::RustState;
 
-use crate::graphics::Color;
-use crate::interface::application::InterfaceSettings;
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::Sprite;
 use crate::renderer::SpriteRenderer;
 
-#[derive(Clone, Debug, new)]
+#[derive(Clone, Debug, new, RustState, StateElement)]
 pub struct SpriteAnimationState {
     #[new(default)]
     pub action_base_offset: usize,
@@ -31,7 +30,7 @@ impl SpriteAnimationState {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, RustState, StateElement)]
 pub enum ActionEvent {
     /// Start playing a WAV sound file.
     Sound { key: SoundEffectKey },
@@ -41,17 +40,7 @@ pub enum ActionEvent {
     Unknown,
 }
 
-impl PrototypeElement<InterfaceSettings> for ActionEvent {
-    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
-        match self {
-            Self::Sound { .. } => PrototypeElement::to_element(&"Sound", display),
-            Self::Attack => PrototypeElement::to_element(&"Attack", display),
-            Self::Unknown => PrototypeElement::to_element(&"Unknown", display),
-        }
-    }
-}
-
-#[derive(Debug, PrototypeElement)]
+#[derive(Debug, RustState, StateElement)]
 pub struct Actions {
     pub actions: Vec<Action>,
     pub delays: Vec<f32>,
@@ -69,8 +58,9 @@ impl Actions {
         animation_state: &SpriteAnimationState,
         position: ScreenPosition,
         camera_direction: usize,
+        screen_clip: ScreenClip,
         color: Color,
-        application: &InterfaceSettings,
+        scaling: f32,
     ) {
         let direction = camera_direction % 8;
         let animation_action = animation_state.action_base_offset * 8 + direction;
@@ -98,7 +88,7 @@ impl Actions {
                     Vector2::new(image_size.width, image_size.height)
                 })
                 .map(|component| component as f32);
-            let zoom = sprite_clip.zoom.unwrap_or(1.0) * application.get_scaling_factor();
+            let zoom = sprite_clip.zoom.unwrap_or(1.0) * scaling;
             let zoom2 = sprite_clip.zoom2.unwrap_or_else(|| Vector2::from_value(1.0));
 
             let final_size = dimensions.zip(zoom2, f32::mul) * zoom;
@@ -112,13 +102,6 @@ impl Actions {
             let final_position = ScreenPosition {
                 left: final_position.x,
                 top: final_position.y,
-            };
-
-            let screen_clip = ScreenClip {
-                left: 0.0,
-                top: 0.0,
-                right: f32::MAX,
-                bottom: f32::MAX,
             };
 
             renderer.render_sprite(texture.clone(), final_position, final_size, screen_clip, color, false);

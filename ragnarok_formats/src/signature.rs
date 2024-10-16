@@ -1,6 +1,8 @@
+use std::fmt::Display;
+
 use ragnarok_bytes::{ByteReader, ByteWriter, ConversionError, ConversionResult, FixedByteSize, FromBytes, ToBytes};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Signature<const MAGIC: &'static [u8]>;
 
 impl<const MAGIC: &'static [u8]> FixedByteSize for Signature<MAGIC> {
@@ -29,11 +31,9 @@ impl<const MAGIC: &'static [u8]> ToBytes for Signature<MAGIC> {
     }
 }
 
-#[cfg(feature = "interface")]
-impl<const MAGIC: &'static [u8], App: korangar_interface::application::Application> korangar_interface::elements::PrototypeElement<App>
-    for Signature<MAGIC>
-{
-    fn to_element(&self, display: String) -> korangar_interface::elements::ElementCell<App> {
-        std::str::from_utf8(MAGIC).unwrap().to_element(display)
+impl<const MAGIC: &'static [u8]> Display for Signature<MAGIC> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string = std::str::from_utf8(MAGIC).expect("signature has to be UTF-8");
+        write!(f, "{}", string)
     }
 }

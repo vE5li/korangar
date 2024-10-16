@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use crate::profiling::Measurement;
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct FrameMeasurement {
     buffer: Vec<Measurement>,
     next_index: usize,
@@ -37,6 +37,11 @@ impl FrameMeasurement {
     /// Returns the root measurement of the frame's measurement.
     pub fn root_measurement(&self) -> &Measurement {
         &self.buffer[0]
+    }
+
+    /// Returns an iterator over all measurements.
+    pub fn measurements(&self) -> impl Iterator<Item = &Measurement> {
+        self.buffer.iter()
     }
 }
 

@@ -1,11 +1,16 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
+use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::StateElement;
 use ron::ser::PrettyConfig;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType};
+use crate::graphics::{
+    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
+};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, RustState, StateElement)]
 pub struct GraphicsSettings {
     pub lighting_mode: LightingMode,
     pub vsync: bool,
@@ -75,10 +80,79 @@ impl Drop for GraphicsSettings {
 }
 
 /// The lighting mode used when rendering the game.
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, StateElement)]
 pub enum LightingMode {
     /// Mode that mimics the way the original client rendered the game.
     Classic,
     /// Mode that enabled all enhanced graphics features.
     Enhanced,
+}
+
+impl DropDownItem<LightingMode> for LightingMode {
+    fn text(&self) -> &str {
+        match self {
+            LightingMode::Classic => "Classic",
+            LightingMode::Enhanced => "Enhanced",
+        }
+    }
+
+    fn value(&self) -> LightingMode {
+        *self
+    }
+}
+
+#[derive(RustState, StateElement)]
+pub struct GraphicsSettingsCapabilities {
+    lighting_modes: Vec<LightingMode>,
+    texture_filtering_options: Vec<TextureSamplerType>,
+    limit_framerate_options: Vec<LimitFramerate>,
+    supported_msaa: Vec<Msaa>,
+    ssaa_options: Vec<Ssaa>,
+    screen_space_anti_aliasing_options: Vec<ScreenSpaceAntiAliasing>,
+    shadow_quality_options: Vec<ShadowQuality>,
+    shadow_detail_options: Vec<ShadowDetail>,
+    vsync_setting_disabled: bool,
+}
+
+impl Default for GraphicsSettingsCapabilities {
+    fn default() -> Self {
+        Self {
+            lighting_modes: vec![LightingMode::Classic, LightingMode::Enhanced],
+            texture_filtering_options: vec![
+                TextureSamplerType::Nearest,
+                TextureSamplerType::Linear,
+                TextureSamplerType::Anisotropic(4),
+                TextureSamplerType::Anisotropic(8),
+                TextureSamplerType::Anisotropic(16),
+            ],
+            limit_framerate_options: vec![
+                LimitFramerate::Unlimited,
+                LimitFramerate::Limit(30),
+                LimitFramerate::Limit(60),
+                LimitFramerate::Limit(120),
+                LimitFramerate::Limit(144),
+                LimitFramerate::Limit(240),
+            ],
+            supported_msaa: Vec::new(),
+            ssaa_options: vec![Ssaa::Off, Ssaa::X2, Ssaa::X3, Ssaa::X4],
+            screen_space_anti_aliasing_options: vec![ScreenSpaceAntiAliasing::Off, ScreenSpaceAntiAliasing::Fxaa],
+            shadow_quality_options: vec![
+                ShadowQuality::Hard,
+                ShadowQuality::SoftPCF,
+                ShadowQuality::SoftPCSSx8,
+                ShadowQuality::SoftPCSSx16,
+                ShadowQuality::SoftPCSSx32,
+                ShadowQuality::SoftPCSSx64,
+            ],
+            shadow_detail_options: vec![ShadowDetail::Normal, ShadowDetail::Ultra, ShadowDetail::Insane],
+            vsync_setting_disabled: true,
+        }
+    }
+}
+
+impl GraphicsSettingsCapabilities {
+    pub fn update(&mut self, supported_msaa: Vec<Msaa>, present_mode_info: PresentModeInfo) {
+        self.supported_msaa = supported_msaa;
+        self.vsync_setting_disabled = !present_mode_info.supports_mailbox && !present_mode_info.supports_immediate;
+    }
 }

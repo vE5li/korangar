@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
-use korangar_interface::application::ClipTraitExt;
+use korangar_interface::application::Clip;
 use ragnarok_packets::ClientTick;
 
-use super::application::InterfaceSettings;
-use super::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::graphics::Color;
+use crate::graphics::{Color, ScreenClip, ScreenPosition, ScreenSize};
 use crate::input::Grabbed;
 use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
@@ -87,18 +85,29 @@ impl MouseCursor {
         mouse_position: ScreenPosition,
         grabbed: Option<Grabbed>,
         color: Color,
-        application: &InterfaceSettings,
+        scaling: f32,
     ) {
         if !self.shown {
             return;
         }
 
+        // Adjust the position of the mouse cursor based on the interface scale. At 1.0
+        // the cursos is in the perfect position but for everything else the
+        // sprite drifts from the mouse position. This might be cause by how we
+        // scale sprites, needs further investigation.
+        //
+        // Values picked by testing. Can this be derived somehow?
+        let mouse_position = ScreenPosition {
+            left: mouse_position.left + 10.0 * (scaling - 1.0),
+            top: mouse_position.top + 14.0 * (scaling - 1.0),
+        };
+
         if let Some(grabbed) = grabbed {
             match grabbed {
                 Grabbed::Texture(texture) => renderer.render_sprite(
                     texture.clone(),
-                    mouse_position - ScreenSize::uniform(15.0 * application.get_scaling_factor()),
-                    ScreenSize::uniform(30.0 * application.get_scaling_factor()),
+                    mouse_position - ScreenSize::uniform(15.0 * scaling),
+                    ScreenSize::uniform(30.0 * scaling),
                     ScreenClip::unbound(),
                     Color::WHITE,
                     false,
@@ -109,8 +118,9 @@ impl MouseCursor {
                     &animation_state,
                     mouse_position,
                     0,
+                    ScreenClip::unbound(),
                     Color::WHITE,
-                    application,
+                    scaling,
                 ),
             }
         }
@@ -127,8 +137,9 @@ impl MouseCursor {
             &self.animation_state,
             mouse_position,
             direction,
+            ScreenClip::unbound(),
             color,
-            application,
+            scaling,
         );
     }
 }

@@ -1,9 +1,10 @@
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{Colorize, print_debug};
-use korangar_interface::elements::PrototypeElement;
+use korangar_interface::element::StateElement;
+use rust_state::RustState;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, PrototypeElement)]
+#[derive(Serialize, Deserialize, RustState, StateElement)]
 pub(super) struct GameArchiveList {
     pub archives: Vec<String>,
 }

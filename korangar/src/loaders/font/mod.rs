@@ -13,49 +13,37 @@ use image::{ImageBuffer, Rgba, RgbaImage, imageops};
 use korangar_debug::logging::Colorize;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::print_debug;
-use korangar_interface::application::FontSizeTrait;
-use korangar_interface::elements::ElementDisplay;
+use korangar_interface::application::TextLayouter;
+use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::ElementDisplay;
 use korangar_util::Rectangle;
 use serde::{Deserialize, Serialize};
 
 use self::color_span_iterator::ColorSpanIterator;
 use super::{GameFileLoader, TextureLoader};
-use crate::graphics::{Color, MAX_TEXTURE_SIZE, Texture};
-use crate::interface::application::InterfaceSettings;
-use crate::interface::layout::{ArrayType, ScreenSize};
+use crate::graphics::{Color, MAX_TEXTURE_SIZE, ScreenSize, Texture};
 use crate::loaders::font::font_file::FontFile;
+use crate::state::ClientState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct FontSize(pub f32);
 
-impl ArrayType for FontSize {
-    type Element = f32;
+#[derive(Clone, Copy)]
+pub enum OverflowBehavior {
+    Shrink,
+    LineBreak,
+}
 
-    const ELEMENT_COUNT: usize = 1;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [("size".to_owned(), &self.0)]
-    }
-
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.0]
+impl korangar_interface::application::FontSize for FontSize {
+    fn scaled(&self, scaling: f32) -> Self {
+        Self(self.0 * scaling)
     }
 }
 
 impl ElementDisplay for FontSize {
-    fn display(&self) -> String {
-        format!("^FFBB00F^000000{}", self.0.display())
-    }
-}
-
-impl FontSizeTrait for FontSize {
-    fn new(value: f32) -> Self {
-        Self(value)
-    }
-
-    fn get_value(&self) -> f32 {
-        self.0
+    fn element_display(&self) -> String {
+        format!("^000001F^000000{}", self.0.element_display())
     }
 }
 
@@ -71,35 +59,50 @@ impl std::ops::Mul<f32> for FontSize {
 #[serde(transparent)]
 pub struct Scaling(f32);
 
-impl ArrayType for Scaling {
-    type Element = f32;
+impl Scaling {
+    // TODO: Likely remove this function
+    pub fn get_factor(&self) -> f32 {
+        self.0
+    }
+}
 
-    const ELEMENT_COUNT: usize = 1;
-
-    fn get_array_fields(&'static self) -> [(String, &'static Self::Element); Self::ELEMENT_COUNT] {
-        [("scale".to_owned(), &self.0)]
+impl DropDownItem<Scaling> for Scaling {
+    fn text(&self) -> &str {
+        match self.0 {
+            0.5 => "50%",
+            0.6 => "60%",
+            0.7 => "70%",
+            0.8 => "80%",
+            0.9 => "90%",
+            1.0 => "100%",
+            1.1 => "110%",
+            1.2 => "120%",
+            1.3 => "130%",
+            1.4 => "140%",
+            1.5 => "150%",
+            1.6 => "160%",
+            1.7 => "170%",
+            1.8 => "180%",
+            1.9 => "190%",
+            2.0 => "200%",
+            _ => unimplemented!(),
+        }
     }
 
-    fn get_inner(&self) -> [Self::Element; Self::ELEMENT_COUNT] {
-        [self.0]
+    fn value(&self) -> Scaling {
+        *self
     }
 }
 
 impl ElementDisplay for Scaling {
-    fn display(&self) -> String {
-        format!("^FFBB00a^000000{}", self.0.display())
+    fn element_display(&self) -> String {
+        format!("^000001a^000000{}", self.0.element_display())
     }
 }
 
 impl Scaling {
     pub const fn new(value: f32) -> Self {
         Self(value)
-    }
-}
-
-impl korangar_interface::application::ScalingTrait for Scaling {
-    fn get_factor(&self) -> f32 {
-        self.0
     }
 }
 
@@ -241,13 +244,46 @@ impl FontLoader {
         }
     }
 
-    pub fn get_text_dimensions(&self, text: &str, font_size: FontSize, line_height_scale: f32, available_width: f32) -> ScreenSize {
-        let size = self.layout_text(text, Color::BLACK, font_size, line_height_scale, available_width, None);
+    pub fn get_text_dimensions(
+        &self,
+        text: &str,
+        mut font_size: FontSize,
+        line_height_scale: f32,
+        available_width: f32,
+        overflow_behavior: OverflowBehavior,
+    ) -> (ScreenSize, FontSize) {
+        // Avoid floating point inaccuracy leading to a line break when shrinking.
+        const THRESHOLD: f32 = 1.0;
 
-        ScreenSize {
-            width: size.x,
-            height: size.y,
+        let layout_width = match overflow_behavior {
+            OverflowBehavior::Shrink => None,
+            OverflowBehavior::LineBreak => Some(available_width),
+        };
+
+        let mut size = self.layout_text(
+            text,
+            Color::BLACK,
+            Color::BLACK,
+            font_size,
+            line_height_scale,
+            layout_width,
+            None,
+        );
+
+        if let OverflowBehavior::Shrink = overflow_behavior {
+            let scaling_factor = (available_width / (size.x + THRESHOLD)).min(1.0);
+
+            font_size = FontSize(font_size.0 * scaling_factor);
+            size *= scaling_factor;
         }
+
+        (
+            ScreenSize {
+                width: size.x,
+                height: size.y,
+            },
+            font_size,
+        )
     }
 
     // TODO: NHA cosmic_text could help us to render text in boxes.
@@ -262,9 +298,10 @@ impl FontLoader {
         &self,
         text: &str,
         default_color: Color,
+        highlight_color: Color,
         font_size: FontSize,
         line_height_scale: f32,
-        available_width: f32,
+        available_width: Option<f32>,
         mut glyphs: Option<&mut Vec<GlyphInstruction>>,
     ) -> Vector2<f32> {
         let mut text_width = 0f32;
@@ -278,10 +315,10 @@ impl FontLoader {
             let mut font_system = self.font_system.lock().unwrap();
             let mut buffer = Buffer::new(&mut font_system, metrics);
 
-            buffer.set_size(&mut font_system, Some(available_width), None);
+            buffer.set_size(&mut font_system, available_width, None);
             buffer.set_rich_text(
                 &mut font_system,
-                ColorSpanIterator::new(text, default_color, attributes.clone()),
+                ColorSpanIterator::new(text, default_color, highlight_color, attributes.clone()),
                 &attributes,
                 Shaping::Advanced,
                 None,
@@ -336,8 +373,18 @@ impl FontLoader {
     }
 }
 
-impl korangar_interface::application::FontLoaderTrait<InterfaceSettings> for Arc<FontLoader> {
-    fn get_text_dimensions(&self, text: &str, font_size: FontSize, available_width: f32) -> ScreenSize {
-        FontLoader::get_text_dimensions(self, text, font_size, 1.0, available_width)
+impl TextLayouter<ClientState> for Arc<FontLoader> {
+    fn get_text_dimensions(
+        &self,
+        text: &str,
+        font_size: FontSize,
+        available_width: f32,
+        overflow_behavior: OverflowBehavior,
+    ) -> (ScreenSize, FontSize) {
+        let (size, font_size) = self
+            .as_ref()
+            .get_text_dimensions(text, font_size, 1.0, available_width, overflow_behavior);
+
+        (size, font_size)
     }
 }

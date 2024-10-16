@@ -33,7 +33,9 @@ pub enum NetworkEvent {
     CharacterServerDisconnected {
         reason: DisconnectReason,
     },
-    AccountId(AccountId),
+    AccountId {
+        account_id: AccountId,
+    },
     CharacterList {
         characters: Vec<CharacterInformation>,
     },
@@ -68,7 +70,9 @@ pub enum NetworkEvent {
         entity_id: EntityId,
     },
     /// Add an entity to the list of entities that the client is aware of.
-    AddEntity(EntityData),
+    AddEntity {
+        entity_data: EntityData,
+    },
     /// Remove an entity from the list of entities that the client is aware of
     /// by its id.
     RemoveEntity {
@@ -76,14 +80,24 @@ pub enum NetworkEvent {
         reason: DisappearanceReason,
     },
     /// The player is pathing to a new position.
-    PlayerMove(WorldPosition, WorldPosition, ClientTick),
+    PlayerMove {
+        origin: WorldPosition,
+        destination: WorldPosition,
+        starting_timestamp: ClientTick,
+    },
     /// An Entity nearby is pathing to a new position.
-    EntityMove(EntityId, WorldPosition, WorldPosition, ClientTick),
+    EntityMove {
+        entity_id: EntityId,
+        origin: WorldPosition,
+        destination: WorldPosition,
+        starting_timestamp: ClientTick,
+    },
     /// Player was moved to a new position on a different map or the current map
-    ChangeMap(String, TilePosition),
-    /// Update the client side [`tick
-    /// counter`](crate::system::GameTimer::base_client_tick) to keep server and
-    /// client synchronized.
+    ChangeMap {
+        map_name: String,
+        position: TilePosition,
+    },
+    /// Update the client side to keep server and client synchronized.
     UpdateClientTick {
         client_tick: ClientTick,
         received_at: Instant,
@@ -97,27 +111,50 @@ pub enum NetworkEvent {
     CharacterSlotSwitchFailed,
     /// Update entity details. Mostly received when the client sends
     /// [RequestDetailsPacket] after the player hovered an entity.
-    UpdateEntityDetails(EntityId, String),
-    UpdateEntityHealth(EntityId, usize, usize),
+    UpdateEntityDetails {
+        entity_id: EntityId,
+        name: String,
+    },
+    UpdateEntityHealth {
+        entity_id: EntityId,
+        health_points: usize,
+        maximum_health_points: usize,
+    },
     DamageEffect {
         entity_id: EntityId,
         damage_amount: usize,
     },
-    HealEffect(EntityId, usize),
-    UpdateStatus(StatusType),
-    OpenDialog(String, EntityId),
+    HealEffect {
+        entity_id: EntityId,
+        heal_amount: usize,
+    },
+    UpdateStatus {
+        status_type: StatusType,
+    },
+    OpenDialog {
+        text: String,
+        npc_id: EntityId,
+    },
     AddNextButton,
     AddCloseButton,
-    AddChoiceButtons(Vec<String>),
-    AddQuestEffect(QuestEffectPacket),
-    RemoveQuestEffect(EntityId),
+    AddChoiceButtons {
+        choices: Vec<String>,
+    },
+    AddQuestEffect {
+        quest_effect: QuestEffectPacket,
+    },
+    RemoveQuestEffect {
+        entity_id: EntityId,
+    },
     SetInventory {
         items: Vec<InventoryItem<NoMetadata>>,
     },
     IventoryItemAdded {
         item: InventoryItem<NoMetadata>,
     },
-    SkillTree(Vec<SkillInformation>),
+    SkillTree {
+        skill_information: Vec<SkillInformation>,
+    },
     UpdateEquippedPosition {
         index: InventoryIndex,
         equipped_position: EquipPosition,
@@ -134,11 +171,20 @@ pub enum NetworkEvent {
     FriendRequest {
         requestee: Friend,
     },
-    VisualEffect(&'static str, EntityId),
-    AddSkillUnit(EntityId, UnitId, TilePosition),
-    RemoveSkillUnit(EntityId),
+    VisualEffect {
+        effect_path: &'static str,
+        entity_id: EntityId,
+    },
+    AddSkillUnit {
+        entity_id: EntityId,
+        unit_id: UnitId,
+        position: TilePosition,
+    },
+    RemoveSkillUnit {
+        entity_id: EntityId,
+    },
     SetFriendList {
-        friends: Vec<Friend>,
+        friend_list: Vec<Friend>,
     },
     FriendAdded {
         friend: Friend,

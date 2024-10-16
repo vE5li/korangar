@@ -1,234 +1,249 @@
-use super::SizeBound;
-use super::bound::ParentLimits;
-use crate::application::{
-    Application, FontLoaderTrait, FontSizeTraitExt, PartialSizeTrait, PositionTrait, PositionTraitExt, ScalingTrait, SizeTrait,
-    SizeTraitExt,
-};
+use super::area::{Area, PartialArea};
+use crate::application::{Application, TextLayouter};
+use crate::prelude::HorizontalAlignment;
 
-const ELEMENT_THRESHHOLD: f32 = 1.0000;
-const REMAINDER_THRESHHOLD: f32 = 0.0001;
-
-pub struct PlacementResolver<App>
-where
-    App: Application,
-{
-    font_loader: App::FontLoader,
-    available_space: App::PartialSize,
-    parent_limits: ParentLimits,
-    base_position: App::Position,
-    horizontal_accumulator: f32,
-    vertical_offset: f32,
-    total_height: f32,
-    border: App::Size,
-    gaps: App::Size,
-    scaling: App::Scaling,
+pub struct Resolver<'a, App: Application> {
+    available_area: PartialArea,
+    used_height: f32,
+    gaps: f32,
+    text_layouter: &'a App::TextLayouter,
 }
 
-impl<App> PlacementResolver<App>
+impl<App> Clone for Resolver<'_, App>
 where
     App: Application,
 {
-    pub fn new(
-        font_loader: App::FontLoader,
-        screen_size: App::Size,
-        window_size: App::Size,
-        size_bound: &SizeBound,
-        border: App::Size,
-        gaps: App::Size,
-        scaling: App::Scaling,
-    ) -> Self {
-        let window_size = window_size.shrink(border.scaled(scaling).doubled());
-
-        // I'm not enirely sure why we need to subtract one border here, but if we
-        // don't the `super` bound is too big.
-        let parent_limits = ParentLimits::from_bound(size_bound, screen_size.shrink(border.scaled(scaling)), scaling);
-        let base_position = App::Position::from_size(border.scaled(scaling));
-        let horizontal_accumulator = 0.0;
-        let vertical_offset = 0.0;
-        let total_height = 0.0;
-
-        let height = (!size_bound.height.is_flexible()).then_some(window_size.height());
-        let available_space = App::PartialSize::new(window_size.width(), height);
-
+    fn clone(&self) -> Self {
         Self {
-            font_loader,
-            available_space,
-            parent_limits,
-            base_position,
-            horizontal_accumulator,
-            total_height,
-            vertical_offset,
-            border,
+            available_area: self.available_area,
+            used_height: self.used_height,
+            gaps: self.gaps,
+            text_layouter: self.text_layouter,
+        }
+    }
+}
+
+impl<'a, App> Resolver<'a, App>
+where
+    App: Application,
+{
+    pub fn new(available_area: impl Into<PartialArea>, gaps: f32, text_layouter: &'a App::TextLayouter) -> Self {
+        Self {
+            available_area: available_area.into(),
+            used_height: 0.0,
             gaps,
-            scaling,
+            text_layouter,
         }
     }
 
-    pub fn derive(&mut self, size_bound: &SizeBound, offset: App::Position, border: App::Size) -> (Self, App::PartialSize, App::Position) {
-        let (size, position) = self.allocate(size_bound);
+    fn push_gaps(&mut self) {
+        if self.used_height > 0.0 {
+            self.available_area.top += self.gaps;
+            self.used_height += self.gaps;
 
-        let border_with_offset = offset.remaining(border.scaled(self.scaling).doubled());
-        let available_space = App::PartialSize::new(
-            size.width() - border_with_offset.width(),
-            size.height().map(|height| height - border_with_offset.height()),
-        );
+            if let Some(available_height) = &mut self.available_area.height {
+                *available_height -= self.gaps;
+            }
+        }
+    }
 
-        let font_loader = self.font_loader.clone();
-        let unusable_space = position.remaining(border_with_offset);
-        let parent_limits = self.parent_limits.derive(size_bound, available_space, unusable_space, self.scaling);
-        let base_position = offset.offset(border.scaled(self.scaling));
-        let horizontal_accumulator = 0.0;
-        let vertical_offset = 0.0;
-        let total_height = 0.0;
-        let gaps = self.gaps;
-        let scaling = self.scaling;
+    pub fn push_available_area(&mut self) -> PartialArea {
+        self.push_gaps();
 
-        let derived_resolver = Self {
-            font_loader,
-            available_space,
-            parent_limits,
-            base_position,
-            horizontal_accumulator,
-            total_height,
-            vertical_offset,
-            border,
-            gaps,
-            scaling,
+        self.available_area
+    }
+
+    pub fn with_height(&mut self, height: f32) -> Area {
+        self.push_gaps();
+
+        let returned = Area {
+            left: self.available_area.left,
+            top: self.available_area.top,
+            width: self.available_area.width,
+            height,
         };
 
-        (derived_resolver, size, position)
+        self.available_area.top += height;
+        self.used_height += height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= height;
+        }
+
+        returned
     }
 
     pub fn get_text_dimensions(
         &self,
         text: &str,
         font_size: App::FontSize,
-        text_offset: App::Position,
-        scaling: App::Scaling,
-        available_width: f32,
-    ) -> App::Size {
-        self.font_loader.get_text_dimensions(
-            text,
-            font_size.scaled(scaling),
-            available_width - text_offset.left() * scaling.get_factor(),
-        )
-    }
-
-    pub fn set_gaps(&mut self, gaps: App::Size) {
-        self.gaps = gaps;
-    }
-
-    pub fn get_available(&self) -> App::PartialSize {
-        self.available_space
-    }
-
-    pub fn get_remaining(&self) -> App::PartialSize {
-        let remaining_width = self.available_space.width() - self.horizontal_accumulator;
-        let remaining_height = self
-            .available_space
-            .height()
-            .map(|height| height - self.total_height - self.vertical_offset);
-
-        App::PartialSize::new(remaining_width, remaining_height)
-    }
-
-    pub fn newline(&mut self) {
-        self.total_height += self.vertical_offset + self.gaps.height() * self.scaling.get_factor();
-        self.base_position = App::Position::new(
-            self.base_position.left(),
-            self.base_position.top() + self.vertical_offset + self.gaps.height() * self.scaling.get_factor(),
-        );
-        self.horizontal_accumulator = 0.0;
-        self.vertical_offset = 0.0;
-    }
-
-    pub fn register_height(&mut self, height: f32) {
-        self.vertical_offset = f32::max(self.vertical_offset, height);
-    }
-
-    pub fn allocate(&mut self, size_bound: &SizeBound) -> (App::PartialSize, App::Position) {
-        let is_width_absolute = size_bound.width.is_absolute();
-        let gaps_add = match is_width_absolute {
-            true => self.gaps.width() * 2.0,
-            false => 0.0,
+        horizontal_alignment: HorizontalAlignment,
+        overflow_behavior: App::OverflowBehavior,
+    ) -> (App::Size, App::FontSize) {
+        let offset = match horizontal_alignment {
+            HorizontalAlignment::Left { offset, border } => offset + border,
+            HorizontalAlignment::Center { offset, border } => offset + border,
+            HorizontalAlignment::Right { offset, border } => offset + border,
         };
 
-        let mut remaining = self.get_remaining();
-        let mut size = size_bound.resolve_element::<App::PartialSize>(self.available_space, remaining, &self.parent_limits, self.scaling);
-        let mut gaps_subtract = 0.0;
-
-        if remaining.width() < size.width() - REMAINDER_THRESHHOLD {
-            self.newline();
-            remaining = self.get_remaining();
-
-            if size_bound.width.is_remaining() || size_bound.height.is_remaining() {
-                size = size_bound.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
-            }
-
-            size = App::PartialSize::new(f32::min(size.width(), self.available_space.width()), size.height());
-        }
-
-        if self.horizontal_accumulator > ELEMENT_THRESHHOLD {
-            match is_width_absolute {
-                true => {}
-                false => gaps_subtract += self.gaps.width() * self.scaling.get_factor(),
-            }
-        }
-
-        let position = App::Position::new(
-            self.base_position.left() + self.horizontal_accumulator + gaps_subtract,
-            self.base_position.top(),
-        );
-
-        self.horizontal_accumulator += size.width() + gaps_add;
-
-        if let Some(height) = size.height() {
-            self.register_height(height);
-        }
-
-        if remaining.width() - size.width() > ELEMENT_THRESHHOLD {
-            match is_width_absolute {
-                true => {}
-                false => gaps_subtract += self.gaps.width() * self.scaling.get_factor(),
-            }
-        }
-
-        size = App::PartialSize::new(size.width() - gaps_subtract, size.height());
-        (size, position)
+        self.text_layouter
+            .get_text_dimensions(text, font_size, self.available_area.width - offset, overflow_behavior)
     }
 
-    pub fn allocate_right(&mut self, size_bound: &SizeBound) -> (App::PartialSize, App::Position) {
-        let mut remaining = self.get_remaining();
-        let mut size = size_bound.resolve_element::<App::PartialSize>(self.available_space, remaining, &self.parent_limits, self.scaling);
-
-        if remaining.width() < size.width() - REMAINDER_THRESHHOLD + self.gaps.width() * self.scaling.get_factor() {
-            self.newline();
-            remaining = self.get_remaining();
-
-            if size_bound.width.is_remaining() || size_bound.height.is_remaining() {
-                size = size_bound.resolve_element(self.available_space, remaining, &self.parent_limits, self.scaling);
-            }
-        }
-
-        let position = App::Position::new(
-            self.base_position.left() + (self.available_space.width() - size.width() - self.gaps.width() * self.scaling.get_factor()),
-            self.base_position.top(),
-        );
-
-        self.horizontal_accumulator += remaining.width();
-
-        if let Some(height) = size.height() {
-            self.register_height(height);
-        }
-
-        (size, position)
+    pub fn get_text_layouter(&self) -> &App::TextLayouter {
+        self.text_layouter
     }
 
-    pub(crate) fn get_parent_limits(&self) -> ParentLimits {
-        self.parent_limits
+    pub fn push_top(&mut self, height: f32) {
+        self.push_gaps();
+
+        self.available_area.top += height;
+        self.used_height += height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= height;
+        }
     }
 
-    pub fn final_height(self) -> f32 {
-        self.total_height + self.vertical_offset + self.border.height() * 2.0 * self.scaling.get_factor()
+    #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
+    pub fn with_derived<L>(&mut self, gaps: f32, border: f32, f: impl FnOnce(&mut Resolver<'a, App>) -> L) -> (Area, L) {
+        self.push_gaps();
+
+        let mut inner = Resolver {
+            available_area: PartialArea {
+                left: self.available_area.left + border,
+                top: self.available_area.top + border,
+                width: self.available_area.width - border * 2.0,
+                height: self.available_area.height.map(|height| height - border * 2.0),
+            },
+            used_height: 0.0,
+            gaps,
+            text_layouter: self.text_layouter,
+        };
+
+        let layout_info = f(&mut inner);
+
+        let returned = Area {
+            left: self.available_area.left,
+            top: self.available_area.top,
+            width: self.available_area.width,
+            height: inner.used_height + border * 2.0,
+        };
+
+        self.available_area.top += returned.height;
+        self.used_height += returned.height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= returned.height;
+        }
+
+        (returned, layout_info)
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile("derived"))]
+    pub fn with_derived_borderless<L>(
+        &mut self,
+        gaps: f32,
+        border: f32,
+        once_gap: f32,
+        f: impl FnOnce(&mut Resolver<'a, App>) -> L,
+    ) -> (Area, L) {
+        self.push_gaps();
+
+        let mut inner = Resolver {
+            available_area: PartialArea {
+                left: self.available_area.left + border,
+                top: self.available_area.top + once_gap,
+                width: self.available_area.width - border * 2.0,
+                height: self.available_area.height.map(|height| height - border - once_gap),
+            },
+            used_height: 0.0,
+            gaps,
+            text_layouter: self.text_layouter,
+        };
+
+        let layout_info = f(&mut inner);
+
+        let returned = Area {
+            left: self.available_area.left,
+            top: self.available_area.top,
+            width: self.available_area.width,
+            height: inner.used_height + border + once_gap,
+        };
+
+        self.available_area.top += returned.height;
+        self.used_height += returned.height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= returned.height;
+        }
+
+        (returned, layout_info)
+    }
+
+    pub fn with_derived_scrolled<L>(&mut self, scroll: f32, f: impl FnOnce(&mut Resolver<'a, App>) -> L) -> (Area, f32, L) {
+        self.push_gaps();
+
+        let mut inner = Resolver {
+            available_area: PartialArea {
+                left: self.available_area.left,
+                top: self.available_area.top - scroll,
+                width: self.available_area.width,
+                height: None,
+            },
+            used_height: 0.0,
+            gaps: self.gaps,
+            text_layouter: self.text_layouter,
+        };
+
+        let layout_info = f(&mut inner);
+
+        let children_height = inner.used_height;
+        let height = self
+            .available_area
+            .height
+            .expect("attempted to get height from an unbound resolver");
+
+        let returned = Area {
+            left: self.available_area.left,
+            top: self.available_area.top,
+            width: self.available_area.width,
+            height,
+        };
+
+        self.available_area.top += returned.height;
+        self.used_height += returned.height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= returned.height;
+        }
+
+        (returned, children_height, layout_info)
+    }
+
+    pub fn get_used_height(&self) -> f32 {
+        self.used_height
+    }
+
+    pub fn commit_used_height(&mut self, used_height: f32) {
+        self.available_area.top += used_height;
+        self.used_height += used_height;
+
+        if let Some(available_height) = &mut self.available_area.height {
+            *available_height -= used_height;
+        }
+    }
+}
+
+pub trait ResolverSet<'a, App: Application> {
+    fn with_index<C>(&mut self, index: usize, f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C;
+}
+
+impl<'a, App> ResolverSet<'a, App> for &mut Resolver<'a, App>
+where
+    App: Application,
+{
+    fn with_index<C>(&mut self, _: usize, mut f: impl FnMut(&mut Resolver<'a, App>) -> C) -> C {
+        f(*self)
     }
 }

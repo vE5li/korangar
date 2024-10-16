@@ -2,18 +2,23 @@ use cosmic_text::Attrs;
 
 use crate::graphics::Color;
 
+const RESET_COLOR_CODE: &str = "000000";
+const HIGHLIGHT_COLOR_CODE: &str = "000001";
+
 pub(crate) struct ColorSpanIterator<'r, 's> {
     text: &'s str,
     default_color: cosmic_text::Color,
+    highlight_color: cosmic_text::Color,
     attributes: Attrs<'r>,
     position: usize,
 }
 
 impl<'r, 's> ColorSpanIterator<'r, 's> {
-    pub(crate) fn new(text: &'s str, default_color: Color, attributes: Attrs<'r>) -> Self {
+    pub(crate) fn new(text: &'s str, default_color: Color, highlight_color: Color, attributes: Attrs<'r>) -> Self {
         Self {
             text,
             default_color: default_color.into(),
+            highlight_color: highlight_color.into(),
             attributes,
             position: 0,
         }
@@ -47,7 +52,8 @@ impl<'r, 's> Iterator for ColorSpanIterator<'r, 's> {
 
                     self.position = absolute_color_position + 7;
                     self.attributes.color_opt = match potential_color {
-                        "000000" => Some(self.default_color),
+                        RESET_COLOR_CODE => Some(self.default_color),
+                        HIGHLIGHT_COLOR_CODE => Some(self.highlight_color),
                         code => Some(Color::rgb_hex(code).into()),
                     };
 
@@ -81,7 +87,7 @@ mod tests {
     fn test_basic_color_change() {
         let attributes = Attrs::new();
         let text = "Hello ^FF0000Red ^00FF00Green";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 3);
         assert_eq!(spans[0].0, "Hello ");
@@ -93,7 +99,7 @@ mod tests {
     fn test_reset_to_default_color() {
         let attributes = Attrs::new();
         let text = "^FF0000Red ^000000Default";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 2);
         assert_eq!(spans[0].0, "Red ");
@@ -104,7 +110,7 @@ mod tests {
     fn test_invalid_color_codes() {
         let attributes = Attrs::new();
         let text = "^FFInvalid ^FF00 ^FFFF00Valid";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 2);
         assert_eq!(spans[0].0, "^FFInvalid ^FF00 ");
@@ -115,7 +121,7 @@ mod tests {
     fn test_empty_text_between_colors() {
         let attributes = Attrs::new();
         let text = "^FF0000^00FF00^0000FF";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 0);
     }
@@ -124,7 +130,7 @@ mod tests {
     fn test_color_code_at_end() {
         let attributes = Attrs::new();
         let text = "Text^FF0000";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 1);
         assert_eq!(spans[0].0, "Text");
@@ -134,7 +140,7 @@ mod tests {
     fn test_caret_at_end() {
         let attributes = Attrs::new();
         let text = "Normal text ^FFFF00Colored text^";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 2);
         assert_eq!(spans[0].0, "Normal text ");
@@ -145,7 +151,7 @@ mod tests {
     fn test_consecutive_color_changes() {
         let attributes = Attrs::new();
         let text = "^AAAAAA^BBBBBBtext^CCCCCCmore^DDDDDDlast";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 3);
         assert_eq!(spans[0].0, "text");
@@ -157,8 +163,19 @@ mod tests {
     fn test_empty_input() {
         let attributes = Attrs::new();
         let text = "";
-        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, attributes).collect();
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
 
         assert_eq!(spans.len(), 0);
+    }
+
+    #[test]
+    fn test_highlight_color() {
+        let attributes = Attrs::new();
+        let text = "^000001Highlighted ^000000Default";
+        let spans: Vec<_> = ColorSpanIterator::new(text, Color::BLACK, Color::WHITE, attributes).collect();
+
+        assert_eq!(spans.len(), 2);
+        assert_eq!(spans[0].0, "Highlighted ");
+        assert_eq!(spans[1].0, "Default");
     }
 }

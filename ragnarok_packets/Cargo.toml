@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 bitflags = { workspace = true }
 korangar_interface = { workspace = true, optional = true }
+rust_state = { workspace = true, optional = true }
 ragnarok_bytes = { workspace = true, features = ["derive"] }
 ragnarok_procedural = { workspace = true }
 
@@ -17,6 +18,6 @@ pcap = { workspace = true }
 [features]
 debug = []
 derive = []
-interface = ["korangar_interface"]
-packet-to-prototype-element = ["interface"]
+interface = ["korangar_interface", "rust_state"]
+packet-to-state-element = ["interface"]
 unicode = ["korangar_debug/unicode"]

@@ -55,6 +55,12 @@ impl ByteWriter {
         self.data.push(byte);
     }
 
+    /// Pops a single byte.
+    #[inline(always)]
+    pub fn pop(&mut self) {
+        self.data.pop();
+    }
+
     /// Adds the given bytes to the data.
     #[inline(always)]
     pub fn extend_from_slice(&mut self, bytes: &[u8]) {

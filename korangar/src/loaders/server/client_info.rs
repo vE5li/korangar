@@ -1,5 +1,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
+use korangar_interface::components::drop_down::DropDownItem;
+use korangar_interface::element::StateElement;
+use rust_state::RustState;
 use serde::de::Error;
 use serde::{Deserialize, Deserializer};
 
@@ -13,7 +16,7 @@ use super::ServiceId;
 ///
 /// See more: <https://github.com/rathena/rathena/wiki/Clientinfo.xml>
 #[allow(dead_code)]
-#[derive(Default, Debug, Deserialize)]
+#[derive(Default, Debug, Deserialize, RustState, StateElement)]
 pub struct ClientInfo {
     /// ClientInfo's description.
     #[serde(alias = "desc")]
@@ -71,7 +74,7 @@ pub struct ClientInfo {
 
 /// The ClientInfo's Service structure
 #[allow(dead_code)]
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
 pub struct Service {
     /// Displays the name of the server at the Service Select screen.
     #[serde(alias = "display")]
@@ -132,9 +135,19 @@ impl Service {
     }
 }
 
+impl DropDownItem<ServiceId> for Service {
+    fn text(&self) -> &str {
+        self.display_name.as_ref().unwrap_or(&self.address)
+    }
+
+    fn value(&self) -> ServiceId {
+        self.service_id()
+    }
+}
+
 /// The ClientInfo Service's Account ID structure.
 #[allow(dead_code)]
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
 pub struct GameMasterAccount {
     /// GM's Account ID.
     #[serde(alias = "admin")]
@@ -143,7 +156,7 @@ pub struct GameMasterAccount {
 
 /// The ClientInfo Service's Loading Image structure.
 #[allow(dead_code)]
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
 pub struct LoadingImage {
     /// File name.
     #[serde(alias = "image")]
@@ -151,7 +164,7 @@ pub struct LoadingImage {
 }
 
 /// The ClientInfo's ServiceType enumerator.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, RustState, StateElement)]
 pub enum ServiceType {
     #[default]
     Korea,
@@ -255,7 +268,7 @@ where
 }
 
 /// The ClientInfo's ServerType enumerator.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, StateElement)]
 pub enum ServerType {
     #[default]
     Primary,

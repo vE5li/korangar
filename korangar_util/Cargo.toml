@@ -8,10 +8,11 @@ cgmath = { workspace = true }
 fast-srgb8 = { workspace = true }
 hashbrown = { workspace = true }
 image = { workspace = true }
+rust_state = { workspace = true, optional = true }
 korangar_interface = { workspace = true, optional = true }
 
 [dev-dependencies]
 rand_aes = { workspace = true }
 
 [features]
-interface = ["korangar_interface"]
+interface = ["korangar_interface", "rust_state"]

@@ -12,6 +12,7 @@ bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_co
 cgmath = { workspace = true, features = ["mint", "serde"] }
 chrono = { workspace = true }
 cosmic-text = { workspace = true, features = ["std", "fontconfig"] }
+korangar_components = { path = "components" }
 ctrlc = { workspace = true }
 ddsfile = { workspace = true }
 derive-new = { workspace = true }
@@ -22,7 +23,7 @@ image = { workspace = true, features = ["bmp", "jpeg", "png", "tga", "rayon"] }
 korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }
-korangar_networking = { workspace = true, features = ["debug"] }
+korangar_networking = { workspace = true, features = ["interface"] }
 korangar_util = { workspace = true, features = ["interface"] }
 korangar_video = { workspace = true }
 lunify = { workspace = true }
@@ -33,10 +34,11 @@ pollster = { workspace = true }
 quick-xml = { workspace = true, features = ["serde", "serialize"] }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }
-ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-prototype-element"] }
+ragnarok_packets = { workspace = true, features = ["derive", "interface", "packet-to-state-element"] }
 rand_aes = { workspace = true, features = ["tls", "tls_aes128_ctr128"] }
 rayon = { workspace = true }
 ron = { workspace = true }
+rust_state = { workspace = true }
 serde = { workspace = true }
 sevenz-rust2 = { workspace = true, features = ["compress"] }
 smallvec = { workspace = true, features = ["const_generics", "const_new", "union"] }
@@ -47,7 +49,7 @@ wgpu = { workspace = true, features = ["static-dxc"] }
 winit = { workspace = true }
 
 [features]
-debug = ["korangar_debug", "korangar_audio/debug", "ragnarok_packets/debug"]
+debug = ["korangar_audio/debug", "korangar_debug", "korangar_interface/debug", "korangar_networking/debug", "ragnarok_packets/debug"]
 plain = ["korangar_debug/plain"]
 unicode = ["korangar_debug/unicode"]
 flac = ["korangar_audio/flac"]

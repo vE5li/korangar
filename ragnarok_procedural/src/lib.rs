@@ -1,5 +1,4 @@
 #![feature(extend_one)]
-#![feature(extract_if)]
 
 mod convertable;
 mod fixed_size;

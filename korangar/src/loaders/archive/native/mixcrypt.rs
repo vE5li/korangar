@@ -73,7 +73,7 @@ fn calculate_encryption_cycle(digit: usize) -> usize {
 }
 
 fn decrypt_data(data: &mut [u8], only_header_is_encrypted: bool, cycle: usize) {
-    if data.len() % BLOCK_SIZE == 0 {
+    if data.len().is_multiple_of(BLOCK_SIZE) {
         decrypt_data_blocks(data, only_header_is_encrypted, cycle);
     } else {
         let original_length = data.len();
@@ -106,7 +106,7 @@ fn decrypt_data_blocks(data: &mut [u8], only_header_is_encrypted: bool, cycle: u
 }
 
 fn should_apply_des(block_number: usize, only_header_is_encrypted: bool, cycle: usize) -> bool {
-    block_number < HEADER_BLOCKS_SIZE || (!only_header_is_encrypted && block_number % cycle == 0)
+    block_number < HEADER_BLOCKS_SIZE || (!only_header_is_encrypted && block_number.is_multiple_of(cycle))
 }
 
 fn should_apply_scramble(block_num: usize, only_header_is_encrypted: bool) -> bool {

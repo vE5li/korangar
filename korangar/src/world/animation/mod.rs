@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
-use korangar_interface::elements::PrototypeElement;
+use korangar_interface::element::StateElement;
 use korangar_util::container::Cacheable;
 use ragnarok_packets::{ClientTick, Direction, EntityId};
+use rust_state::RustState;
 
 #[cfg(feature = "debug")]
 use crate::graphics::DebugRectangleInstruction;
@@ -118,7 +119,7 @@ impl AnimationState {
     }
 }
 
-#[derive(Clone, PrototypeElement)]
+#[derive(RustState, Clone, StateElement)]
 pub struct AnimationData {
     pub animation_pair: Vec<AnimationPair>,
     pub animations: Vec<Animation>,
@@ -133,13 +134,13 @@ impl Cacheable for AnimationData {
     }
 }
 
-#[derive(Clone, PrototypeElement)]
+#[derive(RustState, Clone, StateElement)]
 pub struct AnimationPair {
     pub sprites: Arc<Sprite>,
     pub actions: Arc<Actions>,
 }
 
-#[derive(Clone, PrototypeElement)]
+#[derive(RustState, Clone, StateElement)]
 pub struct Animation {
     #[hidden_element]
     pub frames: Vec<AnimationFrame>,

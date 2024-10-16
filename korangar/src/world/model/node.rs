@@ -1,13 +1,14 @@
 use cgmath::{Matrix, Matrix4, Point3, SquareMatrix, Transform as PointTransform, Vector4, VectorSpace};
 use derive_new::new;
-use korangar_interface::elements::PrototypeElement;
+use korangar_interface::element::StateElement;
 use ragnarok_formats::model::{RotationKeyframeData, ScaleKeyframeData, TranslationKeyframeData};
 use ragnarok_formats::version::InternalVersion;
+use rust_state::RustState;
 
 use crate::graphics::ModelInstruction;
 use crate::world::Camera;
 
-#[derive(PrototypeElement, new)]
+#[derive(RustState, StateElement, new)]
 pub struct Node {
     pub version: InternalVersion,
     #[hidden_element]
@@ -21,6 +22,8 @@ pub struct Node {
     #[hidden_element]
     pub centroid: Point3<f32>,
     pub sub_meshes: Vec<SubMesh>,
+    // TODO: Unhide once this doesn't crash the compilation anymore.
+    #[hidden_element]
     pub child_nodes: Vec<Node>,
     pub animation_length: u32,
     pub scale_keyframes: Vec<ScaleKeyframeData>,
@@ -28,7 +31,7 @@ pub struct Node {
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
 
-#[derive(PrototypeElement)]
+#[derive(Clone, RustState, StateElement)]
 pub struct SubMesh {
     pub index_offset: u32,
     pub index_count: u32,

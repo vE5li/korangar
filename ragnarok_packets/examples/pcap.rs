@@ -1,5 +1,3 @@
-#![feature(const_type_id)]
-
 use std::any::TypeId;
 
 use etherparse::{SlicedPacket, TransportSlice};

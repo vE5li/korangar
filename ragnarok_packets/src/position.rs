@@ -1,7 +1,7 @@
 use ragnarok_bytes::{ByteConvertable, ByteReader, ByteWriter, ConversionResult, FromBytes, ToBytes};
 
 #[derive(Debug, Copy, Clone, ByteConvertable)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub enum Direction {
     N = 0,
     NE = 1,
@@ -54,7 +54,7 @@ impl From<[isize; 2]> for Direction {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct WorldPosition {
     pub x: usize,
     pub y: usize,
@@ -110,7 +110,7 @@ impl ToBytes for WorldPosition {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[cfg_attr(feature = "interface", derive(rust_state::RustState, korangar_interface::element::StateElement))]
 pub struct WorldPosition2 {
     pub x1: usize,
     pub y1: usize,

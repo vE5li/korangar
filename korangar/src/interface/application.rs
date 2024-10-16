@@ -17,9 +17,10 @@ use super::layout::{CornerRadius, PartialScreenSize, ScreenClip, ScreenPosition,
 use super::resource::{Move, PartialMove};
 use super::theme::{DefaultMain, DefaultMenu, GameTheme, InterfaceTheme, InterfaceThemeKind, Themes};
 use super::windows::WindowCache;
-use crate::graphics::{Color, InterfaceRenderer};
+use crate::graphics::Color;
 use crate::input::{MouseInputMode, UserEvent};
 use crate::loaders::{FontLoader, FontSize, Scaling};
+use crate::renderer::InterfaceRenderer;
 
 impl korangar_interface::application::ColorTrait for Color {
     fn is_transparent(&self) -> bool {
@@ -321,7 +322,6 @@ impl Application for InterfaceSettings {
     type MouseInputMode = MouseInputMode;
     type PartialSize = PartialScreenSize;
     type Position = ScreenPosition;
-    type RenderPass<'encoder> = wgpu::RenderPass<'encoder>;
     type Renderer = InterfaceRenderer;
     type Scaling = Scaling;
     type Size = ScreenSize;

@@ -117,8 +117,6 @@ impl Color {
         }
     }
 
-    // TODO: NHA For this function we should have a sRGBA (4x u8) and linear color
-    //       type (4x f32).
     pub fn components_linear(self) -> [f32; 4] {
         let srgb = [self.red, self.green, self.blue];
         let linear = srgb.map(|channel| {

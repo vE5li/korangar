@@ -4,18 +4,15 @@ use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
-use wgpu::RenderPass;
 
-use crate::graphics::{Buffer, Camera, GeometryRenderer, ModelVertex, Renderer, TextureGroup};
+use crate::graphics::ModelInstruction;
 
 #[derive(PrototypeElement, new)]
 pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
-    #[hidden_element]
-    pub vertex_buffer: Buffer<ModelVertex>,
-    #[hidden_element]
-    pub textures: TextureGroup,
+    pub vertex_offset: usize,
+    pub vertex_count: usize,
     pub child_nodes: Vec<Node>,
     pub rotation_keyframes: Vec<RotationKeyframeData>,
 }
@@ -42,7 +39,6 @@ impl Node {
         current_rotation.into()
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn world_matrix(&self, transform: &Transform, client_tick: ClientTick) -> Matrix4<f32> {
         let animation_rotation_matrix = match self.rotation_keyframes.is_empty() {
             true => Matrix4::identity(),
@@ -60,31 +56,15 @@ impl Node {
             * animation_rotation_matrix
     }
 
-    #[cfg_attr(feature = "debug", korangar_debug::profile("render node geometry"))]
-    pub fn render_geometry<T>(
-        &self,
-        render_target: &mut T::Target,
-        render_pass: &mut RenderPass,
-        renderer: &T,
-        camera: &dyn Camera,
-        transform: &Transform,
-        client_tick: ClientTick,
-        time: f32,
-    ) where
-        T: Renderer + GeometryRenderer,
-    {
-        renderer.render_geometry(
-            render_target,
-            render_pass,
-            camera,
-            &self.vertex_buffer,
-            &self.textures,
-            self.world_matrix(transform, client_tick),
-            time,
-        );
+    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, transform: &Transform, client_tick: ClientTick) {
+        instructions.push(ModelInstruction {
+            model_matrix: self.world_matrix(transform, client_tick),
+            vertex_offset: self.vertex_offset,
+            vertex_count: self.vertex_count,
+        });
 
         self.child_nodes
             .iter()
-            .for_each(|node| node.render_geometry(render_target, render_pass, renderer, camera, transform, client_tick, time));
+            .for_each(|node| node.render_geometry(instructions, transform, client_tick));
     }
 }

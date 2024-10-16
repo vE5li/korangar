@@ -4,13 +4,13 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
 use ragnarok_packets::EntityId;
-use wgpu::RenderPass;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::Color;
 use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
+use crate::renderer::InterfaceRenderer;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum DialogElement {
@@ -112,8 +112,6 @@ impl Element<InterfaceSettings> for DialogContainer {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -124,10 +122,10 @@ impl Element<InterfaceSettings> for DialogContainer {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer =
-            self.state
-                .state
-                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(renderer, application, parent_position, screen_clip);
 
         self.state.render(
             &mut renderer,

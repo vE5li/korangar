@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use derive_new::new;
 use image::{EncodableLayout, ImageFormat, ImageReader, Rgba};
@@ -20,11 +20,11 @@ pub struct TextureLoader {
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
     #[new(default)]
-    cache: HashMap<String, Arc<Texture>>,
+    cache: Mutex<HashMap<String, Arc<Texture>>>,
 }
 
 impl TextureLoader {
-    fn load(&mut self, path: &str) -> Result<Arc<Texture>, LoadError> {
+    fn load(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture from {}", path.magenta()));
 
@@ -90,7 +90,7 @@ impl TextureLoader {
         );
         let texture = Arc::new(texture);
 
-        self.cache.insert(path.to_string(), texture.clone());
+        self.cache.lock().as_mut().unwrap().insert(path.to_string(), texture.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();
@@ -98,10 +98,40 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn get(&mut self, path: &str) -> Result<Arc<Texture>, LoadError> {
-        match self.cache.get(path) {
+    pub fn get(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
+        let lock = self.cache.lock();
+        match lock.as_ref().unwrap().get(path) {
             Some(texture) => Ok(texture.clone()),
-            None => self.load(path),
+            None => {
+                // We need to drop to avoid a deadlock here.
+                drop(lock);
+                self.load(path)
+            }
         }
+    }
+
+    /// We need to map the model texture indices to the indices of the textures
+    /// buffer.
+    pub fn map_model_texture_to_texture_buffer(
+        &self,
+        texture_cache: &mut HashMap<String, i32>,
+        texture_buffer: &mut Vec<Arc<Texture>>,
+        texture_names: &[impl AsRef<str>],
+    ) -> Vec<i32> {
+        texture_names
+            .iter()
+            .map(|texture_name| {
+                let texture_name = texture_name.as_ref();
+                let offset = if let Some(texture_offset) = texture_cache.get(texture_name).copied() {
+                    texture_offset
+                } else {
+                    let texture_offset = texture_buffer.len() as i32;
+                    texture_buffer.push(self.get(texture_name).expect("can't load model texture"));
+                    texture_cache.insert(texture_name.to_string(), texture_offset);
+                    texture_offset
+                };
+                offset
+            })
+            .collect()
     }
 }

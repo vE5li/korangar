@@ -234,8 +234,6 @@ where
 
     pub fn render(
         &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         theme: &App::Theme,
@@ -251,8 +249,6 @@ where
         );
 
         renderer.render_rectangle(
-            render_target,
-            render_pass,
             self.position,
             self.size,
             screen_clip,
@@ -262,8 +258,6 @@ where
 
         self.elements.iter().for_each(|element| {
             element.borrow().render(
-                render_target,
-                render_pass,
                 renderer,
                 application,
                 theme,
@@ -280,8 +274,6 @@ where
             let position = position_tracker().unwrap(); // FIX: Don't unwrap obviously
 
             popup.borrow().render(
-                render_target,
-                render_pass,
                 renderer,
                 application,
                 theme,
@@ -295,18 +287,9 @@ where
         };
     }
 
-    pub fn render_anchors(
-        &self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
-        renderer: &App::Renderer,
-        theme: &App::Theme,
-        available_space: App::Size,
-    ) {
-        self.anchor
-            .render_window_anchors(render_target, render_pass, renderer, theme, self.position, self.size);
-        self.anchor
-            .render_screen_anchors(render_target, render_pass, renderer, theme, available_space);
+    pub fn render_anchors(&self, renderer: &App::Renderer, theme: &App::Theme, available_space: App::Size) {
+        self.anchor.render_window_anchors(renderer, theme, self.position, self.size);
+        self.anchor.render_screen_anchors(renderer, theme, available_space);
     }
 }
 

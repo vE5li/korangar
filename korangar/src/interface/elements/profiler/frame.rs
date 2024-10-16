@@ -6,15 +6,15 @@ use korangar_interface::event::{ChangeEvent, ClickAction, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote};
-use wgpu::RenderPass;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::Color;
 use crate::input::MouseInputMode;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::interface::windows::FrameInspectorWindow;
 use crate::loaders::FontSize;
+use crate::renderer::InterfaceRenderer;
 
 pub struct FrameView {
     state: ElementState<InterfaceSettings>,
@@ -89,8 +89,6 @@ impl Element<InterfaceSettings> for FrameView {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         _theme: &InterfaceTheme,
@@ -101,9 +99,7 @@ impl Element<InterfaceSettings> for FrameView {
         _mouse_mode: &MouseInputMode,
         _second_theme: bool,
     ) {
-        let mut renderer = self
-            .state
-            .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self.state.element_renderer(renderer, application, parent_position, screen_clip);
 
         let (entries, statistics_map, longest_frame) = korangar_debug::profiling::get_statistics_data(*self.visible_thread.get());
 

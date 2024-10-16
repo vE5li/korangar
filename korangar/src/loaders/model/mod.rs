@@ -11,22 +11,16 @@ use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
-use wgpu::{BufferUsages, Device, Queue};
 
 use super::error::LoadError;
 use super::FALLBACK_MODEL_FILE;
-use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
+use crate::graphics::{Color, ModelVertex, NativeModelVertex, Texture};
 use crate::loaders::{GameFileLoader, TextureLoader};
 use crate::world::{Model, Node};
-use crate::Color;
 
 #[derive(new)]
 pub struct ModelLoader {
-    device: Arc<Device>,
-    queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
-    #[new(default)]
-    cache: HashMap<(String, bool), Arc<Model>>,
 }
 
 impl ModelLoader {
@@ -137,26 +131,30 @@ impl ModelLoader {
     }
 
     fn process_node_mesh(
-        device: &Device,
-        queue: &Queue,
         current_node: &NodeData,
-        nodes: &Vec<NodeData>,
-        textures: &Vec<Arc<Texture>>,
+        nodes: &[NodeData],
+        vertex_buffer: &mut Vec<ModelVertex>,
+        texture_index_mapping: &[i32],
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
         root_node_name: &ModelString<40>,
         reverse_order: bool,
     ) -> Node {
-        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
-        let vertices = NativeModelVertex::to_vertices(Self::make_vertices(current_node, &main_matrix, reverse_order));
+        let node_texture_index_mapping: Vec<i32> = current_node
+            .texture_indices
+            .iter()
+            .map(|&index| texture_index_mapping[index as usize])
+            .collect();
 
-        let vertex_buffer = Buffer::with_data(
-            device,
-            queue,
-            &current_node.node_name.inner,
-            BufferUsages::COPY_DST | BufferUsages::VERTEX,
-            &vertices,
+        let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
+        let vertices = NativeModelVertex::to_vertices(
+            Self::make_vertices(current_node, &main_matrix, reverse_order),
+            Some(&node_texture_index_mapping),
         );
+
+        let vertex_offset = vertex_buffer.len();
+        let vertex_count = vertices.len();
+        vertex_buffer.extend(vertices);
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = AABB::from_vertices(
@@ -167,24 +165,16 @@ impl ModelLoader {
         );
         main_bounding_box.extend(&bounding_box);
 
-        let node_textures: Vec<Arc<Texture>> = current_node
-            .texture_indices
-            .iter()
-            .map(|index| *index as usize)
-            .map(|index| textures[index].clone())
-            .collect();
-
         let child_nodes = nodes
             .iter()
             .filter(|node| node.parent_node_name == current_node.node_name)
             .filter(|node| node.parent_node_name != node.node_name)
             .map(|node| {
                 Self::process_node_mesh(
-                    device,
-                    queue,
                     node,
                     nodes,
-                    textures,
+                    vertex_buffer,
+                    texture_index_mapping,
                     &box_transform_matrix,
                     main_bounding_box,
                     root_node_name,
@@ -193,12 +183,10 @@ impl ModelLoader {
             })
             .collect();
 
-        let node_textures = TextureGroup::new(device, &root_node_name.inner, node_textures);
-
         Node::new(
             transform_matrix,
-            vertex_buffer,
-            node_textures,
+            vertex_offset,
+            vertex_count,
             child_nodes,
             current_node.rotation_keyframes.clone(),
         )
@@ -223,7 +211,15 @@ impl ModelLoader {
             .for_each(|child_node| Self::calculate_transformation_matrix(child_node, false, bounding_box, node.transform_matrix));
     }
 
-    fn load(&mut self, texture_loader: &mut TextureLoader, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, LoadError> {
+    pub fn load(
+        &mut self,
+        texture_loader: &TextureLoader,
+        texture_cache: &mut HashMap<String, i32>,
+        vertex_buffer: &mut Vec<ModelVertex>,
+        texture_buffer: &mut Vec<Arc<Texture>>,
+        model_file: &str,
+        reverse_order: bool,
+    ) -> Result<Model, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}", model_file.magenta()));
 
@@ -242,7 +238,14 @@ impl ModelLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.get(texture_loader, FALLBACK_MODEL_FILE, reverse_order);
+                return self.load(
+                    texture_loader,
+                    texture_cache,
+                    vertex_buffer,
+                    texture_buffer,
+                    FALLBACK_MODEL_FILE,
+                    reverse_order,
+                );
             }
         };
 
@@ -255,14 +258,18 @@ impl ModelLoader {
                 print_debug!("Replacing with fallback");
             }
 
-            return self.get(texture_loader, FALLBACK_MODEL_FILE, reverse_order);
+            return self.load(
+                texture_loader,
+                texture_cache,
+                vertex_buffer,
+                texture_buffer,
+                FALLBACK_MODEL_FILE,
+                reverse_order,
+            );
         }
 
-        let textures = model_data
-            .texture_names
-            .iter()
-            .map(|texture_name| texture_loader.get(&texture_name.inner).unwrap())
-            .collect();
+        let texture_index_mapping =
+            texture_loader.map_model_texture_to_texture_buffer(texture_cache, texture_buffer, &model_data.texture_names);
 
         let root_node_name = &model_data.root_node_name;
 
@@ -274,11 +281,10 @@ impl ModelLoader {
 
         let mut bounding_box = AABB::uninitialized();
         let mut root_node = Self::process_node_mesh(
-            &self.device,
-            &self.queue,
             root_node,
             &model_data.nodes,
-            &textures,
+            vertex_buffer,
+            &texture_index_mapping,
             &Matrix4::identity(),
             &mut bounding_box,
             root_node_name,
@@ -286,26 +292,16 @@ impl ModelLoader {
         );
         Self::calculate_transformation_matrix(&mut root_node, true, bounding_box, Matrix4::identity());
 
-        let model = Arc::new(Model::new(
+        let model = Model::new(
             root_node,
             bounding_box,
             #[cfg(feature = "debug")]
             model_data,
-        ));
-
-        self.cache.insert((model_file.to_string(), reverse_order), model.clone());
+        );
 
         #[cfg(feature = "debug")]
         timer.stop();
 
         Ok(model)
-    }
-
-    pub fn get(&mut self, texture_loader: &mut TextureLoader, model_file: &str, reverse_order: bool) -> Result<Arc<Model>, LoadError> {
-        match self.cache.get(&(model_file.to_string(), reverse_order)) {
-            // kinda dirty
-            Some(model) => Ok(model.clone()),
-            None => self.load(texture_loader, model_file, reverse_order),
-        }
     }
 }

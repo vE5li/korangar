@@ -4,12 +4,14 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 
 [workspace.dependencies]
 bitflags = "2.6"
+bumpalo = "3"
 bytemuck = "1.17"
 cgmath = "0.18"
 chrono = "0.4"
 cpal = "0.15"
 derive-new = "0.7"
 etherparse = "0.16"
+hashbrown = "0.15"
 image = { version = "0.25", default-features = false }
 kira = { version = "0.9", default-features = false }
 korangar_audio = { path = "korangar_audio" }

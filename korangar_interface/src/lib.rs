@@ -17,7 +17,7 @@ pub mod windows;
 
 use std::marker::PhantomData;
 
-use application::{Application, FocusState, InterfaceRenderer, SizeTrait, SizeTraitExt, WindowCache};
+use application::{Application, FocusState, SizeTrait, SizeTraitExt, WindowCache};
 use elements::ElementCell;
 use event::{ChangeEvent, ClickAction, HoverInformation};
 // Re-export proc macros.
@@ -396,8 +396,6 @@ where
     #[cfg_attr(feature = "debug", korangar_debug::profile("render user interface"))]
     pub fn render(
         &mut self,
-        render_target: &mut <App::Renderer as InterfaceRenderer<App>>::Target,
-        render_pass: &mut App::RenderPass<'_>,
         renderer: &App::Renderer,
         application: &App,
         hovered_element: Option<ElementCell<App>>,
@@ -415,19 +413,10 @@ where
                 let kind = window.get_theme_kind();
                 let theme = application.get_theme(kind);
 
-                window.render(
-                    render_target,
-                    render_pass,
-                    renderer,
-                    application,
-                    theme,
-                    hovered_element,
-                    focused_element,
-                    mouse_mode,
-                );
+                window.render(renderer, application, theme, hovered_element, focused_element, mouse_mode);
 
                 if mouse_mode.is_moving_window(index) {
-                    window.render_anchors(render_target, render_pass, renderer, theme, self.available_space);
+                    window.render_anchors(renderer, theme, self.available_space);
                 }
             }
         }

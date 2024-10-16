@@ -1,8 +1,7 @@
 use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 use derive_new::new;
 
-use crate::graphics::ModelVertex;
-use crate::Color;
+use crate::graphics::{Color, ModelVertex};
 
 #[derive(new)]
 pub struct NativeModelVertex {
@@ -15,18 +14,22 @@ pub struct NativeModelVertex {
 }
 
 impl NativeModelVertex {
-    fn convert_to_vertex(self) -> ModelVertex {
+    fn convert_to_vertex(self, texture_index_mapping: Option<&[i32]>) -> ModelVertex {
+        // sic! We want to panic when the mapping doesn't contain the texture index.
+        let texture_index = texture_index_mapping
+            .map(|mapping| mapping[self.texture_index as usize])
+            .unwrap_or(self.texture_index);
         ModelVertex::new(
             self.position,
             self.normal,
             self.texture_coordinates,
-            self.texture_index,
+            texture_index,
             self.color,
             self.wind_affinity,
         )
     }
 
-    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>) -> Vec<ModelVertex> {
+    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_index_mapping: Option<&[i32]>) -> Vec<ModelVertex> {
         let mut vertices = Vec::new();
         let mut drain_iterator = native_vertices.drain(..);
 
@@ -38,9 +41,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.convert_to_vertex());
-            vertices.push(second_partial.convert_to_vertex());
-            vertices.push(third_partial.convert_to_vertex());
+            vertices.push(first_partial.convert_to_vertex(texture_index_mapping));
+            vertices.push(second_partial.convert_to_vertex(texture_index_mapping));
+            vertices.push(third_partial.convert_to_vertex(texture_index_mapping));
         }
 
         vertices

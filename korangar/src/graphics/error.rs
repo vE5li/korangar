@@ -9,4 +9,7 @@ pub fn error_handler(error: Error) {
     };
 
     print_debug!("wgpu [{}] [{}]: {}", message_type.yellow(), "error".red(), message);
+
+    #[cfg(debug_assertions)]
+    panic!("WGPU error found");
 }

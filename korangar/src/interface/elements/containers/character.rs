@@ -8,14 +8,14 @@ use korangar_interface::layout::PlacementResolver;
 use korangar_interface::state::{PlainRemote, Remote};
 use korangar_interface::{dimension_bound, size_bound};
 use ragnarok_packets::CharacterInformation;
-use wgpu::RenderPass;
 
-use crate::graphics::{Color, InterfaceRenderer, Renderer};
+use crate::graphics::Color;
 use crate::input::{MouseInputMode, UserEvent};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::interface::theme::InterfaceTheme;
 use crate::loaders::FontSize;
+use crate::renderer::InterfaceRenderer;
 
 // TODO: rework all of this
 pub struct CharacterPreview {
@@ -186,8 +186,6 @@ impl Element<InterfaceSettings> for CharacterPreview {
 
     fn render(
         &self,
-        render_target: &mut <InterfaceRenderer as Renderer>::Target,
-        render_pass: &mut RenderPass,
         renderer: &InterfaceRenderer,
         application: &InterfaceSettings,
         theme: &InterfaceTheme,
@@ -198,10 +196,10 @@ impl Element<InterfaceSettings> for CharacterPreview {
         mouse_mode: &MouseInputMode,
         second_theme: bool,
     ) {
-        let mut renderer =
-            self.state
-                .state
-                .element_renderer(render_target, render_pass, renderer, application, parent_position, screen_clip);
+        let mut renderer = self
+            .state
+            .state
+            .element_renderer(renderer, application, parent_position, screen_clip);
 
         let background_color = match self.is_element_self(hovered_element) || self.is_element_self(focused_element) {
             true => theme.button.hovered_background_color.get(),

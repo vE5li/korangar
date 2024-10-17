@@ -17,7 +17,6 @@ pub trait Application: Sized + 'static {
     type MouseInputMode: MouseInputModeTrait<Self>;
     type PartialSize: PartialSizeTrait;
     type Position: PositionTrait;
-    type RenderPass<'encoder>;
     type Renderer: InterfaceRenderer<Self>;
     type Scaling: ScalingTrait;
     type Size: SizeTrait;
@@ -74,14 +73,10 @@ pub trait InterfaceRenderer<App>
 where
     App: Application,
 {
-    type Target;
-
     fn get_text_dimensions(&self, text: &str, font_size: App::FontSize, available_width: f32) -> App::Size;
 
     fn render_rectangle(
         &self,
-        render_target: &mut Self::Target,
-        render_pass: &mut App::RenderPass<'_>,
         position: App::Position,
         size: App::Size,
         clip: App::Clip,
@@ -89,38 +84,11 @@ where
         color: App::Color,
     );
 
-    fn render_text(
-        &self,
-        render_target: &mut Self::Target,
-        render_pass: &mut App::RenderPass<'_>,
-        text: &str,
-        position: App::Position,
-        clip: App::Clip,
-        color: App::Color,
-        font_size: App::FontSize,
-    ) -> f32;
+    fn render_text(&self, text: &str, position: App::Position, clip: App::Clip, color: App::Color, font_size: App::FontSize) -> f32;
 
-    fn render_checkbox(
-        &self,
-        render_target: &mut Self::Target,
-        render_pass: &mut App::RenderPass<'_>,
-        position: App::Position,
-        size: App::Size,
-        clip: App::Clip,
-        color: App::Color,
-        checked: bool,
-    );
+    fn render_checkbox(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, checked: bool);
 
-    fn render_expand_arrow(
-        &self,
-        render_target: &mut Self::Target,
-        render_pass: &mut App::RenderPass<'_>,
-        position: App::Position,
-        size: App::Size,
-        clip: App::Clip,
-        color: App::Color,
-        expanded: bool,
-    );
+    fn render_expand_arrow(&self, position: App::Position, size: App::Size, clip: App::Clip, color: App::Color, expanded: bool);
 }
 
 pub trait ColorTrait: Clone {

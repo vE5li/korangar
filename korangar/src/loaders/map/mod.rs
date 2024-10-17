@@ -18,11 +18,11 @@ use ragnarok_formats::version::InternalVersion;
 use wgpu::{BufferUsages, Device, Queue};
 
 pub use self::vertices::MAP_TILE_SIZE;
-use self::vertices::{generate_tile_vertices, ground_water_vertices, load_textures};
+use self::vertices::{generate_tile_vertices, ground_water_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
-use crate::world::{point_light_extent, LightSourceKey};
+use crate::world::{point_light_extent, LightSourceKey, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -46,29 +46,15 @@ pub struct MapLoader {
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
-    #[new(default)]
-    cache: HashMap<String, Arc<Map>>,
 }
 
 impl MapLoader {
-    pub fn get(
+    pub fn load(
         &mut self,
         resource_file: String,
         model_loader: &mut ModelLoader,
-        texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Map>, LoadError> {
-        match self.cache.get(&resource_file) {
-            Some(map) => Ok(map.clone()),
-            None => self.load(resource_file, model_loader, texture_loader),
-        }
-    }
-
-    fn load(
-        &mut self,
-        resource_file: String,
-        model_loader: &mut ModelLoader,
-        texture_loader: &mut TextureLoader,
-    ) -> Result<Arc<Map>, LoadError> {
+        texture_loader: &TextureLoader,
+    ) -> Result<Map, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
@@ -84,7 +70,11 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let map_data_clone = map_data.clone();
 
+        #[cfg(feature = "debug")]
         let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
+        #[cfg(not(feature = "debug"))]
+        let (_, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
+
         let water_level = -map_data
             .water_settings
             .as_ref()
@@ -92,18 +82,31 @@ impl MapLoader {
             .unwrap_or_default();
         let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
 
-        let ground_vertices = NativeModelVertex::to_vertices(ground_vertices);
+        let mut texture_buffer: Vec<Arc<Texture>> = Vec::new();
+        let mut texture_cache = HashMap::<String, i32>::new();
 
-        let ground_vertex_buffer = self.create_vertex_buffer(&resource_file, "ground", &ground_vertices);
+        let ground_vertex_offset = 0;
+        let ground_vertex_count = ground_vertices.len();
+        let ground_texture_mapping =
+            texture_loader.map_model_texture_to_texture_buffer(&mut texture_cache, &mut texture_buffer, &ground_data.textures);
+
+        let mut vertices = NativeModelVertex::to_vertices(ground_vertices, Some(&ground_texture_mapping));
+
         let water_vertex_buffer = (!water_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "water", &water_vertices));
-        let tile_vertex_buffer = (!tile_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile", &tile_vertices));
+        #[cfg(feature = "debug")]
+        let tile_vertex_buffer = Arc::new(
+            (!tile_vertices.is_empty())
+                .then(|| self.create_vertex_buffer(&resource_file, "tile", &tile_vertices))
+                .unwrap(),
+        );
         let tile_picker_vertex_buffer =
             (!tile_picker_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile picker", &tile_picker_vertices));
 
-        let textures: Vec<Arc<Texture>> = load_textures(&ground_data, texture_loader);
         apply_map_offset(&ground_data, &mut map_data.resources);
 
+        let mut model_cache = HashMap::<(String, bool), Arc<Model>>::new();
         let mut objects = SimpleSlab::with_capacity(map_data.resources.objects.len() as u32);
+
         let object_bounding_boxes: Vec<(ObjectKey, AABB)> = map_data
             .resources
             .objects
@@ -111,9 +114,24 @@ impl MapLoader {
             .map(|object_data| {
                 let array: [f32; 3] = object_data.transform.scale.into();
                 let reverse_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
-                let model = model_loader
-                    .get(texture_loader, object_data.model_name.as_str(), reverse_order)
-                    .expect("can't find model");
+
+                let model = model_cache
+                    .entry((object_data.model_name.clone(), reverse_order))
+                    .or_insert_with(|| {
+                        Arc::new(
+                            model_loader
+                                .load(
+                                    texture_loader,
+                                    &mut texture_cache,
+                                    &mut vertices,
+                                    &mut texture_buffer,
+                                    object_data.model_name.as_str(),
+                                    reverse_order,
+                                )
+                                .expect("can't find model"),
+                        )
+                    })
+                    .clone();
 
                 let object = Object::new(
                     object_data.name.to_owned(),
@@ -144,32 +162,35 @@ impl MapLoader {
             .collect();
         let light_sources_kdtree = KDTree::from_objects(&light_source_spheres);
 
-        let textures = TextureGroup::new(&self.device, &map_file_name, textures);
+        let vertex_buffer = self.create_vertex_buffer(&resource_file, "map vertices", &vertices);
+        let textures = TextureGroup::new(&self.device, &map_file_name, texture_buffer);
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
-        let map = Arc::new(Map::new(
+        let map = Map::new(
             gat_data.map_width as usize,
             gat_data.map_height as usize,
             map_data.water_settings,
             map_data.light_settings,
             gat_data.tiles,
-            ground_vertex_buffer,
+            ground_vertex_offset,
+            ground_vertex_count,
+            vertex_buffer,
             water_vertex_buffer,
             textures,
             objects,
             light_sources,
             map_data.resources.sound_sources,
+            #[cfg(feature = "debug")]
             map_data.resources.effect_sources,
             tile_picker_vertex_buffer.unwrap(),
-            tile_vertex_buffer.unwrap(),
+            #[cfg(feature = "debug")]
+            tile_vertex_buffer,
             object_kdtree,
             light_sources_kdtree,
             background_music_track_name,
             #[cfg(feature = "debug")]
             map_data_clone,
-        ));
-
-        self.cache.insert(resource_file, map.clone());
+        );
 
         #[cfg(feature = "debug")]
         timer.stop();

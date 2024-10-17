@@ -1,6 +1,7 @@
 #![allow(incomplete_features)]
 #![allow(clippy::too_many_arguments)]
 #![feature(adt_const_params)]
+#![feature(allocator_api)]
 #![feature(generic_const_exprs)]
 #![feature(iter_next_chunk)]
 #![feature(let_chains)]
@@ -10,12 +11,26 @@
 #![feature(unsized_const_params)]
 #![feature(variant_count)]
 
+// Helper macro to time and print the startup time of Korangar
+macro_rules! time_phase {
+    ($message:expr, { $($statements:tt)* }) => {
+        #[cfg(feature = "debug")]
+        let _statement_timer = korangar_debug::logging::Timer::new($message);
+
+        $($statements)*
+
+        #[cfg(feature = "debug")]
+        _statement_timer.stop();
+    }
+}
+
 mod graphics;
 mod input;
 #[macro_use]
 mod interface;
 mod inventory;
 mod loaders;
+mod renderer;
 mod system;
 mod world;
 
@@ -23,6 +38,7 @@ use std::cell::RefCell;
 use std::io::Cursor;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::rc::Rc;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
@@ -38,26 +54,23 @@ use korangar_debug::profiling::Profiler;
 use korangar_interface::application::{Application, FontSizeTraitExt, PositionTraitExt};
 use korangar_interface::application::{FocusState, FontSizeTrait};
 use korangar_interface::state::{
-    MappedRemote, PlainTrackedState, Remote, RemoteClone, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec,
+    MappedRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec,
 };
 use korangar_interface::Interface;
 use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
 };
-use korangar_util::collision::Sphere;
-use num::Zero;
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
     BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, DisappearanceReason, Friend, HotbarSlot,
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
-use rayon::in_place_scope;
-use wgpu::{
-    Adapter, CommandEncoderDescriptor, Device, Features, Instance, InstanceFlags, Limits, Maintain, MemoryHints, Queue, TextureFormat,
-    TextureViewDescriptor,
-};
+use renderer::InterfaceRenderer;
+#[cfg(feature = "debug")]
+use wgpu::{Device, Queue};
+use wgpu::{Dx12Compiler, Features, Instance, InstanceFlags, Limits, MemoryHints};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -78,6 +91,9 @@ use crate::interface::resource::{ItemSource, Move, SkillSource};
 use crate::interface::windows::*;
 use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
+#[cfg(feature = "debug")]
+use crate::renderer::DebugMarkerRenderer;
+use crate::renderer::{EffectRenderer, GameInterfaceRenderer};
 use crate::system::GameTimer;
 use crate::world::*;
 
@@ -85,7 +101,9 @@ const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
 // The real limiting factor is WGPUs
 // "Limit::max_sampled_textures_per_shader_stage".
-const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = 30;
+const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 512;
+// We need room for 8 textures for the screen bind group.
+const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = (MAX_TEXTURES_PER_SHADER_STAGE - 8) as usize;
 const DEFAULT_MAP: &str = "geffen";
 const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
 const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
@@ -106,19 +124,6 @@ korangar_debug::create_profiler_threads!(threads, {
     Deferred,
 });
 
-// Helper macro to time and print the startup time of Korangar
-macro_rules! time_phase {
-    ($message:expr, { $($statements:tt)* }) => {
-        #[cfg(feature = "debug")]
-        let _statement_timer = korangar_debug::logging::Timer::new($message);
-
-        $($statements)*
-
-        #[cfg(feature = "debug")]
-        _statement_timer.stop();
-    }
-}
-
 fn main() {
     // We start a frame so that functions trying to start a measurement don't panic.
     #[cfg(feature = "debug")]
@@ -136,15 +141,12 @@ fn main() {
 }
 
 struct Client {
-    instance: Instance,
-    adapter: Adapter,
-    device: Arc<Device>,
-    queue: Arc<Queue>,
     window: Option<Arc<Window>>,
-    surface: Option<Surface>,
-    previous_surface_texture_format: Option<TextureFormat>,
-    max_frame_count: usize,
-
+    #[cfg(feature = "debug")]
+    device: Arc<Device>,
+    #[cfg(feature = "debug")]
+    queue: Arc<Queue>,
+    graphics_engine: GraphicsEngine,
     audio_engine: Arc<AudioEngine<GameFileLoader>>,
     #[cfg(feature = "debug")]
     packet_history_callback: PacketHistoryCallback,
@@ -152,16 +154,38 @@ struct Client {
     networking_system: NetworkingSystem<PacketHistoryCallback>,
     #[cfg(not(feature = "debug"))]
     networking_system: NetworkingSystem<NoPacketCallback>,
-    render_context: Option<RenderContext>,
 
     model_loader: ModelLoader,
-    texture_loader: TextureLoader,
+    texture_loader: Arc<TextureLoader>,
     font_loader: Rc<RefCell<FontLoader>>,
     map_loader: MapLoader,
     sprite_loader: SpriteLoader,
     script_loader: ScriptLoader,
     action_loader: ActionLoader,
     effect_loader: EffectLoader,
+
+    interface_renderer: InterfaceRenderer,
+    bottom_interface_renderer: GameInterfaceRenderer,
+    middle_interface_renderer: GameInterfaceRenderer,
+    top_interface_renderer: GameInterfaceRenderer,
+    effect_renderer: EffectRenderer,
+    #[cfg(feature = "debug")]
+    debug_marker_renderer: DebugMarkerRenderer,
+    #[cfg(feature = "debug")]
+    aabb_instructions: Vec<DebugAabbInstruction>,
+    #[cfg(feature = "debug")]
+    circle_instructions: Vec<DebugCircleInstruction>,
+    model_batches: Vec<ModelBatch>,
+    model_instructions: Vec<ModelInstruction>,
+    entity_instructions: Vec<EntityInstruction>,
+    directional_shadow_model_batches: Vec<ModelBatch>,
+    directional_shadow_model_instructions: Vec<ModelInstruction>,
+    directional_shadow_entity_instructions: Vec<EntityInstruction>,
+    point_shadow_model_batches: Vec<ModelBatch>,
+    point_shadow_model_instructions: Vec<ModelInstruction>,
+    point_shadow_entity_instructions: Vec<EntityInstruction>,
+    point_light_with_shadow_instructions: Vec<PointShadowCasterInstruction>,
+    point_light_instructions: Vec<PointLightInstruction>,
 
     input_system: InputSystem,
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
@@ -216,29 +240,14 @@ struct Client {
     bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
     #[cfg(feature = "debug")]
-    pathing_texture_group: TextureGroup,
+    pathing_texture_group: Arc<TextureGroup>,
     #[cfg(feature = "debug")]
-    tile_texture_group: TextureGroup,
+    tile_texture_group: Arc<TextureGroup>,
 
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
 
-    map: Arc<Map>,
-}
-
-struct RenderContext {
-    deferred_renderer: DeferredRenderer,
-    interface_renderer: InterfaceRenderer,
-    picker_renderer: PickerRenderer,
-    directional_shadow_renderer: DirectionalShadowRenderer,
-    point_shadow_renderer: PointShadowRenderer,
-
-    screen_targets: Vec<<DeferredRenderer as Renderer>::Target>,
-    interface_target: <InterfaceRenderer as Renderer>::Target,
-    picker_targets: Vec<<PickerRenderer as Renderer>::Target>,
-    directional_shadow_targets: Vec<<DirectionalShadowRenderer as Renderer>::Target>,
-    point_shadow_targets: Vec<Vec<<PointShadowRenderer as Renderer>::Target>>,
-    point_shadow_maps: Vec<Vec<Arc<CubeTexture>>>,
+    map: Map,
 }
 
 impl Client {
@@ -252,7 +261,10 @@ impl Client {
         time_phase!("create adapter", {
             let trace_dir = std::env::var("WGPU_TRACE");
             let backends = wgpu::util::backend_bits_from_env().unwrap_or_default();
-            let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or_default();
+            let dx12_shader_compiler = wgpu::util::dx12_shader_compiler_from_env().unwrap_or(Dx12Compiler::Dxc {
+                dxil_path: None,
+                dxc_path: None,
+            });
             let gles_minor_version = wgpu::util::gles_minor_version_from_env().unwrap_or_default();
             let flags = InstanceFlags::from_build_config().with_env();
 
@@ -275,7 +287,9 @@ impl Client {
         });
 
         time_phase!("create device", {
-            let required_features = Features::PUSH_CONSTANTS | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
+            let required_features = Features::INDIRECT_FIRST_INSTANCE
+                | Features::MULTI_DRAW_INDIRECT
+                | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
             #[cfg(feature = "debug")]
             let required_features = required_features | Features::POLYGON_MODE_LINE;
 
@@ -297,8 +311,7 @@ impl Client {
             }
 
             let required_limits = Limits {
-                max_push_constant_size: 128,
-                max_sampled_textures_per_shader_stage: u32::try_from(MAX_BINDING_TEXTURE_ARRAY_COUNT).unwrap(),
+                max_sampled_textures_per_shader_stage: MAX_TEXTURES_PER_SHADER_STAGE,
                 ..Default::default()
             }
             .using_resolution(adapter.limits());
@@ -342,8 +355,8 @@ impl Client {
             std::fs::create_dir_all("client/themes").unwrap();
             let font_loader = Rc::new(RefCell::new(FontLoader::new(&device, queue.clone(), &game_file_loader)));
 
-            let mut model_loader = ModelLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
-            let mut texture_loader = TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
+            let mut model_loader = ModelLoader::new(game_file_loader.clone());
+            let texture_loader = Arc::new(TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone()));
             let mut map_loader = MapLoader::new(device.clone(), queue.clone(), game_file_loader.clone(), audio_engine.clone());
             let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
             let mut action_loader = ActionLoader::new(game_file_loader.clone());
@@ -366,16 +379,46 @@ impl Client {
 
                 ScriptLoader::new(&game_file_loader).unwrap()
             });
+
+            let interface_renderer = InterfaceRenderer::new(initial_screen_size, font_loader.clone(), &texture_loader);
+            let bottom_interface_renderer = GameInterfaceRenderer::new(initial_screen_size, &texture_loader);
+            let middle_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
+            let top_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
+            let effect_renderer = EffectRenderer::new(initial_screen_size);
+            #[cfg(feature = "debug")]
+            let debug_marker_renderer = DebugMarkerRenderer::new();
+
+            #[cfg(feature = "debug")]
+            let aabb_instructions = Vec::default();
+            #[cfg(feature = "debug")]
+            let circle_instructions = Vec::default();
+            let model_batches = Vec::default();
+            let model_instructions = Vec::default();
+            let entity_instructions = Vec::default();
+            let directional_shadow_model_batches = Vec::default();
+            let directional_shadow_model_instructions = Vec::default();
+            let directional_shadow_entity_instructions = Vec::default();
+            let point_shadow_model_batches = Vec::default();
+            let point_shadow_model_instructions = Vec::default();
+            let point_shadow_entity_instructions = Vec::default();
+            let point_light_with_shadow_instructions = Vec::default();
+            let point_light_instructions = Vec::default();
+        });
+
+        time_phase!("create graphics engine", {
+            let picker_value = Arc::new(AtomicU64::new(0));
+            let graphics_engine = GraphicsEngine::initialize(GraphicsEngineDescriptor {
+                adapter,
+                instance,
+                device: device.clone(),
+                queue: queue.clone(),
+                texture_loader: texture_loader.clone(),
+                picker_value: picker_value.clone(),
+            });
         });
 
         time_phase!("load settings", {
-            // TODO: NHA We should make double buffering optional and selectable in the
-            //       settings. Since WGPU uses staging buffers and we record changed
-            //       in advance, double buffering is not really needed anymore (especially
-            //       with FIFO).
-            let max_frame_count = 1;
-
-            let input_system = InputSystem::new();
+            let input_system = InputSystem::new(picker_value);
             let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
 
             let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
@@ -454,14 +497,14 @@ impl Client {
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
             #[cfg(feature = "debug")]
-            let pathing_texture_group = TextureGroup::new(&device, "pathing textures", vec![
+            let pathing_texture_group = Arc::new(TextureGroup::new(&device, "pathing textures", vec![
                 texture_loader.get("pathing_goal.png").unwrap(),
                 texture_loader.get("pathing_straight.png").unwrap(),
                 texture_loader.get("pathing_diagonal.png").unwrap(),
-            ]);
+            ]));
 
             #[cfg(feature = "debug")]
-            let tile_texture_group = TextureGroup::new(&device, "tile textures", vec![
+            let tile_texture_group = Arc::new(TextureGroup::new(&device, "tile textures", vec![
                 texture_loader.get("tile_0.png").unwrap(),
                 texture_loader.get("tile_1.png").unwrap(),
                 texture_loader.get("tile_2.png").unwrap(),
@@ -469,7 +512,7 @@ impl Client {
                 texture_loader.get("tile_4.png").unwrap(),
                 texture_loader.get("tile_5.png").unwrap(),
                 texture_loader.get("tile_6.png").unwrap(),
-            ]);
+            ]));
 
             let welcome_string = format!(
                 "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
@@ -485,7 +528,7 @@ impl Client {
 
         time_phase!("load default map", {
             let map = map_loader
-                .get(DEFAULT_MAP.to_string(), &mut model_loader, &mut texture_loader)
+                .load(DEFAULT_MAP.to_string(), &mut model_loader, &texture_loader)
                 .expect("failed to load initial map");
 
             map.set_ambient_sound_sources(&audio_engine);
@@ -493,19 +536,16 @@ impl Client {
         });
 
         Self {
-            instance,
-            adapter,
-            device,
-            queue,
             window: None,
-            surface: None,
-            previous_surface_texture_format: None,
-            max_frame_count,
+            #[cfg(feature = "debug")]
+            device,
+            #[cfg(feature = "debug")]
+            queue,
+            graphics_engine,
             audio_engine,
             #[cfg(feature = "debug")]
             packet_history_callback,
             networking_system,
-            render_context: None,
             model_loader,
             texture_loader,
             font_loader,
@@ -514,6 +554,28 @@ impl Client {
             script_loader,
             action_loader,
             effect_loader,
+            interface_renderer,
+            bottom_interface_renderer,
+            middle_interface_renderer,
+            top_interface_renderer,
+            effect_renderer,
+            #[cfg(feature = "debug")]
+            debug_marker_renderer,
+            #[cfg(feature = "debug")]
+            aabb_instructions,
+            #[cfg(feature = "debug")]
+            circle_instructions,
+            model_batches,
+            model_instructions,
+            entity_instructions,
+            directional_shadow_model_batches,
+            directional_shadow_model_instructions,
+            directional_shadow_entity_instructions,
+            point_shadow_model_batches,
+            point_shadow_model_instructions,
+            point_shadow_entity_instructions,
+            point_light_with_shadow_instructions,
+            point_light_instructions,
             input_system,
             shadow_detail,
             framerate_limit,
@@ -575,6 +637,38 @@ impl Client {
         let _measurement = threads::Main::start_frame();
 
         #[cfg(feature = "debug")]
+        let clear_measurement = Profiler::start_measurement("clear instructions");
+
+        self.interface_renderer.clear();
+        self.bottom_interface_renderer.clear();
+        self.middle_interface_renderer.clear();
+        self.top_interface_renderer.clear();
+        self.effect_renderer.clear();
+        #[cfg(feature = "debug")]
+        self.debug_marker_renderer.clear();
+
+        #[cfg(feature = "debug")]
+        self.aabb_instructions.clear();
+        #[cfg(feature = "debug")]
+        self.circle_instructions.clear();
+        self.model_batches.clear();
+        self.model_instructions.clear();
+        self.entity_instructions.clear();
+        self.directional_shadow_model_batches.clear();
+        self.directional_shadow_model_instructions.clear();
+        self.directional_shadow_entity_instructions.clear();
+        self.point_shadow_model_batches.clear();
+        self.point_shadow_model_instructions.clear();
+        self.point_shadow_entity_instructions.clear();
+        self.point_light_with_shadow_instructions.clear();
+        self.point_light_instructions.clear();
+
+        #[cfg(feature = "debug")]
+        clear_measurement.stop();
+
+        let frame = self.graphics_engine.wait_for_next_frame();
+
+        #[cfg(feature = "debug")]
         let timer_measurement = Profiler::start_measurement("update timers");
 
         self.input_system.update_delta();
@@ -593,7 +687,6 @@ impl Client {
             &mut self.interface,
             &self.application,
             &mut self.focus_state,
-            &mut self.render_context.as_mut().unwrap().picker_targets[self.surface.as_ref().unwrap().frame_number()],
             &mut self.mouse_cursor,
             #[cfg(feature = "debug")]
             &self.render_settings,
@@ -697,7 +790,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .get(crate::DEFAULT_MAP.to_string(), &mut self.model_loader, &mut self.texture_loader)
+                        .load(DEFAULT_MAP.to_string(), &mut self.model_loader, &self.texture_loader)
                         .expect("failed to load initial map");
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -776,7 +869,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .get(map_name, &mut self.model_loader, &mut self.texture_loader)
+                        .load(map_name, &mut self.model_loader, &self.texture_loader)
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -911,7 +1004,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .get(map_name, &mut self.model_loader, &mut self.texture_loader)
+                        .load(map_name, &mut self.model_loader, &self.texture_loader)
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -992,15 +1085,14 @@ impl Client {
                 NetworkEvent::AddCloseButton => self.dialog_system.add_close_button(),
                 NetworkEvent::AddChoiceButtons(choices) => self.dialog_system.add_choice_buttons(choices),
                 NetworkEvent::AddQuestEffect(quest_effect) => {
-                    self.particle_holder
-                        .add_quest_icon(&mut self.texture_loader, &self.map, quest_effect)
+                    self.particle_holder.add_quest_icon(&self.texture_loader, &self.map, quest_effect)
                 }
                 NetworkEvent::RemoveQuestEffect(entity_id) => self.particle_holder.remove_quest_icon(entity_id),
                 NetworkEvent::SetInventory { items } => {
-                    self.player_inventory.fill(&mut self.texture_loader, &self.script_loader, items);
+                    self.player_inventory.fill(&self.texture_loader, &self.script_loader, items);
                 }
                 NetworkEvent::IventoryItemAdded { item } => {
-                    self.player_inventory.add_item(&mut self.texture_loader, &self.script_loader, item);
+                    self.player_inventory.add_item(&self.texture_loader, &self.script_loader, item);
 
                     // TODO: Update the selling items. If you pick up an item
                     // that you already have the sell window
@@ -1050,7 +1142,7 @@ impl Client {
                     self.friend_list.push((friend, LinkedElement::new()));
                 }
                 NetworkEvent::VisualEffect(path, entity_id) => {
-                    let effect = self.effect_loader.get(path, &mut self.texture_loader).unwrap();
+                    let effect = self.effect_loader.get(path, &self.texture_loader).unwrap();
                     let frame_timer = effect.new_frame_timer();
 
                     self.effect_holder.add_effect(Box::new(EffectWithLight::new(
@@ -1074,7 +1166,7 @@ impl Client {
                     UnitId::Firewall => {
                         let position = Vector2::new(position.x as usize, position.y as usize);
                         let position = self.map.get_world_position(position);
-                        let effect = self.effect_loader.get("firewall.str", &mut self.texture_loader).unwrap();
+                        let effect = self.effect_loader.get("firewall.str", &self.texture_loader).unwrap();
                         let frame_timer = effect.new_frame_timer();
 
                         self.effect_holder.add_unit(
@@ -1095,7 +1187,7 @@ impl Client {
                     UnitId::Pneuma => {
                         let position = Vector2::new(position.x as usize, position.y as usize);
                         let position = self.map.get_world_position(position);
-                        let effect = self.effect_loader.get("pneuma1.str", &mut self.texture_loader).unwrap();
+                        let effect = self.effect_loader.get("pneuma1.str", &self.texture_loader).unwrap();
                         let frame_timer = effect.new_frame_timer();
 
                         self.effect_holder.add_unit(
@@ -1149,7 +1241,7 @@ impl Client {
                     self.shop_items.mutate(|shop_items| {
                         *shop_items = items
                             .into_iter()
-                            .map(|item| self.script_loader.load_market_item_metadata(&mut self.texture_loader, item))
+                            .map(|item| self.script_loader.load_market_item_metadata(&self.texture_loader, item))
                             .collect()
                     });
 
@@ -1329,7 +1421,7 @@ impl Client {
                     &self.application,
                     &mut self.focus_state,
                     &GraphicsSettingsWindow::new(
-                        self.surface.as_ref().unwrap().present_mode_info(),
+                        self.graphics_engine.get_present_mode_info(),
                         self.shadow_detail.clone_state(),
                         self.framerate_limit.clone_state(),
                     ),
@@ -1658,74 +1750,14 @@ impl Client {
             .update(&self.application, self.font_loader.clone(), &mut self.focus_state);
         self.mouse_cursor.update(client_tick);
 
-        if let Some(surface) = self.surface.as_mut()
-            && surface.is_invalid()
-        {
-            #[cfg(feature = "debug")]
-            profile_block!("re-create buffers");
-
-            surface.reconfigure();
-            let dimensions = surface.window_screen_size();
-
-            if let Some(context) = self.render_context.as_mut() {
-                context.deferred_renderer.reconfigure_pipeline(
-                    surface.format(),
-                    dimensions,
-                    #[cfg(feature = "debug")]
-                    self.render_settings.get().show_wireframe,
-                );
-                context.interface_renderer.reconfigure_pipeline(dimensions);
-                context.picker_renderer.reconfigure_pipeline(dimensions);
-                context.screen_targets = (0..self.max_frame_count)
-                    .map(|_| context.deferred_renderer.create_render_target())
-                    .collect();
-                context.interface_target = context.interface_renderer.create_render_target();
-                context.picker_targets = (0..self.max_frame_count)
-                    .map(|_| context.picker_renderer.create_render_target())
-                    .collect();
-            }
-        }
-
         if self.shadow_detail.consume_changed() {
             #[cfg(feature = "debug")]
-            print_debug!("re-creating {}", "directional shadow targets".magenta());
-
-            #[cfg(feature = "debug")]
-            profile_block!("re-create shadow maps");
-
-            let new_shadow_detail = self.shadow_detail.get();
-
-            if let Some(context) = self.render_context.as_mut() {
-                context.directional_shadow_targets = (0..self.max_frame_count)
-                    .map(|_| {
-                        context
-                            .directional_shadow_renderer
-                            .create_render_target(new_shadow_detail.directional_shadow_resolution())
-                    })
-                    .collect::<Vec<<DirectionalShadowRenderer as Renderer>::Target>>();
-
-                context.point_shadow_targets = (0..self.max_frame_count)
-                    .map(|_| {
-                        (0..NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
-                            .map(|_| {
-                                context
-                                    .point_shadow_renderer
-                                    .create_render_target(new_shadow_detail.point_shadow_resolution())
-                            })
-                            .collect::<Vec<<PointShadowRenderer as Renderer>::Target>>()
-                    })
-                    .collect::<Vec<Vec<_>>>();
-
-                context.point_shadow_maps = context
-                    .point_shadow_targets
-                    .iter()
-                    .map(|target| target.iter().map(|target| target.texture.clone()).collect())
-                    .collect();
-            }
+            profile_block!("shadow detail changed");
+            self.graphics_engine.set_shadow_detail(*self.shadow_detail.get())
         }
 
         if self.framerate_limit.consume_changed() {
-            self.surface.as_mut().unwrap().set_frame_limit(self.framerate_limit.cloned());
+            self.graphics_engine.set_framerate_limit(*self.framerate_limit.get());
 
             // For some reason the interface buffer becomes messed up when
             // recreating the surface, so we need to render it again.
@@ -1735,7 +1767,7 @@ impl Client {
         #[cfg(feature = "debug")]
         let matrices_measurement = Profiler::start_measurement("generate view and projection matrices");
 
-        let window_size = self.surface.as_ref().unwrap().window_size();
+        let window_size = self.graphics_engine.get_window_size();
         let screen_size: ScreenSize = window_size.into();
 
         if self.entities.is_empty() {
@@ -1774,15 +1806,6 @@ impl Client {
         frame_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let frame_measurement = Profiler::start_measurement("get next frame");
-
-        let (frame_number, frame) = self.surface.as_mut().unwrap().acquire();
-        let frame_view = frame.texture.create_view(&TextureViewDescriptor::default());
-
-        #[cfg(feature = "debug")]
-        frame_measurement.stop();
-
-        #[cfg(feature = "debug")]
         let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
 
         #[cfg(feature = "debug")]
@@ -1795,56 +1818,6 @@ impl Client {
             _ => None,
         };
 
-        let context = self.render_context.as_mut().unwrap();
-
-        let picker_target = &mut context.picker_targets[frame_number];
-        let directional_shadow_target = &mut context.directional_shadow_targets[frame_number];
-        let point_shadow_target = &mut context.point_shadow_targets[frame_number];
-        let deferred_target = &mut context.screen_targets[frame_number];
-
-        // TODO: NHA Lifetime limitation
-        let directional_shadow_map = directional_shadow_target.texture.clone();
-
-        #[cfg(feature = "debug")]
-        let command_buffer_measurement = Profiler::start_measurement("allocate command buffer");
-
-        let mut picker_render_command_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Picker render"),
-        });
-        let mut picker_render_pass = picker_target.start_render_pass(&mut picker_render_command_encoder);
-
-        let mut picker_compute_command_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Picker compute"),
-        });
-        let mut picker_compute_pass = picker_target.start_compute_pass(&mut picker_compute_command_encoder);
-
-        let mut interface_command_encoder = self
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor { label: Some("Interface") });
-        let mut interface_render_pass = context.interface_target.start(&mut interface_command_encoder, clear_interface);
-
-        let mut directional_shadow_command_encoder = self
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor { label: Some("Shadow") });
-        let mut directional_shadow_render_pass = directional_shadow_target.start(&mut directional_shadow_command_encoder);
-
-        let mut point_shadow_command_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
-            label: Some("Point Light"),
-        });
-
-        let mut geometry_command_encoder = self
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor { label: Some("Geometry") });
-        let mut geometry_render_pass = deferred_target.start_geometry_pass(&mut geometry_command_encoder);
-
-        let mut screen_command_encoder = self
-            .device
-            .create_command_encoder(&CommandEncoderDescriptor { label: Some("Screen") });
-        let mut screen_render_pass = deferred_target.start_screen_pass(&frame_view, &mut screen_command_encoder);
-
-        #[cfg(feature = "debug")]
-        command_buffer_measurement.stop();
-
         #[cfg(feature = "debug")]
         let point_light_manager_measurement = Profiler::start_measurement("point light manager");
 
@@ -1856,8 +1829,7 @@ impl Client {
             self.map
                 .register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
 
-            self.point_light_manager
-                .create_point_light_set(crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
+            self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
         };
 
         #[cfg(feature = "debug")]
@@ -1866,519 +1838,357 @@ impl Client {
         #[cfg(feature = "debug")]
         prepare_frame_measurement.stop();
 
-        in_place_scope(|scope| {
-            scope.spawn(|_| {
+        #[cfg(feature = "debug")]
+        let collect_instructions_measurement = Profiler::start_measurement("collect instructions");
+
+        let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
+        let water_level = self.map.get_water_light();
+        let ambient_light_color = self.map.get_ambient_light_color(day_timer);
+        let (directional_light_view_matrix, directional_light_projection_matrix) =
+            self.directional_shadow_camera.view_projection_matrices();
+        let directional_light_matrix = directional_light_projection_matrix * directional_light_view_matrix;
+        let (directional_light_direction, directional_light_color) = self.map.get_directional_light(day_timer);
+        let picker_position = ScreenPosition {
+            left: mouse_position.left.clamp(0.0, window_size.x as f32),
+            top: mouse_position.top.clamp(0.0, window_size.y as f32),
+        };
+        let mut indicator_instruction = None;
+        let mut map_water_vertex_buffer = None;
+
+        // Marker
+        {
+            #[cfg(feature = "debug")]
+            self.map.render_markers(
+                &mut self.debug_marker_renderer,
+                current_camera,
+                render_settings,
+                entities,
+                &point_light_set,
+                hovered_marker_identifier,
+            );
+
+            #[cfg(feature = "debug")]
+            self.map.render_markers(
+                &mut self.middle_interface_renderer,
+                current_camera,
+                render_settings,
+                entities,
+                &point_light_set,
+                hovered_marker_identifier,
+            );
+        }
+
+        // Directional Shadows
+        {
+            let object_set = self.map.cull_objects_with_frustum(
+                &self.directional_shadow_camera,
+                &mut self.directional_shadow_object_set_buffer,
                 #[cfg(feature = "debug")]
-                let _measurement = threads::Picker::start_frame();
+                render_settings.frustum_culling,
+            );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                self.map
-                    .render_tiles(picker_target, &mut picker_render_pass, &context.picker_renderer, current_camera);
+            let offset = self.directional_shadow_model_instructions.len();
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                self.map.render_entities(
-                    entities,
-                    picker_target,
-                    &mut picker_render_pass,
-                    &context.picker_renderer,
-                    current_camera,
-                    false,
-                );
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+            self.map
+                .render_objects(&mut self.directional_shadow_model_instructions, &object_set, client_tick);
 
-                #[cfg(feature = "debug")]
-                self.map.render_markers(
-                    picker_target,
-                    &mut picker_render_pass,
-                    &context.picker_renderer,
-                    current_camera,
-                    render_settings,
-                    entities,
-                    &point_light_set,
-                    hovered_marker_identifier,
-                );
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+            self.map.render_ground(&mut self.directional_shadow_model_instructions);
 
-                context
-                    .picker_renderer
-                    .dispatch_selector(picker_target, &mut picker_compute_pass, screen_size, mouse_position);
+            let count = self.directional_shadow_model_instructions.len() - offset;
+
+            self.directional_shadow_model_batches.push(ModelBatch {
+                offset,
+                count,
+                textures: None,
+                vertex_buffer: None,
             });
 
-            scope.spawn(|_| {
+            #[cfg(feature = "debug")]
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
+            self.map.render_overlay_tiles(
+                &mut self.directional_shadow_model_instructions,
+                &mut self.directional_shadow_model_batches,
+                &self.tile_texture_group,
+            );
+
+            #[cfg(feature = "debug")]
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+            self.map.render_entity_pathing(
+                &mut self.directional_shadow_model_instructions,
+                &mut self.directional_shadow_model_batches,
+                &self.entities,
+                &self.pathing_texture_group,
+            );
+
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
+            self.map.render_entities(
+                &mut self.directional_shadow_entity_instructions,
+                entities,
+                &self.directional_shadow_camera,
+                true,
+            );
+        }
+
+        // Point Lights and Shadows
+        {
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
+            point_light_set.render_point_lights(&mut self.point_light_instructions, current_camera);
+
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
+            point_light_set.render_point_lights_with_shadows(
+                &self.map,
+                current_camera,
+                &mut self.point_shadow_camera,
+                &mut self.point_shadow_object_set_buffer,
+                &mut self.point_shadow_model_instructions,
+                &mut self.point_light_with_shadow_instructions,
+                client_tick,
                 #[cfg(feature = "debug")]
-                let _measurement = threads::Shadow::start_frame();
+                render_settings,
+            );
+        }
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                self.map.render_ground(
-                    directional_shadow_target,
-                    &mut directional_shadow_render_pass,
-                    &context.directional_shadow_renderer,
-                    &self.directional_shadow_camera,
-                    animation_timer,
-                );
+        // Geometry
+        {
+            let object_set = self.map.cull_objects_with_frustum(
+                current_camera,
+                &mut self.deferred_object_set_buffer,
+                #[cfg(feature = "debug")]
+                render_settings.frustum_culling,
+            );
 
+            let offset = self.model_instructions.len();
+
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
+            self.map.render_objects(&mut self.model_instructions, &object_set, client_tick);
+
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
+            self.map.render_ground(&mut self.model_instructions);
+
+            let count = self.model_instructions.len() - offset;
+
+            self.model_batches.push(ModelBatch {
+                offset,
+                count,
+                textures: None,
+                vertex_buffer: None,
+            });
+
+            #[cfg(feature = "debug")]
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
+            self.map
+                .render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_group);
+
+            #[cfg(feature = "debug")]
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
+            self.map.render_entity_pathing(
+                &mut self.model_instructions,
+                &mut self.model_batches,
+                &self.entities,
+                &self.pathing_texture_group,
+            );
+
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
+            self.map
+                .render_entities(&mut self.entity_instructions, entities, current_camera, true);
+
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
+            self.map.render_water(&mut map_water_vertex_buffer);
+
+            #[cfg(feature = "debug")]
+            if render_settings.show_bounding_boxes {
                 let object_set = self.map.cull_objects_with_frustum(
-                    &self.directional_shadow_camera,
-                    &mut self.directional_shadow_object_set_buffer,
+                    &self.player_camera,
+                    &mut self.bounding_box_object_set_buffer,
                     #[cfg(feature = "debug")]
                     render_settings.frustum_culling,
                 );
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                self.map.render_objects(
-                    directional_shadow_target,
-                    &mut directional_shadow_render_pass,
-                    &context.directional_shadow_renderer,
-                    &self.directional_shadow_camera,
-                    client_tick,
+                self.map
+                    .render_bounding(&mut self.aabb_instructions, render_settings.frustum_culling, &object_set);
+            }
+        }
+
+        //  Sprites and Interface
+        {
+            #[cfg(feature = "debug")]
+            if let Some(marker_identifier) = hovered_marker_identifier {
+                self.map.render_marker_overlay(
+                    &mut self.aabb_instructions,
+                    &mut self.circle_instructions,
+                    current_camera,
+                    marker_identifier,
+                    &point_light_set,
                     animation_timer,
-                    &object_set,
                 );
+            }
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                self.map.render_entities(
-                    entities,
-                    directional_shadow_target,
-                    &mut directional_shadow_render_pass,
-                    &context.directional_shadow_renderer,
-                    &self.directional_shadow_camera,
-                    true,
+            self.particle_holder.render(
+                &self.bottom_interface_renderer,
+                current_camera,
+                screen_size,
+                self.application.get_scaling_factor(),
+                entities,
+            );
+
+            self.effect_holder.render(&mut self.effect_renderer, current_camera);
+
+            if let Some(PickerTarget::Tile { x, y }) = mouse_target
+                && !entities.is_empty()
+            {
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
+                self.map.render_walk_indicator(
+                    &mut indicator_instruction,
+                    walk_indicator_color,
+                    Vector2::new(x as usize, y as usize),
                 );
+            } else if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
+                let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
-                #[cfg(feature = "debug")]
-                if render_settings.show_pathing {
-                    self.map.render_pathing(
-                        entities,
-                        directional_shadow_target,
-                        &mut directional_shadow_render_pass,
-                        &context.directional_shadow_renderer,
-                        &self.directional_shadow_camera,
-                        &self.pathing_texture_group,
+                if let Some(entity) = entity {
+                    entity.render_status(
+                        &self.middle_interface_renderer,
+                        current_camera,
+                        self.application.get_game_theme(),
+                        screen_size,
                     );
-                }
 
-                #[cfg(feature = "debug")]
-                if render_settings.show_map_tiles {
-                    self.map.render_overlay_tiles(
-                        directional_shadow_target,
-                        &mut directional_shadow_render_pass,
-                        &context.directional_shadow_renderer,
-                        &self.directional_shadow_camera,
-                        &self.tile_texture_group,
-                    );
-                }
+                    if let Some(name) = &entity.get_details() {
+                        let name = name.split('#').next().unwrap();
 
-                if let Some(PickerTarget::Tile { x, y }) = mouse_target
-                    && !entities.is_empty()
-                {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
-                    self.map.render_walk_indicator(
-                        directional_shadow_target,
-                        &mut directional_shadow_render_pass,
-                        &context.directional_shadow_renderer,
-                        &self.directional_shadow_camera,
-                        walk_indicator_color,
-                        Vector2::new(x as usize, y as usize),
-                    );
-                }
-            });
+                        let offset = ScreenPosition {
+                            left: name.len() as f32 * -3.0,
+                            top: 20.0,
+                        };
 
-            scope.spawn(|_| {
-                #[cfg(feature = "debug")]
-                let _measurement = threads::PointShadow::start_frame();
-
-                for (light_index, point_light) in point_light_set.with_shadow_iterator().enumerate() {
-                    let Some(point_shadow_target) = point_shadow_target.get_mut(light_index) else {
-                        break;
-                    };
-
-                    self.point_shadow_camera.set_camera_position(point_light.position);
-                    context.point_shadow_renderer.set_light_position(point_light.position);
-
-                    let extent = point_light_extent(point_light.color, point_light.range);
-                    let object_set = self.map.cull_objects_in_sphere(
-                        Sphere::new(point_light.position, extent),
-                        &mut self.point_shadow_object_set_buffer,
-                        #[cfg(feature = "debug")]
-                        render_settings.frustum_culling,
-                    );
-                    // TODO: Create an entity set, similar to the object set for better
-                    // performance.
-
-                    for index in 0..6 {
-                        self.point_shadow_camera.change_direction(index);
-                        self.point_shadow_camera.generate_view_projection(Vector2::zero());
-
-                        let (view_matrix, projection_matrix) = self.point_shadow_camera.view_projection_matrices();
-                        let mut point_shadow_render_pass = point_shadow_target.start(
-                            &self.queue,
-                            &mut point_shadow_command_encoder,
-                            index,
-                            projection_matrix * view_matrix,
+                        // TODO: move variables into theme
+                        self.middle_interface_renderer.render_text(
+                            name,
+                            mouse_position + offset + ScreenPosition::uniform(1.0),
+                            Color::BLACK,
+                            FontSize::new(12.0),
                         );
 
-                        /* #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                        self.entity_set.render(
-                            context.point_shadow_target,
-                            &mut point_shadow_render_pass,
-                            &context.point_shadow_renderer,
-                            &self.point_shadow_camera,
-                            true,
-                        ); */
-
-                        #[cfg(feature = "debug")]
-                        if render_settings.show_pathing {
-                            self.map.render_pathing(
-                                entities,
-                                point_shadow_target,
-                                &mut point_shadow_render_pass,
-                                &context.point_shadow_renderer,
-                                &self.point_shadow_camera,
-                                &self.pathing_texture_group,
-                            );
-                        }
-
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                        self.map.render_objects(
-                            point_shadow_target,
-                            &mut point_shadow_render_pass,
-                            &context.point_shadow_renderer,
-                            &self.point_shadow_camera,
-                            client_tick,
-                            animation_timer,
-                            &object_set,
-                        );
-
-                        if let Some(PickerTarget::Tile { x, y }) = mouse_target
-                            && !entities.is_empty()
-                        {
-                            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
-                            self.map.render_walk_indicator(
-                                point_shadow_target,
-                                &mut point_shadow_render_pass,
-                                &context.point_shadow_renderer,
-                                &self.point_shadow_camera,
-                                walk_indicator_color,
-                                Vector2::new(x as usize, y as usize),
-                            );
-                        }
-
-                        #[cfg(feature = "debug")]
-                        if render_settings.show_map_tiles {
-                            self.map.render_overlay_tiles(
-                                point_shadow_target,
-                                &mut point_shadow_render_pass,
-                                &context.point_shadow_renderer,
-                                &self.point_shadow_camera,
-                                &self.tile_texture_group,
-                            );
-                        }
-
-                        #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                        self.map.render_ground(
-                            point_shadow_target,
-                            &mut point_shadow_render_pass,
-                            &context.point_shadow_renderer,
-                            &self.point_shadow_camera,
-                            animation_timer,
-                        );
+                        self.middle_interface_renderer
+                            .render_text(name, mouse_position + offset, Color::WHITE, FontSize::new(12.0));
                     }
                 }
-            });
+            }
 
-            scope.spawn(|_| {
+            if !entities.is_empty() {
                 #[cfg(feature = "debug")]
-                let _measurement = threads::Deferred::start_frame();
+                profile_block!("render player status");
 
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
-                self.map.render_ground(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);
-
-                #[cfg(feature = "debug")]
-                if render_settings.show_map_tiles {
-                    self.map.render_overlay_tiles(
-                        deferred_target,
-                        &mut geometry_render_pass,
-                        &context.deferred_renderer,
-                        current_camera,
-                        &self.tile_texture_group,
-                    );
-                }
-
-                let object_set = self.map.cull_objects_with_frustum(
+                entities[0].render_status(
+                    &self.middle_interface_renderer,
                     current_camera,
-                    &mut self.deferred_object_set_buffer,
-                    #[cfg(feature = "debug")] render_settings.frustum_culling
+                    self.application.get_game_theme(),
+                    screen_size,
                 );
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                self.map.render_objects(
-                    deferred_target,
-                    &mut geometry_render_pass,
-                    &context.deferred_renderer,
-                    current_camera,
-                    client_tick,
-                    animation_timer,
-                    &object_set,
-                );
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-                self.map.render_entities(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, true);
-
-                #[cfg(feature = "debug")]
-                if render_settings.show_pathing {
-                    self.map.render_pathing(entities, deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, &self.pathing_texture_group);
-                }
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
-                self.map.render_water(deferred_target, &mut geometry_render_pass, &context.deferred_renderer, current_camera, animation_timer);
-
-                if let Some(PickerTarget::Tile { x, y }) = mouse_target
-                    && !entities.is_empty()
-                {
-                    #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
-                    self.map.render_walk_indicator(
-                        deferred_target,
-                        &mut geometry_render_pass,
-                        &context.deferred_renderer,
-                        current_camera,
-                        walk_indicator_color,
-                        Vector2::new(x as usize, y as usize),
-                    );
-                }
-
-                // We switch to record the screen render pass.
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light && !render_settings.show_buffers()))]
-                self.map.ambient_light(deferred_target, &mut screen_render_pass, &context.deferred_renderer, day_timer);
-
-                let (view_matrix, projection_matrix) = self.directional_shadow_camera.view_projection_matrices();
-                let light_matrix = projection_matrix * view_matrix;
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light && !render_settings.show_buffers()))]
-                self.map.directional_light(
-                    deferred_target,
-                    &mut screen_render_pass,
-                    &context.deferred_renderer,
-                    current_camera,
-                    &directional_shadow_map,
-                    light_matrix,
-                    day_timer,
-                );
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
-                point_light_set.render_point_lights(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, &context.point_shadow_maps[frame_number]);
-
-                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water && !render_settings.show_buffers()))]
-                self.map.water_light(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera);
-
-                #[cfg(feature = "debug")]
-                self.map.render_markers(
-                    deferred_target,
-                    &mut screen_render_pass,
-                    &context.deferred_renderer,
-                    current_camera,
-                    render_settings,
-                    entities,
-                    &point_light_set,
-                    hovered_marker_identifier,
-                );
-
-                #[cfg(feature = "debug")]
-                if render_settings.show_bounding_boxes {
-                    let object_set = self.map.cull_objects_with_frustum(
-                        &self.player_camera,
-                        &mut self.bounding_box_object_set_buffer,
-                        #[cfg(feature = "debug")] render_settings.frustum_culling
-                    );
-
-                    self.map.render_bounding(
-                        deferred_target,
-                        &mut screen_render_pass,
-                        &context.deferred_renderer,
-                        current_camera,
-                        render_settings.frustum_culling,
-                        &object_set,
-                    );
-                }
-
-                #[cfg(feature = "debug")]
-                if let Some(marker_identifier) = hovered_marker_identifier {
-                    self.map.render_marker_overlay(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, marker_identifier, &point_light_set, animation_timer);
-                }
-
-                self.particle_holder.render(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera, screen_size, self.application.get_scaling_factor(), entities);
-                self.effect_holder.render(deferred_target, &mut screen_render_pass, &context.deferred_renderer, current_camera);
-            });
+            }
 
             if render_interface {
                 #[cfg(feature = "debug")]
                 profile_block!("render user interface");
 
                 self.interface.render(
-                    &mut context.interface_target,
-                    &mut interface_render_pass,
-                    &context.interface_renderer,
+                    &self.interface_renderer,
                     &self.application,
                     hovered_element,
                     focused_element,
                     self.input_system.get_mouse_mode(),
                 );
             }
-        });
 
-        #[cfg(feature = "debug")]
-        if render_settings.show_buffers() {
-            // TODO: Make configurable through the UI
-            let point_light_id = 0;
-
-            context.deferred_renderer.overlay_buffers(
-                deferred_target,
-                &mut screen_render_pass,
-                &picker_target.texture,
-                &directional_shadow_map,
-                self.font_loader.borrow().get_font_atlas(),
-                &context.point_shadow_maps[frame_number][point_light_id],
-                render_settings,
-            );
-        }
-
-        if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
             #[cfg(feature = "debug")]
-            profile_block!("render hovered entity status");
+            if render_settings.show_frames_per_second {
+                let game_theme = self.application.get_game_theme();
 
-            let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
-
-            if let Some(entity) = entity {
-                entity.render_status(
-                    deferred_target,
-                    &mut screen_render_pass,
-                    &context.deferred_renderer,
-                    current_camera,
-                    self.application.get_game_theme(),
-                    screen_size,
+                self.top_interface_renderer.render_text(
+                    &self.game_timer.last_frames_per_second().to_string(),
+                    game_theme.overlay.text_offset.get().scaled(self.application.get_scaling()),
+                    game_theme.overlay.foreground_color.get(),
+                    game_theme.overlay.font_size.get().scaled(self.application.get_scaling()),
                 );
+            }
 
-                if let Some(name) = &entity.get_details() {
-                    let name = name.split('#').next().unwrap();
-
-                    let offset = ScreenPosition {
-                        left: name.len() as f32 * -3.0,
-                        top: 20.0,
-                    };
-
-                    // TODO: move variables into theme
-                    context.deferred_renderer.render_text(
-                        deferred_target,
-                        &mut screen_render_pass,
-                        name,
-                        mouse_position + offset + ScreenPosition::uniform(1.0),
-                        Color::BLACK,
-                        FontSize::new(12.0),
-                    );
-
-                    context.deferred_renderer.render_text(
-                        deferred_target,
-                        &mut screen_render_pass,
-                        name,
-                        mouse_position + offset,
-                        Color::WHITE,
-                        FontSize::new(12.0),
-                    );
-                }
+            if self.show_interface {
+                self.mouse_cursor.render(
+                    &self.top_interface_renderer,
+                    mouse_position,
+                    self.input_system.get_mouse_mode().grabbed(),
+                    self.application.get_game_theme().cursor.color.get(),
+                    &self.application,
+                );
             }
         }
 
-        if !entities.is_empty() {
+        #[cfg(feature = "debug")]
+        collect_instructions_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let render_frame_measurement = Profiler::start_measurement("render next frame");
+
+        let interface_instructions = self.interface_renderer.get_instructions();
+        let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
+        let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
+        let top_layer_instructions = self.top_interface_renderer.get_instructions();
+        let font_atlas = self.font_loader.borrow();
+
+        let render_instruction = RenderInstruction {
+            clear_interface,
+            show_interface: self.show_interface,
+            picker_position,
+            uniforms: Uniforms {
+                view_matrix,
+                projection_matrix,
+                animation_timer,
+                day_timer,
+                water_level,
+                ambient_light_color,
+            },
+            indicator: indicator_instruction,
+            interface: interface_instructions.as_slice(),
+            bottom_layer_rectangles: bottom_layer_instructions.as_slice(),
+            middle_layer_rectangles: middle_layer_instructions.as_slice(),
+            top_layer_rectangles: top_layer_instructions.as_slice(),
+            directional_light_with_shadow: DirectionalShadowCasterInstruction {
+                view_projection_matrix: directional_light_matrix,
+                direction: directional_light_direction,
+                color: directional_light_color,
+            },
+            point_light_shadow_caster: &self.point_light_with_shadow_instructions,
+            point_light: &self.point_light_instructions,
+            model_batches: &self.model_batches,
+            models: &self.model_instructions,
+            entities: &self.entity_instructions,
+            directional_model_batches: &self.directional_shadow_model_batches,
+            directional_shadow_models: &self.directional_shadow_model_instructions,
+            directional_shadow_entities: &self.directional_shadow_entity_instructions,
+            point_shadow_models: &self.point_shadow_model_instructions,
+            point_shadow_entities: &self.point_shadow_entity_instructions,
+            effects: self.effect_renderer.get_instructions(),
+            map_textures: self.map.get_texture_group(),
+            map_model_vertex_group: self.map.get_model_vertex_buffer(),
+            map_picker_tile_vertex_buffer: self.map.get_tile_picker_vertex_buffer(),
+            map_water_vertex_buffer,
+            font_atlas_texture: font_atlas.get_font_atlas(),
             #[cfg(feature = "debug")]
-            profile_block!("render player status");
+            render_settings: *self.render_settings.get(),
+            #[cfg(feature = "debug")]
+            aabb: &self.aabb_instructions,
+            #[cfg(feature = "debug")]
+            circles: &self.circle_instructions,
+            #[cfg(feature = "debug")]
+            marker: self.debug_marker_renderer.get_instructions(),
+        };
 
-            entities[0].render_status(
-                deferred_target,
-                &mut screen_render_pass,
-                &context.deferred_renderer,
-                current_camera,
-                self.application.get_game_theme(),
-                screen_size,
-            );
-        }
-
-        #[cfg(feature = "debug")]
-        if render_settings.show_frames_per_second {
-            let game_theme = self.application.get_game_theme();
-
-            context.deferred_renderer.render_text(
-                deferred_target,
-                &mut screen_render_pass,
-                &self.game_timer.last_frames_per_second().to_string(),
-                game_theme.overlay.text_offset.get().scaled(self.application.get_scaling()),
-                game_theme.overlay.foreground_color.get(),
-                game_theme.overlay.font_size.get().scaled(self.application.get_scaling()),
-            );
-        }
-
-        if self.show_interface {
-            context
-                .deferred_renderer
-                .overlay_interface(deferred_target, &mut screen_render_pass, &context.interface_target.texture);
-
-            self.mouse_cursor.render(
-                deferred_target,
-                &mut screen_render_pass,
-                &context.deferred_renderer,
-                mouse_position,
-                self.input_system.get_mouse_mode().grabbed(),
-                self.application.get_game_theme().cursor.color.get(),
-                &self.application,
-            );
-        }
+        self.graphics_engine.render_next_frame(frame, &render_instruction);
 
         #[cfg(feature = "debug")]
-        let finalize_frame_measurement = Profiler::start_measurement("finishing command encoders");
-
-        drop(picker_render_pass);
-        drop(picker_compute_pass);
-        drop(interface_render_pass);
-        drop(directional_shadow_render_pass);
-        drop(geometry_render_pass);
-        drop(screen_render_pass);
-
-        let (picker_render_command_buffer, picker_compute_command_buffer) =
-            picker_target.finish(picker_render_command_encoder, picker_compute_command_encoder);
-        let interface_command_buffer = context.interface_target.finish(interface_command_encoder);
-        let directional_shadow_command_buffer = directional_shadow_target.finish(directional_shadow_command_encoder);
-        // HACK: `point_shadow_target[0].finish` internally only calls
-        // `point_shadow_command_encoder.finish()`. The fact that we use index `0` here
-        // is completely arbitrary and a bit ugly.
-        let point_shadow_command_buffer = point_shadow_target[0].finish(point_shadow_command_encoder);
-        let (deferred_command_buffer, screen_command_buffer) = deferred_target.finish(geometry_command_encoder, screen_command_encoder);
-
-        #[cfg(feature = "debug")]
-        finalize_frame_measurement.stop();
-
-        #[cfg(feature = "debug")]
-        let queue_measurement = Profiler::start_measurement("queue command buffers");
-
-        // We need to wait for the last submission to finish to be able to resolve all
-        // outstanding mapping callback.
-        self.device.poll(Maintain::Wait);
-        self.queue.submit([
-            picker_render_command_buffer,
-            picker_compute_command_buffer,
-            interface_command_buffer,
-            directional_shadow_command_buffer,
-            point_shadow_command_buffer,
-            deferred_command_buffer,
-            screen_command_buffer,
-        ]);
-
-        #[cfg(feature = "debug")]
-        queue_measurement.stop();
-
-        #[cfg(feature = "debug")]
-        let present_measurement = Profiler::start_measurement("present frame");
-
-        frame.present();
-
-        #[cfg(feature = "debug")]
-        present_measurement.stop();
+        render_frame_measurement.stop();
     }
 }
 
@@ -2398,9 +2208,8 @@ impl ApplicationHandler for Client {
                 let window_attributes = Window::default_attributes().with_title(CLIENT_NAME).with_window_icon(Some(icon));
                 let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
-                let adapter_info = self.adapter.get_info();
-                let backend = adapter_info.backend.to_string();
-                window.set_title(&format!("{CLIENT_NAME} ({})", str::to_uppercase(&backend)));
+                let backend_name = self.graphics_engine.get_backend_name();
+                window.set_title(&format!("{CLIENT_NAME} ({})", str::to_uppercase(&backend_name)));
                 window.set_cursor_visible(false);
 
                 self.window = Some(window);
@@ -2412,89 +2221,10 @@ impl ApplicationHandler for Client {
 
         // Android devices need to drop the surface on suspend, so we might need to
         // re-create it.
-        if self.surface.is_none()
-            && let Some(window) = self.window.clone()
-        {
-            time_phase!("create surface", {
-                let inner_size: ScreenSize = window.inner_size().max(PhysicalSize::new(1, 1)).into();
-                let raw_surface = self.instance.create_surface(window).unwrap();
-                let surface = Surface::new(
-                    &self.adapter,
-                    self.device.clone(),
-                    raw_surface,
-                    inner_size.width as u32,
-                    inner_size.height as u32,
-                );
-                let surface_texture_format = surface.format();
-
-                if self.previous_surface_texture_format != Some(surface_texture_format) {
-                    self.previous_surface_texture_format = Some(surface_texture_format);
-                    self.render_context = None;
-
-                    time_phase!("create renderers", {
-                        let deferred_renderer = DeferredRenderer::new(
-                            self.device.clone(),
-                            self.queue.clone(),
-                            &mut self.texture_loader,
-                            surface_texture_format,
-                            inner_size,
-                        );
-                        let interface_renderer = InterfaceRenderer::new(
-                            self.device.clone(),
-                            &mut self.texture_loader,
-                            self.font_loader.clone(),
-                            inner_size,
-                        );
-                        let picker_renderer = PickerRenderer::new(self.device.clone(), self.queue.clone(), inner_size);
-                        let directional_shadow_renderer =
-                            DirectionalShadowRenderer::new(self.device.clone(), self.queue.clone(), &mut self.texture_loader);
-                        let point_shadow_renderer = PointShadowRenderer::new(self.device.clone(), &mut self.texture_loader);
-                    });
-
-                    time_phase!("create render targets", {
-                        let screen_targets = (0..self.max_frame_count)
-                            .map(|_| deferred_renderer.create_render_target())
-                            .collect();
-                        let interface_target = interface_renderer.create_render_target();
-                        let picker_targets = (0..self.max_frame_count).map(|_| picker_renderer.create_render_target()).collect();
-                        let directional_shadow_targets = (0..self.max_frame_count)
-                            .map(|_| {
-                                directional_shadow_renderer.create_render_target(self.shadow_detail.get().directional_shadow_resolution())
-                            })
-                            .collect();
-                        let point_shadow_targets = (0..self.max_frame_count)
-                            .map(|_| {
-                                (0..NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS)
-                                    .map(|_| point_shadow_renderer.create_render_target(self.shadow_detail.get().point_shadow_resolution()))
-                                    .collect::<Vec<<PointShadowRenderer as Renderer>::Target>>()
-                            })
-                            .collect::<Vec<Vec<_>>>();
-                        let point_shadow_maps = point_shadow_targets
-                            .iter()
-                            .map(|target| target.iter().map(|target| target.texture.clone()).collect())
-                            .collect();
-                    });
-
-                    self.render_context = Some(RenderContext {
-                        deferred_renderer,
-                        interface_renderer,
-                        picker_renderer,
-                        directional_shadow_renderer,
-                        point_shadow_renderer,
-                        screen_targets,
-                        interface_target,
-                        picker_targets,
-                        directional_shadow_targets,
-                        point_shadow_targets,
-                        point_shadow_maps,
-                    })
-                }
-
-                self.surface = Some(surface);
-
-                #[cfg(feature = "debug")]
-                print_debug!("created {}", "surface".magenta());
-            });
+        if let Some(window) = self.window.clone() {
+            // TODO: NHA Expose texture filtering as an graphics setting.
+            self.graphics_engine
+                .on_resume(window, *self.shadow_detail.get(), TextureSamplerType::Anisotropic(4))
         }
     }
 
@@ -2503,15 +2233,17 @@ impl ApplicationHandler for Client {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
             }
-            WindowEvent::Resized(_) => {
+            WindowEvent::Resized(screen_size) => {
+                let screen_size = screen_size.max(PhysicalSize::new(1, 1)).into();
+                self.graphics_engine.on_resize(screen_size);
+                self.interface.update_window_size(screen_size);
+                self.interface_renderer.update_window_size(screen_size);
+                self.bottom_interface_renderer.update_window_size(screen_size);
+                self.middle_interface_renderer.update_window_size(screen_size);
+                self.top_interface_renderer.update_window_size(screen_size);
+                self.effect_renderer.update_window_size(screen_size);
+
                 if let Some(window) = self.window.as_ref() {
-                    let screen_size: ScreenSize = window.inner_size().max(PhysicalSize::new(1, 1)).into();
-                    self.interface.update_window_size(screen_size);
-
-                    if let Some(surface) = self.surface.as_mut() {
-                        surface.update_window_size(screen_size);
-                    }
-
                     window.request_redraw();
                 }
             }
@@ -2541,12 +2273,9 @@ impl ApplicationHandler for Client {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if self.window.is_some() && self.surface.is_some() {
+                if self.window.is_some() {
                     self.render_frame(event_loop);
-                }
-
-                if let Some(window) = self.window.as_ref() {
-                    window.request_redraw();
+                    self.window.as_mut().unwrap().request_redraw();
                 }
             }
             _ignored => {}
@@ -2554,9 +2283,6 @@ impl ApplicationHandler for Client {
     }
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-        // Android devices are expected to drop their surface view.
-        if cfg!(target_os = "android") {
-            self.surface = None;
-        }
+        self.graphics_engine.on_suspended();
     }
 }

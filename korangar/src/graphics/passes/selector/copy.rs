@@ -37,7 +37,7 @@ impl Dispatch<{ BindGroupCount::Two }> for SelectorCopyDispatcher {
         Self { pipeline }
     }
 
-    fn dispatch<'data>(&mut self, pass: &mut ComputePass<'_>, _dispatch_data: Self::DispatchData<'data>) {
+    fn dispatch(&mut self, pass: &mut ComputePass<'_>, _dispatch_data: Self::DispatchData<'_>) {
         pass.set_pipeline(&self.pipeline);
         pass.dispatch_workgroups(1, 1, 1);
     }

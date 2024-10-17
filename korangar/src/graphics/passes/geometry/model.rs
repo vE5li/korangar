@@ -251,17 +251,17 @@ impl GeometryModelDrawer {
     ) -> RenderPipeline {
         let color_attachment_formats = render_pass_context.color_attachment_formats();
 
-        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
+        device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
-            layout: Some(&pipeline_layout),
+            layout: Some(pipeline_layout),
             vertex: VertexState {
-                module: &shader_module,
+                module: shader_module,
                 entry_point: "vs_main",
                 compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[ModelVertex::buffer_layout(), instance_index_buffer_layout],
             },
             fragment: Some(FragmentState {
-                module: &shader_module,
+                module: shader_module,
                 entry_point: "fs_main",
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[
@@ -301,7 +301,6 @@ impl GeometryModelDrawer {
                 bias: Default::default(),
             }),
             cache: None,
-        });
-        pipeline
+        })
     }
 }

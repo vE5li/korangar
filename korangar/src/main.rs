@@ -790,7 +790,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .load(DEFAULT_MAP.to_string(), &mut self.model_loader, &mut self.texture_loader)
+                        .load(DEFAULT_MAP.to_string(), &mut self.model_loader, &self.texture_loader)
                         .expect("failed to load initial map");
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -869,7 +869,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .load(map_name, &mut self.model_loader, &mut self.texture_loader)
+                        .load(map_name, &mut self.model_loader, &self.texture_loader)
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -1004,7 +1004,7 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .load(map_name, &mut self.model_loader, &mut self.texture_loader)
+                        .load(map_name, &mut self.model_loader, &self.texture_loader)
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -1187,7 +1187,7 @@ impl Client {
                     UnitId::Pneuma => {
                         let position = Vector2::new(position.x as usize, position.y as usize);
                         let position = self.map.get_world_position(position);
-                        let effect = self.effect_loader.get("pneuma1.str", &mut self.texture_loader).unwrap();
+                        let effect = self.effect_loader.get("pneuma1.str", &self.texture_loader).unwrap();
                         let frame_timer = effect.new_frame_timer();
 
                         self.effect_holder.add_unit(

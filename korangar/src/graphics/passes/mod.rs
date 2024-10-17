@@ -49,12 +49,12 @@ pub(crate) trait RenderPassContext<const BIND: BindGroupCount, const COLOR: Colo
     fn new(device: &Device, queue: &Queue, texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self;
 
     /// Crates a render new pass.
-    fn create_pass<'encoder, 'data>(
+    fn create_pass<'encoder>(
         &mut self,
         frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
-        pass_data: Self::PassData<'data>,
+        pass_data: Self::PassData<'_>,
     ) -> RenderPass<'encoder>;
 
     /// The bind group layout of the render pass.
@@ -76,11 +76,11 @@ pub(crate) trait ComputePassContext<const BIND: BindGroupCount> {
     fn new(device: &Device, queue: &Queue, global_context: &GlobalContext) -> Self;
 
     /// Crates a compute new pass.
-    fn create_pass<'encoder, 'data>(
+    fn create_pass<'encoder>(
         &mut self,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
-        pass_data: Self::PassData<'data>,
+        pass_data: Self::PassData<'_>,
     ) -> ComputePass<'encoder>;
 
     /// The bind group layout of the compute pass.
@@ -104,7 +104,7 @@ pub(crate) trait Dispatch<const BIND: BindGroupCount> {
 
     fn new(device: &Device, queue: &Queue, global_context: &GlobalContext, compute_pass_context: &Self::Context) -> Self;
 
-    fn dispatch<'data>(&mut self, pass: &mut ComputePass<'_>, draw_data: Self::DispatchData<'data>);
+    fn dispatch(&mut self, pass: &mut ComputePass<'_>, draw_data: Self::DispatchData<'_>);
 }
 
 /// We reimplement the WGPU type, since we want to have bytemuck support.

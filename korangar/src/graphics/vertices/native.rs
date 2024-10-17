@@ -17,7 +17,7 @@ impl NativeModelVertex {
     fn convert_to_vertex(self, texture_index_mapping: Option<&[i32]>) -> ModelVertex {
         // sic! We want to panic when the mapping doesn't contain the texture index.
         let texture_index = texture_index_mapping
-            .and_then(|mapping| Some(mapping[self.texture_index as usize]))
+            .map(|mapping| mapping[self.texture_index as usize])
             .unwrap_or(self.texture_index);
         ModelVertex::new(
             self.position,

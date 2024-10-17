@@ -101,7 +101,7 @@ const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
 // The real limiting factor is WGPUs
 // "Limit::max_sampled_textures_per_shader_stage".
-const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 384;
+const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 512;
 // We need room for 8 textures for the screen bind group.
 const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = (MAX_TEXTURES_PER_SHADER_STAGE - 8) as usize;
 const DEFAULT_MAP: &str = "geffen";

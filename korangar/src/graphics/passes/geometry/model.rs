@@ -18,6 +18,8 @@ use crate::graphics::passes::{
 use crate::graphics::{Buffer, GlobalContext, ModelVertex, Prepare, RenderInstruction, TextureGroup};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
+#[cfg(feature = "debug")]
+const SHADER_WIREFRAME: ShaderModuleDescriptor = include_wgsl!("shader/model_wireframe.wgsl");
 const DRAWER_NAME: &str = "geometry model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
@@ -48,6 +50,8 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
 
     fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
         let shader_module = device.create_shader_module(SHADER);
+        #[cfg(feature = "debug")]
+        let shader_module_wireframe = device.create_shader_module(SHADER_WIREFRAME);
 
         let instance_data_buffer = Buffer::with_capacity(
             device,
@@ -111,7 +115,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
         let wireframe_pipeline = Self::create_pipeline(
             device,
             render_pass_context,
-            &shader_module,
+            &shader_module_wireframe,
             instance_index_buffer_layout.clone(),
             &pipeline_layout,
             PolygonMode::Line,

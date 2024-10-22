@@ -136,14 +136,14 @@ pub(crate) struct GlobalContext {
     pub(crate) surface_texture_format: TextureFormat,
     pub(crate) solid_pixel_texture: Arc<Texture>,
     pub(crate) walk_indicator_texture: Arc<Texture>,
-    pub(crate) depth_texture: Texture,
-    pub(crate) picker_buffer_texture: Texture,
-    pub(crate) diffuse_buffer_texture: Texture,
-    pub(crate) normal_buffer_texture: Texture,
-    pub(crate) water_buffer_texture: Texture,
-    pub(crate) depth_buffer_texture: Texture,
-    pub(crate) interface_buffer_texture: Texture,
-    pub(crate) directional_shadow_map_texture: Texture,
+    pub(crate) depth_texture: AttachmentTexture,
+    pub(crate) picker_buffer_texture: AttachmentTexture,
+    pub(crate) diffuse_buffer_texture: AttachmentTexture,
+    pub(crate) normal_buffer_texture: AttachmentTexture,
+    pub(crate) water_buffer_texture: AttachmentTexture,
+    pub(crate) depth_buffer_texture: AttachmentTexture,
+    pub(crate) interface_buffer_texture: AttachmentTexture,
+    pub(crate) directional_shadow_map_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: [CubeTexture; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS],
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
     #[cfg(feature = "debug")]
@@ -351,23 +351,39 @@ impl GlobalContext {
     }
 
     fn create_screen_size_textures(device: &Device, screen_size: ScreenSize) -> ScreenSizeTextures {
-        let screen_factory = TextureFactory::new(device, screen_size, 1);
+        let screen_factory = AttachmentTextureFactory::new(device, screen_size, 1);
 
-        let depth_texture = screen_factory.new_texture("depth", TextureFormat::Depth32Float, TextureType::Depth);
-        let picker_buffer_texture = screen_factory.new_texture("picker buffer", TextureFormat::Rg32Uint, TextureType::ColorAttachment);
+        let depth_texture = screen_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
+        let picker_buffer_texture =
+            screen_factory.new_attachment("picker buffer", TextureFormat::Rg32Uint, AttachmentTextureType::ColorAttachment);
 
-        let multisampled_screen_factory = TextureFactory::new(device, screen_size, 4);
+        let multisampled_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4);
 
-        let diffuse_buffer_texture =
-            multisampled_screen_factory.new_texture("diffuse buffer", TextureFormat::Rgba8UnormSrgb, TextureType::ColorAttachment);
-        let normal_buffer_texture =
-            multisampled_screen_factory.new_texture("normal buffer", TextureFormat::Rgba16Float, TextureType::ColorAttachment);
-        let water_buffer_texture =
-            multisampled_screen_factory.new_texture("water buffer", TextureFormat::Rgba8UnormSrgb, TextureType::ColorAttachment);
-        let depth_buffer_texture =
-            multisampled_screen_factory.new_texture("depth buffer", TextureFormat::Depth32Float, TextureType::DepthAttachment);
-        let interface_buffer_texture =
-            multisampled_screen_factory.new_texture("interface buffer", TextureFormat::Rgba8UnormSrgb, TextureType::ColorAttachment);
+        let diffuse_buffer_texture = multisampled_screen_factory.new_attachment(
+            "diffuse buffer",
+            TextureFormat::Rgba8UnormSrgb,
+            AttachmentTextureType::ColorAttachment,
+        );
+        let normal_buffer_texture = multisampled_screen_factory.new_attachment(
+            "normal buffer",
+            TextureFormat::Rgba16Float,
+            AttachmentTextureType::ColorAttachment,
+        );
+        let water_buffer_texture = multisampled_screen_factory.new_attachment(
+            "water buffer",
+            TextureFormat::Rgba8UnormSrgb,
+            AttachmentTextureType::ColorAttachment,
+        );
+        let depth_buffer_texture = multisampled_screen_factory.new_attachment(
+            "depth buffer",
+            TextureFormat::Depth32Float,
+            AttachmentTextureType::DepthAttachment,
+        );
+        let interface_buffer_texture = multisampled_screen_factory.new_attachment(
+            "interface buffer",
+            TextureFormat::Rgba8UnormSrgb,
+            AttachmentTextureType::ColorAttachment,
+        );
 
         ScreenSizeTextures {
             depth_texture,
@@ -380,26 +396,60 @@ impl GlobalContext {
         }
     }
 
-    fn create_directional_shadow_texture(device: &Device, shadow_size: ScreenSize) -> Texture {
-        let shadow_factory = TextureFactory::new(device, shadow_size, 1);
+    fn create_directional_shadow_texture(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
+        let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1);
 
-        shadow_factory.new_texture(
+        shadow_factory.new_attachment(
             "directional shadow map",
             TextureFormat::Depth32Float,
-            TextureType::DepthAttachment,
+            AttachmentTextureType::DepthAttachment,
         )
     }
 
     fn create_point_shadow_textures(device: &Device, shadow_size: ScreenSize) -> [CubeTexture; 6] {
-        let shadow_factory = TextureFactory::new(device, shadow_size, 1);
-
         [
-            shadow_factory.new_cube_texture("point shadow map 0", TextureFormat::Depth32Float, TextureType::DepthAttachment),
-            shadow_factory.new_cube_texture("point shadow map 1", TextureFormat::Depth32Float, TextureType::DepthAttachment),
-            shadow_factory.new_cube_texture("point shadow map 2", TextureFormat::Depth32Float, TextureType::DepthAttachment),
-            shadow_factory.new_cube_texture("point shadow map 3", TextureFormat::Depth32Float, TextureType::DepthAttachment),
-            shadow_factory.new_cube_texture("point shadow map 4", TextureFormat::Depth32Float, TextureType::DepthAttachment),
-            shadow_factory.new_cube_texture("point shadow map 5", TextureFormat::Depth32Float, TextureType::DepthAttachment),
+            CubeTexture::new(
+                device,
+                "point shadow map 0",
+                shadow_size,
+                TextureFormat::Depth32Float,
+                AttachmentTextureType::DepthAttachment,
+            ),
+            CubeTexture::new(
+                device,
+                "point shadow map 1",
+                shadow_size,
+                TextureFormat::Depth32Float,
+                AttachmentTextureType::DepthAttachment,
+            ),
+            CubeTexture::new(
+                device,
+                "point shadow map 2",
+                shadow_size,
+                TextureFormat::Depth32Float,
+                AttachmentTextureType::DepthAttachment,
+            ),
+            CubeTexture::new(
+                device,
+                "point shadow map 3",
+                shadow_size,
+                TextureFormat::Depth32Float,
+                AttachmentTextureType::DepthAttachment,
+            ),
+            CubeTexture::new(
+                device,
+                "point shadow map 4",
+                shadow_size,
+                TextureFormat::Depth32Float,
+                AttachmentTextureType::DepthAttachment,
+            ),
+            CubeTexture::new(
+                device,
+                "point shadow map 5",
+                shadow_size,
+                TextureFormat::Depth32Float,
+                AttachmentTextureType::DepthAttachment,
+            ),
         ]
     }
 
@@ -678,7 +728,7 @@ impl GlobalContext {
         })
     }
 
-    fn create_picker_bind_group(device: &Device, picker_texture: &Texture, picker_buffer: &Buffer<u64>) -> BindGroup {
+    fn create_picker_bind_group(device: &Device, picker_texture: &AttachmentTexture, picker_buffer: &Buffer<u64>) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("picker"),
             layout: Self::picker_bind_group_layout(device),
@@ -697,14 +747,14 @@ impl GlobalContext {
 
     fn create_screen_bind_group(
         device: &Device,
-        diffuse_buffer_texture: &Texture,
-        normal_buffer_texture: &Texture,
-        water_buffer_texture: &Texture,
-        depth_buffer_texture: &Texture,
-        directional_shadow_map_texture: &Texture,
+        diffuse_buffer_texture: &AttachmentTexture,
+        normal_buffer_texture: &AttachmentTexture,
+        water_buffer_texture: &AttachmentTexture,
+        depth_buffer_texture: &AttachmentTexture,
+        directional_shadow_map_texture: &AttachmentTexture,
         point_shadow_maps_texture: &[CubeTexture; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS],
-        interface_buffer_texture: &Texture,
-        #[cfg(feature = "debug")] picker_buffer_texture: &Texture,
+        interface_buffer_texture: &AttachmentTexture,
+        #[cfg(feature = "debug")] picker_buffer_texture: &AttachmentTexture,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("screen"),
@@ -756,11 +806,11 @@ impl GlobalContext {
 }
 
 struct ScreenSizeTextures {
-    depth_texture: Texture,
-    picker_buffer_texture: Texture,
-    diffuse_buffer_texture: Texture,
-    normal_buffer_texture: Texture,
-    water_buffer_texture: Texture,
-    depth_buffer_texture: Texture,
-    interface_buffer_texture: Texture,
+    depth_texture: AttachmentTexture,
+    picker_buffer_texture: AttachmentTexture,
+    diffuse_buffer_texture: AttachmentTexture,
+    normal_buffer_texture: AttachmentTexture,
+    water_buffer_texture: AttachmentTexture,
+    depth_buffer_texture: AttachmentTexture,
+    interface_buffer_texture: AttachmentTexture,
 }

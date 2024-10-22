@@ -587,8 +587,6 @@ impl GraphicsEngine {
 
                 let draw_data = ModelBatchDrawData {
                     batches: instruction.directional_model_batches,
-                    map_textures: instruction.map_textures,
-                    map_vertex_buffer: instruction.map_model_vertex_group,
                     #[cfg(feature = "debug")]
                     show_wireframe: false,
                 };
@@ -611,8 +609,6 @@ impl GraphicsEngine {
                         let model_data = PointShadowBatchData {
                             pass_data,
                             caster: instruction.point_light_shadow_caster,
-                            map_textures: instruction.map_textures,
-                            map_vertex_group: instruction.map_model_vertex_group,
                         };
 
                         let mut render_pass = engine_context.point_shadow_pass_context.create_pass(
@@ -642,8 +638,6 @@ impl GraphicsEngine {
 
                 let draw_data = ModelBatchDrawData {
                     batches: instruction.model_batches,
-                    map_textures: instruction.map_textures,
-                    map_vertex_buffer: instruction.map_model_vertex_group,
                     #[cfg(feature = "debug")]
                     show_wireframe: instruction.render_settings.show_wireframe,
                 };

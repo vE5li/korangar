@@ -5,6 +5,8 @@ use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
+#[cfg(feature = "debug")]
+use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
@@ -626,7 +628,7 @@ impl Common {
     }
 
     #[cfg(feature = "debug")]
-    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map) {
+    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map, pathing_mapping: &[AtlasAllocation]) {
         use crate::{Color, NativeModelVertex, MAP_TILE_SIZE};
 
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
@@ -721,7 +723,7 @@ impl Common {
             ));
         }
 
-        let pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices, None);
+        let pathing_vertices = NativeModelVertex::to_vertices(native_pathing_vertices, pathing_mapping);
 
         if let Some(steps_vertex_buffer) = &active_movement.pathing_vertex_buffer {
             steps_vertex_buffer.write_exact(queue, pathing_vertices.as_slice());
@@ -1067,8 +1069,9 @@ impl Entity {
     }
 
     #[cfg(feature = "debug")]
-    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map) {
-        self.get_common_mut().generate_pathing_mesh(device, queue, map);
+    pub fn generate_pathing_mesh(&mut self, device: &Device, queue: &Queue, map: &Map, pathing_texture_mapping: &[AtlasAllocation]) {
+        self.get_common_mut()
+            .generate_pathing_mesh(device, queue, map, pathing_texture_mapping);
     }
 
     pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera) {

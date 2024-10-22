@@ -1,5 +1,6 @@
 use cgmath::{InnerSpace, Point3, Vector2, Vector3};
 use derive_new::new;
+use korangar_util::texture_atlas::AtlasAllocation;
 
 use crate::graphics::{Color, ModelVertex};
 
@@ -14,22 +15,19 @@ pub struct NativeModelVertex {
 }
 
 impl NativeModelVertex {
-    fn convert_to_vertex(self, texture_index_mapping: Option<&[i32]>) -> ModelVertex {
-        // sic! We want to panic when the mapping doesn't contain the texture index.
-        let texture_index = texture_index_mapping
-            .map(|mapping| mapping[self.texture_index as usize])
-            .unwrap_or(self.texture_index);
+    fn convert_to_vertex(self, texture_mapping: &[AtlasAllocation]) -> ModelVertex {
+        let allocation = texture_mapping[self.texture_index as usize];
+
         ModelVertex::new(
             self.position,
             self.normal,
-            self.texture_coordinates,
-            texture_index,
+            allocation.map_to_atlas(self.texture_coordinates),
             self.color,
             self.wind_affinity,
         )
     }
 
-    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_index_mapping: Option<&[i32]>) -> Vec<ModelVertex> {
+    pub fn to_vertices(mut native_vertices: Vec<NativeModelVertex>, texture_mapping: &[AtlasAllocation]) -> Vec<ModelVertex> {
         let mut vertices = Vec::new();
         let mut drain_iterator = native_vertices.drain(..);
 
@@ -41,9 +39,9 @@ impl NativeModelVertex {
             second_partial.normal = second_partial.normal.normalize();
             third_partial.normal = third_partial.normal.normalize();
 
-            vertices.push(first_partial.convert_to_vertex(texture_index_mapping));
-            vertices.push(second_partial.convert_to_vertex(texture_index_mapping));
-            vertices.push(third_partial.convert_to_vertex(texture_index_mapping));
+            vertices.push(first_partial.convert_to_vertex(texture_mapping));
+            vertices.push(second_partial.convert_to_vertex(texture_mapping));
+            vertices.push(third_partial.convert_to_vertex(texture_mapping));
         }
 
         vertices

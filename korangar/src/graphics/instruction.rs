@@ -7,7 +7,7 @@ use super::color::Color;
 use super::vertices::ModelVertex;
 #[cfg(feature = "debug")]
 use super::RenderSettings;
-use super::{Buffer, Texture, TextureGroup, TileVertex, WaterVertex};
+use super::{Buffer, Texture, TileVertex, WaterVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -37,8 +37,6 @@ pub struct RenderInstruction<'a> {
     pub point_shadow_models: &'a [ModelInstruction],
     pub point_shadow_entities: &'a [EntityInstruction],
     pub effects: &'a [EffectInstruction],
-    pub map_textures: &'a TextureGroup,
-    pub map_model_vertex_group: &'a Buffer<ModelVertex>,
     pub map_picker_tile_vertex_buffer: &'a Buffer<TileVertex>,
     pub map_water_vertex_buffer: Option<&'a Buffer<WaterVertex>>,
     pub font_atlas_texture: &'a Texture,
@@ -79,6 +77,8 @@ pub struct PointShadowCasterInstruction {
     pub screen_size: ScreenSize,
     pub color: Color,
     pub range: f32,
+    pub model_texture: Arc<Texture>,
+    pub model_vertex_buffer: Arc<Buffer<ModelVertex>>,
     /// Start point inside the point_shadow_entities.
     pub entity_offset: [usize; 6],
     /// Model count inside the point_shadow_entities.
@@ -165,10 +165,8 @@ pub struct IndicatorInstruction {
 pub struct ModelBatch {
     pub offset: usize,
     pub count: usize,
-    /// Optional texture group that is used instead of the default map textures.
-    pub textures: Option<Arc<TextureGroup>>,
-    /// Optional texture group that is used instead of the default map textures.
-    pub vertex_buffer: Option<Arc<Buffer<ModelVertex>>>,
+    pub texture: Arc<Texture>,
+    pub vertex_buffer: Arc<Buffer<ModelVertex>>,
 }
 
 #[derive(Clone, Debug)]

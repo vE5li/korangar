@@ -21,4 +21,4 @@ pub use self::model::*;
 pub use self::script::{ResourceMetadata, ScriptLoader};
 pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::sprite::*;
-pub use self::texture::TextureLoader;
+pub use self::texture::{TextureAtlasFactory, TextureLoader};

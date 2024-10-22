@@ -1,16 +1,17 @@
 mod vertices;
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use bytemuck::Pod;
 use cgmath::Vector3;
 use derive_new::new;
+use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::Timer;
 use korangar_util::collision::{KDTree, Sphere, AABB};
 use korangar_util::container::SimpleSlab;
+use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResources};
@@ -20,8 +21,8 @@ use wgpu::{BufferUsages, Device, Queue};
 pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_water_vertices};
 use super::error::LoadError;
-use crate::graphics::{Buffer, NativeModelVertex, Texture, TextureGroup};
-use crate::loaders::{GameFileLoader, ModelLoader, TextureLoader};
+use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
+use crate::loaders::{GameFileLoader, ModelLoader, TextureAtlasFactory, TextureLoader};
 use crate::world::{point_light_extent, LightSourceKey, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
@@ -40,6 +41,11 @@ fn assert_byte_stream_empty<Meta>(mut byte_stream: ByteStream<Meta>, file_name: 
     }
 }
 
+pub struct DeferredVertexGeneration {
+    pub native_model_vertices: Vec<NativeModelVertex>,
+    pub texture_allocation: Vec<AllocationId>,
+}
+
 #[derive(new)]
 pub struct MapLoader {
     device: Arc<Device>,
@@ -53,10 +59,14 @@ impl MapLoader {
         &mut self,
         resource_file: String,
         model_loader: &mut ModelLoader,
-        texture_loader: &TextureLoader,
+        texture_loader: Arc<TextureLoader>,
+        #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
     ) -> Result<Map, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
+
+        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader, "map", true);
+        let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
 
         let map_file_name = format!("data\\{}.rsw", resource_file);
         let mut map_data: MapData = parse_generic_data(&map_file_name, &self.game_file_loader)?;
@@ -71,7 +81,7 @@ impl MapLoader {
         let map_data_clone = map_data.clone();
 
         #[cfg(feature = "debug")]
-        let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
+        let (tile_vertices, tile_picker_vertices) = generate_tile_vertices(&mut gat_data, tile_texture_mapping);
         #[cfg(not(feature = "debug"))]
         let (_, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
 
@@ -80,17 +90,22 @@ impl MapLoader {
             .as_ref()
             .and_then(|settings| settings.water_level)
             .unwrap_or_default();
-        let (ground_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
-
-        let mut texture_buffer: Vec<Arc<Texture>> = Vec::new();
-        let mut texture_cache = HashMap::<String, i32>::new();
+        let (ground_native_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
 
         let ground_vertex_offset = 0;
-        let ground_vertex_count = ground_vertices.len();
-        let ground_texture_mapping =
-            texture_loader.map_model_texture_to_texture_buffer(&mut texture_cache, &mut texture_buffer, &ground_data.textures);
+        let ground_vertex_count = ground_native_vertices.len();
+        let mut vertex_offset = ground_vertex_count;
 
-        let mut vertices = NativeModelVertex::to_vertices(ground_vertices, Some(&ground_texture_mapping));
+        let ground_texture_allocation: Vec<AllocationId> = ground_data
+            .textures
+            .iter()
+            .map(|texture_name| texture_atlas_factory.register(texture_name))
+            .collect();
+
+        deferred_vertex_generation.push(DeferredVertexGeneration {
+            native_model_vertices: ground_native_vertices,
+            texture_allocation: ground_texture_allocation,
+        });
 
         let water_vertex_buffer = (!water_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "water", &water_vertices));
         #[cfg(feature = "debug")]
@@ -118,18 +133,16 @@ impl MapLoader {
                 let model = model_cache
                     .entry((object_data.model_name.clone(), reverse_order))
                     .or_insert_with(|| {
-                        Arc::new(
-                            model_loader
-                                .load(
-                                    texture_loader,
-                                    &mut texture_cache,
-                                    &mut vertices,
-                                    &mut texture_buffer,
-                                    object_data.model_name.as_str(),
-                                    reverse_order,
-                                )
-                                .expect("can't find model"),
-                        )
+                        let (model, deferred) = model_loader
+                            .load(
+                                &mut texture_atlas_factory,
+                                &mut vertex_offset,
+                                object_data.model_name.as_str(),
+                                reverse_order,
+                            )
+                            .expect("can't find model");
+                        deferred_vertex_generation.push(deferred);
+                        Arc::new(model)
                     })
                     .clone();
 
@@ -148,6 +161,9 @@ impl MapLoader {
             .collect();
         let object_kdtree = KDTree::from_objects(&object_bounding_boxes);
 
+        let (texture, vertex_buffer) =
+            self.generate_vertex_buffer_and_atlas_texture(&resource_file, texture_atlas_factory, deferred_vertex_generation, vertex_offset);
+
         let mut light_sources = SimpleSlab::with_capacity(map_data.resources.light_sources.len() as u32);
         let light_source_spheres: Vec<(LightSourceKey, Sphere)> = map_data
             .resources
@@ -161,9 +177,6 @@ impl MapLoader {
             })
             .collect();
         let light_sources_kdtree = KDTree::from_objects(&light_source_spheres);
-
-        let vertex_buffer = self.create_vertex_buffer(&resource_file, "map vertices", &vertices);
-        let textures = TextureGroup::new(&self.device, &map_file_name, texture_buffer);
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
         let map = Map::new(
@@ -176,7 +189,7 @@ impl MapLoader {
             ground_vertex_count,
             vertex_buffer,
             water_vertex_buffer,
-            textures,
+            texture,
             objects,
             light_sources,
             map_data.resources.sound_sources,
@@ -196,6 +209,34 @@ impl MapLoader {
         timer.stop();
 
         Ok(map)
+    }
+
+    fn generate_vertex_buffer_and_atlas_texture(
+        &mut self,
+        resource_file: &str,
+        mut texture_atlas_factory: TextureAtlasFactory,
+        mut deferred_vertex_generation: Vec<DeferredVertexGeneration>,
+        vertex_offset: usize,
+    ) -> (Arc<Texture>, Arc<Buffer<ModelVertex>>) {
+        // We can now generate the final texture atlas. Then we can map the final model
+        // vertices texture coordinates.
+        texture_atlas_factory.build_atlas();
+
+        let mut vertices = Vec::with_capacity(vertex_offset);
+        for mut deferred in deferred_vertex_generation.drain(..) {
+            let texture_mapping: Vec<AtlasAllocation> = deferred
+                .texture_allocation
+                .drain(..)
+                .map(|allocation_id| texture_atlas_factory.get_allocation(allocation_id).unwrap())
+                .collect();
+            let model_vertices = NativeModelVertex::to_vertices(deferred.native_model_vertices, &texture_mapping);
+            vertices.extend(model_vertices);
+        }
+
+        let texture = texture_atlas_factory.upload_texture_atlas_texture();
+        let vertex_buffer = Arc::new(self.create_vertex_buffer(resource_file, "map vertices", &vertices));
+
+        (texture, vertex_buffer)
     }
 
     fn create_vertex_buffer<T: Pod>(&self, resource: &str, label: &str, vertices: &[T]) -> Buffer<T> {

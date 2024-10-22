@@ -1,11 +1,12 @@
-use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
 use derive_new::new;
-use image::{EncodableLayout, ImageFormat, ImageReader, Rgba};
+use hashbrown::HashMap;
+use image::{EncodableLayout, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, TextureAtlas};
 use korangar_util::FileLoader;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
@@ -24,9 +25,39 @@ pub struct TextureLoader {
 }
 
 impl TextureLoader {
+    fn create(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+        let texture = Texture::new_with_data(
+            &self.device,
+            &self.queue,
+            &TextureDescriptor {
+                label: Some(name),
+                size: Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            image.as_bytes(),
+        );
+        Arc::new(texture)
+    }
+
     fn load(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
+        let texture_data = self.load_texture_data(path)?;
+        let texture = self.create(path, texture_data);
+        self.cache.lock().as_mut().unwrap().insert(path.to_string(), texture.clone());
+        Ok(texture)
+    }
+
+    pub fn load_texture_data(&self, path: &str) -> Result<RgbaImage, LoadError> {
         #[cfg(feature = "debug")]
-        let timer = Timer::new_dynamic(format!("load texture from {}", path.magenta()));
+        let timer = Timer::new_dynamic(format!("load texture data from {}", path.magenta()));
 
         let image_format = match &path[path.len() - 4..] {
             ".png" => ImageFormat::Png,
@@ -57,7 +88,7 @@ impl TextureLoader {
                     _ => unreachable!(),
                 };
 
-                return self.get(fallback_path);
+                return self.load_texture_data(fallback_path);
             }
         };
 
@@ -69,33 +100,10 @@ impl TextureLoader {
                 .for_each(|pixel| *pixel = Rgba([0; 4]));
         }
 
-        let texture = Texture::new_with_data(
-            &self.device,
-            &self.queue,
-            &TextureDescriptor {
-                label: Some(path),
-                size: Extent3d {
-                    width: image_buffer.width(),
-                    height: image_buffer.height(),
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::Rgba8UnormSrgb,
-                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            image_buffer.as_bytes(),
-        );
-        let texture = Arc::new(texture);
-
-        self.cache.lock().as_mut().unwrap().insert(path.to_string(), texture.clone());
-
         #[cfg(feature = "debug")]
         timer.stop();
 
-        Ok(texture)
+        Ok(image_buffer)
     }
 
     pub fn get(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
@@ -109,29 +117,66 @@ impl TextureLoader {
             }
         }
     }
+}
 
-    /// We need to map the model texture indices to the indices of the textures
-    /// buffer.
-    pub fn map_model_texture_to_texture_buffer(
-        &self,
-        texture_cache: &mut HashMap<String, i32>,
-        texture_buffer: &mut Vec<Arc<Texture>>,
-        texture_names: &[impl AsRef<str>],
-    ) -> Vec<i32> {
-        texture_names
-            .iter()
-            .map(|texture_name| {
-                let texture_name = texture_name.as_ref();
-                let offset = if let Some(texture_offset) = texture_cache.get(texture_name).copied() {
-                    texture_offset
-                } else {
-                    let texture_offset = texture_buffer.len() as i32;
-                    texture_buffer.push(self.get(texture_name).expect("can't load model texture"));
-                    texture_cache.insert(texture_name.to_string(), texture_offset);
-                    texture_offset
-                };
-                offset
-            })
-            .collect()
+pub struct TextureAtlasFactory {
+    name: String,
+    texture_loader: Arc<TextureLoader>,
+    texture_atlas: TextureAtlas,
+    lookup: HashMap<String, AllocationId>,
+}
+
+impl TextureAtlasFactory {
+    pub fn create_from_group(
+        texture_loader: Arc<TextureLoader>,
+        name: impl Into<String>,
+        add_padding: bool,
+        paths: &[&str],
+    ) -> (Vec<AtlasAllocation>, Arc<Texture>) {
+        let mut factory = Self::new(texture_loader, name, add_padding);
+
+        let mut ids: Vec<AllocationId> = paths.iter().map(|path| factory.register(path)).collect();
+        factory.build_atlas();
+
+        let mapping = ids.drain(..).map(|id| factory.get_allocation(id).unwrap()).collect();
+        let texture = factory.upload_texture_atlas_texture();
+
+        (mapping, texture)
+    }
+
+    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>, add_padding: bool) -> Self {
+        Self {
+            name: name.into(),
+            texture_loader,
+            texture_atlas: TextureAtlas::new(add_padding),
+            lookup: HashMap::default(),
+        }
+    }
+
+    /// Registers the given texture by its path. Will return an allocation ID
+    /// which can later be used to get the actual allocation.
+    pub fn register(&mut self, path: &str) -> AllocationId {
+        if let Some(allocation_id) = self.lookup.get(path).copied() {
+            return allocation_id;
+        }
+
+        let data = self.texture_loader.load_texture_data(path).expect("can't load texture data");
+        let allocation_id = self.texture_atlas.register_image(data);
+        self.lookup.insert(path.to_string(), allocation_id);
+
+        allocation_id
+    }
+
+    pub fn get_allocation(&self, allocation_id: AllocationId) -> Option<AtlasAllocation> {
+        self.texture_atlas.get_allocation(allocation_id)
+    }
+
+    pub fn build_atlas(&mut self) {
+        self.texture_atlas.build_atlas();
+    }
+
+    pub fn upload_texture_atlas_texture(self) -> Arc<Texture> {
+        self.texture_loader
+            .create(&format!("{} texture atlas", self.name), self.texture_atlas.get_atlas())
     }
 }

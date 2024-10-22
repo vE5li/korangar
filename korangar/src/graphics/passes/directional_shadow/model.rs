@@ -14,7 +14,7 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndirectArgs, Drawer,
     ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, ModelVertex, Prepare, RenderInstruction, TextureGroup};
+use crate::graphics::{Buffer, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 const DRAWER_NAME: &str = "directional shadow model";
@@ -66,7 +66,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             attributes: &[VertexAttribute {
                 format: VertexFormat::Uint32,
                 offset: 0,
-                shader_location: 6,
+                shader_location: 5,
             }],
         };
 
@@ -99,7 +99,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 Self::Context::bind_group_layout(device)[0],
                 Self::Context::bind_group_layout(device)[1],
                 &bind_group_layout,
-                TextureGroup::bind_group_layout(device),
+                Texture::bind_group_layout(device),
             ],
             push_constant_ranges: &[],
         });
@@ -158,11 +158,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
                 continue;
             }
 
-            let textures = batch.textures.as_deref().unwrap_or(draw_data.map_textures);
-            let vertex_buffer = batch.vertex_buffer.as_deref().unwrap_or(draw_data.map_vertex_buffer);
-
-            pass.set_bind_group(3, textures.bind_group(), &[]);
-            pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+            pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
+            pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
             pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
             pass.multi_draw_indirect(
                 self.command_buffer.get_buffer(),

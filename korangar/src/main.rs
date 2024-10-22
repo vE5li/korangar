@@ -61,6 +61,8 @@ use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
 };
+#[cfg(feature = "debug")]
+use korangar_util::texture_atlas::AtlasAllocation;
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
@@ -240,9 +242,13 @@ struct Client {
     bounding_box_object_set_buffer: ResourceSetBuffer<ObjectKey>,
 
     #[cfg(feature = "debug")]
-    pathing_texture_group: Arc<TextureGroup>,
+    pathing_texture_mapping: Vec<AtlasAllocation>,
     #[cfg(feature = "debug")]
-    tile_texture_group: Arc<TextureGroup>,
+    pathing_texture: Arc<Texture>,
+    #[cfg(feature = "debug")]
+    tile_texture: Arc<Texture>,
+    #[cfg(feature = "debug")]
+    tile_texture_mapping: Vec<AtlasAllocation>,
 
     chat_messages: PlainTrackedState<Vec<ChatMessage>>,
     main_menu_click_sound_effect: SoundEffectKey,
@@ -497,22 +503,23 @@ impl Client {
             let bounding_box_object_set_buffer = ResourceSetBuffer::default();
 
             #[cfg(feature = "debug")]
-            let pathing_texture_group = Arc::new(TextureGroup::new(&device, "pathing textures", vec![
-                texture_loader.get("pathing_goal.png").unwrap(),
-                texture_loader.get("pathing_straight.png").unwrap(),
-                texture_loader.get("pathing_diagonal.png").unwrap(),
-            ]));
+            let (pathing_texture_mapping, pathing_texture) =
+                TextureAtlasFactory::create_from_group(texture_loader.clone(), "pathing", false, &[
+                    "pathing_goal.png",
+                    "pathing_straight.png",
+                    "pathing_diagonal.png",
+                ]);
 
             #[cfg(feature = "debug")]
-            let tile_texture_group = Arc::new(TextureGroup::new(&device, "tile textures", vec![
-                texture_loader.get("tile_0.png").unwrap(),
-                texture_loader.get("tile_1.png").unwrap(),
-                texture_loader.get("tile_2.png").unwrap(),
-                texture_loader.get("tile_3.png").unwrap(),
-                texture_loader.get("tile_4.png").unwrap(),
-                texture_loader.get("tile_5.png").unwrap(),
-                texture_loader.get("tile_6.png").unwrap(),
-            ]));
+            let (tile_texture_mapping, tile_texture) = TextureAtlasFactory::create_from_group(texture_loader.clone(), "tile", false, &[
+                "tile_0.png",
+                "tile_1.png",
+                "tile_2.png",
+                "tile_3.png",
+                "tile_4.png",
+                "tile_5.png",
+                "tile_6.png",
+            ]);
 
             let welcome_string = format!(
                 "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
@@ -528,7 +535,13 @@ impl Client {
 
         time_phase!("load default map", {
             let map = map_loader
-                .load(DEFAULT_MAP.to_string(), &mut model_loader, &texture_loader)
+                .load(
+                    DEFAULT_MAP.to_string(),
+                    &mut model_loader,
+                    texture_loader.clone(),
+                    #[cfg(feature = "debug")]
+                    &tile_texture_mapping,
+                )
                 .expect("failed to load initial map");
 
             map.set_ambient_sound_sources(&audio_engine);
@@ -623,9 +636,13 @@ impl Client {
             #[cfg(feature = "debug")]
             bounding_box_object_set_buffer,
             #[cfg(feature = "debug")]
-            pathing_texture_group,
+            pathing_texture_mapping,
             #[cfg(feature = "debug")]
-            tile_texture_group,
+            pathing_texture,
+            #[cfg(feature = "debug")]
+            tile_texture_mapping,
+            #[cfg(feature = "debug")]
+            tile_texture,
             chat_messages,
             main_menu_click_sound_effect,
             map,
@@ -790,7 +807,13 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .load(DEFAULT_MAP.to_string(), &mut self.model_loader, &self.texture_loader)
+                        .load(
+                            DEFAULT_MAP.to_string(),
+                            &mut self.model_loader,
+                            self.texture_loader.clone(),
+                            #[cfg(feature = "debug")]
+                            &self.tile_texture_mapping,
+                        )
                         .expect("failed to load initial map");
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -869,7 +892,13 @@ impl Client {
 
                     self.map = self
                         .map_loader
-                        .load(map_name, &mut self.model_loader, &self.texture_loader)
+                        .load(
+                            map_name,
+                            &mut self.model_loader,
+                            self.texture_loader.clone(),
+                            #[cfg(feature = "debug")]
+                            &self.tile_texture_mapping,
+                        )
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -988,7 +1017,7 @@ impl Client {
 
                         entity.move_from_to(&self.map, position_from, position_to, starting_timestamp);
                         #[cfg(feature = "debug")]
-                        entity.generate_pathing_mesh(&self.device, &self.queue, &self.map);
+                        entity.generate_pathing_mesh(&self.device, &self.queue, &self.map, &self.pathing_texture_mapping);
                     }
                 }
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
@@ -997,14 +1026,20 @@ impl Client {
                     self.entities[0].move_from_to(&self.map, position_from, position_to, starting_timestamp);
 
                     #[cfg(feature = "debug")]
-                    self.entities[0].generate_pathing_mesh(&self.device, &self.queue, &self.map);
+                    self.entities[0].generate_pathing_mesh(&self.device, &self.queue, &self.map, &self.pathing_texture_mapping);
                 }
                 NetworkEvent::ChangeMap(map_name, player_position) => {
                     self.entities.truncate(1);
 
                     self.map = self
                         .map_loader
-                        .load(map_name, &mut self.model_loader, &self.texture_loader)
+                        .load(
+                            map_name,
+                            &mut self.model_loader,
+                            self.texture_loader.clone(),
+                            #[cfg(feature = "debug")]
+                            &self.tile_texture_mapping,
+                        )
                         .unwrap();
 
                     self.map.set_ambient_sound_sources(&self.audio_engine);
@@ -1901,8 +1936,8 @@ impl Client {
             self.directional_shadow_model_batches.push(ModelBatch {
                 offset,
                 count,
-                textures: None,
-                vertex_buffer: None,
+                texture: self.map.get_texture().clone(),
+                vertex_buffer: self.map.get_model_vertex_buffer().clone(),
             });
 
             #[cfg(feature = "debug")]
@@ -1910,7 +1945,7 @@ impl Client {
             self.map.render_overlay_tiles(
                 &mut self.directional_shadow_model_instructions,
                 &mut self.directional_shadow_model_batches,
-                &self.tile_texture_group,
+                &self.tile_texture,
             );
 
             #[cfg(feature = "debug")]
@@ -1919,7 +1954,7 @@ impl Client {
                 &mut self.directional_shadow_model_instructions,
                 &mut self.directional_shadow_model_batches,
                 &self.entities,
-                &self.pathing_texture_group,
+                &self.pathing_texture,
             );
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
@@ -1972,14 +2007,14 @@ impl Client {
             self.model_batches.push(ModelBatch {
                 offset,
                 count,
-                textures: None,
-                vertex_buffer: None,
+                texture: self.map.get_texture().clone(),
+                vertex_buffer: self.map.get_model_vertex_buffer().clone(),
             });
 
             #[cfg(feature = "debug")]
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map_tiles))]
             self.map
-                .render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture_group);
+                .render_overlay_tiles(&mut self.model_instructions, &mut self.model_batches, &self.tile_texture);
 
             #[cfg(feature = "debug")]
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_pathing))]
@@ -1987,7 +2022,7 @@ impl Client {
                 &mut self.model_instructions,
                 &mut self.model_batches,
                 &self.entities,
-                &self.pathing_texture_group,
+                &self.pathing_texture,
             );
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
@@ -2170,8 +2205,6 @@ impl Client {
             point_shadow_models: &self.point_shadow_model_instructions,
             point_shadow_entities: &self.point_shadow_entity_instructions,
             effects: self.effect_renderer.get_instructions(),
-            map_textures: self.map.get_texture_group(),
-            map_model_vertex_group: self.map.get_model_vertex_buffer(),
             map_picker_tile_vertex_buffer: self.map.get_tile_picker_vertex_buffer(),
             map_water_vertex_buffer,
             font_atlas_texture: font_atlas.get_font_atlas(),

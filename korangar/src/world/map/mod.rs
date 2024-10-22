@@ -1,6 +1,5 @@
 #[cfg(feature = "debug")]
 use std::collections::HashSet;
-#[cfg(feature = "debug")]
 use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
@@ -27,7 +26,7 @@ use super::{point_light_extent, LightSourceExt, Model, PointLightSet};
 use super::{Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
-use crate::graphics::{Camera, EntityInstruction, IndicatorInstruction, ModelInstruction};
+use crate::graphics::{Camera, EntityInstruction, IndicatorInstruction, ModelInstruction, Texture};
 #[cfg(feature = "debug")]
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, RenderSettings};
 #[cfg(feature = "debug")]
@@ -36,7 +35,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-use crate::{Buffer, Color, GameFileLoader, ModelVertex, TextureGroup, TileVertex, WaterVertex, MAP_TILE_SIZE};
+use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, WaterVertex, MAP_TILE_SIZE};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
 create_simple_key!(LightSourceKey, "Key to an light source inside the map");
@@ -120,9 +119,9 @@ pub struct Map {
     tiles: Vec<Tile>,
     ground_vertex_offset: usize,
     ground_vertex_count: usize,
-    vertex_buffer: Buffer<ModelVertex>,
+    vertex_buffer: Arc<Buffer<ModelVertex>>,
     water_vertex_buffer: Option<Buffer<WaterVertex>>,
-    textures: TextureGroup,
+    texture: Arc<Texture>,
     objects: SimpleSlab<ObjectKey, Object>,
     light_sources: SimpleSlab<LightSourceKey, LightSource>,
     sound_sources: Vec<SoundSource>,
@@ -161,11 +160,11 @@ impl Map {
         self.background_music_track_name.as_deref()
     }
 
-    pub fn get_texture_group(&self) -> &TextureGroup {
-        &self.textures
+    pub fn get_texture(&self) -> &Arc<Texture> {
+        &self.texture
     }
 
-    pub fn get_model_vertex_buffer(&self) -> &Buffer<ModelVertex> {
+    pub fn get_model_vertex_buffer(&self) -> &Arc<Buffer<ModelVertex>> {
         &self.vertex_buffer
     }
 
@@ -402,7 +401,7 @@ impl Map {
         &self,
         model_instructions: &mut Vec<ModelInstruction>,
         model_batches: &mut Vec<ModelBatch>,
-        tile_texture_group: &Arc<TextureGroup>,
+        tile_texture: &Arc<Texture>,
     ) {
         let vertex_count = self.tile_vertex_buffer.count() as usize;
         let offset = model_instructions.len();
@@ -416,8 +415,8 @@ impl Map {
         model_batches.push(ModelBatch {
             offset,
             count: 1,
-            textures: Some(tile_texture_group.clone()),
-            vertex_buffer: Some(self.tile_vertex_buffer.clone()),
+            texture: tile_texture.clone(),
+            vertex_buffer: self.tile_vertex_buffer.clone(),
         });
     }
 
@@ -428,7 +427,7 @@ impl Map {
         model_instructions: &mut Vec<ModelInstruction>,
         model_batches: &mut Vec<ModelBatch>,
         entities: &[Entity],
-        path_texture_group: &Arc<TextureGroup>,
+        path_texture: &Arc<Texture>,
     ) {
         entities.iter().for_each(|entity| {
             if let Some(vertex_buffer) = entity.get_pathing_vertex_buffer() {
@@ -444,8 +443,8 @@ impl Map {
                 model_batches.push(ModelBatch {
                     offset,
                     count: 1,
-                    textures: Some(path_texture_group.clone()),
-                    vertex_buffer: Some(vertex_buffer.clone()),
+                    texture: path_texture.clone(),
+                    vertex_buffer: vertex_buffer.clone(),
                 });
             }
         });

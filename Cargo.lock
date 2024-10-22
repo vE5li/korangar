@@ -1471,6 +1471,7 @@ version = "0.1.0"
 dependencies = [
  "cgmath",
  "derive-new",
+ "image",
  "korangar_interface",
  "rand",
 ]

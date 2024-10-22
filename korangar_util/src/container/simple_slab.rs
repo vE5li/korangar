@@ -149,6 +149,18 @@ impl<I: SimpleKey, T> SimpleSlab<I, T> {
         }
     }
 
+    /// Removes all elements from the slab, returning them as an iterator.
+    pub fn drain(&mut self) -> DrainIter<I, T> {
+        let old_len = self.entries.len();
+        self.next_free = None;
+        self.count = 0;
+        DrainIter {
+            slab: self,
+            index: 0,
+            len: old_len,
+        }
+    }
+
     /// Returns the amount of occupied slab entries.
     pub fn count(&self) -> u32 {
         self.count
@@ -159,6 +171,39 @@ impl<I: SimpleKey, T> SimpleSlab<I, T> {
         self.entries.clear();
         self.next_free = None;
         self.count = 0;
+    }
+}
+
+pub struct DrainIter<'a, I: SimpleKey, T> {
+    slab: &'a mut SimpleSlab<I, T>,
+    index: usize,
+    len: usize,
+}
+
+impl<'a, I: SimpleKey, T> Iterator for DrainIter<'a, I, T> {
+    type Item = (I, T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.index < self.len {
+            let current_index = self.index;
+            self.index += 1;
+
+            if let Slot::Occupied(value) = std::mem::replace(&mut self.slab.entries[current_index], Slot::Empty(None)) {
+                return Some((I::new(current_index as u32), value));
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.len - self.index))
+    }
+}
+
+impl<'a, I: SimpleKey, T> Drop for DrainIter<'a, I, T> {
+    fn drop(&mut self) {
+        // Exhaust the iterator to ensure all remaining elements are dropped.
+        for _ in self {}
     }
 }
 

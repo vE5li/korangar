@@ -1,8 +1,12 @@
 use cgmath::{Point3, Vector2};
+#[cfg(feature = "debug")]
+use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
 use super::GroundTileExt;
-use crate::graphics::{Color, ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
+#[cfg(feature = "debug")]
+use crate::graphics::Color;
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
 
 pub const MAP_TILE_SIZE: f32 = 10.0;
 
@@ -172,9 +176,11 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
     (native_ground_vertices, water_vertices)
 }
 
-pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<TileVertex>) {
+pub fn generate_tile_vertices(
+    gat_data: &mut GatData,
+    #[cfg(feature = "debug")] tile_texture_mapping: &[AtlasAllocation],
+) -> (Vec<ModelVertex>, Vec<TileVertex>) {
     const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
-    const TILE_MESH_OFFSET: f32 = 0.9;
 
     let mut tile_vertices = Vec::new();
     let mut tile_picker_vertices = Vec::new();
@@ -196,74 +202,74 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
 
             let offset = Vector2::new(x as f32 * HALF_TILE_SIZE, y as f32 * HALF_TILE_SIZE);
 
-            let first_position = Point3::new(offset.x, tile.upper_left_height + TILE_MESH_OFFSET, offset.y);
-            let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height + TILE_MESH_OFFSET, offset.y);
-            let third_position = Point3::new(
-                offset.x + HALF_TILE_SIZE,
-                tile.lower_right_height + TILE_MESH_OFFSET,
-                offset.y + HALF_TILE_SIZE,
-            );
-            let fourth_position = Point3::new(offset.x, tile.lower_left_height + TILE_MESH_OFFSET, offset.y + HALF_TILE_SIZE);
+            #[cfg(feature = "debug")]
+            {
+                const TILE_MESH_OFFSET: f32 = 0.9;
 
-            let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
-            let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
+                let first_position = Point3::new(offset.x, tile.upper_left_height + TILE_MESH_OFFSET, offset.y);
+                let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height + TILE_MESH_OFFSET, offset.y);
+                let third_position = Point3::new(
+                    offset.x + HALF_TILE_SIZE,
+                    tile.lower_right_height + TILE_MESH_OFFSET,
+                    offset.y + HALF_TILE_SIZE,
+                );
+                let fourth_position = Point3::new(offset.x, tile.lower_left_height + TILE_MESH_OFFSET, offset.y + HALF_TILE_SIZE);
 
-            let first_texture_coordinates = Vector2::new(0.0, 0.0);
-            let second_texture_coordinates = Vector2::new(0.0, 1.0);
-            let third_texture_coordinates = Vector2::new(1.0, 1.0);
-            let fourth_texture_coordinates = Vector2::new(1.0, 0.0);
+                let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
+                let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
-            let tile_type_index = TryInto::<u8>::try_into(tile.flags).unwrap() as i32;
+                let tile_type_index = TryInto::<u8>::try_into(tile.flags).unwrap() as usize;
+                let atlas_allocation = tile_texture_mapping[tile_type_index];
 
-            tile_vertices.push(ModelVertex::new(
-                first_position,
-                first_normal,
-                first_texture_coordinates,
-                tile_type_index,
-                Color::WHITE,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                second_position,
-                first_normal,
-                second_texture_coordinates,
-                tile_type_index,
-                Color::WHITE,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                third_position,
-                first_normal,
-                third_texture_coordinates,
-                tile_type_index,
-                Color::WHITE,
-                0.0,
-            ));
+                let first_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(0.0, 0.0));
+                let second_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(0.0, 1.0));
+                let third_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(1.0, 1.0));
+                let fourth_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(1.0, 0.0));
 
-            tile_vertices.push(ModelVertex::new(
-                first_position,
-                second_normal,
-                first_texture_coordinates,
-                tile_type_index,
-                Color::WHITE,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                third_position,
-                second_normal,
-                third_texture_coordinates,
-                tile_type_index,
-                Color::WHITE,
-                0.0,
-            ));
-            tile_vertices.push(ModelVertex::new(
-                fourth_position,
-                second_normal,
-                fourth_texture_coordinates,
-                tile_type_index,
-                Color::WHITE,
-                0.0,
-            ));
+                tile_vertices.push(ModelVertex::new(
+                    first_position,
+                    first_normal,
+                    first_texture_coordinates,
+                    Color::WHITE,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    second_position,
+                    first_normal,
+                    second_texture_coordinates,
+                    Color::WHITE,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    third_position,
+                    first_normal,
+                    third_texture_coordinates,
+                    Color::WHITE,
+                    0.0,
+                ));
+
+                tile_vertices.push(ModelVertex::new(
+                    first_position,
+                    second_normal,
+                    first_texture_coordinates,
+                    Color::WHITE,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    third_position,
+                    second_normal,
+                    third_texture_coordinates,
+                    Color::WHITE,
+                    0.0,
+                ));
+                tile_vertices.push(ModelVertex::new(
+                    fourth_position,
+                    second_normal,
+                    fourth_texture_coordinates,
+                    Color::WHITE,
+                    0.0,
+                ));
+            }
 
             let first_position = Point3::new(offset.x, tile.upper_left_height, offset.y);
             let second_position = Point3::new(offset.x + HALF_TILE_SIZE, tile.upper_right_height, offset.y);
@@ -280,6 +286,7 @@ pub fn generate_tile_vertices(gat_data: &mut GatData) -> (Vec<ModelVertex>, Vec<
             tile_picker_vertices.push(TileVertex::new(fourth_position, color));
         }
     }
+
     (tile_vertices, tile_picker_vertices)
 }
 

@@ -20,8 +20,7 @@ struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) normal: vec4<f32>,
     @location(1) texture_coordinates: vec2<f32>,
-    @location(2) texture_index: i32,
-    @location(3) color: vec3<f32>,
+    @location(2) color: vec3<f32>,
 }
 
 struct FragmentOutput {
@@ -33,17 +32,16 @@ struct FragmentOutput {
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(3) var texture_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(2) @binding(0) var textures: binding_array<texture_2d<f32>>;
+@group(2) @binding(0) var texture: texture_2d<f32>;
 
 @vertex
 fn vs_main(
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) texture_coordinates: vec2<f32>,
-    @location(3) texture_index: i32,
-    @location(4) color: vec3<f32>,
-    @location(5) wind_affinity: f32,
-    @location(6) instance_id: u32
+    @location(3) color: vec3<f32>,
+    @location(4) wind_affinity: f32,
+    @location(5) instance_id: u32
 ) -> VertexOutput {
     let instance = instance_data[instance_id];
 
@@ -55,15 +53,14 @@ fn vs_main(
     output.position = global_uniforms.view_projection * (world_position + offset);
     output.normal = instance.inv_world * vec4<f32>(normal, 1.0);
     output.texture_coordinates = texture_coordinates;
-    output.texture_index = texture_index;
     output.color = color;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-    let diffuse_color = textureSample(textures[input.texture_index], texture_sampler, input.texture_coordinates);
-    let alpha_channel = textureSample(textures[input.texture_index], nearest_sampler, input.texture_coordinates).a;
+    let diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
+    let alpha_channel = textureSample(texture, nearest_sampler, input.texture_coordinates).a;
 
     if (alpha_channel < 1.0) {
         discard;

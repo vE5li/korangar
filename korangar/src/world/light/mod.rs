@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use cgmath::{Matrix4, Point3, SquareMatrix, Vector2, Vector3, Zero};
 use korangar_util::collision::Sphere;
 use ragnarok_formats::map::LightSource;
@@ -5,7 +7,9 @@ use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
-use crate::graphics::{ModelInstruction, PointLightInstruction, PointShadowCamera, PointShadowCasterInstruction};
+use crate::graphics::{
+    Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCamera, PointShadowCasterInstruction, Texture,
+};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -86,6 +90,8 @@ impl PointLight {
         instructions: &mut Vec<PointShadowCasterInstruction>,
         camera: &dyn Camera,
         view_projection_matrices: [Matrix4<f32>; 6],
+        model_texture: Arc<Texture>,
+        model_vertex_buffer: Arc<Buffer<ModelVertex>>,
         entity_offset: [usize; 6],
         entity_count: [usize; 6],
         model_offset: [usize; 6],
@@ -99,6 +105,8 @@ impl PointLight {
             screen_size,
             color: self.color,
             range: self.range,
+            model_texture,
+            model_vertex_buffer,
             entity_offset,
             entity_count,
             model_offset,
@@ -300,6 +308,8 @@ impl PointLightSet<'_> {
                 point_light_with_shadow_instructions,
                 current_camera,
                 view_projection_matrices,
+                map.get_texture().clone(),
+                map.get_model_vertex_buffer().clone(),
                 entity_offsets,
                 entity_counts,
                 model_offsets,

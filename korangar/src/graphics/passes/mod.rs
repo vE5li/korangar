@@ -18,7 +18,7 @@ pub(crate) use screen::*;
 pub(crate) use selector::*;
 use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat, TextureView};
 
-use crate::graphics::{Buffer, GlobalContext, ModelBatch, ModelVertex, TextureGroup};
+use crate::graphics::{GlobalContext, ModelBatch};
 use crate::loaders::TextureLoader;
 
 #[derive(Clone, Copy, PartialEq, Eq, ConstParamTy)]
@@ -121,8 +121,6 @@ struct DrawIndirectArgs {
 /// buffer.
 pub(crate) struct ModelBatchDrawData<'a> {
     pub(crate) batches: &'a [ModelBatch],
-    pub(crate) map_textures: &'a TextureGroup,
-    pub(crate) map_vertex_buffer: &'a Buffer<ModelVertex>,
     #[cfg(feature = "debug")]
     pub(crate) show_wireframe: bool,
 }

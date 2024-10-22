@@ -6,11 +6,13 @@ use std::ops::RangeBounds;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use bytemuck::{cast_slice, Pod, Zeroable};
+use bytemuck::{bytes_of, cast_slice, Pod, Zeroable};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use wgpu::util::StagingBelt;
-use wgpu::{BindingResource, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, CommandEncoder, Device, Queue};
+use wgpu::{
+    BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, CommandEncoder, Device, Queue,
+};
 
 /// Convenience abstraction over GPU buffers. Can be seen as a "Vec<T>" on the
 /// GPU.
@@ -213,5 +215,67 @@ impl Buffer<u64> {
                 }
             }
         });
+    }
+}
+
+pub struct DynamicUniformBuffer<T> {
+    buffer: Buffer<u8>,
+    data: Vec<u8>,
+    aligned_size: usize,
+    marker: PhantomData<T>,
+}
+
+impl<T: Sized + Pod + Zeroable> DynamicUniformBuffer<T> {
+    pub fn new(device: &Device, label: &str) -> Self {
+        let uniform_alignment = device.limits().min_uniform_buffer_offset_alignment as usize;
+        let aligned_size = (size_of::<T>() + uniform_alignment - 1) & !(uniform_alignment - 1);
+        let buffer = Buffer::with_capacity(device, label, BufferUsages::UNIFORM | BufferUsages::COPY_DST, aligned_size as _);
+
+        Self {
+            buffer,
+            data: Vec::new(),
+            aligned_size,
+            marker: PhantomData,
+        }
+    }
+
+    pub fn write_data<D>(&mut self, data: D)
+    where
+        D: IntoIterator<Item = T>,
+    {
+        for (index, uniform) in data.into_iter().enumerate() {
+            let start = index * self.aligned_size;
+            let end = start + size_of::<T>();
+
+            if self.data.len() < end {
+                self.data.resize(end, 0);
+            }
+
+            self.data[start..end].copy_from_slice(bytes_of(&uniform));
+        }
+    }
+
+    pub fn upload(&mut self, device: &Device, staging_belt: &mut StagingBelt, command_encoder: &mut CommandEncoder) -> bool {
+        self.buffer.write(device, staging_belt, command_encoder, &self.data)
+    }
+
+    pub fn dynamic_offset(&self, index: usize) -> u32 {
+        (index * self.aligned_size) as u32
+    }
+
+    pub fn get_binding_type() -> BindingType {
+        BindingType::Buffer {
+            ty: BufferBindingType::Uniform,
+            has_dynamic_offset: true,
+            min_binding_size: NonZeroU64::new(size_of::<T>() as _),
+        }
+    }
+
+    pub fn get_binding_resource(&self) -> BindingResource {
+        BindingResource::Buffer(wgpu::BufferBinding {
+            buffer: self.buffer.get_buffer(),
+            offset: 0,
+            size: Some(NonZeroU64::new(size_of::<T>() as u64).unwrap()),
+        })
     }
 }

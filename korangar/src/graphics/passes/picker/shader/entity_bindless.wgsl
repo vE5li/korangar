@@ -29,14 +29,15 @@ struct Vertex {
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) texture_coordinates: vec2<f32>,
-    @location(1) identifier_high: u32,
-    @location(2) identifier_low: u32,
+    @location(1) texture_index: i32,
+    @location(2) identifier_high: u32,
+    @location(3) identifier_low: u32,
 }
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(2) @binding(0) var texture: texture_2d<f32>;
+@group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
 
 @vertex
 fn vs_main(
@@ -49,6 +50,7 @@ fn vs_main(
     var output: VertexOutput;
     output.position = global_uniforms.view_projection * instance.world * vec4<f32>(vertex.position, 1.0);
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
+    output.texture_index = instance.texture_index;
     output.identifier_high = instance.identifier_high;
     output.identifier_low = instance.identifier_low;
 
@@ -61,7 +63,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec2<u32> {
-    let diffuse_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
+    let diffuse_color = textureSample(textures[input.texture_index], nearest_sampler, input.texture_coordinates);
 
     if (diffuse_color.a != 1.0) {
         discard;

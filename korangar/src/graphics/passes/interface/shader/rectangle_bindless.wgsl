@@ -22,8 +22,8 @@ struct VertexOutput {
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(1) @binding(1) var font_atlas: texture_2d<f32>;
-@group(2) @binding(0) var texture: texture_2d<f32>;
+@group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
+@group(1) @binding(2) var font_atlas: texture_2d<f32>;
 
 @vertex
 fn vs_main(
@@ -53,7 +53,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             return draw_solid(instance, input.position, input.fragment_position);
         }
         case 1u: {
-            return draw_sprite(instance, input.position, input.texture_coordinates, instance.linear_filtering);
+            return draw_sprite(instance, input.position, input.texture_coordinates, instance.texture_index, instance.linear_filtering);
         }
         default: {
             return draw_text(instance, input.position, input.texture_coordinates);
@@ -109,14 +109,15 @@ fn draw_sprite(
     instance: InstanceData,
     position: vec4<f32>,
     texture_coordinates: vec2<f32>,
+    texture_index: i32,
     linear_filtering: u32
 ) -> vec4<f32> {
     var color: vec4<f32>;
 
     if linear_filtering == 0u {
-        color = textureSample(texture, nearest_sampler, texture_coordinates);
+        color = textureSample(textures[texture_index], nearest_sampler, texture_coordinates);
     } else {
-        color = textureSample(texture, linear_sampler, texture_coordinates);
+        color = textureSample(textures[texture_index], linear_sampler, texture_coordinates);
     }
 
     if (position.x < instance.screen_clip.x || position.y < instance.screen_clip.y ||

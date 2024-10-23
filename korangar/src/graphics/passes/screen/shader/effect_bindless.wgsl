@@ -15,12 +15,13 @@ struct InstanceData {
 
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(3) @binding(0) var texture: texture_2d<f32>;
+@group(2) @binding(1) var textures: binding_array<texture_2d<f32>>;
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) texture_coordinates: vec2<f32>,
     @location(1) color: vec4<f32>,
+    @location(2) texture_index: i32,
 }
 
 @vertex
@@ -36,12 +37,13 @@ fn vs_main(
     output.position = vec4<f32>(positions.xy, 0.0, 1.0);
     output.texture_coordinates = positions.zw;
     output.color = vec4<f32>(instance.color0, instance.color1);
+    output.texture_index = instance.texture_index;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    return textureSample(texture, linear_sampler, input.texture_coordinates) * input.color;
+    return textureSample(textures[input.texture_index], linear_sampler, input.texture_coordinates) * input.color;
 }
 
 fn position_data(instance: InstanceData, vertex_index: u32) -> vec4<f32> {

@@ -14,7 +14,7 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, DrawIndirectArgs, Drawer,
     ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 const DRAWER_NAME: &str = "directional shadow model";
@@ -27,6 +27,7 @@ struct InstanceData {
 }
 
 pub(crate) struct DirectionalShadowModelDrawer {
+    multi_draw_indirect_support: bool,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
     command_buffer: Buffer<DrawIndirectArgs>,
@@ -42,7 +43,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
     type Context = DirectionalShadowRenderPassContext;
     type DrawData<'data> = ModelBatchDrawData<'data>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let instance_data_buffer = Buffer::with_capacity(
@@ -133,6 +140,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         });
 
         Self {
+            multi_draw_indirect_support: capabilities.supports_multidraw_indirect(),
             instance_data_buffer,
             instance_index_vertex_buffer,
             command_buffer,
@@ -161,11 +169,25 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
             pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
-            pass.multi_draw_indirect(
-                self.command_buffer.get_buffer(),
-                (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
-                batch.count as u32,
-            );
+
+            if self.multi_draw_indirect_support {
+                pass.multi_draw_indirect(
+                    self.command_buffer.get_buffer(),
+                    (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                    batch.count as u32,
+                );
+            } else {
+                let start = batch.offset;
+                let end = start + batch.count;
+
+                for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                    let vertex_start = instruction.vertex_offset as u32;
+                    let vertex_end = vertex_start + instruction.vertex_count as u32;
+                    let index = (start + index) as u32;
+
+                    pass.draw(vertex_start..vertex_end, index..index + 1);
+                }
+            }
         }
     }
 }

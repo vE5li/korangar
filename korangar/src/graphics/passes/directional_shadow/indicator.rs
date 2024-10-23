@@ -8,7 +8,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, Drawer, RenderPassContext,
 };
-use crate::graphics::{GlobalContext, IndicatorInstruction};
+use crate::graphics::{Capabilities, GlobalContext, IndicatorInstruction};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/indicator.wgsl");
 const DRAWER_NAME: &str = "directional shadow indicator";
@@ -22,7 +22,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
     type Context = DirectionalShadowRenderPassContext;
     type DrawData<'data> = Option<&'data IndicatorInstruction>;
 
-    fn new(device: &Device, _queue: &Queue, global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {

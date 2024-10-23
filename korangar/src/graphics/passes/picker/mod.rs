@@ -62,7 +62,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
                 },
             })],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: global_context.depth_texture.get_texture_view(),
+                view: global_context.picker_depth_texture.get_texture_view(),
                 depth_ops: Some(Operations {
                     load: LoadOp::Clear(0.0),
                     store: StoreOp::Discard,
@@ -73,6 +73,8 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
             occlusion_query_set: None,
         });
 
+        let unpadded_size = global_context.picker_buffer_texture.get_unpadded_size();
+        pass.set_viewport(0.0, 0.0, unpadded_size.width as f32, unpadded_size.height as f32, 0.0, 1.0);
         pass.set_bind_group(0, &global_context.global_bind_group, &[]);
 
         pass

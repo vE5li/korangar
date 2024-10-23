@@ -9,7 +9,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::{GlobalContext, Prepare, RenderInstruction, RenderSettings, Texture};
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, RenderSettings, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/buffer.wgsl");
 const DRAWER_NAME: &str = "screen buffer";
@@ -22,9 +22,15 @@ pub(crate) struct ScreenBufferDrawer {
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenBufferDrawer {
     type Context = ScreenRenderPassContext;
-    type DrawData<'data> = RenderSettings;
+    type DrawData<'data> = &'data RenderSettings;
 
-    fn new(device: &Device, _queue: &Queue, global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {

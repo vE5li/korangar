@@ -8,13 +8,13 @@ use korangar_debug::logging::{print_debug, Colorize};
 use korangar_debug::profile_block;
 use wgpu::util::StagingBelt;
 use wgpu::{
-    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Instance, Maintain, Queue, SurfaceTexture, TextureFormat,
-    TextureViewDescriptor,
+    Adapter, CommandBuffer, CommandEncoder, CommandEncoderDescriptor, Device, Extent3d, ImageCopyBuffer, ImageCopyTexture, ImageDataLayout,
+    Instance, Maintain, Origin3d, Queue, SurfaceTexture, TextureAspect, TextureFormat, TextureViewDescriptor,
 };
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-use super::{GlobalContext, Prepare, PresentModeInfo, ShadowDetail, Surface, TextureSamplerType};
+use super::{Capabilities, GlobalContext, Prepare, PresentModeInfo, ShadowDetail, Surface, TextureSamplerType};
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
 use crate::interface::layout::ScreenSize;
@@ -22,6 +22,7 @@ use crate::loaders::TextureLoader;
 use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 
 pub struct GraphicsEngineDescriptor {
+    pub capabilities: Capabilities,
     pub instance: Instance,
     pub adapter: Adapter,
     pub device: Arc<Device>,
@@ -50,6 +51,7 @@ pub struct GraphicsEngineDescriptor {
 ///
 /// Push Constants: Draw Data (up to 128 KiB)
 pub struct GraphicsEngine {
+    capabilities: Capabilities,
     instance: Instance,
     adapter: Adapter,
     device: Arc<Device>,
@@ -67,7 +69,6 @@ struct EngineContext {
 
     interface_render_pass_context: InterfaceRenderPassContext,
     picker_render_pass_context: PickerRenderPassContext,
-    selector_compute_pass_context: SelectorComputePassContext,
     directional_shadow_pass_context: DirectionalShadowRenderPassContext,
     point_shadow_pass_context: PointShadowRenderPassContext,
     geometry_pass_context: GeometryRenderPassContext,
@@ -76,7 +77,6 @@ struct EngineContext {
     interface_rectangle_drawer: InterfaceRectangleDrawer,
     picker_entity_drawer: PickerEntityDrawer,
     picker_tile_drawer: PickerTileDrawer,
-    selector_copy_dispatcher: SelectorCopyDispatcher,
     directional_shadow_model_drawer: DirectionalShadowModelDrawer,
     directional_shadow_entity_drawer: DirectionalShadowEntityDrawer,
     directional_shadow_indicator_drawer: DirectionalShadowIndicatorDrawer,
@@ -110,6 +110,7 @@ impl GraphicsEngine {
         let staging_belt = StagingBelt::new(1048576); // 1 MiB
 
         Self {
+            capabilities: descriptor.capabilities,
             instance: descriptor.instance,
             adapter: descriptor.adapter,
             device: descriptor.device,
@@ -154,8 +155,6 @@ impl GraphicsEngine {
                             texture_sampler_type,
                         );
 
-                        let selector_compute_pass_context = SelectorComputePassContext::new(&self.device, &self.queue, &global_context);
-
                         let interface_render_pass_context =
                             InterfaceRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let picker_render_pass_context =
@@ -171,76 +170,185 @@ impl GraphicsEngine {
                     });
 
                     time_phase!("create computer and drawer", {
-                        let selector_copy_dispatcher =
-                            SelectorCopyDispatcher::new(&self.device, &self.queue, &global_context, &selector_compute_pass_context);
-
-                        let interface_rectangle_drawer =
-                            InterfaceRectangleDrawer::new(&self.device, &self.queue, &global_context, &interface_render_pass_context);
-                        let picker_entity_drawer =
-                            PickerEntityDrawer::new(&self.device, &self.queue, &global_context, &picker_render_pass_context);
-                        let picker_tile_drawer =
-                            PickerTileDrawer::new(&self.device, &self.queue, &global_context, &picker_render_pass_context);
-                        let directional_shadow_model_drawer =
-                            DirectionalShadowModelDrawer::new(&self.device, &self.queue, &global_context, &directional_shadow_pass_context);
+                        let interface_rectangle_drawer = InterfaceRectangleDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &interface_render_pass_context,
+                        );
+                        let picker_entity_drawer = PickerEntityDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &picker_render_pass_context,
+                        );
+                        let picker_tile_drawer = PickerTileDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &picker_render_pass_context,
+                        );
+                        let directional_shadow_model_drawer = DirectionalShadowModelDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &directional_shadow_pass_context,
+                        );
                         let directional_shadow_entity_drawer = DirectionalShadowEntityDrawer::new(
+                            &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
                             &directional_shadow_pass_context,
                         );
                         let directional_shadow_indicator_drawer = DirectionalShadowIndicatorDrawer::new(
+                            &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
                             &directional_shadow_pass_context,
                         );
-                        let point_shadow_model_drawer =
-                            PointShadowModelDrawer::new(&self.device, &self.queue, &global_context, &point_shadow_pass_context);
-                        let point_shadow_entity_drawer =
-                            PointShadowEntityDrawer::new(&self.device, &self.queue, &global_context, &point_shadow_pass_context);
-                        let point_shadow_indicator_drawer =
-                            PointShadowIndicatorDrawer::new(&self.device, &self.queue, &global_context, &point_shadow_pass_context);
-                        let geometry_model_drawer =
-                            GeometryModelDrawer::new(&self.device, &self.queue, &global_context, &geometry_pass_context);
-                        let geometry_entity_drawer =
-                            GeometryEntityDrawer::new(&self.device, &self.queue, &global_context, &geometry_pass_context);
-                        let geometry_indicator_drawer =
-                            GeometryIndicatorDrawer::new(&self.device, &self.queue, &global_context, &geometry_pass_context);
-                        let geometry_water_drawer =
-                            GeometryWaterDrawer::new(&self.device, &self.queue, &global_context, &geometry_pass_context);
-                        let screen_ambient_light_drawer =
-                            ScreenAmbientLightDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
-                        let screen_directional_light_drawer =
-                            ScreenDirectionalLightDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
-                        let screen_point_light_drawer =
-                            ScreenPointLightDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
-                        let screen_water_light_drawer =
-                            ScreenWaterLightDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
-                        let screen_rectangle_drawer =
-                            ScreenRectangleDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
-                        let screen_effect_drawer =
-                            ScreenEffectDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
-                        let screen_overlay_drawer =
-                            ScreenOverlayDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
+                        let point_shadow_model_drawer = PointShadowModelDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &point_shadow_pass_context,
+                        );
+                        let point_shadow_entity_drawer = PointShadowEntityDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &point_shadow_pass_context,
+                        );
+                        let point_shadow_indicator_drawer = PointShadowIndicatorDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &point_shadow_pass_context,
+                        );
+                        let geometry_model_drawer = GeometryModelDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &geometry_pass_context,
+                        );
+                        let geometry_entity_drawer = GeometryEntityDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &geometry_pass_context,
+                        );
+                        let geometry_indicator_drawer = GeometryIndicatorDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &geometry_pass_context,
+                        );
+                        let geometry_water_drawer = GeometryWaterDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &geometry_pass_context,
+                        );
+                        let screen_ambient_light_drawer = ScreenAmbientLightDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
+                        let screen_directional_light_drawer = ScreenDirectionalLightDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
+                        let screen_point_light_drawer = ScreenPointLightDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
+                        let screen_water_light_drawer = ScreenWaterLightDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
+                        let screen_rectangle_drawer = ScreenRectangleDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
+                        let screen_effect_drawer = ScreenEffectDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
+                        let screen_overlay_drawer = ScreenOverlayDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
 
                         #[cfg(feature = "debug")]
-                        let picker_marker_drawer =
-                            PickerMarkerDrawer::new(&self.device, &self.queue, &global_context, &picker_render_pass_context);
+                        let picker_marker_drawer = PickerMarkerDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &picker_render_pass_context,
+                        );
                         #[cfg(feature = "debug")]
-                        let screen_aabb_drawer = ScreenAabbDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
+                        let screen_aabb_drawer = ScreenAabbDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
                         #[cfg(feature = "debug")]
-                        let screen_circle_drawer =
-                            ScreenCircleDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
+                        let screen_circle_drawer = ScreenCircleDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
                         #[cfg(feature = "debug")]
-                        let screen_buffer_drawer =
-                            ScreenBufferDrawer::new(&self.device, &self.queue, &global_context, &screen_pass_context);
+                        let screen_buffer_drawer = ScreenBufferDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_pass_context,
+                        );
                     });
 
                     self.engine_context = Some(EngineContext {
                         global_context,
                         interface_render_pass_context,
                         picker_render_pass_context,
-                        selector_compute_pass_context,
                         directional_shadow_pass_context,
                         point_shadow_pass_context,
                         geometry_pass_context,
@@ -248,7 +356,6 @@ impl GraphicsEngine {
                         interface_rectangle_drawer,
                         picker_entity_drawer,
                         picker_tile_drawer,
-                        selector_copy_dispatcher,
                         directional_shadow_model_drawer,
                         directional_shadow_entity_drawer,
                         directional_shadow_indicator_drawer,
@@ -536,7 +643,7 @@ impl GraphicsEngine {
         let mut screen_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
         rayon::in_place_scope(|scope| {
-            // Picker + Selector Pass
+            // Picker Pass
             scope.spawn(|_| {
                 let mut render_pass = engine_context.picker_render_pass_context.create_pass(
                     frame_view,
@@ -548,7 +655,7 @@ impl GraphicsEngine {
                 engine_context
                     .picker_tile_drawer
                     .draw(&mut render_pass, instruction.map_picker_tile_vertex_buffer);
-                engine_context.picker_entity_drawer.draw(&mut render_pass, None);
+                engine_context.picker_entity_drawer.draw(&mut render_pass, instruction.entities);
                 #[cfg(feature = "debug")]
                 {
                     engine_context.picker_marker_drawer.draw(&mut render_pass, None);
@@ -556,12 +663,33 @@ impl GraphicsEngine {
 
                 drop(render_pass);
 
-                let mut compute_pass =
-                    engine_context
-                        .selector_compute_pass_context
-                        .create_pass(&mut picker_encoder, &engine_context.global_context, None);
+                // Copy the picker value from the texture into the buffer.
+                let bytes_per_row = engine_context.global_context.picker_buffer_texture.get_bytes_per_row();
+                let unpadded_texture_size = engine_context.global_context.picker_buffer_texture.get_unpadded_size();
+                let x = (unpadded_texture_size.width - 1).min(instruction.picker_position.left as u32);
+                let y = (unpadded_texture_size.height - 1).min(instruction.picker_position.top as u32);
 
-                engine_context.selector_copy_dispatcher.dispatch(&mut compute_pass, None);
+                picker_encoder.copy_texture_to_buffer(
+                    ImageCopyTexture {
+                        texture: engine_context.global_context.picker_buffer_texture.get_texture(),
+                        mip_level: 0,
+                        origin: Origin3d { x, y, z: 0 },
+                        aspect: TextureAspect::All,
+                    },
+                    ImageCopyBuffer {
+                        buffer: engine_context.global_context.picker_value_buffer.get_buffer(),
+                        layout: ImageDataLayout {
+                            offset: 0,
+                            bytes_per_row,
+                            rows_per_image: None,
+                        },
+                    },
+                    Extent3d {
+                        width: 1,
+                        height: 1,
+                        depth_or_array_layers: 1,
+                    },
+                );
             });
 
             // Interface Pass
@@ -573,7 +701,9 @@ impl GraphicsEngine {
                     instruction.clear_interface,
                 );
 
-                engine_context.interface_rectangle_drawer.draw(&mut render_pass, None);
+                engine_context
+                    .interface_rectangle_drawer
+                    .draw(&mut render_pass, instruction.interface);
             });
 
             // Directional Shadow Caster Pass
@@ -587,6 +717,7 @@ impl GraphicsEngine {
 
                 let draw_data = ModelBatchDrawData {
                     batches: instruction.directional_model_batches,
+                    instructions: instruction.directional_shadow_models,
                     #[cfg(feature = "debug")]
                     show_wireframe: false,
                 };
@@ -595,7 +726,9 @@ impl GraphicsEngine {
                 engine_context
                     .directional_shadow_indicator_drawer
                     .draw(&mut render_pass, instruction.indicator.as_ref());
-                engine_context.directional_shadow_entity_drawer.draw(&mut render_pass, None);
+                engine_context
+                    .directional_shadow_entity_drawer
+                    .draw(&mut render_pass, instruction.directional_shadow_entities);
             });
 
             // Point Shadow Caster Pass
@@ -606,9 +739,15 @@ impl GraphicsEngine {
                             shadow_caster_index,
                             face_index,
                         };
-                        let model_data = PointShadowBatchData {
+                        let model_data = PointShadowModelBatchData {
                             pass_data,
                             caster: instruction.point_light_shadow_caster,
+                            instructions: instruction.point_shadow_models,
+                        };
+                        let entity_data = PointShadowEntityBatchData {
+                            pass_data,
+                            caster: instruction.point_light_shadow_caster,
+                            instructions: instruction.point_shadow_entities,
                         };
 
                         let mut render_pass = engine_context.point_shadow_pass_context.create_pass(
@@ -619,7 +758,7 @@ impl GraphicsEngine {
                         );
 
                         engine_context.point_shadow_model_drawer.draw(&mut render_pass, &model_data);
-                        engine_context.point_shadow_entity_drawer.draw(&mut render_pass, &model_data);
+                        engine_context.point_shadow_entity_drawer.draw(&mut render_pass, &entity_data);
                         engine_context
                             .point_shadow_indicator_drawer
                             .draw(&mut render_pass, instruction.indicator.as_ref());
@@ -638,6 +777,7 @@ impl GraphicsEngine {
 
                 let draw_data = ModelBatchDrawData {
                     batches: instruction.model_batches,
+                    instructions: instruction.models,
                     #[cfg(feature = "debug")]
                     show_wireframe: instruction.render_settings.show_wireframe,
                 };
@@ -646,7 +786,7 @@ impl GraphicsEngine {
                 engine_context
                     .geometry_indicator_drawer
                     .draw(&mut render_pass, instruction.indicator.as_ref());
-                engine_context.geometry_entity_drawer.draw(&mut render_pass, None);
+                engine_context.geometry_entity_drawer.draw(&mut render_pass, instruction.entities);
 
                 if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
                     engine_context.geometry_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
@@ -673,17 +813,27 @@ impl GraphicsEngine {
                 engine_context.screen_circle_drawer.draw(&mut render_pass, None);
             }
 
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, Layer::Bottom);
-            engine_context.screen_effect_drawer.draw(&mut render_pass, None);
+            let rectangle_data = ScreenRectangleDrawInstruction {
+                layer: Layer::Bottom,
+                instructions: instruction.bottom_layer_rectangles,
+            };
+
+            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+            engine_context.screen_effect_drawer.draw(&mut render_pass, instruction.effects);
 
             #[cfg(feature = "debug")]
             {
                 engine_context
                     .screen_buffer_drawer
-                    .draw(&mut render_pass, instruction.render_settings);
+                    .draw(&mut render_pass, &instruction.render_settings);
             }
 
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, Layer::Middle);
+            let rectangle_data = ScreenRectangleDrawInstruction {
+                layer: Layer::Middle,
+                instructions: instruction.middle_layer_rectangles,
+            };
+
+            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
 
             #[cfg(feature = "debug")]
             {
@@ -695,7 +845,12 @@ impl GraphicsEngine {
                 engine_context.screen_overlay_drawer.draw(&mut render_pass, None);
             }
 
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, Layer::Top);
+            let rectangle_data = ScreenRectangleDrawInstruction {
+                layer: Layer::Top,
+                instructions: instruction.top_layer_rectangles,
+            };
+
+            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
         });
 
         (

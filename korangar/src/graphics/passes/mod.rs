@@ -4,7 +4,6 @@ mod interface;
 mod picker;
 mod point_shadow;
 mod screen;
-mod selector;
 
 use std::marker::ConstParamTy;
 
@@ -15,10 +14,9 @@ pub(crate) use interface::*;
 pub(crate) use picker::*;
 pub(crate) use point_shadow::*;
 pub(crate) use screen::*;
-pub(crate) use selector::*;
 use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat, TextureView};
 
-use crate::graphics::{GlobalContext, ModelBatch};
+use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction};
 use crate::loaders::TextureLoader;
 
 #[derive(Clone, Copy, PartialEq, Eq, ConstParamTy)]
@@ -42,6 +40,7 @@ pub(crate) enum DepthAttachmentCount {
 
 /// Gives render passes the context they need to execute. They are the owner of
 /// the resources that are pass specific and shared by multiple drawer.
+#[allow(unused)]
 pub(crate) trait RenderPassContext<const BIND: BindGroupCount, const COLOR: ColorAttachmentCount, const DEPTH: DepthAttachmentCount> {
     type PassData<'data>;
 
@@ -69,6 +68,7 @@ pub(crate) trait RenderPassContext<const BIND: BindGroupCount, const COLOR: Colo
 
 /// Gives compute passes the context they need to execute. They are the owner of
 /// that resources that are pass specific and shared by multiple drawer.
+#[allow(unused)]
 pub(crate) trait ComputePassContext<const BIND: BindGroupCount> {
     type PassData<'data>;
 
@@ -88,21 +88,35 @@ pub(crate) trait ComputePassContext<const BIND: BindGroupCount> {
 }
 
 /// Trait for structures that do draw operations inside a render pass.
+#[allow(unused)]
 pub(crate) trait Drawer<const BIND: BindGroupCount, const COLOR: ColorAttachmentCount, const DEPTH: DepthAttachmentCount> {
     type Context: RenderPassContext<BIND, COLOR, DEPTH>;
     type DrawData<'data>;
 
-    fn new(device: &Device, queue: &Queue, global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self;
+    fn new(
+        capabilities: &Capabilities,
+        device: &Device,
+        queue: &Queue,
+        global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self;
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>);
 }
 
 /// Trait for structures that do dispatch operations inside a compute pass.
+#[allow(unused)]
 pub(crate) trait Dispatch<const BIND: BindGroupCount> {
     type Context: ComputePassContext<BIND>;
     type DispatchData<'data>;
 
-    fn new(device: &Device, queue: &Queue, global_context: &GlobalContext, compute_pass_context: &Self::Context) -> Self;
+    fn new(
+        capabilities: &Capabilities,
+        device: &Device,
+        queue: &Queue,
+        global_context: &GlobalContext,
+        compute_pass_context: &Self::Context,
+    ) -> Self;
 
     fn dispatch(&mut self, pass: &mut ComputePass<'_>, draw_data: Self::DispatchData<'_>);
 }
@@ -121,6 +135,7 @@ struct DrawIndirectArgs {
 /// buffer.
 pub(crate) struct ModelBatchDrawData<'a> {
     pub(crate) batches: &'a [ModelBatch],
+    pub(crate) instructions: &'a [ModelInstruction],
     #[cfg(feature = "debug")]
     pub(crate) show_wireframe: bool,
 }

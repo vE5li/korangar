@@ -1,7 +1,14 @@
-struct PassUniforms {
+struct GlobalUniforms {
     view_projection: mat4x4<f32>,
-    light_position: vec4<f32>,
-    animation_timer: f32
+    inverse_view_projection: mat4x4<f32>,
+    view:mat4x4<f32>,
+    indicator_positions: mat4x4<f32>,
+    indicator_color: vec4<f32>,
+    ambient_color: vec4<f32>,
+    pointer_position: vec2<u32>,
+    animation_timer: f32,
+    day_timer: f32,
+    water_level: f32,
 }
 
 struct InstanceData {
@@ -23,18 +30,25 @@ struct Vertex {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) world_position: vec4<f32>,
-    @location(1) texture_coordinates: vec2<f32>,
+    @location(0) texture_coordinates: vec2<f32>,
+    @location(1) normal: vec3<f32>,
     @location(2) depth_offset: f32,
     @location(3) curvature: f32,
     @location(4) @interpolate(flat) original_depth_offset: f32,
     @location(5) @interpolate(flat) original_curvature: f32,
+    @location(6) texture_index: i32,
 }
 
-@group(0) @binding(1) var nearest_sampler: sampler;
-@group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
-@group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(3) @binding(0) var texture: texture_2d<f32>;
+struct FragmentOutput {
+    @location(0) fragment_color: vec4<f32>,
+    @location(1) fragment_normal: vec4<f32>,
+    @builtin(frag_depth) frag_depth: f32,
+}
+
+@group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
+@group(0) @binding(2) var linear_sampler: sampler;
+@group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
+@group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
 
 override near_plane: f32;
 
@@ -50,42 +64,44 @@ fn vs_main(
     let vertex = vertex_data(vertex_index);
 
     var output: VertexOutput;
-    output.world_position = instance.world * vec4<f32>(vertex.position, 1.0);
-    output.position = pass_uniforms.view_projection * output.world_position;
+    output.position = global_uniforms.view_projection * instance.world * vec4<f32>(vertex.position, 1.0);
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
 
     if (instance.mirror != 0u) {
         output.texture_coordinates.x = 1.0 - output.texture_coordinates.x;
     }
 
+    let rotated = rotateY(vec3<f32>(global_uniforms.view[2].x, 0, global_uniforms.view[2].z), vertex.position.x);
+    output.normal = vec3<f32>(-rotated.x, rotated.y, rotated.z);
     output.depth_offset = vertex.depth_multiplier;
     output.curvature = vertex.curvature_multiplier;
     output.original_depth_offset = instance.depth_offset;
     output.original_curvature = instance.curvature;
+    output.texture_index = instance.texture_index;
     return output;
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
-    let diffuse_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
-
-    let scaled_depth_offset = pow(input.depth_offset, 2.0) * input.original_depth_offset;
-    // let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
-
-    // let linear_z: f32 = nonLinearToLinear(position.z);
-    // // We add the offsets in linear view space.
-    // let adjusted_linear_z: f32 = 2.0 + linear_z - scaled_curvature_offset - scaled_curvature_offset;
-    // let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
-    // let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
-
-    let light_distance = length(input.world_position.xyz - pass_uniforms.light_position.xyz);
-    // return (light_distance / 256) + scaled_depth_offset;
-
+fn fs_main(input: VertexOutput) -> FragmentOutput {
+    let diffuse_color = textureSample(textures[input.texture_index], linear_sampler, input.texture_coordinates);
     if (diffuse_color.a != 1.0) {
         discard;
     }
 
-    return light_distance;
+    let scaled_depth_offset = pow(input.depth_offset, 2.0) * input.original_depth_offset;
+    let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
+
+    let linear_z: f32 = nonLinearToLinear(input.position.z);
+    // We add the offsets in linear view space.
+    let adjusted_linear_z: f32 = -2.0 + linear_z - scaled_depth_offset - scaled_curvature_offset;
+    let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
+    let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
+
+    var output: FragmentOutput;
+    output.fragment_color = diffuse_color;
+    output.fragment_normal = vec4<f32>(normalize(input.normal), 1.0);
+    output.frag_depth = clamped_depth;
+    return output;
 }
 
 // Optimized version of the following truth table:
@@ -117,6 +133,18 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     let curve = u * 2.0 - 1.0;
 
     return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v), depth, curve);
+}
+
+
+fn rotateY(direction: vec3<f32>, angle: f32) -> vec3<f32> {
+    let s = sin(angle);
+    let c = cos(angle);
+    let rotation_matrix = mat3x3<f32>(
+        c, 0.0, -s,
+        0.0, 1.0, 0.0,
+        s, 0.0, c
+    );
+    return rotation_matrix * direction;
 }
 
 fn linearToNonLinear(linear_depth: f32) -> f32 {

@@ -17,7 +17,7 @@ struct VertexOutput {
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(3) @binding(0) var texture: texture_2d<f32>;
+@group(2) @binding(1) var textures: binding_array<texture_2d<f32>>;
 
 @vertex
 fn vs_main(
@@ -47,9 +47,9 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     if instance.linear_filtering == 0 {
-        return textureSample(texture, nearest_sampler, input.texture_coordinates) * instance.color;
+        return textureSample(textures[instance.texture_index], nearest_sampler, input.texture_coordinates) * instance.color;
     } else {
-        return textureSample(texture, linear_sampler, input.texture_coordinates) * instance.color;
+        return textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates) * instance.color;
     }
 }
 

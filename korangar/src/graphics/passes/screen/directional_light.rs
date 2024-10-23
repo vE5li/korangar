@@ -10,7 +10,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::{GlobalContext, Prepare, RenderInstruction, LIGHT_ATTACHMENT_BLEND};
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, LIGHT_ATTACHMENT_BLEND};
 use crate::Buffer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/directional_light.wgsl");
@@ -36,7 +36,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     type Context = ScreenRenderPassContext;
     type DrawData<'data> = Option<()>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let buffer = Buffer::with_capacity(

@@ -17,7 +17,7 @@ use wgpu::{
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
 use crate::graphics::buffer::DynamicUniformBuffer;
-use crate::graphics::{GlobalContext, PointShadowCasterInstruction, Prepare, RenderInstruction};
+use crate::graphics::{EntityInstruction, GlobalContext, ModelInstruction, PointShadowCasterInstruction, Prepare, RenderInstruction};
 use crate::loaders::TextureLoader;
 
 const PASS_NAME: &str = "point shadow render pass";
@@ -38,9 +38,16 @@ pub(crate) struct PointShadowData {
     pub(crate) face_index: usize,
 }
 
-pub(crate) struct PointShadowBatchData<'a> {
+pub(crate) struct PointShadowEntityBatchData<'a> {
     pub(crate) pass_data: PointShadowData,
     pub(crate) caster: &'a [PointShadowCasterInstruction],
+    pub(crate) instructions: &'a [EntityInstruction],
+}
+
+pub(crate) struct PointShadowModelBatchData<'a> {
+    pub(crate) pass_data: PointShadowData,
+    pub(crate) caster: &'a [PointShadowCasterInstruction],
+    pub(crate) instructions: &'a [ModelInstruction],
 }
 
 pub(crate) struct PointShadowRenderPassContext {
@@ -55,7 +62,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
     type PassData<'data> = PointShadowData;
 
     fn new(device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
-        let point_shadow_texture_format = global_context.point_shadow_map_textures[0].get_texture_format();
+        let point_shadow_texture_format = global_context.point_shadow_map_textures.get_texture_format();
 
         let uniforms_buffer = DynamicUniformBuffer::new(device, &format!("{PASS_NAME} pass uniforms"));
 
@@ -75,13 +82,17 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
         global_context: &GlobalContext,
         pass_data: PointShadowData,
     ) -> RenderPass<'encoder> {
-        let dynamic_offset = self.uniforms_buffer.dynamic_offset(pass_data.shadow_caster_index * NUMBER_FACES);
+        let dynamic_offset = self
+            .uniforms_buffer
+            .dynamic_offset(pass_data.shadow_caster_index * NUMBER_FACES + pass_data.face_index);
 
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: global_context.point_shadow_map_textures[pass_data.shadow_caster_index].get_texture_face_view(pass_data.face_index),
+                view: global_context
+                    .point_shadow_map_textures
+                    .get_texture_face_view(pass_data.shadow_caster_index, pass_data.face_index),
                 depth_ops: Some(Operations {
                     load: LoadOp::Clear(1.0),
                     store: StoreOp::Store,

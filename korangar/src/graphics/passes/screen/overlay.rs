@@ -7,7 +7,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::GlobalContext;
+use crate::graphics::{Capabilities, GlobalContext};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/overlay.wgsl");
 const DRAWER_NAME: &str = "screen overlay";
@@ -20,7 +20,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     type Context = ScreenRenderPassContext;
     type DrawData<'data> = Option<()>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let bind_group_layouts = Self::Context::bind_group_layout(device);

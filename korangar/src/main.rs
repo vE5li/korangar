@@ -72,7 +72,7 @@ use ragnarok_packets::{
 use renderer::InterfaceRenderer;
 #[cfg(feature = "debug")]
 use wgpu::{Device, Queue};
-use wgpu::{Dx12Compiler, Features, Instance, InstanceFlags, Limits, MemoryHints};
+use wgpu::{Dx12Compiler, Instance, InstanceFlags, MemoryHints};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -101,11 +101,6 @@ use crate::world::*;
 
 const CLIENT_NAME: &str = "Korangar";
 const ROLLING_CUTTER_ID: SkillId = SkillId(2036);
-// The real limiting factor is WGPUs
-// "Limit::max_sampled_textures_per_shader_stage".
-const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 512;
-// We need room for 8 textures for the screen bind group.
-const MAX_BINDING_TEXTURE_ARRAY_COUNT: usize = (MAX_TEXTURES_PER_SHADER_STAGE - 8) as usize;
 const DEFAULT_MAP: &str = "geffen";
 const DEFAULT_BACKGROUND_MUSIC: Option<&str> = Some("bgm\\01.mp3");
 const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
@@ -293,42 +288,15 @@ impl Client {
         });
 
         time_phase!("create device", {
-            let required_features = Features::INDIRECT_FIRST_INSTANCE
-                | Features::MULTI_DRAW_INDIRECT
-                | Features::SAMPLED_TEXTURE_AND_STORAGE_BUFFER_ARRAY_NON_UNIFORM_INDEXING;
-            #[cfg(feature = "debug")]
-            let required_features = required_features | Features::POLYGON_MODE_LINE;
-
-            let adapter_features = adapter.features();
-            assert!(
-                adapter_features.contains(required_features),
-                "Adapter does not support required features: {:?}",
-                required_features - adapter_features
-            );
-            set_supported_features(adapter_features);
-
-            #[cfg(feature = "debug")]
-            {
-                let supported = match features_supported(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
-                    true => "supported".green(),
-                    false => "unsupported".yellow(),
-                };
-                print_debug!("PARTIALLY_BOUND_BINDING_ARRAY: {}", supported);
-            }
-
-            let required_limits = Limits {
-                max_sampled_textures_per_shader_stage: MAX_TEXTURES_PER_SHADER_STAGE,
-                ..Default::default()
-            }
-            .using_resolution(adapter.limits());
+            let capabilities = Capabilities::from_adapter(&adapter);
 
             let (device, queue) = pollster::block_on(async {
                 adapter
                     .request_device(
                         &wgpu::DeviceDescriptor {
                             label: None,
-                            required_features: adapter_features | required_features,
-                            required_limits,
+                            required_features: capabilities.get_required_features(),
+                            required_limits: capabilities.get_required_limits(),
                             memory_hints: MemoryHints::Performance,
                         },
                         trace_dir.ok().as_ref().map(std::path::Path::new),
@@ -414,6 +382,7 @@ impl Client {
         time_phase!("create graphics engine", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let graphics_engine = GraphicsEngine::initialize(GraphicsEngineDescriptor {
+                capabilities,
                 adapter,
                 instance,
                 device: device.clone(),

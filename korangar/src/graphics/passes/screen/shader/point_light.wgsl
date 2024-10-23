@@ -31,7 +31,7 @@ struct VertexOutput {
 @group(1) @binding(0) var diffuse_buffer: texture_multisampled_2d<f32>;
 @group(1) @binding(1) var normal_buffer: texture_multisampled_2d<f32>;
 @group(1) @binding(3) var depth_buffer: texture_depth_multisampled_2d;
-@group(1) @binding(5) var shadow_maps: binding_array<texture_depth_cube>;
+@group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 
 @vertex
@@ -84,7 +84,7 @@ fn calculate_sample(position: vec4<f32>, fragment_position: vec2<f32>, instance_
     // For this we save the texture_index as (texture_index += 1);
     if (instance.texture_index != 0) {
         let flipped_light_direction = vec3<f32>(light_direction.x, -light_direction.y, light_direction.z);
-        let shadow_map_depth = textureSample(shadow_maps[instance.texture_index - 1], linear_sampler, flipped_light_direction);
+        let shadow_map_depth = textureSample(point_shadow_maps, linear_sampler, flipped_light_direction, instance.texture_index - 1);
 
         var bias = 0.05 * tan(acos(light_percent));
         bias = clamp(bias, 0.0, 0.005);

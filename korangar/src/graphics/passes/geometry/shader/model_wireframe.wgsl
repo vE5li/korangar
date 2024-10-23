@@ -33,8 +33,8 @@ struct FragmentOutput {
 fn vs_main(
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
-    @location(5) wind_affinity: f32,
-    @location(6) instance_id: u32
+    @location(4) wind_affinity: f32,
+    @location(5) instance_id: u32
 ) -> VertexOutput {
     let instance = instance_data[instance_id];
 

@@ -12,7 +12,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PickerRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, PickerTarget, Prepare, RenderInstruction};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, PickerTarget, Prepare, RenderInstruction};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/marker.wgsl");
 const DRAWER_NAME: &str = "picker marker";
@@ -74,7 +74,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     type Context = PickerRenderPassContext;
     type DrawData<'data> = Option<()>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let instance_data_buffer = Buffer::with_capacity(

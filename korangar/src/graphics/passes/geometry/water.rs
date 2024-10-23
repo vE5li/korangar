@@ -7,7 +7,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, GeometryRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, WaterVertex};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, WaterVertex};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/water.wgsl");
 const DRAWER_NAME: &str = "geometry water";
@@ -20,7 +20,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
     type Context = GeometryRenderPassContext;
     type DrawData<'data> = &'data Buffer<WaterVertex>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {

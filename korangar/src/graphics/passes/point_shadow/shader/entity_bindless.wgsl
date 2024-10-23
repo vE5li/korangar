@@ -29,12 +29,13 @@ struct VertexOutput {
     @location(3) curvature: f32,
     @location(4) @interpolate(flat) original_depth_offset: f32,
     @location(5) @interpolate(flat) original_curvature: f32,
+    @location(6) texture_index: i32,
 }
 
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(3) @binding(0) var texture: texture_2d<f32>;
+@group(2) @binding(1) var textures: binding_array<texture_2d<f32>>;
 
 override near_plane: f32;
 
@@ -62,12 +63,13 @@ fn vs_main(
     output.curvature = vertex.curvature_multiplier;
     output.original_depth_offset = instance.depth_offset;
     output.original_curvature = instance.curvature;
+    output.texture_index = instance.texture_index;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
-    let diffuse_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
+    let diffuse_color = textureSample(textures[input.texture_index], nearest_sampler, input.texture_coordinates);
 
     let scaled_depth_offset = pow(input.depth_offset, 2.0) * input.original_depth_offset;
     // let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;

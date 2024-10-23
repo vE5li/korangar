@@ -12,7 +12,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, Prepare, RenderInstruction};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RenderInstruction};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/circle.wgsl");
 const DRAWER_NAME: &str = "screen circle";
@@ -40,7 +40,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     type Context = ScreenRenderPassContext;
     type DrawData<'data> = Option<()>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let instance_data_buffer = Buffer::with_capacity(

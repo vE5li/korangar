@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Formatter};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
 use derive_new::new;
@@ -11,7 +12,10 @@ use wgpu::{
 
 use crate::interface::layout::ScreenSize;
 
+static TEXTURE_ID: AtomicU64 = AtomicU64::new(0);
+
 pub struct Texture {
+    id: u64,
     label: Option<String>,
     texture: wgpu::Texture,
     texture_view: TextureView,
@@ -29,6 +33,7 @@ impl Debug for Texture {
 
 impl Texture {
     pub fn new(device: &Device, descriptor: &TextureDescriptor) -> Self {
+        let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(descriptor);
         let texture_view = texture.create_view(&TextureViewDescriptor {
@@ -46,6 +51,7 @@ impl Texture {
         });
 
         Self {
+            id,
             label,
             texture,
             texture_view,
@@ -54,6 +60,7 @@ impl Texture {
     }
 
     pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, data: &[u8]) -> Self {
+        let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture_with_data(queue, descriptor, TextureDataOrder::LayerMajor, data);
         let texture_view = texture.create_view(&TextureViewDescriptor {
@@ -71,6 +78,7 @@ impl Texture {
         });
 
         Self {
+            id,
             label,
             texture,
             texture_view,
@@ -78,7 +86,11 @@ impl Texture {
         }
     }
 
-    pub fn get_extent(&self) -> Extent3d {
+    pub fn get_id(&self) -> u64 {
+        self.id
+    }
+
+    pub fn get_size(&self) -> Extent3d {
         self.texture.size()
     }
 
@@ -118,36 +130,39 @@ impl Texture {
     }
 }
 
-pub struct CubeTexture {
+pub struct CubeArrayTexture {
     label: Option<String>,
     texture: wgpu::Texture,
     texture_view: TextureView,
-    texture_face_views: [TextureView; 6],
+    texture_face_views: Vec<[TextureView; 6]>,
 }
 
-impl Debug for CubeTexture {
+impl Debug for CubeArrayTexture {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.label {
-            None => write!(f, "CubeTexture(\"Unknown\")"),
-            Some(label) => write!(f, "CubeTexture(\"{label}\")"),
+            None => write!(f, "CubeArrayTexture(\"Unknown\")"),
+            Some(label) => write!(f, "CubeArrayTexture(\"{label}\")"),
         }
     }
 }
 
-impl CubeTexture {
+impl CubeArrayTexture {
     pub(crate) fn new(
         device: &Device,
         texture_name: &str,
-        dimensions: ScreenSize,
+        face_dimensions: ScreenSize,
         format: TextureFormat,
         attachment_image_type: AttachmentTextureType,
-    ) -> CubeTexture {
+        cube_count: u32,
+    ) -> Self {
+        let face_size = face_dimensions.width.max(face_dimensions.height);
+
         let descriptor = TextureDescriptor {
             label: Some(texture_name),
             size: Extent3d {
-                width: dimensions.width as u32,
-                height: dimensions.height as u32,
-                depth_or_array_layers: 6,
+                width: face_size as u32,
+                height: face_size as u32,
+                depth_or_array_layers: 6 * cube_count,
             },
             mip_level_count: 1,
             sample_count: 1,
@@ -157,44 +172,47 @@ impl CubeTexture {
             view_formats: &[],
         };
 
-        let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(&descriptor);
 
-        let texture_view = texture.create_view(&TextureViewDescriptor {
-            label: descriptor.label,
-            format: None,
-            dimension: Some(TextureViewDimension::Cube),
-            aspect: wgpu::TextureAspect::All,
-            base_mip_level: 0,
-            mip_level_count: None,
-            base_array_layer: 0,
-            array_layer_count: Some(6),
-        });
-
-        fn create_face_view(texture: &wgpu::Texture, index: u32) -> TextureView {
+        fn create_face_view(texture: &wgpu::Texture, cube_index: u32, face_index: u32) -> TextureView {
             texture.create_view(&TextureViewDescriptor {
-                label: Some("cube map face view"),
+                label: Some("cube array face view"),
                 format: None,
                 dimension: Some(TextureViewDimension::D2),
                 aspect: wgpu::TextureAspect::All,
                 base_mip_level: 0,
                 mip_level_count: None,
-                base_array_layer: index,
+                base_array_layer: cube_index * 6 + face_index,
                 array_layer_count: Some(1),
             })
         }
 
-        let texture_face_views = [
-            create_face_view(&texture, 0),
-            create_face_view(&texture, 1),
-            create_face_view(&texture, 2),
-            create_face_view(&texture, 3),
-            create_face_view(&texture, 4),
-            create_face_view(&texture, 5),
-        ];
+        let mut texture_face_views = Vec::with_capacity(cube_count as usize);
+        for cube_idx in 0..cube_count {
+            let face_views = [
+                create_face_view(&texture, cube_idx, 0),
+                create_face_view(&texture, cube_idx, 1),
+                create_face_view(&texture, cube_idx, 2),
+                create_face_view(&texture, cube_idx, 3),
+                create_face_view(&texture, cube_idx, 4),
+                create_face_view(&texture, cube_idx, 5),
+            ];
+            texture_face_views.push(face_views);
+        }
+
+        let texture_view = texture.create_view(&TextureViewDescriptor {
+            label: Some("cube array view"),
+            format: None,
+            dimension: Some(TextureViewDimension::CubeArray),
+            aspect: wgpu::TextureAspect::All,
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: Some(6 * cube_count),
+        });
 
         Self {
-            label,
+            label: descriptor.label.map(|l| l.to_string()),
             texture,
             texture_view,
             texture_face_views,
@@ -209,13 +227,14 @@ impl CubeTexture {
         &self.texture_view
     }
 
-    pub fn get_texture_face_view(&self, index: usize) -> &TextureView {
-        &self.texture_face_views[index]
+    pub fn get_texture_face_view(&self, cube_index: usize, face_index: usize) -> &TextureView {
+        &self.texture_face_views[cube_index][face_index]
     }
 }
 
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub(crate) enum AttachmentTextureType {
+    PickerAttachment,
     ColorAttachment,
     DepthAttachment,
     Depth,
@@ -224,6 +243,9 @@ pub(crate) enum AttachmentTextureType {
 impl From<AttachmentTextureType> for TextureUsages {
     fn from(value: AttachmentTextureType) -> Self {
         match value {
+            AttachmentTextureType::PickerAttachment => {
+                TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC
+            }
             AttachmentTextureType::ColorAttachment => TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
             AttachmentTextureType::DepthAttachment => TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
             AttachmentTextureType::Depth => TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
@@ -235,6 +257,7 @@ pub struct AttachmentTexture {
     label: Option<String>,
     texture: wgpu::Texture,
     texture_view: TextureView,
+    unpadded_size: Extent3d,
 }
 
 impl Debug for AttachmentTexture {
@@ -247,23 +270,48 @@ impl Debug for AttachmentTexture {
 }
 
 impl AttachmentTexture {
-    pub fn new(device: &Device, descriptor: &TextureDescriptor) -> Self {
+    pub fn new(device: &Device, mut descriptor: TextureDescriptor, padded_width: Option<u32>) -> Self {
+        let unpadded_size = descriptor.size;
+
+        if let Some(padded_width) = padded_width {
+            descriptor.size.width = padded_width;
+        }
+
         let label = descriptor.label.map(|label| label.to_string());
-        let texture = device.create_texture(descriptor);
+        let texture = device.create_texture(&descriptor);
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
-            ..Default::default()
+            format: None,
+            dimension: None,
+            aspect: Default::default(),
+            base_mip_level: 0,
+            mip_level_count: None,
+            base_array_layer: 0,
+            array_layer_count: None,
         });
 
         Self {
             label,
             texture,
             texture_view,
+            unpadded_size,
         }
+    }
+
+    pub fn get_unpadded_size(&self) -> Extent3d {
+        self.unpadded_size
+    }
+
+    pub fn get_bytes_per_row(&self) -> Option<u32> {
+        Some(self.texture.format().block_copy_size(None).unwrap() * self.texture.size().width)
     }
 
     pub fn get_format(&self) -> TextureFormat {
         self.texture.format()
+    }
+
+    pub fn get_texture(&self) -> &wgpu::Texture {
+        &self.texture
     }
 
     pub fn get_texture_view(&self) -> &TextureView {
@@ -276,6 +324,7 @@ pub(crate) struct AttachmentTextureFactory<'a> {
     device: &'a Device,
     dimensions: ScreenSize,
     sample_count: u32,
+    padded_width: Option<u32>,
 }
 
 impl<'a> AttachmentTextureFactory<'a> {
@@ -285,19 +334,23 @@ impl<'a> AttachmentTextureFactory<'a> {
         format: TextureFormat,
         attachment_image_type: AttachmentTextureType,
     ) -> AttachmentTexture {
-        AttachmentTexture::new(&self.device, &TextureDescriptor {
-            label: Some(texture_name),
-            size: Extent3d {
-                width: self.dimensions.width as u32,
-                height: self.dimensions.height as u32,
-                depth_or_array_layers: 1,
+        AttachmentTexture::new(
+            self.device,
+            TextureDescriptor {
+                label: Some(texture_name),
+                size: Extent3d {
+                    width: self.dimensions.width as u32,
+                    height: self.dimensions.height as u32,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: self.sample_count,
+                dimension: TextureDimension::D2,
+                format,
+                usage: attachment_image_type.into(),
+                view_formats: &[],
             },
-            mip_level_count: 1,
-            sample_count: self.sample_count,
-            dimension: TextureDimension::D2,
-            format,
-            usage: attachment_image_type.into(),
-            view_formats: &[],
-        })
+            self.padded_width,
+        )
     }
 }

@@ -750,7 +750,7 @@ impl Common {
         let scale = Vector2::from_value(0.7);
         let cell_count = Vector2::new(1, 1);
         let cell_position = Vector2::new(0, 0);
-        let image_dimensions = texture.get_extent();
+        let image_dimensions = texture.get_size();
         let size = Vector2::new(
             image_dimensions.width as f32 * scale.x / 10.0,
             image_dimensions.height as f32 * scale.y / 10.0,

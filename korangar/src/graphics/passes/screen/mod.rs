@@ -23,7 +23,7 @@ pub(crate) use directional_light::ScreenDirectionalLightDrawer;
 pub(crate) use effect::ScreenEffectDrawer;
 pub(crate) use overlay::ScreenOverlayDrawer;
 pub(crate) use point_light::ScreenPointLightDrawer;
-pub(crate) use rectangle::{Layer, ScreenRectangleDrawer};
+pub(crate) use rectangle::{Layer, ScreenRectangleDrawInstruction, ScreenRectangleDrawer};
 pub(crate) use water_light::ScreenWaterLightDrawer;
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,

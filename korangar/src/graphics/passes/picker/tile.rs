@@ -10,7 +10,7 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PickerRenderPassContext, RenderPassContext,
 };
 use crate::graphics::picker_target::PickerValueType;
-use crate::graphics::{Buffer, GlobalContext, TileVertex};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, TileVertex};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/tile.wgsl");
 const DRAWER_NAME: &str = "picker tile";
@@ -23,7 +23,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     type Context = PickerRenderPassContext;
     type DrawData<'draw> = &'draw Buffer<TileVertex>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {

@@ -13,7 +13,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::{GlobalContext, Prepare, RenderInstruction, WaterVertex};
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, WaterVertex};
 use crate::Buffer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/aabb.wgsl");
@@ -43,7 +43,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     type Context = ScreenRenderPassContext;
     type DrawData<'data> = Option<()>;
 
-    fn new(device: &Device, queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        _capabilities: &Capabilities,
+        device: &Device,
+        queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         // Vertices are defined in world coordinates (Same as WGPU's NDC).

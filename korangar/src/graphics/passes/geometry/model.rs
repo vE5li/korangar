@@ -15,7 +15,7 @@ use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, GeometryRenderPassContext, ModelBatchDrawData,
     RenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 #[cfg(feature = "debug")]
@@ -31,6 +31,7 @@ struct InstanceData {
 }
 
 pub(crate) struct GeometryModelDrawer {
+    multi_draw_indirect_support: bool,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
     command_buffer: Buffer<DrawIndirectArgs>,
@@ -48,7 +49,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
     type Context = GeometryRenderPassContext;
     type DrawData<'data> = ModelBatchDrawData<'data>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
         #[cfg(feature = "debug")]
         let shader_module_wireframe = device.create_shader_module(SHADER_WIREFRAME);
@@ -112,14 +119,25 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
         });
 
         #[cfg(feature = "debug")]
-        let wireframe_pipeline = Self::create_pipeline(
-            device,
-            render_pass_context,
-            &shader_module_wireframe,
-            instance_index_buffer_layout.clone(),
-            &pipeline_layout,
-            PolygonMode::Line,
-        );
+        let wireframe_pipeline = if capabilities.supports_polygon_mode_line() {
+            Self::create_pipeline(
+                device,
+                render_pass_context,
+                &shader_module_wireframe,
+                instance_index_buffer_layout.clone(),
+                &pipeline_layout,
+                PolygonMode::Line,
+            )
+        } else {
+            Self::create_pipeline(
+                device,
+                render_pass_context,
+                &shader_module_wireframe,
+                instance_index_buffer_layout.clone(),
+                &pipeline_layout,
+                PolygonMode::Fill,
+            )
+        };
 
         let pipeline = Self::create_pipeline(
             device,
@@ -131,6 +149,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
         );
 
         Self {
+            multi_draw_indirect_support: capabilities.supports_multidraw_indirect(),
             instance_data_buffer,
             instance_index_vertex_buffer,
             command_buffer,
@@ -170,11 +189,25 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
             pass.set_bind_group(2, batch.texture.get_bind_group(), &[]);
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
             pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
-            pass.multi_draw_indirect(
-                self.command_buffer.get_buffer(),
-                (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
-                batch.count as u32,
-            );
+
+            if self.multi_draw_indirect_support {
+                pass.multi_draw_indirect(
+                    self.command_buffer.get_buffer(),
+                    (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                    batch.count as u32,
+                );
+            } else {
+                let start = batch.offset;
+                let end = start + batch.count;
+
+                for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                    let vertex_start = instruction.vertex_offset as u32;
+                    let vertex_end = vertex_start + instruction.vertex_count as u32;
+                    let index = (start + index) as u32;
+
+                    pass.draw(vertex_start..vertex_end, index..index + 1);
+                }
+            }
         }
     }
 }

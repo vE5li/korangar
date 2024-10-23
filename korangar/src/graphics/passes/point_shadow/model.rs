@@ -11,10 +11,10 @@ use wgpu::{
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, PointShadowBatchData,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, PointShadowModelBatchData,
     PointShadowRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 const DRAWER_NAME: &str = "point shadow model";
@@ -27,6 +27,7 @@ struct InstanceData {
 }
 
 pub(crate) struct PointShadowModelDrawer {
+    multi_draw_indirect_support: bool,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
     command_buffer: Buffer<DrawIndirectArgs>,
@@ -40,9 +41,15 @@ pub(crate) struct PointShadowModelDrawer {
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAttachmentCount::One }> for PointShadowModelDrawer {
     type Context = PointShadowRenderPassContext;
-    type DrawData<'data> = &'data PointShadowBatchData<'data>;
+    type DrawData<'data> = &'data PointShadowModelBatchData<'data>;
 
-    fn new(device: &Device, _queue: &Queue, _global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
+    fn new(
+        capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        _global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
         let instance_data_buffer = Buffer::with_capacity(
@@ -133,6 +140,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         });
 
         Self {
+            multi_draw_indirect_support: capabilities.supports_multidraw_indirect(),
             instance_data_buffer,
             instance_index_vertex_buffer,
             command_buffer,
@@ -161,11 +169,25 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         pass.set_bind_group(3, batch.model_texture.get_bind_group(), &[]);
         pass.set_vertex_buffer(0, batch.model_vertex_buffer.slice(..));
         pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
-        pass.multi_draw_indirect(
-            self.command_buffer.get_buffer(),
-            (offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
-            count as u32,
-        );
+
+        if self.multi_draw_indirect_support {
+            pass.multi_draw_indirect(
+                self.command_buffer.get_buffer(),
+                (offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                count as u32,
+            );
+        } else {
+            let start = offset;
+            let end = start + count;
+
+            for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                let vertex_start = instruction.vertex_offset as u32;
+                let vertex_end = vertex_start + instruction.vertex_count as u32;
+                let index = (start + index) as u32;
+
+                pass.draw(vertex_start..vertex_end, index..index + 1);
+            }
+        }
     }
 }
 

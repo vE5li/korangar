@@ -21,7 +21,7 @@ struct VertexOutput {
 @group(1) @binding(2) var water_buffer: texture_multisampled_2d<f32>;
 @group(1) @binding(3) var depth_buffer: texture_depth_multisampled_2d;
 @group(1) @binding(4) var shadow_texture: texture_depth_2d;
-@group(1) @binding(5) var point_shadow_maps: binding_array<texture_depth_cube>;
+@group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
 @group(1) @binding(7) var picker_texture: texture_2d<u32>;
 @group(2) @binding(0) var font_atlas: texture_2d<f32>;
 
@@ -116,7 +116,7 @@ fn fs_main(
             default: { sample_dir = vec3<f32>(-cell_uv.x * 2.0 + 1.0, -cell_uv.y * 2.0 + 1.0, -1.0); }
         }
 
-        let depth = textureSample(point_shadow_maps[debug_uniforms.show_point_shadow - 1u], nearest_sampler, sample_dir);
+        let depth = textureSample(point_shadow_maps, nearest_sampler, sample_dir, debug_uniforms.show_point_shadow - 1u);
         output_color += vec3<f32>(depth, depth, depth);
     }
 

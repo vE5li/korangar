@@ -1,10 +1,10 @@
 mod buffer;
 mod cameras;
+mod capabilities;
 mod color;
 mod engine;
 #[cfg(feature = "debug")]
 mod error;
-mod features;
 mod graphic_settings;
 mod instruction;
 mod particles;
@@ -18,7 +18,7 @@ mod surface;
 mod texture;
 mod vertices;
 
-use std::num::{NonZeroU32, NonZeroU64};
+use std::num::NonZeroU64;
 use std::sync::{Arc, OnceLock};
 
 use bytemuck::{Pod, Zeroable};
@@ -28,16 +28,16 @@ use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
     BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, CommandEncoder, Device,
     Extent3d, Queue, Sampler, SamplerBindingType, ShaderStages, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-    TextureUsages, TextureViewDimension,
+    TextureUsages, TextureViewDimension, COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 
 pub use self::buffer::Buffer;
 pub use self::cameras::*;
+pub use self::capabilities::*;
 pub use self::color::*;
 pub use self::engine::{GraphicsEngine, GraphicsEngineDescriptor};
 #[cfg(feature = "debug")]
 pub use self::error::error_handler;
-pub use self::features::*;
 pub use self::graphic_settings::*;
 pub use self::instruction::*;
 pub use self::particles::*;
@@ -138,13 +138,14 @@ pub(crate) struct GlobalContext {
     pub(crate) walk_indicator_texture: Arc<Texture>,
     pub(crate) depth_texture: AttachmentTexture,
     pub(crate) picker_buffer_texture: AttachmentTexture,
+    pub(crate) picker_depth_texture: AttachmentTexture,
     pub(crate) diffuse_buffer_texture: AttachmentTexture,
     pub(crate) normal_buffer_texture: AttachmentTexture,
     pub(crate) water_buffer_texture: AttachmentTexture,
     pub(crate) depth_buffer_texture: AttachmentTexture,
     pub(crate) interface_buffer_texture: AttachmentTexture,
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
-    pub(crate) point_shadow_map_textures: [CubeTexture; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS],
+    pub(crate) point_shadow_map_textures: CubeArrayTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
     #[cfg(feature = "debug")]
     pub(crate) debug_uniforms_buffer: Buffer<DebugUniforms>,
@@ -153,7 +154,6 @@ pub(crate) struct GlobalContext {
     pub(crate) linear_sampler: Sampler,
     pub(crate) texture_sampler: Sampler,
     pub(crate) global_bind_group: BindGroup,
-    pub(crate) picker_bind_group: BindGroup,
     pub(crate) screen_bind_group: BindGroup,
     pub(crate) screen_size: ScreenSize,
     pub(crate) directional_shadow_size: ScreenSize,
@@ -257,7 +257,7 @@ impl GlobalContext {
                 mip_level_count: 1,
                 sample_count: 1,
                 dimension: TextureDimension::D2,
-                format: TextureFormat::R32Float,
+                format: TextureFormat::Rgba8Unorm,
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                 view_formats: Default::default(),
             },
@@ -271,7 +271,7 @@ impl GlobalContext {
         let picker_value_buffer = Buffer::with_capacity(
             device,
             "picker value",
-            BufferUsages::STORAGE | BufferUsages::MAP_READ,
+            BufferUsages::COPY_DST | BufferUsages::MAP_READ,
             PickerTarget::value_size() as _,
         );
 
@@ -304,7 +304,6 @@ impl GlobalContext {
             &texture_sampler,
         );
 
-        let picker_bind_group = Self::create_picker_bind_group(device, &screen_textures.picker_buffer_texture, &picker_value_buffer);
         let screen_bind_group = Self::create_screen_bind_group(
             device,
             &screen_textures.diffuse_buffer_texture,
@@ -324,6 +323,7 @@ impl GlobalContext {
             walk_indicator_texture,
             depth_texture: screen_textures.depth_texture,
             picker_buffer_texture: screen_textures.picker_buffer_texture,
+            picker_depth_texture: screen_textures.picker_depth_texture,
             diffuse_buffer_texture: screen_textures.diffuse_buffer_texture,
             normal_buffer_texture: screen_textures.normal_buffer_texture,
             water_buffer_texture: screen_textures.water_buffer_texture,
@@ -339,7 +339,6 @@ impl GlobalContext {
             linear_sampler,
             texture_sampler,
             global_bind_group,
-            picker_bind_group,
             screen_bind_group,
             screen_size,
             directional_shadow_size,
@@ -351,13 +350,26 @@ impl GlobalContext {
     }
 
     fn create_screen_size_textures(device: &Device, screen_size: ScreenSize) -> ScreenSizeTextures {
-        let screen_factory = AttachmentTextureFactory::new(device, screen_size, 1);
+        let depth_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
+        let depth_texture = depth_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
 
-        let depth_texture = screen_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
-        let picker_buffer_texture =
-            screen_factory.new_attachment("picker buffer", TextureFormat::Rg32Uint, AttachmentTextureType::ColorAttachment);
+        // Since we need to copy from the picker attachment to read the picker value, we
+        // need to align both attachments properly to the requirements of
+        // COPY_BYTES_PER_ROW_ALIGNMENT.
+        let block_size = TextureFormat::Rg32Uint.block_copy_size(None).unwrap();
+        let picker_padded_width = ((screen_size.width as u32 * block_size + (COPY_BYTES_PER_ROW_ALIGNMENT - 1))
+            & !(COPY_BYTES_PER_ROW_ALIGNMENT - 1))
+            / block_size;
 
-        let multisampled_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4);
+        let picker_factory = AttachmentTextureFactory::new(device, screen_size, 1, Some(picker_padded_width));
+        let picker_buffer_texture = picker_factory.new_attachment(
+            "picker buffer",
+            TextureFormat::Rg32Uint,
+            AttachmentTextureType::PickerAttachment,
+        );
+        let picker_depth_texture = picker_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
+
+        let multisampled_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
 
         let diffuse_buffer_texture = multisampled_screen_factory.new_attachment(
             "diffuse buffer",
@@ -388,6 +400,7 @@ impl GlobalContext {
         ScreenSizeTextures {
             depth_texture,
             picker_buffer_texture,
+            picker_depth_texture,
             diffuse_buffer_texture,
             normal_buffer_texture,
             water_buffer_texture,
@@ -397,7 +410,7 @@ impl GlobalContext {
     }
 
     fn create_directional_shadow_texture(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
-        let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1);
+        let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1, None);
 
         shadow_factory.new_attachment(
             "directional shadow map",
@@ -406,51 +419,15 @@ impl GlobalContext {
         )
     }
 
-    fn create_point_shadow_textures(device: &Device, shadow_size: ScreenSize) -> [CubeTexture; 6] {
-        [
-            CubeTexture::new(
-                device,
-                "point shadow map 0",
-                shadow_size,
-                TextureFormat::Depth32Float,
-                AttachmentTextureType::DepthAttachment,
-            ),
-            CubeTexture::new(
-                device,
-                "point shadow map 1",
-                shadow_size,
-                TextureFormat::Depth32Float,
-                AttachmentTextureType::DepthAttachment,
-            ),
-            CubeTexture::new(
-                device,
-                "point shadow map 2",
-                shadow_size,
-                TextureFormat::Depth32Float,
-                AttachmentTextureType::DepthAttachment,
-            ),
-            CubeTexture::new(
-                device,
-                "point shadow map 3",
-                shadow_size,
-                TextureFormat::Depth32Float,
-                AttachmentTextureType::DepthAttachment,
-            ),
-            CubeTexture::new(
-                device,
-                "point shadow map 4",
-                shadow_size,
-                TextureFormat::Depth32Float,
-                AttachmentTextureType::DepthAttachment,
-            ),
-            CubeTexture::new(
-                device,
-                "point shadow map 5",
-                shadow_size,
-                TextureFormat::Depth32Float,
-                AttachmentTextureType::DepthAttachment,
-            ),
-        ]
+    fn create_point_shadow_textures(device: &Device, shadow_size: ScreenSize) -> CubeArrayTexture {
+        CubeArrayTexture::new(
+            device,
+            "point shadow map",
+            shadow_size,
+            TextureFormat::Depth32Float,
+            AttachmentTextureType::DepthAttachment,
+            NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS as u32,
+        )
     }
 
     fn update_screen_size_textures(&mut self, device: &Device, screen_size: ScreenSize) {
@@ -459,15 +436,15 @@ impl GlobalContext {
 
         self.depth_texture = new_textures.depth_texture;
         self.picker_buffer_texture = new_textures.picker_buffer_texture;
+        self.picker_depth_texture = new_textures.picker_depth_texture;
         self.diffuse_buffer_texture = new_textures.diffuse_buffer_texture;
         self.normal_buffer_texture = new_textures.normal_buffer_texture;
         self.water_buffer_texture = new_textures.water_buffer_texture;
         self.depth_buffer_texture = new_textures.depth_buffer_texture;
         self.interface_buffer_texture = new_textures.interface_buffer_texture;
 
-        // We need to update these bind groups, because their content changed, and they
-        // are not re-created each frame.
-        self.picker_bind_group = Self::create_picker_bind_group(device, &self.picker_buffer_texture, &self.picker_value_buffer);
+        // We need to update this bind group, because it's content changed, and it isn't
+        // re-created each frame.
         self.screen_bind_group = Self::create_screen_bind_group(
             device,
             &self.diffuse_buffer_texture,
@@ -568,37 +545,6 @@ impl GlobalContext {
         })
     }
 
-    fn picker_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
-        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
-        LAYOUT.get_or_init(|| {
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("picker"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Uint,
-                            view_dimension: TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(PickerTarget::value_size() as _),
-                        },
-                        count: None,
-                    },
-                ],
-            })
-        })
-    }
-
     fn screen_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
         static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
         LAYOUT.get_or_init(|| {
@@ -660,10 +606,10 @@ impl GlobalContext {
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Depth,
-                            view_dimension: TextureViewDimension::Cube,
+                            view_dimension: TextureViewDimension::CubeArray,
                             multisampled: false,
                         },
-                        count: NonZeroU32::new(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS as _),
+                        count: None,
                     },
                     BindGroupLayoutEntry {
                         binding: 6,
@@ -728,23 +674,6 @@ impl GlobalContext {
         })
     }
 
-    fn create_picker_bind_group(device: &Device, picker_texture: &AttachmentTexture, picker_buffer: &Buffer<u64>) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label: Some("picker"),
-            layout: Self::picker_bind_group_layout(device),
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(picker_texture.get_texture_view()),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: picker_buffer.as_entire_binding(),
-                },
-            ],
-        })
-    }
-
     fn create_screen_bind_group(
         device: &Device,
         diffuse_buffer_texture: &AttachmentTexture,
@@ -752,7 +681,7 @@ impl GlobalContext {
         water_buffer_texture: &AttachmentTexture,
         depth_buffer_texture: &AttachmentTexture,
         directional_shadow_map_texture: &AttachmentTexture,
-        point_shadow_maps_texture: &[CubeTexture; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS],
+        point_shadow_maps_texture: &CubeArrayTexture,
         interface_buffer_texture: &AttachmentTexture,
         #[cfg(feature = "debug")] picker_buffer_texture: &AttachmentTexture,
     ) -> BindGroup {
@@ -782,14 +711,7 @@ impl GlobalContext {
                 },
                 BindGroupEntry {
                     binding: 5,
-                    resource: BindingResource::TextureViewArray(&[
-                        point_shadow_maps_texture[0].get_texture_view(),
-                        point_shadow_maps_texture[1].get_texture_view(),
-                        point_shadow_maps_texture[2].get_texture_view(),
-                        point_shadow_maps_texture[3].get_texture_view(),
-                        point_shadow_maps_texture[4].get_texture_view(),
-                        point_shadow_maps_texture[5].get_texture_view(),
-                    ]),
+                    resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
                 },
                 BindGroupEntry {
                     binding: 6,
@@ -808,6 +730,7 @@ impl GlobalContext {
 struct ScreenSizeTextures {
     depth_texture: AttachmentTexture,
     picker_buffer_texture: AttachmentTexture,
+    picker_depth_texture: AttachmentTexture,
     diffuse_buffer_texture: AttachmentTexture,
     normal_buffer_texture: AttachmentTexture,
     water_buffer_texture: AttachmentTexture,

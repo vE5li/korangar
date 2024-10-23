@@ -1,3 +1,4 @@
+
 struct GlobalUniforms {
     view_projection: mat4x4<f32>,
     inverse_view_projection: mat4x4<f32>,
@@ -36,7 +37,6 @@ struct VertexOutput {
     @location(3) curvature: f32,
     @location(4) @interpolate(flat) original_depth_offset: f32,
     @location(5) @interpolate(flat) original_curvature: f32,
-    @location(6) texture_index: i32,
 }
 
 struct FragmentOutput {
@@ -48,7 +48,7 @@ struct FragmentOutput {
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
+@group(2) @binding(0) var texture: texture_2d<f32>;
 
 override near_plane: f32;
 
@@ -77,13 +77,12 @@ fn vs_main(
     output.curvature = vertex.curvature_multiplier;
     output.original_depth_offset = instance.depth_offset;
     output.original_curvature = instance.curvature;
-    output.texture_index = instance.texture_index;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-    let diffuse_color = textureSample(textures[input.texture_index], linear_sampler, input.texture_coordinates);
+    let diffuse_color = textureSample(texture, linear_sampler, input.texture_coordinates);
     if (diffuse_color.a != 1.0) {
         discard;
     }

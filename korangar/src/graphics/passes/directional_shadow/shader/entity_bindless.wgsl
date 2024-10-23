@@ -1,7 +1,6 @@
 struct PassUniforms {
     view_projection: mat4x4<f32>,
-    light_position: vec4<f32>,
-    animation_timer: f32
+    animation_timer: f32,
 }
 
 struct InstanceData {
@@ -23,18 +22,18 @@ struct Vertex {
 
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
-    @location(0) world_position: vec4<f32>,
-    @location(1) texture_coordinates: vec2<f32>,
-    @location(2) depth_offset: f32,
-    @location(3) curvature: f32,
-    @location(4) @interpolate(flat) original_depth_offset: f32,
-    @location(5) @interpolate(flat) original_curvature: f32,
+    @location(0) texture_coordinates: vec2<f32>,
+    @location(1) depth_offset: f32,
+    @location(2) curvature: f32,
+    @location(3) @interpolate(flat) original_depth_offset: f32,
+    @location(4) @interpolate(flat) original_curvature: f32,
+    @location(5) texture_index: i32,
 }
 
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
-@group(3) @binding(0) var texture: texture_2d<f32>;
+@group(2) @binding(1) var textures: binding_array<texture_2d<f32>>;
 
 override near_plane: f32;
 
@@ -50,8 +49,7 @@ fn vs_main(
     let vertex = vertex_data(vertex_index);
 
     var output: VertexOutput;
-    output.world_position = instance.world * vec4<f32>(vertex.position, 1.0);
-    output.position = pass_uniforms.view_projection * output.world_position;
+    output.position = pass_uniforms.view_projection * instance.world * vec4<f32>(vertex.position, 1.0);
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
 
     if (instance.mirror != 0u) {
@@ -62,30 +60,29 @@ fn vs_main(
     output.curvature = vertex.curvature_multiplier;
     output.original_depth_offset = instance.depth_offset;
     output.original_curvature = instance.curvature;
+    output.texture_index = instance.texture_index;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
-    let diffuse_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
-
-    let scaled_depth_offset = pow(input.depth_offset, 2.0) * input.original_depth_offset;
-    // let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
-
-    // let linear_z: f32 = nonLinearToLinear(position.z);
-    // // We add the offsets in linear view space.
-    // let adjusted_linear_z: f32 = 2.0 + linear_z - scaled_curvature_offset - scaled_curvature_offset;
-    // let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
-    // let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
-
-    let light_distance = length(input.world_position.xyz - pass_uniforms.light_position.xyz);
-    // return (light_distance / 256) + scaled_depth_offset;
-
+    let diffuse_color = textureSample(textures[input.texture_index], nearest_sampler, input.texture_coordinates);
     if (diffuse_color.a != 1.0) {
         discard;
     }
 
-    return light_distance;
+    let scaled_depth_offset = pow(input.depth_offset, 2.0) * input.original_depth_offset;
+    let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
+
+    let linear_z: f32 = nonLinearToLinear(input.position.z);
+    // We add the offsets in linear view space.
+    let adjusted_linear_z: f32 = 2.0 + linear_z - scaled_curvature_offset - scaled_curvature_offset;
+    let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
+    let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
+
+    return input.position.z;
+    // FIX: we don't even use any of the calculated values here! should it not be:
+    // return clamped_depth;
 }
 
 // Optimized version of the following truth table:

@@ -1,4 +1,4 @@
-use std::num::{NonZeroU32, NonZeroU64};
+use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use bumpalo::Bump;
@@ -8,7 +8,7 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device,
-    Features, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
     RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureView, TextureViewDimension,
     VertexState,
 };
@@ -16,12 +16,17 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::{features_supported, Buffer, GlobalContext, Prepare, RectangleInstruction, RenderInstruction, Texture};
-use crate::MAX_BINDING_TEXTURE_ARRAY_COUNT;
+use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RectangleInstruction, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/rectangle.wgsl");
+const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/rectangle_bindless.wgsl");
 const DRAWER_NAME: &str = "screen rectangle";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
+
+pub(crate) struct ScreenRectangleDrawInstruction<'a> {
+    pub(crate) layer: Layer,
+    pub(crate) instructions: &'a [RectangleInstruction],
+}
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum Layer {
@@ -50,6 +55,7 @@ struct Batch {
 }
 
 pub(crate) struct ScreenRectangleDrawer {
+    bindless_support: bool,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
@@ -63,10 +69,20 @@ pub(crate) struct ScreenRectangleDrawer {
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenRectangleDrawer {
     type Context = ScreenRenderPassContext;
-    type DrawData<'data> = Layer;
+    type DrawData<'data> = ScreenRectangleDrawInstruction<'data>;
 
-    fn new(device: &Device, _queue: &Queue, global_context: &GlobalContext, render_pass_context: &Self::Context) -> Self {
-        let shader_module = device.create_shader_module(SHADER);
+    fn new(
+        capabilities: &Capabilities,
+        device: &Device,
+        _queue: &Queue,
+        global_context: &GlobalContext,
+        render_pass_context: &Self::Context,
+    ) -> Self {
+        let shader_module = if capabilities.supports_bindless() {
+            device.create_shader_module(SHADER_BINDLESS)
+        } else {
+            device.create_shader_module(SHADER)
+        };
 
         let instance_data_buffer = Buffer::with_capacity(
             device,
@@ -75,10 +91,36 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             (size_of::<InstanceData>() * INITIAL_INSTRUCTION_SIZE) as _,
         );
 
-        let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            label: Some(DRAWER_NAME),
-            entries: &[
-                BindGroupLayoutEntry {
+        let bind_group_layout = if capabilities.supports_bindless() {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some(DRAWER_NAME),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::VERTEX_FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(size_of::<InstanceData>() as _),
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: capabilities.get_max_texture_binding_array_count(),
+                    },
+                ],
+            })
+        } else {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some(DRAWER_NAME),
+                entries: &[BindGroupLayoutEntry {
                     binding: 0,
                     visibility: ShaderStages::VERTEX_FRAGMENT,
                     ty: BindingType::Buffer {
@@ -87,35 +129,34 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                         min_binding_size: NonZeroU64::new(size_of::<InstanceData>() as _),
                     },
                     count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: NonZeroU32::new(MAX_BINDING_TEXTURE_ARRAY_COUNT as _),
-                },
-            ],
-        });
+                }],
+            })
+        };
 
-        let mut texture_views = vec![global_context.solid_pixel_texture.get_texture_view()];
+        let bind_group = if capabilities.supports_bindless() {
+            Self::create_bind_group_bindless(device, &bind_group_layout, &instance_data_buffer, &[global_context
+                .solid_pixel_texture
+                .get_texture_view()])
+        } else {
+            Self::create_bind_group(device, &bind_group_layout, &instance_data_buffer)
+        };
 
-        if !features_supported(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
-            for _ in 0..MAX_BINDING_TEXTURE_ARRAY_COUNT.saturating_sub(texture_views.len()) {
-                texture_views.push(texture_views[0]);
-            }
-        }
+        let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
-        let bind_group = Self::create_bind_group(device, &bind_group_layout, &instance_data_buffer, &texture_views);
-
-        let bind_group_layouts = Self::Context::bind_group_layout(device);
+        let bind_group_layouts: &[&BindGroupLayout] = if capabilities.supports_bindless() {
+            &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout]
+        } else {
+            &[
+                pass_bind_group_layouts[0],
+                pass_bind_group_layouts[1],
+                &bind_group_layout,
+                Texture::bind_group_layout(device),
+            ]
+        };
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[bind_group_layouts[0], bind_group_layouts[1], &bind_group_layout],
+            bind_group_layouts,
             push_constant_ranges: &[],
         });
 
@@ -146,6 +187,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         });
 
         Self {
+            bindless_support: capabilities.supports_bindless(),
             solid_pixel_texture: global_context.solid_pixel_texture.clone(),
             instance_data_buffer,
             bind_group_layout,
@@ -159,7 +201,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        let batch = self.layer_batches[draw_data as usize];
+        let batch = self.layer_batches[draw_data.layer as usize];
 
         if batch.count == 0 {
             return;
@@ -170,7 +212,25 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);
-        pass.draw(0..6, offset..end);
+
+        if self.bindless_support {
+            pass.draw(0..6, offset..end);
+        } else {
+            let mut current_texture_id = self.solid_pixel_texture.get_id();
+            pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
+
+            for (index, instruction) in draw_data.instructions.iter().enumerate() {
+                if let RectangleInstruction::Sprite { texture, .. } = instruction
+                    && texture.get_id() != current_texture_id
+                {
+                    current_texture_id = texture.get_id();
+                    pass.set_bind_group(3, texture.get_bind_group(), &[]);
+                }
+                let index = offset + index as u32;
+
+                pass.draw(0..6, index..index + 1);
+            }
+        }
     }
 }
 
@@ -185,90 +245,147 @@ impl Prepare for ScreenRectangleDrawer {
         }
 
         self.instance_data.clear();
-        self.bump.reset();
-        self.lookup.clear();
 
-        let mut texture_views = Vec::with_capacity_in(draw_count, &self.bump);
+        if self.bindless_support {
+            self.bump.reset();
+            self.lookup.clear();
 
-        let mut offset = 0;
+            let mut texture_views = Vec::with_capacity_in(draw_count, &self.bump);
 
-        for (batch_index, batch) in [
-            instructions.bottom_layer_rectangles,
-            instructions.middle_layer_rectangles,
-            instructions.top_layer_rectangles,
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            let count = batch.len();
-            self.layer_batches[batch_index] = Batch { offset, count };
-            offset += count;
+            let mut offset = 0;
 
-            for instruction in batch.iter() {
-                match instruction {
-                    RectangleInstruction::Solid {
-                        screen_position,
-                        screen_size,
-                        color,
-                    } => {
-                        self.instance_data.push(InstanceData {
-                            color: color.components_linear(),
-                            screen_position: (*screen_position).into(),
-                            screen_size: (*screen_size).into(),
-                            texture_position: [0.0; 2],
-                            texture_size: [0.0; 2],
-                            texture_index: 0,
-                            linear_filtering: 0,
-                            padding: Default::default(),
-                        });
-                    }
-                    RectangleInstruction::Sprite {
-                        screen_position,
-                        screen_size,
-                        color,
-                        texture_position,
-                        texture_size,
-                        linear_filtering,
-                        texture,
-                    } => {
-                        let mut texture_index = (texture_views.len() + 1) as i32;
-                        let id = texture.get_texture().global_id().inner();
-                        let potential_index = self.lookup.get(&id);
+            for (batch_index, batch) in [
+                instructions.bottom_layer_rectangles,
+                instructions.middle_layer_rectangles,
+                instructions.top_layer_rectangles,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let count = batch.len();
+                self.layer_batches[batch_index] = Batch { offset, count };
+                offset += count;
 
-                        if let Some(potential_index) = potential_index {
-                            texture_index = *potential_index;
-                        } else {
-                            self.lookup.insert(id, texture_index);
-                            texture_views.push(texture.get_texture_view());
+                for instruction in batch.iter() {
+                    match instruction {
+                        RectangleInstruction::Solid {
+                            screen_position,
+                            screen_size,
+                            color,
+                        } => {
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: [0.0; 2],
+                                texture_size: [0.0; 2],
+                                texture_index: -1,
+                                linear_filtering: 0,
+                                padding: Default::default(),
+                            });
                         }
+                        RectangleInstruction::Sprite {
+                            screen_position,
+                            screen_size,
+                            color,
+                            texture_position,
+                            texture_size,
+                            linear_filtering,
+                            texture,
+                        } => {
+                            let mut texture_index = texture_views.len() as i32;
+                            let id = texture.get_id();
+                            let potential_index = self.lookup.get(&id);
 
-                        self.instance_data.push(InstanceData {
-                            color: color.components_linear(),
-                            screen_position: (*screen_position).into(),
-                            screen_size: (*screen_size).into(),
-                            texture_position: (*texture_position).into(),
-                            texture_size: (*texture_size).into(),
-                            texture_index,
-                            linear_filtering: *linear_filtering as u32,
-                            padding: Default::default(),
-                        });
+                            if let Some(potential_index) = potential_index {
+                                texture_index = *potential_index;
+                            } else {
+                                self.lookup.insert(id, texture_index);
+                                texture_views.push(texture.get_texture_view());
+                            }
+
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: (*texture_position).into(),
+                                texture_size: (*texture_size).into(),
+                                texture_index,
+                                linear_filtering: *linear_filtering as u32,
+                                padding: Default::default(),
+                            });
+                        }
                     }
                 }
             }
-        }
 
-        if texture_views.is_empty() {
-            texture_views.push(self.solid_pixel_texture.get_texture_view());
-        }
+            if texture_views.is_empty() {
+                texture_views.push(self.solid_pixel_texture.get_texture_view());
+            }
 
-        if !features_supported(Features::PARTIALLY_BOUND_BINDING_ARRAY) {
-            for _ in 0..MAX_BINDING_TEXTURE_ARRAY_COUNT.saturating_sub(texture_views.len()) {
-                texture_views.push(texture_views[0]);
+            self.instance_data_buffer.reserve(device, self.instance_data.len());
+            self.bind_group = Self::create_bind_group_bindless(device, &self.bind_group_layout, &self.instance_data_buffer, &texture_views);
+        } else {
+            let mut offset = 0;
+
+            for (batch_index, batch) in [
+                instructions.bottom_layer_rectangles,
+                instructions.middle_layer_rectangles,
+                instructions.top_layer_rectangles,
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let count = batch.len();
+                self.layer_batches[batch_index] = Batch { offset, count };
+                offset += count;
+
+                for instruction in batch.iter() {
+                    match instruction {
+                        RectangleInstruction::Solid {
+                            screen_position,
+                            screen_size,
+                            color,
+                        } => {
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: [0.0; 2],
+                                texture_size: [0.0; 2],
+                                texture_index: -1,
+                                linear_filtering: 0,
+                                padding: Default::default(),
+                            });
+                        }
+                        RectangleInstruction::Sprite {
+                            screen_position,
+                            screen_size,
+                            color,
+                            texture_position,
+                            texture_size,
+                            linear_filtering,
+                            texture: _,
+                        } => {
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: (*texture_position).into(),
+                                texture_size: (*texture_size).into(),
+                                texture_index: 0,
+                                linear_filtering: *linear_filtering as u32,
+                                padding: Default::default(),
+                            });
+                        }
+                    }
+                }
+            }
+
+            if self.instance_data_buffer.reserve(device, self.instance_data.len()) {
+                self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, &self.instance_data_buffer);
             }
         }
-
-        self.instance_data_buffer.reserve(device, self.instance_data.len());
-        self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, &self.instance_data_buffer, &texture_views);
     }
 
     fn upload(&mut self, device: &Device, staging_belt: &mut StagingBelt, command_encoder: &mut CommandEncoder) {
@@ -278,7 +395,7 @@ impl Prepare for ScreenRectangleDrawer {
 }
 
 impl ScreenRectangleDrawer {
-    fn create_bind_group(
+    fn create_bind_group_bindless(
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
@@ -297,6 +414,17 @@ impl ScreenRectangleDrawer {
                     resource: BindingResource::TextureViewArray(texture_views),
                 },
             ],
+        })
+    }
+
+    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, instance_data_buffer: &Buffer<InstanceData>) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+            label: Some(DRAWER_NAME),
+            layout: bind_group_layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: instance_data_buffer.as_entire_binding(),
+            }],
         })
     }
 }

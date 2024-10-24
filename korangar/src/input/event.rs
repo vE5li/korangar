@@ -130,6 +130,9 @@ pub enum UserEvent {
     CameraAccelerate,
     #[cfg(feature = "debug")]
     CameraDecelerate,
+    // TODO: NHA Remove once Forward+ experiment is over.
+    #[cfg(feature = "debug")]
+    ChangeRenderMethod,
 }
 
 impl ElementEvent<InterfaceSettings> for UserEvent {

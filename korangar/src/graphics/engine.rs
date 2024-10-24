@@ -31,6 +31,12 @@ pub struct GraphicsEngineDescriptor {
     pub picker_value: Arc<AtomicU64>,
 }
 
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+enum RenderType {
+    Deferred,
+    Forward,
+}
+
 /// Bind Group layout:
 ///
 /// The safe default limit for bound bind-groups is 4.
@@ -62,6 +68,7 @@ pub struct GraphicsEngine {
     texture_loader: Arc<TextureLoader>,
     engine_context: Option<EngineContext>,
     picker_value: Arc<AtomicU64>,
+    render_type: RenderType,
 }
 
 struct EngineContext {
@@ -73,6 +80,8 @@ struct EngineContext {
     point_shadow_pass_context: PointShadowRenderPassContext,
     geometry_pass_context: GeometryRenderPassContext,
     screen_pass_context: ScreenRenderPassContext,
+
+    forward_pass_context: ForwardRenderPassContext,
 
     interface_rectangle_drawer: InterfaceRectangleDrawer,
     picker_entity_drawer: PickerEntityDrawer,
@@ -103,6 +112,18 @@ struct EngineContext {
     screen_circle_drawer: ScreenCircleDrawer,
     #[cfg(feature = "debug")]
     screen_buffer_drawer: ScreenBufferDrawer,
+
+    forward_effect_drawer: ForwardEffectDrawer,
+    forward_entity_drawer: ForwardEntityDrawer,
+    forward_indicator_drawer: ForwardIndicatorDrawer,
+    forward_model_drawer: ForwardModelDrawer,
+    forward_overlay_drawer: ForwardOverlayDrawer,
+    forward_rectangle_drawer: ForwardRectangleDrawer,
+    forward_water_drawer: ForwardWaterDrawer,
+    #[cfg(feature = "debug")]
+    forward_aabb_drawer: ForwardAabbDrawer,
+    #[cfg(feature = "debug")]
+    forward_circle_drawer: ForwardCircleDrawer,
 }
 
 impl GraphicsEngine {
@@ -121,7 +142,17 @@ impl GraphicsEngine {
             texture_loader: descriptor.texture_loader,
             engine_context: None,
             picker_value: descriptor.picker_value,
+            render_type: RenderType::Deferred,
         }
+    }
+
+    // TODO: NHA remove once Forward+ experiment is over.
+    pub fn on_change_render_method(&mut self) {
+        match self.render_type {
+            RenderType::Deferred => self.render_type = RenderType::Forward,
+            RenderType::Forward => self.render_type = RenderType::Deferred,
+        }
+        dbg!(self.render_type);
     }
 
     pub fn on_resume(&mut self, window: Arc<Window>, shadow_detail: ShadowDetail, texture_sampler_type: TextureSamplerType) {
@@ -167,6 +198,9 @@ impl GraphicsEngine {
                             GeometryRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let screen_pass_context =
                             ScreenRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+
+                        let forward_pass_context =
+                            ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                     });
 
                     time_phase!("create computer and drawer", {
@@ -343,6 +377,72 @@ impl GraphicsEngine {
                             &global_context,
                             &screen_pass_context,
                         );
+
+                        let forward_effect_drawer = ForwardEffectDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        let forward_entity_drawer = ForwardEntityDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        let forward_indicator_drawer = ForwardIndicatorDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        let forward_model_drawer = ForwardModelDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        let forward_overlay_drawer = ForwardOverlayDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        let forward_rectangle_drawer = ForwardRectangleDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        let forward_water_drawer = ForwardWaterDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        #[cfg(feature = "debug")]
+                        let forward_aabb_drawer = ForwardAabbDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
+                        #[cfg(feature = "debug")]
+                        let forward_circle_drawer = ForwardCircleDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &forward_pass_context,
+                        );
                     });
 
                     self.engine_context = Some(EngineContext {
@@ -353,6 +453,7 @@ impl GraphicsEngine {
                         point_shadow_pass_context,
                         geometry_pass_context,
                         screen_pass_context,
+                        forward_pass_context,
                         interface_rectangle_drawer,
                         picker_entity_drawer,
                         picker_tile_drawer,
@@ -381,6 +482,17 @@ impl GraphicsEngine {
                         screen_circle_drawer,
                         #[cfg(feature = "debug")]
                         screen_buffer_drawer,
+                        forward_effect_drawer,
+                        forward_entity_drawer,
+                        forward_indicator_drawer,
+                        forward_model_drawer,
+                        forward_overlay_drawer,
+                        forward_rectangle_drawer,
+                        forward_water_drawer,
+                        #[cfg(feature = "debug")]
+                        forward_aabb_drawer,
+                        #[cfg(feature = "debug")]
+                        forward_circle_drawer,
                     })
                 }
 
@@ -549,6 +661,8 @@ impl GraphicsEngine {
             scope.spawn(|_| {
                 context.geometry_entity_drawer.prepare(&self.device, instruction);
                 context.geometry_model_drawer.prepare(&self.device, instruction);
+                context.forward_entity_drawer.prepare(&self.device, instruction);
+                context.forward_model_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
                 context.interface_rectangle_drawer.prepare(&self.device, instruction);
@@ -560,20 +674,24 @@ impl GraphicsEngine {
             scope.spawn(|_| {
                 context.screen_directional_light_drawer.prepare(&self.device, instruction);
                 context.screen_effect_drawer.prepare(&self.device, instruction);
+                context.forward_effect_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
                 context.screen_point_light_drawer.prepare(&self.device, instruction);
                 context.screen_rectangle_drawer.prepare(&self.device, instruction);
+                context.forward_rectangle_drawer.prepare(&self.device, instruction);
             });
             #[cfg(feature = "debug")]
             scope.spawn(|_| {
                 context.picker_marker_drawer.prepare(&self.device, instruction);
                 context.screen_aabb_drawer.prepare(&self.device, instruction);
+                context.forward_aabb_drawer.prepare(&self.device, instruction);
             });
             #[cfg(feature = "debug")]
             scope.spawn(|_| {
                 context.screen_buffer_drawer.prepare(&self.device, instruction);
                 context.screen_circle_drawer.prepare(&self.device, instruction);
+                context.forward_circle_drawer.prepare(&self.device, instruction);
             });
 
             context.global_context.prepare(&self.device, instruction);
@@ -605,6 +723,10 @@ impl GraphicsEngine {
         visitor.upload(&mut context.screen_effect_drawer);
         visitor.upload(&mut context.screen_point_light_drawer);
         visitor.upload(&mut context.screen_rectangle_drawer);
+        visitor.upload(&mut context.forward_effect_drawer);
+        visitor.upload(&mut context.forward_entity_drawer);
+        visitor.upload(&mut context.forward_model_drawer);
+        visitor.upload(&mut context.forward_rectangle_drawer);
 
         #[cfg(feature = "debug")]
         {
@@ -612,6 +734,8 @@ impl GraphicsEngine {
             visitor.upload(&mut context.screen_aabb_drawer);
             visitor.upload(&mut context.screen_buffer_drawer);
             visitor.upload(&mut context.screen_circle_drawer);
+            visitor.upload(&mut context.forward_aabb_drawer);
+            visitor.upload(&mut context.forward_circle_drawer);
         }
 
         encoder.finish()
@@ -639,6 +763,7 @@ impl GraphicsEngine {
         let mut interface_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut directional_shadow_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut point_shadow_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+        // TODO: NHA rename if we use forward+ instead.
         let mut geometry_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut screen_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
@@ -766,14 +891,98 @@ impl GraphicsEngine {
                 });
             });
 
-            // Geometry Pass
-            scope.spawn(|_| {
-                let mut render_pass = engine_context.geometry_pass_context.create_pass(
-                    frame_view,
-                    &mut geometry_encoder,
-                    &engine_context.global_context,
-                    None,
-                );
+            if self.render_type == RenderType::Deferred {
+                // Geometry Pass
+                scope.spawn(|_| {
+                    let mut render_pass = engine_context.geometry_pass_context.create_pass(
+                        frame_view,
+                        &mut geometry_encoder,
+                        &engine_context.global_context,
+                        None,
+                    );
+
+                    let draw_data = ModelBatchDrawData {
+                        batches: instruction.model_batches,
+                        instructions: instruction.models,
+                        #[cfg(feature = "debug")]
+                        show_wireframe: instruction.render_settings.show_wireframe,
+                    };
+
+                    engine_context.geometry_model_drawer.draw(&mut render_pass, draw_data);
+                    engine_context
+                        .geometry_indicator_drawer
+                        .draw(&mut render_pass, instruction.indicator.as_ref());
+                    engine_context.geometry_entity_drawer.draw(&mut render_pass, instruction.entities);
+
+                    if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
+                        engine_context.geometry_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
+                    }
+                });
+
+                // Screen Pass
+                let mut render_pass =
+                    engine_context
+                        .screen_pass_context
+                        .create_pass(frame_view, &mut screen_encoder, &engine_context.global_context, None);
+
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light))]
+                engine_context.screen_ambient_light_drawer.draw(&mut render_pass, None);
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light))]
+                engine_context.screen_directional_light_drawer.draw(&mut render_pass, None);
+                #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
+                engine_context.screen_point_light_drawer.draw(&mut render_pass, None);
+                engine_context.screen_water_light_drawer.draw(&mut render_pass, None);
+
+                #[cfg(feature = "debug")]
+                {
+                    engine_context.screen_aabb_drawer.draw(&mut render_pass, None);
+                    engine_context.screen_circle_drawer.draw(&mut render_pass, None);
+                }
+
+                let rectangle_data = ScreenRectangleDrawInstruction {
+                    layer: Layer::Bottom,
+                    instructions: instruction.bottom_layer_rectangles,
+                };
+
+                engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+                engine_context.screen_effect_drawer.draw(&mut render_pass, instruction.effects);
+
+                #[cfg(feature = "debug")]
+                {
+                    engine_context
+                        .screen_buffer_drawer
+                        .draw(&mut render_pass, &instruction.render_settings);
+                }
+
+                let rectangle_data = ScreenRectangleDrawInstruction {
+                    layer: Layer::Middle,
+                    instructions: instruction.middle_layer_rectangles,
+                };
+
+                engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+
+                #[cfg(feature = "debug")]
+                {
+                    #[cfg(feature = "debug")]
+                    engine_context.screen_aabb_drawer.draw(&mut render_pass, None);
+                }
+
+                if instruction.show_interface {
+                    engine_context.screen_overlay_drawer.draw(&mut render_pass, None);
+                }
+
+                let rectangle_data = ScreenRectangleDrawInstruction {
+                    layer: Layer::Top,
+                    instructions: instruction.top_layer_rectangles,
+                };
+
+                engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+            } else {
+                // Forward Pass
+                let mut render_pass =
+                    engine_context
+                        .forward_pass_context
+                        .create_pass(frame_view, &mut screen_encoder, &engine_context.global_context, None);
 
                 let draw_data = ModelBatchDrawData {
                     batches: instruction.model_batches,
@@ -782,75 +991,48 @@ impl GraphicsEngine {
                     show_wireframe: instruction.render_settings.show_wireframe,
                 };
 
-                engine_context.geometry_model_drawer.draw(&mut render_pass, draw_data);
+                engine_context.forward_model_drawer.draw(&mut render_pass, draw_data);
+
                 engine_context
-                    .geometry_indicator_drawer
+                    .forward_indicator_drawer
                     .draw(&mut render_pass, instruction.indicator.as_ref());
-                engine_context.geometry_entity_drawer.draw(&mut render_pass, instruction.entities);
+
+                engine_context.forward_entity_drawer.draw(&mut render_pass, instruction.entities);
 
                 if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
-                    engine_context.geometry_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
+                    engine_context.forward_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
                 }
-            });
 
-            // Screen Pass
-            let mut render_pass =
-                engine_context
-                    .screen_pass_context
-                    .create_pass(frame_view, &mut screen_encoder, &engine_context.global_context, None);
-
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light))]
-            engine_context.screen_ambient_light_drawer.draw(&mut render_pass, None);
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light))]
-            engine_context.screen_directional_light_drawer.draw(&mut render_pass, None);
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
-            engine_context.screen_point_light_drawer.draw(&mut render_pass, None);
-            engine_context.screen_water_light_drawer.draw(&mut render_pass, None);
-
-            #[cfg(feature = "debug")]
-            {
-                engine_context.screen_aabb_drawer.draw(&mut render_pass, None);
-                engine_context.screen_circle_drawer.draw(&mut render_pass, None);
-            }
-
-            let rectangle_data = ScreenRectangleDrawInstruction {
-                layer: Layer::Bottom,
-                instructions: instruction.bottom_layer_rectangles,
-            };
-
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
-            engine_context.screen_effect_drawer.draw(&mut render_pass, instruction.effects);
-
-            #[cfg(feature = "debug")]
-            {
-                engine_context
-                    .screen_buffer_drawer
-                    .draw(&mut render_pass, &instruction.render_settings);
-            }
-
-            let rectangle_data = ScreenRectangleDrawInstruction {
-                layer: Layer::Middle,
-                instructions: instruction.middle_layer_rectangles,
-            };
-
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
-
-            #[cfg(feature = "debug")]
-            {
                 #[cfg(feature = "debug")]
-                engine_context.screen_aabb_drawer.draw(&mut render_pass, None);
+                {
+                    engine_context.forward_aabb_drawer.draw(&mut render_pass, None);
+                    engine_context.forward_circle_drawer.draw(&mut render_pass, None);
+                }
+
+                let rectangle_data = ForwardRectangleDrawInstruction {
+                    layer: ForwardRectangleLayer::Bottom,
+                    instructions: instruction.bottom_layer_rectangles,
+                };
+                engine_context.forward_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+
+                engine_context.forward_effect_drawer.draw(&mut render_pass, instruction.effects);
+
+                let rectangle_data = ForwardRectangleDrawInstruction {
+                    layer: ForwardRectangleLayer::Middle,
+                    instructions: instruction.middle_layer_rectangles,
+                };
+                engine_context.forward_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+
+                if instruction.show_interface {
+                    engine_context.forward_overlay_drawer.draw(&mut render_pass, None);
+                }
+
+                let rectangle_data = ForwardRectangleDrawInstruction {
+                    layer: ForwardRectangleLayer::Top,
+                    instructions: instruction.top_layer_rectangles,
+                };
+                engine_context.forward_rectangle_drawer.draw(&mut render_pass, rectangle_data);
             }
-
-            if instruction.show_interface {
-                engine_context.screen_overlay_drawer.draw(&mut render_pass, None);
-            }
-
-            let rectangle_data = ScreenRectangleDrawInstruction {
-                layer: Layer::Top,
-                instructions: instruction.top_layer_rectangles,
-            };
-
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
         });
 
         (

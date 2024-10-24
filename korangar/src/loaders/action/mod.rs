@@ -79,8 +79,8 @@ impl AnimationState {
 
 #[derive(Debug, PrototypeElement)]
 pub struct Actions {
-    actions: Vec<Action>,
-    delays: Vec<f32>,
+    pub actions: Vec<Action>,
+    pub delays: Vec<f32>,
     #[cfg(feature = "debug")]
     actions_data: ActionsData,
 }

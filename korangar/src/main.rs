@@ -160,6 +160,7 @@ struct Client {
     script_loader: ScriptLoader,
     action_loader: ActionLoader,
     effect_loader: EffectLoader,
+    animation_loader: AnimationLoader,
 
     interface_renderer: InterfaceRenderer,
     bottom_interface_renderer: GameInterfaceRenderer,
@@ -338,6 +339,7 @@ impl Client {
             let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
             let mut action_loader = ActionLoader::new(game_file_loader.clone());
             let effect_loader = EffectLoader::new(game_file_loader.clone());
+            let animation_loader = AnimationLoader::new(device.clone(), queue.clone());
 
             let script_loader = ScriptLoader::new(&game_file_loader).unwrap_or_else(|_| {
                 // The scrip loader not being created correctly means that the lua files were
@@ -542,6 +544,7 @@ impl Client {
             script_loader,
             action_loader,
             effect_loader,
+            animation_loader,
             interface_renderer,
             bottom_interface_renderer,
             middle_interface_renderer,
@@ -892,6 +895,7 @@ impl Client {
                     let player = Player::new(
                         &mut self.sprite_loader,
                         &mut self.action_loader,
+                        &mut self.animation_loader,
                         &self.script_loader,
                         &self.map,
                         saved_login_data.account_id,
@@ -958,6 +962,7 @@ impl Client {
                     let npc = Npc::new(
                         &mut self.sprite_loader,
                         &mut self.action_loader,
+                        &mut self.animation_loader,
                         &self.script_loader,
                         &self.map,
                         entity_appeared_data,
@@ -1142,7 +1147,12 @@ impl Client {
                     // request a full list of items and the hotbar.
 
                     entity.set_job(job_id as usize);
-                    entity.reload_sprite(&mut self.sprite_loader, &mut self.action_loader, &self.script_loader);
+                    entity.reload_sprite(
+                        &mut self.sprite_loader,
+                        &mut self.action_loader,
+                        &mut self.animation_loader,
+                        &self.script_loader,
+                    );
                 }
                 NetworkEvent::LoggedOut => {
                     self.networking_system.disconnect_from_map_server();

@@ -32,6 +32,7 @@ ron = { workspace = true }
 rusttype = { workspace = true, features = ["gpu_cache"] }
 serde = { workspace = true }
 serde-xml-rs = { workspace = true }
+spin_sleep = { workspace = true }
 walkdir = { workspace = true }
 wgpu = { workspace = true }
 winit = { workspace = true }

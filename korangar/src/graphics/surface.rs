@@ -41,20 +41,23 @@ pub struct Surface {
     surface: wgpu::Surface<'static>,
     config: SurfaceConfiguration,
     present_mode_info: PresentModeInfo,
-    frame_number: usize,
-    max_frame_count: usize,
-    window_width: u32,
-    window_height: u32,
     invalid: bool,
 }
 
 impl Surface {
-    pub fn new(adapter: &Adapter, device: Arc<Device>, surface: wgpu::Surface<'static>, window_width: u32, window_height: u32) -> Self {
+    pub fn new(
+        adapter: &Adapter,
+        device: Arc<Device>,
+        surface: wgpu::Surface<'static>,
+        window_width: u32,
+        window_height: u32,
+        triple_buffering: bool,
+        vsync: bool,
+    ) -> Self {
         let window_width = window_width.max(1);
         let window_height = window_height.max(1);
 
         let mut config = surface.get_default_config(adapter, window_width, window_height).unwrap();
-        let recreate = false;
 
         let surfaces_formats: Vec<TextureFormat> = surface.get_capabilities(adapter).formats;
 
@@ -66,42 +69,41 @@ impl Surface {
             }
         }
 
+        let present_mode_info = PresentModeInfo::from_adapter(adapter, &surface);
         let srgb_formats: Vec<TextureFormat> = surfaces_formats.iter().copied().filter(|format| format.is_srgb()).collect();
         let srgb_format = *srgb_formats.first().expect("Surface does not support sRGB");
 
-        // TODO: NHA make the frame latency configurable.
-        config.desired_maximum_frame_latency = 2;
         config.format = srgb_format;
         config.view_formats.push(srgb_format);
-
-        // Fifo is supported on all platforms.
-        let present_mode_info = PresentModeInfo::from_adapter(adapter, &surface);
-        config.present_mode = PresentMode::Fifo;
+        config.desired_maximum_frame_latency = match triple_buffering {
+            true => 2,
+            false => 1,
+        };
+        config.present_mode = match vsync {
+            false if present_mode_info.supports_mailbox => PresentMode::Mailbox,
+            false if present_mode_info.supports_immediate => PresentMode::Immediate,
+            _ => PresentMode::Fifo,
+        };
 
         #[cfg(feature = "debug")]
-        print_debug!("Surface format is {:?}", config.format);
+        {
+            print_debug!("Surface present mode is {:?}", config.present_mode.magenta());
+            print_debug!("Surface format is {:?}", config.format);
+        }
 
         surface.configure(&device, &config);
-
-        let max_frame_count = config.desired_maximum_frame_latency as usize;
 
         Self {
             device,
             surface,
             config,
             present_mode_info,
-            frame_number: 0,
-            max_frame_count,
-            window_width,
-            window_height,
-            invalid: recreate,
+            invalid: false,
         }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn acquire(&mut self) -> (usize, SurfaceTexture) {
-        self.frame_number = (self.frame_number + 1) % (self.max_frame_count - 1);
-
+    pub fn acquire(&mut self) -> SurfaceTexture {
         let frame = match self.surface.get_current_texture() {
             Ok(frame) => frame,
             // On timeout, we will just try again.
@@ -126,7 +128,7 @@ impl Surface {
             self.invalid = true;
         }
 
-        (self.frame_number, frame)
+        frame
     }
 
     pub fn invalidate(&mut self) {
@@ -140,13 +142,11 @@ impl Surface {
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn reconfigure(&mut self) {
         self.invalid = false;
-        self.config.width = self.window_width;
-        self.config.height = self.window_height;
         self.surface.configure(&self.device, &self.config);
     }
 
-    pub fn set_frame_limit(&mut self, limited: bool) {
-        self.config.present_mode = match limited {
+    pub fn set_vsync(&mut self, enabled: bool) {
+        self.config.present_mode = match enabled {
             false if self.present_mode_info.supports_mailbox => PresentMode::Mailbox,
             false if self.present_mode_info.supports_immediate => PresentMode::Immediate,
             _ => PresentMode::Fifo,
@@ -158,17 +158,17 @@ impl Surface {
         self.invalidate();
     }
 
-    pub fn update_window_size(&mut self, window_size: ScreenSize) {
-        self.window_width = window_size.width as u32;
-        self.window_height = window_size.height as u32;
-        self.invalidate();
+    pub fn set_triple_buffering(&mut self, enabled: bool) {
+        self.config.desired_maximum_frame_latency = match enabled {
+            true => 2,
+            false => 1,
+        };
     }
 
-    pub fn window_size(&self) -> Vector2<usize> {
-        Vector2 {
-            x: self.window_width as usize,
-            y: self.window_height as usize,
-        }
+    pub fn update_window_size(&mut self, window_size: ScreenSize) {
+        self.config.width = window_size.width as u32;
+        self.config.height = window_size.height as u32;
+        self.invalidate();
     }
 
     pub fn present_mode_info(&self) -> PresentModeInfo {
@@ -179,10 +179,17 @@ impl Surface {
         self.config.format
     }
 
+    pub fn window_size(&self) -> Vector2<usize> {
+        Vector2 {
+            x: self.config.width as usize,
+            y: self.config.height as usize,
+        }
+    }
+
     pub fn window_screen_size(&self) -> ScreenSize {
         ScreenSize {
-            width: self.window_width as f32,
-            height: self.window_height as f32,
+            width: self.config.width as f32,
+            height: self.config.height as f32,
         }
     }
 }

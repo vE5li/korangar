@@ -29,9 +29,13 @@ struct PointLight {
 
 struct InstanceData {
     world: mat4x4<f32>,
+    frame_part_transform: mat4x4<f32>,
     texture_position: vec2<f32>,
     texture_size: vec2<f32>,
+    color: vec4<f32>,
+    extra_depth_offset: f32,
     depth_offset: f32,
+    angle: f32,
     curvature: f32,
     mirror: u32,
     texture_index: i32,
@@ -57,6 +61,8 @@ struct VertexOutput {
     @location(4) curvature: f32,
     @location(5) @interpolate(flat) original_depth_offset: f32,
     @location(6) @interpolate(flat) original_curvature: f32,
+    @location(7) angle: f32,
+    @location(8) color: vec4<f32>,
 }
 
 struct FragmentOutput {
@@ -67,7 +73,9 @@ struct FragmentOutput {
 const TILE_SIZE: u32 = 16;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
+@group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
+@group(0) @binding(3) var texture_sampler: sampler;
 @group(1) @binding(0) var<uniform> directional_light: DirectionalLightUniforms;
 @group(1) @binding(1) var shadow_map: texture_depth_2d;
 @group(1) @binding(2) var<storage, read> point_lights: array<PointLight>;
@@ -84,9 +92,10 @@ fn vs_main(
 ) -> VertexOutput {
     let instance = instance_data[instance_index];
     let vertex = vertex_data(vertex_index);
+    let frame_part_vertex = instance.frame_part_transform * vec4<f32>(vertex.position, 1.0);
+    let world_position = instance.world * frame_part_vertex;
 
     var output: VertexOutput;
-    let world_position = instance.world * vec4<f32>(vertex.position, 1.0);
     output.world_position = world_position;
     output.position = global_uniforms.view_projection * world_position;
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
@@ -97,16 +106,35 @@ fn vs_main(
 
     let rotated = rotateY(vec3<f32>(global_uniforms.view[2].x, 0, global_uniforms.view[2].z), vertex.position.x);
     output.normal = vec3<f32>(-rotated.x, rotated.y, rotated.z);
-    output.depth_offset = vertex.depth_multiplier;
-    output.curvature = vertex.curvature_multiplier;
+
+    // The depth multiplier and curvature multiplier is derived from the truth table of vertex_data
+    // Because we have to transform the vertex of the frame part, we can't use the depth and curvature
+    // directly and are using the fact, that y/depth and x/curvature correlate to each other.
+    // An offset is also added for frame parts not stay at the same depth.
+    output.depth_offset = frame_part_vertex.y / 2.0 + instance.extra_depth_offset;
+    output.curvature = frame_part_vertex.x;
+
     output.original_depth_offset = instance.depth_offset;
     output.original_curvature = instance.curvature;
+    output.angle = instance.angle;
+    output.color = instance.color;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-    let diffuse_color = textureSample(texture, linear_sampler, input.texture_coordinates);
+    // Apply the rotation from action
+    let sin_factor = sin(input.angle);
+    let cos_factor = cos(input.angle);
+    let rotate = vec2(input.texture_coordinates.x - 0.5, input.texture_coordinates.y - 0.5) * mat2x2(cos_factor, sin_factor, -sin_factor, cos_factor);
+    let texture_coordinates = vec2(clamp(rotate.x + 0.5, 0.0, 1.0), clamp(rotate.y + 0.5, 0.0, 1.0));
+
+    let diffuse_color = textureSample(texture, texture_sampler, texture_coordinates);
+    let alpha_channel = textureSample(texture, nearest_sampler, texture_coordinates).a;
+
+    if (alpha_channel == 0.0) {
+        discard;
+    }
 
     // Calculate which tile this fragment belongs to
     let pixel_position = vec2<u32>(floor(input.position.xy));
@@ -118,7 +146,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     // Get the number of lights affecting this tile
     let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
 
-    if (diffuse_color.a != 1.0) {
+    if (diffuse_color.a == 0.0) {
         discard;
     }
 
@@ -136,8 +164,13 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let clip_position = global_uniforms.view_projection * adjusted_world_position;
     let clamped_depth = clamp(clip_position.z / clip_position.w, 0.0, 1.0);
 
+
+    // Apply the color multiplier from the action
+    var base_color = diffuse_color.rgb * input.color.rgb;
+    var final_alpha = diffuse_color.a * input.color.a;
+
     // Ambient light
-    var final_color = diffuse_color.rgb * global_uniforms.ambient_color.rgb;
+    var final_color = base_color * global_uniforms.ambient_color.rgb;
 
     // Directional light
     let light_direction = normalize(-directional_light.direction.xyz);
@@ -153,7 +186,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let shadow_map_depth = textureSample(shadow_map, linear_sampler, uv);
     let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
 
-    final_color += clamped_light * directional_light.color.rgb * diffuse_color.rgb * visibility;
+    final_color += clamped_light * directional_light.color.rgb * base_color * visibility;
 
     // Point lights
     for (var index = 0u; index < light_count; index++) {
@@ -177,7 +210,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     }
 
     var output: FragmentOutput;
-    output.fragment_color = vec4<f32>(final_color, 1.0);
+    output.fragment_color = vec4<f32>(final_color, final_alpha);
     output.frag_depth = clamped_depth;
     return output;
 }
@@ -221,8 +254,8 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     let z = 1.0;
     let u = f32(1 - case0);
     let v = f32(1 - case1);
-    let depth = f32(case1);
-    let curve = u * 2.0 - 1.0;
+    let depth = y / 2.0;
+    let curve = x;
 
     return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v), depth, curve);
 }

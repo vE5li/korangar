@@ -7,10 +7,10 @@ use hashbrown::HashMap;
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, CompareFunction,
-    DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    ShaderStages, StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    BindingResource, BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder,
+    CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -27,12 +27,17 @@ const INITIAL_INSTRUCTION_SIZE: usize = 256;
 #[repr(C)]
 pub(crate) struct InstanceData {
     world: [[f32; 4]; 4],
+    frame_part_transform: [[f32; 4]; 4],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
+    color: [f32; 4],
+    extra_depth_offset: f32,
     depth_offset: f32,
+    angle: f32,
     curvature: f32,
     mirror: u32,
     texture_index: i32,
+    padding: [u32; 2],
 }
 
 pub(crate) struct ForwardEntityDrawer {
@@ -158,7 +163,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: color_attachment_formats[0],
-                    blend: None,
+                    blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::default(),
                 })],
             }),
@@ -251,15 +256,18 @@ impl Prepare for ForwardEntityDrawer {
 
                 self.instance_data.push(InstanceData {
                     world: instruction.world.into(),
+                    frame_part_transform: instruction.frame_part_transform.into(),
                     texture_position: instruction.texture_position.into(),
                     texture_size: instruction.texture_size.into(),
+                    color: instruction.color.components_linear(),
+                    angle: instruction.angle,
+                    extra_depth_offset: instruction.extra_depth_offset,
                     depth_offset: instruction.depth_offset,
                     curvature: instruction.curvature,
                     mirror: instruction.mirror as u32,
                     texture_index,
+                    padding: Default::default(),
                 });
-
-                texture_views.push(instruction.texture.get_texture_view());
             }
 
             if texture_views.is_empty() {
@@ -272,12 +280,17 @@ impl Prepare for ForwardEntityDrawer {
             for instruction in instructions.entities.iter() {
                 self.instance_data.push(InstanceData {
                     world: instruction.world.into(),
+                    frame_part_transform: instruction.frame_part_transform.into(),
                     texture_position: instruction.texture_position.into(),
                     texture_size: instruction.texture_size.into(),
+                    color: instruction.color.components_linear(),
+                    angle: instruction.angle,
+                    extra_depth_offset: instruction.extra_depth_offset,
                     depth_offset: instruction.depth_offset,
                     curvature: instruction.curvature,
                     mirror: instruction.mirror as u32,
                     texture_index: 0,
+                    padding: Default::default(),
                 });
             }
 

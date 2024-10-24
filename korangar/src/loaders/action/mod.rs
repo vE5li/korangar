@@ -15,7 +15,7 @@ use ragnarok_packets::ClientTick;
 
 use super::error::LoadError;
 use super::Sprite;
-use crate::graphics::{Color, Texture};
+use crate::graphics::Color;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
@@ -79,51 +79,14 @@ impl AnimationState {
 
 #[derive(Debug, PrototypeElement)]
 pub struct Actions {
-    actions: Vec<Action>,
-    delays: Vec<f32>,
+    pub actions: Vec<Action>,
+    pub delays: Vec<f32>,
     #[cfg(feature = "debug")]
     actions_data: ActionsData,
 }
 
 impl Actions {
     pub fn render(
-        &self,
-        sprite: &Sprite,
-        animation_state: &AnimationState,
-        camera_direction: usize,
-        head_direction: usize,
-    ) -> (Arc<Texture>, Vector2<f32>, bool) {
-        let direction = (camera_direction + head_direction) % 8;
-        let aa = animation_state.action * 8 + direction;
-        let a = &self.actions[aa % self.actions.len()];
-        let delay = self.delays[aa % self.delays.len()];
-
-        let factor = animation_state
-            .factor
-            .map(|factor| delay * (factor / 5.0))
-            .unwrap_or_else(|| delay * 50.0);
-
-        let frame = animation_state
-            .duration
-            .map(|duration| animation_state.time * a.motions.len() as u32 / duration)
-            .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
-        // TODO: work out how to avoid losing digits when casting timg to an f32. When
-        // fixed remove set_start_time in MouseCursor.
-
-        let fs = &a.motions[frame as usize % a.motions.len()];
-
-        let texture = sprite.textures[fs.sprite_clips[0].sprite_number as usize].clone();
-        let texture_size = texture.get_size();
-        let offset = fs.sprite_clips[0].position.map(|component| component as f32);
-
-        (
-            texture,
-            Vector2::new(-offset.x, offset.y + (texture_size.height as f32) / 2.0) / 10.0,
-            fs.sprite_clips[0].mirror_on != 0,
-        )
-    }
-
-    pub fn render2(
         &self,
         renderer: &impl SpriteRenderer,
         sprite: &Sprite,

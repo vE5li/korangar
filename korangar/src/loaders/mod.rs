@@ -1,4 +1,5 @@
 mod action;
+mod animation;
 mod archive;
 pub mod client;
 mod effect;
@@ -13,6 +14,7 @@ mod sprite;
 mod texture;
 
 pub use self::action::*;
+pub use self::animation::*;
 pub use self::effect::EffectLoader;
 pub use self::font::{FontLoader, FontSize, Scaling};
 pub use self::gamefile::*;

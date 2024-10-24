@@ -1,13 +1,16 @@
+use std::string::String;
 use std::sync::Arc;
 
 use cgmath::{Array, EuclideanSpace, Point3, Vector2, VectorSpace};
 use derive_new::new;
+use image::{save_buffer, RgbaImage};
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::TileFlags;
+use ragnarok_formats::sprite::RgbaImageData;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
@@ -17,7 +20,9 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{ActionLoader, Actions, AnimationState, ScriptLoader, Sprite, SpriteLoader};
+use crate::loaders::{
+    ActionLoader, Actions, AnimationData, AnimationLoader, AnimationPair, AnimationState, ScriptLoader, Sprite, SpriteLoader,
+};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -75,8 +80,7 @@ pub struct Common {
     #[hidden_element]
     pub entity_type: EntityType,
     pub active_movement: Option<Movement>,
-    pub sprite: Arc<Sprite>,
-    pub actions: Arc<Actions>,
+    pub animation_data: AnimationData,
     pub grid_position: Vector2<usize>,
     pub position: Point3<f32>,
     #[hidden_element]
@@ -236,41 +240,39 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
     }
 }
 
-fn get_sprite_and_actions(
-    sprite_loader: &mut SpriteLoader,
-    action_loader: &mut ActionLoader,
-    script_loader: &ScriptLoader,
-    entity_type: EntityType,
-    job_id: usize,
-    sex: Sex,
-) -> (Arc<Sprite>, Arc<Actions>) {
+// This part instead of generating the sprite and actions, you need to generate
+// the animation_loader.
+fn get_entity_filename(script_loader: &ScriptLoader, entity_type: EntityType, job_id: usize, sex: Sex) -> Vec<String> {
     let sex_sprite_path = match sex == Sex::Female {
         true => "¿©",
         false => "³²",
     };
-
-    let file_path = match entity_type {
-        EntityType::Player => format!(
+    fn player_body_path(sex_sprite_path: &str, job_id: usize) -> String {
+        format!(
             "ÀÎ°£Á·\\¸öÅë\\{}\\{}_{}",
             sex_sprite_path,
             get_sprite_path_for_player_job(job_id),
             sex_sprite_path
-        ),
-        EntityType::Npc => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)),
-        EntityType::Monster => format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(job_id)),
-        EntityType::Warp | EntityType::Hidden => format!("npc\\{}", script_loader.get_job_name_from_id(job_id)), // TODO: change
+        )
+    }
+    fn player_head_path(sex_sprite_path: &str, head_id: usize) -> String {
+        format!("ÀÎ°£Á·\\¸Ó¸®Åë\\{}\\{}_{}", sex_sprite_path, head_id, sex_sprite_path)
+    }
+    let entity_filename = match entity_type {
+        EntityType::Player => vec![player_body_path(sex_sprite_path, job_id), player_head_path(sex_sprite_path, 32)],
+        EntityType::Npc => vec![format!("npc\\{}", script_loader.get_job_name_from_id(job_id))],
+        EntityType::Monster => vec![format!("¸ó½ºÅÍ\\{}", script_loader.get_job_name_from_id(job_id))],
+        EntityType::Warp | EntityType::Hidden => vec![format!("npc\\{}", script_loader.get_job_name_from_id(job_id))], // TODO: change
     };
 
-    (
-        sprite_loader.get(&format!("{file_path}.spr")).unwrap(),
-        action_loader.get(&format!("{file_path}.act")).unwrap(),
-    )
+    entity_filename
 }
 
 impl Common {
     pub fn new(
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
+        animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
         entity_data: EntityData,
@@ -300,7 +302,11 @@ impl Common {
             _ => EntityType::Npc,
         };
 
-        let (sprite, actions) = get_sprite_and_actions(sprite_loader, action_loader, script_loader, entity_type, job_id, sex);
+        let entity_filename: Vec<String> = get_entity_filename(script_loader, entity_type, job_id, sex);
+        // generate animation
+        let animation_data = animation_loader
+            .get(sprite_loader, action_loader, entity_filename, entity_type)
+            .unwrap();
         let details = ResourceState::Unavailable;
         let animation_state = AnimationState::new(client_tick);
 
@@ -316,8 +322,7 @@ impl Common {
             movement_speed,
             health_points,
             maximum_health_points,
-            sprite,
-            actions,
+            animation_data,
             details,
             animation_state,
         };
@@ -331,15 +336,17 @@ impl Common {
         common
     }
 
-    pub fn reload_sprite(&mut self, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, script_loader: &ScriptLoader) {
-        (self.sprite, self.actions) = get_sprite_and_actions(
-            sprite_loader,
-            action_loader,
-            script_loader,
-            self.entity_type,
-            self.job_id,
-            self.sex,
-        );
+    pub fn reload_sprite(
+        &mut self,
+        sprite_loader: &mut SpriteLoader,
+        action_loader: &mut ActionLoader,
+        script_loader: &ScriptLoader,
+        animation_loader: &mut AnimationLoader,
+    ) {
+        let entity_filename: Vec<String> = get_entity_filename(script_loader, self.entity_type, self.job_id, self.sex);
+        self.animation_data = animation_loader
+            .get(sprite_loader, action_loader, entity_filename, self.entity_type)
+            .unwrap();
     }
 
     pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
@@ -743,8 +750,8 @@ impl Common {
     pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera) {
         let camera_direction = camera.camera_direction();
         let (texture, position, mirror) = self
-            .actions
-            .render(&self.sprite, &self.animation_state, camera_direction, self.head_direction);
+            .animation_data
+            .render(&self.animation_state, camera_direction, self.head_direction);
 
         let origin = Point3::new(position.x, position.y, 0.0);
         let scale = Vector2::from_value(0.7);
@@ -798,6 +805,7 @@ impl Player {
     pub fn new(
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
+        animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
         account_id: AccountId,
@@ -812,6 +820,7 @@ impl Player {
         let common = Common::new(
             sprite_loader,
             action_loader,
+            animation_loader,
             script_loader,
             map,
             EntityData::from_character(account_id, character_information, player_position),
@@ -922,12 +931,21 @@ impl Npc {
     pub fn new(
         sprite_loader: &mut SpriteLoader,
         action_loader: &mut ActionLoader,
+        animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
         entity_data: EntityData,
         client_tick: ClientTick,
     ) -> Self {
-        let common = Common::new(sprite_loader, action_loader, script_loader, map, entity_data, client_tick);
+        let common = Common::new(
+            sprite_loader,
+            action_loader,
+            animation_loader,
+            script_loader,
+            map,
+            entity_data,
+            client_tick,
+        );
 
         Self { common }
     }
@@ -1018,8 +1036,15 @@ impl Entity {
         self.get_common_mut().job_id = job_id;
     }
 
-    pub fn reload_sprite(&mut self, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, script_loader: &ScriptLoader) {
-        self.get_common_mut().reload_sprite(sprite_loader, action_loader, script_loader);
+    pub fn reload_sprite(
+        &mut self,
+        sprite_loader: &mut SpriteLoader,
+        action_loader: &mut ActionLoader,
+        animation_loader: &mut AnimationLoader,
+        script_loader: &ScriptLoader,
+    ) {
+        self.get_common_mut()
+            .reload_sprite(sprite_loader, action_loader, script_loader, animation_loader);
     }
 
     pub fn set_details_requested(&mut self) {

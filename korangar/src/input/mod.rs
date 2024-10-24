@@ -566,6 +566,11 @@ impl InputSystem {
             if self.get_key(KeyCode::Space).down() && render_settings.get().use_debug_camera {
                 events.push(UserEvent::CameraMoveUp);
             }
+
+            #[cfg(feature = "debug")]
+            if self.get_key(KeyCode::F1).released() {
+                events.push(UserEvent::ChangeRenderMethod);
+            }
         }
 
         if window_index.is_none() && (self.mouse_input_mode.is_none() || self.mouse_input_mode.is_walk()) {

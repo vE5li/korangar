@@ -1714,6 +1714,10 @@ impl Client {
                 UserEvent::CameraAccelerate => self.debug_camera.accelerate(),
                 #[cfg(feature = "debug")]
                 UserEvent::CameraDecelerate => self.debug_camera.decelerate(),
+                #[cfg(feature = "debug")]
+                UserEvent::ChangeRenderMethod => {
+                    self.graphics_engine.on_change_render_method();
+                }
             }
         }
 

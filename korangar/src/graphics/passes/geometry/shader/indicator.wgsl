@@ -1,7 +1,8 @@
 struct GlobalUniforms {
     view_projection: mat4x4<f32>,
     inverse_view_projection: mat4x4<f32>,
-    view:mat4x4<f32>,
+    view: mat4x4<f32>,
+    inverse_view: mat4x4<f32>,
     indicator_positions: mat4x4<f32>,
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
@@ -9,6 +10,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     water_level: f32,
+    point_light_count: u32,
 }
 
 struct IndicatorUniforms {

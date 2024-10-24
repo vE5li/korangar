@@ -79,19 +79,6 @@ pub const WATER_ATTACHMENT_BLEND: BlendState = BlendState {
     },
 };
 
-pub const EFFECT_ATTACHMENT_BLEND: BlendState = BlendState {
-    color: BlendComponent {
-        src_factor: BlendFactor::One,
-        dst_factor: BlendFactor::One,
-        operation: BlendOperation::Max,
-    },
-    alpha: BlendComponent {
-        src_factor: BlendFactor::One,
-        dst_factor: BlendFactor::One,
-        operation: BlendOperation::Max,
-    },
-};
-
 /// Trait to prepare all GPU data of contexts, computer and renderer.
 pub(crate) trait Prepare {
     /// Prepares the GPU data.

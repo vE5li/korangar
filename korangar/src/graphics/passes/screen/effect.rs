@@ -7,22 +7,37 @@ use hashbrown::HashMap;
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState,
-    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    BindingResource, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages,
+    ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayout,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
+    ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
 };
-use crate::graphics::{
-    Buffer, Capabilities, EffectInstruction, GlobalContext, Prepare, RenderInstruction, Texture, EFFECT_ATTACHMENT_BLEND,
-};
+use crate::graphics::{Buffer, Capabilities, EffectInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/effect.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/effect_bindless.wgsl");
 const DRAWER_NAME: &str = "screen effect";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
+
+/// These are the TOP5 combinations we currently find in the korean client
+/// files and will preload at start.
+const PRELOAD_PIPELINES: &[(BlendFactor, BlendFactor)] = &[
+    (BlendFactor::SrcAlpha, BlendFactor::DstAlpha),
+    (BlendFactor::SrcAlpha, BlendFactor::OneMinusSrcAlpha),
+    (BlendFactor::One, BlendFactor::Zero),
+    (BlendFactor::Zero, BlendFactor::OneMinusSrcAlpha),
+    (BlendFactor::OneMinusSrcAlpha, BlendFactor::OneMinusSrcAlpha),
+];
+
+struct EffectBatch {
+    offset: usize,
+    count: usize,
+    blend_state: (BlendFactor, BlendFactor),
+}
 
 #[derive(Copy, Clone, Pod, Zeroable)]
 #[repr(C)]
@@ -49,11 +64,14 @@ pub(crate) struct ScreenEffectDrawer {
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    pipeline: RenderPipeline,
-    draw_count: usize,
+    shader_module: ShaderModule,
+    pipeline_layout: PipelineLayout,
+    color_attachment_format: TextureFormat,
+    pipelines: HashMap<(BlendFactor, BlendFactor), RenderPipeline>,
     instance_data: Vec<InstanceData>,
     bump: Bump,
     lookup: HashMap<u64, i32>,
+    batches: Vec<EffectBatch>,
 }
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenEffectDrawer {
@@ -67,6 +85,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
+        let color_attachment_format = render_pass_context.color_attachment_formats()[0];
+
         let shader_module = if capabilities.supports_bindless() {
             device.create_shader_module(SHADER_BINDLESS)
         } else {
@@ -149,31 +169,18 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             push_constant_ranges: &[],
         });
 
-        let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some(DRAWER_NAME),
-            layout: Some(&pipeline_layout),
-            vertex: VertexState {
-                module: &shader_module,
-                entry_point: "vs_main",
-                compilation_options: PipelineCompilationOptions::default(),
-                buffers: &[],
-            },
-            fragment: Some(FragmentState {
-                module: &shader_module,
-                entry_point: "fs_main",
-                compilation_options: PipelineCompilationOptions::default(),
-                targets: &[Some(ColorTargetState {
-                    format: render_pass_context.color_attachment_formats()[0],
-                    blend: Some(EFFECT_ATTACHMENT_BLEND),
-                    write_mask: ColorWrites::default(),
-                })],
-            }),
-            multiview: None,
-            primitive: PrimitiveState::default(),
-            multisample: MultisampleState::default(),
-            depth_stencil: None,
-            cache: None,
-        });
+        let mut pipelines = HashMap::with_capacity(PRELOAD_PIPELINES.len());
+        for (source_blend_factor, destination_blend_factor) in PRELOAD_PIPELINES.iter().copied() {
+            let pipeline = Self::create_pipeline(
+                &device,
+                &shader_module,
+                &pipeline_layout,
+                color_attachment_format,
+                source_blend_factor,
+                destination_blend_factor,
+            );
+            pipelines.insert((source_blend_factor, destination_blend_factor), pipeline);
+        }
 
         Self {
             bindless_support: capabilities.supports_bindless(),
@@ -181,36 +188,47 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             instance_data_buffer,
             bind_group_layout,
             bind_group,
-            pipeline,
-            draw_count: 0,
+            shader_module,
+            pipeline_layout,
+            color_attachment_format,
+            pipelines,
             instance_data: Vec::default(),
             bump: Bump::default(),
             lookup: HashMap::default(),
+            batches: Vec::default(),
         }
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if self.draw_count == 0 {
+        if self.batches.is_empty() {
             return;
         }
 
-        pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);
 
-        if self.bindless_support {
-            pass.draw(0..6, 0..self.draw_count as u32);
-        } else {
-            let mut current_texture_id = self.solid_pixel_texture.get_id();
-            pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
+        for batch in self.batches.drain(..) {
+            if let Some(pipeline) = self.pipelines.get(&batch.blend_state) {
+                pass.set_pipeline(pipeline);
 
-            for (index, instruction) in draw_data[0..self.draw_count].iter().enumerate() {
-                if instruction.texture.get_id() != current_texture_id {
-                    current_texture_id = instruction.texture.get_id();
-                    pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
+                let start = batch.offset as u32;
+                let end = start + batch.count as u32;
+
+                if self.bindless_support {
+                    pass.draw(0..6, start..end);
+                } else {
+                    let mut current_texture_id = self.solid_pixel_texture.get_id();
+                    pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
+
+                    for (index, instruction) in draw_data[start as usize..end as usize].iter().enumerate() {
+                        if instruction.texture.get_id() != current_texture_id {
+                            current_texture_id = instruction.texture.get_id();
+                            pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
+                        }
+                        let index = start + index as u32;
+
+                        pass.draw(0..6, index..index + 1);
+                    }
                 }
-                let index = index as u32;
-
-                pass.draw(0..6, index..index + 1);
             }
         }
     }
@@ -218,21 +236,44 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
 impl Prepare for ScreenEffectDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        self.draw_count = instructions.effects.len();
+        let draw_count = instructions.effects.len();
 
-        if self.draw_count == 0 {
+        if draw_count == 0 {
             return;
         }
 
         self.instance_data.clear();
 
+        let first_effect = &instructions.effects[0];
+        let mut blend_state = (first_effect.source_blend_factor, first_effect.destination_blend_factor);
+        let mut offset = 0;
+
         if self.bindless_support {
             self.bump.reset();
             self.lookup.clear();
 
-            let mut texture_views = Vec::with_capacity_in(self.draw_count, &self.bump);
+            let mut texture_views = Vec::with_capacity_in(draw_count, &self.bump);
 
-            for instruction in instructions.effects.iter() {
+            for (index, instruction) in instructions.effects.iter().enumerate() {
+                let effect_blend_state = (instruction.source_blend_factor, instruction.destination_blend_factor);
+
+                if effect_blend_state != blend_state {
+                    Self::push_effect_batch(
+                        device,
+                        &mut self.pipelines,
+                        &mut self.batches,
+                        &self.shader_module,
+                        self.color_attachment_format,
+                        &self.pipeline_layout,
+                        blend_state,
+                        self.instance_data.len() - offset,
+                        offset,
+                    );
+
+                    blend_state = effect_blend_state;
+                    offset = index;
+                }
+
                 let mut texture_index = texture_views.len() as i32;
                 let id = instruction.texture.get_texture().global_id().inner();
                 let potential_index = self.lookup.get(&id);
@@ -261,6 +302,18 @@ impl Prepare for ScreenEffectDrawer {
                 });
             }
 
+            Self::push_effect_batch(
+                device,
+                &mut self.pipelines,
+                &mut self.batches,
+                &self.shader_module,
+                self.color_attachment_format,
+                &self.pipeline_layout,
+                blend_state,
+                self.instance_data.len() - offset,
+                offset,
+            );
+
             if texture_views.is_empty() {
                 texture_views.push(self.solid_pixel_texture.get_texture_view());
             }
@@ -268,7 +321,26 @@ impl Prepare for ScreenEffectDrawer {
             self.instance_data_buffer.reserve(device, self.instance_data.len());
             self.bind_group = Self::create_bind_group_bindless(device, &self.bind_group_layout, &self.instance_data_buffer, &texture_views)
         } else {
-            for instruction in instructions.effects.iter() {
+            for (index, instruction) in instructions.effects.iter().enumerate() {
+                let effect_blend_state = (instruction.source_blend_factor, instruction.destination_blend_factor);
+
+                if effect_blend_state != blend_state {
+                    Self::push_effect_batch(
+                        device,
+                        &mut self.pipelines,
+                        &mut self.batches,
+                        &self.shader_module,
+                        self.color_attachment_format,
+                        &self.pipeline_layout,
+                        blend_state,
+                        self.instance_data.len() - offset,
+                        offset,
+                    );
+
+                    blend_state = effect_blend_state;
+                    offset = index;
+                }
+
                 let color = instruction.color.components_linear();
                 self.instance_data.push(InstanceData {
                     top_left: instruction.top_left.into(),
@@ -285,6 +357,18 @@ impl Prepare for ScreenEffectDrawer {
                     padding: 0,
                 });
             }
+
+            Self::push_effect_batch(
+                device,
+                &mut self.pipelines,
+                &mut self.batches,
+                &self.shader_module,
+                self.color_attachment_format,
+                &self.pipeline_layout,
+                blend_state,
+                self.instance_data.len() - offset,
+                offset,
+            );
 
             self.instance_data_buffer.reserve(device, self.instance_data.len());
             self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, &self.instance_data_buffer)
@@ -329,5 +413,81 @@ impl ScreenEffectDrawer {
                 resource: instance_data_buffer.as_entire_binding(),
             }],
         })
+    }
+
+    fn create_pipeline(
+        device: &Device,
+        shader_module: &ShaderModule,
+        pipeline_layout: &PipelineLayout,
+        color_attachment_format: TextureFormat,
+        source_blend_factor: BlendFactor,
+        destination_blend_factor: BlendFactor,
+    ) -> RenderPipeline {
+        device.create_render_pipeline(&RenderPipelineDescriptor {
+            label: Some(DRAWER_NAME),
+            layout: Some(pipeline_layout),
+            vertex: VertexState {
+                module: shader_module,
+                entry_point: "vs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                buffers: &[],
+            },
+            fragment: Some(FragmentState {
+                module: shader_module,
+                entry_point: "fs_main",
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: color_attachment_format,
+                    blend: Some(BlendState {
+                        color: BlendComponent {
+                            src_factor: source_blend_factor,
+                            dst_factor: destination_blend_factor,
+                            operation: BlendOperation::Add,
+                        },
+                        alpha: BlendComponent {
+                            src_factor: source_blend_factor,
+                            dst_factor: destination_blend_factor,
+                            operation: BlendOperation::Add,
+                        },
+                    }),
+                    write_mask: ColorWrites::default(),
+                })],
+            }),
+            primitive: PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: MultisampleState::default(),
+            multiview: None,
+            cache: None,
+        })
+    }
+
+    fn push_effect_batch(
+        device: &Device,
+        pipelines: &mut HashMap<(BlendFactor, BlendFactor), RenderPipeline>,
+        batches: &mut Vec<EffectBatch>,
+        shader_module: &ShaderModule,
+        color_attachment_format: TextureFormat,
+        pipeline_layout: &PipelineLayout,
+        blend_state: (BlendFactor, BlendFactor),
+        count: usize,
+        offset: usize,
+    ) {
+        if !pipelines.contains_key(&blend_state) {
+            let pipeline = Self::create_pipeline(
+                device,
+                shader_module,
+                pipeline_layout,
+                color_attachment_format,
+                blend_state.0,
+                blend_state.1,
+            );
+            pipelines.insert(blend_state, pipeline);
+        }
+
+        batches.push(EffectBatch {
+            offset,
+            count,
+            blend_state,
+        });
     }
 }

@@ -102,7 +102,7 @@ impl MouseCursor {
                     Color::WHITE,
                     false,
                 ),
-                Grabbed::Action(sprite, actions, animation_state) => actions.render2(
+                Grabbed::Action(sprite, actions, animation_state) => actions.render(
                     renderer,
                     &sprite,
                     &animation_state,
@@ -120,7 +120,7 @@ impl MouseCursor {
             _ => 7,
         };
 
-        self.actions.render2(
+        self.actions.render(
             renderer,
             &self.sprite,
             &self.animation_state,

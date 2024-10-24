@@ -1,3 +1,4 @@
+mod animation;
 mod effect;
 mod entity;
 mod light;
@@ -6,6 +7,7 @@ mod model;
 mod object;
 mod sound;
 
+pub use self::animation::*;
 pub use self::effect::*;
 pub use self::entity::*;
 pub use self::light::*;

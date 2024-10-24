@@ -27,12 +27,15 @@ const INITIAL_INSTRUCTION_SIZE: usize = 128;
 #[repr(C)]
 struct InstanceData {
     world: [[f32; 4]; 4],
+    frame_part_transform: [[f32; 4]; 4],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
     texture_index: i32,
+    angle: f32,
     mirror: u32,
     identifier_high: u32,
     identifier_low: u32,
+    padding: [u32; 3],
 }
 
 pub(crate) struct PickerEntityDrawer {
@@ -211,7 +214,8 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
 impl Prepare for PickerEntityDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        self.draw_count = instructions.entities.len().saturating_sub(1);
+        let player_size = 2;
+        self.draw_count = instructions.entities.len().saturating_sub(player_size);
 
         if self.draw_count == 0 {
             return;
@@ -227,7 +231,8 @@ impl Prepare for PickerEntityDrawer {
 
             // We skip the first entity, because we don't want the player entity to show up
             // in the picker buffer.
-            for instruction in instructions.entities.iter().skip(1) {
+            // TODO: Remove the player entity correctly.
+            for instruction in instructions.entities.iter().skip(player_size) {
                 let picker_target = PickerTarget::Entity(instruction.entity_id);
                 let (identifier_high, identifier_low) = picker_target.into();
 
@@ -244,15 +249,16 @@ impl Prepare for PickerEntityDrawer {
 
                 self.instance_data.push(InstanceData {
                     world: instruction.world.into(),
+                    frame_part_transform: instruction.frame_part_transform.into(),
                     texture_position: instruction.texture_position.into(),
                     texture_size: instruction.texture_size.into(),
                     texture_index,
+                    angle: instruction.angle,
                     mirror: instruction.mirror as u32,
                     identifier_high,
                     identifier_low,
+                    padding: Default::default(),
                 });
-
-                texture_views.push(instruction.texture.get_texture_view());
             }
 
             self.instance_data_buffer.reserve(device, self.instance_data.len());
@@ -260,18 +266,22 @@ impl Prepare for PickerEntityDrawer {
         } else {
             // We skip the first entity, because we don't want the player entity to show up
             // in the picker buffer.
-            for instruction in instructions.entities.iter().skip(1) {
+            // TODO: Remove the player entity correctly.
+            for instruction in instructions.entities.iter().skip(player_size) {
                 let picker_target = PickerTarget::Entity(instruction.entity_id);
                 let (identifier_high, identifier_low) = picker_target.into();
 
                 self.instance_data.push(InstanceData {
                     world: instruction.world.into(),
+                    frame_part_transform: instruction.frame_part_transform.into(),
                     texture_position: instruction.texture_position.into(),
                     texture_size: instruction.texture_size.into(),
                     texture_index: 0,
+                    angle: instruction.angle,
                     mirror: instruction.mirror as u32,
                     identifier_high,
                     identifier_low,
+                    padding: Default::default(),
                 });
             }
 

@@ -101,7 +101,7 @@ impl Element<InterfaceSettings> for SkillBox {
         renderer.render_background(CornerRadius::uniform(5.0), background_color);
 
         if let Some(skill) = &self.skill {
-            skill.actions.render2(
+            skill.actions.render(
                 renderer.renderer,
                 &skill.sprite,
                 &skill.animation_state,

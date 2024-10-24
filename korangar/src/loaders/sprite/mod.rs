@@ -18,6 +18,7 @@ use crate::loaders::GameFileLoader;
 
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
+    pub palette_size: usize,
     #[hidden_element]
     pub textures: Vec<Arc<Texture>>,
     #[cfg(feature = "debug")]
@@ -61,11 +62,33 @@ impl SpriteLoader {
         let cloned_sprite_data = sprite_data.clone();
 
         let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
-        // the default palette is
 
-        let rgba_images/*: Vec<Arc<ImmutableImage>>*/ = sprite_data
+        let rgba_images: Vec<RgbaImageData> = sprite_data
             .rgba_image_data
-            .into_iter();
+            .iter()
+            .map(|image_data| {
+                // Revert the rows, the image is flipped upside down
+                // Convert the pixel from ABGR format to RGBA format
+                let width = image_data.width;
+                let data = image_data
+                    .data
+                    .chunks_exact(4 * width as usize)
+                    .rev()
+                    .flat_map(|pixels| {
+                        pixels
+                            .chunks_exact(4)
+                            .flat_map(|pixel| [pixel[3], pixel[2], pixel[1], pixel[0]])
+                            .collect::<Vec<u8>>()
+                    })
+                    .collect();
+
+                RgbaImageData {
+                    width: image_data.width,
+                    height: image_data.height,
+                    data,
+                }
+            })
+            .collect();
 
         // TODO: Move this to an extension trait in `korangar_loaders`.
         pub fn color_bytes(palette: &PaletteColor, index: u8) -> [u8; 4] {
@@ -77,8 +100,8 @@ impl SpriteLoader {
             [palette.red, palette.green, palette.blue, alpha]
         }
 
-        let palette_images = sprite_data.palette_image_data.into_iter().map(|image_data| {
-            // decode palette image data if necessary
+        let palette_images = sprite_data.palette_image_data.iter().map(|image_data| {
+            // Decode palette image data if necessary
             let data: Vec<u8> = image_data
                 .data
                 .0
@@ -92,9 +115,10 @@ impl SpriteLoader {
                 data,
             }
         });
+        let palette_size = palette_images.len();
 
-        let textures = rgba_images
-            .chain(palette_images)
+        let textures = palette_images
+            .chain(rgba_images)
             .map(|image_data| {
                 let texture = Texture::new_with_data(
                     &self.device,
@@ -120,11 +144,11 @@ impl SpriteLoader {
             .collect();
 
         let sprite = Arc::new(Sprite {
+            palette_size,
             textures,
             #[cfg(feature = "debug")]
             sprite_data: cloned_sprite_data,
         });
-
         self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]

@@ -4,6 +4,12 @@ use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LimitFramerate {
+    Unlimited,
+    Limit(u16),
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TextureSamplerType {
     Nearest,
     Linear,
@@ -40,15 +46,21 @@ impl ShadowDetail {
 
 #[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
-    pub frame_limit: bool,
+    pub vsync: bool,
+    pub limit_framerate: LimitFramerate,
+    pub triple_buffering: bool,
+    pub texture_filtering: TextureSamplerType,
     pub shadow_detail: ShadowDetail,
 }
 
 impl Default for GraphicsSettings {
     fn default() -> Self {
         Self {
-            frame_limit: true,
-            shadow_detail: ShadowDetail::Medium,
+            vsync: true,
+            limit_framerate: LimitFramerate::Unlimited,
+            triple_buffering: true,
+            texture_filtering: TextureSamplerType::Linear,
+            shadow_detail: ShadowDetail::High,
         }
     }
 }

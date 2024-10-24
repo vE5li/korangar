@@ -1,5 +1,6 @@
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
+use std::time::Instant;
 
 use cgmath::Vector2;
 #[cfg(feature = "debug")]
@@ -14,7 +15,10 @@ use wgpu::{
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
-use super::{Capabilities, GlobalContext, Prepare, PresentModeInfo, ShadowDetail, Surface, TextureSamplerType};
+use super::{
+    Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Prepare, PresentModeInfo, ShadowDetail, Surface,
+    TextureSamplerType,
+};
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
 use crate::interface::layout::ScreenSize;
@@ -58,6 +62,9 @@ pub struct GraphicsEngine {
     queue: Arc<Queue>,
     staging_belt: StagingBelt,
     surface: Option<Surface>,
+    frame_pacer: FramePacer,
+    cpu_stage: FrameStage<Instant>,
+    limit_framerate: bool,
     previous_surface_texture_format: Option<TextureFormat>,
     texture_loader: Arc<TextureLoader>,
     engine_context: Option<EngineContext>,
@@ -108,6 +115,8 @@ struct EngineContext {
 impl GraphicsEngine {
     pub fn initialize(descriptor: GraphicsEngineDescriptor) -> GraphicsEngine {
         let staging_belt = StagingBelt::new(1048576); // 1 MiB
+        let mut frame_pacer = FramePacer::new(60.0);
+        let cpu_stage = frame_pacer.create_frame_stage(Instant::now());
 
         Self {
             capabilities: descriptor.capabilities,
@@ -117,6 +126,9 @@ impl GraphicsEngine {
             queue: descriptor.queue,
             staging_belt,
             surface: None,
+            frame_pacer,
+            cpu_stage,
+            limit_framerate: false,
             previous_surface_texture_format: None,
             texture_loader: descriptor.texture_loader,
             engine_context: None,
@@ -124,7 +136,17 @@ impl GraphicsEngine {
         }
     }
 
-    pub fn on_resume(&mut self, window: Arc<Window>, shadow_detail: ShadowDetail, texture_sampler_type: TextureSamplerType) {
+    pub fn on_resume(
+        &mut self,
+        window: Arc<Window>,
+        triple_buffering: bool,
+        vsync: bool,
+        limit_framerate: LimitFramerate,
+        shadow_detail: ShadowDetail,
+        texture_sampler_type: TextureSamplerType,
+    ) {
+        self.set_limit_framerate(limit_framerate);
+
         // Android devices need to drop the surface on suspend, so we might need to
         // re-create it.
         if self.surface.is_none() {
@@ -137,6 +159,8 @@ impl GraphicsEngine {
                     raw_surface,
                     screen_size.width as u32,
                     screen_size.height as u32,
+                    triple_buffering,
+                    vsync,
                 );
                 let surface_texture_format = surface.format();
 
@@ -405,9 +429,27 @@ impl GraphicsEngine {
         }
     }
 
-    pub fn set_framerate_limit(&mut self, enabled: bool) {
+    pub fn set_vsync(&mut self, enabled: bool) {
         if let Some(surface) = self.surface.as_mut() {
-            surface.set_frame_limit(enabled)
+            surface.set_vsync(enabled);
+        }
+    }
+
+    pub fn set_limit_framerate(&mut self, limit_framerate: LimitFramerate) {
+        match limit_framerate {
+            LimitFramerate::Unlimited => {
+                self.limit_framerate = false;
+            }
+            LimitFramerate::Limit(rate) => {
+                self.limit_framerate = true;
+                self.frame_pacer.set_monitor_frequency(f64::from(rate));
+            }
+        }
+    }
+
+    pub fn set_triple_buffering(&mut self, enabled: bool) {
+        if let Some(surface) = self.surface.as_mut() {
+            surface.set_triple_buffering(enabled);
         }
     }
 
@@ -457,8 +499,12 @@ impl GraphicsEngine {
             }
         }
 
-        let (_, swap_chain) = self.surface.as_mut().expect("surface not set").acquire();
-        swap_chain
+        if self.limit_framerate {
+            self.frame_pacer.wait_for_frame();
+        }
+        self.frame_pacer.begin_frame_stage(self.cpu_stage, Instant::now());
+
+        self.surface.as_mut().expect("surface not set").acquire()
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -497,6 +543,8 @@ impl GraphicsEngine {
 
         // Schedule the presentation of the frame.
         frame.present();
+
+        self.frame_pacer.end_frame_stage(self.cpu_stage, Instant::now());
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

@@ -24,10 +24,8 @@ pub struct Frame {
     pub delay: f32,
     pub angle: f32,
     pub color: [f32; 4],
-    // Needs to actually set the attachment blend mode of the source alpha
-    pub source_alpha: i32,
-    // Needs to actually set the attachment blend mode of the destination alpha
-    pub destination_alpha: i32,
+    pub source_blend_factor: i32,
+    pub destination_blend_factor: i32,
     pub mt_present: i32,
 }
 

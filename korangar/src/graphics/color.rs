@@ -1,3 +1,5 @@
+use std::ops::{Add, Mul, Sub};
+
 use ragnarok_formats::color::{ColorBGRA, ColorRGB};
 use serde::{Deserialize, Serialize};
 
@@ -127,6 +129,45 @@ impl Color {
             }
         });
         [linear[0], linear[1], linear[2], self.alpha]
+    }
+}
+
+impl Add for Color {
+    type Output = Color;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Self {
+            red: self.red + rhs.red,
+            blue: self.blue + rhs.blue,
+            green: self.green + rhs.green,
+            alpha: self.alpha + rhs.alpha,
+        }
+    }
+}
+
+impl Sub for Color {
+    type Output = Color;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self {
+            red: self.red - rhs.red,
+            blue: self.blue - rhs.blue,
+            green: self.green - rhs.green,
+            alpha: self.alpha - rhs.alpha,
+        }
+    }
+}
+
+impl Mul<f32> for Color {
+    type Output = Color;
+
+    fn mul(self, rhs: f32) -> Self::Output {
+        Self {
+            red: self.red * rhs,
+            blue: self.blue * rhs,
+            green: self.green * rhs,
+            alpha: self.alpha * rhs,
+        }
     }
 }
 

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3};
 use ragnarok_packets::EntityId;
+use wgpu::BlendFactor;
 
 use super::color::Color;
 use super::vertices::ModelVertex;
@@ -199,6 +200,8 @@ pub struct EffectInstruction {
     pub texture_top_right: Vector2<f32>,
     pub texture_bottom_right: Vector2<f32>,
     pub color: Color,
+    pub source_blend_factor: BlendFactor,
+    pub destination_blend_factor: BlendFactor,
     pub texture: Arc<Texture>,
 }
 

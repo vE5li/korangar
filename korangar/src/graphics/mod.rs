@@ -94,6 +94,7 @@ pub(crate) struct GlobalUniforms {
     view_projection: [[f32; 4]; 4],
     inverse_view_projection: [[f32; 4]; 4],
     view: [[f32; 4]; 4],
+    inverse_view: [[f32; 4]; 4],
     indicator_positions: [[f32; 4]; 4],
     indicator_color: [f32; 4],
     ambient_color: [f32; 4],
@@ -101,7 +102,28 @@ pub(crate) struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     water_level: f32,
-    padding: [u32; 3],
+    point_light_count: u32,
+    padding: [u32; 2],
+}
+
+#[derive(Copy, Clone, Default, Pod, Zeroable)]
+#[repr(C)]
+pub(crate) struct DirectionalLightUniforms {
+    view_projection: [[f32; 4]; 4],
+    color: [f32; 4],
+    direction: [f32; 4],
+}
+
+#[derive(Copy, Clone, Pod, Zeroable)]
+#[repr(C)]
+pub(crate) struct PointLightData {
+    position: [f32; 4],
+    color: [f32; 4],
+    screen_position: [f32; 2],
+    screen_size: [f32; 2],
+    range: f32,
+    texture_index: i32,
+    padding: [u32; 2],
 }
 
 #[cfg(feature = "debug")]
@@ -124,8 +146,10 @@ pub(crate) struct GlobalContext {
     pub(crate) solid_pixel_texture: Arc<Texture>,
     pub(crate) walk_indicator_texture: Arc<Texture>,
     pub(crate) depth_texture: AttachmentTexture,
+    pub(crate) forward_depth_texture: AttachmentTexture,
     pub(crate) picker_buffer_texture: AttachmentTexture,
     pub(crate) picker_depth_texture: AttachmentTexture,
+    pub(crate) forward_multisample_texture: AttachmentTexture,
     pub(crate) diffuse_buffer_texture: AttachmentTexture,
     pub(crate) normal_buffer_texture: AttachmentTexture,
     pub(crate) water_buffer_texture: AttachmentTexture,
@@ -134,6 +158,8 @@ pub(crate) struct GlobalContext {
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
+    pub(crate) directional_light_uniforms_buffer: Buffer<DirectionalLightUniforms>,
+    pub(crate) point_light_data_buffer: Buffer<PointLightData>,
     #[cfg(feature = "debug")]
     pub(crate) debug_uniforms_buffer: Buffer<DebugUniforms>,
     pub(crate) picker_value_buffer: Buffer<u64>,
@@ -141,17 +167,22 @@ pub(crate) struct GlobalContext {
     pub(crate) linear_sampler: Sampler,
     pub(crate) texture_sampler: Sampler,
     pub(crate) global_bind_group: BindGroup,
+    pub(crate) forward_bind_group: BindGroup,
     pub(crate) screen_bind_group: BindGroup,
     pub(crate) screen_size: ScreenSize,
     pub(crate) directional_shadow_size: ScreenSize,
     pub(crate) point_shadow_size: ScreenSize,
     global_uniforms: GlobalUniforms,
+    directional_light_uniforms: DirectionalLightUniforms,
+    point_light_data: Vec<PointLightData>,
     #[cfg(feature = "debug")]
     debug_uniforms: DebugUniforms,
 }
 
 impl Prepare for GlobalContext {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
+        self.point_light_data.clear();
+
         let (indicator_positions, indicator_color) = instructions
             .indicator
             .as_ref()
@@ -172,6 +203,7 @@ impl Prepare for GlobalContext {
             view_projection: view_projection.into(),
             inverse_view_projection: view_projection.invert().unwrap_or_else(Matrix4::identity).into(),
             view: instructions.uniforms.view_matrix.into(),
+            inverse_view: instructions.uniforms.view_matrix.invert().unwrap_or_else(Matrix4::identity).into(),
             indicator_positions: indicator_positions.into(),
             indicator_color: indicator_color.components_linear(),
             ambient_color: instructions.uniforms.ambient_light_color.components_linear(),
@@ -179,8 +211,39 @@ impl Prepare for GlobalContext {
             animation_timer: instructions.uniforms.animation_timer,
             day_timer: instructions.uniforms.day_timer,
             water_level: instructions.uniforms.water_level,
+            point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
             padding: Default::default(),
         };
+
+        self.directional_light_uniforms = DirectionalLightUniforms {
+            view_projection: instructions.directional_light_with_shadow.view_projection_matrix.into(),
+            color: instructions.directional_light_with_shadow.color.components_linear(),
+            direction: instructions.directional_light_with_shadow.direction.extend(0.0).into(),
+        };
+
+        for (instance_index, instruction) in instructions.point_light_shadow_caster.iter().enumerate() {
+            self.point_light_data.push(PointLightData {
+                position: instruction.position.to_homogeneous().into(),
+                color: instruction.color.components_linear(),
+                screen_position: instruction.screen_position.into(),
+                screen_size: instruction.screen_size.into(),
+                range: instruction.range,
+                texture_index: (instance_index + 1) as i32,
+                padding: Default::default(),
+            });
+        }
+
+        for instruction in instructions.point_light.iter() {
+            self.point_light_data.push(PointLightData {
+                position: instruction.position.to_homogeneous().into(),
+                color: instruction.color.components_linear(),
+                screen_position: instruction.screen_position.into(),
+                screen_size: instruction.screen_size.into(),
+                range: instruction.range,
+                texture_index: 0,
+                padding: Default::default(),
+            });
+        }
 
         #[cfg(feature = "debug")]
         {
@@ -198,15 +261,26 @@ impl Prepare for GlobalContext {
     }
 
     fn upload(&mut self, device: &Device, staging_belt: &mut StagingBelt, command_encoder: &mut CommandEncoder) {
-        let recreated = self
+        let mut recreated = self
             .global_uniforms_buffer
             .write(device, staging_belt, command_encoder, &[self.global_uniforms]);
 
+        recreated |=
+            self.directional_light_uniforms_buffer
+                .write(device, staging_belt, command_encoder, &[self.directional_light_uniforms]);
+
+        if !self.point_light_data.is_empty() {
+            recreated |= self
+                .point_light_data_buffer
+                .write(device, staging_belt, command_encoder, &self.point_light_data);
+        }
+
         #[cfg(feature = "debug")]
-        let recreated = recreated
-            | self
+        {
+            recreated |= self
                 .debug_uniforms_buffer
                 .write(device, staging_belt, command_encoder, &[self.debug_uniforms]);
+        }
 
         if recreated {
             self.global_bind_group = Self::create_global_bind_group(
@@ -217,6 +291,15 @@ impl Prepare for GlobalContext {
                 &self.nearest_sampler,
                 &self.linear_sampler,
                 &self.texture_sampler,
+            );
+
+            self.forward_bind_group = Self::create_forward_bind_group(
+                device,
+                &self.directional_light_uniforms_buffer,
+                &self.point_light_data_buffer,
+                &self.directional_shadow_map_texture,
+                &self.point_shadow_map_textures,
+                &self.interface_buffer_texture,
             );
         }
     }
@@ -251,7 +334,7 @@ impl GlobalContext {
             &[255, 255, 255, 255],
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
-        let screen_textures = Self::create_screen_size_textures(device, screen_size);
+        let screen_textures = Self::create_screen_size_textures(device, screen_size, surface_texture_format);
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
 
@@ -267,6 +350,20 @@ impl GlobalContext {
             "global uniforms",
             BufferUsages::COPY_DST | BufferUsages::UNIFORM,
             size_of::<GlobalUniforms>() as _,
+        );
+
+        let directional_light_uniforms_buffer = Buffer::with_capacity(
+            device,
+            "directional light uniforms",
+            BufferUsages::COPY_DST | BufferUsages::UNIFORM,
+            size_of::<DirectionalLightUniforms>() as _,
+        );
+
+        let point_light_data_buffer = Buffer::with_capacity(
+            device,
+            "point light data",
+            BufferUsages::COPY_DST | BufferUsages::STORAGE,
+            (128 * size_of::<PointLightData>()) as _,
         );
 
         #[cfg(feature = "debug")]
@@ -291,6 +388,15 @@ impl GlobalContext {
             &texture_sampler,
         );
 
+        let forward_bind_group = Self::create_forward_bind_group(
+            device,
+            &directional_light_uniforms_buffer,
+            &point_light_data_buffer,
+            &directional_shadow_map_texture,
+            &point_shadow_map_textures,
+            &screen_textures.interface_buffer_texture,
+        );
+
         let screen_bind_group = Self::create_screen_bind_group(
             device,
             &screen_textures.diffuse_buffer_texture,
@@ -309,8 +415,10 @@ impl GlobalContext {
             solid_pixel_texture,
             walk_indicator_texture,
             depth_texture: screen_textures.depth_texture,
+            forward_depth_texture: screen_textures.forward_depth_texture,
             picker_buffer_texture: screen_textures.picker_buffer_texture,
             picker_depth_texture: screen_textures.picker_depth_texture,
+            forward_multisample_texture: screen_textures.forward_multisample_texture,
             diffuse_buffer_texture: screen_textures.diffuse_buffer_texture,
             normal_buffer_texture: screen_textures.normal_buffer_texture,
             water_buffer_texture: screen_textures.water_buffer_texture,
@@ -319,6 +427,9 @@ impl GlobalContext {
             directional_shadow_map_texture,
             point_shadow_map_textures,
             global_uniforms_buffer,
+            forward_bind_group,
+            directional_light_uniforms_buffer,
+            point_light_data_buffer,
             #[cfg(feature = "debug")]
             debug_uniforms_buffer,
             picker_value_buffer,
@@ -331,14 +442,20 @@ impl GlobalContext {
             directional_shadow_size,
             point_shadow_size,
             global_uniforms: GlobalUniforms::default(),
+            directional_light_uniforms: DirectionalLightUniforms::default(),
+            point_light_data: Vec::default(),
             #[cfg(feature = "debug")]
             debug_uniforms: DebugUniforms::default(),
         }
     }
 
-    fn create_screen_size_textures(device: &Device, screen_size: ScreenSize) -> ScreenSizeTextures {
+    fn create_screen_size_textures(device: &Device, screen_size: ScreenSize, surface_texture_format: TextureFormat) -> ScreenSizeTextures {
         let depth_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
         let depth_texture = depth_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
+
+        let forward_depth_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
+        let forward_depth_texture =
+            forward_depth_factory.new_attachment("forward depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
 
         // Since we need to copy from the picker attachment to read the picker value, we
         // need to align both attachments properly to the requirements of
@@ -358,6 +475,11 @@ impl GlobalContext {
 
         let multisampled_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
 
+        let forward_multisample_texture = multisampled_screen_factory.new_attachment(
+            "forward multisample texture",
+            surface_texture_format,
+            AttachmentTextureType::ColorAttachment,
+        );
         let diffuse_buffer_texture = multisampled_screen_factory.new_attachment(
             "diffuse buffer",
             TextureFormat::Rgba8UnormSrgb,
@@ -386,8 +508,10 @@ impl GlobalContext {
 
         ScreenSizeTextures {
             depth_texture,
+            forward_depth_texture,
             picker_buffer_texture,
             picker_depth_texture,
+            forward_multisample_texture,
             diffuse_buffer_texture,
             normal_buffer_texture,
             water_buffer_texture,
@@ -419,11 +543,13 @@ impl GlobalContext {
 
     fn update_screen_size_textures(&mut self, device: &Device, screen_size: ScreenSize) {
         self.screen_size = screen_size;
-        let new_textures = Self::create_screen_size_textures(device, self.screen_size);
+        let new_textures = Self::create_screen_size_textures(device, self.screen_size, self.surface_texture_format);
 
         self.depth_texture = new_textures.depth_texture;
+        self.forward_depth_texture = new_textures.forward_depth_texture;
         self.picker_buffer_texture = new_textures.picker_buffer_texture;
         self.picker_depth_texture = new_textures.picker_depth_texture;
+        self.forward_multisample_texture = new_textures.forward_multisample_texture;
         self.diffuse_buffer_texture = new_textures.diffuse_buffer_texture;
         self.normal_buffer_texture = new_textures.normal_buffer_texture;
         self.water_buffer_texture = new_textures.water_buffer_texture;
@@ -432,6 +558,14 @@ impl GlobalContext {
 
         // We need to update this bind group, because it's content changed, and it isn't
         // re-created each frame.
+        self.forward_bind_group = Self::create_forward_bind_group(
+            device,
+            &self.directional_light_uniforms_buffer,
+            &self.point_light_data_buffer,
+            &self.directional_shadow_map_texture,
+            &self.point_shadow_map_textures,
+            &self.interface_buffer_texture,
+        );
         self.screen_bind_group = Self::create_screen_bind_group(
             device,
             &self.diffuse_buffer_texture,
@@ -455,6 +589,14 @@ impl GlobalContext {
 
         // We need to update this bind group, because it's content changed, and it isn't
         // re-created each frame.
+        self.forward_bind_group = Self::create_forward_bind_group(
+            device,
+            &self.directional_light_uniforms_buffer,
+            &self.point_light_data_buffer,
+            &self.directional_shadow_map_texture,
+            &self.point_shadow_map_textures,
+            &self.interface_buffer_texture,
+        );
         self.screen_bind_group = Self::create_screen_bind_group(
             device,
             &self.diffuse_buffer_texture,
@@ -524,6 +666,67 @@ impl GlobalContext {
                             ty: BufferBindingType::Uniform,
                             has_dynamic_offset: false,
                             min_binding_size: NonZeroU64::new(size_of::<DebugUniforms>() as _),
+                        },
+                        count: None,
+                    },
+                ],
+            })
+        })
+    }
+
+    fn forward_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
+        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
+        LAYOUT.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("forward"),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::all(),
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(size_of::<DirectionalLightUniforms>() as _),
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Depth,
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::VERTEX_FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Depth,
+                            view_dimension: TextureViewDimension::CubeArray,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: false },
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: true,
                         },
                         count: None,
                     },
@@ -712,12 +915,50 @@ impl GlobalContext {
             ],
         })
     }
+
+    fn create_forward_bind_group(
+        device: &Device,
+        directional_light_uniforms_buffer: &Buffer<DirectionalLightUniforms>,
+        point_light_data_buffer: &Buffer<PointLightData>,
+        directional_shadow_map_texture: &AttachmentTexture,
+        point_shadow_maps_texture: &CubeArrayTexture,
+        interface_buffer_texture: &AttachmentTexture,
+    ) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+            label: Some("forward"),
+            layout: Self::forward_bind_group_layout(device),
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: directional_light_uniforms_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(directional_shadow_map_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: point_light_data_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: BindingResource::TextureView(interface_buffer_texture.get_texture_view()),
+                },
+            ],
+        })
+    }
 }
 
 struct ScreenSizeTextures {
     depth_texture: AttachmentTexture,
+    forward_depth_texture: AttachmentTexture,
     picker_buffer_texture: AttachmentTexture,
     picker_depth_texture: AttachmentTexture,
+    forward_multisample_texture: AttachmentTexture,
     diffuse_buffer_texture: AttachmentTexture,
     normal_buffer_texture: AttachmentTexture,
     water_buffer_texture: AttachmentTexture,

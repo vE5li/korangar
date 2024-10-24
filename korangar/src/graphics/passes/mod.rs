@@ -1,4 +1,5 @@
 mod directional_shadow;
+mod forward;
 mod geometry;
 mod interface;
 mod picker;
@@ -9,6 +10,7 @@ use std::marker::ConstParamTy;
 
 use bytemuck::{Pod, Zeroable};
 pub(crate) use directional_shadow::*;
+pub(crate) use forward::*;
 pub(crate) use geometry::*;
 pub(crate) use interface::*;
 pub(crate) use picker::*;

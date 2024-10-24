@@ -8,7 +8,7 @@ use crate::version::{MinorFirst, Version};
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 pub struct SpriteClip {
     pub position: Vector2<i32>,
-    pub sprite_number: u32,
+    pub sprite_number: i32,
     pub mirror_on: u32,
     #[version_equals_or_above(2, 0)]
     pub color: Option<u32>,

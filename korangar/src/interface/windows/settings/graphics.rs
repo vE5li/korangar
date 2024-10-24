@@ -3,41 +3,65 @@ use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
-use crate::graphics::{PresentModeInfo, ShadowDetail};
+use crate::graphics::{LimitFramerate, PresentModeInfo, ShadowDetail, TextureSamplerType};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 
-pub struct GraphicsSettingsWindow<Shadow, Framerate>
+pub struct GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
 where
+    Vsync: TrackedStateBinary<bool>,
+    FramerateLimit: TrackedState<LimitFramerate> + 'static,
+    TripleBuffering: TrackedStateBinary<bool>,
+    TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
 {
     present_mode_info: PresentModeInfo,
+    vsync: Vsync,
+    limit_framerate: FramerateLimit,
+    triple_buffering: TripleBuffering,
+    texture_filtering: TextureFiltering,
     shadow_detail: Shadow,
-    framerate_limit: Framerate,
 }
 
-impl<Shadow, Framerate> GraphicsSettingsWindow<Shadow, Framerate>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
+    GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
 where
+    Vsync: TrackedStateBinary<bool>,
+    FramerateLimit: TrackedState<LimitFramerate> + 'static,
+    TripleBuffering: TrackedStateBinary<bool>,
+    TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
-    pub fn new(present_mode_info: PresentModeInfo, shadow_detail: Shadow, framerate_limit: Framerate) -> Self {
+    pub fn new(
+        present_mode_info: PresentModeInfo,
+        vsync: Vsync,
+        limit_framerate: FramerateLimit,
+        triple_buffering: TripleBuffering,
+        texture_filtering: TextureFiltering,
+        shadow_detail: Shadow,
+    ) -> Self {
         Self {
             present_mode_info,
+            vsync,
+            limit_framerate,
+            triple_buffering,
+            texture_filtering,
             shadow_detail,
-            framerate_limit,
         }
     }
 }
 
-impl<Shadow, Framerate> PrototypeWindow<InterfaceSettings> for GraphicsSettingsWindow<Shadow, Framerate>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow> PrototypeWindow<InterfaceSettings>
+    for GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
 where
+    Vsync: TrackedStateBinary<bool>,
+    FramerateLimit: TrackedState<LimitFramerate> + 'static,
+    TripleBuffering: TrackedStateBinary<bool>,
+    TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
-    Framerate: TrackedStateBinary<bool>,
 {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
@@ -50,6 +74,28 @@ where
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let mut elements = vec![
+            StateButtonBuilder::new()
+                .with_text("Triple buffering")
+                .with_event(self.triple_buffering.toggle_action())
+                .with_remote(self.triple_buffering.new_remote())
+                .build()
+                .wrap(),
+            Text::default()
+                .with_text("Texture filtering")
+                .with_width(dimension_bound!(50%))
+                .wrap(),
+            PickList::default()
+                .with_options(vec![
+                    ("Nearest", TextureSamplerType::Nearest),
+                    ("Linear", TextureSamplerType::Linear),
+                    ("Anisotropic x4", TextureSamplerType::Anisotropic(4)),
+                    ("Anisotropic x8", TextureSamplerType::Anisotropic(8)),
+                    ("Anisotropic x16", TextureSamplerType::Anisotropic(16)),
+                ])
+                .with_selected(self.texture_filtering.clone())
+                .with_event(Box::new(Vec::new))
+                .with_width(dimension_bound!(!))
+                .wrap(),
             Text::default().with_text("Shadow detail").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(vec![
@@ -65,16 +111,39 @@ where
             application.to_element("Interface settings".to_string()),
         ];
 
-        // TODO: Instead of not showing this option, disable the checkbox and add a
-        // tooltip
+        // TODO: Instead of not showing these options, disable the checkboxes and add a
+        //       tooltip
         if self.present_mode_info.supports_immediate || self.present_mode_info.supports_mailbox {
             elements.insert(
                 0,
                 StateButtonBuilder::new()
-                    .with_text("Framerate limit")
-                    .with_event(self.framerate_limit.toggle_action())
-                    .with_remote(self.framerate_limit.new_remote())
+                    .with_text("Enable VSYNC")
+                    .with_event(self.vsync.toggle_action())
+                    .with_remote(self.vsync.new_remote())
                     .build()
+                    .wrap(),
+            );
+            elements.insert(
+                1,
+                Text::default()
+                    .with_text("Limit framerate")
+                    .with_width(dimension_bound!(50%))
+                    .wrap(),
+            );
+            elements.insert(
+                2,
+                PickList::default()
+                    .with_options(vec![
+                        ("Unlimited", LimitFramerate::Unlimited),
+                        ("30 Hz", LimitFramerate::Limit(30)),
+                        ("60 Hz", LimitFramerate::Limit(60)),
+                        ("120 Hz", LimitFramerate::Limit(120)),
+                        ("144 Hz", LimitFramerate::Limit(144)),
+                        ("240 Hz", LimitFramerate::Limit(240)),
+                    ])
+                    .with_selected(self.limit_framerate.clone())
+                    .with_event(Box::new(Vec::new))
+                    .with_width(dimension_bound!(!))
                     .wrap(),
             );
         }

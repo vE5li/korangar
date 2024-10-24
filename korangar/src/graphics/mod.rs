@@ -5,6 +5,7 @@ mod color;
 mod engine;
 #[cfg(feature = "debug")]
 mod error;
+mod frame_pacer;
 mod graphic_settings;
 mod instruction;
 mod particles;
@@ -38,6 +39,7 @@ pub use self::color::*;
 pub use self::engine::{GraphicsEngine, GraphicsEngineDescriptor};
 #[cfg(feature = "debug")]
 pub use self::error::error_handler;
+pub use self::frame_pacer::*;
 pub use self::graphic_settings::*;
 pub use self::instruction::*;
 pub use self::particles::*;

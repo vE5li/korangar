@@ -185,8 +185,11 @@ struct Client {
     point_light_instructions: Vec<PointLightInstruction>,
 
     input_system: InputSystem,
+    vsync: MappedRemote<GraphicsSettings, bool>,
+    limit_framerate: MappedRemote<GraphicsSettings, LimitFramerate>,
+    triple_buffering: MappedRemote<GraphicsSettings, bool>,
+    texture_filtering: MappedRemote<GraphicsSettings, TextureSamplerType>,
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
-    framerate_limit: MappedRemote<GraphicsSettings, bool>,
     #[cfg(feature = "debug")]
     render_settings: PlainTrackedState<RenderSettings>,
 
@@ -396,8 +399,11 @@ impl Client {
             let input_system = InputSystem::new(picker_value);
             let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
 
+            let vsync = graphics_settings.mapped(|settings| &settings.vsync).new_remote();
+            let limit_framerate = graphics_settings.mapped(|settings| &settings.limit_framerate).new_remote();
+            let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
+            let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
             let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
-            let framerate_limit = graphics_settings.mapped(|settings| &settings.frame_limit).new_remote();
 
             #[cfg(feature = "debug")]
             let render_settings = PlainTrackedState::new(RenderSettings::new());
@@ -559,8 +565,11 @@ impl Client {
             point_light_with_shadow_instructions,
             point_light_instructions,
             input_system,
+            vsync,
+            limit_framerate,
+            triple_buffering,
+            texture_filtering,
             shadow_detail,
-            framerate_limit,
             #[cfg(feature = "debug")]
             render_settings,
             application,
@@ -652,6 +661,10 @@ impl Client {
         #[cfg(feature = "debug")]
         clear_measurement.stop();
 
+        // We can only apply the graphic changes and reconfigure the surface once the
+        // previous image was presented. Moving this function to the end of the
+        // function results in surface configuration errors under DX12.
+        self.update_graphic_settings();
         let frame = self.graphics_engine.wait_for_next_frame();
 
         #[cfg(feature = "debug")]
@@ -1426,8 +1439,11 @@ impl Client {
                     &mut self.focus_state,
                     &GraphicsSettingsWindow::new(
                         self.graphics_engine.get_present_mode_info(),
+                        self.vsync.clone_state(),
+                        self.limit_framerate.clone_state(),
+                        self.triple_buffering.clone_state(),
+                        self.texture_filtering.clone_state(),
                         self.shadow_detail.clone_state(),
-                        self.framerate_limit.clone_state(),
                     ),
                 ),
                 UserEvent::OpenAudioSettingsWindow => {
@@ -1753,20 +1769,6 @@ impl Client {
             .interface
             .update(&self.application, self.font_loader.clone(), &mut self.focus_state);
         self.mouse_cursor.update(client_tick);
-
-        if self.shadow_detail.consume_changed() {
-            #[cfg(feature = "debug")]
-            profile_block!("shadow detail changed");
-            self.graphics_engine.set_shadow_detail(*self.shadow_detail.get())
-        }
-
-        if self.framerate_limit.consume_changed() {
-            self.graphics_engine.set_framerate_limit(*self.framerate_limit.get());
-
-            // For some reason the interface buffer becomes messed up when
-            // recreating the surface, so we need to render it again.
-            self.interface.schedule_render();
-        }
 
         #[cfg(feature = "debug")]
         let matrices_measurement = Profiler::start_measurement("generate view and projection matrices");
@@ -2192,6 +2194,40 @@ impl Client {
         #[cfg(feature = "debug")]
         render_frame_measurement.stop();
     }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn update_graphic_settings(&mut self) {
+        // For some reason the interface buffer becomes messed up when
+        // recreating the surface, so we need to render it again.
+        let mut update_interface = false;
+
+        if self.vsync.consume_changed() {
+            self.graphics_engine.set_vsync(*self.vsync.get());
+            update_interface = true;
+        }
+
+        if self.limit_framerate.consume_changed() {
+            self.graphics_engine.set_limit_framerate(*self.limit_framerate.get());
+        }
+
+        if self.triple_buffering.consume_changed() {
+            self.graphics_engine.set_triple_buffering(*self.triple_buffering.get());
+            update_interface = true;
+        }
+
+        if self.texture_filtering.consume_changed() {
+            self.graphics_engine.set_texture_sampler_type(*self.texture_filtering.get());
+            update_interface = true;
+        }
+
+        if self.shadow_detail.consume_changed() {
+            self.graphics_engine.set_shadow_detail(*self.shadow_detail.get());
+        }
+
+        if update_interface {
+            self.interface.schedule_render();
+        }
+    }
 }
 
 impl ApplicationHandler for Client {
@@ -2224,9 +2260,14 @@ impl ApplicationHandler for Client {
         // Android devices need to drop the surface on suspend, so we might need to
         // re-create it.
         if let Some(window) = self.window.clone() {
-            // TODO: NHA Expose texture filtering as an graphics setting.
-            self.graphics_engine
-                .on_resume(window, *self.shadow_detail.get(), TextureSamplerType::Anisotropic(4))
+            self.graphics_engine.on_resume(
+                window,
+                *self.triple_buffering.get(),
+                *self.vsync.get(),
+                *self.limit_framerate.get(),
+                *self.shadow_detail.get(),
+                *self.texture_filtering.get(),
+            )
         }
     }
 

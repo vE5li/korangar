@@ -6,6 +6,7 @@ struct GlobalUniforms {
     indicator_positions: mat4x4<f32>,
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
+    screen_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
     day_timer: f32,

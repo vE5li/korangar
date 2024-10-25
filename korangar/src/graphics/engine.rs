@@ -82,6 +82,7 @@ struct EngineContext {
     screen_pass_context: ScreenRenderPassContext,
 
     forward_pass_context: ForwardRenderPassContext,
+    light_culling_pass_context: LightCullingPassContext,
 
     interface_rectangle_drawer: InterfaceRectangleDrawer,
     picker_entity_drawer: PickerEntityDrawer,
@@ -120,6 +121,7 @@ struct EngineContext {
     forward_overlay_drawer: ForwardOverlayDrawer,
     forward_rectangle_drawer: ForwardRectangleDrawer,
     forward_water_drawer: ForwardWaterDrawer,
+    light_culling_dispatcher: LightCullingDispatcher,
     #[cfg(feature = "debug")]
     forward_aabb_drawer: ForwardAabbDrawer,
     #[cfg(feature = "debug")]
@@ -201,6 +203,7 @@ impl GraphicsEngine {
 
                         let forward_pass_context =
                             ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+                        let light_culling_pass_context = LightCullingPassContext::new(&self.device, &self.queue, &global_context);
                     });
 
                     time_phase!("create computer and drawer", {
@@ -427,6 +430,13 @@ impl GraphicsEngine {
                             &global_context,
                             &forward_pass_context,
                         );
+                        let light_culling_dispatcher = LightCullingDispatcher::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &light_culling_pass_context,
+                        );
                         #[cfg(feature = "debug")]
                         let forward_aabb_drawer = ForwardAabbDrawer::new(
                             &self.capabilities,
@@ -454,6 +464,7 @@ impl GraphicsEngine {
                         geometry_pass_context,
                         screen_pass_context,
                         forward_pass_context,
+                        light_culling_pass_context,
                         interface_rectangle_drawer,
                         picker_entity_drawer,
                         picker_tile_drawer,
@@ -489,6 +500,7 @@ impl GraphicsEngine {
                         forward_overlay_drawer,
                         forward_rectangle_drawer,
                         forward_water_drawer,
+                        light_culling_dispatcher,
                         #[cfg(feature = "debug")]
                         forward_aabb_drawer,
                         #[cfg(feature = "debug")]
@@ -565,7 +577,7 @@ impl GraphicsEngine {
             if let Some(engine_context) = self.engine_context.as_mut() {
                 engine_context
                     .global_context
-                    .update_screen_size_textures(&self.device, surface.window_screen_size());
+                    .update_screen_size_resources(&self.device, surface.window_screen_size());
             }
         }
 
@@ -978,6 +990,18 @@ impl GraphicsEngine {
 
                 engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
             } else {
+                // Light Culling Pass
+                scope.spawn(|_| {
+                    let mut compute_pass =
+                        engine_context
+                            .light_culling_pass_context
+                            .create_pass(&mut geometry_encoder, &engine_context.global_context, None);
+
+                    engine_context
+                        .light_culling_dispatcher
+                        .dispatch(&mut compute_pass, engine_context.global_context.screen_size);
+                });
+
                 // Forward Pass
                 let mut render_pass =
                     engine_context

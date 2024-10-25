@@ -1,7 +1,7 @@
 use std::string::String;
 use std::sync::Arc;
 
-use cgmath::{Array, EuclideanSpace, Point3, Vector2, VectorSpace};
+use cgmath::{Array, EuclideanSpace, InnerSpace, Point3, Vector2, VectorSpace};
 use derive_new::new;
 use image::{save_buffer, RgbaImage};
 use korangar_interface::elements::PrototypeElement;
@@ -753,7 +753,10 @@ impl Common {
             .animation_data
             .render(&self.animation_state, camera_direction, self.head_direction);
 
-        let origin = Point3::new(position.x, position.y, 0.0);
+        let view_direction = camera.view_direction();
+        let right_vector = camera.look_up_vector().cross(view_direction).normalize();
+
+        let origin = Point3::new(0.0, position.y, 0.0) - position.x * right_vector;
         let scale = Vector2::from_value(0.7);
         let cell_count = Vector2::new(1, 1);
         let cell_position = Vector2::new(0, 0);

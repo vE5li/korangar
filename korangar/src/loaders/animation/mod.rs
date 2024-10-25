@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -126,6 +127,8 @@ impl AnimationLoader {
                         frame_part = FramePart {
                             sprite_type,
                             rgba_data: rgba_image_data_scale.clone(),
+                            upleft_x: 0,
+                            upleft_y: 0,
                             offset_x: offset.x,
                             offset_y: offset.y,
                             attach_point_x,
@@ -193,7 +196,60 @@ impl AnimationLoader {
                 EntityType::Npc => format!("2_{}_{}", entity_filename[0], action_index),
                 _ => format!("3"),
             };
-            let textures: Vec<Arc<Texture>> = rgba_images
+            // TODO: Remove this code after fixing the offset
+            // This code resize the sprites in the correct size may be used later
+            let mut max_width = 0;
+            let mut max_height = 0;
+            let mut min_offset_x = i32::MAX;
+            let mut min_offset_y = i32::MAX;
+            let mut max_offset_x = 0;
+            let mut max_offset_y = 0;
+            rgba_images.iter().zip(offsets.iter()).for_each(|(image_data, offset)| {
+                max_width = max(max_width, image_data.width as i32);
+                max_height = max(max_height, image_data.height as i32);
+                min_offset_x = min(min_offset_x, offset.x as i32);
+                min_offset_y = min(min_offset_y, offset.y as i32);
+                max_offset_x = max(max_offset_x, offset.x as i32);
+                max_offset_y = max(max_offset_y, offset.y as i32);
+            });
+            max_width += max_offset_x - min_offset_x + 2;
+            max_height += max_offset_y - min_offset_y + 2;
+
+            let rgba_images_fix_size = rgba_images.iter().zip(offsets.iter_mut()).map(|(image_data, offset)| {
+                // Create a RgbaImage of the drawing
+                let mut rgba: RgbaImage = RgbaImage::new(max_width as u32, max_height as u32);
+                let width = image_data.width as i32;
+                let height = image_data.height as i32;
+
+                let space_x = offset.x as i32 - min_offset_x;
+                let space_y = offset.y as i32 - min_offset_y;
+
+                offset.x = min_offset_x as f32;
+                offset.y = min_offset_y as f32;
+                offset.x += (max_offset_x - min_offset_x + 2) as f32;
+                offset.y += (max_offset_y - min_offset_y + 2) as f32;
+
+                let rgba_raw: RgbaImage =
+                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data.clone()).unwrap();
+                // Insert the images in the new ImageBuffer
+                // The order of for is important for cache
+                for y in 0..height {
+                    let new_y = y as i32 + space_y - height / 2 + (max_height - (max_offset_y - min_offset_y + 2)) / 2;
+                    for x in 0..width {
+                        let new_x = x as i32 + space_x - width / 2 + (max_width - (max_offset_x - min_offset_x + 2)) / 2;
+                        let change_x = x as i32;
+                        let pixel: &mut Rgba<u8> = rgba.get_pixel_mut(new_x as u32, new_y as u32);
+                        pixel.blend(rgba_raw.get_pixel(change_x as u32, y as u32));
+                    }
+                }
+                RgbaImageData {
+                    width: rgba.width() as u16,
+                    height: rgba.height() as u16,
+                    data: rgba.into_raw(),
+                }
+            });
+
+            let textures: Vec<Arc<Texture>> = rgba_images_fix_size
                 .into_iter()
                 .map(|image_data| {
                     let texture = Texture::new_with_data(
@@ -263,6 +319,8 @@ pub struct FramePart {
     pub rgba_data: RgbaImageData,
     pub offset_x: i32,
     pub offset_y: i32,
+    pub upleft_x: i32,
+    pub upleft_y: i32,
     pub has_attach_point: bool,
     pub attach_point_x: i32,
     pub attach_point_y: i32,
@@ -271,19 +329,17 @@ pub struct FramePart {
     pub mirror: bool,
 }
 
-pub struct Frame {
-    pub texture: Arc<Texture>,
-}
+pub struct Frame {}
 
 impl Frame {
-    // The generate image will be overwrite in the order of the index of the vector
+    // This function generate image that will be overwrite in the order of the index
+    // of the vector
     pub fn merge_frame_part(action_frames: &mut Vec<FramePart>) -> FramePart {
-        // Adjusting the values
         for frame_part in action_frames.iter_mut() {
-            // A small offset when there is mirror image
+            // A small offset when to correct the mirror images
             let mirror_offset = match frame_part.mirror {
-                true => -1,
-                false => 1,
+                true => 0,
+                false => 0,
             };
             let attach_point_offset_x = match &frame_part.has_attach_point {
                 true => match &frame_part.sprite_type {
@@ -299,15 +355,21 @@ impl Frame {
                 },
                 false => 0,
             };
-            // Correcting the mirror offset of the center of image
-            let center_image_x: i32 = (frame_part.rgba_data.width as i32 + mirror_offset) / 2;
-            let center_image_y: i32 = (frame_part.rgba_data.height as i32 + mirror_offset) / 2;
 
-            // Correcting the origin from the center of image to the left upper corner of
-            // image
-            frame_part.offset_x = frame_part.offset_x - center_image_x + attach_point_offset_x;
-            frame_part.offset_y = frame_part.offset_y - center_image_y + attach_point_offset_y;
+            // The origin is (0, 0)
+            // Finding the half size of the image
+            let half_size_x: i32 = (frame_part.rgba_data.width as i32 + mirror_offset) / 2;
+            let half_size_y: i32 = (frame_part.rgba_data.height as i32 + mirror_offset) / 2;
+
+            // Adding the offset from attach point
+            frame_part.offset_x += attach_point_offset_x;
+            frame_part.offset_y += attach_point_offset_y;
+
+            // For each retangle find the upleft corner
+            frame_part.upleft_x = frame_part.offset_x - half_size_x;
+            frame_part.upleft_y = frame_part.offset_y - half_size_y;
         }
+        // If there is no frame return an image
         if action_frames.is_empty() {
             return FramePart {
                 sprite_type: SpriteType::Other,
@@ -316,6 +378,8 @@ impl Frame {
                     height: 1,
                     data: vec![0x00, 0x00, 0x00, 0x00],
                 },
+                upleft_x: 0,
+                upleft_y: 0,
                 offset_x: 0,
                 offset_y: 0,
                 has_attach_point: false,
@@ -326,24 +390,25 @@ impl Frame {
                 mirror: false,
             };
         }
-        // Get the minimal offset to find the new pixel (0, 0)
-        let offset_x = action_frames.iter().min_by_key(|frame_part| frame_part.offset_x).unwrap().offset_x;
-        let offset_y = action_frames.iter().min_by_key(|frame_part| frame_part.offset_y).unwrap().offset_y;
+        // Find the upmost and leftmost coordinates
+        let upleft_x = action_frames.iter().min_by_key(|frame_part| frame_part.upleft_x).unwrap().upleft_x;
+        let upleft_y = action_frames.iter().min_by_key(|frame_part| frame_part.upleft_y).unwrap().upleft_y;
 
-        // The new size of the rgba
+        // Find the downmost and rightmost coordinates
         let frame_part_x = action_frames
             .iter()
-            .max_by_key(|frame_part| frame_part.offset_x + frame_part.rgba_data.width as i32)
+            .max_by_key(|frame_part| frame_part.upleft_x + frame_part.rgba_data.width as i32)
             .unwrap();
         let frame_part_y = action_frames
             .iter()
-            .max_by_key(|frame_part| frame_part.offset_y + frame_part.rgba_data.height as i32)
+            .max_by_key(|frame_part| frame_part.upleft_y + frame_part.rgba_data.height as i32)
             .unwrap();
 
-        let mut new_width = frame_part_x.offset_x + frame_part_x.rgba_data.width as i32;
-        let mut new_height = frame_part_y.offset_y + frame_part_y.rgba_data.height as i32;
-        new_width -= offset_x;
-        new_height -= offset_y;
+        // Calculate the new rectangle that is formed
+        let mut new_width = frame_part_x.upleft_x + frame_part_x.rgba_data.width as i32;
+        let mut new_height = frame_part_y.upleft_y + frame_part_y.rgba_data.height as i32;
+        new_width -= upleft_x;
+        new_height -= upleft_y;
 
         // Create a RgbaImage of the drawing
         let mut rgba: RgbaImage = RgbaImage::new(new_width as u32, new_height as u32);
@@ -366,23 +431,28 @@ impl Frame {
             let height = rgba_list[index].height();
             let width = rgba_list[index].width();
             for y in 0..height {
-                let new_y = (y as i32) + action_frames[index].offset_y - offset_y;
+                let new_y = (y as i32) + action_frames[index].upleft_y - upleft_y;
                 for x in 0..width {
-                    let new_x = x as i32 + action_frames[index].offset_x - offset_x;
+                    let new_x = x as i32 + action_frames[index].upleft_x - upleft_x;
                     let mut change_x = x as i32;
                     if action_frames[index].mirror {
                         change_x = width as i32 - 1 - x as i32;
                     }
                     let pixel: &mut Rgba<u8> = rgba.get_pixel_mut(new_x as u32, new_y as u32);
                     pixel.blend(rgba_list[index].get_pixel(change_x as u32, y));
-                    //rgba.put_pixel(new_x as u32, new_y as u32, pixel);
                 }
             }
         }
         FramePart {
             sprite_type: SpriteType::Other,
-            offset_x: offset_x + rgba.width() as i32 / 2,  // Convert back to the center
-            offset_y: offset_y + rgba.height() as i32 / 2, // Convert back to the center
+            upleft_x: 0,
+            upleft_y: 0,
+            offset_x: upleft_x + rgba.width() as i32 / 2, /* As the origin is (0,0), you get the upleft point of the retangle and shift
+                                                           * to center, the
+                                                           * offset is the difference between the origin and this point */
+            offset_y: upleft_y + rgba.height() as i32 / 2, /* As the origin is (0,0), you get the upleft point of the retangle and shift
+                                                            * to the center,
+                                                            * the offset is the difference between the origin and this point */
             rgba_data: RgbaImageData {
                 width: rgba.width() as u16,
                 height: rgba.height() as u16,

@@ -281,7 +281,13 @@ impl AnimationLoader {
             delays: vec[0].actions.delays.clone(),
             entity_type,
         };
-        self.cache.insert(entity_filename[0].clone(), animation_data.clone());
+        let hash = match entity_type {
+            EntityType::Player => format!("0_{}_{}", entity_filename[0], entity_filename[1]),
+            EntityType::Monster => format!("1_{}", entity_filename[0]),
+            EntityType::Npc => format!("2_{}", entity_filename[0]),
+            _ => format!("3"),
+        };
+        self.cache.insert(hash.clone(), animation_data.clone());
         Ok(animation_data)
     }
 

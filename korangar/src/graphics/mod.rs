@@ -181,6 +181,9 @@ pub(crate) struct GlobalContext {
 
 impl Prepare for GlobalContext {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
+        let num_point_lights = instructions.point_light_shadow_caster.len() + instructions.point_light.len();
+        dbg!(num_point_lights);
+
         self.point_light_data.clear();
 
         let (indicator_positions, indicator_color) = instructions

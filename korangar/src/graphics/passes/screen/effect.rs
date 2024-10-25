@@ -206,7 +206,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         pass.set_bind_group(2, &self.bind_group, &[]);
 
-        for batch in self.batches.drain(..) {
+        for batch in self.batches.iter() {
             if let Some(pipeline) = self.pipelines.get(&batch.blend_state) {
                 pass.set_pipeline(pipeline);
 
@@ -243,6 +243,7 @@ impl Prepare for ScreenEffectDrawer {
         }
 
         self.instance_data.clear();
+        self.batches.clear();
 
         let first_effect = &instructions.effects[0];
         let mut blend_state = (first_effect.source_blend_factor, first_effect.destination_blend_factor);

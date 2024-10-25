@@ -95,11 +95,19 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             visibility = f32(mapped_distance - bias < shadow_map_depth);
         }
 
-        let attenuation = min(light.range / exp(light_distance / 10.0), 0.7) * visibility;
+        let attenuation = calculate_attenuation(light_distance, light.range) * visibility;
         final_color += light_percent * light.color.rgb * base_color * attenuation;
     }
 
     return vec4<f32>(final_color, texel_color.a);
+}
+
+// Inverse square law with smooth falloff
+fn calculate_attenuation(distance: f32, range: f32) -> f32 {
+    let d = min(distance, range);
+    let normalized_distance = d / range;
+    let att = saturate(1.0 - normalized_distance * normalized_distance);
+    return att * att;
 }
 
 fn clip_to_screen_space(ndc: vec2<f32>) -> vec2<f32> {

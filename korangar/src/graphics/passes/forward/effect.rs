@@ -8,9 +8,10 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages,
-    ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayout,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState,
+    MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat,
+    TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
@@ -67,6 +68,7 @@ pub(crate) struct ForwardEffectDrawer {
     shader_module: ShaderModule,
     pipeline_layout: PipelineLayout,
     color_attachment_format: TextureFormat,
+    depth_attachment_format: TextureFormat,
     pipelines: HashMap<(BlendFactor, BlendFactor), RenderPipeline>,
     instance_data: Vec<InstanceData>,
     bump: Bump,
@@ -86,6 +88,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         render_pass_context: &Self::Context,
     ) -> Self {
         let color_attachment_format = render_pass_context.color_attachment_formats()[0];
+        let depth_attachment_format = render_pass_context.depth_attachment_output_format()[0];
 
         let shader_module = if capabilities.supports_bindless() {
             device.create_shader_module(SHADER_BINDLESS)
@@ -172,10 +175,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         let mut pipelines = HashMap::with_capacity(PRELOAD_PIPELINES.len());
         for (source_blend_factor, destination_blend_factor) in PRELOAD_PIPELINES.iter().copied() {
             let pipeline = Self::create_pipeline(
-                &device,
+                device,
                 &shader_module,
                 &pipeline_layout,
                 color_attachment_format,
+                depth_attachment_format,
                 source_blend_factor,
                 destination_blend_factor,
             );
@@ -191,6 +195,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             shader_module,
             pipeline_layout,
             color_attachment_format,
+            depth_attachment_format,
             pipelines,
             instance_data: Vec::default(),
             bump: Bump::default(),
@@ -206,7 +211,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         pass.set_bind_group(2, &self.bind_group, &[]);
 
-        for batch in self.batches.drain(..) {
+        for batch in self.batches.iter() {
             if let Some(pipeline) = self.pipelines.get(&batch.blend_state) {
                 pass.set_pipeline(pipeline);
 
@@ -243,6 +248,7 @@ impl Prepare for ForwardEffectDrawer {
         }
 
         self.instance_data.clear();
+        self.batches.clear();
 
         let first_effect = &instructions.effects[0];
         let mut blend_state = (first_effect.source_blend_factor, first_effect.destination_blend_factor);
@@ -264,6 +270,7 @@ impl Prepare for ForwardEffectDrawer {
                         &mut self.batches,
                         &self.shader_module,
                         self.color_attachment_format,
+                        self.depth_attachment_format,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -308,6 +315,7 @@ impl Prepare for ForwardEffectDrawer {
                 &mut self.batches,
                 &self.shader_module,
                 self.color_attachment_format,
+                self.depth_attachment_format,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -331,6 +339,7 @@ impl Prepare for ForwardEffectDrawer {
                         &mut self.batches,
                         &self.shader_module,
                         self.color_attachment_format,
+                        self.depth_attachment_format,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -364,6 +373,7 @@ impl Prepare for ForwardEffectDrawer {
                 &mut self.batches,
                 &self.shader_module,
                 self.color_attachment_format,
+                self.depth_attachment_format,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -420,6 +430,7 @@ impl ForwardEffectDrawer {
         shader_module: &ShaderModule,
         pipeline_layout: &PipelineLayout,
         color_attachment_format: TextureFormat,
+        depth_attachment_format: TextureFormat,
         source_blend_factor: BlendFactor,
         destination_blend_factor: BlendFactor,
     ) -> RenderPipeline {
@@ -454,8 +465,17 @@ impl ForwardEffectDrawer {
                 })],
             }),
             primitive: PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: MultisampleState::default(),
+            multisample: MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: depth_attachment_format,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             multiview: None,
             cache: None,
         })
@@ -467,6 +487,7 @@ impl ForwardEffectDrawer {
         batches: &mut Vec<EffectBatch>,
         shader_module: &ShaderModule,
         color_attachment_format: TextureFormat,
+        depth_attachment_format: TextureFormat,
         pipeline_layout: &PipelineLayout,
         blend_state: (BlendFactor, BlendFactor),
         count: usize,
@@ -478,6 +499,7 @@ impl ForwardEffectDrawer {
                 shader_module,
                 pipeline_layout,
                 color_attachment_format,
+                depth_attachment_format,
                 blend_state.0,
                 blend_state.1,
             );

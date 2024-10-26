@@ -82,6 +82,37 @@ impl AnimationLoader {
                             _ => animation_pair.sprites.palette_images[sprite_number as usize].clone(),
                         };
 
+                        let mut rgba_image: RgbaImage = RgbaImage::from_raw(
+                            rgba_image_data.width.into(),
+                            rgba_image_data.height.into(),
+                            rgba_image_data.data.clone(),
+                        )
+                        .unwrap();
+                        // Apply color filter in the image
+                        let color = match motion.sprite_clips[pos].color {
+                            Some(value) => value,
+                            None => 0,
+                        };
+                        if color != 0 {
+                            let alpha = ((((color >> 24) & 0xFF) as u8) as f32 / 255.0) as f32;
+                            let blue = ((((color >> 16) & 0xFF) as u8) as f32 / 255.0) as f32;
+                            let green = ((((color >> 8) & 0xFF) as u8) as f32 / 255.0) as f32;
+                            let red = ((((color) & 0xFF) as u8) as f32 / 255.0) as f32;
+
+                            let height = rgba_image.height();
+                            let width = rgba_image.width();
+                            for y in 0..height {
+                                for x in 0..width {
+                                    let pixel: &mut Rgba<u8> = rgba_image.get_pixel_mut(x, y);
+                                    pixel.0[0] = (pixel.0[0] as f32 * red) as u8;
+                                    pixel.0[1] = (pixel.0[1] as f32 * green) as u8;
+                                    pixel.0[2] = (pixel.0[2] as f32 * blue) as u8;
+                                    pixel.0[3] = (pixel.0[3] as f32) as u8; // TODO: Multiply by alpha later
+                                }
+                            }
+                        }
+
+                        // Scale the image
                         // Try to match the first type of zoom, if doesn't match find the second method
                         let zoom = match motion.sprite_clips[pos].zoom {
                             Some(value) => (value, value).into(),
@@ -90,38 +121,28 @@ impl AnimationLoader {
                                 None => (1.0, 1.0).into(),
                             },
                         };
+                        if (zoom.x - 1.0).abs() <= 0.0001 && (zoom.y - 1.0).abs() <= 0.0001 {
+                            let new_width = (rgba_image_data.width as f32 * zoom.x) as u32;
+                            let new_height = (rgba_image_data.height as f32 * zoom.y) as u32;
+                            rgba_image = image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Nearest);
+                        }
 
-                        // Rotate
+                        // Rotate the image
+                        // TODO: This rotate_about_center cut the parts that not inside the initial
+                        // rotate side, need address the cut parts
                         let angle = match motion.sprite_clips[pos].angle {
                             Some(value) => value,
                             None => 0,
                         };
+                        if angle == 0 {
+                            let angle_radian = (angle as f32 / 360.0) * 2.0 * std::f32::consts::PI;
+                            rgba_image = rotate_about_center(&rgba_image, angle_radian, Interpolation::Nearest, Rgba([0u8, 0u8, 0u8, 0u8]));
+                        }
 
-                        let rgba_image: RgbaImage = RgbaImage::from_raw(
-                            rgba_image_data.width.into(),
-                            rgba_image_data.height.into(),
-                            rgba_image_data.data.clone(),
-                        )
-                        .unwrap();
-                        let new_width = (rgba_image_data.width as f32 * zoom.x) as u32;
-                        let new_height = (rgba_image_data.height as f32 * zoom.y) as u32;
-                        let rgba_image_scale: image::ImageBuffer<Rgba<u8>, Vec<u8>> =
-                            image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Nearest);
-
-                        // TODO: This rotate_about_center cut the parts that not inside the initial
-                        // rotate side, need address the cut parts
-                        let angle_radian = (angle as f32 / 360.0) * 2.0 * std::f32::consts::PI;
-                        let rgba_image_rotate = rotate_about_center(
-                            &rgba_image_scale,
-                            angle_radian,
-                            Interpolation::Nearest,
-                            Rgba([0u8, 0u8, 0u8, 0u8]),
-                        );
-
-                        let rgba_image_data_scale = RgbaImageData {
-                            width: rgba_image_rotate.width() as u16,
-                            height: rgba_image_rotate.height() as u16,
-                            data: rgba_image_rotate.into_raw(),
+                        let rgba_image_data_modify = RgbaImageData {
+                            width: rgba_image.width() as u16,
+                            height: rgba_image.height() as u16,
+                            data: rgba_image.into_raw(),
                         };
 
                         let offset = motion.sprite_clips[pos].position.map(|component| component);
@@ -148,7 +169,7 @@ impl AnimationLoader {
                         };
                         frame_part = FramePart {
                             sprite_type,
-                            rgba_data: rgba_image_data_scale.clone(),
+                            rgba_data: rgba_image_data_modify.clone(),
                             upleft_x: 0,
                             upleft_y: 0,
                             offset_x: offset.x,

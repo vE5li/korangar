@@ -2,10 +2,11 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::Vector2;
+use cgmath::{Deg, Vector2};
 use derive_new::new;
 use image::imageops::FilterType;
 use image::{save_buffer, Pixel, Rgba, RgbaImage};
+use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::sprite::RgbaImageData;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
@@ -90,7 +91,11 @@ impl AnimationLoader {
                             },
                         };
 
-                        // TODO: ADD ROTATION
+                        // Rotate
+                        let angle = match motion.sprite_clips[pos].angle {
+                            Some(value) => value,
+                            None => 0,
+                        };
 
                         let rgba_image: RgbaImage = RgbaImage::from_raw(
                             rgba_image_data.width.into(),
@@ -100,12 +105,23 @@ impl AnimationLoader {
                         .unwrap();
                         let new_width = (rgba_image_data.width as f32 * zoom.x) as u32;
                         let new_height = (rgba_image_data.height as f32 * zoom.y) as u32;
-                        let rgba_image_scale = image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Nearest);
+                        let rgba_image_scale: image::ImageBuffer<Rgba<u8>, Vec<u8>> =
+                            image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Nearest);
+
+                        // TODO: This rotate_about_center cut the parts that not inside the initial
+                        // rotate side, need address the cut parts
+                        let angle_radian = (angle as f32 / 360.0) * 2.0 * std::f32::consts::PI;
+                        let rgba_image_rotate = rotate_about_center(
+                            &rgba_image_scale,
+                            angle_radian,
+                            Interpolation::Nearest,
+                            Rgba([0u8, 0u8, 0u8, 0u8]),
+                        );
 
                         let rgba_image_data_scale = RgbaImageData {
-                            width: rgba_image_scale.width() as u16,
-                            height: rgba_image_scale.height() as u16,
-                            data: rgba_image_scale.into_raw(),
+                            width: rgba_image_rotate.width() as u16,
+                            height: rgba_image_rotate.height() as u16,
+                            data: rgba_image_rotate.into_raw(),
                         };
 
                         let offset = motion.sprite_clips[pos].position.map(|component| component);

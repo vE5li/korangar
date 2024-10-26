@@ -13,6 +13,7 @@ derive-new = "0.7"
 etherparse = "0.16"
 hashbrown = "0.15"
 image = { version = "0.25", default-features = false }
+imageproc = { version = "0.25", default-features = false }
 kira = { version = "0.9", default-features = false }
 korangar_audio = { path = "korangar_audio" }
 korangar_debug = { path = "korangar_debug" }

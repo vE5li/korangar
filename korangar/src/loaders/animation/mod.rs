@@ -51,8 +51,7 @@ impl AnimationLoader {
         // The sprite is stored in animation_pair.sprites.rgba_images or
         // animation_pair.sprites.palette_images
 
-        // Get the actions for merging the sprites in one
-        // Each action have a vector of framepart
+        // For each animation, we collect all the framepart need to generate
         let mut animations_list: Vec<Vec<Vec<FramePart>>> = Vec::new();
         let mut animation_index: usize = 0;
 
@@ -121,9 +120,9 @@ impl AnimationLoader {
                                 None => (1.0, 1.0).into(),
                             },
                         };
-                        if (zoom.x - 1.0).abs() <= 0.0001 && (zoom.y - 1.0).abs() <= 0.0001 {
-                            let new_width = (rgba_image_data.width as f32 * zoom.x) as u32;
-                            let new_height = (rgba_image_data.height as f32 * zoom.y) as u32;
+                        if (zoom.x - 1.0).abs() >= 0.0001 || (zoom.y - 1.0).abs() >= 0.0001 {
+                            let new_width = (rgba_image_data.width as f32 * zoom.x).floor() as u32;
+                            let new_height = (rgba_image_data.height as f32 * zoom.y).floor() as u32;
                             rgba_image = image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Nearest);
                         }
 
@@ -243,13 +242,7 @@ impl AnimationLoader {
                     motion_index as i32,
                 );*/
             }
-            // 3 - Create the textures using the animation loader functions.
-            let label = match entity_type {
-                EntityType::Player => format!("0_{}_{}_{}", entity_filename[0], entity_filename[1], action_index),
-                EntityType::Monster => format!("1_{}_{}", entity_filename[0], action_index),
-                EntityType::Npc => format!("2_{}_{}", entity_filename[0], action_index),
-                _ => format!("3"),
-            };
+
             // TODO: Remove this code after fixing the offset
             // The problem is that the offset is not in the correct proportion
             // To solve this primarly, we created images of the same size and same offset
@@ -272,37 +265,44 @@ impl AnimationLoader {
             max_height += max_offset_y - min_offset_y + 2;
 
             let rgba_images_fix_size = rgba_images.iter().zip(offsets.iter_mut()).map(|(image_data, offset)| {
-                // Create a RgbaImage of the drawing
-                let mut rgba: RgbaImage = RgbaImage::new(max_width as u32, max_height as u32);
+                let mut rgba_new: RgbaImage = RgbaImage::new(max_width as u32, max_height as u32);
                 let width = image_data.width as i32;
                 let height = image_data.height as i32;
 
-                let space_x = offset.x as i32 - min_offset_x;
-                let space_y = offset.y as i32 - min_offset_y;
+                let rgba_old: RgbaImage =
+                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data.clone()).unwrap();
 
+                for y in 0..height {
+                    let upleft_old_y = offset.y as i32 - ((height - 1) / 2);
+                    let upleft_new_y = min_offset_y - (max_height - (max_offset_y - min_offset_y + 2) - 1) / 2;
+                    let new_y = y as i32 + upleft_old_y - upleft_new_y;
+                    for x in 0..width {
+                        let upleft_old_x = offset.x as i32 - ((width - 1) / 2);
+                        let upleft_new_x = min_offset_x - (max_width - (max_offset_x - min_offset_x + 2) - 1) / 2;
+                        let new_x = x as i32 + upleft_old_x - upleft_new_x;
+                        let pixel: &mut Rgba<u8> = rgba_new.get_pixel_mut(new_x as u32, new_y as u32);
+                        pixel.blend(rgba_old.get_pixel(x as u32, y as u32));
+                    }
+                }
                 offset.x = min_offset_x as f32;
                 offset.y = min_offset_y as f32;
                 offset.x += (max_offset_x - min_offset_x + 2) as f32;
                 offset.y += (max_offset_y - min_offset_y + 2) as f32;
 
-                let rgba_raw: RgbaImage =
-                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data.clone()).unwrap();
-                // Insert the images in the new ImageBuffer
-                // The order of for is important for cache
-                for y in 0..height {
-                    let new_y = y as i32 + space_y - height / 2 + (max_height - (max_offset_y - min_offset_y + 2)) / 2;
-                    for x in 0..width {
-                        let new_x = x as i32 + space_x - width / 2 + (max_width - (max_offset_x - min_offset_x + 2)) / 2;
-                        let pixel: &mut Rgba<u8> = rgba.get_pixel_mut(new_x as u32, new_y as u32);
-                        pixel.blend(rgba_raw.get_pixel(x as u32, y as u32));
-                    }
-                }
                 RgbaImageData {
-                    width: rgba.width() as u16,
-                    height: rgba.height() as u16,
-                    data: rgba.into_raw(),
+                    width: rgba_new.width() as u16,
+                    height: rgba_new.height() as u16,
+                    data: rgba_new.into_raw(),
                 }
             });
+
+            // Create the textures using the animation loader functions.
+            let label = match entity_type {
+                EntityType::Player => format!("0_{}_{}_{}", entity_filename[0], entity_filename[1], action_index),
+                EntityType::Monster => format!("1_{}_{}", entity_filename[0], action_index),
+                EntityType::Npc => format!("2_{}_{}", entity_filename[0], action_index),
+                _ => format!("3"),
+            };
 
             let textures: Vec<Arc<Texture>> = rgba_images_fix_size
                 .into_iter()
@@ -414,8 +414,8 @@ impl Frame {
 
             // The origin is (0, 0)
             // Finding the half size of the image
-            let half_size_x = frame_part.rgba_data.width as i32 / 2;
-            let half_size_y = frame_part.rgba_data.height as i32 / 2;
+            let half_size_x = (frame_part.rgba_data.width as i32 - 1) / 2;
+            let half_size_y = (frame_part.rgba_data.height as i32 - 1) / 2;
 
             // Adding the offset from attach point
             frame_part.offset_x += attach_point_offset_x;
@@ -503,12 +503,14 @@ impl Frame {
             sprite_type: SpriteType::Other,
             upleft_x: 0,
             upleft_y: 0,
-            offset_x: upleft_x + rgba.width() as i32 / 2, /* As the origin is (0,0), you get the upleft point of the retangle and shift
-                                                           * to center, the
-                                                           * offset is the difference between the origin and this point */
-            offset_y: upleft_y + rgba.height() as i32 / 2, /* As the origin is (0,0), you get the upleft point of the retangle and shift
-                                                            * to the center,
-                                                            * the offset is the difference between the origin and this point */
+            offset_x: upleft_x + (rgba.width() as i32 - 1) / 2, /* As the origin is (0,0), you get the upleft point of the retangle and
+                                                                 * shift
+                                                                 * to center, the
+                                                                 * offset is the difference between the origin and this point */
+            offset_y: upleft_y + (rgba.height() as i32 - 1) / 2, /* As the origin is (0,0), you get the upleft point of the retangle and
+                                                                  * shift
+                                                                  * to the center,
+                                                                  * the offset is the difference between the origin and this point */
             rgba_data: RgbaImageData {
                 width: rgba.width() as u16,
                 height: rgba.height() as u16,

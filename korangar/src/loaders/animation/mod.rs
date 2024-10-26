@@ -80,10 +80,17 @@ impl AnimationLoader {
                             0 => animation_pair.sprites.rgba_images[sprite_number as usize].clone(),
                             _ => animation_pair.sprites.palette_images[sprite_number as usize].clone(),
                         };
+
+                        // Try to match the first type of zoom, if doesn't match find the second method
                         let zoom = match motion.sprite_clips[pos].zoom {
-                            Some(value) => value,
-                            None => 1.0,
+                            Some(value) => (value, value).into(),
+                            None => match motion.sprite_clips[pos].zoom2 {
+                                Some(value) => value,
+                                None => (1.0, 1.0).into(),
+                            },
                         };
+
+                        // TODO: ADD ROTATION
 
                         let rgba_image: RgbaImage = RgbaImage::from_raw(
                             rgba_image_data.width.into(),
@@ -91,10 +98,9 @@ impl AnimationLoader {
                             rgba_image_data.data.clone(),
                         )
                         .unwrap();
-
-                        let new_width = (rgba_image_data.width as f32 * zoom) as u32;
-                        let new_height = (rgba_image_data.height as f32 * zoom) as u32;
-                        let rgba_image_scale = image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Lanczos3);
+                        let new_width = (rgba_image_data.width as f32 * zoom.x) as u32;
+                        let new_height = (rgba_image_data.height as f32 * zoom.y) as u32;
+                        let rgba_image_scale = image::imageops::resize(&rgba_image, new_width, new_height, FilterType::Nearest);
 
                         let rgba_image_data_scale = RgbaImageData {
                             width: rgba_image_scale.width() as u16,
@@ -188,6 +194,17 @@ impl AnimationLoader {
 
                 rgba_images.push(frame.rgba_data);
                 offsets.push(Vector2::new(frame.offset_x as f32, frame.offset_y as f32));
+
+                // TODO: Create an interface that show the shift of the image
+                // inside the debugger.
+                /*#[cfg(feature = "debug")]
+                Frame::image_save(
+                    rgba_images.last().unwrap().clone(),
+                    entity_filename[0].len() as i32,
+                    offsets.last().unwrap().clone(),
+                    action_index as i32,
+                    motion_index as i32,
+                );*/
             }
             // 3 - Create the textures using the animation loader functions.
             let label = match entity_type {
@@ -197,6 +214,8 @@ impl AnimationLoader {
                 _ => format!("3"),
             };
             // TODO: Remove this code after fixing the offset
+            // The problem is that the offset is not in the correct proportion
+            // To solve this primarly, we created images of the same size and same offset
             // This code resize the sprites in the correct size may be used later
             let mut max_width = 0;
             let mut max_height = 0;
@@ -237,9 +256,8 @@ impl AnimationLoader {
                     let new_y = y as i32 + space_y - height / 2 + (max_height - (max_offset_y - min_offset_y + 2)) / 2;
                     for x in 0..width {
                         let new_x = x as i32 + space_x - width / 2 + (max_width - (max_offset_x - min_offset_x + 2)) / 2;
-                        let change_x = x as i32;
                         let pixel: &mut Rgba<u8> = rgba.get_pixel_mut(new_x as u32, new_y as u32);
-                        pixel.blend(rgba_raw.get_pixel(change_x as u32, y as u32));
+                        pixel.blend(rgba_raw.get_pixel(x as u32, y as u32));
                     }
                 }
                 RgbaImageData {
@@ -342,11 +360,6 @@ impl Frame {
     // of the vector
     pub fn merge_frame_part(action_frames: &mut Vec<FramePart>) -> FramePart {
         for frame_part in action_frames.iter_mut() {
-            // A small offset when to correct the mirror images
-            let mirror_offset = match frame_part.mirror {
-                true => 0,
-                false => 0,
-            };
             let attach_point_offset_x = match &frame_part.has_attach_point {
                 true => match &frame_part.sprite_type {
                     SpriteType::Head => -frame_part.attach_point_x + frame_part.attach_point_parent_x,
@@ -364,8 +377,8 @@ impl Frame {
 
             // The origin is (0, 0)
             // Finding the half size of the image
-            let half_size_x: i32 = (frame_part.rgba_data.width as i32 + mirror_offset) / 2;
-            let half_size_y: i32 = (frame_part.rgba_data.height as i32 + mirror_offset) / 2;
+            let half_size_x = frame_part.rgba_data.width as i32 / 2;
+            let half_size_y = frame_part.rgba_data.height as i32 / 2;
 
             // Adding the offset from attach point
             frame_part.offset_x += attach_point_offset_x;
@@ -475,12 +488,29 @@ impl Frame {
     }
 
     #[cfg(feature = "debug")]
-    pub fn image_save(image_new: RgbaImageData, sprite_number: i32) {
+    pub fn image_save(image_new: RgbaImageData, entity: i32, offset: Vector2<f32>, action_number: i32, sprite_number: i32) {
+        // Create a RgbaImage of the drawing
+
+        let temp: RgbaImage = RgbaImage::from_raw(image_new.width.into(), image_new.height.into(), image_new.data.clone()).unwrap();
+        let mut rgba: RgbaImage = RgbaImage::new(1024 as u32, 1024 as u32);
+
+        let height = image_new.height;
+        let width = image_new.width;
+        for y in 0..height {
+            let new_y = y as i32 + offset.y as i32 - (height as i32 / 2) + 500;
+            for x in 0..width {
+                let new_x = x as i32 + offset.x as i32 - (width as i32 / 2) + 500;
+                let mut change_x = x as i32;
+                let pixel: &mut Rgba<u8> = rgba.get_pixel_mut(new_x as u32, new_y as u32);
+                pixel.blend(temp.get_pixel(change_x as u32, y.into()));
+            }
+        }
+
         save_buffer(
-            format!("image_{}.png", sprite_number),
-            &image_new.data,
-            image_new.width.into(),
-            image_new.height.into(),
+            format!(".\\images\\image_{}_{}_{}.png", entity, action_number, sprite_number),
+            &rgba.clone().into_raw(),
+            rgba.width().into(),
+            rgba.height().into(),
             image::ExtendedColorType::Rgba8,
         )
         .unwrap();

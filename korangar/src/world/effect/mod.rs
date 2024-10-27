@@ -15,7 +15,7 @@ use crate::renderer::EffectRenderer;
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{point_light_extent, PointLightId, PointLightManager};
+use crate::world::{PointLightId, PointLightManager};
 
 pub trait EffectBase {
     fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) -> bool;
@@ -324,10 +324,9 @@ impl EffectBase for EffectWithLight {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
         let frustum = Frustum::new(projection_matrix * view_matrix);
 
-        let extent = point_light_extent(self.light_color, self.current_light_intensity);
         let light_position = self.center.to_position() + self.light_offset;
 
-        if frustum.intersects_sphere(&Sphere::new(light_position, extent)) {
+        if frustum.intersects_sphere(&Sphere::new(light_position, self.current_light_intensity)) {
             point_light_manager.register_fading(
                 self.point_light_id,
                 light_position,

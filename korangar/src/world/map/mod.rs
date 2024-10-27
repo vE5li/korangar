@@ -21,9 +21,9 @@ use ragnarok_formats::map::{LightSettings, LightSource, SoundSource, Tile, TileF
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
-#[cfg(feature = "debug")]
-use super::{point_light_extent, LightSourceExt, Model, PointLightSet};
 use super::{Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
+#[cfg(feature = "debug")]
+use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
 use crate::graphics::{Camera, EntityInstruction, IndicatorInstruction, ModelInstruction, Texture};
@@ -586,11 +586,9 @@ impl Map {
 
             MarkerIdentifier::LightSource(key) => {
                 let light_source = self.light_sources.get(LightSourceKey::new(key)).unwrap();
-                let color = light_source.color.into();
-                let extent = point_light_extent(color, light_source.range);
 
                 if let Some((screen_position, screen_size)) =
-                    Self::calculate_circle_screen_position_size(camera, light_source.position, extent)
+                    Self::calculate_circle_screen_position_size(camera, light_source.position, light_source.range)
                 {
                     circle_instructions.push(DebugCircleInstruction {
                         position: light_source.position,
@@ -619,10 +617,9 @@ impl Map {
             MarkerIdentifier::Entity(_index) => {}
             MarkerIdentifier::Shadow(index) => {
                 let point_light = point_light_set.with_shadow_iterator().nth(index as usize).unwrap();
-                let extent = point_light_extent(point_light.color, point_light.range);
 
                 if let Some((screen_position, screen_size)) =
-                    Self::calculate_circle_screen_position_size(camera, point_light.position, extent)
+                    Self::calculate_circle_screen_position_size(camera, point_light.position, point_light.range)
                 {
                     circle_instructions.push(DebugCircleInstruction {
                         position: point_light.position,

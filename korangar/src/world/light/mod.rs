@@ -17,23 +17,6 @@ use crate::world::MarkerIdentifier;
 use crate::world::{Map, ObjectKey, ResourceSetBuffer};
 use crate::{Camera, Color, NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS};
 
-/// Calculates the extent of a point light based on its range attribute.
-pub fn point_light_extent(color: Color, range: f32) -> f32 {
-    // The threshold of brightness at which we deem the light invisible.
-    //
-    // The current value will make objects in point lights cast shadows slightly
-    // later than they become illuminated, but the dead-zone is very small so the
-    // transition should never be noticeable in a real scenario.
-    const VISIBILITY_THRESHOLD: f32 = 0.01;
-
-    // If the color channel is less intense it will fade out more quickly, so we can
-    // scale down the range to the strongest color channel.
-    let color_intensity = [color.red, color.green, color.blue].into_iter().reduce(f32::max).unwrap();
-    let adjusted_range = range * color_intensity;
-
-    10.0 * (adjusted_range / VISIBILITY_THRESHOLD).ln()
-}
-
 pub trait LightSourceExt {
     fn offset(&mut self, offset: Vector3<f32>);
 
@@ -252,9 +235,8 @@ impl PointLightSet<'_> {
             let mut model_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let mut mode_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
 
-            let extent = point_light_extent(point_light.color, point_light.range);
             let object_set = map.cull_objects_in_sphere(
-                Sphere::new(point_light.position, extent),
+                Sphere::new(point_light.position, point_light.range),
                 point_shadow_object_set_buffer,
                 #[cfg(feature = "debug")]
                 render_settings.frustum_culling,

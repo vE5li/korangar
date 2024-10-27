@@ -182,6 +182,7 @@ pub fn generate_tile_vertices(
 ) -> (Vec<ModelVertex>, Vec<TileVertex>) {
     const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
 
+    #[allow(unused_mut)]
     let mut tile_vertices = Vec::new();
     let mut tile_picker_vertices = Vec::new();
 

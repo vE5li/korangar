@@ -8,19 +8,20 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages,
-    ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayout,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState,
+    MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat,
+    TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
 use crate::graphics::{Buffer, Capabilities, EffectInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/effect.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/effect_bindless.wgsl");
-const DRAWER_NAME: &str = "screen effect";
+const DRAWER_NAME: &str = "forward effect";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
 /// These are the TOP5 combinations we currently find in the korean client
@@ -58,7 +59,7 @@ pub(crate) struct InstanceData {
     padding: u32,
 }
 
-pub(crate) struct ScreenEffectDrawer {
+pub(crate) struct ForwardEffectDrawer {
     bindless_support: bool,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
@@ -67,6 +68,7 @@ pub(crate) struct ScreenEffectDrawer {
     shader_module: ShaderModule,
     pipeline_layout: PipelineLayout,
     color_attachment_format: TextureFormat,
+    depth_attachment_format: TextureFormat,
     pipelines: HashMap<(BlendFactor, BlendFactor), RenderPipeline>,
     instance_data: Vec<InstanceData>,
     bump: Bump,
@@ -74,8 +76,8 @@ pub(crate) struct ScreenEffectDrawer {
     batches: Vec<EffectBatch>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenEffectDrawer {
-    type Context = ScreenRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardEffectDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = &'data [EffectInstruction];
 
     fn new(
@@ -86,6 +88,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         render_pass_context: &Self::Context,
     ) -> Self {
         let color_attachment_format = render_pass_context.color_attachment_formats()[0];
+        let depth_attachment_format = render_pass_context.depth_attachment_output_format()[0];
 
         let shader_module = if capabilities.supports_bindless() {
             device.create_shader_module(SHADER_BINDLESS)
@@ -172,10 +175,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         let mut pipelines = HashMap::with_capacity(PRELOAD_PIPELINES.len());
         for (source_blend_factor, destination_blend_factor) in PRELOAD_PIPELINES.iter().copied() {
             let pipeline = Self::create_pipeline(
-                &device,
+                device,
                 &shader_module,
                 &pipeline_layout,
                 color_attachment_format,
+                depth_attachment_format,
                 source_blend_factor,
                 destination_blend_factor,
             );
@@ -191,6 +195,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             shader_module,
             pipeline_layout,
             color_attachment_format,
+            depth_attachment_format,
             pipelines,
             instance_data: Vec::default(),
             bump: Bump::default(),
@@ -234,7 +239,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 }
 
-impl Prepare for ScreenEffectDrawer {
+impl Prepare for ForwardEffectDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         let draw_count = instructions.effects.len();
 
@@ -243,6 +248,7 @@ impl Prepare for ScreenEffectDrawer {
         }
 
         self.instance_data.clear();
+        self.batches.clear();
 
         let first_effect = &instructions.effects[0];
         let mut blend_state = (first_effect.source_blend_factor, first_effect.destination_blend_factor);
@@ -264,6 +270,7 @@ impl Prepare for ScreenEffectDrawer {
                         &mut self.batches,
                         &self.shader_module,
                         self.color_attachment_format,
+                        self.depth_attachment_format,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -308,6 +315,7 @@ impl Prepare for ScreenEffectDrawer {
                 &mut self.batches,
                 &self.shader_module,
                 self.color_attachment_format,
+                self.depth_attachment_format,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -331,6 +339,7 @@ impl Prepare for ScreenEffectDrawer {
                         &mut self.batches,
                         &self.shader_module,
                         self.color_attachment_format,
+                        self.depth_attachment_format,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -364,6 +373,7 @@ impl Prepare for ScreenEffectDrawer {
                 &mut self.batches,
                 &self.shader_module,
                 self.color_attachment_format,
+                self.depth_attachment_format,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -381,7 +391,7 @@ impl Prepare for ScreenEffectDrawer {
     }
 }
 
-impl ScreenEffectDrawer {
+impl ForwardEffectDrawer {
     fn create_bind_group_bindless(
         device: &Device,
         bind_group_layout: &BindGroupLayout,
@@ -420,6 +430,7 @@ impl ScreenEffectDrawer {
         shader_module: &ShaderModule,
         pipeline_layout: &PipelineLayout,
         color_attachment_format: TextureFormat,
+        depth_attachment_format: TextureFormat,
         source_blend_factor: BlendFactor,
         destination_blend_factor: BlendFactor,
     ) -> RenderPipeline {
@@ -454,8 +465,17 @@ impl ScreenEffectDrawer {
                 })],
             }),
             primitive: PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: MultisampleState::default(),
+            multisample: MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: depth_attachment_format,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             multiview: None,
             cache: None,
         })
@@ -467,6 +487,7 @@ impl ScreenEffectDrawer {
         batches: &mut Vec<EffectBatch>,
         shader_module: &ShaderModule,
         color_attachment_format: TextureFormat,
+        depth_attachment_format: TextureFormat,
         pipeline_layout: &PipelineLayout,
         blend_state: (BlendFactor, BlendFactor),
         count: usize,
@@ -478,6 +499,7 @@ impl ScreenEffectDrawer {
                 shader_module,
                 pipeline_layout,
                 color_attachment_format,
+                depth_attachment_format,
                 blend_state.0,
                 blend_state.1,
             );

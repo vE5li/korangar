@@ -51,32 +51,23 @@ pub struct RenderSettings {
     #[new(default)]
     pub show_pathing: bool,
     #[new(default)]
-    pub show_diffuse_buffer: bool,
-    #[new(default)]
-    pub show_normal_buffer: bool,
-    #[new(default)]
-    pub show_water_buffer: bool,
-    #[new(default)]
-    pub show_depth_buffer: bool,
-    #[new(default)]
-    pub show_shadow_buffer: bool,
-    #[new(default)]
     pub show_picker_buffer: bool,
     #[new(default)]
-    pub show_font_atlas: bool,
+    pub show_directional_shadow_map: bool,
     #[new(default)]
-    pub show_point_shadow: Option<NonZeroU32>,
+    pub show_point_shadow_map: Option<NonZeroU32>,
+    #[new(default)]
+    pub show_light_culling_count_buffer: bool,
+    #[new(default)]
+    pub show_font_atlas: bool,
 }
 
 impl RenderSettings {
     pub fn show_buffers(&self) -> bool {
-        self.show_diffuse_buffer
-            || self.show_normal_buffer
-            || self.show_water_buffer
-            || self.show_depth_buffer
-            || self.show_shadow_buffer
+        self.show_directional_shadow_map
             || self.show_picker_buffer
+            || self.show_point_shadow_map.is_some()
+            || self.show_light_culling_count_buffer
             || self.show_font_atlas
-            || self.show_point_shadow.is_some()
     }
 }

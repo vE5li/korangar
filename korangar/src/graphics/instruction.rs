@@ -74,8 +74,6 @@ pub struct DirectionalShadowCasterInstruction {
 pub struct PointShadowCasterInstruction {
     pub view_projection_matrices: [Matrix4<f32>; 6],
     pub position: Point3<f32>,
-    pub screen_position: ScreenPosition,
-    pub screen_size: ScreenSize,
     pub color: Color,
     pub range: f32,
     pub model_texture: Arc<Texture>,
@@ -94,8 +92,6 @@ pub struct PointShadowCasterInstruction {
 pub struct PointLightInstruction {
     pub position: Point3<f32>,
     pub color: Color,
-    pub screen_position: ScreenPosition,
-    pub screen_size: ScreenSize,
     pub range: f32,
 }
 
@@ -151,7 +147,6 @@ pub struct MarkerInstruction {
     pub screen_position: ScreenPosition,
     pub screen_size: ScreenSize,
     pub identifier: MarkerIdentifier,
-    pub hovered: bool,
 }
 
 #[derive(Clone, Debug)]

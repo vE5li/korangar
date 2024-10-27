@@ -1,27 +1,28 @@
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState,
-    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension, VertexState,
+    BindingResource, BindingType, BlendState, ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthBiasState,
+    DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
+    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType,
+    TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, RenderSettings, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/buffer.wgsl");
-const DRAWER_NAME: &str = "screen buffer";
+const DRAWER_NAME: &str = "forward buffer";
 
-pub(crate) struct ScreenBufferDrawer {
+pub(crate) struct ForwardBufferDrawer {
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenBufferDrawer {
-    type Context = ScreenRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardBufferDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = &'data RenderSettings;
 
     fn new(
@@ -72,13 +73,22 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: render_pass_context.color_attachment_formats()[0],
-                    blend: None,
+                    blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::default(),
                 })],
             }),
             primitive: PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: MultisampleState::default(),
+            multisample: MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: render_pass_context.depth_attachment_output_format()[0],
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             multiview: None,
             cache: None,
         });
@@ -101,7 +111,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 }
 
-impl Prepare for ScreenBufferDrawer {
+impl Prepare for ForwardBufferDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, instructions.font_atlas_texture);
     }
@@ -111,7 +121,7 @@ impl Prepare for ScreenBufferDrawer {
     }
 }
 
-impl ScreenBufferDrawer {
+impl ForwardBufferDrawer {
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, font_atlas: &Texture) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),

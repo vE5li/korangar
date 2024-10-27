@@ -6,20 +6,20 @@ use wgpu::{
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, GeometryRenderPassContext, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
 use crate::graphics::{Capabilities, GlobalContext, IndicatorInstruction};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/indicator.wgsl");
-const DRAWER_NAME: &str = "geometry indicator";
+const DRAWER_NAME: &str = "forward indicator";
 
-pub(crate) struct GeometryIndicatorDrawer {
+pub(crate) struct ForwardIndicatorDrawer {
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for GeometryIndicatorDrawer {
-    type Context = GeometryRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardIndicatorDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = Option<&'data IndicatorInstruction>;
 
     fn new(
@@ -56,11 +56,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[Self::Context::bind_group_layout(device)[0], &bind_group_layout],
+            bind_group_layouts: &[
+                Self::Context::bind_group_layout(device)[0],
+                Self::Context::bind_group_layout(device)[1],
+                &bind_group_layout,
+            ],
             push_constant_ranges: &[],
         });
-
-        let color_attachment_formats = render_pass_context.color_attachment_formats();
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
@@ -75,23 +77,11 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
                 module: &shader_module,
                 entry_point: "fs_main",
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[0],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[1],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[2],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                ],
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend: None,
+                    write_mask: ColorWrites::default(),
+                })],
             }),
             multiview: None,
             primitive: PrimitiveState {
@@ -119,7 +109,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
     fn draw(&mut self, pass: &mut RenderPass<'_>, instruction: Self::DrawData<'_>) {
         if instruction.is_some() {
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(1, &self.bind_group, &[]);
+            pass.set_bind_group(2, &self.bind_group, &[]);
             pass.draw(0..6, 0..1);
         }
     }

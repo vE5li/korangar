@@ -1,23 +1,22 @@
 use wgpu::{
-    include_wgsl, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
-    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
-    VertexState,
+    include_wgsl, BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState,
+    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModuleDescriptor, StencilState, VertexState,
 };
 
-use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
-};
-use crate::graphics::{Capabilities, GlobalContext, WATER_ATTACHMENT_BLEND};
+use crate::graphics::passes::forward::ForwardRenderPassContext;
+use crate::graphics::passes::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext};
+use crate::graphics::{Capabilities, GlobalContext};
 
-const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/water_light.wgsl");
-const DRAWER_NAME: &str = "screen water light";
+const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/overlay.wgsl");
+const DRAWER_NAME: &str = "forward overlay";
 
-pub(crate) struct ScreenWaterLightDrawer {
+pub(crate) struct ForwardOverlayDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenWaterLightDrawer {
-    type Context = ScreenRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardOverlayDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = Option<()>;
 
     fn new(
@@ -29,11 +28,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
 
-        let bind_group_layouts = Self::Context::bind_group_layout(device);
+        let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[bind_group_layouts[0], bind_group_layouts[1]],
+            bind_group_layouts: &[pass_bind_group_layouts[0], pass_bind_group_layouts[1]],
             push_constant_ranges: &[],
         });
 
@@ -52,13 +51,22 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: render_pass_context.color_attachment_formats()[0],
-                    blend: Some(WATER_ATTACHMENT_BLEND),
+                    blend: Some(BlendState::ALPHA_BLENDING),
                     write_mask: ColorWrites::default(),
                 })],
             }),
             primitive: PrimitiveState::default(),
-            depth_stencil: None,
-            multisample: MultisampleState::default(),
+            depth_stencil: Some(DepthStencilState {
+                format: render_pass_context.depth_attachment_output_format()[0],
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
+            multisample: MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
             multiview: None,
             cache: None,
         });

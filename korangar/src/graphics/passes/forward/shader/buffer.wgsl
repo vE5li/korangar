@@ -1,12 +1,25 @@
+struct GlobalUniforms {
+    view_projection: mat4x4<f32>,
+    view: mat4x4<f32>,
+    inverse_view: mat4x4<f32>,
+    inverse_projection: mat4x4<f32>,
+    indicator_positions: mat4x4<f32>,
+    indicator_color: vec4<f32>,
+    ambient_color: vec4<f32>,
+    screen_size: vec2<u32>,
+    pointer_position: vec2<u32>,
+    animation_timer: f32,
+    day_timer: f32,
+    water_level: f32,
+    point_light_count: u32,
+}
+
 struct DebugUniforms {
-    show_diffuse_buffer: u32,
-    show_normal_buffer: u32,
-    show_water_buffer: u32,
-    show_depth_buffer: u32,
     show_picker_buffer: u32,
-    show_shadow_buffer: u32,
+    show_directional_shadow_map: u32,
+    show_point_shadow_map: u32,
+    show_light_culling_count_buffer: u32,
     show_font_atlas: u32,
-    show_point_shadow: u32,
 }
 
 struct VertexOutput {
@@ -14,15 +27,14 @@ struct VertexOutput {
     @location(0) fragment_position: vec2<f32>,
 }
 
-@group(0) @binding(4) var<uniform> debug_uniforms: DebugUniforms;
+const TILE_SIZE: u32 = 16;
+
 @group(0) @binding(1) var nearest_sampler: sampler;
-@group(1) @binding(0) var diffuse_buffer: texture_multisampled_2d<f32>;
-@group(1) @binding(1) var normal_buffer: texture_multisampled_2d<f32>;
-@group(1) @binding(2) var water_buffer: texture_multisampled_2d<f32>;
-@group(1) @binding(3) var depth_buffer: texture_depth_multisampled_2d;
-@group(1) @binding(4) var shadow_texture: texture_depth_2d;
+@group(1) @binding(1) var directional_shadow_map: texture_depth_2d;
+@group(1) @binding(3) var light_count_texture: texture_2d<u32>;
 @group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
-@group(1) @binding(7) var picker_texture: texture_2d<u32>;
+@group(1) @binding(7) var<uniform> debug_uniforms: DebugUniforms;
+@group(1) @binding(8) var picker_texture: texture_2d<u32>;
 @group(2) @binding(0) var font_atlas: texture_2d<f32>;
 
 @vertex
@@ -44,50 +56,24 @@ fn fs_main(
 ) -> @location(0) vec4<f32> {
     let pixel_coord = vec2<i32>(position.xy);
 
-    var output_color: vec3<f32> = vec3<f32>(0.0);
-
-    if (debug_uniforms.show_diffuse_buffer != 0u) {
-        let diffuse = textureLoad(diffuse_buffer, pixel_coord, 0).rgb;
-        output_color += diffuse;
-    }
-
-    if (debug_uniforms.show_normal_buffer != 0u) {
-        let normal = textureLoad(normal_buffer, pixel_coord, 0).rgb;
-        output_color += normal;
-    }
-
-    if (debug_uniforms.show_water_buffer != 0u) {
-        let water = textureLoad(water_buffer, pixel_coord, 0);
-        output_color += vec3<f32>(0.0, 0.0, water.r);
-    }
-
-    if (debug_uniforms.show_depth_buffer != 0u) {
-        let depth = 1.0 - textureLoad(depth_buffer, pixel_coord, 0);
-        output_color += linearize(depth, 1.0, 2000.0);
-    }
+    var output_color: vec4<f32> = vec4<f32>(0.0);
 
     if (debug_uniforms.show_picker_buffer != 0u) {
         let picker = textureLoad(picker_texture, pixel_coord, 0).rg;
         let red = f32(picker.r & 0xfu) / 100.0;
         let green = f32((picker.r >> 8u) & 0xfu) / 100.0;
         let blue = f32((picker.r >> 16u) & 0xfu) / 100.0;
-        output_color += vec3<f32>(red, green, blue);
+        output_color += vec4<f32>(red, green, blue, 1.0);
     }
 
-    if (debug_uniforms.show_shadow_buffer != 0u) {
+    if (debug_uniforms.show_directional_shadow_map != 0u) {
         var sample_position = clip_to_uv(fragment_position);
         sample_position.y = 1.0 - sample_position.y;
-        let depth = textureSample(shadow_texture, nearest_sampler, sample_position);
-        output_color += vec3<f32>(depth);
+        let depth = textureSample(directional_shadow_map, nearest_sampler, sample_position);
+        output_color += vec4<f32>(depth, depth, depth, 1.0);
     }
 
-    if (debug_uniforms.show_font_atlas != 0u) {
-        let color = textureSample(font_atlas, nearest_sampler, clip_to_uv(fragment_position));
-        output_color += vec3<f32>(color.r);
-    }
-
-
-    if (debug_uniforms.show_point_shadow != 0u) {
+    if (debug_uniforms.show_point_shadow_map != 0u) {
         // +--------+--------+--------+
         // |   +Y   |   +Z   |   +X   |
         // +--------+--------+--------+
@@ -116,11 +102,40 @@ fn fs_main(
             default: { sample_dir = vec3<f32>(-cell_uv.x * 2.0 + 1.0, -cell_uv.y * 2.0 + 1.0, -1.0); }
         }
 
-        let depth = textureSample(point_shadow_maps, nearest_sampler, sample_dir, debug_uniforms.show_point_shadow - 1u);
-        output_color += vec3<f32>(depth, depth, depth);
+        let depth = textureSample(point_shadow_maps, nearest_sampler, sample_dir, debug_uniforms.show_point_shadow_map - 1u);
+        output_color += vec4<f32>(depth, depth, depth, 1.0);
     }
 
-    return vec4<f32>(output_color, 1.0);
+    if (debug_uniforms.show_light_culling_count_buffer != 0u) {
+        let tile_coord = pixel_coord / i32(TILE_SIZE);
+        let count = textureLoad(light_count_texture, tile_coord, 0).r;
+
+        var color = vec4<f32>(0.0);
+
+        if count != 0 {
+            if (count <= 7) {
+                let incidence = f32(count) / 7.0;
+                color = vec4<f32>(0.0, incidence, 1.0 - incidence, 0.25);
+            } else if (count <= 13) {
+                let incidence = (f32(count) - 7.0) / 6.0;
+                color = vec4<f32>(incidence, 1.0, 0.0, 0.25);
+            } else if (count <= 20) {
+                let incidence = (f32(count) - 13.0) / 7.0;
+                color = vec4<f32>(1.0, 1.0 - incidence, 0.0, 0.25);
+            } else {
+                color = vec4<f32>(1.0, 0.0, 0.0, 0.25);
+            }
+        }
+
+        output_color += color;
+    }
+
+    if (debug_uniforms.show_font_atlas != 0u) {
+        let color = textureSample(font_atlas, nearest_sampler, clip_to_uv(fragment_position));
+        output_color += vec4<f32>(color.r, color.r, color.r, 1.0);
+    }
+
+    return output_color;
 }
 
 fn linearize(raw_value: f32, z_near: f32, z_far: f32) -> f32 {

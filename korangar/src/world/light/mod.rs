@@ -10,7 +10,6 @@ use crate::graphics::RenderSettings;
 use crate::graphics::{
     Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCamera, PointShadowCasterInstruction, Texture,
 };
-use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
@@ -74,13 +73,10 @@ pub struct PointLight {
 }
 
 impl PointLight {
-    pub fn render(&self, instructions: &mut Vec<PointLightInstruction>, camera: &dyn Camera) {
-        let (screen_position, screen_size) = self.calculate_screen_position_and_size(camera);
+    pub fn render(&self, instructions: &mut Vec<PointLightInstruction>) {
         instructions.push(PointLightInstruction {
             position: self.position,
             color: self.color,
-            screen_position,
-            screen_size,
             range: self.range,
         });
     }
@@ -88,7 +84,6 @@ impl PointLight {
     pub fn render_with_shadows(
         &self,
         instructions: &mut Vec<PointShadowCasterInstruction>,
-        camera: &dyn Camera,
         view_projection_matrices: [Matrix4<f32>; 6],
         model_texture: Arc<Texture>,
         model_vertex_buffer: Arc<Buffer<ModelVertex>>,
@@ -97,12 +92,9 @@ impl PointLight {
         model_offset: [usize; 6],
         mode_count: [usize; 6],
     ) {
-        let (screen_position, screen_size) = self.calculate_screen_position_and_size(camera);
         instructions.push(PointShadowCasterInstruction {
             view_projection_matrices,
             position: self.position,
-            screen_position,
-            screen_size,
             color: self.color,
             range: self.range,
             model_texture,
@@ -112,21 +104,6 @@ impl PointLight {
             model_offset,
             mode_count,
         });
-    }
-
-    fn calculate_screen_position_and_size(&self, camera: &dyn Camera) -> (ScreenPosition, ScreenSize) {
-        let extent = point_light_extent(self.color, self.range);
-
-        let corner_offset = (extent.powf(2.0) * 2.0).sqrt();
-        let (mut top_left_position, mut bottom_right_position) = camera.billboard_coordinates(self.position, corner_offset);
-
-        // A negative w means that the point light is behind the camera, but we still
-        // need to render the quad since the point light has an effect on the
-        // scene in front of the camera.
-        top_left_position.w = top_left_position.w.abs();
-        bottom_right_position.w = bottom_right_position.w.abs();
-
-        camera.screen_position_size(top_left_position, bottom_right_position)
     }
 }
 
@@ -250,16 +227,15 @@ impl PointLightSet<'_> {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_point_lights(&self, instructions: &mut Vec<PointLightInstruction>, camera: &dyn Camera) {
+    pub fn render_point_lights(&self, instructions: &mut Vec<PointLightInstruction>) {
         self.without_shadow_iterator()
-            .for_each(|point_light| point_light.render(instructions, camera));
+            .for_each(|point_light| point_light.render(instructions));
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
     pub fn render_point_lights_with_shadows(
         &self,
         map: &Map,
-        current_camera: &dyn Camera,
         point_shadow_camera: &mut PointShadowCamera,
         point_shadow_object_set_buffer: &mut ResourceSetBuffer<ObjectKey>,
         point_shadow_model_instructions: &mut Vec<ModelInstruction>,
@@ -306,7 +282,6 @@ impl PointLightSet<'_> {
 
             point_light.render_with_shadows(
                 point_light_with_shadow_instructions,
-                current_camera,
                 view_projection_matrices,
                 map.get_texture().clone(),
                 map.get_model_vertex_buffer().clone(),

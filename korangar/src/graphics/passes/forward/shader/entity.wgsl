@@ -182,7 +182,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     return output;
 }
 
-// Inverse square law with smooth falloff
+// Quadratic attenuation with smooth falloff
 fn calculate_attenuation(distance: f32, range: f32) -> f32 {
     let effective_distance = min(distance, range);
     let normalized_distance = effective_distance / range;

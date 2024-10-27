@@ -23,7 +23,7 @@ use self::vertices::{generate_tile_vertices, ground_water_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureAtlasFactory, TextureLoader};
-use crate::world::{point_light_extent, LightSourceKey, Model};
+use crate::world::{LightSourceKey, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
 const MAP_OFFSET: f32 = 5.0;
@@ -170,8 +170,7 @@ impl MapLoader {
             .light_sources
             .drain(..)
             .map(|light_source| {
-                let extent = point_light_extent(light_source.color.into(), light_source.range);
-                let sphere = Sphere::new(light_source.position, extent);
+                let sphere = Sphere::new(light_source.position, light_source.range);
                 let key = light_sources.insert(light_source).expect("light sources slab is full");
                 (key, sphere)
             })

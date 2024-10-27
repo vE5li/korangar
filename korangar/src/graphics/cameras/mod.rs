@@ -7,7 +7,9 @@ mod start;
 
 use std::f32::consts::FRAC_PI_2;
 
-use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, MetricSpace, Point3, Rad, Vector2, Vector3, Vector4};
+#[cfg(feature = "debug")]
+use cgmath::MetricSpace;
+use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
 
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
@@ -16,6 +18,7 @@ pub use self::player::PlayerCamera;
 pub use self::point_shadow::PointShadowCamera;
 pub use self::start::StartCamera;
 use crate::graphics::SmoothedValue;
+#[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
 /// The near-plane we use for all perspective projections.
@@ -31,8 +34,9 @@ pub trait Camera {
     fn focus_point(&self) -> Point3<f32>;
     fn generate_view_projection(&mut self, window_size: Vector2<usize>);
     fn look_up_vector(&self) -> Vector3<f32>;
-    fn screen_to_world_matrix(&self) -> Matrix4<f32>;
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);
+
+    #[cfg(feature = "debug")]
     fn world_to_screen_matrix(&self) -> Matrix4<f32>;
 
     fn billboard_matrix(&self, position: Point3<f32>, origin: Point3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
@@ -54,6 +58,7 @@ pub trait Camera {
         translation_matrix * (rotation_matrix * origin_matrix) * scale_matrix
     }
 
+    #[cfg(feature = "debug")]
     fn billboard_coordinates(&self, position: Point3<f32>, size: f32) -> (Vector4<f32>, Vector4<f32>) {
         let view_direction = self.view_direction();
         let right_vector = self.look_up_vector().cross(view_direction).normalize();
@@ -129,10 +134,12 @@ pub trait Camera {
         Vector4::new(x, y, 0.0, 1.0)
     }
 
+    #[cfg(feature = "debug")]
     fn distance_to(&self, position: Point3<f32>) -> f32 {
         self.camera_position().distance(position)
     }
 
+    #[cfg(feature = "debug")]
     fn screen_position_size(&self, top_left_position: Vector4<f32>, bottom_right_position: Vector4<f32>) -> (ScreenPosition, ScreenSize) {
         let top_left_position = self.clip_to_screen_space(top_left_position);
         let bottom_right_position = self.clip_to_screen_space(bottom_right_position);

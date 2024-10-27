@@ -160,7 +160,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             multisample: MultisampleState::default(),
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: false,
+                depth_write_enabled: true,
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
@@ -183,7 +183,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if self.draw_count == 0 {
+        if self.draw_count == 0 || draw_data.is_empty() {
             return;
         }
 
@@ -196,7 +196,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             let mut current_texture_id = self.solid_pixel_texture.get_id();
             pass.set_bind_group(2, self.solid_pixel_texture.get_bind_group(), &[]);
 
-            for (index, instruction) in draw_data[0..self.draw_count].iter().enumerate() {
+            for (index, instruction) in draw_data[1..self.draw_count.saturating_add(1)].iter().enumerate() {
                 if instruction.texture.get_id() != current_texture_id {
                     current_texture_id = instruction.texture.get_id();
                     pass.set_bind_group(2, instruction.texture.get_bind_group(), &[]);

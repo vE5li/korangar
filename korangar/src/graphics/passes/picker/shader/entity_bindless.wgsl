@@ -1,14 +1,17 @@
 struct GlobalUniforms {
     view_projection: mat4x4<f32>,
-    inverse_view_projection: mat4x4<f32>,
-    view:mat4x4<f32>,
+    view: mat4x4<f32>,
+    inverse_view: mat4x4<f32>,
+    inverse_projection: mat4x4<f32>,
     indicator_positions: mat4x4<f32>,
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
+    screen_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
     day_timer: f32,
     water_level: f32,
+    point_light_count: u32,
 }
 
 struct InstanceData {
@@ -34,10 +37,19 @@ struct VertexOutput {
     @location(3) identifier_low: u32,
 }
 
+struct FragmentOutput {
+    @location(0) identifier: vec2<u32>,
+    @builtin(frag_depth) frag_depth: f32,
+}
+
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
+
+// Small value to prevent division by zero.
+const EPSILON: f32 = 1e-7;
+const NEAR_PLANE: f32 = 1.0;
 
 @vertex
 fn vs_main(
@@ -51,25 +63,34 @@ fn vs_main(
     output.position = global_uniforms.view_projection * instance.world * vec4<f32>(vertex.position, 1.0);
     output.texture_coordinates = instance.texture_position + vertex.texture_coordinates * instance.texture_size;
     output.texture_index = instance.texture_index;
-    output.identifier_high = instance.identifier_high;
-    output.identifier_low = instance.identifier_low;
 
     if (instance.mirror != 0u) {
         output.texture_coordinates.x = 1.0 - output.texture_coordinates.x;
     }
 
+    output.identifier_high = instance.identifier_high;
+    output.identifier_low = instance.identifier_low;
     return output;
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec2<u32> {
+fn fs_main(input: VertexOutput) -> FragmentOutput {
     let diffuse_color = textureSample(textures[input.texture_index], nearest_sampler, input.texture_coordinates);
 
     if (diffuse_color.a != 1.0) {
         discard;
     }
 
-    return vec2<u32>(input.identifier_low, input.identifier_high);
+    // We add a small offset in linear space, so that entities don't clip into the ground.
+    let linear_z: f32 = nonLinearToLinear(input.position.z);
+    let adjusted_linear_z: f32 = linear_z - 2.0;
+    let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
+    let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
+
+    var output: FragmentOutput;
+    output.identifier = vec2<u32>(input.identifier_low, input.identifier_high);
+    output.frag_depth = clamped_depth;
+    return output;
 }
 
 // Optimized version of the following truth table:
@@ -93,8 +114,16 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     let x = f32(1 - 2 * case0);
     let y = f32(2 * case1);
     let z = 0.0;
-    let u = f32(case0);
+    let u = f32(1 - case0);
     let v = f32(1 - case1);
 
     return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v));
+}
+
+fn linearToNonLinear(linear_depth: f32) -> f32 {
+    return NEAR_PLANE / (linear_depth + EPSILON);
+}
+
+fn nonLinearToLinear(non_linear_depth: f32) -> f32 {
+    return NEAR_PLANE / (non_linear_depth + EPSILON);
 }

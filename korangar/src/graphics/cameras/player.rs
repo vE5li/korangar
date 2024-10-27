@@ -17,7 +17,6 @@ pub struct PlayerCamera {
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
     world_to_screen_matrix: Matrix4<f32>,
-    screen_to_world_matrix: Matrix4<f32>,
     view_angle: SmoothedValue,
     zoom: SmoothedValue,
     aspect_ratio: f32,
@@ -31,7 +30,6 @@ impl PlayerCamera {
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
             world_to_screen_matrix: Matrix4::from_value(0.0),
-            screen_to_world_matrix: Matrix4::from_value(0.0),
             view_angle: SmoothedValue::new(FRAC_PI_2, THRESHHOLD, 15.0),
             zoom: SmoothedValue::new(DEFAULT_ZOOM, THRESHHOLD, 5.0),
             aspect_ratio: 0.0,
@@ -90,21 +88,17 @@ impl Camera for PlayerCamera {
         self.view_matrix = Matrix4::look_at_lh(camera_position, self.focus_point(), self.look_up_vector);
 
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
-        self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();
     }
 
     fn look_up_vector(&self) -> Vector3<f32> {
         self.look_up_vector
     }
 
-    fn screen_to_world_matrix(&self) -> Matrix4<f32> {
-        self.screen_to_world_matrix
-    }
-
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
         (self.view_matrix, self.projection_matrix)
     }
 
+    #[cfg(feature = "debug")]
     fn world_to_screen_matrix(&self) -> Matrix4<f32> {
         self.world_to_screen_matrix
     }

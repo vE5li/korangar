@@ -24,7 +24,7 @@ impl DebugMarkerRenderer {
 }
 
 impl MarkerRenderer for DebugMarkerRenderer {
-    fn render_marker(&mut self, camera: &dyn Camera, marker_identifier: MarkerIdentifier, position: Point3<f32>, hovered: bool) {
+    fn render_marker(&mut self, camera: &dyn Camera, marker_identifier: MarkerIdentifier, position: Point3<f32>, _hovered: bool) {
         let (top_left_position, bottom_right_position) = camera.billboard_coordinates(position, MarkerIdentifier::SIZE);
 
         if top_left_position.w >= 0.1 && bottom_right_position.w >= 0.1 {
@@ -34,7 +34,6 @@ impl MarkerRenderer for DebugMarkerRenderer {
                 screen_position,
                 screen_size,
                 identifier: marker_identifier,
-                hovered,
             });
         }
     }

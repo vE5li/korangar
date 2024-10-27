@@ -28,7 +28,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
         let picker_texture_format = global_context.picker_buffer_texture.get_format();
-        let depth_texture_format = global_context.depth_texture.get_format();
+        let depth_texture_format = global_context.picker_depth_texture.get_format();
 
         Self {
             picker_texture_format,

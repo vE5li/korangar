@@ -11,16 +11,16 @@ use wgpu::{
     ShaderModuleDescriptor, ShaderStages, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
 };
 
+use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, GeometryRenderPassContext, ModelBatchDrawData,
-    RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
 use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 #[cfg(feature = "debug")]
 const SHADER_WIREFRAME: ShaderModuleDescriptor = include_wgsl!("shader/model_wireframe.wgsl");
-const DRAWER_NAME: &str = "geometry model";
+const DRAWER_NAME: &str = "forward model";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -30,7 +30,7 @@ struct InstanceData {
     inv_world: [[f32; 4]; 4],
 }
 
-pub(crate) struct GeometryModelDrawer {
+pub(crate) struct ForwardModelDrawer {
     multi_draw_indirect_support: bool,
     instance_data_buffer: Buffer<InstanceData>,
     instance_index_vertex_buffer: Buffer<u32>,
@@ -45,8 +45,8 @@ pub(crate) struct GeometryModelDrawer {
     draw_commands: Vec<DrawIndirectArgs>,
 }
 
-impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for GeometryModelDrawer {
-    type Context = GeometryRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardModelDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = ModelBatchDrawData<'data>;
 
     fn new(
@@ -108,10 +108,13 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
 
         let bind_group = Self::create_bind_group(device, &bind_group_layout, &instance_data_buffer);
 
+        let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
+
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
             bind_group_layouts: &[
-                Self::Context::bind_group_layout(device)[0],
+                pass_bind_group_layouts[0],
+                pass_bind_group_layouts[1],
                 &bind_group_layout,
                 Texture::bind_group_layout(device),
             ],
@@ -179,14 +182,14 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
         #[cfg(not(feature = "debug"))]
         pass.set_pipeline(&self.pipeline);
 
-        pass.set_bind_group(1, &self.bind_group, &[]);
+        pass.set_bind_group(2, &self.bind_group, &[]);
 
         for batch in draw_data.batches.iter() {
             if batch.count == 0 {
                 continue;
             }
 
-            pass.set_bind_group(2, batch.texture.get_bind_group(), &[]);
+            pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
             pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
 
@@ -212,7 +215,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
     }
 }
 
-impl Prepare for GeometryModelDrawer {
+impl Prepare for ForwardModelDrawer {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
         let draw_count = instructions.models.len();
 
@@ -263,7 +266,7 @@ impl Prepare for GeometryModelDrawer {
     }
 }
 
-impl GeometryModelDrawer {
+impl ForwardModelDrawer {
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, instance_data_buffer: &Buffer<InstanceData>) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -277,14 +280,12 @@ impl GeometryModelDrawer {
 
     fn create_pipeline(
         device: &Device,
-        render_pass_context: &GeometryRenderPassContext,
+        render_pass_context: &ForwardRenderPassContext,
         shader_module: &ShaderModule,
         instance_index_buffer_layout: VertexBufferLayout,
         pipeline_layout: &PipelineLayout,
         polygon_mode: PolygonMode,
     ) -> RenderPipeline {
-        let color_attachment_formats = render_pass_context.color_attachment_formats();
-
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
             layout: Some(pipeline_layout),
@@ -298,23 +299,11 @@ impl GeometryModelDrawer {
                 module: shader_module,
                 entry_point: "fs_main",
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[0],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[1],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[2],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                ],
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend: None,
+                    write_mask: ColorWrites::default(),
+                })],
             }),
             multiview: None,
             primitive: PrimitiveState {

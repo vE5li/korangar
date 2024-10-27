@@ -14,7 +14,6 @@ pub struct DebugCamera {
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
     world_to_screen_matrix: Matrix4<f32>,
-    screen_to_world_matrix: Matrix4<f32>,
     pitch: Rad<f32>,
     yaw: Rad<f32>,
     fly_speed: f32,
@@ -28,7 +27,6 @@ impl DebugCamera {
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
             world_to_screen_matrix: Matrix4::from_value(0.0),
-            screen_to_world_matrix: Matrix4::from_value(0.0),
             pitch: Rad(0.0),
             yaw: Rad(0.0),
             fly_speed: 100.0,
@@ -96,15 +94,10 @@ impl Camera for DebugCamera {
         self.view_matrix = Matrix4::look_at_lh(self.camera_position, self.focus_point(), self.look_up_vector);
 
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
-        self.screen_to_world_matrix = self.world_to_screen_matrix.invert().unwrap();
     }
 
     fn look_up_vector(&self) -> Vector3<f32> {
         self.look_up_vector
-    }
-
-    fn screen_to_world_matrix(&self) -> Matrix4<f32> {
-        self.screen_to_world_matrix
     }
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {

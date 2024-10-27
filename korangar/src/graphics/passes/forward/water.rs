@@ -1,23 +1,23 @@
 use wgpu::{
     include_wgsl, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState,
-    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModuleDescriptor, StencilState, VertexState,
+    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModuleDescriptor, StencilState, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, GeometryRenderPassContext, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, WaterVertex};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, WaterVertex, WATER_ATTACHMENT_BLEND};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/water.wgsl");
-const DRAWER_NAME: &str = "geometry water";
+const DRAWER_NAME: &str = "forward water";
 
-pub(crate) struct GeometryWaterDrawer {
+pub(crate) struct ForwardWaterDrawer {
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for GeometryWaterDrawer {
-    type Context = GeometryRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardWaterDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = &'data Buffer<WaterVertex>;
 
     fn new(
@@ -35,8 +35,6 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
             push_constant_ranges: &[],
         });
 
-        let color_attachment_formats = render_pass_context.color_attachment_formats();
-
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
             layout: Some(&pipeline_layout),
@@ -50,26 +48,14 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
                 module: &shader_module,
                 entry_point: "fs_main",
                 compilation_options: PipelineCompilationOptions::default(),
-                targets: &[
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[0],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[1],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[2],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                ],
+                targets: &[Some(ColorTargetState {
+                    format: render_pass_context.color_attachment_formats()[0],
+                    blend: Some(WATER_ATTACHMENT_BLEND),
+                    write_mask: ColorWrites::default(),
+                })],
             }),
             multiview: None,
-            primitive: Default::default(),
+            primitive: PrimitiveState::default(),
             multisample: MultisampleState {
                 count: 4,
                 ..Default::default()

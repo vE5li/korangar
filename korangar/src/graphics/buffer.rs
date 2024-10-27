@@ -10,9 +10,7 @@ use bytemuck::{bytes_of, cast_slice, Pod, Zeroable};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use wgpu::util::StagingBelt;
-use wgpu::{
-    BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferSize, BufferSlice, BufferUsages, CommandEncoder, Device, Queue,
-};
+use wgpu::{BindingResource, BindingType, BufferBindingType, BufferDescriptor, BufferSlice, BufferUsages, CommandEncoder, Device, Queue};
 
 /// Convenience abstraction over GPU buffers. Can be seen as a "Vec<T>" on the
 /// GPU.
@@ -173,11 +171,6 @@ impl<T: Sized + Pod + Zeroable> Buffer<T> {
         };
 
         self.buffer.slice(start..end)
-    }
-
-    /// Returns the allocated capacity in bytes of the underlying GPU buffer.
-    pub fn byte_capacity(&self) -> Option<BufferSize> {
-        BufferSize::new(self.capacity)
     }
 
     /// Returns the number of `T` currently saved inside the buffer.

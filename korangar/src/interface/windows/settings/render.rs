@@ -82,17 +82,12 @@ fn grid_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCell<
 
 fn buffers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCell<InterfaceSettings> {
     let setting_elements = vec![
-        render_state_button("diffuse buffer", settings.mapped(|settings| &settings.show_diffuse_buffer)),
-        render_state_button("normal buffer", settings.mapped(|settings| &settings.show_normal_buffer)),
-        render_state_button("water buffer", settings.mapped(|settings| &settings.show_water_buffer)),
-        render_state_button("depth buffer", settings.mapped(|settings| &settings.show_depth_buffer)),
-        render_state_button("shadow buffer", settings.mapped(|settings| &settings.show_shadow_buffer)),
-        render_state_button("picker buffer", settings.mapped(|settings| &settings.show_picker_buffer)),
-        render_state_button("font atlas", settings.mapped(|settings| &settings.show_font_atlas)),
-        Text::default()
-            .with_text("show point shadow")
-            .with_width(dimension_bound!(50%))
-            .wrap(),
+        render_state_button("picker", settings.mapped(|settings| &settings.show_picker_buffer)),
+        render_state_button(
+            "directional shadow",
+            settings.mapped(|settings| &settings.show_directional_shadow_map),
+        ),
+        Text::default().with_text("point shadow").with_width(dimension_bound!(50%)).wrap(),
         PickList::default()
             .with_options(vec![
                 ("off", None),
@@ -103,10 +98,15 @@ fn buffers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCe
                 ("5", NonZeroU32::new(5)),
                 ("6", NonZeroU32::new(6)),
             ])
-            .with_selected(settings.mapped(|settings| &settings.show_point_shadow))
+            .with_selected(settings.mapped(|settings| &settings.show_point_shadow_map))
             .with_event(Box::new(Vec::new))
             .with_width(dimension_bound!(!))
             .wrap(),
+        render_state_button(
+            "light cull count",
+            settings.mapped(|settings| &settings.show_light_culling_count_buffer),
+        ),
+        render_state_button("font atlas", settings.mapped(|settings| &settings.show_font_atlas)),
     ];
 
     Expandable::new("buffers".to_string(), setting_elements, true).wrap()

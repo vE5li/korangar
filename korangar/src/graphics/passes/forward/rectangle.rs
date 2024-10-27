@@ -7,29 +7,29 @@ use hashbrown::HashMap;
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder, Device,
-    FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureView, TextureViewDimension,
-    VertexState,
+    BindingResource, BindingType, BlendState, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder,
+    CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor,
+    ShaderStages, StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, RenderPassContext, ScreenRenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
 use crate::graphics::{Buffer, Capabilities, GlobalContext, Prepare, RectangleInstruction, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/rectangle.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/rectangle_bindless.wgsl");
-const DRAWER_NAME: &str = "screen rectangle";
+const DRAWER_NAME: &str = "forward rectangle";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
-pub(crate) struct ScreenRectangleDrawInstruction<'a> {
-    pub(crate) layer: Layer,
+pub(crate) struct ForwardRectangleDrawInstruction<'a> {
+    pub(crate) layer: ForwardRectangleLayer,
     pub(crate) instructions: &'a [RectangleInstruction],
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) enum Layer {
+pub(crate) enum ForwardRectangleLayer {
     Bottom = 0,
     Middle = 1,
     Top = 2,
@@ -54,7 +54,7 @@ struct Batch {
     count: usize,
 }
 
-pub(crate) struct ScreenRectangleDrawer {
+pub(crate) struct ForwardRectangleDrawer {
     bindless_support: bool,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
@@ -67,9 +67,9 @@ pub(crate) struct ScreenRectangleDrawer {
     lookup: HashMap<u64, i32>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for ScreenRectangleDrawer {
-    type Context = ScreenRenderPassContext;
-    type DrawData<'data> = ScreenRectangleDrawInstruction<'data>;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardRectangleDrawer {
+    type Context = ForwardRenderPassContext;
+    type DrawData<'data> = ForwardRectangleDrawInstruction<'data>;
 
     fn new(
         capabilities: &Capabilities,
@@ -181,8 +181,17 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             }),
             multiview: None,
             primitive: PrimitiveState::default(),
-            multisample: MultisampleState::default(),
-            depth_stencil: None,
+            multisample: MultisampleState {
+                count: 4,
+                ..Default::default()
+            },
+            depth_stencil: Some(DepthStencilState {
+                format: render_pass_context.depth_attachment_output_format()[0],
+                depth_write_enabled: false,
+                depth_compare: CompareFunction::Always,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             cache: None,
         });
 
@@ -234,7 +243,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 }
 
-impl Prepare for ScreenRectangleDrawer {
+impl Prepare for ForwardRectangleDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         let draw_count = instructions.bottom_layer_rectangles.len()
             + instructions.middle_layer_rectangles.len()
@@ -394,7 +403,7 @@ impl Prepare for ScreenRectangleDrawer {
     }
 }
 
-impl ScreenRectangleDrawer {
+impl ForwardRectangleDrawer {
     fn create_bind_group_bindless(
         device: &Device,
         bind_group_layout: &BindGroupLayout,

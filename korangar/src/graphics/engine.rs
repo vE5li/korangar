@@ -52,8 +52,6 @@ pub struct GraphicsEngineDescriptor {
 /// Set 2: Dispatcher / Drawer Bindings (For example indirection buffers)
 ///
 /// Set 3: Resource Bindings (for example a texture group of a map)
-///
-/// Push Constants: Draw Data (up to 128 KiB)
 pub struct GraphicsEngine {
     capabilities: Capabilities,
     instance: Instance,
@@ -78,8 +76,8 @@ struct EngineContext {
     picker_render_pass_context: PickerRenderPassContext,
     directional_shadow_pass_context: DirectionalShadowRenderPassContext,
     point_shadow_pass_context: PointShadowRenderPassContext,
-    geometry_pass_context: GeometryRenderPassContext,
-    screen_pass_context: ScreenRenderPassContext,
+    light_culling_pass_context: LightCullingPassContext,
+    forward_pass_context: ForwardRenderPassContext,
 
     interface_rectangle_drawer: InterfaceRectangleDrawer,
     picker_entity_drawer: PickerEntityDrawer,
@@ -90,26 +88,22 @@ struct EngineContext {
     point_shadow_entity_drawer: PointShadowEntityDrawer,
     point_shadow_model_drawer: PointShadowModelDrawer,
     point_shadow_indicator_drawer: PointShadowIndicatorDrawer,
-    geometry_model_drawer: GeometryModelDrawer,
-    geometry_indicator_drawer: GeometryIndicatorDrawer,
-    geometry_entity_drawer: GeometryEntityDrawer,
-    geometry_water_drawer: GeometryWaterDrawer,
-    screen_ambient_light_drawer: ScreenAmbientLightDrawer,
-    screen_directional_light_drawer: ScreenDirectionalLightDrawer,
-    screen_point_light_drawer: ScreenPointLightDrawer,
-    screen_water_light_drawer: ScreenWaterLightDrawer,
-    screen_rectangle_drawer: ScreenRectangleDrawer,
-    screen_effect_drawer: ScreenEffectDrawer,
-    screen_overlay_drawer: ScreenOverlayDrawer,
-
+    light_culling_dispatcher: LightCullingDispatcher,
+    forward_effect_drawer: ForwardEffectDrawer,
+    forward_entity_drawer: ForwardEntityDrawer,
+    forward_indicator_drawer: ForwardIndicatorDrawer,
+    forward_model_drawer: ForwardModelDrawer,
+    forward_overlay_drawer: ForwardOverlayDrawer,
+    forward_rectangle_drawer: ForwardRectangleDrawer,
+    forward_water_drawer: ForwardWaterDrawer,
+    #[cfg(feature = "debug")]
+    forward_aabb_drawer: ForwardAabbDrawer,
+    #[cfg(feature = "debug")]
+    forward_buffer_drawer: ForwardBufferDrawer,
+    #[cfg(feature = "debug")]
+    forward_circle_drawer: ForwardCircleDrawer,
     #[cfg(feature = "debug")]
     picker_marker_drawer: PickerMarkerDrawer,
-    #[cfg(feature = "debug")]
-    screen_aabb_drawer: ScreenAabbDrawer,
-    #[cfg(feature = "debug")]
-    screen_circle_drawer: ScreenCircleDrawer,
-    #[cfg(feature = "debug")]
-    screen_buffer_drawer: ScreenBufferDrawer,
 }
 
 impl GraphicsEngine {
@@ -187,10 +181,9 @@ impl GraphicsEngine {
                             DirectionalShadowRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let point_shadow_pass_context =
                             PointShadowRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
-                        let geometry_pass_context =
-                            GeometryRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
-                        let screen_pass_context =
-                            ScreenRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+                        let light_culling_pass_context = LightCullingPassContext::new(&self.device, &self.queue, &global_context);
+                        let forward_pass_context =
+                            ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                     });
 
                     time_phase!("create computer and drawer", {
@@ -257,84 +250,86 @@ impl GraphicsEngine {
                             &global_context,
                             &point_shadow_pass_context,
                         );
-                        let geometry_model_drawer = GeometryModelDrawer::new(
+                        let light_culling_dispatcher = LightCullingDispatcher::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &geometry_pass_context,
+                            &light_culling_pass_context,
                         );
-                        let geometry_entity_drawer = GeometryEntityDrawer::new(
+                        let forward_effect_drawer = ForwardEffectDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &geometry_pass_context,
+                            &forward_pass_context,
                         );
-                        let geometry_indicator_drawer = GeometryIndicatorDrawer::new(
+                        let forward_entity_drawer = ForwardEntityDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &geometry_pass_context,
+                            &forward_pass_context,
                         );
-                        let geometry_water_drawer = GeometryWaterDrawer::new(
+                        let forward_indicator_drawer = ForwardIndicatorDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &geometry_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_ambient_light_drawer = ScreenAmbientLightDrawer::new(
+                        let forward_model_drawer = ForwardModelDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_directional_light_drawer = ScreenDirectionalLightDrawer::new(
+                        let forward_overlay_drawer = ForwardOverlayDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_point_light_drawer = ScreenPointLightDrawer::new(
+                        let forward_rectangle_drawer = ForwardRectangleDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_water_light_drawer = ScreenWaterLightDrawer::new(
+                        let forward_water_drawer = ForwardWaterDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_rectangle_drawer = ScreenRectangleDrawer::new(
+                        #[cfg(feature = "debug")]
+                        let forward_aabb_drawer = ForwardAabbDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_effect_drawer = ScreenEffectDrawer::new(
+                        #[cfg(feature = "debug")]
+                        let forward_buffer_drawer = ForwardBufferDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-                        let screen_overlay_drawer = ScreenOverlayDrawer::new(
+                        #[cfg(feature = "debug")]
+                        let forward_circle_drawer = ForwardCircleDrawer::new(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
                             &global_context,
-                            &screen_pass_context,
+                            &forward_pass_context,
                         );
-
                         #[cfg(feature = "debug")]
                         let picker_marker_drawer = PickerMarkerDrawer::new(
                             &self.capabilities,
@@ -342,30 +337,6 @@ impl GraphicsEngine {
                             &self.queue,
                             &global_context,
                             &picker_render_pass_context,
-                        );
-                        #[cfg(feature = "debug")]
-                        let screen_aabb_drawer = ScreenAabbDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &screen_pass_context,
-                        );
-                        #[cfg(feature = "debug")]
-                        let screen_circle_drawer = ScreenCircleDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &screen_pass_context,
-                        );
-                        #[cfg(feature = "debug")]
-                        let screen_buffer_drawer = ScreenBufferDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &screen_pass_context,
                         );
                     });
 
@@ -375,8 +346,8 @@ impl GraphicsEngine {
                         picker_render_pass_context,
                         directional_shadow_pass_context,
                         point_shadow_pass_context,
-                        geometry_pass_context,
-                        screen_pass_context,
+                        light_culling_pass_context,
+                        forward_pass_context,
                         interface_rectangle_drawer,
                         picker_entity_drawer,
                         picker_tile_drawer,
@@ -386,25 +357,22 @@ impl GraphicsEngine {
                         point_shadow_model_drawer,
                         point_shadow_indicator_drawer,
                         point_shadow_entity_drawer,
-                        geometry_model_drawer,
-                        geometry_entity_drawer,
-                        geometry_water_drawer,
-                        geometry_indicator_drawer,
-                        screen_ambient_light_drawer,
-                        screen_directional_light_drawer,
-                        screen_point_light_drawer,
-                        screen_water_light_drawer,
-                        screen_rectangle_drawer,
-                        screen_effect_drawer,
-                        screen_overlay_drawer,
+                        forward_effect_drawer,
+                        forward_entity_drawer,
+                        forward_indicator_drawer,
+                        forward_model_drawer,
+                        forward_overlay_drawer,
+                        forward_rectangle_drawer,
+                        forward_water_drawer,
+                        light_culling_dispatcher,
+                        #[cfg(feature = "debug")]
+                        forward_aabb_drawer,
+                        #[cfg(feature = "debug")]
+                        forward_buffer_drawer,
+                        #[cfg(feature = "debug")]
+                        forward_circle_drawer,
                         #[cfg(feature = "debug")]
                         picker_marker_drawer,
-                        #[cfg(feature = "debug")]
-                        screen_aabb_drawer,
-                        #[cfg(feature = "debug")]
-                        screen_circle_drawer,
-                        #[cfg(feature = "debug")]
-                        screen_buffer_drawer,
                     })
                 }
 
@@ -495,7 +463,7 @@ impl GraphicsEngine {
             if let Some(engine_context) = self.engine_context.as_mut() {
                 engine_context
                     .global_context
-                    .update_screen_size_textures(&self.device, surface.window_screen_size());
+                    .update_screen_size_resources(&self.device, surface.window_screen_size());
             }
         }
 
@@ -523,8 +491,8 @@ impl GraphicsEngine {
             picker_command_buffer,
             directional_shadow_command_buffer,
             point_shadow_command_buffer,
-            geometry_command_buffer,
-            screen_command_buffer,
+            light_culling_command_buffer,
+            forward_command_buffer,
         ) = self.draw_frame(&frame, instruction);
 
         // Queue all staging belt writes.
@@ -537,8 +505,8 @@ impl GraphicsEngine {
             picker_command_buffer,
             directional_shadow_command_buffer,
             point_shadow_command_buffer,
-            geometry_command_buffer,
-            screen_command_buffer,
+            light_culling_command_buffer,
+            forward_command_buffer,
         );
 
         // Schedule the presentation of the frame.
@@ -555,8 +523,8 @@ impl GraphicsEngine {
         picker_command_buffer: CommandBuffer,
         directional_shadow_command_buffer: CommandBuffer,
         point_shadow_command_buffer: CommandBuffer,
-        geometry_command_buffer: CommandBuffer,
-        screen_command_buffer: CommandBuffer,
+        light_culling_command_buffer: CommandBuffer,
+        forward_command_buffer: CommandBuffer,
     ) {
         // We have gathered all data for the next frame and can now wait until the GPU
         // is ready to accept the command buffers for the next frame. This is the
@@ -569,8 +537,8 @@ impl GraphicsEngine {
             picker_command_buffer,
             directional_shadow_command_buffer,
             point_shadow_command_buffer,
-            geometry_command_buffer,
-            screen_command_buffer,
+            light_culling_command_buffer,
+            forward_command_buffer,
         ]);
     }
 
@@ -595,8 +563,8 @@ impl GraphicsEngine {
                 context.directional_shadow_model_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
-                context.geometry_entity_drawer.prepare(&self.device, instruction);
-                context.geometry_model_drawer.prepare(&self.device, instruction);
+                context.forward_entity_drawer.prepare(&self.device, instruction);
+                context.forward_model_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
                 context.interface_rectangle_drawer.prepare(&self.device, instruction);
@@ -606,22 +574,18 @@ impl GraphicsEngine {
                 context.point_shadow_model_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
-                context.screen_directional_light_drawer.prepare(&self.device, instruction);
-                context.screen_effect_drawer.prepare(&self.device, instruction);
-            });
-            scope.spawn(|_| {
-                context.screen_point_light_drawer.prepare(&self.device, instruction);
-                context.screen_rectangle_drawer.prepare(&self.device, instruction);
+                context.forward_effect_drawer.prepare(&self.device, instruction);
+                context.forward_rectangle_drawer.prepare(&self.device, instruction);
             });
             #[cfg(feature = "debug")]
             scope.spawn(|_| {
                 context.picker_marker_drawer.prepare(&self.device, instruction);
-                context.screen_aabb_drawer.prepare(&self.device, instruction);
+                context.forward_aabb_drawer.prepare(&self.device, instruction);
             });
             #[cfg(feature = "debug")]
             scope.spawn(|_| {
-                context.screen_buffer_drawer.prepare(&self.device, instruction);
-                context.screen_circle_drawer.prepare(&self.device, instruction);
+                context.forward_buffer_drawer.prepare(&self.device, instruction);
+                context.forward_circle_drawer.prepare(&self.device, instruction);
             });
 
             context.global_context.prepare(&self.device, instruction);
@@ -641,25 +605,23 @@ impl GraphicsEngine {
         visitor.upload(&mut context.directional_shadow_entity_drawer);
         visitor.upload(&mut context.directional_shadow_model_drawer);
         visitor.upload(&mut context.directional_shadow_pass_context);
-        visitor.upload(&mut context.geometry_entity_drawer);
-        visitor.upload(&mut context.geometry_model_drawer);
         visitor.upload(&mut context.global_context);
         visitor.upload(&mut context.interface_rectangle_drawer);
         visitor.upload(&mut context.picker_entity_drawer);
         visitor.upload(&mut context.point_shadow_entity_drawer);
         visitor.upload(&mut context.point_shadow_model_drawer);
         visitor.upload(&mut context.point_shadow_pass_context);
-        visitor.upload(&mut context.screen_directional_light_drawer);
-        visitor.upload(&mut context.screen_effect_drawer);
-        visitor.upload(&mut context.screen_point_light_drawer);
-        visitor.upload(&mut context.screen_rectangle_drawer);
+        visitor.upload(&mut context.forward_effect_drawer);
+        visitor.upload(&mut context.forward_entity_drawer);
+        visitor.upload(&mut context.forward_model_drawer);
+        visitor.upload(&mut context.forward_rectangle_drawer);
 
         #[cfg(feature = "debug")]
         {
+            visitor.upload(&mut context.forward_aabb_drawer);
+            visitor.upload(&mut context.forward_buffer_drawer);
+            visitor.upload(&mut context.forward_circle_drawer);
             visitor.upload(&mut context.picker_marker_drawer);
-            visitor.upload(&mut context.screen_aabb_drawer);
-            visitor.upload(&mut context.screen_buffer_drawer);
-            visitor.upload(&mut context.screen_circle_drawer);
         }
 
         encoder.finish()
@@ -680,15 +642,13 @@ impl GraphicsEngine {
     ) {
         let frame_view = &frame.texture.create_view(&TextureViewDescriptor::default());
         let engine_context = self.engine_context.as_mut().unwrap();
-        #[cfg(feature = "debug")]
-        let render_settings = &instruction.render_settings;
 
         let mut picker_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut interface_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut directional_shadow_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
         let mut point_shadow_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-        let mut geometry_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
-        let mut screen_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+        let mut light_culling_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
+        let mut forward_encoder = self.device.create_command_encoder(&CommandEncoderDescriptor::default());
 
         rayon::in_place_scope(|scope| {
             // Picker Pass
@@ -814,91 +774,79 @@ impl GraphicsEngine {
                 });
             });
 
-            // Geometry Pass
+            // Light Culling Pass
             scope.spawn(|_| {
-                let mut render_pass = engine_context.geometry_pass_context.create_pass(
-                    frame_view,
-                    &mut geometry_encoder,
-                    &engine_context.global_context,
-                    None,
-                );
+                let mut compute_pass =
+                    engine_context
+                        .light_culling_pass_context
+                        .create_pass(&mut light_culling_encoder, &engine_context.global_context, None);
 
-                let draw_data = ModelBatchDrawData {
-                    batches: instruction.model_batches,
-                    instructions: instruction.models,
-                    #[cfg(feature = "debug")]
-                    show_wireframe: instruction.render_settings.show_wireframe,
-                };
-
-                engine_context.geometry_model_drawer.draw(&mut render_pass, draw_data);
                 engine_context
-                    .geometry_indicator_drawer
-                    .draw(&mut render_pass, instruction.indicator.as_ref());
-                engine_context.geometry_entity_drawer.draw(&mut render_pass, instruction.entities);
-
-                if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
-                    engine_context.geometry_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
-                }
+                    .light_culling_dispatcher
+                    .dispatch(&mut compute_pass, engine_context.global_context.screen_size);
             });
 
-            // Screen Pass
+            // Forward Pass
             let mut render_pass =
                 engine_context
-                    .screen_pass_context
-                    .create_pass(frame_view, &mut screen_encoder, &engine_context.global_context, None);
+                    .forward_pass_context
+                    .create_pass(frame_view, &mut forward_encoder, &engine_context.global_context, None);
 
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_ambient_light))]
-            engine_context.screen_ambient_light_drawer.draw(&mut render_pass, None);
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_directional_light))]
-            engine_context.screen_directional_light_drawer.draw(&mut render_pass, None);
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
-            engine_context.screen_point_light_drawer.draw(&mut render_pass, None);
-            engine_context.screen_water_light_drawer.draw(&mut render_pass, None);
+            let draw_data = ModelBatchDrawData {
+                batches: instruction.model_batches,
+                instructions: instruction.models,
+                #[cfg(feature = "debug")]
+                show_wireframe: instruction.render_settings.show_wireframe,
+            };
+
+            engine_context.forward_model_drawer.draw(&mut render_pass, draw_data);
+
+            engine_context
+                .forward_indicator_drawer
+                .draw(&mut render_pass, instruction.indicator.as_ref());
+
+            engine_context.forward_entity_drawer.draw(&mut render_pass, instruction.entities);
+
+            if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
+                engine_context.forward_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
+            }
 
             #[cfg(feature = "debug")]
             {
-                engine_context.screen_aabb_drawer.draw(&mut render_pass, None);
-                engine_context.screen_circle_drawer.draw(&mut render_pass, None);
+                engine_context.forward_aabb_drawer.draw(&mut render_pass, None);
+                engine_context.forward_circle_drawer.draw(&mut render_pass, None);
             }
 
-            let rectangle_data = ScreenRectangleDrawInstruction {
-                layer: Layer::Bottom,
+            let rectangle_data = ForwardRectangleDrawInstruction {
+                layer: ForwardRectangleLayer::Bottom,
                 instructions: instruction.bottom_layer_rectangles,
             };
+            engine_context.forward_rectangle_drawer.draw(&mut render_pass, rectangle_data);
 
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
-            engine_context.screen_effect_drawer.draw(&mut render_pass, instruction.effects);
+            engine_context.forward_effect_drawer.draw(&mut render_pass, instruction.effects);
+
+            let rectangle_data = ForwardRectangleDrawInstruction {
+                layer: ForwardRectangleLayer::Middle,
+                instructions: instruction.middle_layer_rectangles,
+            };
+            engine_context.forward_rectangle_drawer.draw(&mut render_pass, rectangle_data);
 
             #[cfg(feature = "debug")]
             {
                 engine_context
-                    .screen_buffer_drawer
+                    .forward_buffer_drawer
                     .draw(&mut render_pass, &instruction.render_settings);
             }
 
-            let rectangle_data = ScreenRectangleDrawInstruction {
-                layer: Layer::Middle,
-                instructions: instruction.middle_layer_rectangles,
-            };
-
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
-
-            #[cfg(feature = "debug")]
-            {
-                #[cfg(feature = "debug")]
-                engine_context.screen_aabb_drawer.draw(&mut render_pass, None);
-            }
-
             if instruction.show_interface {
-                engine_context.screen_overlay_drawer.draw(&mut render_pass, None);
+                engine_context.forward_overlay_drawer.draw(&mut render_pass, None);
             }
 
-            let rectangle_data = ScreenRectangleDrawInstruction {
-                layer: Layer::Top,
+            let rectangle_data = ForwardRectangleDrawInstruction {
+                layer: ForwardRectangleLayer::Top,
                 instructions: instruction.top_layer_rectangles,
             };
-
-            engine_context.screen_rectangle_drawer.draw(&mut render_pass, rectangle_data);
+            engine_context.forward_rectangle_drawer.draw(&mut render_pass, rectangle_data);
         });
 
         (
@@ -906,8 +854,8 @@ impl GraphicsEngine {
             interface_encoder.finish(),
             directional_shadow_encoder.finish(),
             point_shadow_encoder.finish(),
-            geometry_encoder.finish(),
-            screen_encoder.finish(),
+            light_culling_encoder.finish(),
+            forward_encoder.finish(),
         )
     }
 }

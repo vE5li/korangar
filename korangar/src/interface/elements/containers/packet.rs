@@ -388,7 +388,7 @@ impl Element<InterfaceSettings> for PacketView {
             // Add or remove elements that need to be shown/hidden based on filtering. Also
             // append new elements for packets that are new.
             self.packets.get().0.iter().for_each(|(packet, linked_element)| {
-                // Getting here means thatt the packet was already processed once.
+                // Getting here means that the packet was already processed once.
                 let show_packet = show_pings || !packet.is_ping();
 
                 if linked_element.is_linked() {
@@ -414,7 +414,7 @@ impl Element<InterfaceSettings> for PacketView {
                         resolve = true;
                     }
                 } else {
-                    // Getting here means thatt the packet was newly added.
+                    // Getting here means that the packet was newly added.
                     match show_packet {
                         true => {
                             let element = PacketEntry::to_element(packet);

@@ -1939,13 +1939,12 @@ impl Client {
 
         // Point Lights and Shadows
         {
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
-            point_light_set.render_point_lights(&mut self.point_light_instructions, current_camera);
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
+            point_light_set.render_point_lights(&mut self.point_light_instructions);
 
-            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights && !render_settings.show_buffers()))]
+            #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_point_lights))]
             point_light_set.render_point_lights_with_shadows(
                 &self.map,
-                current_camera,
                 &mut self.point_shadow_camera,
                 &mut self.point_shadow_object_set_buffer,
                 &mut self.point_shadow_model_instructions,

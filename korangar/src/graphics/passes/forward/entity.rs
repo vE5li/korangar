@@ -13,15 +13,14 @@ use wgpu::{
     ShaderStages, StencilState, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
-use crate::graphics::cameras::NEAR_PLANE;
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, GeometryRenderPassContext, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
 use crate::graphics::{Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
-const DRAWER_NAME: &str = "geometry entity";
+const DRAWER_NAME: &str = "forward entity";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -36,7 +35,7 @@ pub(crate) struct InstanceData {
     texture_index: i32,
 }
 
-pub(crate) struct GeometryEntityDrawer {
+pub(crate) struct ForwardEntityDrawer {
     bindless_support: bool,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
@@ -49,8 +48,8 @@ pub(crate) struct GeometryEntityDrawer {
     lookup: HashMap<u64, i32>,
 }
 
-impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAttachmentCount::One }> for GeometryEntityDrawer {
-    type Context = GeometryRenderPassContext;
+impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardEntityDrawer {
+    type Context = ForwardRenderPassContext;
     type DrawData<'data> = &'data [EntityInstruction];
 
     fn new(
@@ -126,9 +125,14 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
         let bind_group_layouts: &[&BindGroupLayout] = if capabilities.supports_bindless() {
-            &[pass_bind_group_layouts[0], &bind_group_layout]
+            &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout]
         } else {
-            &[pass_bind_group_layouts[0], &bind_group_layout, Texture::bind_group_layout(device)]
+            &[
+                pass_bind_group_layouts[0],
+                pass_bind_group_layouts[1],
+                &bind_group_layout,
+                Texture::bind_group_layout(device),
+            ]
         };
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -136,9 +140,6 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
             bind_group_layouts,
             push_constant_ranges: &[],
         });
-
-        let mut constants = std::collections::HashMap::new();
-        constants.insert("near_plane".to_owned(), NEAR_PLANE as f64);
 
         let color_attachment_formats = render_pass_context.color_attachment_formats();
 
@@ -148,36 +149,18 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
             vertex: VertexState {
                 module: &shader_module,
                 entry_point: "vs_main",
-                compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
                 entry_point: "fs_main",
-                compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
-                    ..Default::default()
-                },
-                targets: &[
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[0],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[1],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                    Some(ColorTargetState {
-                        format: color_attachment_formats[2],
-                        blend: None,
-                        write_mask: ColorWrites::default(),
-                    }),
-                ],
+                compilation_options: PipelineCompilationOptions::default(),
+                targets: &[Some(ColorTargetState {
+                    format: color_attachment_formats[0],
+                    blend: None,
+                    write_mask: ColorWrites::default(),
+                })],
             }),
             multiview: None,
             primitive: PrimitiveState {
@@ -219,18 +202,18 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
         }
 
         pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(1, &self.bind_group, &[]);
+        pass.set_bind_group(2, &self.bind_group, &[]);
 
         if self.bindless_support {
             pass.draw(0..6, 0..self.draw_count as u32);
         } else {
             let mut current_texture_id = self.solid_pixel_texture.get_id();
-            pass.set_bind_group(2, self.solid_pixel_texture.get_bind_group(), &[]);
+            pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
 
             for (index, instruction) in draw_data[0..self.draw_count].iter().enumerate() {
                 if instruction.texture.get_id() != current_texture_id {
                     current_texture_id = instruction.texture.get_id();
-                    pass.set_bind_group(2, instruction.texture.get_bind_group(), &[]);
+                    pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
                 }
                 let index = index as u32;
                 pass.draw(0..6, index..index + 1);
@@ -239,7 +222,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::Three }, { DepthAtt
     }
 }
 
-impl Prepare for GeometryEntityDrawer {
+impl Prepare for ForwardEntityDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         self.draw_count = instructions.entities.len();
 
@@ -309,7 +292,7 @@ impl Prepare for GeometryEntityDrawer {
     }
 }
 
-impl GeometryEntityDrawer {
+impl ForwardEntityDrawer {
     fn create_bind_group_bindless(
         device: &Device,
         bind_group_layout: &BindGroupLayout,

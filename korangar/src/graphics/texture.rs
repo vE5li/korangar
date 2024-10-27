@@ -354,3 +354,48 @@ impl<'a> AttachmentTextureFactory<'a> {
         )
     }
 }
+
+pub struct StorageTexture {
+    label: String,
+    _texture: wgpu::Texture,
+    texture_view: TextureView,
+}
+
+impl Debug for StorageTexture {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "StorageTexture(\"{}\")", self.label)
+    }
+}
+
+impl StorageTexture {
+    pub fn new(device: &Device, label: &str, width: u32, height: u32, format: TextureFormat) -> Self {
+        let texture = device.create_texture(&TextureDescriptor {
+            label: Some(label),
+            size: Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format,
+            usage: TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let texture_view = texture.create_view(&TextureViewDescriptor {
+            label: Some(label),
+            ..Default::default()
+        });
+
+        Self {
+            label: label.to_string(),
+            _texture: texture,
+            texture_view,
+        }
+    }
+
+    pub fn get_texture_view(&self) -> &TextureView {
+        &self.texture_view
+    }
+}

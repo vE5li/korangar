@@ -1195,7 +1195,7 @@ impl Client {
                                 PointLightId::new(unit_id as u32),
                                 Vector3::new(0.0, 3.0, 0.0),
                                 Color::rgb_u8(255, 30, 0),
-                                20.0,
+                                60.0,
                                 true,
                             )),
                             entity_id,

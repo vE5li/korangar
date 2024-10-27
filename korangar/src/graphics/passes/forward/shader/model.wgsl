@@ -99,7 +99,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Get the number of lights affecting this tile
     let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
 
-    if (alpha_channel < 1.0) {
+    if (alpha_channel == 0.0) {
         discard;
     }
 
@@ -140,7 +140,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         final_color += light_percent * light.color.rgb * base_color * attenuation;
     }
 
-    return vec4<f32>(final_color, 1.0);
+    return vec4<f32>(final_color, alpha_channel);
 }
 
 // Quadratic Attenuation with smooth falloff

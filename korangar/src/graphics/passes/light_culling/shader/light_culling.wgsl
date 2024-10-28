@@ -49,14 +49,22 @@ fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let tile_index = global_id.y * tile_count_x + global_id.x;
 
-    // Calculate tile cone axis and angle
+    // Calculate cone axis in view space
     let sides = calculate_tile_vectors(global_id.x, global_id.y);
-    let cone_center_axis = normalize(sides[0] + sides[1] + sides[2] + sides[3]);
+    let view_space_cone_axis = normalize(sides[0] + sides[1] + sides[2] + sides[3]);
+
+    // Transform cone axis and origin to world space
+    let world_space_cone_axis = (global_uniforms.inverse_view * vec4<f32>(view_space_cone_axis, 0.0)).xyz;
+    let world_space_cone_origin = (global_uniforms.inverse_view * vec4<f32>(0.0, 0.0, 0.0, 1.0)).xyz;
+
+    // Calculate the cone's angle
     let cone_angle_cos = min(
-        min(dot(cone_center_axis, sides[0]), dot(cone_center_axis, sides[1])),
-        min(dot(cone_center_axis, sides[2],), dot(cone_center_axis, sides[3]))
+        min(dot(view_space_cone_axis, sides[0]), dot(view_space_cone_axis, sides[1])),
+        min(dot(view_space_cone_axis, sides[2]), dot(view_space_cone_axis, sides[3])),
     );
     let cone_angle_tan = sqrt(1.0 / (cone_angle_cos * cone_angle_cos) - 1.0);
+
+    let cone_rotation_matrix = create_cone_rotation_matrix(world_space_cone_axis);
 
     var local_count = 0u;
 
@@ -64,13 +72,15 @@ fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     for (var index = 0u; index < global_uniforms.point_light_count; index++) {
         let light = lights[index];
 
-        let light_position = global_uniforms.view * vec4<f32>(light.position.xyz, 1.0);
+        // Position the light's center relative to the new origin
+        // and also rotate it, so that it axis aligned.
+        let light_relativ_position = light.position.xyz - world_space_cone_origin;
+        let light_aligned_position = cone_rotation_matrix * light_relativ_position;
 
-        let is_intersecting = intersect_cone_sphere(
-            cone_center_axis.xyz,
-            cone_angle_tan,
-            light_position.xyz,
+        let is_intersecting = intersect_cone_sphere_aligned(
+            light_aligned_position,
             light.range,
+            cone_angle_tan,
         );
 
         if (local_count < MAX_LIGHTS_PER_TILE) && is_intersecting {
@@ -82,32 +92,35 @@ fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     textureStore(light_count_texture, vec2<i32>(global_id.xy), vec4<u32>(local_count, 0u, 0u, 0u));
 }
 
-/// This is an intersection test that uses the Minkowski difference between the cone and sphere.
-/// Here we are expanding the cone by sphere_radius to create a "fattened" cone that represents
-/// all points where a sphere of that radius could intersect.
+/// Tests if a sphere intersects with a cone that is aligned to the +Z axis with its tip at the origin.
+/// The spheres we test must be inside the cone's view space. This is an optimized version that takes
+/// advantage of the special case where the cone is Z-aligned.
 ///
-/// cone_center_axis and sphere_center must be in view space and the cone origin must be the
-/// coordinate system origin. cone_center_axis must also be normalized.
+/// # How it works
 ///
-/// Based on: "Intersection of a Sphere and a Cone" (2020) by David Eberly.
-fn intersect_cone_sphere(
-    cone_center_axis: vec3<f32>,
-    cone_angle_tan: f32,
+/// The test is split into two parts:
+///
+/// 1. `extends_past_cone_tip`: Checks if any part of the sphere extends past z=0 (the cone's tip)
+///    - A sphere extends past z=0 if its closest point to the XY plane is at or behind z=0
+///    - This occurs when: sphere_center.z > -sphere_radius
+///
+/// 2. `intersects_cone`: Tests if the sphere intersects the cone's surface at the sphere's Z position
+///    - At any Z position, the cone forms a circular cross-section
+///    - The radius of this cross-section is: max(cone_angle_tan * sphere_center.z, 0.0)
+///    - length(sphere_center.xy) gives the distance from sphere center to cone's axis
+///    - For intersection, this distance must be <= cone_radius + sphere_radius
+///
+/// Based on an original idea from Jonathan W. Hale's bachelor thesis
+/// "Dual-Cone View Culling for Virtual Reality Applications" (2018).
+fn intersect_cone_sphere_aligned(
     sphere_center: vec3<f32>,
-    sphere_radius: f32
+    sphere_radius: f32,
+    cone_angle_tan: f32
 ) -> bool {
-    // Check if sphere center is within radius of cone origin.
-    let distance_to_origin_squared = dot(sphere_center, sphere_center);
-    let in_origin_radius = distance_to_origin_squared <= sphere_radius * sphere_radius;
-
-    let projected_length = dot(sphere_center, cone_center_axis);
-    let distance_from_axis = length(sphere_center - projected_length * cone_center_axis);
-    let expanded_radius = (projected_length * cone_angle_tan) + sphere_radius;
-
-    // Check if point is inside the "fattened" cone and the projection is in front of the cone origin.
-    let in_cone_region = distance_from_axis <= expanded_radius && projected_length >= -sphere_radius;
-
-    return in_origin_radius || in_cone_region;
+    let cone_radius = max(cone_angle_tan * sphere_center.z, 0.0);
+    let extends_past_cone_tip = sphere_center.z > -sphere_radius;
+    let intersects_cone = length(sphere_center.xy) <= cone_radius + sphere_radius;
+    return extends_past_cone_tip && intersects_cone;
 }
 
 fn calculate_tile_vectors(tile_x: u32, tile_y: u32) -> mat4x3<f32> {
@@ -135,8 +148,8 @@ fn calculate_tile_vectors(tile_x: u32, tile_y: u32) -> mat4x3<f32> {
         vec4<f32>(ndc_min.x, ndc_max.y, 1.0, 1.0)
     );
 
-    // Transform corners to view space and create the side vectors
-    // sic! Somehow dxc doesn't like it if we to a matrix multiplication
+    // Transform corners to view space and create the side vectors.
+    // sic! Somehow dxc doesn't like it if we do a matrix multiplication.
     let view_corner_0 = global_uniforms.inverse_projection * corners[0];
     let view_corner_1 = global_uniforms.inverse_projection * corners[1];
     let view_corner_2 = global_uniforms.inverse_projection * corners[2];
@@ -150,6 +163,27 @@ fn calculate_tile_vectors(tile_x: u32, tile_y: u32) -> mat4x3<f32> {
     );
 
     return sides;
+}
+
+/// Creates a rotation matrix by constructing an orthonormal basis where the +Z axis
+/// aligns with the given cone_axis. This uses a Gram-Schmidt-like process to build
+/// a coordinate frame by:
+/// 1. Using the cone_axis as the forward (Z) direction
+/// 2. Choosing a reference vector perpendicular to the cone_axis
+/// 3. Computing right (X) and up (Y) vectors via cross products
+///
+/// The resulting 3x3 matrix transforms from the standard basis to this new basis,
+/// effectively rotating any vector into the cone's coordinate system.
+fn create_cone_rotation_matrix(cone_axis: vec3<f32>) -> mat3x3<f32> {
+    let forward_axis = normalize(cone_axis);
+    let reference_vector = select(vec3<f32>(1.0, 0.0, 0.0), vec3<f32>(0.0, 1.0, 0.0), abs(forward_axis.x) > 0.9);
+    let right_axis = normalize(cross(reference_vector, forward_axis));
+    let up_axis = cross(forward_axis, right_axis);
+    return mat3x3<f32>(
+        right_axis.x, up_axis.x, forward_axis.x,
+        right_axis.y, up_axis.y, forward_axis.y,
+        right_axis.z, up_axis.z, forward_axis.z
+    );
 }
 
 fn screen_to_clip_space(screen_space_position: vec2<f32>) -> vec2<f32> {

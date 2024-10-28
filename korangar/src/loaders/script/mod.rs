@@ -72,7 +72,7 @@ end
 
         let print: Function = globals.get("get_job_name_from_id").unwrap();
         print
-            .call::<_, LuaString>(job_id)
+            .call::<LuaString>(job_id)
             .unwrap()
             .to_str()
             .unwrap()
@@ -90,10 +90,10 @@ end
         };
 
         globals
-            .get::<_, LuaTable>("tbl")
+            .get::<LuaTable>("tbl")
             .unwrap()
-            .get::<_, LuaTable>(item_id.0)
-            .map(|table| table.get::<_, LuaString>(lookup_name).unwrap().to_str().unwrap().to_owned())
+            .get::<LuaTable>(item_id.0)
+            .map(|table| table.get::<LuaString>(lookup_name).unwrap().to_str().unwrap().to_owned())
             .unwrap_or_else(|_| "NOTFOUND".to_owned())
     }
 
@@ -108,10 +108,10 @@ end
         };
 
         globals
-            .get::<_, LuaTable>("tbl")
+            .get::<LuaTable>("tbl")
             .unwrap()
-            .get::<_, LuaTable>(item_id.0)
-            .map(|table| table.get::<_, LuaString>(lookup_name).unwrap().to_str().unwrap().to_owned())
+            .get::<LuaTable>(item_id.0)
+            .map(|table| table.get::<LuaString>(lookup_name).unwrap().to_str().unwrap().to_owned())
             .unwrap_or_else(|_| "»ç°ú".to_owned())
     }
 

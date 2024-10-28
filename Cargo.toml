@@ -20,7 +20,7 @@ korangar_interface = { path = "korangar_interface" }
 korangar_networking = { path = "korangar_networking" }
 korangar_util = { path = "korangar_util" }
 lunify = "1.1"
-mlua = "0.9"
+mlua = "0.10"
 num = "0.4"
 option-ext = "0.2"
 pathfinding = "4.10"

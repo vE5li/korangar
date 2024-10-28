@@ -8,6 +8,7 @@ use image::imageops::FilterType;
 use image::{save_buffer, Pixel, Rgba, RgbaImage};
 use imageproc::geometric_transformations::{rotate_about_center, Interpolation};
 use korangar_interface::elements::PrototypeElement;
+use num::Zero;
 use ragnarok_formats::sprite::RgbaImageData;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
@@ -67,10 +68,7 @@ impl AnimationLoader {
                     for position in 0..motion.sprite_clip_count {
                         let frame_part: FramePart;
                         let pos = position as usize;
-                        let sprite_number: i32 = match motion.sprite_clips[pos].sprite_number != -1 {
-                            true => motion.sprite_clips[pos].sprite_number as i32,
-                            false => -1,
-                        };
+                        let sprite_number = motion.sprite_clips[pos].sprite_number;
                         if sprite_number == -1 {
                             continue;
                         }
@@ -151,15 +149,12 @@ impl AnimationLoader {
                             Some(value) => value == 1,
                             None => false,
                         };
-                        let mut attach_point_x = 0;
-                        let mut attach_point_y = 0;
+                        let mut attach_point = Vector2::<i32>::zero();
 
                         if has_attach_point {
-                            attach_point_x = motion.attach_points[0].position.x;
-                            attach_point_y = motion.attach_points[0].position.y;
+                            attach_point = motion.attach_points[0].position;
                         }
-                        let attach_point_parent_x = 0;
-                        let attach_point_parent_y = 0;
+                        let attach_point_parent = Vector2::<i32>::zero();
 
                         let sprite_type = match animation_index {
                             0 => SpriteType::Body,
@@ -169,16 +164,12 @@ impl AnimationLoader {
                         frame_part = FramePart {
                             sprite_type,
                             rgba_data: rgba_image_data_modify.clone(),
-                            upleft_x: 0,
-                            upleft_y: 0,
-                            offset_x: offset.x,
-                            offset_y: offset.y,
-                            attach_point_x,
-                            attach_point_y,
+                            upleft: Vector2::zero(),
+                            offset,
+                            attach_point,
                             has_attach_point,
                             mirror,
-                            attach_point_parent_x,
-                            attach_point_parent_y,
+                            attach_point_parent,
                         };
                         motion_frames.push(frame_part);
                     }
@@ -202,7 +193,7 @@ impl AnimationLoader {
         for action_index in 0..action_size {
             let motion_size = vec[0].actions.actions[action_index].motions.len();
             let mut rgba_images: Vec<RgbaImageData> = Vec::new();
-            let mut offsets: Vec<Vector2<f32>> = Vec::new();
+            let mut offsets: Vec<Vector2<i32>> = Vec::new();
             for motion_index in 0..motion_size {
                 let mut generate: Vec<FramePart> = Vec::new();
 
@@ -210,10 +201,8 @@ impl AnimationLoader {
                 // TODO: create a representation to map the head and body
                 match entity_type {
                     EntityType::Player => {
-                        animations_list[1][action_index][motion_index].attach_point_parent_x =
-                            animations_list[0][action_index][motion_index].attach_point_x;
-                        animations_list[1][action_index][motion_index].attach_point_parent_y =
-                            animations_list[0][action_index][motion_index].attach_point_y;
+                        animations_list[1][action_index][motion_index].attach_point_parent =
+                            animations_list[0][action_index][motion_index].attach_point;
                     }
                     _ => {}
                 }
@@ -229,18 +218,7 @@ impl AnimationLoader {
                 let frame = Frame::merge_frame_part(&mut generate);
 
                 rgba_images.push(frame.rgba_data);
-                offsets.push(Vector2::new(frame.offset_x as f32, frame.offset_y as f32));
-
-                // TODO: Create an interface that show the shift of the image
-                // inside the debugger.
-                /*#[cfg(feature = "debug")]
-                Frame::image_save(
-                    rgba_images.last().unwrap().clone(),
-                    entity_filename[0].len() as i32,
-                    offsets.last().unwrap().clone(),
-                    action_index as i32,
-                    motion_index as i32,
-                );*/
+                offsets.push(frame.offset);
             }
 
             // TODO: Remove this code after fixing the offset
@@ -284,10 +262,10 @@ impl AnimationLoader {
                         pixel.blend(rgba_old.get_pixel(x as u32, y as u32));
                     }
                 }
-                offset.x = min_offset_x as f32;
-                offset.y = min_offset_y as f32;
-                offset.x += (max_offset_x - min_offset_x + 2) as f32;
-                offset.y += (max_offset_y - min_offset_y + 2) as f32;
+                offset.x = min_offset_x;
+                offset.y = min_offset_y;
+                offset.x += max_offset_x - min_offset_x + 2;
+                offset.y += max_offset_y - min_offset_y + 2;
 
                 RgbaImageData {
                     width: rgba_new.width() as u16,
@@ -378,15 +356,11 @@ pub enum SpriteType {
 pub struct FramePart {
     pub sprite_type: SpriteType,
     pub rgba_data: RgbaImageData,
-    pub offset_x: i32,
-    pub offset_y: i32,
-    pub upleft_x: i32,
-    pub upleft_y: i32,
+    pub offset: Vector2<i32>,
+    pub upleft: Vector2<i32>,
     pub has_attach_point: bool,
-    pub attach_point_x: i32,
-    pub attach_point_y: i32,
-    pub attach_point_parent_x: i32,
-    pub attach_point_parent_y: i32,
+    pub attach_point: Vector2<i32>,
+    pub attach_point_parent: Vector2<i32>,
     pub mirror: bool,
 }
 
@@ -397,33 +371,26 @@ impl Frame {
     // of the vector
     pub fn merge_frame_part(action_frames: &mut Vec<FramePart>) -> FramePart {
         for frame_part in action_frames.iter_mut() {
-            let attach_point_offset_x = match &frame_part.has_attach_point {
+            let attach_point_offset = match &frame_part.has_attach_point {
                 true => match &frame_part.sprite_type {
-                    SpriteType::Head => -frame_part.attach_point_x + frame_part.attach_point_parent_x,
-                    _ => 0,
+                    SpriteType::Head => -frame_part.attach_point + frame_part.attach_point_parent,
+                    _ => Vector2::zero(),
                 },
-                false => 0,
-            };
-            let attach_point_offset_y = match &frame_part.has_attach_point {
-                true => match &frame_part.sprite_type {
-                    SpriteType::Head => -frame_part.attach_point_y + frame_part.attach_point_parent_y,
-                    _ => 0,
-                },
-                false => 0,
+                false => Vector2::zero(),
             };
 
             // The origin is (0, 0)
             // Finding the half size of the image
-            let half_size_x = (frame_part.rgba_data.width as i32 - 1) / 2;
-            let half_size_y = (frame_part.rgba_data.height as i32 - 1) / 2;
+            let half_size = Vector2::new(
+                (frame_part.rgba_data.width as i32 - 1) / 2,
+                (frame_part.rgba_data.height as i32 - 1) / 2,
+            );
 
             // Adding the offset from attach point
-            frame_part.offset_x += attach_point_offset_x;
-            frame_part.offset_y += attach_point_offset_y;
+            frame_part.offset += attach_point_offset;
 
             // For each retangle find the upleft corner
-            frame_part.upleft_x = frame_part.offset_x - half_size_x;
-            frame_part.upleft_y = frame_part.offset_y - half_size_y;
+            frame_part.upleft = frame_part.offset - half_size;
         }
         // If there is no frame return an image
         if action_frames.is_empty() {
@@ -434,35 +401,31 @@ impl Frame {
                     height: 1,
                     data: vec![0x00, 0x00, 0x00, 0x00],
                 },
-                upleft_x: 0,
-                upleft_y: 0,
-                offset_x: 0,
-                offset_y: 0,
+                upleft: Vector2::zero(),
+                offset: Vector2::zero(),
                 has_attach_point: false,
-                attach_point_x: 0,
-                attach_point_y: 0,
-                attach_point_parent_x: 0,
-                attach_point_parent_y: 0,
+                attach_point: Vector2::zero(),
+                attach_point_parent: Vector2::zero(),
                 mirror: false,
             };
         }
         // Find the upmost and leftmost coordinates
-        let upleft_x = action_frames.iter().min_by_key(|frame_part| frame_part.upleft_x).unwrap().upleft_x;
-        let upleft_y = action_frames.iter().min_by_key(|frame_part| frame_part.upleft_y).unwrap().upleft_y;
+        let upleft_x = action_frames.iter().min_by_key(|frame_part| frame_part.upleft.x).unwrap().upleft.x;
+        let upleft_y = action_frames.iter().min_by_key(|frame_part| frame_part.upleft.y).unwrap().upleft.y;
 
         // Find the downmost and rightmost coordinates
         let frame_part_x = action_frames
             .iter()
-            .max_by_key(|frame_part| frame_part.upleft_x + frame_part.rgba_data.width as i32)
+            .max_by_key(|frame_part| frame_part.upleft.x + frame_part.rgba_data.width as i32)
             .unwrap();
         let frame_part_y = action_frames
             .iter()
-            .max_by_key(|frame_part| frame_part.upleft_y + frame_part.rgba_data.height as i32)
+            .max_by_key(|frame_part| frame_part.upleft.y + frame_part.rgba_data.height as i32)
             .unwrap();
 
         // Calculate the new rectangle that is formed
-        let mut new_width = frame_part_x.upleft_x + frame_part_x.rgba_data.width as i32;
-        let mut new_height = frame_part_y.upleft_y + frame_part_y.rgba_data.height as i32;
+        let mut new_width = frame_part_x.upleft.x + frame_part_x.rgba_data.width as i32;
+        let mut new_height = frame_part_y.upleft.y + frame_part_y.rgba_data.height as i32;
         new_width -= upleft_x;
         new_height -= upleft_y;
 
@@ -487,9 +450,9 @@ impl Frame {
             let height = rgba_list[index].height();
             let width = rgba_list[index].width();
             for y in 0..height {
-                let new_y = (y as i32) + action_frames[index].upleft_y - upleft_y;
+                let new_y = y as i32 + action_frames[index].upleft.y - upleft_y;
                 for x in 0..width {
-                    let new_x = x as i32 + action_frames[index].upleft_x - upleft_x;
+                    let new_x = x as i32 + action_frames[index].upleft.x - upleft_x;
                     let mut change_x = x as i32;
                     if action_frames[index].mirror {
                         change_x = width as i32 - 1 - x as i32;
@@ -499,68 +462,35 @@ impl Frame {
                 }
             }
         }
+
+        /* As the origin is (0,0), you get the upleft point of the retangle and
+         * shift to the center, the offset is the difference between the origin and
+         * this point */
         FramePart {
             sprite_type: SpriteType::Other,
-            upleft_x: 0,
-            upleft_y: 0,
-            offset_x: upleft_x + (rgba.width() as i32 - 1) / 2, /* As the origin is (0,0), you get the upleft point of the retangle and
-                                                                 * shift
-                                                                 * to center, the
-                                                                 * offset is the difference between the origin and this point */
-            offset_y: upleft_y + (rgba.height() as i32 - 1) / 2, /* As the origin is (0,0), you get the upleft point of the retangle and
-                                                                  * shift
-                                                                  * to the center,
-                                                                  * the offset is the difference between the origin and this point */
+            upleft: Vector2::zero(),
+            offset: Vector2::new(
+                upleft_x + (rgba.width() as i32 - 1) / 2,
+                upleft_y + (rgba.height() as i32 - 1) / 2,
+            ),
             rgba_data: RgbaImageData {
                 width: rgba.width() as u16,
                 height: rgba.height() as u16,
                 data: rgba.into_raw(),
             },
-
             has_attach_point: false,
-            attach_point_x: 0,
-            attach_point_y: 0,
-            attach_point_parent_x: 0,
-            attach_point_parent_y: 0,
+            attach_point: Vector2::zero(),
+            attach_point_parent: Vector2::zero(),
             mirror: false,
         }
-    }
-
-    #[cfg(feature = "debug")]
-    pub fn image_save(image_new: RgbaImageData, entity: i32, offset: Vector2<f32>, action_number: i32, sprite_number: i32) {
-        // Create a RgbaImage of the drawing
-
-        let temp: RgbaImage = RgbaImage::from_raw(image_new.width.into(), image_new.height.into(), image_new.data.clone()).unwrap();
-        let mut rgba: RgbaImage = RgbaImage::new(1024 as u32, 1024 as u32);
-
-        let height = image_new.height;
-        let width = image_new.width;
-        for y in 0..height {
-            let new_y = y as i32 + offset.y as i32 - (height as i32 / 2) + 500;
-            for x in 0..width {
-                let new_x = x as i32 + offset.x as i32 - (width as i32 / 2) + 500;
-                let mut change_x = x as i32;
-                let pixel: &mut Rgba<u8> = rgba.get_pixel_mut(new_x as u32, new_y as u32);
-                pixel.blend(temp.get_pixel(change_x as u32, y.into()));
-            }
-        }
-
-        save_buffer(
-            format!(".\\images\\image_{}_{}_{}.png", entity, action_number, sprite_number),
-            &rgba.clone().into_raw(),
-            rgba.width().into(),
-            rgba.height().into(),
-            image::ExtendedColorType::Rgba8,
-        )
-        .unwrap();
     }
 }
 
 #[derive(Clone, PrototypeElement)]
 pub struct Animation {
     #[hidden_element]
-    pub textures: Vec<Arc<Texture>>, // The vector of frames generated from animation pair
-    pub offsets: Vec<Vector2<f32>>,
+    pub textures: Vec<Arc<Texture>>,
+    pub offsets: Vec<Vector2<i32>>,
 }
 
 #[derive(PrototypeElement)]
@@ -608,15 +538,15 @@ impl AnimationData {
             texture = animation.textures[0].clone();
             let texture_size = texture.get_size();
             position = Vector2::new(
-                animation.offsets[0].x,
-                animation.offsets[0].y + texture_size.height as f32 / 2.0,
+                animation.offsets[0].x as f32,
+                animation.offsets[0].y as f32 + texture_size.height as f32 / 2.0,
             ) / 10.0;
         } else {
             texture = animation.textures[time].clone();
             let texture_size = texture.get_size();
             position = Vector2::new(
-                animation.offsets[time].x,
-                animation.offsets[time].y + texture_size.height as f32 / 2.0,
+                animation.offsets[time].x as f32,
+                animation.offsets[time].y as f32 + texture_size.height as f32 / 2.0,
             ) / 10.0;
         }
 

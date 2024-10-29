@@ -48,7 +48,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         queue: &Queue,
-        _global_context: &GlobalContext,
+        global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
@@ -150,7 +150,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 bias: DepthBiasState::default(),
             }),
             multisample: MultisampleState {
-                count: 4,
+                count: global_context.msaa.sample_count(),
                 ..Default::default()
             },
             cache: None,

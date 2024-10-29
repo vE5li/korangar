@@ -1,13 +1,18 @@
 use std::num::NonZeroU32;
+use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
-use wgpu::{Adapter, Features, Limits};
+use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
+
+use crate::graphics::Msaa;
 
 const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
 const MAX_TEXTURE_SIZE: u32 = 8192;
 
 pub struct Capabilities {
+    adapter: Arc<Adapter>,
+    supported_msaa: Vec<Msaa>,
     bindless: bool,
     multidraw_indirect: bool,
     #[cfg(feature = "debug")]
@@ -17,16 +22,24 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    pub fn from_adapter(adapter: &Adapter) -> Self {
+    pub fn from_adapter(adapter: Arc<Adapter>) -> Self {
         let adapter_features = adapter.features();
         let adapter_limits = adapter.limits();
 
+        // WebGPU only guarantees MSAAx4. For everything else we need to test the
+        // adapter.
+        let required_features = Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
+        let flags = adapter.get_texture_format_features(TextureFormat::Depth32Float).flags;
+        let supported_msaa = flags.supported_sample_counts().iter().map(|count| (*count).into()).collect();
+
         let mut capabilities = Self {
+            adapter: adapter.clone(),
+            supported_msaa,
             bindless: false,
             multidraw_indirect: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
-            required_features: Features::empty(),
+            required_features,
             required_limits: Limits::downlevel_defaults().using_resolution(adapter.limits()),
         };
 
@@ -72,6 +85,38 @@ impl Capabilities {
         }
 
         capabilities
+    }
+
+    pub fn add_msaa_texture_format(&mut self, texture_format: TextureFormat) {
+        if !self
+            .adapter
+            .get_texture_format_features(texture_format)
+            .flags
+            .contains(TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE)
+        {
+            self.supported_msaa.clear();
+            self.supported_msaa.push(Msaa::Off);
+            return;
+        }
+
+        for (flag, msaa) in [
+            (TextureFormatFeatureFlags::MULTISAMPLE_X2, Msaa::X2),
+            (TextureFormatFeatureFlags::MULTISAMPLE_X4, Msaa::X4),
+            (TextureFormatFeatureFlags::MULTISAMPLE_X8, Msaa::X8),
+            (TextureFormatFeatureFlags::MULTISAMPLE_X16, Msaa::X16),
+        ] {
+            if self.adapter.get_texture_format_features(texture_format).flags.contains(flag) && !self.supported_msaa.contains(&msaa) {
+                self.supported_msaa.retain(|supported_msaa| supported_msaa != &msaa);
+            }
+        }
+    }
+
+    pub fn supported_msaa(&self, msaa: Msaa) -> bool {
+        self.supported_msaa.contains(&msaa)
+    }
+
+    pub fn get_supported_msaa(&self) -> &[Msaa] {
+        self.supported_msaa.as_ref()
     }
 
     pub fn get_required_features(&self) -> Features {

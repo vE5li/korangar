@@ -192,6 +192,9 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             multiview: None,
             primitive: Default::default(),
             multisample: MultisampleState {
+                // We render the interface always with 4x MSAA.
+                // This makes sure to remove hard edges in the GUI elements.
+                // 4x MSAA is guaranteed by WebGPU spec to be available.
                 count: 4,
                 ..Default::default()
             },

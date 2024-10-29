@@ -11,6 +11,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<
 fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
     let pixel_coord = vec2<i32>(position.xy);
     var blended = vec4<f32>(0.0);
+
     for (var sample_id: i32 = 0; sample_id < 4; sample_id++) {
         blended += textureLoad(interface_buffer, pixel_coord, sample_id);
     }

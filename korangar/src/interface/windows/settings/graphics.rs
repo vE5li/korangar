@@ -3,64 +3,73 @@ use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
-use crate::graphics::{LimitFramerate, PresentModeInfo, ShadowDetail, TextureSamplerType};
+use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ShadowDetail, TextureSamplerType};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 
-pub struct GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
+pub struct GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
+    Multisampling: TrackedState<Msaa> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
 {
     present_mode_info: PresentModeInfo,
+    supported_msaa: Vec<(String, Msaa)>,
     vsync: Vsync,
     limit_framerate: FramerateLimit,
     triple_buffering: TripleBuffering,
     texture_filtering: TextureFiltering,
+    msaa: Multisampling,
     shadow_detail: Shadow,
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
-    GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
+    GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
+    Multisampling: TrackedState<Msaa> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
     pub fn new(
         present_mode_info: PresentModeInfo,
+        supported_msaa: Vec<(String, Msaa)>,
         vsync: Vsync,
         limit_framerate: FramerateLimit,
         triple_buffering: TripleBuffering,
         texture_filtering: TextureFiltering,
+        msaa: Multisampling,
         shadow_detail: Shadow,
     ) -> Self {
         Self {
             present_mode_info,
+            supported_msaa,
             vsync,
             limit_framerate,
             triple_buffering,
             texture_filtering,
+            msaa,
             shadow_detail,
         }
     }
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow> PrototypeWindow<InterfaceSettings>
-    for GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Shadow>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow> PrototypeWindow<InterfaceSettings>
+    for GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
+    Multisampling: TrackedState<Msaa> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
 {
     fn window_class(&self) -> Option<&str> {
@@ -93,6 +102,13 @@ where
                     ("Anisotropic x16", TextureSamplerType::Anisotropic(16)),
                 ])
                 .with_selected(self.texture_filtering.clone())
+                .with_event(Box::new(Vec::new))
+                .with_width(dimension_bound!(!))
+                .wrap(),
+            Text::default().with_text("MSAA").with_width(dimension_bound!(50%)).wrap(),
+            PickList::default()
+                .with_options(self.supported_msaa.clone())
+                .with_selected(self.msaa.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),

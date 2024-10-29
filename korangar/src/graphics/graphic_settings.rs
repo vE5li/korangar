@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use ron::ser::PrettyConfig;
@@ -44,12 +46,63 @@ impl ShadowDetail {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Msaa {
+    Off,
+    X2,
+    X4,
+    X8,
+    X16,
+}
+
+impl Display for Msaa {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Msaa::Off => "Off".fmt(f),
+            Msaa::X2 => "x2".fmt(f),
+            Msaa::X4 => "x4".fmt(f),
+            Msaa::X8 => "x8".fmt(f),
+            Msaa::X16 => "x16".fmt(f),
+        }
+    }
+}
+
+impl From<u32> for Msaa {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => Msaa::Off,
+            2 => Msaa::X2,
+            4 => Msaa::X4,
+            8 => Msaa::X8,
+            16 => Msaa::X16,
+            _ => panic!("Unknown sample count"),
+        }
+    }
+}
+
+impl Msaa {
+    pub fn sample_count(self) -> u32 {
+        match self {
+            Msaa::Off => 1,
+            Msaa::X2 => 2,
+            Msaa::X4 => 4,
+            Msaa::X8 => 8,
+            Msaa::X16 => 16,
+        }
+    }
+
+    pub fn multisampling_activated(self) -> bool {
+        self != Msaa::Off
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
     pub vsync: bool,
     pub limit_framerate: LimitFramerate,
     pub triple_buffering: bool,
     pub texture_filtering: TextureSamplerType,
+    pub msaa: Msaa,
     pub shadow_detail: ShadowDetail,
 }
 
@@ -60,6 +113,7 @@ impl Default for GraphicsSettings {
             limit_framerate: LimitFramerate::Unlimited,
             triple_buffering: true,
             texture_filtering: TextureSamplerType::Linear,
+            msaa: Msaa::X4,
             shadow_detail: ShadowDetail::High,
         }
     }

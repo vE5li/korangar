@@ -136,12 +136,13 @@ pub(crate) struct TileLightIndices {
 /// Holds all GPU resources that are shared by multiple passes.
 pub(crate) struct GlobalContext {
     pub(crate) surface_texture_format: TextureFormat,
+    pub(crate) msaa: Msaa,
     pub(crate) solid_pixel_texture: Arc<Texture>,
     pub(crate) walk_indicator_texture: Arc<Texture>,
     pub(crate) forward_depth_texture: AttachmentTexture,
     pub(crate) picker_buffer_texture: AttachmentTexture,
     pub(crate) picker_depth_texture: AttachmentTexture,
-    pub(crate) forward_multisample_texture: AttachmentTexture,
+    pub(crate) forward_multisample_texture: Option<AttachmentTexture>,
     pub(crate) interface_buffer_texture: AttachmentTexture,
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
@@ -329,6 +330,7 @@ impl GlobalContext {
         queue: &Queue,
         texture_loader: &TextureLoader,
         surface_texture_format: TextureFormat,
+        msaa: Msaa,
         screen_size: ScreenSize,
         shadow_detail: ShadowDetail,
         texture_sampler: TextureSamplerType,
@@ -352,7 +354,7 @@ impl GlobalContext {
             &[255, 255, 255, 255],
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
-        let screen_textures = Self::create_screen_size_textures(device, screen_size, surface_texture_format);
+        let screen_textures = Self::create_screen_size_textures(device, screen_size, surface_texture_format, msaa);
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
 
@@ -430,6 +432,7 @@ impl GlobalContext {
 
         Self {
             surface_texture_format,
+            msaa,
             solid_pixel_texture,
             walk_indicator_texture,
             forward_depth_texture: screen_textures.forward_depth_texture,
@@ -464,11 +467,12 @@ impl GlobalContext {
         }
     }
 
-    fn create_screen_size_textures(device: &Device, screen_size: ScreenSize, surface_texture_format: TextureFormat) -> ScreenSizeTextures {
-        let forward_depth_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
-        let forward_depth_texture =
-            forward_depth_factory.new_attachment("forward depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
-
+    fn create_screen_size_textures(
+        device: &Device,
+        screen_size: ScreenSize,
+        surface_texture_format: TextureFormat,
+        msaa: Msaa,
+    ) -> ScreenSizeTextures {
         // Since we need to copy from the picker attachment to read the picker value, we
         // need to align both attachments properly to the requirements of
         // COPY_BYTES_PER_ROW_ALIGNMENT.
@@ -485,15 +489,12 @@ impl GlobalContext {
         );
         let picker_depth_texture = picker_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
 
-        let multisampled_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
+        let (forward_multisample_texture, forward_depth_texture) =
+            Self::create_multisampled_texture(device, screen_size, surface_texture_format, msaa);
 
-        let forward_multisample_texture = multisampled_screen_factory.new_attachment(
-            "forward multisample texture",
-            surface_texture_format,
-            AttachmentTextureType::ColorAttachment,
-        );
+        let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
 
-        let interface_buffer_texture = multisampled_screen_factory.new_attachment(
+        let interface_buffer_texture = interface_screen_factory.new_attachment(
             "interface buffer",
             TextureFormat::Rgba8UnormSrgb,
             AttachmentTextureType::ColorAttachment,
@@ -513,6 +514,29 @@ impl GlobalContext {
         }
     }
 
+    fn create_multisampled_texture(
+        device: &Device,
+        screen_size: ScreenSize,
+        surface_texture_format: TextureFormat,
+        msaa: Msaa,
+    ) -> (Option<AttachmentTexture>, AttachmentTexture) {
+        let factory = AttachmentTextureFactory::new(device, screen_size, msaa.sample_count(), None);
+
+        let color_texture = if msaa.multisampling_activated() {
+            Some(factory.new_attachment(
+                "forward multisample texture",
+                surface_texture_format,
+                AttachmentTextureType::ColorAttachment,
+            ))
+        } else {
+            None
+        };
+
+        let depth_texture = factory.new_attachment("forward depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
+
+        (color_texture, depth_texture)
+    }
+
     fn create_directional_shadow_texture(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
         let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1, None);
 
@@ -526,13 +550,12 @@ impl GlobalContext {
     fn create_tile_light_indices_buffer(device: &Device, screen_size: ScreenSize) -> Buffer<TileLightIndices> {
         let (tile_count_x, tile_count_y) = calculate_light_tile_count(screen_size);
 
-        let tile_light_indices_buffer = Buffer::with_capacity(
+        Buffer::with_capacity(
             device,
             "tile light indices",
             BufferUsages::STORAGE,
             ((tile_count_x * tile_count_y).max(1) as usize * size_of::<TileLightIndices>()) as _,
-        );
-        tile_light_indices_buffer
+        )
     }
 
     fn create_point_shadow_textures(device: &Device, shadow_size: ScreenSize) -> CubeArrayTexture {
@@ -548,7 +571,7 @@ impl GlobalContext {
 
     fn update_screen_size_resources(&mut self, device: &Device, screen_size: ScreenSize) {
         self.screen_size = screen_size;
-        let new_textures = Self::create_screen_size_textures(device, self.screen_size, self.surface_texture_format);
+        let new_textures = Self::create_screen_size_textures(device, self.screen_size, self.surface_texture_format, self.msaa);
 
         self.forward_depth_texture = new_textures.forward_depth_texture;
         self.picker_buffer_texture = new_textures.picker_buffer_texture;
@@ -617,6 +640,12 @@ impl GlobalContext {
             &self.linear_sampler,
             &self.texture_sampler,
         );
+    }
+
+    fn update_msaa(&mut self, device: &Device, msaa: Msaa) {
+        self.msaa = msaa;
+        (self.forward_multisample_texture, self.forward_depth_texture) =
+            Self::create_multisampled_texture(device, self.screen_size, self.surface_texture_format, self.msaa);
     }
 
     fn global_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
@@ -922,9 +951,9 @@ struct ScreenSizeTextures {
     forward_depth_texture: AttachmentTexture,
     picker_buffer_texture: AttachmentTexture,
     picker_depth_texture: AttachmentTexture,
-    forward_multisample_texture: AttachmentTexture,
     interface_buffer_texture: AttachmentTexture,
     tile_light_count_texture: StorageTexture,
+    forward_multisample_texture: Option<AttachmentTexture>,
 }
 
 fn calculate_light_tile_count(screen_size: ScreenSize) -> (u32, u32) {

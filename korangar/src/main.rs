@@ -190,6 +190,7 @@ struct Client {
     triple_buffering: MappedRemote<GraphicsSettings, bool>,
     texture_filtering: MappedRemote<GraphicsSettings, TextureSamplerType>,
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
+    msaa: MappedRemote<GraphicsSettings, Msaa>,
     #[cfg(feature = "debug")]
     render_settings: PlainTrackedState<RenderSettings>,
 
@@ -280,6 +281,7 @@ impl Client {
             });
 
             let adapter = pollster::block_on(async { wgpu::util::initialize_adapter_from_env_or_default(&instance, None).await.unwrap() });
+            let adapter = Arc::new(adapter);
 
             #[cfg(feature = "debug")]
             {
@@ -291,7 +293,7 @@ impl Client {
         });
 
         time_phase!("create device", {
-            let capabilities = Capabilities::from_adapter(&adapter);
+            let capabilities = Capabilities::from_adapter(adapter.clone());
 
             let (device, queue) = pollster::block_on(async {
                 adapter
@@ -404,6 +406,7 @@ impl Client {
             let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
             let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
             let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
+            let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
 
             #[cfg(feature = "debug")]
             let render_settings = PlainTrackedState::new(RenderSettings::new());
@@ -570,6 +573,7 @@ impl Client {
             triple_buffering,
             texture_filtering,
             shadow_detail,
+            msaa,
             #[cfg(feature = "debug")]
             render_settings,
             application,
@@ -1439,10 +1443,12 @@ impl Client {
                     &mut self.focus_state,
                     &GraphicsSettingsWindow::new(
                         self.graphics_engine.get_present_mode_info(),
+                        self.graphics_engine.get_supported_msaa(),
                         self.vsync.clone_state(),
                         self.limit_framerate.clone_state(),
                         self.triple_buffering.clone_state(),
                         self.texture_filtering.clone_state(),
+                        self.msaa.clone_state(),
                         self.shadow_detail.clone_state(),
                     ),
                 ),
@@ -2219,6 +2225,11 @@ impl Client {
             update_interface = true;
         }
 
+        if self.msaa.consume_changed() {
+            self.graphics_engine.set_msaa(*self.msaa.get());
+            update_interface = true;
+        }
+
         if self.shadow_detail.consume_changed() {
             self.graphics_engine.set_shadow_detail(*self.shadow_detail.get());
         }
@@ -2266,6 +2277,7 @@ impl ApplicationHandler for Client {
                 *self.limit_framerate.get(),
                 *self.shadow_detail.get(),
                 *self.texture_filtering.get(),
+                *self.msaa.get(),
             )
         }
     }

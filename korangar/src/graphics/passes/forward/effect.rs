@@ -17,7 +17,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, EffectInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, EffectInstruction, GlobalContext, Msaa, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/effect.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/effect_bindless.wgsl");
@@ -61,6 +61,7 @@ pub(crate) struct InstanceData {
 
 pub(crate) struct ForwardEffectDrawer {
     bindless_support: bool,
+    msaa: Msaa,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
@@ -178,6 +179,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 device,
                 &shader_module,
                 &pipeline_layout,
+                global_context.msaa,
                 color_attachment_format,
                 depth_attachment_format,
                 source_blend_factor,
@@ -188,6 +190,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         Self {
             bindless_support: capabilities.supports_bindless(),
+            msaa: global_context.msaa,
             solid_pixel_texture: global_context.solid_pixel_texture.clone(),
             instance_data_buffer,
             bind_group_layout,
@@ -271,6 +274,7 @@ impl Prepare for ForwardEffectDrawer {
                         &self.shader_module,
                         self.color_attachment_format,
                         self.depth_attachment_format,
+                        self.msaa,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -316,6 +320,7 @@ impl Prepare for ForwardEffectDrawer {
                 &self.shader_module,
                 self.color_attachment_format,
                 self.depth_attachment_format,
+                self.msaa,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -340,6 +345,7 @@ impl Prepare for ForwardEffectDrawer {
                         &self.shader_module,
                         self.color_attachment_format,
                         self.depth_attachment_format,
+                        self.msaa,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -374,6 +380,7 @@ impl Prepare for ForwardEffectDrawer {
                 &self.shader_module,
                 self.color_attachment_format,
                 self.depth_attachment_format,
+                self.msaa,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -429,6 +436,7 @@ impl ForwardEffectDrawer {
         device: &Device,
         shader_module: &ShaderModule,
         pipeline_layout: &PipelineLayout,
+        msaa: Msaa,
         color_attachment_format: TextureFormat,
         depth_attachment_format: TextureFormat,
         source_blend_factor: BlendFactor,
@@ -466,7 +474,7 @@ impl ForwardEffectDrawer {
             }),
             primitive: PrimitiveState::default(),
             multisample: MultisampleState {
-                count: 4,
+                count: msaa.sample_count(),
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {
@@ -488,6 +496,7 @@ impl ForwardEffectDrawer {
         shader_module: &ShaderModule,
         color_attachment_format: TextureFormat,
         depth_attachment_format: TextureFormat,
+        msaa: Msaa,
         pipeline_layout: &PipelineLayout,
         blend_state: (BlendFactor, BlendFactor),
         count: usize,
@@ -498,6 +507,7 @@ impl ForwardEffectDrawer {
                 device,
                 shader_module,
                 pipeline_layout,
+                msaa,
                 color_attachment_format,
                 depth_attachment_format,
                 blend_state.0,

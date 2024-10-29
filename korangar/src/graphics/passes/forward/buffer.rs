@@ -79,7 +79,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             }),
             primitive: PrimitiveState::default(),
             multisample: MultisampleState {
-                count: 4,
+                count: global_context.msaa.sample_count(),
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {

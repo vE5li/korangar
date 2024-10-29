@@ -24,7 +24,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         _capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _global_context: &GlobalContext,
+        global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
@@ -57,7 +57,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             multiview: None,
             primitive: PrimitiveState::default(),
             multisample: MultisampleState {
-                count: 4,
+                count: global_context.msaa.sample_count(),
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {

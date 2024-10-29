@@ -44,7 +44,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
     type PassData<'data> = Option<()>;
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
-        let color_texture_format = global_context.forward_multisample_texture.get_format();
+        let color_texture_format = global_context.surface_texture_format;
         let depth_texture_format = global_context.forward_depth_texture.get_format();
 
         Self {
@@ -60,16 +60,28 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
         global_context: &GlobalContext,
         _pass_data: Option<()>,
     ) -> RenderPass<'encoder> {
-        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some(PASS_NAME),
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: global_context.forward_multisample_texture.get_texture_view(),
+        let color_attachment = match global_context.forward_multisample_texture.as_ref() {
+            Some(attachment) => RenderPassColorAttachment {
+                view: attachment.get_texture_view(),
                 resolve_target: Some(frame_view),
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),
                     store: StoreOp::Store,
                 },
-            })],
+            },
+            None => RenderPassColorAttachment {
+                view: frame_view,
+                resolve_target: None,
+                ops: Operations {
+                    load: LoadOp::Clear(Color::BLACK),
+                    store: StoreOp::Store,
+                },
+            },
+        };
+
+        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some(PASS_NAME),
+            color_attachments: &[Some(color_attachment)],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                 view: global_context.forward_depth_texture.get_texture_view(),
                 depth_ops: Some(Operations {

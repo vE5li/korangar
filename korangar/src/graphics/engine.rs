@@ -16,7 +16,7 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::{
-    Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Prepare, PresentModeInfo, ShadowDetail, Surface,
+    Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo, ShadowDetail, Surface,
     TextureSamplerType,
 };
 use crate::graphics::instruction::RenderInstruction;
@@ -28,7 +28,7 @@ use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 pub struct GraphicsEngineDescriptor {
     pub capabilities: Capabilities,
     pub instance: Instance,
-    pub adapter: Adapter,
+    pub adapter: Arc<Adapter>,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub texture_loader: Arc<TextureLoader>,
@@ -55,7 +55,7 @@ pub struct GraphicsEngineDescriptor {
 pub struct GraphicsEngine {
     capabilities: Capabilities,
     instance: Instance,
-    adapter: Adapter,
+    adapter: Arc<Adapter>,
     device: Arc<Device>,
     queue: Arc<Queue>,
     staging_belt: StagingBelt,
@@ -138,6 +138,7 @@ impl GraphicsEngine {
         limit_framerate: LimitFramerate,
         shadow_detail: ShadowDetail,
         texture_sampler_type: TextureSamplerType,
+        msaa: Msaa,
     ) {
         self.set_limit_framerate(limit_framerate);
 
@@ -156,7 +157,16 @@ impl GraphicsEngine {
                     triple_buffering,
                     vsync,
                 );
+
                 let surface_texture_format = surface.format();
+
+                // We need to make sure that all attachment textures
+                // we use with MSAA support the request MSAA mode.
+                self.capabilities.add_msaa_texture_format(surface_texture_format);
+                let msaa = match self.capabilities.supported_msaa(msaa) {
+                    true => msaa,
+                    false => Msaa::Off,
+                };
 
                 if self.previous_surface_texture_format != Some(surface_texture_format) {
                     self.previous_surface_texture_format = Some(surface_texture_format);
@@ -168,6 +178,7 @@ impl GraphicsEngine {
                             &self.queue,
                             &self.texture_loader,
                             surface_texture_format,
+                            msaa,
                             screen_size,
                             shadow_detail,
                             texture_sampler_type,
@@ -257,73 +268,21 @@ impl GraphicsEngine {
                             &global_context,
                             &light_culling_pass_context,
                         );
-                        let forward_effect_drawer = ForwardEffectDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        let forward_entity_drawer = ForwardEntityDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        let forward_indicator_drawer = ForwardIndicatorDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        let forward_model_drawer = ForwardModelDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        let forward_overlay_drawer = ForwardOverlayDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        let forward_rectangle_drawer = ForwardRectangleDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        let forward_water_drawer = ForwardWaterDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        #[cfg(feature = "debug")]
-                        let forward_aabb_drawer = ForwardAabbDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        #[cfg(feature = "debug")]
-                        let forward_buffer_drawer = ForwardBufferDrawer::new(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &forward_pass_context,
-                        );
-                        #[cfg(feature = "debug")]
-                        let forward_circle_drawer = ForwardCircleDrawer::new(
+                        let ForwardResources {
+                            forward_effect_drawer,
+                            forward_entity_drawer,
+                            forward_indicator_drawer,
+                            forward_model_drawer,
+                            forward_overlay_drawer,
+                            forward_rectangle_drawer,
+                            forward_water_drawer,
+                            #[cfg(feature = "debug")]
+                            forward_aabb_drawer,
+                            #[cfg(feature = "debug")]
+                            forward_buffer_drawer,
+                            #[cfg(feature = "debug")]
+                            forward_circle_drawer,
+                        } = ForwardResources::create(
                             &self.capabilities,
                             &self.device,
                             &self.queue,
@@ -429,6 +388,48 @@ impl GraphicsEngine {
         }
     }
 
+    pub fn set_msaa(&mut self, msaa: Msaa) {
+        if let Some(engine_context) = self.engine_context.as_mut() {
+            engine_context.global_context.update_msaa(&self.device, msaa);
+
+            let ForwardResources {
+                forward_effect_drawer,
+                forward_entity_drawer,
+                forward_indicator_drawer,
+                forward_model_drawer,
+                forward_overlay_drawer,
+                forward_rectangle_drawer,
+                forward_water_drawer,
+                #[cfg(feature = "debug")]
+                forward_aabb_drawer,
+                #[cfg(feature = "debug")]
+                forward_buffer_drawer,
+                #[cfg(feature = "debug")]
+                forward_circle_drawer,
+            } = ForwardResources::create(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.forward_pass_context,
+            );
+
+            engine_context.forward_effect_drawer = forward_effect_drawer;
+            engine_context.forward_entity_drawer = forward_entity_drawer;
+            engine_context.forward_indicator_drawer = forward_indicator_drawer;
+            engine_context.forward_model_drawer = forward_model_drawer;
+            engine_context.forward_overlay_drawer = forward_overlay_drawer;
+            engine_context.forward_rectangle_drawer = forward_rectangle_drawer;
+            engine_context.forward_water_drawer = forward_water_drawer;
+            #[cfg(feature = "debug")]
+            {
+                engine_context.forward_aabb_drawer = forward_aabb_drawer;
+                engine_context.forward_buffer_drawer = forward_buffer_drawer;
+                engine_context.forward_circle_drawer = forward_circle_drawer;
+            }
+        }
+    }
+
     pub fn set_shadow_detail(&mut self, shadow_detail: ShadowDetail) {
         if let Some(engine_context) = self.engine_context.as_mut() {
             engine_context
@@ -443,6 +444,14 @@ impl GraphicsEngine {
 
     pub fn get_present_mode_info(&self) -> PresentModeInfo {
         self.surface.as_ref().unwrap().present_mode_info()
+    }
+
+    pub fn get_supported_msaa(&self) -> Vec<(String, Msaa)> {
+        self.capabilities
+            .get_supported_msaa()
+            .iter()
+            .map(|msaa| (msaa.to_string(), *msaa))
+            .collect()
     }
 
     pub fn get_window_size(&self) -> Vector2<usize> {
@@ -869,5 +878,61 @@ struct UploadVisitor<'a> {
 impl<'a> UploadVisitor<'a> {
     fn upload(&mut self, context: &mut impl Prepare) {
         context.upload(self.device, self.staging_belt, self.encoder);
+    }
+}
+
+struct ForwardResources {
+    forward_effect_drawer: ForwardEffectDrawer,
+    forward_entity_drawer: ForwardEntityDrawer,
+    forward_indicator_drawer: ForwardIndicatorDrawer,
+    forward_model_drawer: ForwardModelDrawer,
+    forward_overlay_drawer: ForwardOverlayDrawer,
+    forward_rectangle_drawer: ForwardRectangleDrawer,
+    forward_water_drawer: ForwardWaterDrawer,
+    #[cfg(feature = "debug")]
+    forward_aabb_drawer: ForwardAabbDrawer,
+    #[cfg(feature = "debug")]
+    forward_buffer_drawer: ForwardBufferDrawer,
+    #[cfg(feature = "debug")]
+    forward_circle_drawer: ForwardCircleDrawer,
+}
+
+impl ForwardResources {
+    fn create(
+        capabilities: &Capabilities,
+        device: &Device,
+        queue: &Queue,
+        global_context: &GlobalContext,
+        forward_pass_context: &ForwardRenderPassContext,
+    ) -> Self {
+        let forward_effect_drawer = ForwardEffectDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_entity_drawer = ForwardEntityDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_indicator_drawer = ForwardIndicatorDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_model_drawer = ForwardModelDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_overlay_drawer = ForwardOverlayDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_rectangle_drawer = ForwardRectangleDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        let forward_water_drawer = ForwardWaterDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        #[cfg(feature = "debug")]
+        let forward_aabb_drawer = ForwardAabbDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        #[cfg(feature = "debug")]
+        let forward_buffer_drawer = ForwardBufferDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        #[cfg(feature = "debug")]
+        let forward_circle_drawer = ForwardCircleDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+
+        Self {
+            forward_effect_drawer,
+            forward_entity_drawer,
+            forward_indicator_drawer,
+            forward_model_drawer,
+            forward_overlay_drawer,
+            forward_rectangle_drawer,
+            forward_water_drawer,
+            #[cfg(feature = "debug")]
+            forward_aabb_drawer,
+            #[cfg(feature = "debug")]
+            forward_buffer_drawer,
+            #[cfg(feature = "debug")]
+            forward_circle_drawer,
+        }
     }
 }

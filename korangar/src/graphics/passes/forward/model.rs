@@ -15,7 +15,7 @@ use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Msaa, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 #[cfg(feature = "debug")]
@@ -53,7 +53,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         capabilities: &Capabilities,
         device: &Device,
         _queue: &Queue,
-        _global_context: &GlobalContext,
+        global_context: &GlobalContext,
         render_pass_context: &Self::Context,
     ) -> Self {
         let shader_module = device.create_shader_module(SHADER);
@@ -126,6 +126,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             Self::create_pipeline(
                 device,
                 render_pass_context,
+                global_context.msaa,
                 &shader_module_wireframe,
                 instance_index_buffer_layout.clone(),
                 &pipeline_layout,
@@ -135,6 +136,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             Self::create_pipeline(
                 device,
                 render_pass_context,
+                global_context.msaa,
                 &shader_module_wireframe,
                 instance_index_buffer_layout.clone(),
                 &pipeline_layout,
@@ -145,6 +147,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         let pipeline = Self::create_pipeline(
             device,
             render_pass_context,
+            global_context.msaa,
             &shader_module,
             instance_index_buffer_layout,
             &pipeline_layout,
@@ -281,6 +284,7 @@ impl ForwardModelDrawer {
     fn create_pipeline(
         device: &Device,
         render_pass_context: &ForwardRenderPassContext,
+        msaa: Msaa,
         shader_module: &ShaderModule,
         instance_index_buffer_layout: VertexBufferLayout,
         pipeline_layout: &PipelineLayout,
@@ -313,7 +317,7 @@ impl ForwardModelDrawer {
                 ..Default::default()
             },
             multisample: MultisampleState {
-                count: 4,
+                count: msaa.sample_count(),
                 ..Default::default()
             },
             depth_stencil: Some(DepthStencilState {

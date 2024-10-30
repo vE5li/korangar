@@ -1,29 +1,33 @@
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingResource, BindingType, BlendState, ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthBiasState,
-    DepthStencilState, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
-    Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, TextureSampleType,
-    TextureViewDimension, VertexState,
+    BindingResource, BindingType, BlendState, ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState,
+    PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
+    ShaderModuleDescriptor, ShaderStages, TextureSampleType, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
 use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, RenderSettings, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/buffer.wgsl");
-const DRAWER_NAME: &str = "forward buffer";
+const DRAWER_NAME: &str = "post processing buffer";
 
-pub(crate) struct ForwardBufferDrawer {
+pub(crate) struct PostProcessingBufferDrawData<'a> {
+    pub(crate) render_settings: &'a RenderSettings,
+    pub(crate) debug_bind_group: &'a BindGroup,
+}
+
+pub(crate) struct PostProcessingBufferDrawer {
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     pipeline: RenderPipeline,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardBufferDrawer {
-    type Context = ForwardRenderPassContext;
-    type DrawData<'data> = &'data RenderSettings;
+impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for PostProcessingBufferDrawer {
+    type Context = PostProcessingRenderPassContext;
+    type DrawData<'data> = PostProcessingBufferDrawData<'data>;
 
     fn new(
         _capabilities: &Capabilities,
@@ -54,7 +58,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some(DRAWER_NAME),
-            bind_group_layouts: &[bind_group_layouts[0], bind_group_layouts[1], &bind_group_layout],
+            bind_group_layouts: &[
+                bind_group_layouts[0],
+                GlobalContext::debug_bind_group_layout(device),
+                &bind_group_layout,
+            ],
             push_constant_ranges: &[],
         });
 
@@ -78,17 +86,8 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 })],
             }),
             primitive: PrimitiveState::default(),
-            multisample: MultisampleState {
-                count: global_context.msaa.sample_count(),
-                ..Default::default()
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: false,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
+            multisample: MultisampleState::default(),
+            depth_stencil: None,
             multiview: None,
             cache: None,
         });
@@ -101,17 +100,18 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if !draw_data.show_buffers() {
+        if !draw_data.render_settings.show_buffers() {
             return;
         }
 
         pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(1, draw_data.debug_bind_group, &[]);
         pass.set_bind_group(2, &self.bind_group, &[]);
         pass.draw(0..3, 0..1);
     }
 }
 
-impl Prepare for ForwardBufferDrawer {
+impl Prepare for PostProcessingBufferDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, instructions.font_atlas_texture);
     }
@@ -121,7 +121,7 @@ impl Prepare for ForwardBufferDrawer {
     }
 }
 
-impl ForwardBufferDrawer {
+impl PostProcessingBufferDrawer {
     fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, font_atlas: &Texture) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),

@@ -142,7 +142,7 @@ pub(crate) struct GlobalContext {
     pub(crate) forward_depth_texture: AttachmentTexture,
     pub(crate) picker_buffer_texture: AttachmentTexture,
     pub(crate) picker_depth_texture: AttachmentTexture,
-    pub(crate) forward_multisample_texture: Option<AttachmentTexture>,
+    pub(crate) forward_color_texture: AttachmentTexture,
     pub(crate) interface_buffer_texture: AttachmentTexture,
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
@@ -160,6 +160,8 @@ pub(crate) struct GlobalContext {
     pub(crate) global_bind_group: BindGroup,
     pub(crate) light_culling_bind_group: BindGroup,
     pub(crate) forward_bind_group: BindGroup,
+    #[cfg(feature = "debug")]
+    pub(crate) debug_bind_group: BindGroup,
     pub(crate) screen_size: ScreenSize,
     pub(crate) directional_shadow_size: ScreenSize,
     pub(crate) point_shadow_size: ScreenSize,
@@ -314,12 +316,19 @@ impl Prepare for GlobalContext {
                 &self.tile_light_indices_buffer,
                 &self.directional_shadow_map_texture,
                 &self.point_shadow_map_textures,
-                &self.interface_buffer_texture,
-                #[cfg(feature = "debug")]
-                &self.debug_uniforms_buffer,
-                #[cfg(feature = "debug")]
-                &self.picker_buffer_texture,
             );
+
+            #[cfg(feature = "debug")]
+            {
+                self.debug_bind_group = Self::create_debug_bind_group(
+                    device,
+                    &self.debug_uniforms_buffer,
+                    &self.picker_buffer_texture,
+                    &self.directional_shadow_map_texture,
+                    &self.tile_light_count_texture,
+                    &self.point_shadow_map_textures,
+                );
+            }
         }
     }
 }
@@ -408,6 +417,13 @@ impl GlobalContext {
             &texture_sampler,
         );
 
+        let light_culling_bind_group = Self::create_light_culling_bind_group(
+            device,
+            &point_light_data_buffer,
+            &screen_textures.tile_light_count_texture,
+            &tile_light_indices_buffer,
+        );
+
         let forward_bind_group = Self::create_forward_bind_group(
             device,
             &directional_light_uniforms_buffer,
@@ -416,18 +432,16 @@ impl GlobalContext {
             &tile_light_indices_buffer,
             &directional_shadow_map_texture,
             &point_shadow_map_textures,
-            &screen_textures.interface_buffer_texture,
-            #[cfg(feature = "debug")]
-            &debug_uniforms_buffer,
-            #[cfg(feature = "debug")]
-            &screen_textures.picker_buffer_texture,
         );
 
-        let light_culling_bind_group = Self::create_light_culling_bind_group(
+        #[cfg(feature = "debug")]
+        let debug_bind_group = Self::create_debug_bind_group(
             device,
-            &point_light_data_buffer,
+            &debug_uniforms_buffer,
+            &screen_textures.picker_buffer_texture,
+            &directional_shadow_map_texture,
             &screen_textures.tile_light_count_texture,
-            &tile_light_indices_buffer,
+            &point_shadow_map_textures,
         );
 
         Self {
@@ -438,13 +452,15 @@ impl GlobalContext {
             forward_depth_texture: screen_textures.forward_depth_texture,
             picker_buffer_texture: screen_textures.picker_buffer_texture,
             picker_depth_texture: screen_textures.picker_depth_texture,
-            forward_multisample_texture: screen_textures.forward_multisample_texture,
+            forward_color_texture: screen_textures.forward_color_texture,
             interface_buffer_texture: screen_textures.interface_buffer_texture,
             directional_shadow_map_texture,
             point_shadow_map_textures,
             tile_light_count_texture: screen_textures.tile_light_count_texture,
             global_uniforms_buffer,
             forward_bind_group,
+            #[cfg(feature = "debug")]
+            debug_bind_group,
             directional_light_uniforms_buffer,
             tile_light_indices_buffer,
             #[cfg(feature = "debug")]
@@ -489,8 +505,8 @@ impl GlobalContext {
         );
         let picker_depth_texture = picker_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
 
-        let (forward_multisample_texture, forward_depth_texture) =
-            Self::create_multisampled_texture(device, screen_size, surface_texture_format, msaa);
+        let (forward_color_texture, forward_depth_texture) =
+            Self::create_forward_texture(device, screen_size, surface_texture_format, msaa);
 
         let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
 
@@ -508,32 +524,21 @@ impl GlobalContext {
             forward_depth_texture,
             picker_buffer_texture,
             picker_depth_texture,
-            forward_multisample_texture,
+            forward_color_texture,
             interface_buffer_texture,
             tile_light_count_texture,
         }
     }
 
-    fn create_multisampled_texture(
+    fn create_forward_texture(
         device: &Device,
         screen_size: ScreenSize,
         surface_texture_format: TextureFormat,
         msaa: Msaa,
-    ) -> (Option<AttachmentTexture>, AttachmentTexture) {
+    ) -> (AttachmentTexture, AttachmentTexture) {
         let factory = AttachmentTextureFactory::new(device, screen_size, msaa.sample_count(), None);
-
-        let color_texture = if msaa.multisampling_activated() {
-            Some(factory.new_attachment(
-                "forward multisample texture",
-                surface_texture_format,
-                AttachmentTextureType::ColorAttachment,
-            ))
-        } else {
-            None
-        };
-
+        let color_texture = factory.new_attachment("forward color", surface_texture_format, AttachmentTextureType::ColorAttachment);
         let depth_texture = factory.new_attachment("forward depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
-
         (color_texture, depth_texture)
     }
 
@@ -576,7 +581,7 @@ impl GlobalContext {
         self.forward_depth_texture = new_textures.forward_depth_texture;
         self.picker_buffer_texture = new_textures.picker_buffer_texture;
         self.picker_depth_texture = new_textures.picker_depth_texture;
-        self.forward_multisample_texture = new_textures.forward_multisample_texture;
+        self.forward_color_texture = new_textures.forward_color_texture;
         self.interface_buffer_texture = new_textures.interface_buffer_texture;
         self.tile_light_count_texture = new_textures.tile_light_count_texture;
 
@@ -584,6 +589,13 @@ impl GlobalContext {
 
         // We need to update this bind group, because it's content changed, and it isn't
         // re-created each frame.
+        self.light_culling_bind_group = Self::create_light_culling_bind_group(
+            device,
+            &self.point_light_data_buffer,
+            &self.tile_light_count_texture,
+            &self.tile_light_indices_buffer,
+        );
+
         self.forward_bind_group = Self::create_forward_bind_group(
             device,
             &self.directional_light_uniforms_buffer,
@@ -592,18 +604,19 @@ impl GlobalContext {
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
-            &self.interface_buffer_texture,
-            #[cfg(feature = "debug")]
-            &self.debug_uniforms_buffer,
-            #[cfg(feature = "debug")]
-            &self.picker_buffer_texture,
         );
-        self.light_culling_bind_group = Self::create_light_culling_bind_group(
-            device,
-            &self.point_light_data_buffer,
-            &self.tile_light_count_texture,
-            &self.tile_light_indices_buffer,
-        );
+
+        #[cfg(feature = "debug")]
+        {
+            self.debug_bind_group = Self::create_debug_bind_group(
+                device,
+                &self.debug_uniforms_buffer,
+                &self.picker_buffer_texture,
+                &self.directional_shadow_map_texture,
+                &self.tile_light_count_texture,
+                &self.point_shadow_map_textures,
+            );
+        }
     }
 
     fn update_shadow_size_textures(&mut self, device: &Device, shadow_detail: ShadowDetail) {
@@ -623,12 +636,19 @@ impl GlobalContext {
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
-            &self.interface_buffer_texture,
-            #[cfg(feature = "debug")]
-            &self.debug_uniforms_buffer,
-            #[cfg(feature = "debug")]
-            &self.picker_buffer_texture,
         );
+
+        #[cfg(feature = "debug")]
+        {
+            self.debug_bind_group = Self::create_debug_bind_group(
+                device,
+                &self.debug_uniforms_buffer,
+                &self.picker_buffer_texture,
+                &self.directional_shadow_map_texture,
+                &self.tile_light_count_texture,
+                &self.point_shadow_map_textures,
+            );
+        }
     }
 
     fn update_texture_sampler(&mut self, device: &Device, texture_sampler_type: TextureSamplerType) {
@@ -644,8 +664,8 @@ impl GlobalContext {
 
     fn update_msaa(&mut self, device: &Device, msaa: Msaa) {
         self.msaa = msaa;
-        (self.forward_multisample_texture, self.forward_depth_texture) =
-            Self::create_multisampled_texture(device, self.screen_size, self.surface_texture_format, self.msaa);
+        (self.forward_color_texture, self.forward_depth_texture) =
+            Self::create_forward_texture(device, self.screen_size, self.surface_texture_format, self.msaa);
     }
 
     fn global_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
@@ -794,19 +814,20 @@ impl GlobalContext {
                         },
                         count: None,
                     },
+                ],
+            })
+        })
+    }
+
+    #[cfg(feature = "debug")]
+    fn debug_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
+        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
+        LAYOUT.get_or_init(|| {
+            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                label: Some("debug"),
+                entries: &[
                     BindGroupLayoutEntry {
-                        binding: 6,
-                        visibility: ShaderStages::FRAGMENT,
-                        ty: BindingType::Texture {
-                            sample_type: TextureSampleType::Float { filterable: false },
-                            view_dimension: TextureViewDimension::D2,
-                            multisampled: true,
-                        },
-                        count: None,
-                    },
-                    #[cfg(feature = "debug")]
-                    BindGroupLayoutEntry {
-                        binding: 7,
+                        binding: 0,
                         visibility: ShaderStages::all(),
                         ty: BindingType::Buffer {
                             ty: BufferBindingType::Uniform,
@@ -815,13 +836,42 @@ impl GlobalContext {
                         },
                         count: None,
                     },
-                    #[cfg(feature = "debug")]
                     BindGroupLayoutEntry {
-                        binding: 8,
+                        binding: 1,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Uint,
                             view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Depth,
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Uint,
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Depth,
+                            view_dimension: TextureViewDimension::CubeArray,
                             multisampled: false,
                         },
                         count: None,
@@ -896,9 +946,6 @@ impl GlobalContext {
         tile_light_indices_buffer: &Buffer<TileLightIndices>,
         directional_shadow_map_texture: &AttachmentTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
-        interface_buffer_texture: &AttachmentTexture,
-        #[cfg(feature = "debug")] debug_uniforms_buffer: &Buffer<DebugUniforms>,
-        #[cfg(feature = "debug")] picker_buffer_texture: &AttachmentTexture,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("forward"),
@@ -928,19 +975,42 @@ impl GlobalContext {
                     binding: 5,
                     resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
                 },
+            ],
+        })
+    }
+
+    #[cfg(feature = "debug")]
+    fn create_debug_bind_group(
+        device: &Device,
+        debug_uniforms_buffer: &Buffer<DebugUniforms>,
+        picker_buffer_texture: &AttachmentTexture,
+        directional_shadow_map_texture: &AttachmentTexture,
+        tile_light_count_texture: &StorageTexture,
+        point_shadow_maps_texture: &CubeArrayTexture,
+    ) -> BindGroup {
+        device.create_bind_group(&BindGroupDescriptor {
+            label: Some("debug"),
+            layout: Self::debug_bind_group_layout(device),
+            entries: &[
                 BindGroupEntry {
-                    binding: 6,
-                    resource: BindingResource::TextureView(interface_buffer_texture.get_texture_view()),
-                },
-                #[cfg(feature = "debug")]
-                BindGroupEntry {
-                    binding: 7,
+                    binding: 0,
                     resource: debug_uniforms_buffer.as_entire_binding(),
                 },
-                #[cfg(feature = "debug")]
                 BindGroupEntry {
-                    binding: 8,
+                    binding: 1,
                     resource: BindingResource::TextureView(picker_buffer_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::TextureView(directional_shadow_map_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 3,
+                    resource: BindingResource::TextureView(tile_light_count_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
                 },
             ],
         })
@@ -948,12 +1018,12 @@ impl GlobalContext {
 }
 
 struct ScreenSizeTextures {
+    forward_color_texture: AttachmentTexture,
     forward_depth_texture: AttachmentTexture,
     picker_buffer_texture: AttachmentTexture,
     picker_depth_texture: AttachmentTexture,
     interface_buffer_texture: AttachmentTexture,
     tile_light_count_texture: StorageTexture,
-    forward_multisample_texture: Option<AttachmentTexture>,
 }
 
 fn calculate_light_tile_count(screen_size: ScreenSize) -> (u32, u32) {

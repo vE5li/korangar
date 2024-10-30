@@ -127,6 +127,7 @@ pub struct TextureAtlasFactory {
 }
 
 impl TextureAtlasFactory {
+    #[cfg(feature = "debug")]
     pub fn create_from_group(
         texture_loader: Arc<TextureLoader>,
         name: impl Into<String>,

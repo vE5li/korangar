@@ -148,13 +148,13 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &shader_module,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
                 targets: &[Some(ColorTargetState {
                     format: color_attachment_formats[0],
@@ -239,7 +239,7 @@ impl Prepare for ForwardEntityDrawer {
 
             for instruction in instructions.entities.iter() {
                 let mut texture_index = texture_views.len() as i32;
-                let id = instruction.texture.get_texture().global_id().inner();
+                let id = instruction.texture.get_id();
                 let potential_index = self.lookup.get(&id);
 
                 if let Some(potential_index) = potential_index {

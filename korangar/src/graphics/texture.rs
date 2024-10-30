@@ -1,13 +1,14 @@
 use std::fmt::{Debug, Formatter};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use derive_new::new;
+use hashbrown::HashMap;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, Device, Extent3d, Queue, ShaderStages, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-    TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
+    BindingType, Device, Extent3d, Queue, ShaderStages, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
 use crate::interface::layout::ScreenSize;
@@ -258,6 +259,7 @@ pub struct AttachmentTexture {
     texture: wgpu::Texture,
     texture_view: TextureView,
     unpadded_size: Extent3d,
+    bind_group: BindGroup,
 }
 
 impl Debug for AttachmentTexture {
@@ -281,13 +283,24 @@ impl AttachmentTexture {
         let texture = device.create_texture(&descriptor);
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
-            format: None,
-            dimension: None,
-            aspect: Default::default(),
-            base_mip_level: 0,
-            mip_level_count: None,
-            base_array_layer: 0,
-            array_layer_count: None,
+            ..Default::default()
+        });
+
+        let sample_type = descriptor.format.sample_type(Some(TextureAspect::All), None).unwrap();
+
+        let layout = if descriptor.sample_count == 1 {
+            Self::bind_group_layout(device, sample_type, false)
+        } else {
+            Self::bind_group_layout(device, sample_type, true)
+        };
+
+        let bind_group = device.create_bind_group(&BindGroupDescriptor {
+            label: descriptor.label,
+            layout: &layout,
+            entries: &[BindGroupEntry {
+                binding: 0,
+                resource: BindingResource::TextureView(&texture_view),
+            }],
         });
 
         Self {
@@ -295,6 +308,7 @@ impl AttachmentTexture {
             texture,
             texture_view,
             unpadded_size,
+            bind_group,
         }
     }
 
@@ -316,6 +330,45 @@ impl AttachmentTexture {
 
     pub fn get_texture_view(&self) -> &TextureView {
         &self.texture_view
+    }
+
+    pub fn get_bind_group(&self) -> &BindGroup {
+        &self.bind_group
+    }
+
+    pub fn bind_group_layout(device: &Device, mut sample_type: TextureSampleType, multisampled: bool) -> Arc<BindGroupLayout> {
+        if multisampled
+            && let TextureSampleType::Float { filterable } = &mut sample_type
+            && *filterable
+        {
+            *filterable = false;
+        }
+
+        static LAYOUTS: OnceLock<Mutex<HashMap<(bool, TextureSampleType), Arc<BindGroupLayout>>>> = OnceLock::new();
+        let layouts = LAYOUTS.get_or_init(|| Mutex::new(HashMap::new()));
+        let lock = layouts.lock().unwrap();
+        match lock.get(&(multisampled, sample_type)) {
+            None => {
+                let layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+                    label: None,
+                    entries: &[BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type,
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled,
+                        },
+                        count: None,
+                    }],
+                });
+                let layout = Arc::new(layout);
+                drop(lock);
+                layouts.lock().unwrap().insert((multisampled, sample_type), layout.clone());
+                layout
+            }
+            Some(layout) => layout.clone(),
+        }
     }
 }
 

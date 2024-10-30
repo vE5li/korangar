@@ -8,20 +8,19 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingResource, BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages,
-    ColorTargetState, ColorWrites, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState, Device, FragmentState,
-    MultisampleState, PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
-    RenderPipeline, RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, TextureFormat,
-    TextureSampleType, TextureView, TextureViewDimension, VertexState,
+    ColorTargetState, ColorWrites, CommandEncoder, Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayout,
+    PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
+    ShaderModuleDescriptor, ShaderStages, TextureFormat, TextureSampleType, TextureView, TextureViewDimension, VertexState,
 };
 
 use crate::graphics::passes::{
-    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
+    BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, EffectInstruction, GlobalContext, Msaa, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, EffectInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/effect.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/effect_bindless.wgsl");
-const DRAWER_NAME: &str = "forward effect";
+const DRAWER_NAME: &str = "post processing effect";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
 /// These are the TOP5 combinations we currently find in the korean client
@@ -59,9 +58,8 @@ pub(crate) struct InstanceData {
     padding: u32,
 }
 
-pub(crate) struct ForwardEffectDrawer {
+pub(crate) struct PostProcessingEffectDrawer {
     bindless_support: bool,
-    msaa: Msaa,
     solid_pixel_texture: Arc<Texture>,
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
@@ -69,7 +67,6 @@ pub(crate) struct ForwardEffectDrawer {
     shader_module: ShaderModule,
     pipeline_layout: PipelineLayout,
     color_attachment_format: TextureFormat,
-    depth_attachment_format: TextureFormat,
     pipelines: HashMap<(BlendFactor, BlendFactor), RenderPipeline>,
     instance_data: Vec<InstanceData>,
     bump: Bump,
@@ -77,8 +74,8 @@ pub(crate) struct ForwardEffectDrawer {
     batches: Vec<EffectBatch>,
 }
 
-impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardEffectDrawer {
-    type Context = ForwardRenderPassContext;
+impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for PostProcessingEffectDrawer {
+    type Context = PostProcessingRenderPassContext;
     type DrawData<'data> = &'data [EffectInstruction];
 
     fn new(
@@ -89,7 +86,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         render_pass_context: &Self::Context,
     ) -> Self {
         let color_attachment_format = render_pass_context.color_attachment_formats()[0];
-        let depth_attachment_format = render_pass_context.depth_attachment_output_format()[0];
 
         let shader_module = if capabilities.supports_bindless() {
             device.create_shader_module(SHADER_BINDLESS)
@@ -157,14 +153,9 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
 
         let bind_group_layouts: &[&BindGroupLayout] = if capabilities.supports_bindless() {
-            &[pass_bind_group_layouts[0], pass_bind_group_layouts[1], &bind_group_layout]
+            &[pass_bind_group_layouts[0], &bind_group_layout]
         } else {
-            &[
-                pass_bind_group_layouts[0],
-                pass_bind_group_layouts[1],
-                &bind_group_layout,
-                Texture::bind_group_layout(device),
-            ]
+            &[pass_bind_group_layouts[0], &bind_group_layout, Texture::bind_group_layout(device)]
         };
 
         let pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
@@ -179,9 +170,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 device,
                 &shader_module,
                 &pipeline_layout,
-                global_context.msaa,
                 color_attachment_format,
-                depth_attachment_format,
                 source_blend_factor,
                 destination_blend_factor,
             );
@@ -190,7 +179,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         Self {
             bindless_support: capabilities.supports_bindless(),
-            msaa: global_context.msaa,
             solid_pixel_texture: global_context.solid_pixel_texture.clone(),
             instance_data_buffer,
             bind_group_layout,
@@ -198,7 +186,6 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             shader_module,
             pipeline_layout,
             color_attachment_format,
-            depth_attachment_format,
             pipelines,
             instance_data: Vec::default(),
             bump: Bump::default(),
@@ -212,7 +199,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             return;
         }
 
-        pass.set_bind_group(2, &self.bind_group, &[]);
+        pass.set_bind_group(1, &self.bind_group, &[]);
 
         for batch in self.batches.drain(..) {
             if let Some(pipeline) = self.pipelines.get(&batch.blend_state) {
@@ -225,12 +212,12 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                     pass.draw(0..6, start..end);
                 } else {
                     let mut current_texture_id = self.solid_pixel_texture.get_id();
-                    pass.set_bind_group(3, self.solid_pixel_texture.get_bind_group(), &[]);
+                    pass.set_bind_group(2, self.solid_pixel_texture.get_bind_group(), &[]);
 
                     for (index, instruction) in draw_data[start as usize..end as usize].iter().enumerate() {
                         if instruction.texture.get_id() != current_texture_id {
                             current_texture_id = instruction.texture.get_id();
-                            pass.set_bind_group(3, instruction.texture.get_bind_group(), &[]);
+                            pass.set_bind_group(2, instruction.texture.get_bind_group(), &[]);
                         }
                         let index = start + index as u32;
 
@@ -242,7 +229,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 }
 
-impl Prepare for ForwardEffectDrawer {
+impl Prepare for PostProcessingEffectDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         let draw_count = instructions.effects.len();
 
@@ -273,8 +260,6 @@ impl Prepare for ForwardEffectDrawer {
                         &mut self.batches,
                         &self.shader_module,
                         self.color_attachment_format,
-                        self.depth_attachment_format,
-                        self.msaa,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -319,8 +304,6 @@ impl Prepare for ForwardEffectDrawer {
                 &mut self.batches,
                 &self.shader_module,
                 self.color_attachment_format,
-                self.depth_attachment_format,
-                self.msaa,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -344,8 +327,6 @@ impl Prepare for ForwardEffectDrawer {
                         &mut self.batches,
                         &self.shader_module,
                         self.color_attachment_format,
-                        self.depth_attachment_format,
-                        self.msaa,
                         &self.pipeline_layout,
                         blend_state,
                         self.instance_data.len() - offset,
@@ -379,8 +360,6 @@ impl Prepare for ForwardEffectDrawer {
                 &mut self.batches,
                 &self.shader_module,
                 self.color_attachment_format,
-                self.depth_attachment_format,
-                self.msaa,
                 &self.pipeline_layout,
                 blend_state,
                 self.instance_data.len() - offset,
@@ -398,7 +377,7 @@ impl Prepare for ForwardEffectDrawer {
     }
 }
 
-impl ForwardEffectDrawer {
+impl PostProcessingEffectDrawer {
     fn create_bind_group_bindless(
         device: &Device,
         bind_group_layout: &BindGroupLayout,
@@ -436,9 +415,7 @@ impl ForwardEffectDrawer {
         device: &Device,
         shader_module: &ShaderModule,
         pipeline_layout: &PipelineLayout,
-        msaa: Msaa,
         color_attachment_format: TextureFormat,
-        depth_attachment_format: TextureFormat,
         source_blend_factor: BlendFactor,
         destination_blend_factor: BlendFactor,
     ) -> RenderPipeline {
@@ -473,17 +450,8 @@ impl ForwardEffectDrawer {
                 })],
             }),
             primitive: PrimitiveState::default(),
-            multisample: MultisampleState {
-                count: msaa.sample_count(),
-                ..Default::default()
-            },
-            depth_stencil: Some(DepthStencilState {
-                format: depth_attachment_format,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Always,
-                stencil: StencilState::default(),
-                bias: DepthBiasState::default(),
-            }),
+            multisample: MultisampleState::default(),
+            depth_stencil: None,
             multiview: None,
             cache: None,
         })
@@ -495,8 +463,6 @@ impl ForwardEffectDrawer {
         batches: &mut Vec<EffectBatch>,
         shader_module: &ShaderModule,
         color_attachment_format: TextureFormat,
-        depth_attachment_format: TextureFormat,
-        msaa: Msaa,
         pipeline_layout: &PipelineLayout,
         blend_state: (BlendFactor, BlendFactor),
         count: usize,
@@ -507,9 +473,7 @@ impl ForwardEffectDrawer {
                 device,
                 shader_module,
                 pipeline_layout,
-                msaa,
                 color_attachment_format,
-                depth_attachment_format,
                 blend_state.0,
                 blend_state.1,
             );

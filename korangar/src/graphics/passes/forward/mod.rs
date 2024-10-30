@@ -1,29 +1,19 @@
 #[cfg(feature = "debug")]
 mod aabb;
 #[cfg(feature = "debug")]
-mod buffer;
-#[cfg(feature = "debug")]
 mod circle;
-mod effect;
 mod entity;
 mod indicator;
 mod model;
-mod overlay;
-mod rectangle;
 mod water;
 
 #[cfg(feature = "debug")]
 pub(crate) use aabb::ForwardAabbDrawer;
 #[cfg(feature = "debug")]
-pub(crate) use buffer::ForwardBufferDrawer;
-#[cfg(feature = "debug")]
 pub(crate) use circle::ForwardCircleDrawer;
-pub(crate) use effect::ForwardEffectDrawer;
 pub(crate) use entity::ForwardEntityDrawer;
 pub(crate) use indicator::ForwardIndicatorDrawer;
 pub(crate) use model::ForwardModelDrawer;
-pub(crate) use overlay::ForwardOverlayDrawer;
-pub(crate) use rectangle::{ForwardRectangleDrawInstruction, ForwardRectangleDrawer, ForwardRectangleLayer};
 pub(crate) use water::ForwardWaterDrawer;
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
@@ -55,33 +45,21 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
 
     fn create_pass<'encoder>(
         &mut self,
-        frame_view: &TextureView,
+        _frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
         _pass_data: Option<()>,
     ) -> RenderPass<'encoder> {
-        let color_attachment = match global_context.forward_multisample_texture.as_ref() {
-            Some(attachment) => RenderPassColorAttachment {
-                view: attachment.get_texture_view(),
-                resolve_target: Some(frame_view),
-                ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
-                    store: StoreOp::Store,
-                },
-            },
-            None => RenderPassColorAttachment {
-                view: frame_view,
+        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
+            label: Some(PASS_NAME),
+            color_attachments: &[Some(RenderPassColorAttachment {
+                view: global_context.forward_color_texture.get_texture_view(),
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),
                     store: StoreOp::Store,
                 },
-            },
-        };
-
-        let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some(PASS_NAME),
-            color_attachments: &[Some(color_attachment)],
+            })],
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                 view: global_context.forward_depth_texture.get_texture_view(),
                 depth_ops: Some(Operations {

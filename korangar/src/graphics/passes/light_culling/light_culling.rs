@@ -40,7 +40,7 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
             label: Some(DISPATCHER_NAME),
             layout: Some(&pipeline_layout),
             module: &shader_module,
-            entry_point: "cs_main",
+            entry_point: Some("cs_main"),
             compilation_options: PipelineCompilationOptions {
                 zero_initialize_workgroup_memory: false,
                 ..Default::default()

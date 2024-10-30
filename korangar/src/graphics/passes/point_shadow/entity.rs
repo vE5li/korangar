@@ -144,7 +144,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &shader_module,
-                entry_point: "vs_main",
+                entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions {
                     constants: &constants,
                     ..Default::default()
@@ -153,7 +153,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 compilation_options: PipelineCompilationOptions {
                     constants: &constants,
                     ..Default::default()
@@ -240,7 +240,7 @@ impl Prepare for PointShadowEntityDrawer {
 
             for instruction in instructions.point_shadow_entities.iter() {
                 let mut texture_index = texture_views.len() as i32;
-                let id = instruction.texture.get_texture().global_id().inner();
+                let id = instruction.texture.get_id();
                 let potential_index = self.lookup.get(&id);
 
                 if let Some(potential_index) = potential_index {

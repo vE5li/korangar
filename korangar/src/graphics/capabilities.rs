@@ -1,5 +1,4 @@
 use std::num::NonZeroU32;
-use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
@@ -11,7 +10,6 @@ const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
 const MAX_TEXTURE_SIZE: u32 = 8192;
 
 pub struct Capabilities {
-    adapter: Arc<Adapter>,
     supported_msaa: Vec<Msaa>,
     bindless: bool,
     multidraw_indirect: bool,
@@ -22,24 +20,21 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    pub fn from_adapter(adapter: Arc<Adapter>) -> Self {
+    pub fn from_adapter(adapter: &Adapter) -> Self {
         let adapter_features = adapter.features();
         let adapter_limits = adapter.limits();
 
-        // WebGPU only guarantees MSAAx4. For everything else we need to test the
-        // adapter.
-        let required_features = Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES;
-        let flags = adapter.get_texture_format_features(TextureFormat::Depth32Float).flags;
-        let supported_msaa = flags.supported_sample_counts().iter().map(|count| (*count).into()).collect();
+        // We need to test all textures that we use for MSAA
+        // which sample count they support.
+        let supported_msaa = determine_supported_msaa(adapter, &[TextureFormat::Depth32Float, TextureFormat::Rgba8UnormSrgb]);
 
         let mut capabilities = Self {
-            adapter: adapter.clone(),
             supported_msaa,
             bindless: false,
             multidraw_indirect: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
-            required_features,
+            required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
             required_limits: Limits::downlevel_defaults().using_resolution(adapter.limits()),
         };
 
@@ -87,34 +82,6 @@ impl Capabilities {
         capabilities
     }
 
-    pub fn add_msaa_texture_format(&mut self, texture_format: TextureFormat) {
-        if !self
-            .adapter
-            .get_texture_format_features(texture_format)
-            .flags
-            .contains(TextureFormatFeatureFlags::MULTISAMPLE_RESOLVE)
-        {
-            self.supported_msaa.clear();
-            self.supported_msaa.push(Msaa::Off);
-            return;
-        }
-
-        for (flag, msaa) in [
-            (TextureFormatFeatureFlags::MULTISAMPLE_X2, Msaa::X2),
-            (TextureFormatFeatureFlags::MULTISAMPLE_X4, Msaa::X4),
-            (TextureFormatFeatureFlags::MULTISAMPLE_X8, Msaa::X8),
-            (TextureFormatFeatureFlags::MULTISAMPLE_X16, Msaa::X16),
-        ] {
-            if self.adapter.get_texture_format_features(texture_format).flags.contains(flag) && !self.supported_msaa.contains(&msaa) {
-                self.supported_msaa.retain(|supported_msaa| supported_msaa != &msaa);
-            }
-        }
-    }
-
-    pub fn supported_msaa(&self, msaa: Msaa) -> bool {
-        self.supported_msaa.contains(&msaa)
-    }
-
     pub fn get_supported_msaa(&self) -> &[Msaa] {
         self.supported_msaa.as_ref()
     }
@@ -160,4 +127,26 @@ impl Capabilities {
         };
         print_debug!("{:?}: {}", feature, supported);
     }
+}
+
+fn determine_supported_msaa(adapter: &Adapter, texture_formats: &[TextureFormat]) -> Vec<Msaa> {
+    let mut supported_msaa = vec![Msaa::Off];
+
+    let msaa_levels = [
+        (TextureFormatFeatureFlags::MULTISAMPLE_X2, Msaa::X2),
+        (TextureFormatFeatureFlags::MULTISAMPLE_X4, Msaa::X4),
+        (TextureFormatFeatureFlags::MULTISAMPLE_X8, Msaa::X8),
+        (TextureFormatFeatureFlags::MULTISAMPLE_X16, Msaa::X16),
+    ];
+
+    for (flag, level) in msaa_levels.into_iter() {
+        if texture_formats.iter().all(|&format| {
+            let features = adapter.get_texture_format_features(format);
+            features.flags.contains(flag)
+        }) {
+            supported_msaa.push(level);
+        }
+    }
+
+    supported_msaa
 }

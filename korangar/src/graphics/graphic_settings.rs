@@ -46,7 +46,7 @@ impl ShadowDetail {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Msaa {
     Off,
     X2,
@@ -96,6 +96,21 @@ impl Msaa {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum ScreenSpaceAntiAliasing {
+    Off,
+    Fxaa,
+}
+
+impl Display for ScreenSpaceAntiAliasing {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScreenSpaceAntiAliasing::Off => "Off".fmt(f),
+            ScreenSpaceAntiAliasing::Fxaa => "FXAA".fmt(f),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
     pub vsync: bool,
@@ -103,6 +118,7 @@ pub struct GraphicsSettings {
     pub triple_buffering: bool,
     pub texture_filtering: TextureSamplerType,
     pub msaa: Msaa,
+    pub screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     pub shadow_detail: ShadowDetail,
 }
 
@@ -114,6 +130,7 @@ impl Default for GraphicsSettings {
             triple_buffering: true,
             texture_filtering: TextureSamplerType::Linear,
             msaa: Msaa::X4,
+            screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
             shadow_detail: ShadowDetail::High,
         }
     }

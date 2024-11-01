@@ -12,7 +12,7 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, CommandEncoder,
     Device, LoadOp, Operations, Queue, RenderPass, RenderPassDepthStencilAttachment, RenderPassDescriptor, ShaderStages, StoreOp,
-    TextureFormat, TextureView,
+    TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
@@ -77,7 +77,6 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
 
     fn create_pass<'encoder>(
         &mut self,
-        _frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
         pass_data: PointShadowData,

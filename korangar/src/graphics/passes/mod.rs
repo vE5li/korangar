@@ -16,7 +16,7 @@ pub(crate) use light_culling::*;
 pub(crate) use picker::*;
 pub(crate) use point_shadow::*;
 pub(crate) use postprocessing::*;
-use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat, TextureView};
+use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat};
 
 use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction};
 use crate::loaders::TextureLoader;
@@ -51,7 +51,6 @@ pub(crate) trait RenderPassContext<const BIND: BindGroupCount, const COLOR: Colo
     /// Crates a render new pass.
     fn create_pass<'encoder>(
         &mut self,
-        frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
         pass_data: Self::PassData<'_>,

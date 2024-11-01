@@ -2,13 +2,15 @@ mod blitter;
 #[cfg(feature = "debug")]
 mod buffer;
 mod effect;
+mod fxaa;
 mod rectangle;
 
-pub(crate) use blitter::PostProcessingBlitterDrawer;
+pub(crate) use blitter::{PostProcessingBlitterDrawData, PostProcessingBlitterDrawer};
 #[cfg(feature = "debug")]
 pub(crate) use buffer::{PostProcessingBufferDrawData, PostProcessingBufferDrawer};
 pub(crate) use effect::PostProcessingEffectDrawer;
-pub(crate) use rectangle::{PostProcessingRectangleDrawInstruction, PostProcessingRectangleDrawer, PostProcessingRectangleLayer};
+pub(crate) use fxaa::PostProcessingFxaaDrawer;
+pub(crate) use rectangle::{PostProcessingRectangleDrawData, PostProcessingRectangleDrawer, PostProcessingRectangleLayer};
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
     StoreOp, TextureFormat, TextureView,
@@ -26,7 +28,7 @@ pub(crate) struct PostProcessingRenderPassContext {
 impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }>
     for PostProcessingRenderPassContext
 {
-    type PassData<'data> = Option<()>;
+    type PassData<'data> = &'data TextureView;
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
         let surface_texture_format = global_context.surface_texture_format;
@@ -35,15 +37,14 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
 
     fn create_pass<'encoder>(
         &mut self,
-        frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
-        _pass_data: Option<()>,
+        pass_data: Self::PassData<'_>,
     ) -> RenderPass<'encoder> {
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: frame_view,
+                view: pass_data,
                 resolve_target: None,
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),

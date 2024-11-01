@@ -3,7 +3,7 @@ mod rectangle;
 pub(crate) use rectangle::InterfaceRectangleDrawer;
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
-    StoreOp, TextureFormat, TextureView,
+    StoreOp, TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
@@ -29,7 +29,6 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
 
     fn create_pass<'encoder>(
         &mut self,
-        _frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
         clear_interface: bool,

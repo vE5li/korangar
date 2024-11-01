@@ -9,7 +9,7 @@ pub(crate) use marker::PickerMarkerDrawer;
 pub(crate) use tile::PickerTileDrawer;
 use wgpu::{
     BindGroupLayout, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat, TextureView,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
@@ -38,7 +38,6 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
 
     fn create_pass<'encoder>(
         &mut self,
-        _frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
         _pass_data: Option<()>,

@@ -17,7 +17,7 @@ pub(crate) use model::ForwardModelDrawer;
 pub(crate) use water::ForwardWaterDrawer;
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat, TextureView,
+    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
@@ -34,7 +34,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
     type PassData<'data> = Option<()>;
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
-        let color_texture_format = global_context.surface_texture_format;
+        let color_texture_format = global_context.forward_color_texture.get_format();
         let depth_texture_format = global_context.forward_depth_texture.get_format();
 
         Self {
@@ -45,7 +45,6 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
 
     fn create_pass<'encoder>(
         &mut self,
-        _frame_view: &TextureView,
         encoder: &'encoder mut CommandEncoder,
         global_context: &GlobalContext,
         _pass_data: Option<()>,

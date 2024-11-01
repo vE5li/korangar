@@ -16,8 +16,8 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::{
-    Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo, ShadowDetail, Surface,
-    TextureSamplerType,
+    Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo, ScreenSpaceAntiAliasing,
+    ShadowDetail, Surface, TextureSamplerType,
 };
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
@@ -95,6 +95,7 @@ struct EngineContext {
     forward_model_drawer: ForwardModelDrawer,
     forward_water_drawer: ForwardWaterDrawer,
     post_processing_effect_drawer: PostProcessingEffectDrawer,
+    post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
     post_processing_rectangle_drawer: PostProcessingRectangleDrawer,
     #[cfg(feature = "debug")]
@@ -140,6 +141,7 @@ impl GraphicsEngine {
         shadow_detail: ShadowDetail,
         texture_sampler_type: TextureSamplerType,
         msaa: Msaa,
+        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     ) {
         self.set_limit_framerate(limit_framerate);
 
@@ -161,14 +163,6 @@ impl GraphicsEngine {
 
                 let surface_texture_format = surface.format();
 
-                // We need to make sure that all attachment textures
-                // we use with MSAA support the request MSAA mode.
-                self.capabilities.add_msaa_texture_format(surface_texture_format);
-                let msaa = match self.capabilities.supported_msaa(msaa) {
-                    true => msaa,
-                    false => Msaa::Off,
-                };
-
                 if self.previous_surface_texture_format != Some(surface_texture_format) {
                     self.previous_surface_texture_format = Some(surface_texture_format);
                     self.engine_context = None;
@@ -180,6 +174,7 @@ impl GraphicsEngine {
                             &self.texture_loader,
                             surface_texture_format,
                             msaa,
+                            screen_space_anti_aliasing,
                             screen_size,
                             shadow_detail,
                             texture_sampler_type,
@@ -291,6 +286,7 @@ impl GraphicsEngine {
                         );
                         let PostProcessingResources {
                             post_processing_effect_drawer,
+                            post_processing_fxaa_drawer,
                             post_processing_blitter_drawer,
                             post_processing_rectangle_drawer,
                             #[cfg(feature = "debug")]
@@ -334,6 +330,7 @@ impl GraphicsEngine {
                         forward_indicator_drawer,
                         forward_model_drawer,
                         post_processing_effect_drawer,
+                        post_processing_fxaa_drawer,
                         post_processing_blitter_drawer,
                         post_processing_rectangle_drawer,
                         forward_water_drawer,
@@ -402,6 +399,14 @@ impl GraphicsEngine {
         }
     }
 
+    pub fn set_screen_space_anti_aliasing(&mut self, screen_space_anti_aliasing: ScreenSpaceAntiAliasing) {
+        if let Some(engine_context) = self.engine_context.as_mut() {
+            engine_context
+                .global_context
+                .update_screen_space_anti_aliasing(screen_space_anti_aliasing);
+        }
+    }
+
     pub fn set_msaa(&mut self, msaa: Msaa) {
         if let Some(engine_context) = self.engine_context.as_mut() {
             engine_context.global_context.update_msaa(&self.device, msaa);
@@ -425,6 +430,7 @@ impl GraphicsEngine {
 
             let PostProcessingResources {
                 post_processing_effect_drawer,
+                post_processing_fxaa_drawer,
                 post_processing_blitter_drawer,
                 post_processing_rectangle_drawer,
                 #[cfg(feature = "debug")]
@@ -441,6 +447,7 @@ impl GraphicsEngine {
             engine_context.forward_indicator_drawer = forward_indicator_drawer;
             engine_context.forward_model_drawer = forward_model_drawer;
             engine_context.post_processing_effect_drawer = post_processing_effect_drawer;
+            engine_context.post_processing_fxaa_drawer = post_processing_fxaa_drawer;
             engine_context.post_processing_blitter_drawer = post_processing_blitter_drawer;
             engine_context.post_processing_rectangle_drawer = post_processing_rectangle_drawer;
             engine_context.forward_water_drawer = forward_water_drawer;
@@ -691,12 +698,10 @@ impl GraphicsEngine {
         rayon::in_place_scope(|scope| {
             // Picker Pass
             scope.spawn(|_| {
-                let mut render_pass = engine_context.picker_render_pass_context.create_pass(
-                    frame_view,
-                    &mut picker_encoder,
-                    &engine_context.global_context,
-                    None,
-                );
+                let mut render_pass =
+                    engine_context
+                        .picker_render_pass_context
+                        .create_pass(&mut picker_encoder, &engine_context.global_context, None);
 
                 engine_context
                     .picker_tile_drawer
@@ -741,7 +746,6 @@ impl GraphicsEngine {
             // Interface Pass
             scope.spawn(|_| {
                 let mut render_pass = engine_context.interface_render_pass_context.create_pass(
-                    frame_view,
                     &mut interface_encoder,
                     &engine_context.global_context,
                     instruction.clear_interface,
@@ -755,7 +759,6 @@ impl GraphicsEngine {
             // Directional Shadow Caster Pass
             scope.spawn(|_| {
                 let mut render_pass = engine_context.directional_shadow_pass_context.create_pass(
-                    frame_view,
                     &mut directional_shadow_encoder,
                     &engine_context.global_context,
                     None,
@@ -797,7 +800,6 @@ impl GraphicsEngine {
                         };
 
                         let mut render_pass = engine_context.point_shadow_pass_context.create_pass(
-                            frame_view,
                             &mut point_shadow_encoder,
                             &engine_context.global_context,
                             pass_data,
@@ -829,7 +831,7 @@ impl GraphicsEngine {
                 let mut render_pass =
                     engine_context
                         .forward_pass_context
-                        .create_pass(frame_view, &mut forward_encoder, &engine_context.global_context, None);
+                        .create_pass(&mut forward_encoder, &engine_context.global_context, None);
 
                 let draw_data = ModelBatchDrawData {
                     batches: instruction.model_batches,
@@ -858,18 +860,57 @@ impl GraphicsEngine {
             });
 
             // Post Processing Pass
-            let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                frame_view,
-                &mut post_processing_encoder,
-                &engine_context.global_context,
-                None,
-            );
+            let mut render_pass = match engine_context.global_context.screen_space_anti_aliasing {
+                ScreenSpaceAntiAliasing::Off => {
+                    // We just blit the forward texture to the screen.
+                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        frame_view,
+                    );
 
-            engine_context
-                .post_processing_blitter_drawer
-                .draw(&mut render_pass, &engine_context.global_context.forward_color_texture);
+                    let blitter_data = PostProcessingBlitterDrawData {
+                        source_texture: &engine_context.global_context.forward_color_texture,
+                        luma_in_alpha: false,
+                        alpha_blending: false,
+                    };
+                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
 
-            let rectangle_data = PostProcessingRectangleDrawInstruction {
+                    render_pass
+                }
+                ScreenSpaceAntiAliasing::Fxaa => {
+                    // We blit the forward texture and calculate the luma in the alpha channel.
+                    // We then run FXAA, which in turn copied the forward texture to the screen.
+                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        engine_context.global_context.scratchpad_texture.get_texture_view(),
+                    );
+
+                    let blitter_data = PostProcessingBlitterDrawData {
+                        source_texture: &engine_context.global_context.forward_color_texture,
+                        luma_in_alpha: true,
+                        alpha_blending: false,
+                    };
+                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+
+                    drop(render_pass);
+
+                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        frame_view,
+                    );
+
+                    engine_context
+                        .post_processing_fxaa_drawer
+                        .draw(&mut render_pass, &engine_context.global_context.scratchpad_texture);
+
+                    render_pass
+                }
+            };
+
+            let rectangle_data = PostProcessingRectangleDrawData {
                 layer: PostProcessingRectangleLayer::Bottom,
                 instructions: instruction.bottom_layer_rectangles,
             };
@@ -881,7 +922,7 @@ impl GraphicsEngine {
                 .post_processing_effect_drawer
                 .draw(&mut render_pass, instruction.effects);
 
-            let rectangle_data = PostProcessingRectangleDrawInstruction {
+            let rectangle_data = PostProcessingRectangleDrawData {
                 layer: PostProcessingRectangleLayer::Middle,
                 instructions: instruction.middle_layer_rectangles,
             };
@@ -900,12 +941,15 @@ impl GraphicsEngine {
             }
 
             if instruction.show_interface {
-                engine_context
-                    .post_processing_blitter_drawer
-                    .draw(&mut render_pass, &engine_context.global_context.interface_buffer_texture);
+                let blitter_data = PostProcessingBlitterDrawData {
+                    source_texture: &engine_context.global_context.interface_buffer_texture,
+                    luma_in_alpha: false,
+                    alpha_blending: true,
+                };
+                engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
             }
 
-            let rectangle_data = PostProcessingRectangleDrawInstruction {
+            let rectangle_data = PostProcessingRectangleDrawData {
                 layer: PostProcessingRectangleLayer::Top,
                 instructions: instruction.top_layer_rectangles,
             };
@@ -983,6 +1027,7 @@ impl ForwardResources {
 
 struct PostProcessingResources {
     post_processing_effect_drawer: PostProcessingEffectDrawer,
+    post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
     post_processing_rectangle_drawer: PostProcessingRectangleDrawer,
     #[cfg(feature = "debug")]
@@ -999,6 +1044,8 @@ impl PostProcessingResources {
     ) -> Self {
         let post_processing_effect_drawer =
             PostProcessingEffectDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
+        let post_processing_fxaa_drawer =
+            PostProcessingFxaaDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
         let post_processing_blitter_drawer =
             PostProcessingBlitterDrawer::new(capabilities, device, queue, global_context, post_processing_pass_context);
         let post_processing_rectangle_drawer =
@@ -1009,6 +1056,7 @@ impl PostProcessingResources {
 
         Self {
             post_processing_effect_drawer,
+            post_processing_fxaa_drawer,
             post_processing_blitter_drawer,
             post_processing_rectangle_drawer,
             #[cfg(feature = "debug")]

@@ -191,6 +191,7 @@ struct Client {
     texture_filtering: MappedRemote<GraphicsSettings, TextureSamplerType>,
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
     msaa: MappedRemote<GraphicsSettings, Msaa>,
+    screen_space_anti_aliasing: MappedRemote<GraphicsSettings, ScreenSpaceAntiAliasing>,
     #[cfg(feature = "debug")]
     render_settings: PlainTrackedState<RenderSettings>,
 
@@ -293,7 +294,7 @@ impl Client {
         });
 
         time_phase!("create device", {
-            let capabilities = Capabilities::from_adapter(adapter.clone());
+            let capabilities = Capabilities::from_adapter(&adapter);
 
             let (device, queue) = pollster::block_on(async {
                 adapter
@@ -407,6 +408,9 @@ impl Client {
             let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
             let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
             let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
+            let screen_space_anti_aliasing = graphics_settings
+                .mapped(|settings| &settings.screen_space_anti_aliasing)
+                .new_remote();
 
             #[cfg(feature = "debug")]
             let render_settings = PlainTrackedState::new(RenderSettings::new());
@@ -574,6 +578,7 @@ impl Client {
             texture_filtering,
             shadow_detail,
             msaa,
+            screen_space_anti_aliasing,
             #[cfg(feature = "debug")]
             render_settings,
             application,
@@ -1449,6 +1454,7 @@ impl Client {
                         self.triple_buffering.clone_state(),
                         self.texture_filtering.clone_state(),
                         self.msaa.clone_state(),
+                        self.screen_space_anti_aliasing.clone_state(),
                         self.shadow_detail.clone_state(),
                     ),
                 ),
@@ -2230,6 +2236,11 @@ impl Client {
             update_interface = true;
         }
 
+        if self.screen_space_anti_aliasing.consume_changed() {
+            self.graphics_engine
+                .set_screen_space_anti_aliasing(*self.screen_space_anti_aliasing.get());
+        }
+
         if self.shadow_detail.consume_changed() {
             self.graphics_engine.set_shadow_detail(*self.shadow_detail.get());
         }
@@ -2278,6 +2289,7 @@ impl ApplicationHandler for Client {
                 *self.shadow_detail.get(),
                 *self.texture_filtering.get(),
                 *self.msaa.get(),
+                *self.screen_space_anti_aliasing.get(),
             )
         }
     }

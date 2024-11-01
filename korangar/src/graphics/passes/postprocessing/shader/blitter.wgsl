@@ -1,3 +1,5 @@
+override LUMA_IN_ALPHA: bool;
+
 @group(1) @binding(0) var texture: texture_2d<f32>;
 
 @vertex
@@ -9,5 +11,12 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> @builtin(position) vec4<
 
 @fragment
 fn fs_main(@builtin(position) position: vec4<f32>) -> @location(0) vec4<f32> {
-    return textureLoad(texture, vec2<i32>(position.xy), 0);
+    var color = textureLoad(texture, vec2<i32>(position.xy), 0);
+
+    if (LUMA_IN_ALPHA) {
+        /// Rec. 601 luma calculation for LDR sources.
+        color.a = sqrt(dot(color.rgb, vec3<f32>(0.299, 0.587, 0.114)));
+    }
+
+    return color;
 }

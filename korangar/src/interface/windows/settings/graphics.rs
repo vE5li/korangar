@@ -3,18 +3,19 @@ use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
-use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ShadowDetail, TextureSamplerType};
+use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, TextureSamplerType};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 
-pub struct GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
+pub struct GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Multisampling: TrackedState<Msaa> + 'static,
+    ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
 {
     present_mode_info: PresentModeInfo,
@@ -24,17 +25,19 @@ where
     triple_buffering: TripleBuffering,
     texture_filtering: TextureFiltering,
     msaa: Multisampling,
+    screen_space_anti_aliasing: ScreenAntiAliasing,
     shadow_detail: Shadow,
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
-    GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
+    GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Multisampling: TrackedState<Msaa> + 'static,
+    ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
@@ -47,6 +50,7 @@ where
         triple_buffering: TripleBuffering,
         texture_filtering: TextureFiltering,
         msaa: Multisampling,
+        screen_space_anti_aliasing: ScreenAntiAliasing,
         shadow_detail: Shadow,
     ) -> Self {
         Self {
@@ -57,19 +61,21 @@ where
             triple_buffering,
             texture_filtering,
             msaa,
+            screen_space_anti_aliasing,
             shadow_detail,
         }
     }
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow> PrototypeWindow<InterfaceSettings>
-    for GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, Shadow>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow> PrototypeWindow<InterfaceSettings>
+    for GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Multisampling: TrackedState<Msaa> + 'static,
+    ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
 {
     fn window_class(&self) -> Option<&str> {
@@ -109,6 +115,19 @@ where
             PickList::default()
                 .with_options(self.supported_msaa.clone())
                 .with_selected(self.msaa.clone())
+                .with_event(Box::new(Vec::new))
+                .with_width(dimension_bound!(!))
+                .wrap(),
+            Text::default()
+                .with_text("Screen space AA")
+                .with_width(dimension_bound!(50%))
+                .wrap(),
+            PickList::default()
+                .with_options(vec![
+                    ("Off", ScreenSpaceAntiAliasing::Off),
+                    ("FXAA", ScreenSpaceAntiAliasing::Fxaa),
+                ])
+                .with_selected(self.screen_space_anti_aliasing.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),

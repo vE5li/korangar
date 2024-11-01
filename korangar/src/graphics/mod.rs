@@ -137,6 +137,7 @@ pub(crate) struct TileLightIndices {
 pub(crate) struct GlobalContext {
     pub(crate) surface_texture_format: TextureFormat,
     pub(crate) msaa: Msaa,
+    pub(crate) screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     pub(crate) solid_pixel_texture: Arc<Texture>,
     pub(crate) walk_indicator_texture: Arc<Texture>,
     pub(crate) forward_depth_texture: AttachmentTexture,
@@ -145,6 +146,7 @@ pub(crate) struct GlobalContext {
     pub(crate) forward_color_texture: AttachmentTexture,
     pub(crate) interface_buffer_texture: AttachmentTexture,
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
+    pub(crate) scratchpad_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
     pub(crate) tile_light_count_texture: StorageTexture,
     pub(crate) global_uniforms_buffer: Buffer<GlobalUniforms>,
@@ -340,6 +342,7 @@ impl GlobalContext {
         texture_loader: &TextureLoader,
         surface_texture_format: TextureFormat,
         msaa: Msaa,
+        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
         screen_size: ScreenSize,
         shadow_detail: ShadowDetail,
         texture_sampler: TextureSamplerType,
@@ -447,6 +450,7 @@ impl GlobalContext {
         Self {
             surface_texture_format,
             msaa,
+            screen_space_anti_aliasing,
             solid_pixel_texture,
             walk_indicator_texture,
             forward_depth_texture: screen_textures.forward_depth_texture,
@@ -454,6 +458,7 @@ impl GlobalContext {
             picker_depth_texture: screen_textures.picker_depth_texture,
             forward_color_texture: screen_textures.forward_color_texture,
             interface_buffer_texture: screen_textures.interface_buffer_texture,
+            scratchpad_texture: screen_textures.scratchpad_texture,
             directional_shadow_map_texture,
             point_shadow_map_textures,
             tile_light_count_texture: screen_textures.tile_light_count_texture,
@@ -486,7 +491,7 @@ impl GlobalContext {
     fn create_screen_size_textures(
         device: &Device,
         screen_size: ScreenSize,
-        surface_texture_format: TextureFormat,
+        surface_texture: TextureFormat,
         msaa: Msaa,
     ) -> ScreenSizeTextures {
         // Since we need to copy from the picker attachment to read the picker value, we
@@ -505,8 +510,7 @@ impl GlobalContext {
         );
         let picker_depth_texture = picker_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
 
-        let (forward_color_texture, forward_depth_texture) =
-            Self::create_forward_texture(device, screen_size, surface_texture_format, msaa);
+        let (forward_color_texture, forward_depth_texture) = Self::create_forward_texture(device, screen_size, msaa);
 
         let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
 
@@ -515,6 +519,11 @@ impl GlobalContext {
             TextureFormat::Rgba8UnormSrgb,
             AttachmentTextureType::ColorAttachment,
         );
+
+        let scratchpad_screen_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
+
+        let scratchpad_texture =
+            scratchpad_screen_factory.new_attachment("scratchpad", surface_texture, AttachmentTextureType::ColorAttachment);
 
         let (tile_x, tile_y) = calculate_light_tile_count(screen_size);
 
@@ -526,18 +535,18 @@ impl GlobalContext {
             picker_depth_texture,
             forward_color_texture,
             interface_buffer_texture,
+            scratchpad_texture,
             tile_light_count_texture,
         }
     }
 
-    fn create_forward_texture(
-        device: &Device,
-        screen_size: ScreenSize,
-        surface_texture_format: TextureFormat,
-        msaa: Msaa,
-    ) -> (AttachmentTexture, AttachmentTexture) {
+    fn create_forward_texture(device: &Device, screen_size: ScreenSize, msaa: Msaa) -> (AttachmentTexture, AttachmentTexture) {
         let factory = AttachmentTextureFactory::new(device, screen_size, msaa.sample_count(), None);
-        let color_texture = factory.new_attachment("forward color", surface_texture_format, AttachmentTextureType::ColorAttachment);
+        let color_texture = factory.new_attachment(
+            "forward color",
+            TextureFormat::Rgba8UnormSrgb,
+            AttachmentTextureType::ColorAttachment,
+        );
         let depth_texture = factory.new_attachment("forward depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
         (color_texture, depth_texture)
     }
@@ -576,14 +585,23 @@ impl GlobalContext {
 
     fn update_screen_size_resources(&mut self, device: &Device, screen_size: ScreenSize) {
         self.screen_size = screen_size;
-        let new_textures = Self::create_screen_size_textures(device, self.screen_size, self.surface_texture_format, self.msaa);
+        let ScreenSizeTextures {
+            forward_color_texture,
+            forward_depth_texture,
+            picker_buffer_texture,
+            picker_depth_texture,
+            interface_buffer_texture,
+            scratchpad_texture,
+            tile_light_count_texture,
+        } = Self::create_screen_size_textures(device, self.screen_size, self.surface_texture_format, self.msaa);
 
-        self.forward_depth_texture = new_textures.forward_depth_texture;
-        self.picker_buffer_texture = new_textures.picker_buffer_texture;
-        self.picker_depth_texture = new_textures.picker_depth_texture;
-        self.forward_color_texture = new_textures.forward_color_texture;
-        self.interface_buffer_texture = new_textures.interface_buffer_texture;
-        self.tile_light_count_texture = new_textures.tile_light_count_texture;
+        self.forward_color_texture = forward_color_texture;
+        self.forward_depth_texture = forward_depth_texture;
+        self.picker_buffer_texture = picker_buffer_texture;
+        self.picker_depth_texture = picker_depth_texture;
+        self.interface_buffer_texture = interface_buffer_texture;
+        self.scratchpad_texture = scratchpad_texture;
+        self.tile_light_count_texture = tile_light_count_texture;
 
         self.tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, screen_size);
 
@@ -664,8 +682,11 @@ impl GlobalContext {
 
     fn update_msaa(&mut self, device: &Device, msaa: Msaa) {
         self.msaa = msaa;
-        (self.forward_color_texture, self.forward_depth_texture) =
-            Self::create_forward_texture(device, self.screen_size, self.surface_texture_format, self.msaa);
+        (self.forward_color_texture, self.forward_depth_texture) = Self::create_forward_texture(device, self.screen_size, self.msaa);
+    }
+
+    fn update_screen_space_anti_aliasing(&mut self, screen_space_anti_aliasing: ScreenSpaceAntiAliasing) {
+        self.screen_space_anti_aliasing = screen_space_anti_aliasing;
     }
 
     fn global_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
@@ -1023,6 +1044,7 @@ struct ScreenSizeTextures {
     picker_buffer_texture: AttachmentTexture,
     picker_depth_texture: AttachmentTexture,
     interface_buffer_texture: AttachmentTexture,
+    scratchpad_texture: AttachmentTexture,
     tile_light_count_texture: StorageTexture,
 }
 

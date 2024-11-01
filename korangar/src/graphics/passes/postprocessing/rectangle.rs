@@ -23,7 +23,7 @@ const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/rectangle_
 const DRAWER_NAME: &str = "post processing rectangle";
 const INITIAL_INSTRUCTION_SIZE: usize = 256;
 
-pub(crate) struct PostProcessingRectangleDrawInstruction<'a> {
+pub(crate) struct PostProcessingRectangleDrawData<'a> {
     pub(crate) layer: PostProcessingRectangleLayer,
     pub(crate) instructions: &'a [RectangleInstruction],
 }
@@ -69,7 +69,7 @@ pub(crate) struct PostProcessingRectangleDrawer {
 
 impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for PostProcessingRectangleDrawer {
     type Context = PostProcessingRenderPassContext;
-    type DrawData<'data> = PostProcessingRectangleDrawInstruction<'data>;
+    type DrawData<'data> = PostProcessingRectangleDrawData<'data>;
 
     fn new(
         capabilities: &Capabilities,

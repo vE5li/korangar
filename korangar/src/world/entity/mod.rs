@@ -295,8 +295,8 @@ impl Common {
             111 => EntityType::Hidden, // TODO: check that this is correct
             // 111 | 139 => None,
             0..=44 | 4000..=5999 => EntityType::Player,
-            46..=999 => EntityType::Npc,
-            1000..=3999 => EntityType::Monster,
+            46..=999 | 10000..=19999 => EntityType::Npc,
+            1000..=3999 | 20000..=29999 => EntityType::Monster,
             _ => EntityType::Npc,
         };
 

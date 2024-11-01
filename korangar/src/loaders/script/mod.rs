@@ -33,6 +33,11 @@ impl ScriptLoader {
             .unwrap();
         state.load(&data).exec()?;
 
+        let data = game_file_loader
+            .get("data\\luafiles514\\lua files\\datainfo\\npcidentity.lub")
+            .unwrap();
+        state.load(&data).exec()?;
+
         let job_id_function = r#"
 function get_job_name_from_id(id)
   for k,v in pairs(JTtbl) do
@@ -53,6 +58,16 @@ function get_job_name_from_id(id)
         return string.sub(k, 4)
     end
   end
+
+  for k,v in pairs(jobtbl) do
+    if v==id then
+        if string.sub(k, 1, 5) == "JT_G_" then
+            return string.sub(k, 6)
+        end
+        return string.sub(k, 4)
+    end
+  end
+
   return "1_f_maria"
   --return nil
 end

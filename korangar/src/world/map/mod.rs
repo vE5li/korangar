@@ -308,6 +308,13 @@ impl Map {
         const HALF_TILE_SIZE: f32 = MAP_TILE_SIZE / 2.0;
         const OFFSET: f32 = 1.0;
 
+        // Since the picker buffer is always one frame behind the current scene, a map
+        // transition can cause the picked tile to be out of bounds. To avoid a
+        // panic we ensure the coordinates are in bounds.
+        if position.x >= self.width || position.y >= self.height {
+            return;
+        }
+
         let tile = self.get_tile(position);
 
         if tile.flags.contains(TileFlags::WALKABLE) {

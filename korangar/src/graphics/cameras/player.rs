@@ -5,7 +5,7 @@ use cgmath::{InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use super::{perspective_reverse_lh, Camera, SmoothedValue};
 
 const ZOOM_SPEED: f32 = 2.0;
-const ROTATION_SPEED: f32 = 0.02;
+const ROTATION_SPEED: f32 = 0.01;
 const MINIMUM_ZOOM: f32 = 150.0;
 const MAXIMUM_ZOOM: f32 = 600.0;
 const DEFAULT_ZOOM: f32 = 400.0;

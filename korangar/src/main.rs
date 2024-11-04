@@ -1144,7 +1144,7 @@ impl Client {
                 NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                     self.player_inventory.update_equipped_position(index, equipped_position);
                 }
-                NetworkEvent::ChangeJob(account_id, job_id) => {
+                NetworkEvent::ChangeJob { account_id, job_id } => {
                     let entity = self
                         .entities
                         .iter_mut()
@@ -1156,6 +1156,21 @@ impl Client {
                     // request a full list of items and the hotbar.
 
                     entity.set_job(job_id as usize);
+                    entity.reload_sprite(
+                        &mut self.sprite_loader,
+                        &mut self.action_loader,
+                        &mut self.animation_loader,
+                        &self.script_loader,
+                    );
+                }
+                NetworkEvent::ChangeHair { account_id, hair_id } => {
+                    let entity = self
+                        .entities
+                        .iter_mut()
+                        .find(|entity| entity.get_entity_id().0 == account_id.0)
+                        .unwrap();
+
+                    entity.set_hair(hair_id as usize);
                     entity.reload_sprite(
                         &mut self.sprite_loader,
                         &mut self.action_loader,

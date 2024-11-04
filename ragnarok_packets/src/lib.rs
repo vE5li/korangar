@@ -800,9 +800,28 @@ pub struct CriticalWeightUpdatePacket {
 #[header(0x01D7)]
 pub struct SpriteChangePacket {
     pub account_id: AccountId,
-    pub sprite_type: u8, // TODO: Is it actually the sprite type?
+    pub sprite_type: SpriteChangeType,
     pub value: u32,
     pub value2: u32,
+}
+
+#[derive(Debug, Clone, ByteConvertable)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub enum SpriteChangeType {
+    Base,
+    Hair,
+    Weapon,
+    HeadBottom,
+    HeadTop,
+    HeadMiddle,
+    HairCollor,
+    ClothesColor,
+    Shield,
+    Shoes,
+    Body,
+    ResetCostumes,
+    Robe,
+    Body2,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, MapServer)]

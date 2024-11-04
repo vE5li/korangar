@@ -118,7 +118,14 @@ pub enum NetworkEvent {
         index: InventoryIndex,
         equipped_position: EquipPosition,
     },
-    ChangeJob(AccountId, u32),
+    ChangeJob {
+        account_id: AccountId,
+        job_id: u32,
+    },
+    ChangeHair {
+        account_id: AccountId,
+        hair_id: u32,
+    },
     SetPlayerPosition(WorldPosition),
     LoggedOut,
     FriendRequest {

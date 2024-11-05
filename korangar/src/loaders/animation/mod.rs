@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Vector2};
+use cgmath::{Matrix4, Rad, Vector2};
 use korangar_util::container::SimpleCache;
 use num::Zero;
 
@@ -45,11 +45,10 @@ impl AnimationLoader {
 
         let mut animations_list: Vec<Vec<Vec<AnimationFrame>>> = Vec::new();
 
-        // Each animation pair has the sprites and actions, we iterate over the
-        // animation pairs.
-        // Each entity has several actions and the actions is composed of several
-        // motion, in each motion contains several pictures that we try to
-        // merge.
+        // Each animation pair consists of pairs of sprite and action.
+        // Each entity has multiple actions, and each action is composed of
+        // several motions. Each motion references multiple sprites
+        // that we want to combine.
         for (animation_index, animation_pair) in animation_pairs.iter().enumerate() {
             let mut animation_frames: Vec<Vec<AnimationFrame>> = Vec::new();
 
@@ -69,7 +68,7 @@ impl AnimationLoader {
                         }
 
                         let mut sprite_number = sprite_clip.sprite_number as usize;
-                        // The type of sprite 0 for pallete, 1 for BGRA.
+                        // The sprite type is 0 for palette and 1 for BGRA.
                         let sprite_type = match sprite_clip.sprite_type {
                             Some(value) => value as usize,
                             None => 0,
@@ -100,13 +99,12 @@ impl AnimationLoader {
                             },
                         };
 
-                        // Scales the image. Try to match the first type of zoom, if it doesn't match
-                        // find the second method.
+                        // Scale the image. Attempt to match the first type of zoom.
+                        // If it doesn't match, use the second type of zoom.
                         let zoom = match sprite_clip.zoom {
                             Some(value) => (value, value).into(),
                             None => sprite_clip.zoom2.unwrap_or_else(|| (1.0, 1.0).into()),
                         };
-
                         if zoom != (1.0, 1.0).into() {
                             width = (width as f32 * zoom.x).ceil() as u32;
                             height = (height as f32 * zoom.y).ceil() as u32;
@@ -121,8 +119,8 @@ impl AnimationLoader {
                         let mirror = sprite_clip.mirror_on != 0;
 
                         // Attach points have a different offset calculation.
-                        // This is hardcoded for the player heads. An `animation_index` of `0` is the
-                        // head, and `1` is the body.
+                        // Currently, this is hardcoded for the player heads. An `animation_index` of
+                        // `0` corresponds to the head, and `1` for the body.
                         let has_attach_point = match motion.attach_point_count {
                             Some(value) => value == 1,
                             None => false,
@@ -131,6 +129,12 @@ impl AnimationLoader {
                         if entity_type == EntityType::Player && has_attach_point && animation_index == 1 {
                             let parent_animation_pair = &animation_pairs[0];
                             let parent_action = &parent_animation_pair.actions.actions[action_index];
+                            // TODO: Precompute the size of each motion from the animation pair.
+                            // Determine the minimum motion size to iterate without going out of bound.
+                            // This check resolves the game crash when using the Assassin class.
+                            if parent_action.motions.len() <= motion_index {
+                                continue;
+                            }
                             let parent_motion = &parent_action.motions[motion_index];
                             let parent_attach_point = parent_motion.attach_points[0].position;
                             let attach_point = motion.attach_points[0].position;
@@ -153,7 +157,6 @@ impl AnimationLoader {
                             size,
                             top_left: Vector2::zero(),
                             offset,
-                            remove_offset: Vector2::zero(),
                             frame_parts: vec![frame_part],
                         };
 
@@ -179,13 +182,10 @@ impl AnimationLoader {
 
         let mut animations: Vec<Animation> = Vec::new();
 
-        // Generate all the motions for each action.
-        // Get the animation pair for merging for each motion.
-        // Merge the animation pair and get the frame for each action.
+        // Merge the sprites from each motion by combining the animation pair.
         for action_index in 0..action_size {
             let motion_size = animation_pairs[0].actions.actions[action_index].motions.len();
             let mut frames: Vec<AnimationFrame> = Vec::new();
-
             for motion_index in 0..motion_size {
                 let mut generate: Vec<AnimationFrame> = Vec::new();
 
@@ -193,64 +193,90 @@ impl AnimationLoader {
                     if pair.len() <= action_index || pair[action_index].len() <= motion_index {
                         continue;
                     }
-
                     generate.push(pair[action_index][motion_index].clone());
                 }
-
                 let frame = merge_frame(&mut generate);
                 frames.push(frame);
             }
+            animations.push(Animation { frames });
+        }
 
-            // The problem is that each frame of an action is not in the same size
-            // and without the same size the proportion is different.
-            // To solve this primarily, we created images of the same size and same offset
-            // This code resizes the frame to the same size and same offset.
-            // Initially we find the max width and height and max and min offsets.
-            let mut max_width = 0;
-            let mut max_height = 0;
-            let mut min_offset_x = i32::MAX;
-            let mut min_offset_y = i32::MAX;
-            let mut max_offset_x = 0;
-            let mut max_offset_y = 0;
+        // The problem is that each frame of an action is not the same size
+        // and without size consistency, the proportion differ between frames,
+        // causing pixel offsets.
+        // To resolve this, we resized the frames to ensure
+        // identical frame size and origin point at (0,0) between frames.
 
-            frames.iter().for_each(|frame| {
-                max_width = max(max_width, frame.size.x);
-                max_height = max(max_height, frame.size.y);
-                min_offset_x = min(min_offset_x, frame.offset.x);
-                min_offset_y = min(min_offset_y, frame.offset.y);
-                max_offset_x = max(max_offset_x, frame.offset.x);
-                max_offset_y = max(max_offset_y, frame.offset.y);
+        // First, identify the bounding box that encompasses all motion
+        // frames.
+        let mut min_top = i32::MAX;
+        let mut max_bottom = 0;
+        let mut min_left = i32::MAX;
+        let mut max_right = 0;
+        for action_index in 0..action_size {
+            animations[action_index].frames.iter().for_each(|frame| {
+                let center_x = (frame.size.x - 1) / 2;
+                min_left = min(min_left, frame.offset.x - center_x);
+                max_right = max(max_right, frame.offset.x + (frame.size.x - 1 - center_x));
+
+                let center_y = (frame.size.y - 1) / 2;
+                min_top = min(min_top, frame.offset.y - center_y);
+                max_bottom = max(max_bottom, frame.offset.y + (frame.size.y - 1 - center_y));
             });
+        }
+        // The player can change the sprite and causes an offset from a image to
+        // another.
+        if entity_type == EntityType::Player {
+            // Create a bounding box to standardize the size of the player sprite, ensuring
+            // that every sprite has the same proportion and that pixels are rendered in
+            // the correct position.
+            // The player sprite is generally 110 pixels, with an additional 40 pixels added
+            // for extra space, making the total height 150 pixels.
+            let extra_size = 20;
+            min_top = -80;
+            max_bottom = 30;
+            min_top -= extra_size;
+            max_bottom += extra_size;
+            min_left = -150;
+            max_right = 150;
+        }
 
-            // The 2 adds a bit of padding to avoid edge cases that might cut off one pixel
-            // of the texture.
-            // TODO: Check if this can actually happen.
-            let offset_width = max_offset_x - min_offset_x + 2;
-            let offset_height = max_offset_x - min_offset_x + 2;
+        fn calculate_new_size(min_top: i32, max_bottom: i32, min_left: i32, max_right: i32) -> Vector2<i32> {
+            // Create a rectangle centered on the y-axis, extending to the maximum of
+            // max_left and max_right.
+            let size_x = 2 * max(i32::abs(min_left), i32::abs(max_right)) + 1;
 
-            max_width += offset_width;
-            max_height += offset_height;
+            // The size_y is defined to be odd, as it ranges from [0, 2k],
+            // resulting in a size of 2k+1.
+            let mut padding = 1;
+            if max_bottom % 2 == min_top % 2 {
+                padding = 0;
+            }
+            let size_y = max_bottom - min_top + padding + 1;
 
-            // Shift every frame by the calculated offset.
-            // The bottom part and the left part will not be offset.
-            frames.iter_mut().for_each(|frame| {
-                frame.offset.x = min_offset_x;
-                frame.offset.y = min_offset_y;
-                frame.offset.x += offset_width;
-                frame.offset.y += offset_height;
-                frame.size = Vector2::new(max_width, max_height);
-                frame.remove_offset.x = offset_width;
-                frame.remove_offset.y = offset_height;
+            return Vector2::new(size_x, size_y);
+        }
 
+        for action_index in 0..action_size {
+            animations[action_index].frames.iter_mut().for_each(|frame| {
+                frame.size = calculate_new_size(min_top, max_bottom, min_left, max_right);
+                // Set the origin point at (0, 0) correctly by applying an offset in y by
+                // max_bottom.
+                frame.offset = Vector2::new(0, -max_bottom);
                 for frame_part in frame.frame_parts.iter_mut() {
-                    frame_part.offset.x += offset_width;
-                    frame_part.offset.y += offset_height;
+                    // Determine the top-left corner of the frame rectangle
+                    // and the top-left corner of the frame part rectangle.
+                    let frame_top_left = frame.offset - (frame.size - Vector2::new(1, 1)) / 2;
+                    let frame_part_top_left = frame_part.offset - (frame_part.size - Vector2::new(1, 1)) / 2;
 
-                    // Precompute the vertex for rendering later.
+                    // Generate the key points of the frame rectangle.
+                    let texture_frame_center = Vector2::new(0.0, 1.0);
+
+                    // Generate the key points of the frame part rectangle.
+                    // In the variables, we removed the term frame_part,
+                    // but we are still working with the frame part.
                     let new_vector = frame_part.size;
-                    let old_origin = frame.offset - (frame.size - frame.remove_offset - Vector2::new(1, 1)) / 2;
-                    let new_origin = frame_part.offset - (frame_part.size - Vector2::new(1, 1)) / 2;
-                    let top_left = new_origin - old_origin;
+                    let top_left = frame_part_top_left - frame_top_left;
                     let bottom_left = top_left + new_vector.y * Vector2::<i32>::unit_y();
                     let bottom_right = top_left + new_vector;
 
@@ -258,22 +284,32 @@ impl AnimationLoader {
                     let texture_bottom_left = convert_coordinates(bottom_left, frame.size);
                     let texture_bottom_right = convert_coordinates(bottom_right, frame.size);
 
-                    // Scale the vertex (2.-1), (0, -1), (2, 1), (0, 1) to fit texture coordinates
-                    // as above.
+                    // 1 - Move to the center of the frame rectangle with coordinates
+                    // (-1, 2), (-1, 0), (1, 2), (1, 0).
+                    // 2 - Rotate the image by specified angle.
+                    // 3 - Return to the origin to apply the scaling.
+                    let translation_to_center_matrix = Matrix4::from_translation(texture_frame_center.extend(0.0));
+                    let rotation_matrix = Matrix4::from_angle_z(Rad(-frame_part.angle));
+                    let translation_to_origin_matrix = Matrix4::from_translation((-texture_frame_center).extend(0.0));
+                    let final_rotation_matrix = translation_to_center_matrix * rotation_matrix * translation_to_origin_matrix;
+
+                    // Scale the vertices (-1, 2), (-1, 0), (1, 2), (1, 0) to
+                    // match the texture coordinates as specified above.
                     let scale_matrix = Matrix4::from_nonuniform_scale(
                         (texture_bottom_right.x - texture_bottom_left.x) / 2.0,
                         (texture_top_left.y - texture_bottom_left.y) / 2.0,
                         1.0,
                     );
 
-                    let new_center = Vector2::new(0.0, (texture_top_left.y - texture_bottom_left.y) / 2.0);
+                    // Translate the scaled rectangle from the new texture center to the
+                    // texture center.
                     let texture_center = (texture_top_left + texture_bottom_right) / 2.0;
-                    let translation_matrix = Matrix4::from_translation(texture_center.extend(1.0) - new_center.extend(1.0));
+                    let texture_frame_new_center = Vector2::new(0.0, (texture_top_left.y - texture_bottom_left.y) / 2.0);
+                    let translation_matrix = Matrix4::from_translation(texture_center.extend(1.0) - texture_frame_new_center.extend(1.0));
 
-                    frame_part.affine_matrix = translation_matrix * scale_matrix;
+                    frame_part.affine_matrix = translation_matrix * scale_matrix * final_rotation_matrix;
                 }
             });
-            animations.push(Animation { frames });
         }
 
         let animation_data = Arc::new(AnimationData {
@@ -303,26 +339,25 @@ impl AnimationLoader {
 }
 
 /// This function converts to the "normalized" coordinates of a frame part
-/// inside the frame bounding rectangle with vertices [-1, 0], [-1, 2], [1, 0],
-/// [1, 2].
+/// inside the frame's bounding rectangle, defined by the vertices [-1, 0],
+/// [-1, 2], [1, 0], and [1, 2].
 fn convert_coordinates(coordinates: Vector2<i32>, size: Vector2<i32>) -> Vector2<f32> {
-    const EPSILON: f32 = 0.0001;
-    let x = (coordinates.x as f32 / size.x as f32 - 0.5) * 2.0 + EPSILON;
-    let y = 2.0 - (coordinates.y as f32 / size.y as f32) * 2.0 + EPSILON;
+    assert!(size.x != 0 && size.y != 0);
+    let x = (coordinates.x as f32 / size.x as f32 - 1.0 / 2.0) * 2.0;
+    let y = 2.0 - (coordinates.y as f32 / size.y as f32) * 2.0;
     Vector2::<f32>::new(x, y)
 }
 
 /// This function generates a new frame by merging a list of frames.
 fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
     for frame in frames.iter_mut() {
-        // Finding the half size of the image
-        // For even side and the side have length 4, the center coordinate is 1.
-        // For odd side and the side have length 3, the center coordinate is 1.
+        // For an even side with a length of 4, the center coordinate is 1.
+        // For an odd side with a length of 3, the center coordinate is 1.
         let half_size = (frame.size - Vector2::new(1, 1)) / 2;
         frame.top_left = frame.offset - half_size;
     }
 
-    // If there is no frame return an image with 1 pixel.
+    // If the function input contains no frame, return a 1-pixel image.
     if frames.is_empty() {
         let frame_part = AnimationFramePart {
             animation_index: usize::MAX,
@@ -330,7 +365,6 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
             size: Vector2::new(1, 1),
             offset: Vector2::zero(),
             mirror: false,
-            angle: 0.0,
             color: Color {
                 red: 0.0,
                 blue: 0.0,
@@ -343,21 +377,21 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
             size: Vector2::new(1, 1),
             top_left: Vector2::zero(),
             offset: Vector2::zero(),
-            remove_offset: Vector2::zero(),
             frame_parts: vec![frame_part],
         };
         return frame;
     }
 
-    // Find the upmost and leftmost coordinates
+    // Determine the upmost and leftmost coordinates.
     let top_left_x = frames.iter().min_by_key(|frame| frame.top_left.x).unwrap().top_left.x;
     let top_left_y = frames.iter().min_by_key(|frame| frame.top_left.y).unwrap().top_left.y;
 
-    // Find the bottommost and rightmost coordinates
+    // Determine the bottommost and rightmost coordinates.
     let frame_x = frames.iter().max_by_key(|frame| frame.top_left.x + frame.size.x).unwrap();
     let frame_y = frames.iter().max_by_key(|frame| frame.top_left.y + frame.size.y).unwrap();
 
-    // Calculate the new rectangle that is formed
+    // Calculate the new rectangle formed from the bounding box of
+    // the given rectangles.
     let new_width = (frame_x.top_left.x + frame_x.size.x) - top_left_x;
     let new_height = (frame_y.top_left.y + frame_y.size.y) - top_left_y;
 
@@ -366,21 +400,20 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
         new_frame_parts.append(&mut frame.frame_parts);
     }
 
-    // The origin is (0,0).
+    // The origin is set at (0,0).
     //
-    // The top left point of the rectangle is calculated by
-    // origin + offset - half_size
+    // The top-left point of the rectangle is calculated as
+    // origin + offset - half_size.
     //
-    // The center point of the rectangle is calculated by
-    // top_left_point +  half_size
+    // The center point of the rectangle is calculated as
+    // top_left_point +  half_size.
     //
-    // The new offset is calculated by
+    // The new offset is calculated as
     // center_point - origin.
     AnimationFrame {
         size: Vector2::new(new_width, new_height),
         top_left: Vector2::zero(),
         offset: Vector2::new(top_left_x + (new_width - 1) / 2, top_left_y + (new_height - 1) / 2),
-        remove_offset: Vector2::zero(),
         frame_parts: new_frame_parts,
     }
 }

@@ -26,13 +26,13 @@ struct InstanceData {
     frame_part_transform: [[f32; 4]; 4],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
+    frame_size: [f32; 2],
     extra_depth_offset: f32,
     depth_offset: f32,
-    angle: f32,
     curvature: f32,
     mirror: u32,
     texture_index: i32,
-    padding: [u32; 2],
+    alpha: f32,
 }
 
 pub(crate) struct PointShadowEntityDrawer {
@@ -259,13 +259,13 @@ impl Prepare for PointShadowEntityDrawer {
                     frame_part_transform: instruction.frame_part_transform.into(),
                     texture_position: instruction.texture_position.into(),
                     texture_size: instruction.texture_size.into(),
+                    frame_size: instruction.frame_size.into(),
                     extra_depth_offset: instruction.extra_depth_offset,
                     depth_offset: instruction.depth_offset,
-                    angle: instruction.angle,
                     curvature: instruction.curvature,
                     mirror: instruction.mirror as u32,
+                    alpha: instruction.color.alpha,
                     texture_index,
-                    padding: Default::default(),
                 });
             }
 
@@ -282,13 +282,13 @@ impl Prepare for PointShadowEntityDrawer {
                     frame_part_transform: instruction.frame_part_transform.into(),
                     texture_position: instruction.texture_position.into(),
                     texture_size: instruction.texture_size.into(),
+                    frame_size: instruction.frame_size.into(),
                     extra_depth_offset: instruction.extra_depth_offset,
                     depth_offset: instruction.depth_offset,
-                    angle: instruction.angle,
                     curvature: instruction.curvature,
                     mirror: instruction.mirror as u32,
+                    alpha: instruction.color.alpha,
                     texture_index: 0,
-                    padding: Default::default(),
                 });
             }
 

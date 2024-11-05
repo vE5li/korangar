@@ -70,11 +70,8 @@ impl Surface {
         }
 
         let present_mode_info = PresentModeInfo::from_adapter(adapter, &surface);
-        let srgb_formats: Vec<TextureFormat> = surfaces_formats.iter().copied().filter(|format| format.is_srgb()).collect();
-        let srgb_format = *srgb_formats.first().expect("Surface does not support sRGB");
 
-        config.format = srgb_format;
-        config.view_formats.push(srgb_format);
+        config.format = surfaces_formats.first().copied().expect("not surface formats found");
         config.desired_maximum_frame_latency = match triple_buffering {
             true => 2,
             false => 1,

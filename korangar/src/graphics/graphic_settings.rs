@@ -100,6 +100,7 @@ impl Msaa {
 pub enum ScreenSpaceAntiAliasing {
     Off,
     Fxaa,
+    Cmaa2,
 }
 
 impl Display for ScreenSpaceAntiAliasing {
@@ -107,6 +108,7 @@ impl Display for ScreenSpaceAntiAliasing {
         match self {
             ScreenSpaceAntiAliasing::Off => "Off".fmt(f),
             ScreenSpaceAntiAliasing::Fxaa => "FXAA".fmt(f),
+            ScreenSpaceAntiAliasing::Cmaa2 => "CMAA2".fmt(f),
         }
     }
 }

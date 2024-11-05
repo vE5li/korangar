@@ -1,3 +1,4 @@
+mod cmaa2;
 mod directional_shadow;
 mod forward;
 mod interface;
@@ -5,10 +6,12 @@ mod light_culling;
 mod picker;
 mod point_shadow;
 mod postprocessing;
+mod screen_blit;
 
 use std::marker::ConstParamTy;
 
 use bytemuck::{Pod, Zeroable};
+pub(crate) use cmaa2::*;
 pub(crate) use directional_shadow::*;
 pub(crate) use forward::*;
 pub(crate) use interface::*;
@@ -16,6 +19,7 @@ pub(crate) use light_culling::*;
 pub(crate) use picker::*;
 pub(crate) use point_shadow::*;
 pub(crate) use postprocessing::*;
+pub(crate) use screen_blit::*;
 use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat};
 
 use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction};
@@ -23,6 +27,7 @@ use crate::loaders::TextureLoader;
 
 #[derive(Clone, Copy, PartialEq, Eq, ConstParamTy)]
 pub(crate) enum BindGroupCount {
+    None = 0,
     One = 1,
     Two = 2,
 }
@@ -124,11 +129,20 @@ pub(crate) trait Dispatch<const BIND: BindGroupCount> {
 /// We reimplement the WGPU type, since we want to have bytemuck support.
 #[repr(C)]
 #[derive(Copy, Clone, Pod, Zeroable)]
-struct DrawIndirectArgs {
+pub(crate) struct DrawIndirectArgs {
     vertex_count: u32,
     instance_count: u32,
     first_vertex: u32,
     first_instance: u32,
+}
+
+/// We reimplement the WGPU type, since we want to have bytemuck support.
+#[repr(C)]
+#[derive(Copy, Clone, Pod, Zeroable)]
+pub(crate) struct DispatchIndirectArgs {
+    x: u32,
+    y: u32,
+    z: u32,
 }
 
 /// A batch of models that share a specific texture group and model vertex

@@ -35,7 +35,7 @@ impl Capabilities {
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
             required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
-            required_limits: Limits::downlevel_defaults().using_resolution(adapter.limits()),
+            required_limits: Limits::default().using_resolution(adapter.limits()),
         };
 
         if capabilities.required_limits.max_texture_dimension_2d < MAX_TEXTURE_SIZE {

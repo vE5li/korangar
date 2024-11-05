@@ -16,8 +16,8 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::{
-    Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo, ScreenSpaceAntiAliasing,
-    ShadowDetail, Surface, TextureSamplerType,
+    AntiAliasingResource, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
+    ScreenSpaceAntiAliasing, ShadowDetail, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
 };
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
@@ -42,10 +42,6 @@ pub struct GraphicsEngineDescriptor {
 /// move up a level.
 ///
 /// Set 0: Global Bindings
-///  0 => Uniforms Buffer
-///  1 => Nearest Sampler
-///  2 => Linear Sampler
-///  3 => Texture Sampler
 ///
 /// Set 1: Pass Bindings (For example point shadow project view matrices)
 ///
@@ -78,7 +74,9 @@ struct EngineContext {
     point_shadow_pass_context: PointShadowRenderPassContext,
     light_culling_pass_context: LightCullingPassContext,
     forward_pass_context: ForwardRenderPassContext,
+    cmaa2_pass_context: Cmaa2ComputePassContext,
     post_processing_pass_context: PostProcessingRenderPassContext,
+    screen_blit_pass_context: ScreenBlitRenderPassContext,
 
     interface_rectangle_drawer: InterfaceRectangleDrawer,
     picker_entity_drawer: PickerEntityDrawer,
@@ -94,10 +92,15 @@ struct EngineContext {
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
     forward_water_drawer: ForwardWaterDrawer,
+    cmaa2_edge_colors_dispatcher: Cmaa2EdgeColorsDispatcher,
+    cmaa2_calculate_dispatch_args_dispatcher: Cmaa2CalculateDispatchArgsDispatcher,
+    cmaa2_process_candidates_dispatcher: Cmaa2ProcessCandidatesDispatcher,
+    cmaa2_deferred_color_apply_dispatcher: Cmaa2DeferredColorApplyDispatcher,
     post_processing_effect_drawer: PostProcessingEffectDrawer,
     post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
     post_processing_rectangle_drawer: PostProcessingRectangleDrawer,
+    screen_blit_blitter_drawer: ScreenBlitBlitterDrawer,
     #[cfg(feature = "debug")]
     forward_aabb_drawer: ForwardAabbDrawer,
     #[cfg(feature = "debug")]
@@ -191,8 +194,11 @@ impl GraphicsEngine {
                         let light_culling_pass_context = LightCullingPassContext::new(&self.device, &self.queue, &global_context);
                         let forward_pass_context =
                             ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+                        let cmaa2_pass_context = Cmaa2ComputePassContext::new(&self.device, &self.queue, &global_context);
                         let post_processing_pass_context =
                             PostProcessingRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+                        let screen_blit_pass_context =
+                            ScreenBlitRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                     });
 
                     time_phase!("create computer and drawer", {
@@ -284,6 +290,18 @@ impl GraphicsEngine {
                             &global_context,
                             &forward_pass_context,
                         );
+                        let Cmaa2Resources {
+                            cmaa2_edge_colors_dispatcher,
+                            cmaa2_calculate_dispatch_args_dispatcher,
+                            cmaa2_process_candidates_dispatcher,
+                            cmaa2_deferred_color_apply_dispatcher,
+                        } = Cmaa2Resources::create(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &cmaa2_pass_context,
+                        );
                         let PostProcessingResources {
                             post_processing_effect_drawer,
                             post_processing_fxaa_drawer,
@@ -297,6 +315,13 @@ impl GraphicsEngine {
                             &self.queue,
                             &global_context,
                             &post_processing_pass_context,
+                        );
+                        let screen_blit_blitter_drawer = ScreenBlitBlitterDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &screen_blit_pass_context,
                         );
                         #[cfg(feature = "debug")]
                         let picker_marker_drawer = PickerMarkerDrawer::new(
@@ -316,7 +341,9 @@ impl GraphicsEngine {
                         point_shadow_pass_context,
                         light_culling_pass_context,
                         forward_pass_context,
+                        cmaa2_pass_context,
                         post_processing_pass_context,
+                        screen_blit_pass_context,
                         interface_rectangle_drawer,
                         picker_entity_drawer,
                         picker_tile_drawer,
@@ -326,15 +353,20 @@ impl GraphicsEngine {
                         point_shadow_model_drawer,
                         point_shadow_indicator_drawer,
                         point_shadow_entity_drawer,
+                        light_culling_dispatcher,
                         forward_entity_drawer,
                         forward_indicator_drawer,
                         forward_model_drawer,
+                        forward_water_drawer,
+                        cmaa2_edge_colors_dispatcher,
+                        cmaa2_calculate_dispatch_args_dispatcher,
+                        cmaa2_process_candidates_dispatcher,
+                        cmaa2_deferred_color_apply_dispatcher,
                         post_processing_effect_drawer,
                         post_processing_fxaa_drawer,
                         post_processing_blitter_drawer,
                         post_processing_rectangle_drawer,
-                        forward_water_drawer,
-                        light_culling_dispatcher,
+                        screen_blit_blitter_drawer,
                         #[cfg(feature = "debug")]
                         forward_aabb_drawer,
                         #[cfg(feature = "debug")]
@@ -403,7 +435,7 @@ impl GraphicsEngine {
         if let Some(engine_context) = self.engine_context.as_mut() {
             engine_context
                 .global_context
-                .update_screen_space_anti_aliasing(screen_space_anti_aliasing);
+                .update_screen_space_anti_aliasing(&self.device, screen_space_anti_aliasing);
         }
     }
 
@@ -428,6 +460,19 @@ impl GraphicsEngine {
                 &engine_context.forward_pass_context,
             );
 
+            let Cmaa2Resources {
+                cmaa2_edge_colors_dispatcher,
+                cmaa2_calculate_dispatch_args_dispatcher,
+                cmaa2_process_candidates_dispatcher,
+                cmaa2_deferred_color_apply_dispatcher,
+            } = Cmaa2Resources::create(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.cmaa2_pass_context,
+            );
+
             let PostProcessingResources {
                 post_processing_effect_drawer,
                 post_processing_fxaa_drawer,
@@ -446,6 +491,10 @@ impl GraphicsEngine {
             engine_context.forward_entity_drawer = forward_entity_drawer;
             engine_context.forward_indicator_drawer = forward_indicator_drawer;
             engine_context.forward_model_drawer = forward_model_drawer;
+            engine_context.cmaa2_edge_colors_dispatcher = cmaa2_edge_colors_dispatcher;
+            engine_context.cmaa2_calculate_dispatch_args_dispatcher = cmaa2_calculate_dispatch_args_dispatcher;
+            engine_context.cmaa2_process_candidates_dispatcher = cmaa2_process_candidates_dispatcher;
+            engine_context.cmaa2_deferred_color_apply_dispatcher = cmaa2_deferred_color_apply_dispatcher;
             engine_context.post_processing_effect_drawer = post_processing_effect_drawer;
             engine_context.post_processing_fxaa_drawer = post_processing_fxaa_drawer;
             engine_context.post_processing_blitter_drawer = post_processing_blitter_drawer;
@@ -860,34 +909,51 @@ impl GraphicsEngine {
             });
 
             // Post Processing Pass
-            let mut render_pass = match engine_context.global_context.screen_space_anti_aliasing {
+            let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
                 ScreenSpaceAntiAliasing::Off => {
-                    // We just blit the forward texture to the screen.
-                    let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        frame_view,
-                    );
+                    match engine_context.global_context.resolved_color_texture.as_ref() {
+                        Some(resolved_color_texture) => {
+                            // We need to resolve the multi sampled texture.
+                            let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                                &mut post_processing_encoder,
+                                &engine_context.global_context,
+                                resolved_color_texture,
+                            );
 
-                    let blitter_data = PostProcessingBlitterDrawData {
-                        source_texture: &engine_context.global_context.forward_color_texture,
-                        luma_in_alpha: false,
-                        alpha_blending: false,
-                    };
-                    engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+                            let blitter_data = PostProcessingBlitterDrawData {
+                                target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                                source_texture: &engine_context.global_context.forward_color_texture,
+                                luma_in_alpha: false,
+                                alpha_blending: false,
+                            };
+                            engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
 
-                    render_pass
+                            render_pass
+                        }
+                        None => {
+                            // We can re-use the forward color texture.
+                            engine_context.post_processing_pass_context.create_pass(
+                                &mut post_processing_encoder,
+                                &engine_context.global_context,
+                                &engine_context.global_context.forward_color_texture,
+                            )
+                        }
+                    }
                 }
                 ScreenSpaceAntiAliasing::Fxaa => {
+                    let AntiAliasingResource::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
+                        panic!("fxaa resources not set")
+                    };
+
                     // We blit the forward texture and calculate the luma in the alpha channel.
-                    // We then run FXAA, which in turn copied the forward texture to the screen.
                     let mut render_pass = engine_context.post_processing_pass_context.create_pass(
                         &mut post_processing_encoder,
                         &engine_context.global_context,
-                        engine_context.global_context.scratchpad_texture.get_texture_view(),
+                        &fxaa_resources.color_with_luma_texture,
                     );
 
                     let blitter_data = PostProcessingBlitterDrawData {
+                        target_texture_format: fxaa_resources.color_with_luma_texture.get_format(),
                         source_texture: &engine_context.global_context.forward_color_texture,
                         luma_in_alpha: true,
                         alpha_blending: false,
@@ -896,17 +962,88 @@ impl GraphicsEngine {
 
                     drop(render_pass);
 
+                    let color_texture = engine_context.global_context.get_color_texture();
+
                     let mut render_pass = engine_context.post_processing_pass_context.create_pass(
                         &mut post_processing_encoder,
                         &engine_context.global_context,
-                        frame_view,
+                        color_texture,
                     );
 
                     engine_context
                         .post_processing_fxaa_drawer
-                        .draw(&mut render_pass, &engine_context.global_context.scratchpad_texture);
+                        .draw(&mut render_pass, &fxaa_resources.color_with_luma_texture);
 
                     render_pass
+                }
+                ScreenSpaceAntiAliasing::Cmaa2 => {
+                    let AntiAliasingResource::Cmaa2(cmaa2_resources) = &engine_context.global_context.anti_aliasing_resources else {
+                        panic!("cmaa2 resources not set")
+                    };
+
+                    if let Some(resolved_color_texture) = engine_context.global_context.resolved_color_texture.as_ref() {
+                        // We need to resolve the MSAA texture.
+                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                            &mut post_processing_encoder,
+                            &engine_context.global_context,
+                            resolved_color_texture,
+                        );
+
+                        let blitter_data = PostProcessingBlitterDrawData {
+                            target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                            source_texture: &engine_context.global_context.forward_color_texture,
+                            luma_in_alpha: false,
+                            alpha_blending: false,
+                        };
+                        engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+                    };
+
+                    let mut compute_pass =
+                        engine_context
+                            .cmaa2_pass_context
+                            .create_pass(&mut post_processing_encoder, &engine_context.global_context, None);
+
+                    let color_input_texture = engine_context.global_context.get_color_texture();
+
+                    engine_context
+                        .cmaa2_edge_colors_dispatcher
+                        .dispatch(&mut compute_pass, color_input_texture);
+
+                    engine_context
+                        .cmaa2_calculate_dispatch_args_dispatcher
+                        .dispatch(&mut compute_pass, Cmaa2CalculateDispatchArgsDispatchData::ProcessCandidates);
+
+                    let process_candidates_data = Cmaa2ProcessCandidatesDispatcherDispatchData {
+                        color_input_texture,
+                        dispatch_indirect_args_buffer: &cmaa2_resources.indirect_buffer,
+                    };
+                    engine_context
+                        .cmaa2_process_candidates_dispatcher
+                        .dispatch(&mut compute_pass, process_candidates_data);
+
+                    engine_context
+                        .cmaa2_calculate_dispatch_args_dispatcher
+                        .dispatch(&mut compute_pass, Cmaa2CalculateDispatchArgsDispatchData::DeferredColorApply);
+
+                    let output_bind_group = &GlobalContext::create_cmaa2_output_bind_group(&self.device, color_input_texture);
+
+                    let deferred_color_apply_data = Cmaa2DeferredColorApplyDispatchData {
+                        dispatch_indirect_args_buffer: &cmaa2_resources.indirect_buffer,
+                        output_bind_group,
+                    };
+                    engine_context
+                        .cmaa2_deferred_color_apply_dispatcher
+                        .dispatch(&mut compute_pass, deferred_color_apply_data);
+
+                    drop(compute_pass);
+
+                    let color_texture = engine_context.global_context.get_color_texture();
+
+                    engine_context.post_processing_pass_context.create_pass(
+                        &mut post_processing_encoder,
+                        &engine_context.global_context,
+                        color_texture,
+                    )
                 }
             };
 
@@ -942,6 +1079,7 @@ impl GraphicsEngine {
 
             if instruction.show_interface {
                 let blitter_data = PostProcessingBlitterDrawData {
+                    target_texture_format: RENDER_TO_TEXTURE_FORMAT,
                     source_texture: &engine_context.global_context.interface_buffer_texture,
                     luma_in_alpha: false,
                     alpha_blending: true,
@@ -956,6 +1094,18 @@ impl GraphicsEngine {
             engine_context
                 .post_processing_rectangle_drawer
                 .draw(&mut render_pass, rectangle_data);
+
+            // We now can do the final blit to the surface texture.
+            drop(render_pass);
+            let mut render_pass = engine_context.screen_blit_pass_context.create_pass(
+                &mut post_processing_encoder,
+                &engine_context.global_context,
+                frame_view,
+            );
+
+            let color_texture = engine_context.global_context.get_color_texture();
+
+            engine_context.screen_blit_blitter_drawer.draw(&mut render_pass, color_texture);
         });
 
         (
@@ -1021,6 +1171,38 @@ impl ForwardResources {
             forward_aabb_drawer,
             #[cfg(feature = "debug")]
             forward_circle_drawer,
+        }
+    }
+}
+
+struct Cmaa2Resources {
+    cmaa2_edge_colors_dispatcher: Cmaa2EdgeColorsDispatcher,
+    cmaa2_calculate_dispatch_args_dispatcher: Cmaa2CalculateDispatchArgsDispatcher,
+    cmaa2_process_candidates_dispatcher: Cmaa2ProcessCandidatesDispatcher,
+    cmaa2_deferred_color_apply_dispatcher: Cmaa2DeferredColorApplyDispatcher,
+}
+
+impl Cmaa2Resources {
+    fn create(
+        capabilities: &Capabilities,
+        device: &Device,
+        queue: &Queue,
+        global_context: &GlobalContext,
+        cmaa2_pass_context: &Cmaa2ComputePassContext,
+    ) -> Self {
+        let cmaa2_edge_colors_dispatcher = Cmaa2EdgeColorsDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
+        let cmaa2_calculate_dispatch_args_dispatcher =
+            Cmaa2CalculateDispatchArgsDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
+        let cmaa2_process_candidates_dispatcher =
+            Cmaa2ProcessCandidatesDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
+        let cmaa2_deferred_color_apply_dispatcher =
+            Cmaa2DeferredColorApplyDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
+
+        Self {
+            cmaa2_edge_colors_dispatcher,
+            cmaa2_calculate_dispatch_args_dispatcher,
+            cmaa2_process_candidates_dispatcher,
+            cmaa2_deferred_color_apply_dispatcher,
         }
     }
 }

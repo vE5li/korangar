@@ -12,27 +12,32 @@ pub(crate) use effect::PostProcessingEffectDrawer;
 pub(crate) use fxaa::PostProcessingFxaaDrawer;
 pub(crate) use rectangle::{PostProcessingRectangleDrawData, PostProcessingRectangleDrawer, PostProcessingRectangleLayer};
 use wgpu::{
-    BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
-    StoreOp, TextureFormat, TextureView,
+    BindGroupLayout, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
+    StoreOp, TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
-use crate::graphics::GlobalContext;
+use crate::graphics::{AttachmentTexture, GlobalContext};
 use crate::loaders::TextureLoader;
 const PASS_NAME: &str = "post processing render pass";
 
 pub(crate) struct PostProcessingRenderPassContext {
-    surface_texture_format: TextureFormat,
+    color_texture_format: TextureFormat,
 }
 
 impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }>
     for PostProcessingRenderPassContext
 {
-    type PassData<'data> = &'data TextureView;
+    type PassData<'data> = &'data AttachmentTexture;
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
-        let surface_texture_format = global_context.surface_texture_format;
-        Self { surface_texture_format }
+        let color_texture_format = global_context
+            .resolved_color_texture
+            .as_ref()
+            .unwrap_or(&global_context.forward_color_texture)
+            .get_format();
+
+        Self { color_texture_format }
     }
 
     fn create_pass<'encoder>(
@@ -44,10 +49,10 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
         let mut pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
-                view: pass_data,
+                view: pass_data.get_texture_view(),
                 resolve_target: None,
                 ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
+                    load: LoadOp::Load,
                     store: StoreOp::Store,
                 },
             })],
@@ -65,7 +70,7 @@ impl RenderPassContext<{ BindGroupCount::One }, { ColorAttachmentCount::One }, {
     }
 
     fn color_attachment_formats(&self) -> [TextureFormat; 1] {
-        [self.surface_texture_format]
+        [self.color_texture_format]
     }
 
     fn depth_attachment_output_format(&self) -> [TextureFormat; 0] {

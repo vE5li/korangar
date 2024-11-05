@@ -2,19 +2,20 @@ use hashbrown::HashMap;
 use wgpu::{
     include_wgsl, BlendState, ColorTargetState, ColorWrites, Device, FragmentState, MultisampleState, PipelineCompilationOptions,
     PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor, ShaderModule,
-    ShaderModuleDescriptor, TextureSampleType, VertexState,
+    ShaderModuleDescriptor, TextureFormat, TextureSampleType, VertexState,
 };
 
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext, Msaa};
+use crate::graphics::{AttachmentTexture, Capabilities, GlobalContext, Msaa, FXAA_COLOR_LUMA_TEXTURE_FORMAT};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/blitter.wgsl");
 const SHADER_MSAA: ShaderModuleDescriptor = include_wgsl!("shader/blitter_msaa.wgsl");
 const DRAWER_NAME: &str = "post processing blitter";
 
 pub(crate) struct PostProcessingBlitterDrawData<'a> {
+    pub(crate) target_texture_format: TextureFormat,
     pub(crate) source_texture: &'a AttachmentTexture,
     pub(crate) luma_in_alpha: bool,
     pub(crate) alpha_blending: bool,
@@ -22,6 +23,7 @@ pub(crate) struct PostProcessingBlitterDrawData<'a> {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) struct PipelineKey {
+    format: TextureFormat,
     msaa: Msaa,
     luma_in_alpha: bool,
     alpha_blending: bool,
@@ -47,14 +49,25 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
         let mut pipeline_cache = HashMap::new();
 
-        for (msaa, luma_in_alpha, alpha_blending) in [
-            (global_context.msaa, false, false),
-            (global_context.msaa, true, false),
-            (Msaa::X4, false, true),
-        ] {
+        let surface_texture_format = global_context.surface_texture_format;
+        let color_texture_format = render_pass_context.color_attachment_formats()[0];
+
+        let mut modes = vec![
+            (surface_texture_format, Msaa::Off, false, false),
+            (color_texture_format, global_context.msaa, false, false),
+            (FXAA_COLOR_LUMA_TEXTURE_FORMAT, global_context.msaa, true, false),
+        ];
+        if !modes.contains(&(color_texture_format, Msaa::Off, false, false)) {
+            modes.push((color_texture_format, Msaa::Off, false, false));
+        }
+        if !modes.contains(&(color_texture_format, Msaa::X4, false, true)) {
+            modes.push((color_texture_format, Msaa::X4, false, true));
+        }
+
+        for (format, msaa, luma_in_alpha, alpha_blending) in modes {
             let pipeline = Self::create_pipeline(
                 device,
-                render_pass_context,
+                format,
                 &shader_module,
                 &msaa_module,
                 msaa,
@@ -63,6 +76,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             );
             pipeline_cache.insert(
                 PipelineKey {
+                    format,
                     msaa,
                     luma_in_alpha,
                     alpha_blending,
@@ -76,6 +90,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
         let key = PipelineKey {
+            format: draw_data.target_texture_format,
             msaa: draw_data.source_texture.get_texture().sample_count().into(),
             luma_in_alpha: draw_data.luma_in_alpha,
             alpha_blending: draw_data.alpha_blending,
@@ -91,7 +106,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 impl PostProcessingBlitterDrawer {
     fn create_pipeline(
         device: &Device,
-        render_pass_context: &PostProcessingRenderPassContext,
+        color_texture_format: TextureFormat,
         shader_module: &ShaderModule,
         msaa_module: &ShaderModule,
         msaa: Msaa,
@@ -149,7 +164,7 @@ impl PostProcessingBlitterDrawer {
                     ..Default::default()
                 },
                 targets: &[Some(ColorTargetState {
-                    format: render_pass_context.color_attachment_formats()[0],
+                    format: color_texture_format,
                     blend: if alpha_blending { Some(BlendState::ALPHA_BLENDING) } else { None },
                     write_mask: ColorWrites::default(),
                 })],

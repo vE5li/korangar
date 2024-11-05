@@ -21,7 +21,6 @@ struct InstanceData {
     texture_position: vec2<f32>,
     texture_size: vec2<f32>,
     texture_index: i32,
-    angle: f32,
     mirror: u32,
     identifier_high: u32,
     identifier_low: u32,
@@ -38,7 +37,6 @@ struct VertexOutput {
     @location(1) texture_index: i32,
     @location(2) identifier_high: u32,
     @location(3) identifier_low: u32,
-    @location(4) angle: f32,
 }
 
 struct FragmentOutput {
@@ -75,19 +73,12 @@ fn vs_main(
 
     output.identifier_high = instance.identifier_high;
     output.identifier_low = instance.identifier_low;
-    output.angle = instance.angle;
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
-    // Apply the rotation from action
-    let sin_factor = sin(input.angle);
-    let cos_factor = cos(input.angle);
-    let rotate = vec2(input.texture_coordinates.x - 0.5, input.texture_coordinates.y - 0.5) * mat2x2(cos_factor, sin_factor, -sin_factor, cos_factor);
-    let new_input = vec2(clamp(rotate.x + 0.5, 0.0, 1.0), clamp(rotate.y + 0.5, 0.0, 1.0));
-    let diffuse_color = textureSample(textures[input.texture_index], nearest_sampler, new_input);
-
+    let diffuse_color = textureSample(textures[input.texture_index], nearest_sampler, input.texture_coordinates);
     if (diffuse_color.a != 1.0) {
         discard;
     }

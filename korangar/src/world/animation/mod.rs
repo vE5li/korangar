@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Zero};
+use cgmath::{Array, EuclideanSpace, Matrix4, Point3, Transform, Vector2, Zero};
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::container::Cacheable;
 use ragnarok_packets::EntityId;
@@ -41,8 +41,6 @@ pub struct AnimationFrame {
     pub offset: Vector2<i32>,
     pub top_left: Vector2<i32>,
     pub size: Vector2<i32>,
-    /// Used for the final shift
-    pub remove_offset: Vector2<i32>,
     pub frame_parts: Vec<AnimationFramePart>,
 }
 
@@ -84,6 +82,9 @@ impl AnimationData {
         head_direction: usize,
         add_to_picker: bool,
     ) {
+        const TILE_SIZE: f32 = 10.0;
+        const SPRITE_SCALE: f32 = 1.4;
+
         let camera_direction = camera.camera_direction();
         let direction = (camera_direction + head_direction) % 8;
         let aa = animation_state.action * 8 + direction;
@@ -115,38 +116,35 @@ impl AnimationData {
             let sprite_number = frame_part.sprite_number;
             let texture = &self.animation_pair[animation_index].sprites.textures[sprite_number];
 
-            // The constant 10.0 is a magic scale factor of an image.
             // The vertex position is calculated from the center of image, so we need to
             // add half of the height.
             let position = Vector2::new(
-                animation.frames[0].offset.x as f32,
+                -animation.frames[0].offset.x as f32,
                 animation.frames[0].offset.y as f32 + ((animation.frames[time].size.y - 1) / 2) as f32,
-            ) / 10.0;
+            );
+            let origin = Point3::from_vec(position.extend(0.0)) * SPRITE_SCALE / TILE_SIZE;
+            let frame_size = Vector2::new(frame.size.x as f32, frame.size.y as f32);
+            let size = frame_size * SPRITE_SCALE / TILE_SIZE;
+            let world_matrix = camera.billboard_matrix(entity_position, origin, size);
 
-            let origin = Point3::new(-position.x, position.y, 0.0);
-            let scale = Vector2::from_value(0.7);
             let cell_count = Vector2::new(1, 1);
             let cell_position = Vector2::new(0, 0);
-            let size = Vector2::new(frame.size.x as f32 * scale.x / 10.0, frame.size.y as f32 * scale.y / 10.0);
-
-            let world_matrix = camera.billboard_matrix(entity_position, origin, size);
-            let affine_matrix = frame_part.affine_matrix;
             let texture_size = Vector2::new(1.0 / cell_count.x as f32, 1.0 / cell_count.y as f32);
             let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
-            let (depth_offset, curvature) = camera.calculate_depth_offset_and_curvature(&world_matrix, scale.x, scale.y);
+            let (depth_offset, curvature) = camera.calculate_depth_offset_and_curvature(&world_matrix, SPRITE_SCALE, SPRITE_SCALE);
 
             let position = world_matrix.transform_point(Point3::from_value(0.0));
             let distance = camera.distance_to(position);
 
             instructions.push(EntityInstruction {
                 world: world_matrix,
-                frame_part_transform: affine_matrix,
+                frame_part_transform: frame_part.affine_matrix,
                 texture_position,
                 texture_size,
+                frame_size,
                 depth_offset,
-                extra_depth_offset: 0.001 * index as f32,
+                extra_depth_offset: 0.005 * index as f32,
                 curvature,
-                angle: frame_part.angle,
                 color: frame_part.color,
                 mirror: frame_part.mirror,
                 entity_id,

@@ -95,7 +95,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         3 => "±Ã¼Ö",               // ARCHER
         4 => "¼ºÁ÷ÀÚ",             // ACOLYTE
         5 => "»ÓÀÎ",               // MERCHANT
-        6 => "ΜΜΜÏ",               // THIEF
+        6 => "µµµÏ",               // THIEF
         7 => "±â»ç",               // KNIGHT
         8 => "¼ºÅõ»ç",             // PRIEST
         9 => "¸¶¹Ý»Ç",             // WIZARD
@@ -119,7 +119,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4004 => "±Ã¼Ö",            // ARCHER_H
         4005 => "¼ºÁ÷ÀÚ",          // ACOLYTE_H
         4006 => "»ÓÀÎ",            // MERCHANT_H
-        4007 => "ΜΜΜÏ",            // THIEF_H
+        4007 => "µµµÏ",            // THIEF_H
         4008 => "·Îµå³ªÀÌÆ®",      // KNIGHT_H
         4009 => "ÇÏÀÌÇÁ¸®",        // PRIEST_H
         4010 => "ÇÏÀÌÀ§Àúµå",      // WIZARD_H

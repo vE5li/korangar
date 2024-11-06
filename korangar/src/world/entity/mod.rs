@@ -161,7 +161,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4057 => "¾ÆÅ©ºñ¼ó",        // ARCH_BISHOP
         4058 => "¹ÌÄÉ´Ð",          // MECHANIC
         4059 => "±æ·ÎÆ¾Å©·Î½º",    // GUILLOTINE_CROSS
-        4066 => "°¡ΜÅ",            // ROYAL_GUARD
+        4066 => "°¡µå",            // ROYAL_GUARD
         4067 => "¼Ò¼­·¯",           // SORCERER
         4068 => "¹Î½ºÆ®·²",        // MINSTREL
         4069 => "¿ø´õ·¯",          // WANDERER
@@ -174,7 +174,7 @@ fn get_sprite_path_for_player_job(job_id: usize) -> &'static str {
         4063 => "¾ÆÅ©ºñ¼ó",        // ARCH_BISHOP_H
         4064 => "¹ÌÄÉ´Ð",          // MECHANIC_H
         4065 => "±æ·ÎÆ¾Å©·Î½º",    // GUILLOTINE_CROSS_H
-        4073 => "°¡ΜÅ",            // ROYAL_GUARD_H
+        4073 => "°¡µÅ",            // ROYAL_GUARD_H
         4074 => "¼Ò¼­·¯",           // SORCERER_H
         4075 => "¹Î½ºÆ®·²",        // MINSTREL_H
         4076 => "¿ø´õ·¯",          // WANDERER_H

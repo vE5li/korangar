@@ -1,5 +1,6 @@
 //! A GRF file containing game assets.
 mod builder;
+mod mixcrypt;
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -14,6 +15,7 @@ use ragnarok_formats::archive::{AssetTable, FileTableRow, Header};
 use yazi::{decompress, Format};
 
 pub use self::builder::NativeArchiveBuilder;
+use crate::loaders::archive::native::mixcrypt::decrypt_file;
 use crate::loaders::archive::Archive;
 
 /// Represents a GRF file. GRF Files are an archive to store game assets.
@@ -72,14 +74,8 @@ impl Archive for NativeArchive {
     }
 
     fn get_file_by_path(&self, asset_path: &str) -> Option<Vec<u8>> {
-        self.file_table.get(asset_path).and_then(|file_information| {
+        self.file_table.get(asset_path).map(|file_information| {
             let mut compressed_file_buffer = vec![0u8; file_information.compressed_size_aligned as usize];
-
-            // TODO: Figure out what the GRF_FLAG_MIXCRYPT flag actually means and load the
-            // file correctly
-            if file_information.flags > 1 {
-                return None;
-            }
 
             let position = file_information.offset as u64 + Header::size_in_bytes() as u64;
 
@@ -93,10 +89,12 @@ impl Archive for NativeArchive {
                     .expect("Can't read archive content");
             }
 
+            decrypt_file(file_information, &mut compressed_file_buffer);
+
             let (uncompressed_file_buffer, _checksum) =
                 decompress(&compressed_file_buffer, Format::Zlib).expect("Can't decompress archive content");
 
-            Some(uncompressed_file_buffer)
+            uncompressed_file_buffer
         })
     }
 

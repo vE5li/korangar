@@ -16,10 +16,10 @@ pub use interface::InterfaceRenderer;
 #[cfg(feature = "debug")]
 pub use marker::DebugMarkerRenderer;
 
-#[cfg(feature = "debug")]
-use crate::graphics::Camera;
 use crate::graphics::{Color, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+#[cfg(feature = "debug")]
+use crate::world::Camera;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

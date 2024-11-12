@@ -21,14 +21,14 @@ use ragnarok_formats::map::{LightSettings, LightSource, SoundSource, Tile, TileF
 use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
-use super::{Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
+use super::{Camera, Entity, Object, PointLightId, PointLightManager, ResourceSet, ResourceSetBuffer};
 #[cfg(feature = "debug")]
 use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
-use crate::graphics::{Camera, EntityInstruction, IndicatorInstruction, ModelInstruction, Texture};
 #[cfg(feature = "debug")]
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, RenderSettings};
+use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
 #[cfg(feature = "debug")]

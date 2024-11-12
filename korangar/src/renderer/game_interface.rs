@@ -6,14 +6,14 @@ use cgmath::Point3;
 use cgmath::Vector2;
 use korangar_interface::application::FontSizeTrait;
 
-#[cfg(feature = "debug")]
-use crate::graphics::Camera;
 use crate::graphics::{Color, RectangleInstruction, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontSize, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::renderer::SpriteRenderer;
+#[cfg(feature = "debug")]
+use crate::world::Camera;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

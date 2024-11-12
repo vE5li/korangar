@@ -7,10 +7,11 @@ use korangar_interface::application::ClipTraitExt;
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 
-use super::{Camera, Color, Texture};
+use crate::graphics::{Color, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::TextureLoader;
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
+use crate::world::Camera;
 use crate::{Entity, Map};
 
 pub trait Particle {

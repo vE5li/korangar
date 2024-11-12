@@ -7,14 +7,12 @@ use ragnarok_packets::ClientTick;
 
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
-use crate::graphics::{
-    Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCamera, PointShadowCasterInstruction, Texture,
-};
+use crate::graphics::{Buffer, ModelInstruction, ModelVertex, PointLightInstruction, PointShadowCasterInstruction, Texture};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{Map, ObjectKey, ResourceSetBuffer};
+use crate::world::{Map, ObjectKey, PointShadowCamera, ResourceSetBuffer};
 use crate::{Camera, Color, NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS};
 
 pub trait LightSourceExt {

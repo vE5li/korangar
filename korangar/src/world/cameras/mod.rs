@@ -3,26 +3,24 @@ mod debug;
 mod directional_shadow;
 mod player;
 mod point_shadow;
+pub mod smoothed;
 mod start;
 
 use std::f32::consts::FRAC_PI_2;
 
 #[cfg(feature = "debug")]
 use cgmath::MetricSpace;
-use cgmath::{Angle, Array, EuclideanSpace, InnerSpace, Matrix4, Point3, Rad, Vector2, Vector3, Vector4};
+use cgmath::{Array, EuclideanSpace, InnerSpace, Matrix4, Point3, Vector2, Vector3, Vector4};
 
 #[cfg(feature = "debug")]
 pub use self::debug::DebugCamera;
 pub use self::directional_shadow::DirectionalShadowCamera;
 pub use self::player::PlayerCamera;
 pub use self::point_shadow::PointShadowCamera;
+pub use self::smoothed::SmoothedValue;
 pub use self::start::StartCamera;
-use crate::graphics::SmoothedValue;
 #[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
-
-/// The near-plane we use for all perspective projections.
-pub(super) const NEAR_PLANE: f32 = 1.0;
 
 /// The world space has a left-handed coordinate system where the Y axis is up.
 ///
@@ -174,51 +172,11 @@ fn direction(vector: Vector2<f32>) -> usize {
     }
 }
 
-/// Calculates an orthographic projection matrix for WebGPU or DirectX
-/// rendering.
-///
-/// This function generates a matrix that transforms from left-handed, y-up
-/// world space to left-handed, y-up clip space with a depth range of 0.0 (near)
-/// to 1.0 (far).
-fn orthographic_lh(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> Matrix4<f32> {
-    let width = 1.0 / (right - left);
-    let height = 1.0 / (top - bottom);
-    let depth = 1.0 / (far - near);
-
-    Matrix4::from_cols(
-        Vector4::new(width + width, 0.0, 0.0, 0.0),
-        Vector4::new(0.0, height + height, 0.0, 0.0),
-        Vector4::new(0.0, 0.0, depth, 0.0),
-        Vector4::new(-(left + right) * width, -(top + bottom) * height, -depth * near, 1.0),
-    )
-}
-
-/// Calculates a perspective projection matrix for WebGPU or DirectX rendering.
-///
-/// This uses "reverse Z" with an infinite z-axis which helps greatly with Z
-/// fighting and some approximate numerical computations.
-///
-/// This function generates a matrix that transforms from left-handed, y-up
-/// world space to left-handed, y-up clip space with a depth range of 0.0 (near)
-/// to 1.0 (far).
-fn perspective_reverse_lh(vertical_fov: Rad<f32>, aspect_ratio: f32) -> Matrix4<f32> {
-    let tangent = (vertical_fov / 2.0).tan();
-    let height = 1.0 / tangent;
-    let width = height / aspect_ratio;
-
-    Matrix4::from_cols(
-        Vector4::new(width, 0.0, 0.0, 0.0),
-        Vector4::new(0.0, height, 0.0, 0.0),
-        Vector4::new(0.0, 0.0, 0.0, 1.0),
-        Vector4::new(0.0, 0.0, NEAR_PLANE, 0.0),
-    )
-}
-
 #[cfg(test)]
 mod conversion {
     use cgmath::{assert_relative_eq, Vector4};
 
-    use crate::graphics::{Camera, PlayerCamera};
+    use crate::world::{Camera, PlayerCamera};
 
     #[test]
     fn clip_to_screen_space() {

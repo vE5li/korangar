@@ -2,7 +2,8 @@ use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4};
 
-use super::{orthographic_lh, Camera};
+use super::Camera;
+use crate::graphics::orthographic_lh;
 
 pub struct DirectionalShadowCamera {
     focus_point: Point3<f32>,

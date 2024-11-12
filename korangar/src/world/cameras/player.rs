@@ -2,7 +2,8 @@ use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 
-use super::{perspective_reverse_lh, Camera, SmoothedValue};
+use super::{Camera, SmoothedValue};
+use crate::graphics::perspective_reverse_lh;
 
 const ZOOM_SPEED: f32 = 2.0;
 const ROTATION_SPEED: f32 = 0.01;

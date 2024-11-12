@@ -4,9 +4,9 @@ use cgmath::{Array, Matrix4, Point3, Vector2, Zero};
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_packets::EntityId;
 
-use crate::graphics::{Camera, Color, EntityInstruction};
+use crate::graphics::{Color, EntityInstruction};
 use crate::loaders::{Actions, AnimationState, Sprite};
-use crate::world::EntityType;
+use crate::world::{Camera, EntityType};
 
 #[derive(Clone, PrototypeElement)]
 pub struct AnimationData {

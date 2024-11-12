@@ -13,7 +13,7 @@ use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Se
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
-use crate::graphics::{Camera, EntityInstruction};
+use crate::graphics::EntityInstruction;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
@@ -24,7 +24,7 @@ use crate::renderer::GameInterfaceRenderer;
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{AnimationData, Map};
+use crate::world::{AnimationData, Camera, Map};
 #[cfg(feature = "debug")]
 use crate::{Buffer, ModelVertex};
 

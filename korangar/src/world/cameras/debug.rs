@@ -2,7 +2,8 @@ use std::f32::consts::FRAC_PI_4;
 
 use cgmath::{Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 
-use super::{perspective_reverse_lh, Camera};
+use super::Camera;
+use crate::graphics::perspective_reverse_lh;
 
 const LOOK_AROUND_SPEED: f32 = 0.005;
 const FLY_SPEED_FAST: f32 = 1000.0;

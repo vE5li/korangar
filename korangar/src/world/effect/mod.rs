@@ -9,13 +9,13 @@ use ragnarok_formats::map::EffectSource;
 use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
 
-use crate::graphics::{Camera, Color, Texture};
+use crate::graphics::{Color, Texture};
 use crate::renderer::EffectRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{PointLightId, PointLightManager};
+use crate::world::{Camera, PointLightId, PointLightManager};
 
 pub trait EffectBase {
     fn update(&mut self, entities: &[crate::world::Entity], delta_time: f32) -> bool;

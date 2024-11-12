@@ -4,8 +4,9 @@ use cgmath::{Matrix2, Point3, Rad, Vector2};
 use korangar_interface::application::PositionTrait;
 use wgpu::BlendFactor;
 
-use crate::graphics::{Camera, Color, EffectInstruction, Texture};
+use crate::graphics::{Color, EffectInstruction, Texture};
 use crate::interface::layout::{ScreenPosition, ScreenSize};
+use crate::world::Camera;
 
 pub struct EffectRenderer {
     instructions: Vec<EffectInstruction>,

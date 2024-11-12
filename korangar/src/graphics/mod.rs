@@ -1,5 +1,4 @@
 mod buffer;
-mod cameras;
 mod capabilities;
 mod color;
 mod engine;
@@ -8,13 +7,12 @@ mod error;
 mod frame_pacer;
 mod graphic_settings;
 mod instruction;
-mod particles;
 mod passes;
 mod picker_target;
+mod projection;
 #[cfg(feature = "debug")]
 mod render_settings;
 mod sampler;
-mod smoothed;
 mod surface;
 mod texture;
 mod vertices;
@@ -33,7 +31,6 @@ use wgpu::{
 };
 
 pub use self::buffer::Buffer;
-pub use self::cameras::*;
 pub use self::capabilities::*;
 pub use self::color::*;
 pub use self::engine::{GraphicsEngine, GraphicsEngineDescriptor};
@@ -42,11 +39,10 @@ pub use self::error::error_handler;
 pub use self::frame_pacer::*;
 pub use self::graphic_settings::*;
 pub use self::instruction::*;
-pub use self::particles::*;
 pub use self::picker_target::PickerTarget;
+pub use self::projection::*;
 #[cfg(feature = "debug")]
 pub use self::render_settings::*;
-pub use self::smoothed::*;
 pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;

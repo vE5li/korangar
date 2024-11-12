@@ -1,19 +1,23 @@
 mod animation;
+mod cameras;
 mod effect;
 mod entity;
 mod light;
 mod map;
 mod model;
 mod object;
+mod particles;
 mod sound;
 
 pub use self::animation::*;
+pub use self::cameras::*;
 pub use self::effect::*;
 pub use self::entity::*;
 pub use self::light::*;
 pub use self::map::*;
 pub use self::model::*;
 pub use self::object::*;
+pub use self::particles::*;
 pub use self::sound::*;
 
 pub struct ResourceSetBuffer<K> {

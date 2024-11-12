@@ -2,9 +2,9 @@ use cgmath::Vector3;
 use ragnarok_formats::map::SoundSource;
 
 #[cfg(feature = "debug")]
-use crate::graphics::Camera;
-#[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
+#[cfg(feature = "debug")]
+use crate::world::Camera;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 

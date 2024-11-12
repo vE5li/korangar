@@ -13,11 +13,10 @@ use wgpu::{
     TextureViewDimension, VertexState,
 };
 
-use crate::graphics::cameras::NEAR_PLANE;
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, Drawer, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture, NEAR_PLANE};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");

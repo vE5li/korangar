@@ -118,8 +118,8 @@ impl FromBytes for String {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
         let mut value = String::new();
 
-        loop {
-            match byte_stream.byte::<Self>()? {
+        while let Ok(byte) = byte_stream.byte::<Self>() {
+            match byte {
                 0 => break,
                 byte => value.push(byte as char),
             }

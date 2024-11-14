@@ -66,7 +66,7 @@ impl ModelLoader {
     fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool) -> Vec<NativeModelVertex> {
         let mut native_vertices = Vec::new();
 
-        let array: [f32; 3] = node.scale.into();
+        let array: [f32; 3] = node.scale.unwrap().into();
         let reverse_node_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
 
         if reverse_node_order {
@@ -115,10 +115,10 @@ impl ModelLoader {
     }
 
     fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
-        let main = Matrix4::from_translation(node.translation1) * Matrix4::from(node.offset_matrix);
-
-        let scale_matrix = Matrix4::from_nonuniform_scale(node.scale.x, node.scale.y, node.scale.z);
-        let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis, Rad(node.rotation_angle));
+        let main = Matrix4::from_translation(node.translation1.unwrap()) * Matrix4::from(node.offset_matrix);
+        let scale = node.scale.unwrap();
+        let scale_matrix = Matrix4::from_nonuniform_scale(scale.x, scale.y, scale.z);
+        let rotation_matrix = Matrix4::from_axis_angle(node.rotation_axis.unwrap(), Rad(node.rotation_angle.unwrap()));
         let translation_matrix = Matrix4::from_translation(node.translation2);
 
         let transform = match node.rotation_keyframe_count > 0 {
@@ -247,6 +247,9 @@ impl ModelLoader {
         };
 
         // TODO: Temporary check until we support more versions.
+        // TODO: The model operation to scale keyframe is not implemented yet.
+        // TODO: The model operation to translate keyframe is not implemented yet.
+        // TODO: The model operation to modify texture keyframe is not implemented yet.
         let version: InternalVersion = model_data.version.into();
         if version.equals_or_above(2, 2) {
             #[cfg(feature = "debug")]
@@ -265,7 +268,7 @@ impl ModelLoader {
             .collect();
         let texture_mapping: Vec<i32> = (0..model_data.texture_names.len()).map(|index| index as i32).collect();
 
-        let root_node_name = &model_data.root_node_name;
+        let root_node_name = &model_data.root_node_name.clone().unwrap();
         let root_node = model_data
             .nodes
             .iter()

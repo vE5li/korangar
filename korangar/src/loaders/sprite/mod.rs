@@ -39,10 +39,18 @@ impl SpriteLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
 
-        let bytes = self
-            .game_file_loader
-            .get(&format!("data\\sprite\\{path}"))
-            .map_err(LoadError::File)?;
+        let bytes = match self.game_file_loader.get(&format!("data\\sprite\\{path}")) {
+            Ok(bytes) => bytes,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load sprite: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.get(FALLBACK_SPRITE_FILE);
+            }
+        };
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         let sprite_data = match SpriteData::from_bytes(&mut byte_stream) {

@@ -21,13 +21,6 @@ const LUA_GRF_FILE_NAME: &str = "lua_files/";
 #[cfg(not(feature = "patched_as_folder"))]
 const LUA_GRF_FILE_NAME: &str = "lua_files.grf";
 
-pub const FALLBACK_PNG_FILE: &str = "data\\texture\\missing.png";
-pub const FALLBACK_BMP_FILE: &str = "data\\texture\\missing.bmp";
-pub const FALLBACK_TGA_FILE: &str = "data\\texture\\missing.tga";
-pub const FALLBACK_MODEL_FILE: &str = "data\\model\\missing.rsm";
-pub const FALLBACK_SPRITE_FILE: &str = "data\\sprite\\npc\\missing.spr";
-pub const FALLBACK_ACTIONS_FILE: &str = "data\\sprite\\npc\\missing.act";
-
 /// Type implementing the game file loader.
 ///
 /// Currently, there are two types implementing
@@ -42,36 +35,12 @@ pub struct GameFileLoader {
 impl FileLoader for GameFileLoader {
     fn get(&self, path: &str) -> Result<Vec<u8>, FileNotFoundError> {
         let lowercase_path = path.to_lowercase();
-        let result = self
-            .archives
+        self.archives
             .read()
             .unwrap()
             .iter()
             .find_map(|archive| archive.get_file_by_path(&lowercase_path))
-            .ok_or(FileNotFoundError::new(path.to_owned()));
-
-        // TODO: should this be removed in the future or left in for resilience?
-        if result.is_err() {
-            #[cfg(feature = "debug")]
-            print_debug!("failed to find file {}; tying to replace it with placeholder", path);
-
-            let delimiter_position = path.len() - 4;
-            let extension = path[delimiter_position..].to_ascii_lowercase();
-
-            let fallback_file = match extension.as_str() {
-                ".png" => FALLBACK_PNG_FILE,
-                ".bmp" => FALLBACK_BMP_FILE,
-                ".tga" => FALLBACK_TGA_FILE,
-                ".rsm" => FALLBACK_MODEL_FILE,
-                ".spr" => FALLBACK_SPRITE_FILE,
-                ".act" => FALLBACK_ACTIONS_FILE,
-                _other => return result,
-            };
-
-            return self.get(fallback_file);
-        }
-
-        result
+            .ok_or_else(|| FileNotFoundError::new(path.to_owned()))
     }
 }
 

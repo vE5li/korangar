@@ -173,10 +173,18 @@ impl ActionLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load actions from {}", path.magenta()));
 
-        let bytes = self
-            .game_file_loader
-            .get(&format!("data\\sprite\\{path}"))
-            .map_err(LoadError::File)?;
+        let bytes = match self.game_file_loader.get(&format!("data\\sprite\\{path}")) {
+            Ok(bytes) => bytes,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load actions: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.get(FALLBACK_ACTIONS_FILE);
+            }
+        };
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         let actions_data = match ActionsData::from_bytes(&mut byte_stream) {

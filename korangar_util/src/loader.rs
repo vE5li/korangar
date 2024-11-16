@@ -1,5 +1,4 @@
 /// Error that is thrown when a file loader can't find the requested file.
-#[derive(Debug)]
 #[repr(transparent)]
 pub struct FileNotFoundError(String);
 
@@ -7,6 +6,12 @@ impl FileNotFoundError {
     /// Create a new [`FileNotFoundError`] with a given path.
     pub fn new(path: String) -> Self {
         Self(path)
+    }
+}
+
+impl std::fmt::Debug for FileNotFoundError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "can't find file: {}", self.0)
     }
 }
 

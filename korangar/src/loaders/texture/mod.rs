@@ -82,13 +82,29 @@ impl TextureLoader {
             ".png" => ImageFormat::Png,
             ".bmp" | ".BMP" => ImageFormat::Bmp,
             ".tga" | ".TGA" => ImageFormat::Tga,
-            extension => return Err(LoadError::UnsupportedFormat(extension.to_owned())),
+            _ => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("File with unknown image format found: {:?}", path);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.load_texture_data(FALLBACK_PNG_FILE);
+            }
         };
 
-        let file_data = self
-            .game_file_loader
-            .get(&format!("data\\texture\\{path}"))
-            .map_err(LoadError::File)?;
+        let file_data = match self.game_file_loader.get(&format!("data\\texture\\{path}")) {
+            Ok(file_data) => file_data,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load image: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.load_texture_data(FALLBACK_PNG_FILE);
+            }
+        };
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
 
         let mut image_buffer = match reader.decode() {

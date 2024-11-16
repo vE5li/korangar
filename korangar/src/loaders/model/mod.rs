@@ -227,10 +227,18 @@ impl ModelLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load rsm model from {}", model_file.magenta()));
 
-        let bytes = self
-            .game_file_loader
-            .get(&format!("data\\model\\{model_file}"))
-            .map_err(LoadError::File)?;
+        let bytes = match self.game_file_loader.get(&format!("data\\model\\{model_file}")) {
+            Ok(bytes) => bytes,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load model: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
+            }
+        };
         let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
 
         let model_data = match ModelData::from_bytes(&mut byte_stream) {

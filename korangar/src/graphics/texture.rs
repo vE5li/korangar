@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use derive_new::new;
 use hashbrown::HashMap;
+use korangar_util::container::Cacheable;
 use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
@@ -18,9 +19,16 @@ static TEXTURE_ID: AtomicU64 = AtomicU64::new(0);
 pub struct Texture {
     id: u64,
     label: Option<String>,
+    byte_size: usize,
     texture: wgpu::Texture,
     texture_view: TextureView,
     bind_group: BindGroup,
+}
+
+impl Cacheable for Texture {
+    fn size(&self) -> usize {
+        self.byte_size
+    }
 }
 
 impl Debug for Texture {
@@ -51,8 +59,12 @@ impl Texture {
             }],
         });
 
+        let size = texture.size();
+        let byte_size = size.width as usize * size.height as usize * texture.format().block_copy_size(None).unwrap() as usize;
+
         Self {
             id,
+            byte_size,
             label,
             texture,
             texture_view,
@@ -78,9 +90,13 @@ impl Texture {
             }],
         });
 
+        let size = texture.size();
+        let byte_size = size.width as usize * size.height as usize * texture.format().block_copy_size(None).unwrap() as usize;
+
         Self {
             id,
             label,
+            byte_size,
             texture,
             texture_view,
             bind_group,
@@ -89,6 +105,10 @@ impl Texture {
 
     pub fn get_id(&self) -> u64 {
         self.id
+    }
+
+    pub fn get_byte_size(&self) -> usize {
+        self.byte_size
     }
 
     pub fn get_size(&self) -> Extent3d {

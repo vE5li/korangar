@@ -1,9 +1,9 @@
 use std::cmp::{max, min};
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Vector2};
-use derive_new::new;
-use hashbrown::HashMap;
+use korangar_util::container::SimpleCache;
 use num::Zero;
 
 use super::error::LoadError;
@@ -11,14 +11,23 @@ use crate::loaders::{ActionLoader, SpriteLoader};
 use crate::world::{Animation, AnimationData, AnimationFrame, AnimationFramePart, AnimationPair};
 use crate::{Color, EntityType};
 
-// TODO: NHA Create and use an easier to use cache.
-#[derive(new)]
+const MAX_CACHE_COUNT: u32 = 256;
+const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
+
 pub struct AnimationLoader {
-    #[new(default)]
-    cache: HashMap<Vec<String>, Arc<AnimationData>>,
+    cache: SimpleCache<Vec<String>, Arc<AnimationData>>,
 }
 
 impl AnimationLoader {
+    pub fn new() -> Self {
+        Self {
+            cache: SimpleCache::new(
+                NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+                NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+            ),
+        }
+    }
+
     pub fn load(
         &mut self,
         sprite_loader: &mut SpriteLoader,
@@ -274,7 +283,7 @@ impl AnimationLoader {
             entity_type,
         });
 
-        self.cache.insert(entity_part_files.to_vec(), animation_data.clone());
+        self.cache.insert(entity_part_files.to_vec(), animation_data.clone()).unwrap();
 
         Ok(animation_data)
     }

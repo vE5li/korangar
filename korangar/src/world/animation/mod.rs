@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use cgmath::{Array, Matrix4, Point3, Vector2, Zero};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::container::Cacheable;
 use ragnarok_packets::EntityId;
 
 use crate::graphics::{Color, EntityInstruction};
@@ -15,6 +16,12 @@ pub struct AnimationData {
     pub delays: Vec<f32>,
     #[hidden_element]
     pub entity_type: EntityType,
+}
+
+impl Cacheable for AnimationData {
+    fn size(&self) -> usize {
+        size_of_val(self)
+    }
 }
 
 #[derive(Clone, PrototypeElement)]

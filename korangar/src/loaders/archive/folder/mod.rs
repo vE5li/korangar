@@ -62,10 +62,10 @@ impl Archive for FolderArchive {
         self.file_mapping.get(asset_path).and_then(|file_path| fs::read(file_path).ok())
     }
 
-    fn get_lua_files(&self, lua_files: &mut Vec<String>) {
-        let files = self.file_mapping.keys().filter(|file_name| file_name.ends_with(".lub")).cloned();
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
+        let found_files = self.file_mapping.keys().filter(|file_name| file_name.ends_with(extension)).cloned();
 
-        lua_files.extend(files);
+        files.extend(found_files);
     }
 }
 

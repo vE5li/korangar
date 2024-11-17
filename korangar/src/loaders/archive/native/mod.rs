@@ -100,13 +100,13 @@ impl Archive for NativeArchive {
         })
     }
 
-    fn get_lua_files(&self, lua_files: &mut Vec<String>) {
-        let files = self
+    fn get_files_with_extension(&self, files: &mut Vec<String>, extension: &str) {
+        let found_files = self
             .file_table
             .iter()
-            .filter(|(file_name, row)| file_name.ends_with(".lub") && row.flags == 0x01)
+            .filter(|(file_name, row)| file_name.ends_with(extension) && row.flags == 0x01)
             .map(|(file_name, _)| file_name.clone());
 
-        lua_files.extend(files);
+        files.extend(found_files);
     }
 }

@@ -107,12 +107,14 @@ impl GameFileLoader {
     fn patch_lua_files(&self) {
         use lunify::{unify, Format, Settings};
 
+        const LUA_BYTECODE_EXTENSION: &str = ".lub";
+
         let mut lua_files = Vec::new();
         self.archives
             .read()
             .unwrap()
             .iter()
-            .for_each(|archive| archive.get_lua_files(&mut lua_files));
+            .for_each(|archive| archive.get_files_with_extension(&mut lua_files, LUA_BYTECODE_EXTENSION));
 
         let path = Path::new(LUA_GRF_FILE_NAME);
         let mut lua_archive: Box<dyn Writable> = match GameFileLoader::get_archive_type_by_path(path) {

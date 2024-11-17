@@ -29,7 +29,7 @@ use kira::{Frame, Volume};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use korangar_util::collision::{KDTree, Sphere};
-use korangar_util::container::{Cacheable, GenerationalSlab, ResourceCache, SimpleSlab};
+use korangar_util::container::{Cacheable, GenerationalSlab, SimpleCache, SimpleSlab};
 use korangar_util::{create_generational_key, create_simple_key, FileLoader};
 use rayon::spawn;
 
@@ -108,7 +108,7 @@ struct EngineContext<F> {
     async_response_sender: Sender<AsyncLoadResult>,
     background_music_track: TrackHandle,
     background_music_track_mapping: HashMap<String, String>,
-    cache: ResourceCache<SoundEffectKey, CachedSoundEffect>,
+    cache: SimpleCache<SoundEffectKey, CachedSoundEffect>,
     current_background_music_track: Option<BackgroundMusicTrack>,
     cycling_ambient: HashMap<AmbientKey, PlayingAmbient>,
     game_file_loader: Arc<F>,
@@ -154,7 +154,7 @@ impl<F: FileLoader> AudioEngine<F> {
             .add_listener(position, orientation, ListenerSettings { track: ambient_track.id() })
             .expect("Can't create ambient listener");
         let loading_sound_effect = HashSet::new();
-        let cache = ResourceCache::new(
+        let cache = SimpleCache::new(
             NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
             NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
         );
@@ -239,7 +239,7 @@ impl<F: FileLoader> AudioEngine<F> {
             let _ = context.lookup.remove(&path);
         }
         context.loading_sound_effect.remove(&sound_effect_key);
-        let _ = context.cache.remove(sound_effect_key);
+        let _ = context.cache.remove(&sound_effect_key);
     }
 
     /// Sets the global volume.
@@ -390,11 +390,9 @@ impl<F: FileLoader> EngineContext<F> {
     fn play_sound_effect(&mut self, sound_effect_key: SoundEffectKey) {
         if let Some(data) = self
             .cache
-            .get(sound_effect_key)
+            .get(&sound_effect_key)
             .map(|cached_sound_effect| cached_sound_effect.0.clone())
         {
-            self.cache.touch(sound_effect_key);
-
             let data = data.output_destination(&self.sound_effect_track);
             if let Err(_error) = self.manager.play(data.clone()) {
                 #[cfg(feature = "debug")]
@@ -455,11 +453,9 @@ impl<F: FileLoader> EngineContext<F> {
             let sound_effect_key = sound_config.sound_effect_key;
             if let Some(data) = self
                 .cache
-                .get(sound_effect_key)
+                .get(&sound_effect_key)
                 .map(|cached_sound_effect| cached_sound_effect.0.clone())
             {
-                self.cache.touch(sound_effect_key);
-
                 let data = adjust_ambient_sound(data, &emitter_handle, sound_config);
                 match self.manager.play(data.clone()) {
                     Ok(handle) => {
@@ -637,7 +633,7 @@ impl<F: FileLoader> EngineContext<F> {
 
             let Some(data) = self
                 .cache
-                .get(queued.sound_effect_key)
+                .get(&queued.sound_effect_key)
                 .map(|cached_sound_effect| cached_sound_effect.0.clone())
             else {
                 // Sound effect not loaded yet.

@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
-use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::container::{Cacheable, SimpleCache};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
@@ -16,6 +16,9 @@ use crate::graphics::Texture;
 use crate::loaders::error::LoadError;
 use crate::loaders::GameFileLoader;
 
+const MAX_CACHE_COUNT: u32 = 512;
+const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
+
 #[derive(Clone, Debug, PrototypeElement)]
 pub struct Sprite {
     pub palette_size: usize,
@@ -25,16 +28,32 @@ pub struct Sprite {
     sprite_data: SpriteData,
 }
 
-#[derive(new)]
+impl Cacheable for Sprite {
+    fn size(&self) -> usize {
+        self.textures.iter().map(|t| t.get_byte_size()).sum()
+    }
+}
+
 pub struct SpriteLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
-    #[new(default)]
-    cache: HashMap<String, Arc<Sprite>>,
+    cache: SimpleCache<String, Arc<Sprite>>,
 }
 
 impl SpriteLoader {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: Arc<GameFileLoader>) -> Self {
+        Self {
+            device,
+            queue,
+            game_file_loader,
+            cache: SimpleCache::new(
+                NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+                NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+            ),
+        }
+    }
+
     fn load(&mut self, path: &str) -> Result<Arc<Sprite>, LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load sprite from {}", path.magenta()));
@@ -149,7 +168,7 @@ impl SpriteLoader {
             #[cfg(feature = "debug")]
             sprite_data: cloned_sprite_data,
         });
-        self.cache.insert(path.to_string(), sprite.clone());
+        let _ = self.cache.insert(path.to_string(), sprite.clone());
 
         #[cfg(feature = "debug")]
         timer.stop();

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::ops::Mul;
 use std::sync::Arc;
 
@@ -7,6 +7,7 @@ use derive_new::new;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::container::{Cacheable, SimpleCache};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
@@ -20,6 +21,9 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{GameFileLoader, FALLBACK_ACTIONS_FILE};
 use crate::renderer::SpriteRenderer;
+
+const MAX_CACHE_COUNT: u32 = 256;
+const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
 
 #[derive(Clone, Debug, new)]
 pub struct AnimationState {
@@ -156,16 +160,26 @@ impl Actions {
         }
     }
 }
+
+impl Cacheable for Actions {
+    fn size(&self) -> usize {
+        size_of_val(&self.actions)
+    }
+}
+
 pub struct ActionLoader {
     game_file_loader: Arc<GameFileLoader>,
-    cache: HashMap<String, Arc<Actions>>,
+    cache: SimpleCache<String, Arc<Actions>>,
 }
 
 impl ActionLoader {
     pub fn new(game_file_loader: Arc<GameFileLoader>) -> Self {
         Self {
             game_file_loader,
-            cache: HashMap::new(),
+            cache: SimpleCache::new(
+                NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+                NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+            ),
         }
     }
 
@@ -206,7 +220,7 @@ impl ActionLoader {
             actions_data: saved_actions_data,
         });
 
-        self.cache.insert(path.to_string(), sprite.clone());
+        self.cache.insert(path.to_string(), sprite.clone()).unwrap();
 
         #[cfg(feature = "debug")]
         timer.stop();

@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
 use cgmath::Deg;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::container::SimpleCache;
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteStream, FromBytes};
 use ragnarok_formats::effect::EffectData;
@@ -16,16 +17,22 @@ use crate::graphics::Color;
 use crate::loaders::GameFileLoader;
 use crate::world::{AnimationType, Effect, Frame, FrameType, Layer, MultiTexturePresent};
 
+const MAX_CACHE_COUNT: u32 = 512;
+const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
+
 pub struct EffectLoader {
     game_file_loader: Arc<GameFileLoader>,
-    cache: HashMap<String, Arc<Effect>>,
+    cache: SimpleCache<String, Arc<Effect>>,
 }
 
 impl EffectLoader {
     pub fn new(game_file_loader: Arc<GameFileLoader>) -> Self {
         Self {
             game_file_loader,
-            cache: HashMap::new(),
+            cache: SimpleCache::new(
+                NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+                NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+            ),
         }
     }
 
@@ -141,7 +148,7 @@ impl EffectLoader {
                 .collect(),
         ));
 
-        self.cache.insert(path.to_string(), effect.clone());
+        self.cache.insert(path.to_string(), effect.clone()).unwrap();
 
         #[cfg(feature = "debug")]
         timer.stop();

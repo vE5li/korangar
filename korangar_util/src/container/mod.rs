@@ -55,15 +55,16 @@ macro_rules! create_generational_key {
 
 mod generational_slab;
 mod lru;
-mod resource_cache;
+mod simple_cache;
 mod simple_slab;
 
 use std::num::{NonZeroU32, NonZeroUsize};
-use std::sync::atomic::{AtomicU32, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
+use std::sync::Arc;
 
 pub use generational_slab::{GenerationalIter, GenerationalKey, GenerationalSlab, SecondaryGenerationalSlab};
 pub(crate) use lru::Lru;
-pub use resource_cache::ResourceCache;
+pub use simple_cache::SimpleCache;
 pub use simple_slab::{SecondarySimpleSlab, SimpleIterator, SimpleKey, SimpleSlab};
 
 /// Something that can be cached.
@@ -76,6 +77,12 @@ pub trait Cacheable {
 impl Cacheable for Vec<u8> {
     fn size(&self) -> usize {
         self.len()
+    }
+}
+
+impl<T: Cacheable> Cacheable for Arc<T> {
+    fn size(&self) -> usize {
+        self.as_ref().size()
     }
 }
 
@@ -98,7 +105,6 @@ pub struct Statistics {
     max_count: NonZeroU32,
     size: AtomicUsize,
     max_size: NonZeroUsize,
-    version: AtomicU64,
 }
 
 /// Returns a snapshot view of the statistics.
@@ -112,8 +118,6 @@ pub struct Snapshot {
     pub size: usize,
     /// The maximal size of values inside the cache.
     pub max_size: usize,
-    /// The current version of the cache.
-    pub version: u64,
 }
 
 impl Statistics {
@@ -124,7 +128,6 @@ impl Statistics {
             max_count: self.max_count.get(),
             size: self.size.load(Ordering::Acquire),
             max_size: self.max_size.get(),
-            version: self.version.load(Ordering::Acquire),
         }
     }
 }

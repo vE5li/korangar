@@ -1,5 +1,6 @@
-use std::collections::HashMap;
 use std::hash::Hash;
+
+use hashbrown::HashMap;
 
 use crate::collision::aligned_plane::{AlignedPlane, Axis};
 use crate::collision::AABB;

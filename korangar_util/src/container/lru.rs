@@ -33,7 +33,7 @@ impl<I, V> Entry<I, V> {
 
 /// An LRU cache strategy that tracks the usage of its items and the overall
 /// size they represent.
-pub struct Lru<I, V = ()> {
+pub struct Lru<I, V> {
     pointer: NonNull<Entry<I, V>>,
     entries: SecondaryGenerationalSlab<I, *mut Entry<I, V>>,
     list: *mut Entry<I, V>,
@@ -96,22 +96,11 @@ impl<I: GenerationalKey + Copy, V> Lru<I, V> {
     }
 
     #[inline]
-    pub(crate) fn contains_key(&self, key: I) -> bool {
-        self.entries.contains_key(key)
-    }
-
-    #[inline]
     pub(crate) fn touch(&mut self, key: I) {
         if let Some(node_pointer) = self.entries.get_mut(key).copied() {
             self.detach(node_pointer);
             self.attach(node_pointer);
         }
-    }
-
-    #[inline]
-    pub(crate) fn get(&self, key: I) -> Option<&V> {
-        let node_pointer = self.entries.get(key)?;
-        unsafe { (*(*node_pointer)).value.as_ref() }
     }
 
     pub(crate) fn put(&mut self, key: I, value: V, size: usize) -> bool {

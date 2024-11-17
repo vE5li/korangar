@@ -1,11 +1,12 @@
 use std::io::Cursor;
+use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
-use derive_new::new;
 use hashbrown::HashMap;
 use image::{EncodableLayout, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, TextureAtlas};
 use korangar_util::FileLoader;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
@@ -15,16 +16,29 @@ use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
 use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
 
-#[derive(new)]
+const MAX_CACHE_COUNT: u32 = 512;
+const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
+
 pub struct TextureLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
-    #[new(default)]
-    cache: Mutex<HashMap<String, Arc<Texture>>>,
+    cache: Mutex<SimpleCache<String, Arc<Texture>>>,
 }
 
 impl TextureLoader {
+    pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: Arc<GameFileLoader>) -> Self {
+        Self {
+            device,
+            queue,
+            game_file_loader,
+            cache: Mutex::new(SimpleCache::new(
+                NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
+                NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
+            )),
+        }
+    }
+
     fn create(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
@@ -51,7 +65,12 @@ impl TextureLoader {
     fn load(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
         let texture_data = self.load_texture_data(path)?;
         let texture = self.create(path, texture_data);
-        self.cache.lock().as_mut().unwrap().insert(path.to_string(), texture.clone());
+        self.cache
+            .lock()
+            .as_mut()
+            .unwrap()
+            .insert(path.to_string(), texture.clone())
+            .unwrap();
         Ok(texture)
     }
 
@@ -107,8 +126,8 @@ impl TextureLoader {
     }
 
     pub fn get(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
-        let lock = self.cache.lock();
-        match lock.as_ref().unwrap().get(path) {
+        let mut lock = self.cache.lock();
+        match lock.as_mut().unwrap().get(path) {
             Some(texture) => Ok(texture.clone()),
             None => {
                 // We need to drop to avoid a deadlock here.

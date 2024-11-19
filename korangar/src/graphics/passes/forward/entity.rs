@@ -36,8 +36,9 @@ pub(crate) struct InstanceData {
     angle: f32,
     curvature: f32,
     mirror: u32,
+    opaque: u32,
     texture_index: i32,
-    padding: [u32; 2],
+    padding: u32,
 }
 
 pub(crate) struct ForwardEntityDrawer {
@@ -265,6 +266,7 @@ impl Prepare for ForwardEntityDrawer {
                     depth_offset: instruction.depth_offset,
                     curvature: instruction.curvature,
                     mirror: instruction.mirror as u32,
+                    opaque: instruction.opaque as u32,
                     texture_index,
                     padding: Default::default(),
                 });
@@ -289,6 +291,7 @@ impl Prepare for ForwardEntityDrawer {
                     depth_offset: instruction.depth_offset,
                     curvature: instruction.curvature,
                     mirror: instruction.mirror as u32,
+                    opaque: instruction.opaque as u32,
                     texture_index: 0,
                     padding: Default::default(),
                 });

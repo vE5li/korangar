@@ -113,6 +113,7 @@ impl AnimationData {
             let animation_index = frame_part.animation_index;
             let sprite_number = frame_part.sprite_number;
             let texture = &self.animation_pair[animation_index].sprites.textures[sprite_number];
+            let opaque = &self.animation_pair[animation_index].sprites.vec_opaque[sprite_number];
 
             // The constant 10.0 is a magic scale factor of an image.
             // The vertex position is calculated from the center of image, so we need to
@@ -145,6 +146,7 @@ impl AnimationData {
                 angle: frame_part.angle,
                 color: frame_part.color,
                 mirror: frame_part.mirror,
+                opaque: **opaque && (frame_part.color.alpha == 1.0),
                 entity_id,
                 texture: texture.clone(),
             });

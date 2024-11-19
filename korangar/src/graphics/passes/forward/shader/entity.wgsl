@@ -38,6 +38,7 @@ struct InstanceData {
     angle: f32,
     curvature: f32,
     mirror: u32,
+    opaque: u32,
     texture_index: i32,
 }
 
@@ -63,6 +64,7 @@ struct VertexOutput {
     @location(6) @interpolate(flat) original_curvature: f32,
     @location(7) angle: f32,
     @location(8) color: vec4<f32>,
+    @location(9) opaque: u32,
 }
 
 struct FragmentOutput {
@@ -118,6 +120,7 @@ fn vs_main(
     output.original_curvature = instance.curvature;
     output.angle = instance.angle;
     output.color = instance.color;
+    output.opaque = instance.opaque;
     return output;
 }
 
@@ -129,13 +132,14 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let rotate = vec2(input.texture_coordinates.x - 0.5, input.texture_coordinates.y - 0.5) * mat2x2(cos_factor, sin_factor, -sin_factor, cos_factor);
     let texture_coordinates = vec2(clamp(rotate.x + 0.5, 0.0, 1.0), clamp(rotate.y + 0.5, 0.0, 1.0));
 
-    let diffuse_color = textureSample(texture, texture_sampler, texture_coordinates);
+    var diffuse_color = textureSample(texture, texture_sampler, texture_coordinates);
     let alpha_channel = textureSample(texture, nearest_sampler, texture_coordinates).a;
 
     if (alpha_channel == 0.0) {
         discard;
     }
 
+    diffuse_color.a = select(diffuse_color.a, 1.0, input.opaque != 0u);
     // Calculate which tile this fragment belongs to
     let pixel_position = vec2<u32>(floor(input.position.xy));
     let tile_x = pixel_position.x / TILE_SIZE;

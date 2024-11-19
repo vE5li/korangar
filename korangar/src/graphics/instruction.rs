@@ -185,6 +185,7 @@ pub struct EntityInstruction {
     pub color: Color,
     pub mirror: bool,
     pub entity_id: EntityId,
+    pub opaque: bool,
     pub texture: Arc<Texture>,
 }
 

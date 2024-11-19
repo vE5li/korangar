@@ -1,6 +1,7 @@
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
+use image::{Pixel, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
@@ -24,6 +25,8 @@ pub struct Sprite {
     pub palette_size: usize,
     #[hidden_element]
     pub textures: Vec<Arc<Texture>>,
+    #[hidden_element]
+    pub vec_opaque: Vec<Arc<bool>>,
     #[cfg(feature = "debug")]
     sprite_data: SpriteData,
 }
@@ -89,33 +92,7 @@ impl SpriteLoader {
         let cloned_sprite_data = sprite_data.clone();
 
         let palette = sprite_data.palette.unwrap(); // unwrap_or_default() as soon as i know what
-
-        let rgba_images: Vec<RgbaImageData> = sprite_data
-            .rgba_image_data
-            .iter()
-            .map(|image_data| {
-                // Revert the rows, the image is flipped upside down
-                // Convert the pixel from ABGR format to RGBA format
-                let width = image_data.width;
-                let data = image_data
-                    .data
-                    .chunks_exact(4 * width as usize)
-                    .rev()
-                    .flat_map(|pixels| {
-                        pixels
-                            .chunks_exact(4)
-                            .flat_map(|pixel| [pixel[3], pixel[2], pixel[1], pixel[0]])
-                            .collect::<Vec<u8>>()
-                    })
-                    .collect();
-
-                RgbaImageData {
-                    width: image_data.width,
-                    height: image_data.height,
-                    data,
-                }
-            })
-            .collect();
+        let mut vec_opaque = Vec::new();
 
         // TODO: Move this to an extension trait in `korangar_loaders`.
         pub fn color_bytes(palette: &PaletteColor, index: u8) -> [u8; 4] {
@@ -136,17 +113,49 @@ impl SpriteLoader {
                 .flat_map(|palette_index| color_bytes(&palette.colors[*palette_index as usize], *palette_index))
                 .collect();
 
-            RgbaImageData {
+            let rgba_image_data = RgbaImageData {
                 width: image_data.width,
                 height: image_data.height,
                 data,
-            }
+            };
+            let is_opaque = SpriteLoader::is_opaque(&rgba_image_data);
+            (SpriteLoader::recolor_border(rgba_image_data), is_opaque)
         });
         let palette_size = palette_images.len();
 
+        let rgba_images: Vec<(RgbaImageData, bool)> = sprite_data
+            .rgba_image_data
+            .iter()
+            .map(|image_data| {
+                // Revert the rows, the image is flipped upside down
+                // Convert the pixel from ABGR format to RGBA format
+                let width = image_data.width;
+                let data = image_data
+                    .data
+                    .chunks_exact(4 * width as usize)
+                    .rev()
+                    .flat_map(|pixels| {
+                        pixels
+                            .chunks_exact(4)
+                            .flat_map(|pixel| [pixel[3], pixel[2], pixel[1], pixel[0]])
+                            .collect::<Vec<u8>>()
+                    })
+                    .collect();
+
+                let rgba_image_data = RgbaImageData {
+                    width: image_data.width,
+                    height: image_data.height,
+                    data,
+                };
+                let is_opaque = SpriteLoader::is_opaque(&rgba_image_data);
+                (SpriteLoader::recolor_border(rgba_image_data), is_opaque)
+            })
+            .collect();
+
         let textures = palette_images
             .chain(rgba_images)
-            .map(|image_data| {
+            .map(|(image_data, is_opaque)| {
+                vec_opaque.push(Arc::new(is_opaque));
                 let texture = Texture::new_with_data(
                     &self.device,
                     &self.queue,
@@ -175,6 +184,7 @@ impl SpriteLoader {
             textures,
             #[cfg(feature = "debug")]
             sprite_data: cloned_sprite_data,
+            vec_opaque,
         });
         let _ = self.cache.insert(path.to_string(), sprite.clone());
 
@@ -189,5 +199,90 @@ impl SpriteLoader {
             Some(sprite) => Ok(sprite.clone()),
             None => self.load(path),
         }
+    }
+
+    // Recolor the transparent border with the mean of adjacent color.
+    fn recolor_border(rgba_image_data: RgbaImageData) -> RgbaImageData {
+        let rgba_image = RgbaImage::from_raw(
+            rgba_image_data.width as u32,
+            rgba_image_data.height as u32,
+            rgba_image_data.data,
+        )
+        .unwrap();
+
+        let mut rgba_image_result = rgba_image.clone();
+
+        let pixel_width = rgba_image_data.width as u32;
+        let pixel_height = rgba_image_data.height as u32;
+        let width = rgba_image_data.width as i32;
+        let height = rgba_image_data.height as i32;
+
+        for x in 0..pixel_width {
+            let x_i32 = x as i32;
+            for y in 0..pixel_height {
+                let pixel = rgba_image.get_pixel(x, y).channels();
+                if pixel[3] != 0 {
+                    continue;
+                }
+                let y_i32 = y as i32;
+                let mut total_r = 0;
+                let mut total_g = 0;
+                let mut total_b = 0;
+                let mut pixel_count = 0;
+                for dx in -1..=1 {
+                    for dy in -1..=1 {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let nx = x_i32 + dx;
+                        let ny = y_i32 + dy;
+                        if 0 <= nx && nx < width && 0 <= ny && ny < height {
+                            let close_pixel = rgba_image.get_pixel(nx as u32, ny as u32).channels();
+                            if close_pixel[3] != 0 {
+                                total_r += close_pixel[0] as u32;
+                                total_g += close_pixel[1] as u32;
+                                total_b += close_pixel[2] as u32;
+                                pixel_count += 1;
+                            }
+                        }
+                    }
+                }
+                if pixel_count != 0 {
+                    let mean_r = total_r / pixel_count;
+                    let mean_g = total_g / pixel_count;
+                    let mean_b = total_b / pixel_count;
+                    let color = Rgba([mean_r as u8, mean_g as u8, mean_b as u8, 0]);
+                    rgba_image_result.put_pixel(x, y, color);
+                }
+            }
+        }
+
+        RgbaImageData {
+            width: rgba_image_data.width,
+            height: rgba_image_data.height,
+            data: rgba_image_result.into_raw(),
+        }
+    }
+
+    fn is_opaque(rgba_image_data: &RgbaImageData) -> bool {
+        let rgba_image = RgbaImage::from_raw(
+            rgba_image_data.width as u32,
+            rgba_image_data.height as u32,
+            rgba_image_data.data.clone(),
+        )
+        .unwrap();
+
+        let pixel_width = rgba_image_data.width as u32;
+        let pixel_height = rgba_image_data.height as u32;
+
+        for x in 0..pixel_width {
+            for y in 0..pixel_height {
+                let pixel = rgba_image.get_pixel(x, y).channels();
+                if pixel[3] != 0 && pixel[3] != 255 {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 }

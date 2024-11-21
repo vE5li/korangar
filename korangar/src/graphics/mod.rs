@@ -62,6 +62,7 @@ const LIGHT_TILE_SIZE: u32 = 16;
 /// Bot requirements are needed at the same time, since we want to be able to
 /// re-use the forward color texture, if possible.
 pub const RENDER_TO_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+pub const RENDER_TO_TEXTURE_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
 pub const INTERFACE_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 pub const FXAA_COLOR_LUMA_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
@@ -527,12 +528,12 @@ impl GlobalContext {
             TextureFormat::Rg32Uint,
             AttachmentTextureType::PickerAttachment,
         );
-        let picker_depth_texture = picker_factory.new_attachment("depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
+        let picker_depth_texture = picker_factory.new_attachment("depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
 
         let (forward_color_texture, forward_depth_texture) =
             Self::create_forward_texture(device, screen_size, msaa, screen_space_anti_aliasing);
 
-        let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 4, None);
+        let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
 
         let interface_buffer_texture = interface_screen_factory.new_attachment(
             "interface buffer",
@@ -588,7 +589,7 @@ impl GlobalContext {
 
         let factory = AttachmentTextureFactory::new(device, screen_size, msaa.sample_count(), None);
         let color_texture = factory.new_attachment("forward color", RENDER_TO_TEXTURE_FORMAT, texture_type);
-        let depth_texture = factory.new_attachment("forward depth", TextureFormat::Depth32Float, AttachmentTextureType::Depth);
+        let depth_texture = factory.new_attachment("forward depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
         (color_texture, depth_texture)
     }
 

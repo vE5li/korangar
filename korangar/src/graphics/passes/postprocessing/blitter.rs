@@ -60,8 +60,8 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
         if !modes.contains(&(color_texture_format, Msaa::Off, false, false)) {
             modes.push((color_texture_format, Msaa::Off, false, false));
         }
-        if !modes.contains(&(color_texture_format, Msaa::X4, false, true)) {
-            modes.push((color_texture_format, Msaa::X4, false, true));
+        if !modes.contains(&(color_texture_format, Msaa::Off, false, true)) {
+            modes.push((color_texture_format, Msaa::Off, false, true));
         }
 
         for (format, msaa, luma_in_alpha, alpha_blending) in modes {

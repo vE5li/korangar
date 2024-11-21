@@ -371,6 +371,6 @@ impl std::ops::Mul<f32> for CornerRadius {
 
 impl From<CornerRadius> for [f32; 4] {
     fn from(val: CornerRadius) -> Self {
-        [val.top_left, val.top_right, val.bottom_right, val.bottom_left]
+        [val.top_left, val.top_right, val.bottom_left, val.bottom_right]
     }
 }

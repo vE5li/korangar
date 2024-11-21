@@ -32,10 +32,10 @@ struct InstanceData {
     screen_size: [f32; 2],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
-    aspect_ratio: f32,
     rectangle_type: u32,
     texture_index: i32,
     smooth: u32,
+    padding: u32,
 }
 
 pub(crate) struct InterfaceRectangleDrawer {
@@ -191,13 +191,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             }),
             multiview: None,
             primitive: Default::default(),
-            multisample: MultisampleState {
-                // We render the interface always with 4x MSAA.
-                // This makes sure to remove hard edges in the GUI elements.
-                // 4x MSAA is guaranteed by WebGPU spec to be available.
-                count: 4,
-                ..Default::default()
-            },
+            multisample: MultisampleState::default(),
             depth_stencil: None,
             cache: None,
         });
@@ -269,7 +263,6 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_clip,
                         color,
                         corner_radius,
-                        aspect_ratio,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
@@ -279,10 +272,10 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: [0.0, 0.0],
                             texture_size: [1.0, 1.0],
-                            aspect_ratio: *aspect_ratio,
                             rectangle_type: 0,
                             texture_index: 0,
                             smooth: 0,
+                            padding: 0,
                         });
                     }
                     InterfaceRectangleInstruction::Sprite {
@@ -312,10 +305,10 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: [0.0, 0.0],
                             texture_size: [1.0, 1.0],
-                            aspect_ratio: 0.0,
                             rectangle_type: 1,
                             texture_index,
                             smooth: *smooth as u32,
+                            padding: 0,
                         });
                     }
                     InterfaceRectangleInstruction::Text {
@@ -334,10 +327,10 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: (*texture_position).into(),
                             texture_size: (*texture_size).into(),
-                            aspect_ratio: 0.0,
                             rectangle_type: 2,
                             texture_index: 0,
                             smooth: 1,
+                            padding: 0,
                         });
                     }
                 }
@@ -364,7 +357,6 @@ impl Prepare for InterfaceRectangleDrawer {
                         screen_clip,
                         color,
                         corner_radius,
-                        aspect_ratio,
                     } => {
                         self.instance_data.push(InstanceData {
                             color: color.components_linear(),
@@ -374,10 +366,10 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: [0.0, 0.0],
                             texture_size: [1.0, 1.0],
-                            aspect_ratio: *aspect_ratio,
                             rectangle_type: 0,
                             texture_index: 0,
                             smooth: 0,
+                            padding: 0,
                         });
                     }
                     InterfaceRectangleInstruction::Sprite {
@@ -396,10 +388,10 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: [0.0, 0.0],
                             texture_size: [1.0, 1.0],
-                            aspect_ratio: 0.0,
                             rectangle_type: 1,
                             texture_index: 0,
                             smooth: *smooth as u32,
+                            padding: 0,
                         });
                     }
                     InterfaceRectangleInstruction::Text {
@@ -418,10 +410,10 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: (*texture_position).into(),
                             texture_size: (*texture_size).into(),
-                            aspect_ratio: 0.0,
                             rectangle_type: 2,
                             texture_index: 0,
                             smooth: 1,
+                            padding: 0,
                         });
                     }
                 }

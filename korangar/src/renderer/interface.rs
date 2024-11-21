@@ -69,22 +69,22 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         &self,
         position: <InterfaceSettings as Application>::Position,
         size: <InterfaceSettings as Application>::Size,
-        clip: <InterfaceSettings as Application>::Clip,
+        screen_clip: <InterfaceSettings as Application>::Clip,
         corner_radius: <InterfaceSettings as Application>::CornerRadius,
         color: <InterfaceSettings as Application>::Color,
     ) {
         let screen_position = position / self.window_size;
         let screen_size = size / self.window_size;
-        let pixel_size = 1.0 / self.window_size.height;
-        let corner_radius = corner_radius * pixel_size;
+        // TODO: NHA It seems that corners are currently defined as "double" their
+        //       actual size. We currently compensate for that.
+        let corner_radius = corner_radius * 0.5;
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Solid {
             screen_position,
             screen_size,
-            screen_clip: clip,
+            screen_clip,
             color,
             corner_radius,
-            aspect_ratio: self.window_size.height / self.window_size.width,
         });
     }
 

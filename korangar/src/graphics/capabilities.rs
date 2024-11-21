@@ -4,7 +4,7 @@ use std::num::NonZeroU32;
 use korangar_debug::logging::{print_debug, Colorize};
 use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
 
-use crate::graphics::Msaa;
+use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FORMAT};
 
 const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
 const MAX_TEXTURE_SIZE: u32 = 8192;
@@ -26,7 +26,7 @@ impl Capabilities {
 
         // We need to test all textures that we use for MSAA
         // which sample count they support.
-        let supported_msaa = determine_supported_msaa(adapter, &[TextureFormat::Depth32Float, TextureFormat::Rgba8UnormSrgb]);
+        let supported_msaa = determine_supported_msaa(adapter, &[RENDER_TO_TEXTURE_FORMAT, RENDER_TO_TEXTURE_DEPTH_FORMAT]);
 
         let mut capabilities = Self {
             supported_msaa,

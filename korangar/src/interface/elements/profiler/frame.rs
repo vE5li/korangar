@@ -103,8 +103,9 @@ impl Element<InterfaceSettings> for FrameView {
 
         let (entries, statistics_map, longest_frame) = korangar_debug::profiling::get_statistics_data(*self.visible_thread.get());
 
-        let bar_width = (self.state.cached_size.width - 50.0) / entries.len() as f32;
-        let gap_width = 50.0 / entries.len() as f32;
+        let gap_width = 1.0;
+        let total_gaps = (entries.len() - 1) as f32 * gap_width;
+        let bar_width = (self.state.cached_size.width - total_gaps) / entries.len() as f32;
         let height_unit = self.state.cached_size.height / longest_frame.as_secs_f32();
         let mut x_position = 0.0;
         let mut color_lookup = super::ColorLookup::default();

@@ -121,7 +121,6 @@ pub enum InterfaceRectangleInstruction {
         screen_clip: ScreenClip,
         color: Color,
         corner_radius: CornerRadius,
-        aspect_ratio: f32,
     },
     Sprite {
         screen_position: ScreenPosition,

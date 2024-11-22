@@ -93,7 +93,7 @@ fn draw_solid(
     }
 
     // Convert normalized screen space coordinates to pixel space.
-    let window_size = vec2<f32>(global_uniforms.screen_size);
+    let window_size = vec2<f32>(global_uniforms.screen_size) * 2.0;
     let position = fragment_position * window_size;
     let screen_position = instance.screen_position * window_size;
     let screen_size = instance.screen_size * window_size;
@@ -120,8 +120,8 @@ fn draw_solid(
     );
 
     // Apply smoothing using screen space derivatives.
-    let pixel_size = length(vec2(dpdx(distance), dpdy(distance))) * 2.0;
-    let alpha = smoothstep(0.5, -0.5, distance / pixel_size);
+    let pixel_size = length(vec2(dpdx(distance), dpdy(distance)));
+    let alpha = smoothstep(1.0, -1.0, distance / pixel_size);
 
     return vec4<f32>(instance.color.rgb, instance.color.a * alpha);
 }

@@ -27,7 +27,7 @@ const FONT_FAMILY_NAME: &str = "WenQuanYi Micro Hei";
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct FontSize(f32);
+pub struct FontSize(pub f32);
 
 impl ArrayType for FontSize {
     type Element = f32;

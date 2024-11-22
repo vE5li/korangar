@@ -533,7 +533,7 @@ impl GlobalContext {
         let (forward_color_texture, forward_depth_texture) =
             Self::create_forward_texture(device, screen_size, msaa, screen_space_anti_aliasing);
 
-        let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
+        let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size * 2.0, 1, None);
 
         let interface_buffer_texture = interface_screen_factory.new_attachment(
             "interface buffer",

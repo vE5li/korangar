@@ -3,12 +3,12 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cgmath::EuclideanSpace;
-use korangar_interface::application::Application;
+use korangar_interface::application::{Application, FontSizeTrait};
 
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, GlyphInstruction, TextLayout, TextureLoader};
+use crate::loaders::{FontLoader, FontSize, GlyphInstruction, TextLayout, TextureLoader};
 use crate::renderer::SpriteRenderer;
 
 /// Renders the interface provided by 'korangar_interface'.
@@ -19,11 +19,11 @@ pub struct InterfaceRenderer {
     unchecked_box_texture: Arc<Texture>,
     expanded_arrow_texture: Arc<Texture>,
     collapsed_arrow_texture: Arc<Texture>,
-    window_size: ScreenSize,
+    interface_size: ScreenSize,
 }
 
 impl InterfaceRenderer {
-    pub fn new(window_size: ScreenSize, font_loader: Rc<RefCell<FontLoader>>, texture_loader: &TextureLoader) -> Self {
+    pub fn new(interface_size: ScreenSize, font_loader: Rc<RefCell<FontLoader>>, texture_loader: &TextureLoader) -> Self {
         let instructions = RefCell::new(Vec::default());
 
         let checked_box_texture = texture_loader.get("checked_box.png").unwrap();
@@ -38,7 +38,7 @@ impl InterfaceRenderer {
             unchecked_box_texture,
             expanded_arrow_texture,
             collapsed_arrow_texture,
-            window_size,
+            interface_size: interface_size * 2.0,
         }
     }
 
@@ -50,8 +50,8 @@ impl InterfaceRenderer {
         self.instructions.borrow()
     }
 
-    pub fn update_window_size(&mut self, window_size: ScreenSize) {
-        self.window_size = window_size;
+    pub fn update_interface_size(&mut self, interface_size: ScreenSize) {
+        self.interface_size = interface_size * 2.0;
     }
 }
 
@@ -75,11 +75,13 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         corner_radius: <InterfaceSettings as Application>::CornerRadius,
         color: <InterfaceSettings as Application>::Color,
     ) {
-        let screen_position = position / self.window_size;
-        let screen_size = size / self.window_size;
+        let screen_position = (position * 2.0) / self.interface_size;
+        let screen_size = (size * 2.0) / self.interface_size;
+        let screen_clip = screen_clip * 2.0;
+
         // TODO: NHA It seems that corners are currently defined as "double" their
         //       actual size. We currently compensate for that.
-        let corner_radius = corner_radius * 0.5;
+        let corner_radius = (corner_radius * 0.5) * 2.0;
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Solid {
             screen_position,
@@ -98,6 +100,10 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         color: <InterfaceSettings as Application>::Color,
         font_size: <InterfaceSettings as Application>::FontSize,
     ) -> f32 {
+        let text_position = text_position * 2.0;
+        let screen_clip = screen_clip * 2.0;
+        let font_size = FontSize::new(font_size.0 * 2.0);
+
         let mut font_loader = self.font_loader.borrow_mut();
         let TextLayout { glyphs, size } = font_loader.get(text, color, font_size, 1.0, screen_clip.right - text_position.left);
 
@@ -110,12 +116,12 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
                 let screen_position = ScreenPosition {
                     left: text_position.left + position.min.x as f32,
                     top: text_position.top + position.min.y as f32,
-                } / self.window_size;
+                } / self.interface_size;
 
                 let screen_size = ScreenSize {
                     width: position.width() as f32,
                     height: position.height() as f32,
-                } / self.window_size;
+                } / self.interface_size;
 
                 let texture_position = texture_coordinate.min.to_vec();
                 let texture_size = texture_coordinate.max - texture_coordinate.min;
@@ -178,8 +184,9 @@ impl SpriteRenderer for InterfaceRenderer {
         smooth: bool,
     ) {
         // Normalize screen_position and screen_size in range 0.0 and 1.0.
-        let screen_position = position / self.window_size;
-        let screen_size = size / self.window_size;
+        let screen_position = (position * 2.0) / self.interface_size;
+        let screen_size = (size * 2.0) / self.interface_size;
+        let screen_clip = screen_clip * 2.0;
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sprite {
             screen_position,

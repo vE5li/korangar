@@ -2328,7 +2328,7 @@ impl ApplicationHandler for Client {
                 let screen_size = screen_size.max(PhysicalSize::new(1, 1)).into();
                 self.graphics_engine.on_resize(screen_size);
                 self.interface.update_window_size(screen_size);
-                self.interface_renderer.update_window_size(screen_size);
+                self.interface_renderer.update_interface_size(screen_size);
                 self.bottom_interface_renderer.update_window_size(screen_size);
                 self.middle_interface_renderer.update_window_size(screen_size);
                 self.top_interface_renderer.update_window_size(screen_size);

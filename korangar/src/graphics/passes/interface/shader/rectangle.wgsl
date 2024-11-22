@@ -113,18 +113,35 @@ fn draw_solid(
         return instance.color;
     }
 
-    let distance = rectangle_sdf(
-        relative_position,
-        half_screen_size,
-        corner_radius,
-    );
-
-    // Apply smoothing using screen space derivatives.
-    let pixel_size = length(vec2(dpdx(distance), dpdy(distance))) * 2.0;
-    let alpha = smoothstep(0.5, -0.5, distance / pixel_size);
+    var total = 0.0;
+    for (var i = 0u; i < 16u; i++) {
+        let offset = SAMPLE_OFFSETS[i];
+        let d = rectangle_sdf(relative_position + offset, half_screen_size, corner_radius);
+        total += step(0.0, -d);
+    }
+    let alpha = total / 16.0;
 
     return vec4<f32>(instance.color.rgb, instance.color.a * alpha);
 }
+
+const SAMPLE_OFFSETS: array<vec2<f32>, 16> = array<vec2<f32>, 16>(
+    vec2<f32>( 0.000,  0.000),
+    vec2<f32>( 0.375,  0.924),
+    vec2<f32>( 0.924,  0.375),
+    vec2<f32>( 0.924, -0.375),
+    vec2<f32>( 0.375, -0.924),
+    vec2<f32>(-0.375, -0.924),
+    vec2<f32>(-0.924, -0.375),
+    vec2<f32>(-0.924,  0.375),
+    vec2<f32>(-0.375,  0.924),
+    vec2<f32>( 0.476,  0.476),
+    vec2<f32>( 0.476, -0.476),
+    vec2<f32>(-0.476, -0.476),
+    vec2<f32>(-0.476,  0.476),
+    vec2<f32>( 0.000,  0.500),
+    vec2<f32>( 0.500,  0.000),
+    vec2<f32>( 0.000, -0.500)
+);
 
 fn draw_sprite(
     instance: InstanceData,

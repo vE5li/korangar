@@ -2035,6 +2035,17 @@ impl Client {
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
             self.map
                 .render_entities(&mut self.entity_instructions, entities, current_camera, true);
+            // TODO - OPAQUE: Separate entity_instruction into opaque and semi-transparent.
+            // For opaque pipeline, disable alpha blending; for semi-transparent pipeline,
+            // enable alpha blending.
+            self.entity_instructions.sort_by(|a, b| {
+                if a.opaque == b.opaque {
+                    // As we use reverse depth offset, the comparisor is inverted
+                    a.depth_offset.partial_cmp(&b.depth_offset).unwrap()
+                } else {
+                    b.opaque.cmp(&a.opaque)
+                }
+            });
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
             self.map.render_water(&mut map_water_vertex_buffer);

@@ -142,7 +142,10 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
         discard;
     }
 
+    // TODO - OPAQUE: The correct way is to have a pass without blending for opaque entity framepart
+    // and a pass with blending for semi-transparent entity framepart.
     diffuse_color.a = select(diffuse_color.a, 1.0, input.opaque != 0u);
+
     // Calculate which tile this fragment belongs to
     let pixel_position = vec2<u32>(floor(input.position.xy));
     let tile_x = pixel_position.x / TILE_SIZE;

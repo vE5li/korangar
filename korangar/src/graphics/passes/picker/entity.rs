@@ -214,6 +214,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
 impl Prepare for PickerEntityDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
+        // TODO: Pass the player size directly
         let player_size = 2;
         self.draw_count = instructions.entities.len().saturating_sub(player_size);
 
@@ -232,7 +233,7 @@ impl Prepare for PickerEntityDrawer {
             // We skip the first entity, because we don't want the player entity to show up
             // in the picker buffer.
             // TODO: Remove the player entity correctly.
-            for instruction in instructions.entities.iter().skip(player_size) {
+            for instruction in instructions.entities.iter().filter(|instruction| instruction.pickerable == true) {
                 let picker_target = PickerTarget::Entity(instruction.entity_id);
                 let (identifier_high, identifier_low) = picker_target.into();
 
@@ -267,7 +268,7 @@ impl Prepare for PickerEntityDrawer {
             // We skip the first entity, because we don't want the player entity to show up
             // in the picker buffer.
             // TODO: Remove the player entity correctly.
-            for instruction in instructions.entities.iter().skip(player_size) {
+            for instruction in instructions.entities.iter().filter(|instruction| instruction.pickerable == true) {
                 let picker_target = PickerTarget::Entity(instruction.entity_id);
                 let (identifier_high, identifier_low) = picker_target.into();
 

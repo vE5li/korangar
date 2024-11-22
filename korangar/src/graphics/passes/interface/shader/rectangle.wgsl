@@ -24,7 +24,6 @@ struct InstanceData {
     texture_size: vec2<f32>,
     rectangle_type: u32,
     texture_index: i32,
-    linear_filtering: u32,
 }
 
 struct VertexOutput {
@@ -69,38 +68,53 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         return vec4<f32>(0.0);
     }
 
+    var color: vec4<f32> = instance.color;
+
     switch (instance.rectangle_type) {
-        case 0u: {
-            return draw_solid(instance, input.fragment_position);
-        }
         case 1u: {
-            return draw_sprite(instance, input.texture_coordinates);
+            // Sprite (linear filtering)
+            color *= textureSample(texture, linear_sampler, input.texture_coordinates);
         }
-        default: {
-            return draw_text(instance, input.texture_coordinates);
+        case 2u: {
+            // Sprite (nearest filtering)
+            color *= textureSample(texture, nearest_sampler, input.texture_coordinates);
         }
+        case 3u: {
+            // Text (coverage)
+            color.a *= textureSample(font_atlas, linear_sampler, input.texture_coordinates).r;
+        }
+        default: {}
     }
+
+    return rectangle_with_rounded_edges(
+        instance.corner_radius,
+        instance.screen_position,
+        instance.screen_size,
+        input.fragment_position,
+        color
+    );
 }
 
-fn draw_solid(
-    instance: InstanceData,
-    fragment_position: vec2<f32>
+fn rectangle_with_rounded_edges(
+    corner_radii: vec4<f32>,
+    screen_position: vec2<f32>,
+    screen_size: vec2<f32>,
+    fragment_position: vec2<f32>,
+    color: vec4<f32>,
 ) -> vec4<f32> {
-    let corner_radii = instance.corner_radius;
-
     if (all(corner_radii == vec4<f32>(0.0))) {
-        return instance.color;
+        return color;
     }
 
     // Convert normalized screen space coordinates to pixel space.
     let window_size = vec2<f32>(global_uniforms.screen_size);
     let position = fragment_position * window_size;
-    let screen_position = instance.screen_position * window_size;
-    let screen_size = instance.screen_size * window_size;
+    let origin = screen_position * window_size;
+    let size = screen_size * window_size;
 
     // Calculate position relative to rectangle center.
-    let half_screen_size = screen_size * 0.5;
-    let rectangle_center = screen_position + half_screen_size;
+    let half_size = size * 0.5;
+    let rectangle_center = origin + half_size;
     let relative_position = position - rectangle_center;
 
     // Determine which corner radius to use based on the quadrant this fragment is in.
@@ -110,12 +124,12 @@ fn draw_solid(
     let corner_radius = select(radii_pair.x, radii_pair.y, is_right);
 
     if (corner_radius == 0.0) {
-        return instance.color;
+        return color;
     }
 
     let distance = rectangle_sdf(
         relative_position,
-        half_screen_size,
+        half_size,
         corner_radius,
     );
 
@@ -123,30 +137,7 @@ fn draw_solid(
     let pixel_size = length(vec2(dpdx(distance), dpdy(distance))) * 2.0;
     let alpha = smoothstep(0.5, -0.5, distance / pixel_size);
 
-    return vec4<f32>(instance.color.rgb, instance.color.a * alpha);
-}
-
-fn draw_sprite(
-    instance: InstanceData,
-    texture_coordinates: vec2<f32>,
-) -> vec4<f32> {
-    var color: vec4<f32>;
-
-    if instance.linear_filtering == 0u {
-        color = textureSample(texture, nearest_sampler, texture_coordinates);
-    } else {
-        color = textureSample(texture, linear_sampler, texture_coordinates);
-    }
-
-    return color * instance.color;
-}
-
-fn draw_text(
-    instance: InstanceData,
-    texture_coordinates: vec2<f32>,
-) -> vec4<f32> {
-    let coverage = textureSample(font_atlas, linear_sampler, texture_coordinates).r;
-    return vec4<f32>(instance.color.rgb, coverage * instance.color.a);
+    return vec4<f32>(color.rgb, color.a * alpha);
 }
 
 // Optimized version of the following truth table:

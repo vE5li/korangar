@@ -127,6 +127,7 @@ pub enum InterfaceRectangleInstruction {
         screen_size: ScreenSize,
         screen_clip: ScreenClip,
         color: Color,
+        corner_radius: CornerRadius,
         texture: Arc<Texture>,
         smooth: bool,
     },

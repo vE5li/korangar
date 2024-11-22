@@ -7,7 +7,7 @@ use korangar_interface::application::Application;
 
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::application::InterfaceSettings;
-use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
+use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 use crate::loaders::{FontLoader, TextureLoader};
 use crate::renderer::SpriteRenderer;
 
@@ -173,12 +173,14 @@ impl SpriteRenderer for InterfaceRenderer {
         // Normalize screen_position and screen_size in range 0.0 and 1.0.
         let screen_position = position / self.window_size;
         let screen_size = size / self.window_size;
+        let corner_radius = CornerRadius::default();
 
         self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sprite {
             screen_position,
             screen_size,
             screen_clip,
             color,
+            corner_radius,
             texture,
             smooth,
         });

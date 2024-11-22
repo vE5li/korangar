@@ -1,4 +1,4 @@
-use cgmath::{Point3, Vector2};
+use cgmath::{EuclideanSpace, Point2, Point3, Vector2};
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
@@ -222,10 +222,10 @@ pub fn generate_tile_vertices(
                 let tile_type_index = TryInto::<u8>::try_into(tile.flags).unwrap() as usize;
                 let atlas_allocation = tile_texture_mapping[tile_type_index];
 
-                let first_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(0.0, 0.0));
-                let second_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(0.0, 1.0));
-                let third_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(1.0, 1.0));
-                let fourth_texture_coordinates = atlas_allocation.map_to_atlas(Vector2::new(1.0, 0.0));
+                let first_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(0.0, 0.0)).to_vec();
+                let second_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(0.0, 1.0)).to_vec();
+                let third_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(1.0, 1.0)).to_vec();
+                let fourth_texture_coordinates = atlas_allocation.map_to_atlas(Point2::new(1.0, 0.0)).to_vec();
 
                 tile_vertices.push(ModelVertex::new(
                     first_position,

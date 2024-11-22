@@ -2,13 +2,13 @@ use std::cell::{Ref, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use cgmath::Vector2;
+use cgmath::EuclideanSpace;
 use korangar_interface::application::Application;
 
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, TextureLoader};
+use crate::loaders::{FontLoader, GlyphInstruction, TextLayout, TextureLoader};
 use crate::renderer::SpriteRenderer;
 
 /// Renders the interface provided by 'korangar_interface'.
@@ -62,7 +62,9 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         font_size: <InterfaceSettings as Application>::FontSize,
         available_width: f32,
     ) -> <InterfaceSettings as Application>::Size {
-        self.font_loader.borrow().get_text_dimensions(text, font_size, available_width)
+        self.font_loader
+            .borrow_mut()
+            .get_text_dimensions(text, font_size, 1.0, available_width)
     }
 
     fn render_rectangle(
@@ -91,40 +93,45 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
     fn render_text(
         &self,
         text: &str,
-        position: <InterfaceSettings as Application>::Position,
-        clip: <InterfaceSettings as Application>::Clip,
+        text_position: <InterfaceSettings as Application>::Position,
+        screen_clip: <InterfaceSettings as Application>::Clip,
         color: <InterfaceSettings as Application>::Color,
         font_size: <InterfaceSettings as Application>::FontSize,
     ) -> f32 {
         let mut font_loader = self.font_loader.borrow_mut();
-        let (character_layout, height) = font_loader.get(text, color, font_size, clip.right - position.left);
+        let TextLayout { glyphs, size } = font_loader.get(text, color, font_size, 1.0, screen_clip.right - text_position.left);
 
-        character_layout.iter().for_each(|(texture_coordinates, glyph_position, color)| {
-            let screen_position = ScreenPosition {
-                left: position.left + glyph_position.min.x as f32,
-                top: position.top + glyph_position.min.y as f32,
-            } / self.window_size;
+        glyphs.iter().for_each(
+            |GlyphInstruction {
+                 position,
+                 texture_coordinate,
+                 color,
+             }| {
+                let screen_position = ScreenPosition {
+                    left: text_position.left + position.min.x as f32,
+                    top: text_position.top + position.min.y as f32,
+                } / self.window_size;
 
-            let screen_size = ScreenSize {
-                width: glyph_position.width() as f32,
-                height: glyph_position.height() as f32,
-            } / self.window_size;
+                let screen_size = ScreenSize {
+                    width: position.width() as f32,
+                    height: position.height() as f32,
+                } / self.window_size;
 
-            let texture_position = texture_coordinates.min;
-            // TODO: use absolute instead
-            let texture_size = texture_coordinates.max - texture_coordinates.min;
+                let texture_position = texture_coordinate.min.to_vec();
+                let texture_size = texture_coordinate.max - texture_coordinate.min;
 
-            self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Text {
-                screen_position,
-                screen_size,
-                screen_clip: clip,
-                texture_position: Vector2::new(texture_position.x, texture_position.y),
-                texture_size: Vector2::new(texture_size.x, texture_size.y),
-                color: *color,
-            });
-        });
+                self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Text {
+                    screen_position,
+                    screen_size,
+                    screen_clip,
+                    texture_position,
+                    texture_size,
+                    color: *color,
+                });
+            },
+        );
 
-        height
+        size.y as f32
     }
 
     fn render_checkbox(

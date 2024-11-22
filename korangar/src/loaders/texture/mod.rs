@@ -7,7 +7,7 @@ use image::{EncodableLayout, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::container::SimpleCache;
-use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, TextureAtlas};
+use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use korangar_util::FileLoader;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 
@@ -157,7 +157,7 @@ impl TextureLoader {
 pub struct TextureAtlasFactory {
     name: String,
     texture_loader: Arc<TextureLoader>,
-    texture_atlas: TextureAtlas,
+    texture_atlas: OfflineTextureAtlas,
     lookup: HashMap<String, AllocationId>,
 }
 
@@ -184,7 +184,7 @@ impl TextureAtlasFactory {
         Self {
             name: name.into(),
             texture_loader,
-            texture_atlas: TextureAtlas::new(add_padding),
+            texture_atlas: OfflineTextureAtlas::new(add_padding),
             lookup: HashMap::default(),
         }
     }

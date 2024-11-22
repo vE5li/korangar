@@ -1,81 +1,17 @@
 //! A simple texture atlas for deferred offline generation.
 
-use cgmath::Vector2;
+use cgmath::{EuclideanSpace, Point2, Vector2};
 use image::{imageops, RgbaImage};
 
+use super::AtlasAllocation;
 use crate::container::{SecondarySimpleSlab, SimpleSlab};
-use crate::create_simple_key;
+use crate::{create_simple_key, Rectangle};
 
 /// Factor we used to increase the texture size for inefficiency in
 /// the packing algorithm.
 const EFFICIENCY_FACTOR: f32 = 1.05;
 
-/// Represents a rectangle in 2D space.
-#[derive(Copy, Clone, Debug)]
-pub struct Rectangle {
-    /// The minimal point of the rectangle (should be top left).
-    pub min: Vector2<u32>,
-    /// The maximal point of the rectangle (should be bottom right).
-    pub max: Vector2<u32>,
-}
-
-impl Rectangle {
-    /// Creates a new [`Rectangle`] with given minimum and maximum coordinates.
-    pub fn new(min: Vector2<u32>, max: Vector2<u32>) -> Self {
-        Self { min, max }
-    }
-
-    /// Returns the height of the rectangle.
-    pub fn height(&self) -> u32 {
-        self.max.y - self.min.y
-    }
-
-    /// Returns the width of the rectangle.
-    pub fn width(&self) -> u32 {
-        self.max.x - self.min.x
-    }
-
-    /// Checks if this rectangle can fit another rectangle of given size.
-    fn can_fit(&self, size: Vector2<u32>) -> bool {
-        self.width() >= size.x && self.height() >= size.y
-    }
-
-    /// Tests if the two rectangles overlap.
-    fn overlaps(&self, other: Rectangle) -> bool {
-        self.min.x < other.max.x && self.max.x > other.min.x && self.min.y < other.max.y && self.max.y > other.min.y
-    }
-
-    /// Tests if the other rectangle is contained in the current rectangle.
-    fn contains(&self, other: Rectangle) -> bool {
-        self.min.x <= other.min.x && self.min.y <= other.min.y && self.max.x >= other.max.x && self.max.y >= other.max.y
-    }
-}
-
-impl PartialEq for Rectangle {
-    fn eq(&self, other: &Self) -> bool {
-        self.min == other.min && self.max == other.max
-    }
-}
-
 create_simple_key!(AllocationId, "A key for an allocation");
-
-/// Represents an allocated rectangle in the texture atlas.
-#[derive(Copy, Clone, Debug)]
-pub struct AtlasAllocation {
-    /// The rectangle that was allocated.
-    pub rectangle: Rectangle,
-    /// The final size of the atlas.
-    atlas_size: Vector2<u32>,
-}
-
-impl AtlasAllocation {
-    /// Maps normalized input coordinates to normalized atlas coordinates.
-    pub fn map_to_atlas(&self, normalized_coordinates: Vector2<f32>) -> Vector2<f32> {
-        let x = ((normalized_coordinates.x * self.rectangle.width() as f32) + self.rectangle.min.x as f32) / self.atlas_size.x as f32;
-        let y = ((normalized_coordinates.y * self.rectangle.height() as f32) + self.rectangle.min.y as f32) / self.atlas_size.y as f32;
-        Vector2::new(x, y)
-    }
-}
 
 /// A texture atlas implementation using the MAXRECTS-BSSF (Best Short Side Fit)
 /// algorithm.
@@ -98,9 +34,9 @@ impl AtlasAllocation {
 ///   is much better.
 ///
 /// This implementation is particularly effective when the input can be sorted.
-pub struct TextureAtlas {
+pub struct OfflineTextureAtlas {
     size: Vector2<u32>,
-    free_rects: Vec<Rectangle>,
+    free_rects: Vec<Rectangle<u32>>,
     deferred_allocation: SimpleSlab<AllocationId, DeferredAllocation>,
     allocations: SecondarySimpleSlab<AllocationId, AtlasAllocation>,
     image: Option<RgbaImage>,
@@ -112,10 +48,10 @@ struct DeferredAllocation {
     size: Vector2<u32>,
 }
 
-impl TextureAtlas {
+impl OfflineTextureAtlas {
     /// Creates a new texture atlas.
     pub fn new(add_padding: bool) -> Self {
-        TextureAtlas {
+        OfflineTextureAtlas {
             size: Vector2::new(0, 0),
             free_rects: Vec::default(),
             deferred_allocation: SimpleSlab::default(),
@@ -180,7 +116,7 @@ impl TextureAtlas {
         let mut success = false;
         while !success {
             self.size = Vector2::new(width, height);
-            self.free_rects = vec![Rectangle::new(Vector2::new(0, 0), self.size)];
+            self.free_rects = vec![Rectangle::new(Point2::new(0, 0), Point2::from_vec(self.size))];
             success = true;
 
             temp_allocations.clear();
@@ -236,8 +172,8 @@ impl TextureAtlas {
         let allocation = if self.add_padding {
             AtlasAllocation {
                 rectangle: Rectangle::new(
-                    Vector2::new(free_rect.min.x + 2, free_rect.min.y + 2),
-                    Vector2::new(free_rect.min.x + size.x - 2, free_rect.min.y + size.y - 2),
+                    Point2::new(free_rect.min.x + 2, free_rect.min.y + 2),
+                    Point2::new(free_rect.min.x + size.x - 2, free_rect.min.y + size.y - 2),
                 ),
                 atlas_size: self.size,
             }
@@ -259,19 +195,19 @@ impl TextureAtlas {
     }
 
     /// The actual MAXRECTS splitting as described in the paper.
-    fn maxrects_split(&self, free_rect: Rectangle, used_rect: Rectangle) -> (Option<Rectangle>, Option<Rectangle>) {
+    fn maxrects_split(&self, free_rect: Rectangle<u32>, used_rect: Rectangle<u32>) -> (Option<Rectangle<u32>>, Option<Rectangle<u32>>) {
         let f_prime =
-            (free_rect.max.x > used_rect.max.x).then_some(Rectangle::new(Vector2::new(used_rect.max.x, free_rect.min.y), free_rect.max));
+            (free_rect.max.x > used_rect.max.x).then_some(Rectangle::new(Point2::new(used_rect.max.x, free_rect.min.y), free_rect.max));
 
         let f_double_prime =
-            (free_rect.max.y > used_rect.max.y).then_some(Rectangle::new(Vector2::new(free_rect.min.x, used_rect.max.y), free_rect.max));
+            (free_rect.max.y > used_rect.max.y).then_some(Rectangle::new(Point2::new(free_rect.min.x, used_rect.max.y), free_rect.max));
 
         (f_prime, f_double_prime)
     }
 
     /// After allocating a rectangle (used_rect), we need to update our list of
     /// free rectangles to reflect the new state of available space.
-    fn update_free_rectangles(&mut self, used_rect: Rectangle) {
+    fn update_free_rectangles(&mut self, used_rect: Rectangle<u32>) {
         let mut i = 0;
 
         while i < self.free_rects.len() {
@@ -372,30 +308,30 @@ impl TextureAtlas {
     }
 }
 
-fn subdivide_rectangle(free_rect: Rectangle, used_rect: Rectangle) -> Vec<Rectangle> {
+fn subdivide_rectangle(free_rect: Rectangle<u32>, used_rect: Rectangle<u32>) -> Vec<Rectangle<u32>> {
     let mut result = Vec::new();
 
     // Rectangle on the right side of used_rect.
     if free_rect.max.x > used_rect.max.x {
-        result.push(Rectangle::new(Vector2::new(used_rect.max.x, free_rect.min.y), free_rect.max));
+        result.push(Rectangle::new(Point2::new(used_rect.max.x, free_rect.min.y), free_rect.max));
     }
 
     // Rectangle below used_rect.
     if free_rect.max.y > used_rect.max.y {
         result.push(Rectangle::new(
-            Vector2::new(free_rect.min.x, used_rect.max.y),
-            Vector2::new(free_rect.max.x, free_rect.max.y),
+            Point2::new(free_rect.min.x, used_rect.max.y),
+            Point2::new(free_rect.max.x, free_rect.max.y),
         ));
     }
 
     // Rectangle on the left side of used_rect.
     if free_rect.min.x < used_rect.min.x {
-        result.push(Rectangle::new(free_rect.min, Vector2::new(used_rect.min.x, free_rect.max.y)));
+        result.push(Rectangle::new(free_rect.min, Point2::new(used_rect.min.x, free_rect.max.y)));
     }
 
     // Rectangle above used_rect.
     if free_rect.min.y < used_rect.min.y {
-        result.push(Rectangle::new(free_rect.min, Vector2::new(free_rect.max.x, used_rect.min.y)));
+        result.push(Rectangle::new(free_rect.min, Point2::new(free_rect.max.x, used_rect.min.y)));
     }
 
     result
@@ -409,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_allocate_single_rectangle() {
-        let mut atlas = TextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false);
 
         let image = RgbaImage::new(100, 100);
         let id = atlas.register_image(image);
@@ -425,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_multiple_allocations() {
-        let mut atlas = TextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false);
         let id1 = atlas.register_image(RgbaImage::new(100, 100));
         let id2 = atlas.register_image(RgbaImage::new(200, 200));
         let id3 = atlas.register_image(RgbaImage::new(300, 300));
@@ -445,7 +381,7 @@ mod tests {
 
     #[test]
     fn test_no_rectangle_overlap() {
-        let mut atlas = TextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false);
         let mut ids = Vec::new();
 
         for _ in 0..10 {
@@ -472,7 +408,7 @@ mod tests {
 
     #[test]
     fn test_no_rectangle_overlap_varied_sizes() {
-        let mut atlas = TextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false);
         let sizes = [(50, 50), (200, 200), (100, 100), (300, 100), (100, 300), (25, 25), (400, 400)];
 
         let mut ids = Vec::new();
@@ -506,7 +442,7 @@ mod tests {
 
     #[test]
     fn test_atlas_with_padding() {
-        let mut atlas = TextureAtlas::new(true);
+        let mut atlas = OfflineTextureAtlas::new(true);
         let image = RgbaImage::from_pixel(10, 10, Rgba([255, 0, 0, 255]));
         let id = atlas.register_image(image);
         atlas.build_atlas();

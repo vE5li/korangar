@@ -145,7 +145,7 @@ fn draw_text(
     instance: InstanceData,
     texture_coordinates: vec2<f32>,
 ) -> vec4<f32> {
-    let coverage = textureSample(font_atlas, linear_sampler, texture_coordinates).r;
+    let coverage = textureSample(font_atlas, nearest_sampler, texture_coordinates).r;
     return vec4<f32>(instance.color.rgb, coverage * instance.color.a);
 }
 

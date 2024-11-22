@@ -132,6 +132,18 @@ impl Color {
     }
 }
 
+impl From<Color> for cosmic_text::Color {
+    fn from(value: Color) -> Self {
+        Self::rgba(value.red_as_u8(), value.green_as_u8(), value.blue_as_u8(), value.alpha_as_u8())
+    }
+}
+
+impl From<cosmic_text::Color> for Color {
+    fn from(value: cosmic_text::Color) -> Self {
+        Self::rgba_u8(value.r(), value.g(), value.b(), value.a())
+    }
+}
+
 impl Add for Color {
     type Output = Color;
 

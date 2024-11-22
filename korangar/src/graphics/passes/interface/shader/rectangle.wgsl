@@ -41,6 +41,8 @@ struct VertexOutput {
 @group(1) @binding(1) var font_atlas: texture_2d<f32>;
 @group(2) @binding(0) var texture: texture_2d<f32>;
 
+const SAMPLE_BORDER_THRESHOLD = 2.0;
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
@@ -113,19 +115,24 @@ fn draw_solid(
         return instance.color;
     }
 
-    var total = 0.0;
-    for (var i = 0u; i < 16u; i++) {
-        let offset = SAMPLE_OFFSETS[i];
-        let d = rectangle_sdf(relative_position + offset, half_screen_size, corner_radius);
-        total += step(0.0, -d);
+    let distance = rectangle_sdf(relative_position, half_screen_size, corner_radius);
+
+    var alpha: f32 = step(0.0, -distance);
+
+    if (abs(distance) <= SAMPLE_BORDER_THRESHOLD) {
+        var total = alpha;
+        for (var index = 0u; index < 15u; index++) {
+            let offset = SAMPLE_OFFSETS[index];
+            let sample_distance = rectangle_sdf(relative_position + offset, half_screen_size, corner_radius);
+            total += step(0.0, -sample_distance);
+        }
+        alpha = total / 16.0;
     }
-    let alpha = total / 16.0;
 
     return vec4<f32>(instance.color.rgb, instance.color.a * alpha);
 }
 
-const SAMPLE_OFFSETS: array<vec2<f32>, 16> = array<vec2<f32>, 16>(
-    vec2<f32>( 0.000,  0.000),
+const SAMPLE_OFFSETS: array<vec2<f32>, 15> = array<vec2<f32>, 15>(
     vec2<f32>( 0.375,  0.924),
     vec2<f32>( 0.924,  0.375),
     vec2<f32>( 0.924, -0.375),

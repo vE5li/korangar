@@ -145,6 +145,7 @@ impl GraphicsEngine {
         texture_sampler_type: TextureSamplerType,
         msaa: Msaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
+        high_quality_interface: bool,
     ) {
         self.set_limit_framerate(limit_framerate);
 
@@ -171,6 +172,8 @@ impl GraphicsEngine {
                     self.engine_context = None;
 
                     time_phase!("create contexts", {
+                        let high_quality_interface = self.check_high_quality_interface_requirements(high_quality_interface, screen_size);
+
                         let global_context = GlobalContext::new(
                             &self.device,
                             &self.queue,
@@ -181,6 +184,7 @@ impl GraphicsEngine {
                             screen_size,
                             shadow_detail,
                             texture_sampler_type,
+                            high_quality_interface,
                         );
 
                         let interface_render_pass_context =
@@ -386,6 +390,25 @@ impl GraphicsEngine {
         }
     }
 
+    fn check_high_quality_interface_requirements(&self, mut high_quality_interface: bool, screen_size: ScreenSize) -> bool {
+        if high_quality_interface {
+            let max_texture_dimension_2d = self.capabilities.get_max_texture_dimension_2d();
+            let interface_size = screen_size * 2.0;
+
+            if max_texture_dimension_2d < interface_size.width as u32 && max_texture_dimension_2d < interface_size.height as u32 {
+                high_quality_interface = false;
+
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] can't enable high quality interface because texture would be too large",
+                    "error".red()
+                );
+            }
+        }
+
+        high_quality_interface
+    }
+
     pub fn on_suspended(&mut self) {
         // Android devices are expected to drop their surface view.
         if cfg!(target_os = "android") {
@@ -517,6 +540,14 @@ impl GraphicsEngine {
         }
     }
 
+    pub fn set_high_quality_interface(&mut self, high_quality_interface: bool) {
+        if let Some(engine_context) = self.engine_context.as_mut() {
+            engine_context
+                .global_context
+                .update_high_quality_interface(&self.device, high_quality_interface);
+        }
+    }
+
     pub fn get_backend_name(&self) -> String {
         self.adapter.get_info().backend.to_string()
     }
@@ -548,10 +579,25 @@ impl GraphicsEngine {
 
             surface.reconfigure();
 
+            let screen_size = surface.window_screen_size();
+
+            let high_quality_interface = self
+                .engine_context
+                .as_ref()
+                .map(|engine_context| engine_context.global_context.high_quality_interface)
+                .unwrap_or(false);
+
+            // We need to check if the high quality interface needs to be deactivated.
+            if high_quality_interface && !self.check_high_quality_interface_requirements(high_quality_interface, screen_size) {
+                if let Some(engine_context) = self.engine_context.as_mut() {
+                    engine_context.global_context.update_high_quality_interface(&self.device, false);
+                }
+            }
+
             if let Some(engine_context) = self.engine_context.as_mut() {
                 engine_context
                     .global_context
-                    .update_screen_size_resources(&self.device, surface.window_screen_size());
+                    .update_screen_size_resources(&self.device, screen_size);
             }
         }
 

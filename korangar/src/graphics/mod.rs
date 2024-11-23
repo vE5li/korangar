@@ -102,11 +102,13 @@ pub(crate) struct GlobalUniforms {
     indicator_color: [f32; 4],
     ambient_color: [f32; 4],
     screen_size: [u32; 2],
+    interface_size: [u32; 2],
     pointer_position: [u32; 2],
     animation_timer: f32,
     day_timer: f32,
     water_level: f32,
     point_light_count: u32,
+    padding: [u32; 2],
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -149,6 +151,7 @@ pub(crate) struct GlobalContext {
     pub(crate) surface_texture_format: TextureFormat,
     pub(crate) msaa: Msaa,
     pub(crate) screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
+    pub(crate) high_quality_interface: bool,
     pub(crate) solid_pixel_texture: Arc<Texture>,
     pub(crate) walk_indicator_texture: Arc<Texture>,
     pub(crate) forward_depth_texture: AttachmentTexture,
@@ -177,6 +180,7 @@ pub(crate) struct GlobalContext {
     #[cfg(feature = "debug")]
     pub(crate) debug_bind_group: BindGroup,
     pub(crate) screen_size: ScreenSize,
+    pub(crate) interface_size: ScreenSize,
     pub(crate) directional_shadow_size: ScreenSize,
     pub(crate) point_shadow_size: ScreenSize,
     global_uniforms: GlobalUniforms,
@@ -235,11 +239,13 @@ impl Prepare for GlobalContext {
             indicator_color: indicator_color.components_linear(),
             ambient_color: ambient_light_color.components_linear(),
             screen_size: [self.screen_size.width as u32, self.screen_size.height as u32],
+            interface_size: [self.interface_size.width as u32, self.interface_size.height as u32],
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
             animation_timer: instructions.uniforms.animation_timer,
             day_timer: instructions.uniforms.day_timer,
             water_level: instructions.uniforms.water_level,
             point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
+            padding: Default::default(),
         };
 
         self.directional_light_uniforms = DirectionalLightUniforms {
@@ -358,7 +364,9 @@ impl GlobalContext {
         screen_size: ScreenSize,
         shadow_detail: ShadowDetail,
         texture_sampler: TextureSamplerType,
+        high_quality_interface: bool,
     ) -> Self {
+        let interface_size = if high_quality_interface { screen_size * 2.0 } else { screen_size };
         let directional_shadow_size = ScreenSize::uniform(shadow_detail.directional_shadow_resolution() as f32);
         let point_shadow_size = ScreenSize::uniform(shadow_detail.point_shadow_resolution() as f32);
 
@@ -382,6 +390,7 @@ impl GlobalContext {
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
         let resolved_color_texture = Self::create_resolved_color_texture(device, screen_size, msaa, screen_space_anti_aliasing);
+        let interface_buffer_texture = Self::create_interface_texture(device, interface_size);
 
         let picker_value_buffer = Buffer::with_capacity(
             device,
@@ -466,6 +475,7 @@ impl GlobalContext {
             surface_texture_format,
             msaa,
             screen_space_anti_aliasing,
+            high_quality_interface,
             solid_pixel_texture,
             walk_indicator_texture,
             forward_depth_texture: screen_textures.forward_depth_texture,
@@ -473,7 +483,7 @@ impl GlobalContext {
             picker_depth_texture: screen_textures.picker_depth_texture,
             forward_color_texture: screen_textures.forward_color_texture,
             resolved_color_texture,
-            interface_buffer_texture: screen_textures.interface_buffer_texture,
+            interface_buffer_texture,
             directional_shadow_map_texture,
             point_shadow_map_textures,
             tile_light_count_texture: screen_textures.tile_light_count_texture,
@@ -494,6 +504,7 @@ impl GlobalContext {
             global_bind_group,
             light_culling_bind_group,
             screen_size,
+            interface_size,
             directional_shadow_size,
             point_shadow_size,
             global_uniforms: GlobalUniforms::default(),
@@ -533,14 +544,6 @@ impl GlobalContext {
         let (forward_color_texture, forward_depth_texture) =
             Self::create_forward_texture(device, screen_size, msaa, screen_space_anti_aliasing);
 
-        let interface_screen_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
-
-        let interface_buffer_texture = interface_screen_factory.new_attachment(
-            "interface buffer",
-            INTERFACE_TEXTURE_FORMAT,
-            AttachmentTextureType::ColorAttachment,
-        );
-
         let (tile_x, tile_y) = calculate_light_tile_count(screen_size);
 
         let tile_light_count_texture = StorageTexture::new(device, "tile light count texture", tile_x, tile_y, TextureFormat::R32Uint);
@@ -550,7 +553,6 @@ impl GlobalContext {
             picker_buffer_texture,
             picker_depth_texture,
             forward_color_texture,
-            interface_buffer_texture,
             tile_light_count_texture,
         }
     }
@@ -574,6 +576,16 @@ impl GlobalContext {
             }
             false => None,
         }
+    }
+
+    fn create_interface_texture(device: &Device, interface_size: ScreenSize) -> AttachmentTexture {
+        let interface_screen_factory = AttachmentTextureFactory::new(device, interface_size, 1, None);
+
+        interface_screen_factory.new_attachment(
+            "interface buffer",
+            INTERFACE_TEXTURE_FORMAT,
+            AttachmentTextureType::ColorAttachment,
+        )
     }
 
     fn create_forward_texture(
@@ -717,12 +729,17 @@ impl GlobalContext {
 
     fn update_screen_size_resources(&mut self, device: &Device, screen_size: ScreenSize) {
         self.screen_size = screen_size;
+        self.interface_size = if self.high_quality_interface {
+            self.screen_size * 2.0
+        } else {
+            self.screen_size
+        };
+
         let ScreenSizeTextures {
             forward_color_texture,
             forward_depth_texture,
             picker_buffer_texture,
             picker_depth_texture,
-            interface_buffer_texture,
             tile_light_count_texture,
         } = Self::create_screen_size_textures(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
 
@@ -734,8 +751,9 @@ impl GlobalContext {
         self.picker_buffer_texture = picker_buffer_texture;
         self.picker_depth_texture = picker_depth_texture;
         self.resolved_color_texture = resolved_color_texture;
-        self.interface_buffer_texture = interface_buffer_texture;
         self.tile_light_count_texture = tile_light_count_texture;
+
+        self.interface_buffer_texture = Self::create_interface_texture(device, self.interface_size);
 
         self.tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, screen_size);
 
@@ -836,6 +854,17 @@ impl GlobalContext {
             Self::create_resolved_color_texture(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
 
         self.anti_aliasing_resources = Self::create_anti_aliasing_resources(device, self.screen_space_anti_aliasing, self.screen_size);
+    }
+
+    fn update_high_quality_interface(&mut self, device: &Device, high_quality_interface: bool) {
+        self.high_quality_interface = high_quality_interface;
+        self.interface_size = if self.high_quality_interface {
+            self.screen_size * 2.0
+        } else {
+            self.screen_size
+        };
+
+        self.interface_buffer_texture = Self::create_interface_texture(device, self.interface_size);
     }
 
     fn global_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
@@ -1355,7 +1384,6 @@ struct ScreenSizeTextures {
     forward_depth_texture: AttachmentTexture,
     picker_buffer_texture: AttachmentTexture,
     picker_depth_texture: AttachmentTexture,
-    interface_buffer_texture: AttachmentTexture,
     tile_light_count_texture: StorageTexture,
 }
 

@@ -50,6 +50,14 @@ impl FontSizeTrait for FontSize {
     }
 }
 
+impl std::ops::Mul<f32> for FontSize {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        Self(self.0 * rhs)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Scaling(f32);
@@ -167,7 +175,7 @@ fn layout_paragraph(font: &Font<'static>, scale: Scale, width: f32, text: &str, 
 
 impl FontLoader {
     pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &GameFileLoader) -> Self {
-        let cache_size = Vector2::from_value(512);
+        let cache_size = Vector2::from_value(2048);
         let cache = Cache::builder().dimensions(cache_size.x, cache_size.y).build();
 
         let font_atlas = Texture::new(device, &TextureDescriptor {
@@ -277,6 +285,10 @@ impl FontLoader {
 
     pub fn get_font_atlas(&self) -> &Texture {
         &self.font_atlas
+    }
+
+    pub fn clear(&mut self) {
+        self.cache.clear();
     }
 }
 

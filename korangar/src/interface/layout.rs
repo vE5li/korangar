@@ -275,6 +275,19 @@ impl From<ScreenClip> for [f32; 4] {
     }
 }
 
+impl std::ops::Mul<f32> for ScreenClip {
+    type Output = Self;
+
+    fn mul(self, rhs: f32) -> Self {
+        Self {
+            left: self.left * rhs,
+            right: self.right * rhs,
+            bottom: self.bottom * rhs,
+            top: self.top * rhs,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, new)]
 pub struct PartialScreenSize {
     pub width: f32,

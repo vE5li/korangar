@@ -8,8 +8,16 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
 
-pub struct GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
-where
+pub struct GraphicsSettingsWindow<
+    Vsync,
+    FramerateLimit,
+    TripleBuffering,
+    TextureFiltering,
+    Multisampling,
+    ScreenAntiAliasing,
+    Shadow,
+    HighQualityInterface,
+> where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -17,6 +25,7 @@ where
     Multisampling: TrackedState<Msaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
+    HighQualityInterface: TrackedStateBinary<bool>,
 {
     present_mode_info: PresentModeInfo,
     supported_msaa: Vec<(String, Msaa)>,
@@ -27,10 +36,20 @@ where
     msaa: Multisampling,
     screen_space_anti_aliasing: ScreenAntiAliasing,
     shadow_detail: Shadow,
+    high_quality_interface: HighQualityInterface,
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
-    GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow, HighQualityInterface>
+    GraphicsSettingsWindow<
+        Vsync,
+        FramerateLimit,
+        TripleBuffering,
+        TextureFiltering,
+        Multisampling,
+        ScreenAntiAliasing,
+        Shadow,
+        HighQualityInterface,
+    >
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
@@ -39,6 +58,7 @@ where
     Multisampling: TrackedState<Msaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
+    HighQualityInterface: TrackedStateBinary<bool>,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
 
@@ -52,6 +72,7 @@ where
         msaa: Multisampling,
         screen_space_anti_aliasing: ScreenAntiAliasing,
         shadow_detail: Shadow,
+        high_quality_interface: HighQualityInterface,
     ) -> Self {
         Self {
             present_mode_info,
@@ -63,12 +84,23 @@ where
             msaa,
             screen_space_anti_aliasing,
             shadow_detail,
+            high_quality_interface,
         }
     }
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow> PrototypeWindow<InterfaceSettings>
-    for GraphicsSettingsWindow<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow>
+impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow, HighQualityInterface>
+    PrototypeWindow<InterfaceSettings>
+    for GraphicsSettingsWindow<
+        Vsync,
+        FramerateLimit,
+        TripleBuffering,
+        TextureFiltering,
+        Multisampling,
+        ScreenAntiAliasing,
+        Shadow,
+        HighQualityInterface,
+    >
 where
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
@@ -77,6 +109,7 @@ where
     Multisampling: TrackedState<Msaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
+    HighQualityInterface: TrackedStateBinary<bool>,
 {
     fn window_class(&self) -> Option<&str> {
         Self::WINDOW_CLASS.into()
@@ -143,6 +176,12 @@ where
                 .with_selected(self.shadow_detail.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
+                .wrap(),
+            StateButtonBuilder::new()
+                .with_text("High Quality Interface")
+                .with_event(self.high_quality_interface.toggle_action())
+                .with_remote(self.high_quality_interface.new_remote())
+                .build()
                 .wrap(),
             application.to_element("Interface settings".to_string()),
         ];

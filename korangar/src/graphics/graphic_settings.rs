@@ -122,6 +122,7 @@ pub struct GraphicsSettings {
     pub msaa: Msaa,
     pub screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     pub shadow_detail: ShadowDetail,
+    pub high_quality_interface: bool,
 }
 
 impl Default for GraphicsSettings {
@@ -134,6 +135,7 @@ impl Default for GraphicsSettings {
             msaa: Msaa::X4,
             screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
             shadow_detail: ShadowDetail::High,
+            high_quality_interface: false,
         }
     }
 }

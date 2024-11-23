@@ -193,6 +193,7 @@ struct Client {
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
     msaa: MappedRemote<GraphicsSettings, Msaa>,
     screen_space_anti_aliasing: MappedRemote<GraphicsSettings, ScreenSpaceAntiAliasing>,
+    high_quality_interface: MappedRemote<GraphicsSettings, bool>,
     #[cfg(feature = "debug")]
     render_settings: PlainTrackedState<RenderSettings>,
 
@@ -264,6 +265,26 @@ impl Client {
             width: 800.0,
             height: 600.0,
         };
+
+        time_phase!("load settings", {
+            let picker_value = Arc::new(AtomicU64::new(0));
+            let input_system = InputSystem::new(picker_value.clone());
+            let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
+
+            let vsync = graphics_settings.mapped(|settings| &settings.vsync).new_remote();
+            let limit_framerate = graphics_settings.mapped(|settings| &settings.limit_framerate).new_remote();
+            let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
+            let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
+            let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
+            let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
+            let screen_space_anti_aliasing = graphics_settings
+                .mapped(|settings| &settings.screen_space_anti_aliasing)
+                .new_remote();
+            let high_quality_interface = graphics_settings.mapped(|settings| &settings.high_quality_interface).new_remote();
+
+            #[cfg(feature = "debug")]
+            let render_settings = PlainTrackedState::new(RenderSettings::new());
+        });
 
         time_phase!("create adapter", {
             let trace_dir = std::env::var("WGPU_TRACE");
@@ -362,7 +383,12 @@ impl Client {
                 ScriptLoader::new(&game_file_loader).unwrap()
             });
 
-            let interface_renderer = InterfaceRenderer::new(initial_screen_size, font_loader.clone(), &texture_loader);
+            let interface_renderer = InterfaceRenderer::new(
+                initial_screen_size,
+                font_loader.clone(),
+                &texture_loader,
+                *high_quality_interface.get(),
+            );
             let bottom_interface_renderer = GameInterfaceRenderer::new(initial_screen_size, &texture_loader);
             let middle_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
             let top_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
@@ -388,7 +414,6 @@ impl Client {
         });
 
         time_phase!("create graphics engine", {
-            let picker_value = Arc::new(AtomicU64::new(0));
             let graphics_engine = GraphicsEngine::initialize(GraphicsEngineDescriptor {
                 capabilities,
                 adapter,
@@ -396,26 +421,8 @@ impl Client {
                 device: device.clone(),
                 queue: queue.clone(),
                 texture_loader: texture_loader.clone(),
-                picker_value: picker_value.clone(),
+                picker_value,
             });
-        });
-
-        time_phase!("load settings", {
-            let input_system = InputSystem::new(picker_value);
-            let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
-
-            let vsync = graphics_settings.mapped(|settings| &settings.vsync).new_remote();
-            let limit_framerate = graphics_settings.mapped(|settings| &settings.limit_framerate).new_remote();
-            let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
-            let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
-            let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
-            let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
-            let screen_space_anti_aliasing = graphics_settings
-                .mapped(|settings| &settings.screen_space_anti_aliasing)
-                .new_remote();
-
-            #[cfg(feature = "debug")]
-            let render_settings = PlainTrackedState::new(RenderSettings::new());
         });
 
         time_phase!("initialize interface", {
@@ -582,6 +589,7 @@ impl Client {
             shadow_detail,
             msaa,
             screen_space_anti_aliasing,
+            high_quality_interface,
             #[cfg(feature = "debug")]
             render_settings,
             application,
@@ -1481,6 +1489,7 @@ impl Client {
                         self.msaa.clone_state(),
                         self.screen_space_anti_aliasing.clone_state(),
                         self.shadow_detail.clone_state(),
+                        self.high_quality_interface.clone_state(),
                     ),
                 ),
                 UserEvent::OpenAudioSettingsWindow => {
@@ -2270,6 +2279,14 @@ impl Client {
             self.graphics_engine.set_shadow_detail(*self.shadow_detail.get());
         }
 
+        if self.high_quality_interface.consume_changed() {
+            let high_quality_interface = *self.high_quality_interface.get();
+            self.font_loader.borrow_mut().clear();
+            self.interface_renderer.update_high_quality_interface(high_quality_interface);
+            self.graphics_engine.set_high_quality_interface(high_quality_interface);
+            update_interface = true;
+        }
+
         if update_interface {
             self.interface.schedule_render();
         }
@@ -2315,6 +2332,7 @@ impl ApplicationHandler for Client {
                 *self.texture_filtering.get(),
                 *self.msaa.get(),
                 *self.screen_space_anti_aliasing.get(),
+                *self.high_quality_interface.get(),
             )
         }
     }

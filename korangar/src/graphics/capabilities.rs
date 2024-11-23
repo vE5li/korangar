@@ -94,6 +94,11 @@ impl Capabilities {
         self.required_limits.clone()
     }
 
+    /// Returns the maximum size of 2D textures.
+    pub fn get_max_texture_dimension_2d(&self) -> u32 {
+        self.required_limits.max_texture_dimension_2d
+    }
+
     /// Returns the maximum count of textures inside a binding array.
     pub fn get_max_texture_binding_array_count(&self) -> Option<NonZeroU32> {
         // We need room for 8 textures for the screen bind group.

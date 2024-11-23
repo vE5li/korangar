@@ -7,6 +7,7 @@ struct GlobalUniforms {
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
     screen_size: vec2<u32>,
+    interface_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
     day_timer: f32,
@@ -40,6 +41,11 @@ struct VertexOutput {
 @group(1) @binding(1) var font_atlas: texture_2d<f32>;
 @group(2) @binding(0) var texture: texture_2d<f32>;
 
+// Because of how sampling works, we need to add a bit breathing room
+// for the SDF function and then need to compensate for it.
+const BREATHING_ROOM = 0.5;
+const BORDER_THRESHOLD = 2.0;
+
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
@@ -48,7 +54,11 @@ fn vs_main(
     let instance = instance_data[instance_index];
     let vertex = vertex_data(vertex_index);
 
-    let clip_size = instance.screen_size * 2.0;
+    let pixel_size = vec2<f32>(1.0 / f32(global_uniforms.interface_size.x), 1.0 / f32(global_uniforms.interface_size.y));
+    let size_adjustment = select(vec2<f32>(0.0), (BREATHING_ROOM * 2.0) * pixel_size, any(instance.corner_radius != vec4<f32>(0.0)));
+
+    let adjusted_size = instance.screen_size + size_adjustment;
+    let clip_size = adjusted_size * 2.0;
     let position = screen_to_clip_space(instance.screen_position) + vertex.xy * clip_size;
 
     var output: VertexOutput;
@@ -63,8 +73,11 @@ fn vs_main(
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let instance = instance_data[input.instance_index];
 
-    if (input.position.x < instance.screen_clip.x || input.position.y < instance.screen_clip.y ||
-        input.position.x > instance.screen_clip.z || input.position.y > instance.screen_clip.w) {
+    let clip_adjustment = select(vec4<f32>(0.0), vec4<f32>(-0.5, -0.5, 0.5, 0.5), any(instance.corner_radius != vec4<f32>(0.0)));
+    let adjusted_clip = instance.screen_clip + clip_adjustment;
+
+    if (input.position.x < adjusted_clip.x || input.position.y < adjusted_clip.y ||
+        input.position.x > adjusted_clip.z || input.position.y > adjusted_clip.w) {
         return vec4<f32>(0.0);
     }
 
@@ -107,10 +120,10 @@ fn rectangle_with_rounded_edges(
     }
 
     // Convert normalized screen space coordinates to pixel space.
-    let window_size = vec2<f32>(global_uniforms.screen_size);
-    let position = fragment_position * window_size;
-    let origin = screen_position * window_size;
-    let size = screen_size * window_size;
+    let interface_size = vec2<f32>(global_uniforms.interface_size);
+    let position = fragment_position * interface_size;
+    let origin = (screen_position * interface_size) - vec2<f32>(BREATHING_ROOM);
+    let size = (screen_size * interface_size) + vec2<f32>(BREATHING_ROOM * 2.0);
 
     // Calculate position relative to rectangle center.
     let half_size = size * 0.5;
@@ -127,18 +140,35 @@ fn rectangle_with_rounded_edges(
         return color;
     }
 
-    let distance = rectangle_sdf(
-        relative_position,
-        half_size,
-        corner_radius,
-    );
+    // We multi-sample the edges of a rectangle to get the best possible anti-aliasing.
+    let distance = rectangle_sdf(relative_position, half_size, corner_radius);
 
-    // Apply smoothing using screen space derivatives.
-    let pixel_size = length(vec2(dpdx(distance), dpdy(distance))) * 2.0;
-    let alpha = smoothstep(0.5, -0.5, distance / pixel_size);
+    var alpha: f32 = step(0.0, -distance);
+
+    if (abs(distance) <= BORDER_THRESHOLD) {
+        var total = alpha;
+        for (var index = 0u; index < 8u; index++) {
+            let offset = SAMPLE_OFFSETS[index];
+            let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_radius);
+            total += step(0.0, -sample_distance);
+        }
+        alpha = total * (1.0/9.0);
+    }
 
     return vec4<f32>(color.rgb, color.a * alpha);
 }
+
+// 8-point Poisson Disk pattern
+const SAMPLE_OFFSETS: array<vec2<f32>, 8> = array<vec2<f32>, 8>(
+    vec2<f32>( 0.924,  0.382) * 0.5,
+    vec2<f32>( 0.382,  0.924) * 0.5,
+    vec2<f32>(-0.382,  0.924) * 0.5,
+    vec2<f32>(-0.924,  0.382) * 0.5,
+    vec2<f32>(-0.924, -0.382) * 0.5,
+    vec2<f32>(-0.382, -0.924) * 0.5,
+    vec2<f32>( 0.382, -0.924) * 0.5,
+    vec2<f32>( 0.924, -0.382) * 0.5
+);
 
 // Optimized version of the following truth table:
 //
@@ -181,5 +211,5 @@ fn rectangle_sdf(
 ) -> f32 {
     let shrunk_corner_position = half_size - corner_radius;
     let pixel_to_shrunk_corner = max(vec2<f32>(0.0), abs(relative_position) - shrunk_corner_position);
-    return length(pixel_to_shrunk_corner) - corner_radius;
+    return length(pixel_to_shrunk_corner) - corner_radius + BREATHING_ROOM;
 }

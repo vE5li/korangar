@@ -267,7 +267,7 @@ impl Map {
     pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera, include_self: bool) {
         let mut is_current_player = true || include_self;
         entities.iter().skip(!include_self as usize).for_each(|entity| {
-            entity.render(instructions, camera, is_current_player);
+            entity.render(instructions, camera, !is_current_player);
             is_current_player = false;
         });
     }

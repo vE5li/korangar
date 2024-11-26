@@ -564,14 +564,16 @@ impl GraphicsEngine {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_next_frame(&mut self, frame: SurfaceTexture, instruction: &RenderInstruction) {
+    pub fn render_next_frame(&mut self, frame: SurfaceTexture, mut instruction: RenderInstruction) {
         assert!(instruction.point_light_shadow_caster.len() <= NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS);
+
+        Self::sort_instructions(&mut instruction);
 
         // Reclaim all staging buffers that the GPU has finished reading from.
         self.staging_belt.recall();
 
         // Calculate and stage the uploading of GPU data that is needed for the frame.
-        let prepare_command_buffer = self.prepare_frame_data(instruction);
+        let prepare_command_buffer = self.prepare_frame_data(&instruction);
 
         // Record all draw commands.
         let (
@@ -582,7 +584,7 @@ impl GraphicsEngine {
             light_culling_command_buffer,
             forward_command_buffer,
             post_processing_command_buffer,
-        ) = self.draw_frame(&frame, instruction);
+        ) = self.draw_frame(&frame, &instruction);
 
         // Queue all staging belt writes.
         self.staging_belt.finish();
@@ -603,6 +605,12 @@ impl GraphicsEngine {
         frame.present();
 
         self.frame_pacer.end_frame_stage(self.cpu_stage, Instant::now());
+    }
+
+    #[cfg_attr(feature = "debug", korangar_debug::profile)]
+    fn sort_instructions(instruction: &mut RenderInstruction) {
+        // We render entities back to front.
+        instruction.entities.sort_unstable_by(|a, b| b.distance.total_cmp(&a.distance));
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

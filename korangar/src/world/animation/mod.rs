@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Array, Matrix4, Point3, Vector2, Zero};
+use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Zero};
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::container::Cacheable;
 use ragnarok_packets::EntityId;
@@ -134,6 +134,9 @@ impl AnimationData {
             let texture_position = Vector2::new(texture_size.x * cell_position.x as f32, texture_size.y * cell_position.y as f32);
             let (depth_offset, curvature) = camera.calculate_depth_offset_and_curvature(&world_matrix, scale.x, scale.y);
 
+            let position = world_matrix.transform_point(Point3::from_value(0.0));
+            let distance = camera.distance_to(position);
+
             instructions.push(EntityInstruction {
                 world: world_matrix,
                 frame_part_transform: affine_matrix,
@@ -147,6 +150,7 @@ impl AnimationData {
                 mirror: frame_part.mirror,
                 entity_id,
                 texture: texture.clone(),
+                distance,
             });
         }
     }

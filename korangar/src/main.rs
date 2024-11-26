@@ -2205,7 +2205,7 @@ impl Client {
             point_light: &self.point_light_instructions,
             model_batches: &self.model_batches,
             models: &self.model_instructions,
-            entities: &self.entity_instructions,
+            entities: &mut self.entity_instructions,
             directional_model_batches: &self.directional_shadow_model_batches,
             directional_shadow_models: &self.directional_shadow_model_instructions,
             directional_shadow_entities: &self.directional_shadow_entity_instructions,
@@ -2225,7 +2225,7 @@ impl Client {
             marker: self.debug_marker_renderer.get_instructions(),
         };
 
-        self.graphics_engine.render_next_frame(frame, &render_instruction);
+        self.graphics_engine.render_next_frame(frame, render_instruction);
 
         #[cfg(feature = "debug")]
         render_frame_measurement.stop();

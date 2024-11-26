@@ -31,7 +31,7 @@ pub struct RenderInstruction<'a> {
     pub point_light: &'a [PointLightInstruction],
     pub model_batches: &'a [ModelBatch],
     pub models: &'a [ModelInstruction],
-    pub entities: &'a [EntityInstruction],
+    pub entities: &'a mut [EntityInstruction],
     pub directional_model_batches: &'a [ModelBatch],
     pub directional_shadow_models: &'a [ModelInstruction],
     pub directional_shadow_entities: &'a [EntityInstruction],
@@ -186,6 +186,7 @@ pub struct EntityInstruction {
     pub mirror: bool,
     pub entity_id: EntityId,
     pub texture: Arc<Texture>,
+    pub distance: f32,
 }
 
 #[derive(Clone, Debug)]

@@ -110,7 +110,9 @@ mod conversion {
     #[cfg(feature = "cgmath")]
     #[test]
     pub fn quaternion() {
-        encode_decode::<cgmath::Quaternion<u8>>(&[1, 2, 3, 4]);
+        let floats: [[u8; 4]; 4] = core::array::from_fn(|i| { (i + 1) as f32 }.to_le_bytes());
+        let bytes: &[u8] = floats.as_flattened();
+        encode_decode::<cgmath::Quaternion<f32>>(&bytes);
     }
 
     #[cfg(feature = "cgmath")]

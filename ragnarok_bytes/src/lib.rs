@@ -1,4 +1,5 @@
 #![cfg_attr(test, feature(assert_matches))]
+#![feature(array_try_from_fn)]
 
 mod error;
 mod fixed;

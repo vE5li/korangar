@@ -85,7 +85,7 @@ pub struct PointShadowCasterInstruction {
     /// Start point inside the point_shadow_models.
     pub model_offset: [usize; 6],
     /// Model count inside the point_shadow_models.
-    pub mode_count: [usize; 6],
+    pub model_count: [usize; 6],
 }
 
 #[derive(Clone, Debug)]

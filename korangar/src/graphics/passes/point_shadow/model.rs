@@ -158,11 +158,11 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
         let face_index = draw_data.pass_data.face_index;
         let batch = &draw_data.caster[shadow_caster_index];
 
-        if batch.mode_count[face_index] == 0 {
+        if batch.model_count[face_index] == 0 {
             return;
         }
         let offset = batch.model_offset[face_index];
-        let count = batch.mode_count[face_index];
+        let count = batch.model_count[face_index];
 
         pass.set_pipeline(&self.pipeline);
         pass.set_bind_group(2, &self.bind_group, &[]);

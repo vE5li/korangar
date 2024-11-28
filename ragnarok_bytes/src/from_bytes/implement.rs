@@ -11,33 +11,19 @@ impl FromBytes for u8 {
 
 impl FromBytes for u16 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([byte_stream.byte::<Self>()?, byte_stream.byte::<Self>()?]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 2>()?))
     }
 }
 
 impl FromBytes for u32 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-        ]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 4>()?))
     }
 }
 
 impl FromBytes for u64 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-        ]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 8>()?))
     }
 }
 
@@ -49,68 +35,31 @@ impl FromBytes for i8 {
 
 impl FromBytes for i16 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([byte_stream.byte::<Self>()?, byte_stream.byte::<Self>()?]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 2>()?))
     }
 }
 
 impl FromBytes for i32 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-        ]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 4>()?))
     }
 }
 
 impl FromBytes for i64 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-        ]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 8>()?))
     }
 }
 
 impl FromBytes for f32 {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        Ok(Self::from_le_bytes([
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-            byte_stream.byte::<Self>()?,
-        ]))
+        Ok(Self::from_le_bytes(byte_stream.bytes::<Self, 4>()?))
     }
 }
 
 impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
     fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        use std::mem::MaybeUninit;
-
-        let mut data: [MaybeUninit<T>; SIZE] = unsafe { MaybeUninit::uninit().assume_init() };
-
-        for element in &mut data[..] {
-            let item = T::from_bytes(byte_stream).trace::<Self>()?;
-            *element = MaybeUninit::new(item);
-        }
-
-        // rust wont let us do this currently
-        //unsafe { mem::transmute::<_, [T; SIZE]>(data) }
-
-        // workaround from: https://github.com/rust-lang/rust/issues/61956
-        let pointer = &mut data as *mut _ as *mut [T; SIZE];
-        let result = unsafe { pointer.read() };
-
-        core::mem::forget(data);
-
-        Ok(result)
+        std::array::try_from_fn(|_| T::from_bytes(byte_stream)).trace::<Self>()
     }
 }
 

@@ -150,12 +150,21 @@ where
         }
     }
 
-    pub fn byte<Caller>(&mut self) -> ConversionResult<u8> {
-        Self::check_upper_bound::<Caller>(self.offset, self.limit)?;
-
+    #[inline(always)]
+    fn byte_unchecked(&mut self) -> u8 {
         let byte = self.data[self.offset];
         self.offset += 1;
-        Ok(byte)
+        byte
+    }
+
+    pub fn byte<Caller>(&mut self) -> ConversionResult<u8> {
+        Self::check_upper_bound::<Caller>(self.offset, self.limit)?;
+        Ok(self.byte_unchecked())
+    }
+
+    pub fn bytes<Caller, const LENGTH: usize>(&mut self) -> ConversionResult<[u8; LENGTH]> {
+        Self::check_upper_bound::<Caller>(self.offset + LENGTH.saturating_sub(1), self.limit)?;
+        Ok(std::array::from_fn(|_| self.byte_unchecked()))
     }
 
     pub fn slice<Caller>(&mut self, count: usize) -> ConversionResult<&[u8]> {
@@ -291,6 +300,27 @@ mod byte {
 
         assert!(byte_stream.byte::<()>().is_ok());
         assert!(byte_stream.byte::<()>().is_err());
+    }
+}
+
+#[cfg(test)]
+mod bytes {
+    use std::assert_matches::assert_matches;
+
+    use crate::ByteStream;
+
+    #[test]
+    fn under_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+
+        assert_matches!(byte_stream.bytes::<(), 4>(), Ok([9, 9, 9, 9]));
+    }
+
+    #[test]
+    fn over_limit() {
+        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+
+        assert!(byte_stream.bytes::<(), 5>().is_err());
     }
 }
 

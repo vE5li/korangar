@@ -99,15 +99,15 @@ fn fs_main(
         if count != 0 {
             if (count <= 7) {
                 let incidence = f32(count) / 7.0;
-                color = vec4<f32>(0.0, incidence, 1.0 - incidence, 0.25);
+                color = vec4<f32>(0.0, incidence, 1.0 - incidence, 1.0) * 0.25;
             } else if (count <= 13) {
                 let incidence = (f32(count) - 7.0) / 6.0;
-                color = vec4<f32>(incidence, 1.0, 0.0, 0.25);
+                color = vec4<f32>(incidence, 1.0, 0.0, 1.0) * 0.25;
             } else if (count <= 20) {
                 let incidence = (f32(count) - 13.0) / 7.0;
-                color = vec4<f32>(1.0, 1.0 - incidence, 0.0, 0.25);
+                color = vec4<f32>(1.0, 1.0 - incidence, 0.0, 1.0) * 0.25;
             } else {
-                color = vec4<f32>(1.0, 0.0, 0.0, 0.25);
+                color = vec4<f32>(1.0, 0.0, 0.0, 1.0) * 0.25;
             }
         }
 

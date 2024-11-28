@@ -165,7 +165,11 @@ impl PostProcessingBlitterDrawer {
                 },
                 targets: &[Some(ColorTargetState {
                     format: color_texture_format,
-                    blend: if alpha_blending { Some(BlendState::ALPHA_BLENDING) } else { None },
+                    blend: if alpha_blending {
+                        Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING)
+                    } else {
+                        None
+                    },
                     write_mask: ColorWrites::default(),
                 })],
             }),

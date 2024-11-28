@@ -94,7 +94,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         }
         case 3u: {
             // Text (coverage)
-            color.a *= textureSample(font_atlas, linear_sampler, input.texture_coordinates).r;
+            color *= textureSample(font_atlas, linear_sampler, input.texture_coordinates).r;
         }
         default: {}
     }
@@ -155,7 +155,7 @@ fn rectangle_with_rounded_edges(
         alpha = total * (1.0/9.0);
     }
 
-    return vec4<f32>(color.rgb, color.a * alpha);
+    return color * alpha;
 }
 
 // 8-point Poisson Disk pattern

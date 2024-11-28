@@ -185,6 +185,7 @@ pub struct EntityInstruction {
     pub color: Color,
     pub mirror: bool,
     pub entity_id: EntityId,
+    pub add_to_picker: bool,
     pub texture: Arc<Texture>,
     pub distance: f32,
 }

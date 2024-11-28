@@ -264,11 +264,10 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera, include_self: bool) {
-        entities
-            .iter()
-            .skip(!include_self as usize)
-            .for_each(|entity| entity.render(instructions, camera));
+    pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
+        entities.iter().enumerate().for_each(|(index, entity)| {
+            entity.render(instructions, camera, index != 0);
+        });
     }
 
     #[cfg(feature = "debug")]

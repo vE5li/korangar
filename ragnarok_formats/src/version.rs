@@ -99,7 +99,7 @@ mod conversion {
     #[test]
     fn version_major_first() {
         let input = &[4, 7];
-        let mut byte_reader = ByteReader::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::without_metadata(input);
 
         let version = Version::<MajorFirst>::from_bytes(&mut byte_reader).unwrap();
         let output = version.to_bytes().unwrap();
@@ -110,7 +110,7 @@ mod conversion {
     #[test]
     fn version_minor_first() {
         let input = &[7, 4];
-        let mut byte_reader = ByteReader::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::without_metadata(input);
 
         let version = Version::<MinorFirst>::from_bytes(&mut byte_reader).unwrap();
         let output = version.to_bytes().unwrap();

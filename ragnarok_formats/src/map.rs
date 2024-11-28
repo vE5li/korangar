@@ -600,7 +600,7 @@ mod conversion {
 
             let mut test = |flags: TileFlags| {
                 if let Ok(bytes) = flags.to_bytes() {
-                    let mut byte_reader = ByteReader::<()>::without_metadata(&bytes);
+                    let mut byte_reader = ByteReader::without_metadata(&bytes);
                     let index = EncodedType::from_bytes(&mut byte_reader).unwrap();
                     hit_counter.register(index);
                 }
@@ -630,7 +630,7 @@ mod conversion {
 
             for input in 0..EncodedType::MAX {
                 let bytes = input.to_bytes().unwrap();
-                let mut byte_reader = ByteReader::<()>::without_metadata(&bytes);
+                let mut byte_reader = ByteReader::without_metadata(&bytes);
 
                 if TileFlags::from_bytes(&mut byte_reader).is_ok() {
                     hit_counter.register(input)
@@ -645,7 +645,7 @@ mod conversion {
         fn decode_encode() {
             for input in 0..EncodedType::MAX {
                 let bytes = input.to_bytes().unwrap();
-                let mut byte_reader = ByteReader::<()>::without_metadata(&bytes);
+                let mut byte_reader = ByteReader::without_metadata(&bytes);
 
                 if let Ok(decoded) = TileFlags::from_bytes(&mut byte_reader) {
                     let encoded = decoded.to_bytes().unwrap();

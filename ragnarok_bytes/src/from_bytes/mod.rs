@@ -58,7 +58,7 @@ mod from_n_bytes {
 
     #[test]
     fn data_saturated() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0u8; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0u8; TEST_BYTE_SIZE]);
         let result = Test::from_n_bytes(&mut byte_reader, TEST_BYTE_SIZE);
 
         assert!(result.is_ok());
@@ -67,7 +67,7 @@ mod from_n_bytes {
 
     #[test]
     fn data_left() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0u8; TEST_BYTE_SIZE * 2]);
+        let mut byte_reader = ByteReader::without_metadata(&[0u8; TEST_BYTE_SIZE * 2]);
         let result = Test::from_n_bytes(&mut byte_reader, TEST_BYTE_SIZE);
 
         assert!(result.is_ok());
@@ -76,7 +76,7 @@ mod from_n_bytes {
 
     #[test]
     fn data_missing() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0u8; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0u8; TEST_BYTE_SIZE]);
         let result = Test::from_n_bytes(&mut byte_reader, TEST_BYTE_SIZE * 2);
 
         assert!(result.is_err());
@@ -88,7 +88,7 @@ mod from_n_bytes {
 
     #[test]
     fn incorrect_size() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0u8; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0u8; TEST_BYTE_SIZE]);
         let result = Test::from_n_bytes(&mut byte_reader, TEST_BYTE_SIZE / 2);
 
         assert!(result.is_err());

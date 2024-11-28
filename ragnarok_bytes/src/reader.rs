@@ -39,12 +39,19 @@ where
     metadata: Meta,
 }
 
+impl<'a> ByteReader<'a, ()> {
+    /// Create a new [`ByteReader`] without metadata.
+    pub fn without_metadata(data: &'a [u8]) -> Self {
+        Self::with_metadata(data, ())
+    }
+}
+
 impl<'a, Meta> ByteReader<'a, Meta>
 where
     Meta: Default + 'static,
 {
     /// Create a new [`ByteReader`] with default metadata.
-    pub fn without_metadata(data: &'a [u8]) -> Self {
+    pub fn with_default_metadata(data: &'a [u8]) -> Self {
         Self::with_metadata(data, Default::default())
     }
 }
@@ -191,7 +198,7 @@ mod save_point {
 
     #[test]
     fn restore() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0; TEST_BYTE_SIZE]);
 
         let save_point = byte_reader.create_save_point();
 
@@ -221,7 +228,7 @@ mod temporary_limit {
 
     #[test]
     fn install() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0; TEST_BYTE_SIZE]);
         byte_reader.offset = TEST_BASE_OFFSET;
         let result = byte_reader.install_limit::<()>(TEST_BYTE_SIZE / 2);
 
@@ -235,7 +242,7 @@ mod temporary_limit {
 
     #[test]
     fn install_too_big() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0; TEST_BYTE_SIZE]);
         byte_reader.offset = TEST_BASE_OFFSET;
         let result = byte_reader.install_limit::<()>(TEST_BYTE_SIZE * 2);
 
@@ -244,7 +251,7 @@ mod temporary_limit {
 
     #[test]
     fn uninstall() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::without_metadata(&[0; TEST_BYTE_SIZE]);
         let temporary_limit = byte_reader.install_limit::<()>(TEST_BYTE_SIZE / 2).unwrap();
         byte_reader.uninstall_limit(temporary_limit);
 
@@ -289,14 +296,14 @@ mod byte {
 
     #[test]
     fn under_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 1]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 1]);
 
         assert_matches!(byte_reader.byte::<()>(), Ok(9));
     }
 
     #[test]
     fn over_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 1]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 1]);
 
         assert!(byte_reader.byte::<()>().is_ok());
         assert!(byte_reader.byte::<()>().is_err());
@@ -311,14 +318,14 @@ mod bytes {
 
     #[test]
     fn under_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
         assert_matches!(byte_reader.bytes::<(), 4>(), Ok([9, 9, 9, 9]));
     }
 
     #[test]
     fn over_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
         assert!(byte_reader.bytes::<(), 5>().is_err());
     }
@@ -332,7 +339,7 @@ mod slice {
 
     #[test]
     fn smaller_than_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
         assert_matches!(byte_reader.slice::<()>(3), Ok(&[9, 9, 9]));
         assert_eq!(byte_reader.remaining_bytes().as_slice(), &[9]);
@@ -340,7 +347,7 @@ mod slice {
 
     #[test]
     fn exactly_on_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
 
         assert_matches!(byte_reader.slice::<()>(4), Ok(&[9, 9, 9, 9]));
         assert!(byte_reader.is_empty());
@@ -348,7 +355,7 @@ mod slice {
 
     #[test]
     fn bigger_than_limit() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::without_metadata(&[9; 4]);
         let result = byte_reader.slice::<()>(5);
 
         assert!(result.is_err());
@@ -363,14 +370,14 @@ mod remaining_bytes {
 
     #[test]
     fn some_remaining() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(TEST_BYTES);
+        let mut byte_reader = ByteReader::without_metadata(TEST_BYTES);
 
         assert_eq!(byte_reader.remaining_bytes().as_slice(), TEST_BYTES);
     }
 
     #[test]
     fn none_remaining() {
-        let mut byte_reader = ByteReader::<()>::without_metadata(TEST_BYTES);
+        let mut byte_reader = ByteReader::without_metadata(TEST_BYTES);
 
         assert!(byte_reader.slice::<()>(TEST_BYTES.len()).is_ok());
         assert!(byte_reader.remaining_bytes().is_empty());

@@ -239,7 +239,7 @@ impl ModelLoader {
                 return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
 
         let model_data = match ModelData::from_bytes(&mut byte_reader) {
             Ok(model_data) => model_data,

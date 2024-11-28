@@ -44,7 +44,7 @@ impl EffectLoader {
             .game_file_loader
             .get(&format!("data\\texture\\effect\\{path}"))
             .map_err(LoadError::File)?;
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
 
         // TODO: Add fallback
         let effect_data = EffectData::from_bytes(&mut byte_reader).map_err(LoadError::Conversion)?;

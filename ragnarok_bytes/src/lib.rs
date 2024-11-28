@@ -21,7 +21,7 @@ mod conversion {
     use crate::{ByteReader, FromBytes, ToBytes};
 
     fn encode_decode<T: FromBytes + ToBytes>(input: &[u8]) {
-        let mut byte_reader = ByteReader::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::without_metadata(input);
 
         let data = T::from_bytes(&mut byte_reader).unwrap();
         let output = data.to_bytes().unwrap();

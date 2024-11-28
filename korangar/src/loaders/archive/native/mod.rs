@@ -36,7 +36,7 @@ impl Archive for NativeArchive {
 
         let mut file_header_buffer = vec![0u8; Header::size_in_bytes()];
         file.read_exact(&mut file_header_buffer).unwrap();
-        let file_header = Header::from_bytes(&mut ByteReader::<()>::without_metadata(&file_header_buffer)).unwrap();
+        let file_header = Header::from_bytes(&mut ByteReader::without_metadata(&file_header_buffer)).unwrap();
 
         assert_eq!(file_header.version, 0x200, "invalid grf version");
 
@@ -44,7 +44,7 @@ impl Archive for NativeArchive {
         let mut file_table_buffer = vec![0; AssetTable::size_in_bytes()];
 
         file.read_exact(&mut file_table_buffer).unwrap();
-        let file_table = AssetTable::from_bytes(&mut ByteReader::<()>::without_metadata(&file_table_buffer)).unwrap();
+        let file_table = AssetTable::from_bytes(&mut ByteReader::without_metadata(&file_table_buffer)).unwrap();
 
         let mut compressed_file_table_buffer = vec![0u8; file_table.compressed_size as usize];
         file.read_exact(&mut compressed_file_table_buffer).unwrap();
@@ -52,7 +52,7 @@ impl Archive for NativeArchive {
 
         let file_count = file_header.get_file_count();
 
-        let mut file_table_byte_reader = ByteReader::<()>::without_metadata(&decompressed);
+        let mut file_table_byte_reader = ByteReader::without_metadata(&decompressed);
         let mut assets = HashMap::with_capacity(file_count);
 
         for _index in 0..file_count {

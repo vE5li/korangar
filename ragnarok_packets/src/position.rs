@@ -101,7 +101,7 @@ mod conversion {
         let cases = [[255, 0, 0], [0, 255, 0], [0, 0, 240]];
 
         for case in cases {
-            let mut byte_steam = ragnarok_bytes::ByteReader::<()>::without_metadata(&case);
+            let mut byte_steam = ragnarok_bytes::ByteReader::without_metadata(&case);
 
             let position = WorldPosition::from_bytes(&mut byte_steam).unwrap();
             let output = position.to_bytes().unwrap();
@@ -124,7 +124,7 @@ mod conversion {
         ];
 
         for case in cases {
-            let mut byte_steam = ragnarok_bytes::ByteReader::<()>::without_metadata(&case);
+            let mut byte_steam = ragnarok_bytes::ByteReader::without_metadata(&case);
 
             let position = WorldPosition2::from_bytes(&mut byte_steam).unwrap();
             let output = position.to_bytes().unwrap();

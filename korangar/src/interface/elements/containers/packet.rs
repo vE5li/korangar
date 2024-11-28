@@ -46,7 +46,7 @@ impl Packet for UnknownPacket {
 
 impl<App: Application> PrototypeElement<App> for UnknownPacket {
     fn to_element(&self, display: String) -> ElementCell<App> {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&self.bytes);
+        let mut byte_reader = ByteReader::without_metadata(&self.bytes);
 
         let elements = match self.bytes.len() >= 2 {
             true => {
@@ -91,7 +91,7 @@ impl Packet for ErrorPacket {
 
 impl<App: Application> PrototypeElement<App> for ErrorPacket {
     fn to_element(&self, display: String) -> ElementCell<App> {
-        let mut byte_reader = ByteReader::<()>::without_metadata(&self.bytes);
+        let mut byte_reader = ByteReader::without_metadata(&self.bytes);
         let error = format!("{:?}", self.error);
 
         let elements = match self.bytes.len() >= 2 {

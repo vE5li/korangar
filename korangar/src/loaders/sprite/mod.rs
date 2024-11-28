@@ -70,7 +70,7 @@ impl SpriteLoader {
                 return self.get(FALLBACK_SPRITE_FILE);
             }
         };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
 
         let sprite_data = match SpriteData::from_bytes(&mut byte_reader) {
             Ok(sprite_data) => sprite_data,

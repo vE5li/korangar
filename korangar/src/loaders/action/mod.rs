@@ -199,7 +199,7 @@ impl ActionLoader {
                 return self.get(FALLBACK_ACTIONS_FILE);
             }
         };
-        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
 
         let actions_data = match ActionsData::from_bytes(&mut byte_reader) {
             Ok(actions_data) => actions_data,

@@ -273,7 +273,7 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
 
 fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &GameFileLoader) -> Result<Data, LoadError> {
     let bytes = game_file_loader.get(resource_file).map_err(LoadError::File)?;
-    let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
+    let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::with_default_metadata(&bytes);
 
     let data = Data::from_bytes(&mut byte_reader).map_err(LoadError::Conversion)?;
 

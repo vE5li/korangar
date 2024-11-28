@@ -268,7 +268,6 @@ where
                     let data = &buffer[..cut_off_buffer_base + received_bytes];
                     let mut byte_reader = ByteReader::without_metadata(data);
 
-
                     if read_account_id {
                         let account_id = AccountId::from_bytes(&mut byte_reader).unwrap();
                         events.push(NetworkEvent::AccountId(account_id));

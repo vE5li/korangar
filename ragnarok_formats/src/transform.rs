@@ -90,7 +90,7 @@ mod conversion {
         let input = &[
             1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0,
         ];
-        let mut byte_reader = ByteReader::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::without_metadata(input);
 
         let transform = Transform::from_bytes(&mut byte_reader).unwrap();
         let output = transform.to_bytes().unwrap();

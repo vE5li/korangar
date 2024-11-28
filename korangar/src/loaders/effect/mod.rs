@@ -6,7 +6,7 @@ use cgmath::Deg;
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::container::SimpleCache;
 use korangar_util::FileLoader;
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::effect::EffectData;
 use ragnarok_formats::version::InternalVersion;
 use wgpu::BlendFactor;
@@ -44,10 +44,10 @@ impl EffectLoader {
             .game_file_loader
             .get(&format!("data\\texture\\effect\\{path}"))
             .map_err(LoadError::File)?;
-        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
 
         // TODO: Add fallback
-        let effect_data = EffectData::from_bytes(&mut byte_stream).map_err(LoadError::Conversion)?;
+        let effect_data = EffectData::from_bytes(&mut byte_reader).map_err(LoadError::Conversion)?;
 
         let prefix = match path.chars().rev().position(|character| character == '\\') {
             Some(offset) => path.split_at(path.len() - offset).0,

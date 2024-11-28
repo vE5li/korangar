@@ -1,4 +1,4 @@
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FixedByteSize, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ConversionError, ConversionResult, FixedByteSize, FromBytes, ToBytes};
 
 #[derive(Debug, Clone, Default)]
 pub struct Signature<const MAGIC: &'static [u8]>;
@@ -10,11 +10,11 @@ impl<const MAGIC: &'static [u8]> FixedByteSize for Signature<MAGIC> {
 }
 
 impl<const MAGIC: &'static [u8]> FromBytes for Signature<MAGIC> {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>
     where
         Self: Sized,
     {
-        let bytes = byte_stream.slice::<Self>(MAGIC.len())?;
+        let bytes = byte_reader.slice::<Self>(MAGIC.len())?;
         match bytes == MAGIC {
             true => Ok(Self),
             false => Err(ConversionError::from_message("invalid magic number")),

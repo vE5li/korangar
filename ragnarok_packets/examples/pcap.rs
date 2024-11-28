@@ -5,7 +5,7 @@ use std::any::TypeId;
 use etherparse::{SlicedPacket, TransportSlice};
 use korangar_debug::logging::symbols::ARROW;
 use korangar_debug::logging::{Colorize, Colorized};
-use ragnarok_bytes::{ByteStream, ConversionError};
+use ragnarok_bytes::{ByteReader, ConversionError};
 use ragnarok_packets::handler::{HandlerResult, PacketCallback, PacketHandler};
 use ragnarok_packets::*;
 
@@ -356,23 +356,23 @@ fn main() {
                     // FIX: Handle cut off packets.
 
                     if source_port == LOGIN_SERVER_PORT {
-                        let mut byte_stream = ByteStream::without_metadata(tcp_slice.payload());
-                        while let HandlerResult::Ok(_) = client_login_handler.process_one(&mut byte_stream) {}
+                        let mut byte_reader = ByteReader::without_metadata(tcp_slice.payload());
+                        while let HandlerResult::Ok(_) = client_login_handler.process_one(&mut byte_reader) {}
                     } else if destination_port == LOGIN_SERVER_PORT {
-                        let mut byte_stream = ByteStream::without_metadata(tcp_slice.payload());
-                        while let HandlerResult::Ok(_) = server_login_handler.process_one(&mut byte_stream) {}
+                        let mut byte_reader = ByteReader::without_metadata(tcp_slice.payload());
+                        while let HandlerResult::Ok(_) = server_login_handler.process_one(&mut byte_reader) {}
                     } else if source_port == CHARACTER_SERVER_PORT {
-                        let mut byte_stream = ByteStream::without_metadata(tcp_slice.payload());
-                        while let HandlerResult::Ok(_) = client_character_handler.process_one(&mut byte_stream) {}
+                        let mut byte_reader = ByteReader::without_metadata(tcp_slice.payload());
+                        while let HandlerResult::Ok(_) = client_character_handler.process_one(&mut byte_reader) {}
                     } else if destination_port == CHARACTER_SERVER_PORT {
-                        let mut byte_stream = ByteStream::without_metadata(tcp_slice.payload());
-                        while let HandlerResult::Ok(_) = server_character_handler.process_one(&mut byte_stream) {}
+                        let mut byte_reader = ByteReader::without_metadata(tcp_slice.payload());
+                        while let HandlerResult::Ok(_) = server_character_handler.process_one(&mut byte_reader) {}
                     } else if source_port == MAP_SERVER_PORT {
-                        let mut byte_stream = ByteStream::without_metadata(tcp_slice.payload());
-                        while let HandlerResult::Ok(_) = client_map_handler.process_one(&mut byte_stream) {}
+                        let mut byte_reader = ByteReader::without_metadata(tcp_slice.payload());
+                        while let HandlerResult::Ok(_) = client_map_handler.process_one(&mut byte_reader) {}
                     } else if destination_port == MAP_SERVER_PORT {
-                        let mut byte_stream = ByteStream::without_metadata(tcp_slice.payload());
-                        while let HandlerResult::Ok(_) = server_map_handler.process_one(&mut byte_stream) {}
+                        let mut byte_reader = ByteReader::without_metadata(tcp_slice.payload());
+                        while let HandlerResult::Ok(_) = server_map_handler.process_one(&mut byte_reader) {}
                     }
                 };
             }

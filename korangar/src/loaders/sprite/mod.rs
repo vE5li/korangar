@@ -6,7 +6,7 @@ use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::container::{Cacheable, SimpleCache};
 use korangar_util::FileLoader;
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::sprite::{PaletteColor, RgbaImageData, SpriteData};
 use ragnarok_formats::version::InternalVersion;
 use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
@@ -70,9 +70,9 @@ impl SpriteLoader {
                 return self.get(FALLBACK_SPRITE_FILE);
             }
         };
-        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
 
-        let sprite_data = match SpriteData::from_bytes(&mut byte_stream) {
+        let sprite_data = match SpriteData::from_bytes(&mut byte_reader) {
             Ok(sprite_data) => sprite_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]

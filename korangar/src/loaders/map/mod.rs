@@ -13,7 +13,7 @@ use korangar_util::collision::{KDTree, Sphere, AABB};
 use korangar_util::container::SimpleSlab;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
 use korangar_util::FileLoader;
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
 use wgpu::{BufferUsages, Device, Queue};
@@ -29,14 +29,14 @@ use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSource
 const MAP_OFFSET: f32 = 5.0;
 
 #[cfg(feature = "debug")]
-fn assert_byte_stream_empty<Meta>(mut byte_stream: ByteStream<Meta>, file_name: &str) {
+fn assert_byte_reader_empty<Meta>(mut byte_reader: ByteReader<Meta>, file_name: &str) {
     use korangar_debug::logging::{print_debug, Colorize};
 
-    if !byte_stream.is_empty() {
+    if !byte_reader.is_empty() {
         print_debug!(
             "incomplete read on file {}; {} bytes remaining",
             file_name.magenta(),
-            byte_stream.remaining_bytes().len().yellow(),
+            byte_reader.remaining_bytes().len().yellow(),
         );
     }
 }
@@ -273,12 +273,12 @@ fn apply_map_offset(ground_data: &GroundData, resources: &mut MapResources) {
 
 fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &GameFileLoader) -> Result<Data, LoadError> {
     let bytes = game_file_loader.get(resource_file).map_err(LoadError::File)?;
-    let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
+    let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
 
-    let data = Data::from_bytes(&mut byte_stream).map_err(LoadError::Conversion)?;
+    let data = Data::from_bytes(&mut byte_reader).map_err(LoadError::Conversion)?;
 
     #[cfg(feature = "debug")]
-    assert_byte_stream_empty(byte_stream, resource_file);
+    assert_byte_reader_empty(byte_reader, resource_file);
 
     Ok(data)
 }

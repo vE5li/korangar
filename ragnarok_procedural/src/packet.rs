@@ -31,7 +31,7 @@ pub fn derive_packet_struct(
     };
 
     let insert_packet_length = is_variable_length.then_some(quote! {
-        let __packet_length = ragnarok_bytes::ConversionResultExt::trace::<Self>(u16::from_bytes(byte_stream))?;
+        let __packet_length = ragnarok_bytes::ConversionResultExt::trace::<Self>(u16::from_bytes(byte_reader))?;
     });
 
     let final_to_bytes = match is_variable_length {
@@ -63,8 +63,8 @@ pub fn derive_packet_struct(
             const IS_PING: bool = #is_ping;
             const HEADER: ragnarok_packets::PacketHeader = ragnarok_packets::PacketHeader(#signature);
 
-            fn payload_from_bytes<Meta>(byte_stream: &mut ragnarok_bytes::ByteStream<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
-                let base_offset = byte_stream.get_offset();
+            fn payload_from_bytes<Meta>(byte_reader: &mut ragnarok_bytes::ByteReader<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
+                let base_offset = byte_reader.get_offset();
                 #insert_packet_length
                 #(#from_bytes_implementations)*
                 let packet = #instanciate;

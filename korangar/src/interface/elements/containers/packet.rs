@@ -10,7 +10,7 @@ use korangar_interface::event::{ChangeEvent, HoverInformation};
 use korangar_interface::layout::PlacementResolver;
 use korangar_interface::size_bound;
 use korangar_interface::state::{PlainRemote, Remote, RemoteClone};
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
+use ragnarok_bytes::{ByteReader, ConversionError, ConversionResult, FromBytes};
 use ragnarok_packets::handler::PacketCallback;
 use ragnarok_packets::{Packet, PacketHeader};
 
@@ -30,8 +30,8 @@ impl Packet for UnknownPacket {
     const HEADER: PacketHeader = PacketHeader(0);
     const IS_PING: bool = false;
 
-    fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let _ = byte_stream;
+    fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let _ = byte_reader;
         unimplemented!()
     }
 
@@ -46,13 +46,13 @@ impl Packet for UnknownPacket {
 
 impl<App: Application> PrototypeElement<App> for UnknownPacket {
     fn to_element(&self, display: String) -> ElementCell<App> {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&self.bytes);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&self.bytes);
 
         let elements = match self.bytes.len() >= 2 {
             true => {
-                let signature = PacketHeader::from_bytes(&mut byte_stream).unwrap();
+                let signature = PacketHeader::from_bytes(&mut byte_reader).unwrap();
                 let header = format!("0x{:0>4x}", signature.0);
-                let data = &self.bytes[byte_stream.get_offset()..];
+                let data = &self.bytes[byte_reader.get_offset()..];
 
                 vec![header.to_element("header".to_owned()), data.to_element("data".to_owned())]
             }
@@ -75,8 +75,8 @@ impl Packet for ErrorPacket {
     const HEADER: PacketHeader = PacketHeader(0);
     const IS_PING: bool = false;
 
-    fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let _ = byte_stream;
+    fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let _ = byte_reader;
         unimplemented!()
     }
 
@@ -91,14 +91,14 @@ impl Packet for ErrorPacket {
 
 impl<App: Application> PrototypeElement<App> for ErrorPacket {
     fn to_element(&self, display: String) -> ElementCell<App> {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&self.bytes);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&self.bytes);
         let error = format!("{:?}", self.error);
 
         let elements = match self.bytes.len() >= 2 {
             true => {
-                let signature = PacketHeader::from_bytes(&mut byte_stream).unwrap();
+                let signature = PacketHeader::from_bytes(&mut byte_reader).unwrap();
                 let header = format!("0x{:0>4x}", signature.0);
-                let data = &self.bytes[byte_stream.get_offset()..];
+                let data = &self.bytes[byte_reader.get_offset()..];
 
                 vec![
                     header.to_element("header".to_owned()),

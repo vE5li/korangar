@@ -1,4 +1,4 @@
-use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ConversionResult, FromBytes, ToBytes};
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
@@ -14,8 +14,8 @@ impl WorldPosition {
 }
 
 impl FromBytes for WorldPosition {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let coordinates: Vec<usize> = byte_stream.slice::<Self>(3)?.iter().map(|byte| *byte as usize).collect();
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let coordinates: Vec<usize> = byte_reader.slice::<Self>(3)?.iter().map(|byte| *byte as usize).collect();
 
         let x = (coordinates[1] >> 6) | (coordinates[0] << 2);
         let y = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
@@ -60,8 +60,8 @@ impl WorldPosition2 {
 }
 
 impl FromBytes for WorldPosition2 {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let coordinates: Vec<usize> = byte_stream.slice::<Self>(6)?.iter().map(|byte| *byte as usize).collect();
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let coordinates: Vec<usize> = byte_reader.slice::<Self>(6)?.iter().map(|byte| *byte as usize).collect();
 
         let x1 = (coordinates[1] >> 6) | (coordinates[0] << 2);
         let y1 = (coordinates[2] >> 4) | ((coordinates[1] & 0b111111) << 4);
@@ -101,7 +101,7 @@ mod conversion {
         let cases = [[255, 0, 0], [0, 255, 0], [0, 0, 240]];
 
         for case in cases {
-            let mut byte_steam = ragnarok_bytes::ByteStream::<()>::without_metadata(&case);
+            let mut byte_steam = ragnarok_bytes::ByteReader::<()>::without_metadata(&case);
 
             let position = WorldPosition::from_bytes(&mut byte_steam).unwrap();
             let output = position.to_bytes().unwrap();
@@ -124,7 +124,7 @@ mod conversion {
         ];
 
         for case in cases {
-            let mut byte_steam = ragnarok_bytes::ByteStream::<()>::without_metadata(&case);
+            let mut byte_steam = ragnarok_bytes::ByteReader::<()>::without_metadata(&case);
 
             let position = WorldPosition2::from_bytes(&mut byte_steam).unwrap();
             let output = position.to_bytes().unwrap();

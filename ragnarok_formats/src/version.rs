@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 
-use ragnarok_bytes::{ByteStream, ConversionResult, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ConversionResult, FromBytes, ToBytes};
 
 #[derive(Copy, Clone, Debug)]
 pub struct MajorFirst;
@@ -17,9 +17,9 @@ pub struct Version<T> {
 }
 
 impl FromBytes for Version<MajorFirst> {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let major = byte_stream.byte::<Self>()?;
-        let minor = byte_stream.byte::<Self>()?;
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let major = byte_reader.byte::<Self>()?;
+        let minor = byte_reader.byte::<Self>()?;
 
         Ok(Self {
             major,
@@ -30,9 +30,9 @@ impl FromBytes for Version<MajorFirst> {
 }
 
 impl FromBytes for Version<MinorFirst> {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let minor = byte_stream.byte::<Self>()?;
-        let major = byte_stream.byte::<Self>()?;
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let minor = byte_reader.byte::<Self>()?;
+        let major = byte_reader.byte::<Self>()?;
 
         Ok(Self {
             minor,
@@ -91,7 +91,7 @@ impl Display for InternalVersion {
 
 #[cfg(test)]
 mod conversion {
-    use ragnarok_bytes::{ByteStream, FromBytes, ToBytes};
+    use ragnarok_bytes::{ByteReader, FromBytes, ToBytes};
 
     use super::{MajorFirst, Version};
     use crate::version::MinorFirst;
@@ -99,9 +99,9 @@ mod conversion {
     #[test]
     fn version_major_first() {
         let input = &[4, 7];
-        let mut byte_stream = ByteStream::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::<()>::without_metadata(input);
 
-        let version = Version::<MajorFirst>::from_bytes(&mut byte_stream).unwrap();
+        let version = Version::<MajorFirst>::from_bytes(&mut byte_reader).unwrap();
         let output = version.to_bytes().unwrap();
 
         assert_eq!(input, output.as_slice());
@@ -110,9 +110,9 @@ mod conversion {
     #[test]
     fn version_minor_first() {
         let input = &[7, 4];
-        let mut byte_stream = ByteStream::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::<()>::without_metadata(input);
 
-        let version = Version::<MinorFirst>::from_bytes(&mut byte_stream).unwrap();
+        let version = Version::<MinorFirst>::from_bytes(&mut byte_reader).unwrap();
         let output = version.to_bytes().unwrap();
 
         assert_eq!(input, output.as_slice());

@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use cgmath::{Point3, Vector3};
 use korangar_interface::elements::PrototypeElement;
-use ragnarok_bytes::{ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 use crate::color::{ColorBGRA, ColorRGB};
 use crate::signature::Signature;
@@ -69,7 +69,7 @@ bitflags::bitflags! {
 }
 
 impl FromBytes for QuadTreeData {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
         const MAX_DEPTH: usize = 5;
         const CHILD_COUNT: usize = 4;
 
@@ -84,10 +84,10 @@ impl FromBytes for QuadTreeData {
         let mut nodes = Vec::new();
 
         while let Some((parent_index, depth)) = stack.pop_back() {
-            let max = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
-            let min = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
-            let half_size = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
-            let center = FromBytes::from_bytes(byte_stream).trace::<Self>()?;
+            let max = FromBytes::from_bytes(byte_reader).trace::<Self>()?;
+            let min = FromBytes::from_bytes(byte_reader).trace::<Self>()?;
+            let half_size = FromBytes::from_bytes(byte_reader).trace::<Self>()?;
+            let center = FromBytes::from_bytes(byte_reader).trace::<Self>()?;
 
             let children = match depth < MAX_DEPTH {
                 true => Vec::with_capacity(CHILD_COUNT),
@@ -135,8 +135,8 @@ impl FromBytes for QuadTreeData {
 }
 
 impl FromBytes for TileFlags {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        match <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).trace::<Self>()? {
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        match <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).trace::<Self>()? {
             0 => Ok(Self::WALKABLE),
             1 => Ok(Self::empty()),
             2 => Ok(Self::WATER),
@@ -250,29 +250,29 @@ pub struct GroundTile {
 }
 
 impl FromBytes for GroundTile {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let upper_left_height = f32::from_bytes(byte_stream).trace::<Self>()?;
-        let upper_right_height = f32::from_bytes(byte_stream).trace::<Self>()?;
-        let lower_left_height = f32::from_bytes(byte_stream).trace::<Self>()?;
-        let lower_right_height = f32::from_bytes(byte_stream).trace::<Self>()?;
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let upper_left_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let upper_right_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let lower_left_height = f32::from_bytes(byte_reader).trace::<Self>()?;
+        let lower_right_height = f32::from_bytes(byte_reader).trace::<Self>()?;
 
-        let version = byte_stream
+        let version = byte_reader
             .get_metadata::<Self, Option<InternalVersion>>()?
             .ok_or(ConversionError::from_message("version not set"))?;
 
         let top_surface_index = match version.equals_or_above(1, 7) {
-            true => i32::from_bytes(byte_stream).trace::<Self>()?,
-            false => i16::from_bytes(byte_stream).trace::<Self>()? as i32,
+            true => i32::from_bytes(byte_reader).trace::<Self>()?,
+            false => i16::from_bytes(byte_reader).trace::<Self>()? as i32,
         };
 
         let front_surface_index = match version.equals_or_above(1, 7) {
-            true => i32::from_bytes(byte_stream).trace::<Self>()?,
-            false => i16::from_bytes(byte_stream).trace::<Self>()? as i32,
+            true => i32::from_bytes(byte_reader).trace::<Self>()?,
+            false => i16::from_bytes(byte_reader).trace::<Self>()? as i32,
         };
 
         let right_surface_index = match version.equals_or_above(1, 7) {
-            true => i32::from_bytes(byte_stream).trace::<Self>()?,
-            false => i16::from_bytes(byte_stream).trace::<Self>()? as i32,
+            true => i32::from_bytes(byte_reader).trace::<Self>()?,
+            false => i16::from_bytes(byte_reader).trace::<Self>()? as i32,
         };
 
         Ok(Self {
@@ -318,8 +318,8 @@ pub enum ResourceType {
 }
 
 impl FromBytes for ResourceType {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let index = i32::from_bytes(byte_stream).trace::<Self>()?;
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let index = i32::from_bytes(byte_reader).trace::<Self>()?;
         match index {
             1 => Ok(ResourceType::Object),
             2 => Ok(ResourceType::LightSource),
@@ -385,8 +385,8 @@ impl MapResources {
 }
 
 impl FromBytes for MapResources {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let resources_amount = u32::from_bytes(byte_stream).trace::<Self>()?;
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let resources_amount = u32::from_bytes(byte_reader).trace::<Self>()?;
 
         let mut objects = Vec::new();
         let mut light_sources = Vec::new();
@@ -394,17 +394,17 @@ impl FromBytes for MapResources {
         let mut effect_sources = Vec::new();
 
         for index in 0..resources_amount {
-            let resource_type = ResourceType::from_bytes(byte_stream).trace::<Self>()?;
+            let resource_type = ResourceType::from_bytes(byte_reader).trace::<Self>()?;
 
             match resource_type {
                 ResourceType::Object => {
-                    let mut object = ObjectData::from_bytes(byte_stream).trace::<Self>()?;
+                    let mut object = ObjectData::from_bytes(byte_reader).trace::<Self>()?;
                     // offset the objects slightly to avoid depth buffer fighting
                     object.transform.position += Vector3::new(0.0, 0.0005, 0.0) * index as f32;
                     objects.push(object);
                 }
                 ResourceType::LightSource => {
-                    let mut light_source = LightSource::from_bytes(byte_stream).trace::<Self>()?;
+                    let mut light_source = LightSource::from_bytes(byte_reader).trace::<Self>()?;
                     light_source.position.y = -light_source.position.y;
 
                     // Some light sources have color channels with values bigger than 1.0 (255), so
@@ -415,7 +415,7 @@ impl FromBytes for MapResources {
                     light_sources.push(light_source);
                 }
                 ResourceType::SoundSource => {
-                    let mut sound_source = SoundSource::from_bytes(byte_stream).trace::<Self>()?;
+                    let mut sound_source = SoundSource::from_bytes(byte_reader).trace::<Self>()?;
                     sound_source.position.y = -sound_source.position.y;
 
                     if sound_source.cycle.is_none() {
@@ -425,7 +425,7 @@ impl FromBytes for MapResources {
                     sound_sources.push(sound_source);
                 }
                 ResourceType::EffectSource => {
-                    let mut effect_source = EffectSource::from_bytes(byte_stream).trace::<Self>()?;
+                    let mut effect_source = EffectSource::from_bytes(byte_reader).trace::<Self>()?;
                     effect_source.position.y = -effect_source.position.y;
                     effect_sources.push(effect_source);
                 }
@@ -559,7 +559,7 @@ mod conversion {
     // When adding new permutations `ENCODED_TILE_COUNT` needs to be adjusted.
     mod tile_flags {
         use bitflags::Flags;
-        use ragnarok_bytes::{ByteStream, FromBytes, ToBytes};
+        use ragnarok_bytes::{ByteReader, FromBytes, ToBytes};
 
         use crate::map::TileFlags;
 
@@ -600,8 +600,8 @@ mod conversion {
 
             let mut test = |flags: TileFlags| {
                 if let Ok(bytes) = flags.to_bytes() {
-                    let mut byte_stream = ByteStream::<()>::without_metadata(&bytes);
-                    let index = EncodedType::from_bytes(&mut byte_stream).unwrap();
+                    let mut byte_reader = ByteReader::<()>::without_metadata(&bytes);
+                    let index = EncodedType::from_bytes(&mut byte_reader).unwrap();
                     hit_counter.register(index);
                 }
             };
@@ -630,9 +630,9 @@ mod conversion {
 
             for input in 0..EncodedType::MAX {
                 let bytes = input.to_bytes().unwrap();
-                let mut byte_stream = ByteStream::<()>::without_metadata(&bytes);
+                let mut byte_reader = ByteReader::<()>::without_metadata(&bytes);
 
-                if TileFlags::from_bytes(&mut byte_stream).is_ok() {
+                if TileFlags::from_bytes(&mut byte_reader).is_ok() {
                     hit_counter.register(input)
                 }
             }
@@ -645,9 +645,9 @@ mod conversion {
         fn decode_encode() {
             for input in 0..EncodedType::MAX {
                 let bytes = input.to_bytes().unwrap();
-                let mut byte_stream = ByteStream::<()>::without_metadata(&bytes);
+                let mut byte_reader = ByteReader::<()>::without_metadata(&bytes);
 
-                if let Ok(decoded) = TileFlags::from_bytes(&mut byte_stream) {
+                if let Ok(decoded) = TileFlags::from_bytes(&mut byte_reader) {
                     let encoded = decoded.to_bytes().unwrap();
                     assert_eq!(encoded.as_slice(), bytes);
                 }

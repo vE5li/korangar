@@ -4,7 +4,7 @@ mod position;
 use std::net::Ipv4Addr;
 
 use ragnarok_bytes::{
-    ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FixedByteSize, FromBytes, ToBytes,
+    ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FixedByteSize, FromBytes, ToBytes,
 };
 #[cfg(feature = "derive")]
 pub use ragnarok_procedural::{CharacterServer, ClientPacket, LoginServer, MapServer, Packet, ServerPacket};
@@ -35,7 +35,7 @@ pub trait Packet: std::fmt::Debug + Clone {
 
     /// Read packet **without the header**. To read the packet with the header,
     /// use [`PacketExt::packet_from_bytes`].
-    fn payload_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>;
+    fn payload_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>;
 
     /// Write packet **without the header**. To write the packet with the
     /// header, use [`PacketExt::packet_to_bytes`].
@@ -53,7 +53,7 @@ pub trait Packet: std::fmt::Debug + Clone {
 pub trait PacketExt: Packet {
     /// Read packet **with the header**. To read the packet without the header,
     /// use [`Packet::payload_from_bytes`].
-    fn packet_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>;
+    fn packet_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>;
 
     /// Write packet **with the header**. To write the packet without the
     /// header, use [`Packet::payload_to_bytes`].
@@ -64,14 +64,14 @@ impl<T> PacketExt for T
 where
     T: Packet,
 {
-    fn packet_from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let header = PacketHeader::from_bytes(byte_stream)?;
+    fn packet_from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let header = PacketHeader::from_bytes(byte_reader)?;
 
         if header != Self::HEADER {
             return Err(ConversionError::from_message("mismatched header"));
         }
 
-        Self::payload_from_bytes(byte_stream)
+        Self::payload_from_bytes(byte_reader)
     }
 
     fn packet_to_bytes(&self) -> ConversionResult<Vec<u8>> {
@@ -198,8 +198,8 @@ pub struct ColorRGBA {
 pub struct InventoryIndex(pub u16);
 
 impl FromBytes for InventoryIndex {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        u16::from_bytes(byte_stream).map(|raw| Self(raw - 2))
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        u16::from_bytes(byte_reader).map(|raw| Self(raw - 2))
     }
 }
 
@@ -866,8 +866,8 @@ impl FixedByteSize for RegularItemFlags {
 }
 
 impl FromBytes for RegularItemFlags {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
     }
 }
 
@@ -917,8 +917,8 @@ impl FixedByteSize for EquippableItemFlags {
 }
 
 impl FromBytes for EquippableItemFlags {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
     }
 }
 
@@ -1118,74 +1118,74 @@ pub enum StatusType {
 }
 
 impl FromBytes for StatusType {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let status = match u16::from_bytes(byte_stream).trace::<Self>()? {
-            0 => u32::from_bytes(byte_stream).map(Self::MovementSpeed),
-            1 => u64::from_bytes(byte_stream).map(Self::BaseExperience),
-            2 => u64::from_bytes(byte_stream).map(Self::JobExperience),
-            3 => u32::from_bytes(byte_stream).map(Self::Karma),
-            4 => u32::from_bytes(byte_stream).map(Self::Manner),
-            5 => u32::from_bytes(byte_stream).map(Self::HealthPoints),
-            6 => u32::from_bytes(byte_stream).map(Self::MaximumHealthPoints),
-            7 => u32::from_bytes(byte_stream).map(Self::SpellPoints),
-            8 => u32::from_bytes(byte_stream).map(Self::MaximumSpellPoints),
-            9 => u32::from_bytes(byte_stream).map(Self::StatusPoint),
-            11 => u32::from_bytes(byte_stream).map(Self::BaseLevel),
-            12 => u32::from_bytes(byte_stream).map(Self::SkillPoint),
-            13 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Strength(a, u32::from_bytes(byte_stream)?))),
-            14 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Agility(a, u32::from_bytes(byte_stream)?))),
-            15 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Vitality(a, u32::from_bytes(byte_stream)?))),
-            16 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Intelligence(a, u32::from_bytes(byte_stream)?))),
-            17 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Dexterity(a, u32::from_bytes(byte_stream)?))),
-            18 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Luck(a, u32::from_bytes(byte_stream)?))),
-            20 => u32::from_bytes(byte_stream).map(Self::Zeny),
-            22 => u64::from_bytes(byte_stream).map(Self::NextBaseExperience),
-            23 => u64::from_bytes(byte_stream).map(Self::NextJobExperience),
-            24 => u32::from_bytes(byte_stream).map(Self::Weight),
-            25 => u32::from_bytes(byte_stream).map(Self::MaximumWeight),
-            32 => u8::from_bytes(byte_stream).map(Self::SpUstr),
-            33 => u8::from_bytes(byte_stream).map(Self::SpUagi),
-            34 => u8::from_bytes(byte_stream).map(Self::SpUvit),
-            35 => u8::from_bytes(byte_stream).map(Self::SpUint),
-            36 => u8::from_bytes(byte_stream).map(Self::SpUdex),
-            37 => u8::from_bytes(byte_stream).map(Self::SpUluk),
-            41 => u32::from_bytes(byte_stream).map(Self::Attack1),
-            42 => u32::from_bytes(byte_stream).map(Self::Attack2),
-            43 => u32::from_bytes(byte_stream).map(Self::MagicAttack1),
-            44 => u32::from_bytes(byte_stream).map(Self::MagicAttack2),
-            45 => u32::from_bytes(byte_stream).map(Self::Defense1),
-            46 => u32::from_bytes(byte_stream).map(Self::Defense2),
-            47 => u32::from_bytes(byte_stream).map(Self::MagicDefense1),
-            48 => u32::from_bytes(byte_stream).map(Self::MagicDefense2),
-            49 => u32::from_bytes(byte_stream).map(Self::Hit),
-            50 => u32::from_bytes(byte_stream).map(Self::Flee1),
-            51 => u32::from_bytes(byte_stream).map(Self::Flee2),
-            52 => u32::from_bytes(byte_stream).map(Self::Critical),
-            53 => u32::from_bytes(byte_stream).map(Self::AttackSpeed),
-            55 => u32::from_bytes(byte_stream).map(Self::JobLevel),
-            99 => u16::from_bytes(byte_stream)
-                .and_then(|a| Ok(Self::CartInfo(a, u32::from_bytes(byte_stream)?, u32::from_bytes(byte_stream)?))),
-            219 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Power(a, u32::from_bytes(byte_stream)?))),
-            220 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Stamina(a, u32::from_bytes(byte_stream)?))),
-            221 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Wisdom(a, u32::from_bytes(byte_stream)?))),
-            222 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Spell(a, u32::from_bytes(byte_stream)?))),
-            223 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Concentration(a, u32::from_bytes(byte_stream)?))),
-            224 => u32::from_bytes(byte_stream).and_then(|a| Ok(Self::Creativity(a, u32::from_bytes(byte_stream)?))),
-            225 => u32::from_bytes(byte_stream).map(Self::PhysicalAttack),
-            226 => u32::from_bytes(byte_stream).map(Self::SpellMagicAttack),
-            227 => u32::from_bytes(byte_stream).map(Self::Resistance),
-            228 => u32::from_bytes(byte_stream).map(Self::MagicResistance),
-            229 => u32::from_bytes(byte_stream).map(Self::HealingPlus),
-            230 => u32::from_bytes(byte_stream).map(Self::CriticalDamageRate),
-            231 => u32::from_bytes(byte_stream).map(Self::TraitPoint),
-            232 => u32::from_bytes(byte_stream).map(Self::ActivityPoints),
-            233 => u32::from_bytes(byte_stream).map(Self::MaximumActivityPoints),
-            247 => u8::from_bytes(byte_stream).map(Self::SpUpow),
-            248 => u8::from_bytes(byte_stream).map(Self::SpUsta),
-            249 => u8::from_bytes(byte_stream).map(Self::SpUwis),
-            250 => u8::from_bytes(byte_stream).map(Self::SpUspl),
-            251 => u8::from_bytes(byte_stream).map(Self::SpUcon),
-            252 => u8::from_bytes(byte_stream).map(Self::SpUcrt),
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let status = match u16::from_bytes(byte_reader).trace::<Self>()? {
+            0 => u32::from_bytes(byte_reader).map(Self::MovementSpeed),
+            1 => u64::from_bytes(byte_reader).map(Self::BaseExperience),
+            2 => u64::from_bytes(byte_reader).map(Self::JobExperience),
+            3 => u32::from_bytes(byte_reader).map(Self::Karma),
+            4 => u32::from_bytes(byte_reader).map(Self::Manner),
+            5 => u32::from_bytes(byte_reader).map(Self::HealthPoints),
+            6 => u32::from_bytes(byte_reader).map(Self::MaximumHealthPoints),
+            7 => u32::from_bytes(byte_reader).map(Self::SpellPoints),
+            8 => u32::from_bytes(byte_reader).map(Self::MaximumSpellPoints),
+            9 => u32::from_bytes(byte_reader).map(Self::StatusPoint),
+            11 => u32::from_bytes(byte_reader).map(Self::BaseLevel),
+            12 => u32::from_bytes(byte_reader).map(Self::SkillPoint),
+            13 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Strength(a, u32::from_bytes(byte_reader)?))),
+            14 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Agility(a, u32::from_bytes(byte_reader)?))),
+            15 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Vitality(a, u32::from_bytes(byte_reader)?))),
+            16 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Intelligence(a, u32::from_bytes(byte_reader)?))),
+            17 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Dexterity(a, u32::from_bytes(byte_reader)?))),
+            18 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Luck(a, u32::from_bytes(byte_reader)?))),
+            20 => u32::from_bytes(byte_reader).map(Self::Zeny),
+            22 => u64::from_bytes(byte_reader).map(Self::NextBaseExperience),
+            23 => u64::from_bytes(byte_reader).map(Self::NextJobExperience),
+            24 => u32::from_bytes(byte_reader).map(Self::Weight),
+            25 => u32::from_bytes(byte_reader).map(Self::MaximumWeight),
+            32 => u8::from_bytes(byte_reader).map(Self::SpUstr),
+            33 => u8::from_bytes(byte_reader).map(Self::SpUagi),
+            34 => u8::from_bytes(byte_reader).map(Self::SpUvit),
+            35 => u8::from_bytes(byte_reader).map(Self::SpUint),
+            36 => u8::from_bytes(byte_reader).map(Self::SpUdex),
+            37 => u8::from_bytes(byte_reader).map(Self::SpUluk),
+            41 => u32::from_bytes(byte_reader).map(Self::Attack1),
+            42 => u32::from_bytes(byte_reader).map(Self::Attack2),
+            43 => u32::from_bytes(byte_reader).map(Self::MagicAttack1),
+            44 => u32::from_bytes(byte_reader).map(Self::MagicAttack2),
+            45 => u32::from_bytes(byte_reader).map(Self::Defense1),
+            46 => u32::from_bytes(byte_reader).map(Self::Defense2),
+            47 => u32::from_bytes(byte_reader).map(Self::MagicDefense1),
+            48 => u32::from_bytes(byte_reader).map(Self::MagicDefense2),
+            49 => u32::from_bytes(byte_reader).map(Self::Hit),
+            50 => u32::from_bytes(byte_reader).map(Self::Flee1),
+            51 => u32::from_bytes(byte_reader).map(Self::Flee2),
+            52 => u32::from_bytes(byte_reader).map(Self::Critical),
+            53 => u32::from_bytes(byte_reader).map(Self::AttackSpeed),
+            55 => u32::from_bytes(byte_reader).map(Self::JobLevel),
+            99 => u16::from_bytes(byte_reader)
+                .and_then(|a| Ok(Self::CartInfo(a, u32::from_bytes(byte_reader)?, u32::from_bytes(byte_reader)?))),
+            219 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Power(a, u32::from_bytes(byte_reader)?))),
+            220 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Stamina(a, u32::from_bytes(byte_reader)?))),
+            221 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Wisdom(a, u32::from_bytes(byte_reader)?))),
+            222 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Spell(a, u32::from_bytes(byte_reader)?))),
+            223 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Concentration(a, u32::from_bytes(byte_reader)?))),
+            224 => u32::from_bytes(byte_reader).and_then(|a| Ok(Self::Creativity(a, u32::from_bytes(byte_reader)?))),
+            225 => u32::from_bytes(byte_reader).map(Self::PhysicalAttack),
+            226 => u32::from_bytes(byte_reader).map(Self::SpellMagicAttack),
+            227 => u32::from_bytes(byte_reader).map(Self::Resistance),
+            228 => u32::from_bytes(byte_reader).map(Self::MagicResistance),
+            229 => u32::from_bytes(byte_reader).map(Self::HealingPlus),
+            230 => u32::from_bytes(byte_reader).map(Self::CriticalDamageRate),
+            231 => u32::from_bytes(byte_reader).map(Self::TraitPoint),
+            232 => u32::from_bytes(byte_reader).map(Self::ActivityPoints),
+            233 => u32::from_bytes(byte_reader).map(Self::MaximumActivityPoints),
+            247 => u8::from_bytes(byte_reader).map(Self::SpUpow),
+            248 => u8::from_bytes(byte_reader).map(Self::SpUsta),
+            249 => u8::from_bytes(byte_reader).map(Self::SpUwis),
+            250 => u8::from_bytes(byte_reader).map(Self::SpUspl),
+            251 => u8::from_bytes(byte_reader).map(Self::SpUcon),
+            252 => u8::from_bytes(byte_reader).map(Self::SpUcrt),
             invalid => Err(ConversionError::from_message(format!("invalid status code {invalid}"))),
         };
 
@@ -2216,8 +2216,8 @@ impl FixedByteSize for EquipPosition {
 }
 
 impl FromBytes for EquipPosition {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        <Self as bitflags::Flags>::Bits::from_bytes(byte_stream).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        <Self as bitflags::Flags>::Bits::from_bytes(byte_reader).map(|raw| Self::from_bits(raw).expect("Invalid equip position"))
     }
 }
 

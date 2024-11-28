@@ -4,7 +4,7 @@
 mod error;
 mod fixed;
 mod from_bytes;
-mod stream;
+mod reader;
 mod to_bytes;
 
 #[cfg(feature = "derive")]
@@ -13,17 +13,17 @@ pub use ragnarok_procedural::{ByteConvertable, FixedByteSize, FromBytes, ToBytes
 pub use self::error::{ConversionError, ConversionErrorType, ConversionResult, ConversionResultExt};
 pub use self::fixed::{FixedByteSize, FixedByteSizeCollection};
 pub use self::from_bytes::{FromBytes, FromBytesExt};
-pub use self::stream::ByteStream;
+pub use self::reader::ByteReader;
 pub use self::to_bytes::{ToBytes, ToBytesExt};
 
 #[cfg(test)]
 mod conversion {
-    use crate::{ByteStream, FromBytes, ToBytes};
+    use crate::{ByteReader, FromBytes, ToBytes};
 
     fn encode_decode<T: FromBytes + ToBytes>(input: &[u8]) {
-        let mut byte_stream = ByteStream::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::<()>::without_metadata(input);
 
-        let data = T::from_bytes(&mut byte_stream).unwrap();
+        let data = T::from_bytes(&mut byte_reader).unwrap();
         let output = data.to_bytes().unwrap();
 
         assert_eq!(input, output.as_slice());

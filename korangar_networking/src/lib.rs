@@ -14,7 +14,7 @@ use event::{
     CharacterServerDisconnectedEvent, DisconnectedEvent, LoginServerDisconnectedEvent, MapServerDisconnectedEvent, NetworkEventList,
     NoNetworkEvents,
 };
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_packets::handler::{DuplicateHandlerError, HandlerResult, NoPacketCallback, PacketCallback, PacketHandler};
 use ragnarok_packets::*;
 use server::{ServerConnectCommand, ServerConnection};
@@ -266,20 +266,20 @@ where
                     }
 
                     let data = &buffer[..cut_off_buffer_base + received_bytes];
-                    let mut byte_stream = ByteStream::without_metadata(data);
+                    let mut byte_reader = ByteReader::without_metadata(data);
 
 
                     if read_account_id {
-                        let account_id = AccountId::from_bytes(&mut byte_stream).unwrap();
+                        let account_id = AccountId::from_bytes(&mut byte_reader).unwrap();
                         events.push(NetworkEvent::AccountId(account_id));
                         read_account_id = false;
                     }
 
-                    while !byte_stream.is_empty() {
-                        match packet_handler.process_one(&mut byte_stream) {
+                    while !byte_reader.is_empty() {
+                        match packet_handler.process_one(&mut byte_reader) {
                             HandlerResult::Ok(packet_events) => events.extend(packet_events.0.into_iter()),
                             HandlerResult::PacketCutOff => {
-                                let packet_start = byte_stream.get_offset();
+                                let packet_start = byte_reader.get_offset();
                                 let packet_end = cut_off_buffer_base + received_bytes;
 
                                 if packet_start == 0 {

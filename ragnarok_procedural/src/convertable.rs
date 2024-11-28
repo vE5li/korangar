@@ -34,8 +34,8 @@ fn derive_for_struct(
     let from = implement_from.then(|| {
         quote! {
             impl #impl_generics ragnarok_bytes::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes<Meta>(byte_stream: &mut ragnarok_bytes::ByteStream<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
-                    let base_offset = byte_stream.get_offset();
+                fn from_bytes<Meta>(byte_reader: &mut ragnarok_bytes::ByteReader<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
+                    let base_offset = byte_reader.get_offset();
                     #(#from_bytes_implementations)*
                     Ok(#instanciate)
                 }
@@ -98,8 +98,8 @@ fn derive_for_enum(
     let from = add_from.then(|| {
         quote! {
             impl #impl_generics ragnarok_bytes::FromBytes for #name #type_generics #where_clause {
-                fn from_bytes<Meta>(byte_stream: &mut ragnarok_bytes::ByteStream<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
-                    match ragnarok_bytes::ConversionResultExt::trace::<Self>(#numeric_type::from_bytes(byte_stream))? as usize {
+                fn from_bytes<Meta>(byte_reader: &mut ragnarok_bytes::ByteReader<Meta>) -> ragnarok_bytes::ConversionResult<Self> {
+                    match ragnarok_bytes::ConversionResultExt::trace::<Self>(#numeric_type::from_bytes(byte_reader))? as usize {
                         #( #indices => Ok(Self::#values), )*
                         invalid => Err(ragnarok_bytes::ConversionError::from_message(format!("invalid enum variant {}", invalid))),
                     }

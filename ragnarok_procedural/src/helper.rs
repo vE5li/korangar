@@ -40,17 +40,17 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
 
         let from_length = match length.clone() {
             Some(length) => {
-                quote!(ragnarok_bytes::FromBytesExt::from_n_bytes(byte_stream, #length as usize))
+                quote!(ragnarok_bytes::FromBytesExt::from_n_bytes(byte_reader, #length as usize))
             }
             None if length_remaining => quote!(ragnarok_bytes::FromBytesExt::from_n_bytes(
-                byte_stream,
-                (__packet_length as usize).saturating_sub(2 + (byte_stream.get_offset() - base_offset))
+                byte_reader,
+                (__packet_length as usize).saturating_sub(2 + (byte_reader.get_offset() - base_offset))
             )),
             None if length_remaining_off_by_one => quote!(ragnarok_bytes::FromBytesExt::from_n_bytes(
-                byte_stream,
-                (__packet_length as usize).saturating_sub(1 + (byte_stream.get_offset() - base_offset))
+                byte_reader,
+                (__packet_length as usize).saturating_sub(1 + (byte_reader.get_offset() - base_offset))
             )),
-            None => quote!(ragnarok_bytes::FromBytes::from_bytes(byte_stream)),
+            None => quote!(ragnarok_bytes::FromBytes::from_bytes(byte_reader)),
         };
 
         let to_length = match length {
@@ -127,7 +127,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
             }
             None if repeating_remaining => {
                 quote!({
-                    let remaining_bytes = __packet_length - ((byte_stream.get_offset() - base_offset) as u16) - 2;
+                    let remaining_bytes = __packet_length - ((byte_reader.get_offset() - base_offset) as u16) - 2;
                     let struct_size = <#field_type as ragnarok_bytes::FixedByteSizeCollection>::size_in_bytes() as u16;
 
                     if remaining_bytes % struct_size != 0 {
@@ -171,7 +171,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
         let from_implementation = match version_function {
             Some(function) => {
                 quote! {
-                    let #field_variable = match byte_stream
+                    let #field_variable = match byte_reader
                             .get_metadata::<Self, Option<ragnarok_formats::version::InternalVersion>>()?
                             .ok_or(ragnarok_bytes::ConversionError::from_message("version not set"))?
                             .#function {
@@ -198,7 +198,7 @@ pub fn byte_convertable_helper(data_struct: DataStruct) -> (TokenStream, Vec<Tok
 
         if is_version {
             from_bytes_implementations.push(
-                quote!(*byte_stream.get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()? = Some(ragnarok_formats::version::InternalVersion::from(#field_variable));),
+                quote!(*byte_reader.get_metadata_mut::<Self, Option<ragnarok_formats::version::InternalVersion>>()? = Some(ragnarok_formats::version::InternalVersion::from(#field_variable));),
             );
         }
     }

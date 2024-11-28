@@ -8,7 +8,7 @@ use korangar_util::collision::AABB;
 use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
 use korangar_util::FileLoader;
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, ModelString, NodeData};
 use ragnarok_formats::version::InternalVersion;
 
@@ -239,9 +239,9 @@ impl ModelLoader {
                 return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
             }
         };
-        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
 
-        let model_data = match ModelData::from_bytes(&mut byte_stream) {
+        let model_data = match ModelData::from_bytes(&mut byte_reader) {
             Ok(model_data) => model_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]

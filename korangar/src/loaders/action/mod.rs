@@ -9,7 +9,7 @@ use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::container::{Cacheable, SimpleCache};
 use korangar_util::FileLoader;
-use ragnarok_bytes::{ByteStream, FromBytes};
+use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::action::{Action, ActionsData};
 use ragnarok_formats::version::InternalVersion;
 use ragnarok_packets::ClientTick;
@@ -199,9 +199,9 @@ impl ActionLoader {
                 return self.get(FALLBACK_ACTIONS_FILE);
             }
         };
-        let mut byte_stream: ByteStream<Option<InternalVersion>> = ByteStream::without_metadata(&bytes);
+        let mut byte_reader: ByteReader<Option<InternalVersion>> = ByteReader::without_metadata(&bytes);
 
-        let actions_data = match ActionsData::from_bytes(&mut byte_stream) {
+        let actions_data = match ActionsData::from_bytes(&mut byte_reader) {
             Ok(actions_data) => actions_data,
             Err(_error) => {
                 #[cfg(feature = "debug")]

@@ -1,6 +1,6 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConversionErrorType {
-    ByteStreamTooShort { type_name: &'static str },
+    ByteReaderTooShort { type_name: &'static str },
     DataTooBig { type_name: &'static str },
     IncorrectMetadata { type_name: &'static str },
     Specific { message: String },
@@ -26,8 +26,8 @@ impl ConversionError {
         })
     }
 
-    pub fn is_byte_stream_too_short(&self) -> bool {
-        matches!(self.error_type, ConversionErrorType::ByteStreamTooShort { .. })
+    pub fn is_byte_reader_too_short(&self) -> bool {
+        matches!(self.error_type, ConversionErrorType::ByteReaderTooShort { .. })
     }
 
     fn add_to_stack(&mut self, type_name: &'static str) {
@@ -40,7 +40,7 @@ impl std::fmt::Debug for ConversionError {
         let stack = self.stack.join("::");
 
         match &self.error_type {
-            ConversionErrorType::ByteStreamTooShort { type_name } => {
+            ConversionErrorType::ByteReaderTooShort { type_name } => {
                 write!(formatter, "byte stream too short while parsing {} in {}", type_name, stack)
             }
             ConversionErrorType::DataTooBig { type_name } => {
@@ -108,7 +108,7 @@ mod instanciate {
 
     #[test]
     fn from_error_type() {
-        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let error_type = ConversionErrorType::ByteReaderTooShort { type_name: "test" };
         let error = ConversionError::from_error_type(error_type.clone());
 
         assert_eq!(error.error_type, error_type);
@@ -135,7 +135,7 @@ mod add_to_stack {
 
     #[test]
     fn empty() {
-        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let error_type = ConversionErrorType::ByteReaderTooShort { type_name: "test" };
         let mut error = ConversionError::from_error_type(error_type.clone());
 
         error.add_to_stack(FIRST);
@@ -145,7 +145,7 @@ mod add_to_stack {
 
     #[test]
     fn multiple() {
-        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+        let error_type = ConversionErrorType::ByteReaderTooShort { type_name: "test" };
         let mut error = ConversionError::from_error_type(error_type.clone());
 
         error.add_to_stack(THIRD);
@@ -161,10 +161,10 @@ mod type_check {
     use super::{ConversionError, ConversionErrorType};
 
     #[test]
-    fn is_byte_stream_too_short() {
-        let error_type = ConversionErrorType::ByteStreamTooShort { type_name: "test" };
+    fn is_byte_reader_too_short() {
+        let error_type = ConversionErrorType::ByteReaderTooShort { type_name: "test" };
         let error = ConversionError::from_error_type(error_type.clone());
 
-        assert!(error.is_byte_stream_too_short());
+        assert!(error.is_byte_reader_too_short());
     }
 }

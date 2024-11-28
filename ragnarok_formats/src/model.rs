@@ -1,6 +1,6 @@
 use cgmath::{Matrix3, Point3, Quaternion, Vector2, Vector3};
 use ragnarok_bytes::{
-    ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
+    ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
 };
 
 use crate::signature::Signature;
@@ -14,19 +14,19 @@ pub struct ModelString<const LENGTH: usize> {
 }
 
 impl<const LENGTH: usize> FromBytes for ModelString<LENGTH> {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let inner = if byte_stream
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let inner = if byte_reader
             .get_metadata::<Self, Option<InternalVersion>>()?
             .ok_or(ConversionError::from_message("version not set"))?
             .equals_or_above(2, 2)
         {
-            let length = u32::from_bytes(byte_stream).trace::<Self>()? as usize;
-            let mut inner = String::from_n_bytes(byte_stream, length).trace::<Self>()?;
+            let length = u32::from_bytes(byte_reader).trace::<Self>()? as usize;
+            let mut inner = String::from_n_bytes(byte_reader, length).trace::<Self>()?;
             // need to remove the last character for some reason
             inner.pop();
             inner
         } else {
-            String::from_n_bytes(byte_stream, LENGTH).trace::<Self>()?
+            String::from_n_bytes(byte_reader, LENGTH).trace::<Self>()?
         };
 
         Ok(Self { inner })

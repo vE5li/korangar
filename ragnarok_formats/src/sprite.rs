@@ -1,5 +1,5 @@
 use ragnarok_bytes::{
-    ByteConvertable, ByteStream, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
+    ByteConvertable, ByteReader, ConversionError, ConversionResult, ConversionResultExt, FromBytes, FromBytesExt, ToBytes,
 };
 
 use crate::signature::Signature;
@@ -18,34 +18,34 @@ pub struct PaletteImageData {
 pub struct EncodedData(pub Vec<u8>);
 
 impl FromBytes for PaletteImageData {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self>
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self>
     where
         Self: Sized,
     {
-        let width = u16::from_bytes(byte_stream).trace::<Self>()?;
-        let height = u16::from_bytes(byte_stream).trace::<Self>()?;
+        let width = u16::from_bytes(byte_reader).trace::<Self>()?;
+        let height = u16::from_bytes(byte_reader).trace::<Self>()?;
 
         let data = match width as usize * height as usize {
             0 => Vec::new(),
             image_size
-                if byte_stream
+                if byte_reader
                     .get_metadata::<Self, Option<InternalVersion>>()?
                     .ok_or(ConversionError::from_message("version not set"))?
                     .smaller(2, 1) =>
             {
-                Vec::from_n_bytes(byte_stream, image_size).trace::<Self>()?
+                Vec::from_n_bytes(byte_reader, image_size).trace::<Self>()?
             }
             image_size => {
                 let mut data = vec![0; image_size];
-                let mut encoded = u16::from_bytes(byte_stream).trace::<Self>()?;
+                let mut encoded = u16::from_bytes(byte_reader).trace::<Self>()?;
                 let mut next = 0;
 
                 while next < image_size && encoded > 0 {
-                    let byte = byte_stream.byte::<Self>()?;
+                    let byte = byte_reader.byte::<Self>()?;
                     encoded -= 1;
 
                     if byte == 0 {
-                        let length = usize::max(byte_stream.byte::<Self>()? as usize, 1);
+                        let length = usize::max(byte_reader.byte::<Self>()? as usize, 1);
                         encoded -= 1;
 
                         if next + length > image_size {

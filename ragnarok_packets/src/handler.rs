@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ragnarok_bytes::{ByteStream, ConversionError, ConversionResult, FromBytes};
+use ragnarok_bytes::{ByteReader, ConversionError, ConversionResult, FromBytes};
 
 use crate::PacketHeader;
 
@@ -58,9 +58,9 @@ pub struct NoPacketCallback;
 
 impl PacketCallback for NoPacketCallback {}
 
-pub type HandlerFunction<Output, Meta> = Box<dyn Fn(&mut ByteStream<Meta>) -> ConversionResult<Output>>;
+pub type HandlerFunction<Output, Meta> = Box<dyn Fn(&mut ByteReader<Meta>) -> ConversionResult<Output>>;
 
-/// A struct to help with reading packets from from a [`ByteStream`] and
+/// A struct to help with reading packets from from a [`ByteReader`] and
 /// converting them to some common event type.
 ///
 /// It allows passing a packet callback to monitor incoming packets.
@@ -108,8 +108,8 @@ where
         let packet_callback = self.packet_callback.clone();
         let old_handler = self.handlers.insert(
             Packet::HEADER,
-            Box::new(move |byte_stream| {
-                let packet = Packet::payload_from_bytes(byte_stream)?;
+            Box::new(move |byte_reader| {
+                let packet = Packet::payload_from_bytes(byte_reader)?;
 
                 packet_callback.incoming_packet(&packet);
 
@@ -133,8 +133,8 @@ where
         let packet_callback = self.packet_callback.clone();
         let old_handler = self.handlers.insert(
             Packet::HEADER,
-            Box::new(move |byte_stream| {
-                let packet = Packet::payload_from_bytes(byte_stream)?;
+            Box::new(move |byte_reader| {
+                let packet = Packet::payload_from_bytes(byte_reader)?;
 
                 packet_callback.incoming_packet(&packet);
 
@@ -151,34 +151,34 @@ where
     }
 
     /// Take a single packet from the byte stream.
-    pub fn process_one(&mut self, byte_stream: &mut ByteStream<Meta>) -> HandlerResult<Output> {
-        let save_point = byte_stream.create_save_point();
+    pub fn process_one(&mut self, byte_reader: &mut ByteReader<Meta>) -> HandlerResult<Output> {
+        let save_point = byte_reader.create_save_point();
 
-        let Ok(header) = PacketHeader::from_bytes(byte_stream) else {
+        let Ok(header) = PacketHeader::from_bytes(byte_reader) else {
             // Packet is cut-off at the header.
-            byte_stream.restore_save_point(save_point);
+            byte_reader.restore_save_point(save_point);
             return HandlerResult::PacketCutOff;
         };
 
         let Some(handler) = self.handlers.get(&header) else {
-            byte_stream.restore_save_point(save_point);
+            byte_reader.restore_save_point(save_point);
 
-            self.packet_callback.unknown_packet(byte_stream.remaining_bytes());
+            self.packet_callback.unknown_packet(byte_reader.remaining_bytes());
 
             return HandlerResult::UnhandledPacket;
         };
 
-        match handler(byte_stream) {
+        match handler(byte_reader) {
             Ok(output) => HandlerResult::Ok(output),
             // Cut-off packet (probably).
-            Err(error) if error.is_byte_stream_too_short() => {
-                byte_stream.restore_save_point(save_point);
+            Err(error) if error.is_byte_reader_too_short() => {
+                byte_reader.restore_save_point(save_point);
                 HandlerResult::PacketCutOff
             }
             Err(error) => {
-                byte_stream.restore_save_point(save_point);
+                byte_reader.restore_save_point(save_point);
 
-                self.packet_callback.failed_packet(byte_stream.remaining_bytes(), error.clone());
+                self.packet_callback.failed_packet(byte_reader.remaining_bytes(), error.clone());
 
                 HandlerResult::InternalError(error)
             }

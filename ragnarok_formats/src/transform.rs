@@ -1,7 +1,7 @@
 use std::ops::Add;
 
 use cgmath::{Deg, EuclideanSpace, Point3, Rad, Vector3};
-use ragnarok_bytes::{ByteStream, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
+use ragnarok_bytes::{ByteReader, ConversionResult, ConversionResultExt, FromBytes, ToBytes};
 
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
@@ -13,10 +13,10 @@ pub struct Transform {
 }
 
 impl FromBytes for Transform {
-    fn from_bytes<Meta>(byte_stream: &mut ByteStream<Meta>) -> ConversionResult<Self> {
-        let mut position = <Point3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
-        let rotation = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
-        let scale = <Vector3<f32>>::from_bytes(byte_stream).trace::<Self>()?;
+    fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
+        let mut position = <Point3<f32>>::from_bytes(byte_reader).trace::<Self>()?;
+        let rotation = <Vector3<f32>>::from_bytes(byte_reader).trace::<Self>()?;
+        let scale = <Vector3<f32>>::from_bytes(byte_reader).trace::<Self>()?;
 
         // Convert from a standard Rust float (which is in degrees) to a stronger cgmath
         // type that also represents degrees. We can then easily convert it to
@@ -81,7 +81,7 @@ impl Add for Transform {
 
 #[cfg(test)]
 mod conversion {
-    use ragnarok_bytes::{ByteStream, FromBytes, ToBytes};
+    use ragnarok_bytes::{ByteReader, FromBytes, ToBytes};
 
     use super::Transform;
 
@@ -90,9 +90,9 @@ mod conversion {
         let input = &[
             1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0, 1, 2, 3, 0, 4, 5, 6, 0, 7, 8, 9, 10, 0, 0, 0, 11, 0, 0, 0, 12, 0, 0, 0,
         ];
-        let mut byte_stream = ByteStream::<()>::without_metadata(input);
+        let mut byte_reader = ByteReader::<()>::without_metadata(input);
 
-        let transform = Transform::from_bytes(&mut byte_stream).unwrap();
+        let transform = Transform::from_bytes(&mut byte_reader).unwrap();
         let output = transform.to_bytes().unwrap();
 
         assert_eq!(input, output.as_slice());

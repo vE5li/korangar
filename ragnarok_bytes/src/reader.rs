@@ -2,7 +2,7 @@ use std::any::TypeId;
 
 use crate::{ConversionError, ConversionErrorType, ConversionResult};
 
-/// Saved state of a [`ByteStream`] that can be restored.
+/// Saved state of a [`ByteReader`] that can be restored.
 #[derive(Debug, PartialEq, Eq)]
 pub struct SavePoint {
     offset: usize,
@@ -15,21 +15,21 @@ pub(crate) struct TemporaryLimit {
     old_limit: usize,
 }
 
-/// A stream of bytes that iterates over borrowed data. It can produce single
+/// A reader of bytes that iterates over borrowed data. It can produce single
 /// bytes or slices of memory and carries metadata about the read operation (for
 /// example a version).
 ///
-/// The stream is intended for reading data without lookahead.
+/// The reader is intended for reading data without lookahead.
 ///
-/// The state of the stream can be saved at any time with
-/// [`create_save_point`](ByteStream::create_save_point), and restored with
-/// [`restore_save_point`](ByteStream::restore_save_point).
+/// The state of the reader can be saved at any time with
+/// [`create_save_point`](ByteReader::create_save_point), and restored with
+/// [`restore_save_point`](ByteReader::restore_save_point).
 ///
 /// NOTE: The save point *does not* restore the previous state of the metadata.
 /// It should therefore be avoided to modify the metadata while reading of
 /// composite structures data that might fail, for example multi-field structs
 /// that implement [`FromBytes`](crate::from_bytes::FromBytes).
-pub struct ByteStream<'a, Meta = ()>
+pub struct ByteReader<'a, Meta = ()>
 where
     Meta: 'static,
 {
@@ -39,21 +39,21 @@ where
     metadata: Meta,
 }
 
-impl<'a, Meta> ByteStream<'a, Meta>
+impl<'a, Meta> ByteReader<'a, Meta>
 where
     Meta: Default + 'static,
 {
-    /// Create a new [`ByteStream`] with default metadata.
+    /// Create a new [`ByteReader`] with default metadata.
     pub fn without_metadata(data: &'a [u8]) -> Self {
         Self::with_metadata(data, Default::default())
     }
 }
 
-impl<'a, Meta> ByteStream<'a, Meta>
+impl<'a, Meta> ByteReader<'a, Meta>
 where
     Meta: 'static,
 {
-    /// Create a new [`ByteStream`] with specific metadata.
+    /// Create a new [`ByteReader`] with specific metadata.
     pub fn with_metadata(data: &'a [u8], metadata: Meta) -> Self {
         let limit = data.len();
 
@@ -69,7 +69,7 @@ where
         self.offset
     }
 
-    // TODO: Implement this only for streams with metadata that can not be mutated
+    // TODO: Implement this only for readers with metadata that can not be mutated
     // while reading.
     //
     // E.g: `Reusable` or `Rollback` trait.
@@ -80,7 +80,7 @@ where
         }
     }
 
-    // TODO: Implement this only for streams with metadata that can not be mutated
+    // TODO: Implement this only for readers with metadata that can not be mutated
     // while reading.
     //
     // E.g: `Reusable` or `Rollback` trait.
@@ -94,7 +94,7 @@ where
         let old_limit = self.limit;
 
         if frame_limit > old_limit {
-            return Err(ConversionError::from_error_type(ConversionErrorType::ByteStreamTooShort {
+            return Err(ConversionError::from_error_type(ConversionErrorType::ByteReaderTooShort {
                 type_name: std::any::type_name::<Caller>(),
             }));
         }
@@ -144,7 +144,7 @@ where
     fn check_upper_bound<Caller>(offset: usize, length: usize) -> ConversionResult<()> {
         match offset < length {
             true => Ok(()),
-            false => Err(ConversionError::from_error_type(ConversionErrorType::ByteStreamTooShort {
+            false => Err(ConversionError::from_error_type(ConversionErrorType::ByteReaderTooShort {
                 type_name: std::any::type_name::<Caller>(),
             })),
         }
@@ -185,47 +185,47 @@ where
 
 #[cfg(test)]
 mod save_point {
-    use crate::ByteStream;
+    use crate::ByteReader;
 
     const TEST_BYTE_SIZE: usize = 10;
 
     #[test]
     fn restore() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
 
-        let save_point = byte_stream.create_save_point();
+        let save_point = byte_reader.create_save_point();
 
-        assert_eq!(byte_stream.offset, 0);
-        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE);
+        assert_eq!(byte_reader.offset, 0);
+        assert_eq!(byte_reader.limit, TEST_BYTE_SIZE);
 
-        byte_stream.offset = TEST_BYTE_SIZE / 2;
-        byte_stream.limit = TEST_BYTE_SIZE / 2;
+        byte_reader.offset = TEST_BYTE_SIZE / 2;
+        byte_reader.limit = TEST_BYTE_SIZE / 2;
 
-        assert_eq!(byte_stream.offset, TEST_BYTE_SIZE / 2);
-        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE / 2);
+        assert_eq!(byte_reader.offset, TEST_BYTE_SIZE / 2);
+        assert_eq!(byte_reader.limit, TEST_BYTE_SIZE / 2);
 
-        byte_stream.restore_save_point(save_point);
+        byte_reader.restore_save_point(save_point);
 
-        assert_eq!(byte_stream.offset, 0);
-        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE);
+        assert_eq!(byte_reader.offset, 0);
+        assert_eq!(byte_reader.limit, TEST_BYTE_SIZE);
     }
 }
 
 #[cfg(test)]
 mod temporary_limit {
-    use crate::stream::TemporaryLimit;
-    use crate::ByteStream;
+    use crate::reader::TemporaryLimit;
+    use crate::ByteReader;
 
     const TEST_BASE_OFFSET: usize = 1;
     const TEST_BYTE_SIZE: usize = 10;
 
     #[test]
     fn install() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
-        byte_stream.offset = TEST_BASE_OFFSET;
-        let result = byte_stream.install_limit::<()>(TEST_BYTE_SIZE / 2);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        byte_reader.offset = TEST_BASE_OFFSET;
+        let result = byte_reader.install_limit::<()>(TEST_BYTE_SIZE / 2);
 
-        assert_eq!(byte_stream.limit, TEST_BASE_OFFSET + TEST_BYTE_SIZE / 2);
+        assert_eq!(byte_reader.limit, TEST_BASE_OFFSET + TEST_BYTE_SIZE / 2);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), TemporaryLimit {
             frame_limit: TEST_BASE_OFFSET + TEST_BYTE_SIZE / 2,
@@ -235,49 +235,49 @@ mod temporary_limit {
 
     #[test]
     fn install_too_big() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
-        byte_stream.offset = TEST_BASE_OFFSET;
-        let result = byte_stream.install_limit::<()>(TEST_BYTE_SIZE * 2);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        byte_reader.offset = TEST_BASE_OFFSET;
+        let result = byte_reader.install_limit::<()>(TEST_BYTE_SIZE * 2);
 
         assert!(result.is_err());
     }
 
     #[test]
     fn uninstall() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
-        let temporary_limit = byte_stream.install_limit::<()>(TEST_BYTE_SIZE / 2).unwrap();
-        byte_stream.uninstall_limit(temporary_limit);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[0; TEST_BYTE_SIZE]);
+        let temporary_limit = byte_reader.install_limit::<()>(TEST_BYTE_SIZE / 2).unwrap();
+        byte_reader.uninstall_limit(temporary_limit);
 
-        assert_eq!(byte_stream.limit, TEST_BYTE_SIZE);
-        assert_eq!(byte_stream.offset, TEST_BYTE_SIZE / 2);
+        assert_eq!(byte_reader.limit, TEST_BYTE_SIZE);
+        assert_eq!(byte_reader.offset, TEST_BYTE_SIZE / 2);
     }
 }
 
 #[cfg(test)]
 mod metadata {
-    use crate::ByteStream;
+    use crate::ByteReader;
 
     #[test]
     fn get_metadata() {
-        let byte_stream = ByteStream::<i32>::with_metadata(&[0; 1], 9);
+        let byte_reader = ByteReader::<i32>::with_metadata(&[0; 1], 9);
 
-        assert!(byte_stream.get_metadata::<(), i32>().is_ok());
-        assert!(byte_stream.get_metadata::<(), u32>().is_err());
+        assert!(byte_reader.get_metadata::<(), i32>().is_ok());
+        assert!(byte_reader.get_metadata::<(), u32>().is_err());
     }
 
     #[test]
     fn get_metadata_mut() {
-        let mut byte_stream = ByteStream::<i32>::with_metadata(&[0; 1], 9);
+        let mut byte_reader = ByteReader::<i32>::with_metadata(&[0; 1], 9);
 
-        assert!(byte_stream.get_metadata_mut::<(), i32>().is_ok());
-        assert!(byte_stream.get_metadata_mut::<(), u32>().is_err());
+        assert!(byte_reader.get_metadata_mut::<(), i32>().is_ok());
+        assert!(byte_reader.get_metadata_mut::<(), u32>().is_err());
     }
 
     #[test]
     fn into_metadata() {
-        let byte_stream = ByteStream::<i32>::with_metadata(&[0; 1], 9);
+        let byte_reader = ByteReader::<i32>::with_metadata(&[0; 1], 9);
 
-        assert_eq!(byte_stream.into_metadata(), 9);
+        assert_eq!(byte_reader.into_metadata(), 9);
     }
 }
 
@@ -285,21 +285,21 @@ mod metadata {
 mod byte {
     use std::assert_matches::assert_matches;
 
-    use crate::ByteStream;
+    use crate::ByteReader;
 
     #[test]
     fn under_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 1]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 1]);
 
-        assert_matches!(byte_stream.byte::<()>(), Ok(9));
+        assert_matches!(byte_reader.byte::<()>(), Ok(9));
     }
 
     #[test]
     fn over_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 1]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 1]);
 
-        assert!(byte_stream.byte::<()>().is_ok());
-        assert!(byte_stream.byte::<()>().is_err());
+        assert!(byte_reader.byte::<()>().is_ok());
+        assert!(byte_reader.byte::<()>().is_err());
     }
 }
 
@@ -307,20 +307,20 @@ mod byte {
 mod bytes {
     use std::assert_matches::assert_matches;
 
-    use crate::ByteStream;
+    use crate::ByteReader;
 
     #[test]
     fn under_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
 
-        assert_matches!(byte_stream.bytes::<(), 4>(), Ok([9, 9, 9, 9]));
+        assert_matches!(byte_reader.bytes::<(), 4>(), Ok([9, 9, 9, 9]));
     }
 
     #[test]
     fn over_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
 
-        assert!(byte_stream.bytes::<(), 5>().is_err());
+        assert!(byte_reader.bytes::<(), 5>().is_err());
     }
 }
 
@@ -328,28 +328,28 @@ mod bytes {
 mod slice {
     use std::assert_matches::assert_matches;
 
-    use crate::ByteStream;
+    use crate::ByteReader;
 
     #[test]
     fn smaller_than_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
 
-        assert_matches!(byte_stream.slice::<()>(3), Ok(&[9, 9, 9]));
-        assert_eq!(byte_stream.remaining_bytes().as_slice(), &[9]);
+        assert_matches!(byte_reader.slice::<()>(3), Ok(&[9, 9, 9]));
+        assert_eq!(byte_reader.remaining_bytes().as_slice(), &[9]);
     }
 
     #[test]
     fn exactly_on_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
 
-        assert_matches!(byte_stream.slice::<()>(4), Ok(&[9, 9, 9, 9]));
-        assert!(byte_stream.is_empty());
+        assert_matches!(byte_reader.slice::<()>(4), Ok(&[9, 9, 9, 9]));
+        assert!(byte_reader.is_empty());
     }
 
     #[test]
     fn bigger_than_limit() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(&[9; 4]);
-        let result = byte_stream.slice::<()>(5);
+        let mut byte_reader = ByteReader::<()>::without_metadata(&[9; 4]);
+        let result = byte_reader.slice::<()>(5);
 
         assert!(result.is_err());
     }
@@ -357,22 +357,22 @@ mod slice {
 
 #[cfg(test)]
 mod remaining_bytes {
-    use crate::ByteStream;
+    use crate::ByteReader;
 
     const TEST_BYTES: &[u8] = &[1, 2, 3];
 
     #[test]
     fn some_remaining() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(TEST_BYTES);
+        let mut byte_reader = ByteReader::<()>::without_metadata(TEST_BYTES);
 
-        assert_eq!(byte_stream.remaining_bytes().as_slice(), TEST_BYTES);
+        assert_eq!(byte_reader.remaining_bytes().as_slice(), TEST_BYTES);
     }
 
     #[test]
     fn none_remaining() {
-        let mut byte_stream = ByteStream::<()>::without_metadata(TEST_BYTES);
+        let mut byte_reader = ByteReader::<()>::without_metadata(TEST_BYTES);
 
-        assert!(byte_stream.slice::<()>(TEST_BYTES.len()).is_ok());
-        assert!(byte_stream.remaining_bytes().is_empty());
+        assert!(byte_reader.slice::<()>(TEST_BYTES.len()).is_ok());
+        assert!(byte_reader.remaining_bytes().is_empty());
     }
 }

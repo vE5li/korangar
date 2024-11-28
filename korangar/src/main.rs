@@ -24,6 +24,7 @@ macro_rules! time_phase {
     }
 }
 
+mod audio;
 mod graphics;
 mod input;
 #[macro_use]
@@ -80,6 +81,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Icon, Window, WindowId};
 
+use crate::audio::*;
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
 use crate::interface::application::InterfaceSettings;
@@ -196,6 +198,8 @@ struct Client {
     high_quality_interface: MappedRemote<GraphicsSettings, bool>,
     #[cfg(feature = "debug")]
     render_settings: PlainTrackedState<RenderSettings>,
+
+    mute_on_focus_loss: MappedRemote<AudioSettings, bool>,
 
     application: InterfaceSettings,
     interface: Interface<InterfaceSettings>,
@@ -351,6 +355,9 @@ impl Client {
         });
 
         time_phase!("create audio engine", {
+            let audio_settings = PlainTrackedState::new(AudioSettings::new());
+            let mute_on_focus_loss = audio_settings.mapped(|settings| &settings.mute_on_focus_loss).new_remote();
+
             let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone()));
         });
 
@@ -593,6 +600,7 @@ impl Client {
             high_quality_interface,
             #[cfg(feature = "debug")]
             render_settings,
+            mute_on_focus_loss,
             application,
             interface,
             focus_state,
@@ -1498,10 +1506,11 @@ impl Client {
                         self.high_quality_interface.clone_state(),
                     ),
                 ),
-                UserEvent::OpenAudioSettingsWindow => {
-                    self.interface
-                        .open_window(&self.application, &mut self.focus_state, &AudioSettingsWindow)
-                }
+                UserEvent::OpenAudioSettingsWindow => self.interface.open_window(
+                    &self.application,
+                    &mut self.focus_state,
+                    &AudioSettingsWindow::new(self.mute_on_focus_loss.clone_state()),
+                ),
                 UserEvent::OpenFriendsWindow => {
                     self.interface.open_window(
                         &self.application,
@@ -2360,6 +2369,11 @@ impl ApplicationHandler for Client {
                 *self.high_quality_interface.get(),
             )
         }
+
+        let mute_on_focus_loss = *self.mute_on_focus_loss.get();
+        if mute_on_focus_loss {
+            self.audio_engine.mute(false);
+        }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
@@ -2385,6 +2399,10 @@ impl ApplicationHandler for Client {
                 if !focused {
                     self.input_system.reset();
                     self.focus_state.remove_focus();
+                }
+                let mute_on_focus_loss = *self.mute_on_focus_loss.get();
+                if mute_on_focus_loss {
+                    self.audio_engine.mute(!focused);
                 }
             }
             WindowEvent::CursorLeft { .. } => self.mouse_cursor.hide(),
@@ -2418,5 +2436,9 @@ impl ApplicationHandler for Client {
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
         self.graphics_engine.on_suspended();
+        let mute_on_focus_loss = *self.mute_on_focus_loss.get();
+        if mute_on_focus_loss {
+            self.audio_engine.mute(true);
+        }
     }
 }

@@ -191,8 +191,16 @@ impl<F: FileLoader> AudioEngine<F> {
             sound_effect_paths: GenerationalSlab::default(),
             sound_effect_track,
         });
-
         AudioEngine { engine_context }
+    }
+
+    /// Mutes or unmutes the audio.
+    pub fn mute(&self, enable: bool) {
+        let mut volume = Volume::Amplitude(1.0);
+        if enable {
+            volume = Volume::Amplitude(0.0);
+        }
+        self.set_main_volume(volume);
     }
 
     /// This function needs the full file path with the file extension.

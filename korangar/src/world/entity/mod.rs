@@ -762,7 +762,7 @@ impl Common {
         }
     }
 
-    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera) {
+    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
         self.animation_data.render(
             instructions,
             camera,
@@ -770,6 +770,7 @@ impl Common {
             self.position,
             &self.animation_state,
             self.head_direction,
+            add_to_picker,
         );
     }
 
@@ -1130,8 +1131,8 @@ impl Entity {
             .generate_pathing_mesh(device, queue, map, pathing_texture_mapping);
     }
 
-    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera) {
-        self.get_common().render(instructions, camera);
+    pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
+        self.get_common().render(instructions, camera, add_to_picker);
     }
 
     #[cfg(feature = "debug")]

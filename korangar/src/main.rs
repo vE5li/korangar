@@ -1979,7 +1979,6 @@ impl Client {
                 &mut self.directional_shadow_entity_instructions,
                 entities,
                 &self.directional_shadow_camera,
-                true,
             );
         }
 
@@ -2042,8 +2041,7 @@ impl Client {
             );
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-            self.map
-                .render_entities(&mut self.entity_instructions, entities, current_camera, true);
+            self.map.render_entities(&mut self.entity_instructions, entities, current_camera);
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
             self.map.render_water(&mut map_water_vertex_buffer);

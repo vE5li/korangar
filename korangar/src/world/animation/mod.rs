@@ -82,6 +82,7 @@ impl AnimationData {
         entity_position: Point3<f32>,
         animation_state: &AnimationState,
         head_direction: usize,
+        add_to_picker: bool,
     ) {
         let camera_direction = camera.camera_direction();
         let direction = (camera_direction + head_direction) % 8;
@@ -149,6 +150,7 @@ impl AnimationData {
                 color: frame_part.color,
                 mirror: frame_part.mirror,
                 entity_id,
+                add_to_picker,
                 texture: texture.clone(),
                 distance,
             });

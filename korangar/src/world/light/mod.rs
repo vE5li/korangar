@@ -71,7 +71,7 @@ impl PointLight {
         entity_offset: [usize; 6],
         entity_count: [usize; 6],
         model_offset: [usize; 6],
-        mode_count: [usize; 6],
+        model_count: [usize; 6],
     ) {
         instructions.push(PointShadowCasterInstruction {
             view_projection_matrices,
@@ -83,7 +83,7 @@ impl PointLight {
             entity_offset,
             entity_count,
             model_offset,
-            mode_count,
+            model_count,
         });
     }
 }
@@ -231,7 +231,7 @@ impl PointLightSet<'_> {
             let entity_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let entity_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let mut model_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
-            let mut mode_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
+            let mut model_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
 
             let object_set = map.cull_objects_in_sphere(
                 Sphere::new(point_light.position, point_light.range),
@@ -257,7 +257,7 @@ impl PointLightSet<'_> {
                 map.render_ground(point_shadow_model_instructions);
 
                 model_offsets[face_index as usize] = model_offset;
-                mode_counts[face_index as usize] = point_shadow_model_instructions.len() - model_offset;
+                model_counts[face_index as usize] = point_shadow_model_instructions.len() - model_offset;
             }
 
             point_light.render_with_shadows(
@@ -268,7 +268,7 @@ impl PointLightSet<'_> {
                 entity_offsets,
                 entity_counts,
                 model_offsets,
-                mode_counts,
+                model_counts,
             );
         }
     }

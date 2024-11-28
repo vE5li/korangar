@@ -131,7 +131,7 @@ end
         let globals = self.state.globals();
         let lookup_name = match is_identified {
             true => "identifiedResourceName",
-            false => "undidentifiedResourceName",
+            false => "unidentifiedResourceName",
         };
 
         globals

@@ -119,6 +119,9 @@ impl Color {
         }
     }
 
+    /// Converts the sRGB color into a linear representation for the shader.
+    /// Since we use pre-multiplied alpha blending, we premultiply the alpha
+    /// here too.
     pub fn components_linear(self) -> [f32; 4] {
         let srgb = [self.red, self.green, self.blue];
         let linear = srgb.map(|channel| {
@@ -128,7 +131,7 @@ impl Color {
                 ((channel + 0.055) / 1.055).powf(2.4)
             }
         });
-        [linear[0], linear[1], linear[2], self.alpha]
+        [linear[0] * self.alpha, linear[1] * self.alpha, linear[2] * self.alpha, self.alpha]
     }
 }
 

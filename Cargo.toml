@@ -11,6 +11,7 @@ chrono = "0.4"
 cpal = "0.15"
 derive-new = "0.7"
 etherparse = "0.16"
+fast-srgb8 = "1"
 hashbrown = "0.15"
 image = { version = "0.25", default-features = false }
 kira = { version = "0.9", default-features = false }

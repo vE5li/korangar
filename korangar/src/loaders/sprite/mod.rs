@@ -4,6 +4,7 @@ use std::sync::Arc;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
+use korangar_util::color::premultiply_alpha;
 use korangar_util::container::{Cacheable, SimpleCache};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
@@ -146,7 +147,9 @@ impl SpriteLoader {
 
         let textures = palette_images
             .chain(rgba_images)
-            .map(|image_data| {
+            .map(|mut image_data| {
+                premultiply_alpha(&mut image_data.data);
+
                 let texture = Texture::new_with_data(
                     &self.device,
                     &self.queue,

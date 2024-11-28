@@ -3,7 +3,7 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
 use hashbrown::HashMap;
-use image::{EncodableLayout, ImageFormat, ImageReader, Rgba, RgbaImage};
+use image::{EncodableLayout, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::container::SimpleCache;
@@ -127,12 +127,18 @@ impl TextureLoader {
             }
         };
 
-        if image_format == ImageFormat::Bmp {
-            // These numbers are taken from https://github.com/Duckwhale/RagnarokFileFormats
-            image_buffer
-                .pixels_mut()
-                .filter(|pixel| pixel.0[0] > 0xF0 && pixel.0[1] < 0x10 && pixel.0[2] > 0x0F)
-                .for_each(|pixel| *pixel = Rgba([0; 4]));
+        match image_format {
+            ImageFormat::Bmp => {
+                // These numbers are taken from https://github.com/Duckwhale/RagnarokFileFormats
+                image_buffer
+                    .pixels_mut()
+                    .filter(|pixel| pixel.0[0] > 0xF0 && pixel.0[1] < 0x10 && pixel.0[2] > 0x0F)
+                    .for_each(|pixel| *pixel = Rgba([0; 4]));
+            }
+            ImageFormat::Png | ImageFormat::Tga => {
+                image_buffer = premultiply_alpha(image_buffer);
+            }
+            _ => {}
         }
 
         #[cfg(feature = "debug")]
@@ -152,6 +158,18 @@ impl TextureLoader {
             }
         }
     }
+}
+
+fn premultiply_alpha(image_buffer: RgbaImage) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+    // Iterating over "pixels_mut()" is considerably slower than iterating over the
+    // raw bates, so we have to do this conversion to get raw, mutable access.
+    let width = image_buffer.width();
+    let height = image_buffer.height();
+    let mut bytes = image_buffer.into_raw();
+
+    korangar_util::color::premultiply_alpha(&mut bytes);
+
+    RgbaImage::from_raw(width, height, bytes).unwrap()
 }
 
 pub struct TextureAtlasFactory {

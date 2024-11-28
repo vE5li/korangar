@@ -39,7 +39,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let scaling_factor = instance.screen_size.y / 2.0;
     let intensity = clamp(gaussian_peak(distance_from_center, scaling_factor), 0.0, 1.0);
 
-    return vec4<f32>(instance.color.rgb, intensity);
+    return instance.color * intensity;
 }
 
 fn gaussian_peak(x: f32, scaling_factor: f32) -> f32 {

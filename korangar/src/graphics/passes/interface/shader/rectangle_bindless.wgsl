@@ -94,7 +94,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         }
         case 3u: {
             // Text (coverage)
-            color *= textureSample(font_atlas, linear_sampler, input.texture_coordinates).r;
+            color *= textureSample(font_atlas, nearest_sampler, input.texture_coordinates).r;
         }
         default: {}
     }

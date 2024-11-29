@@ -71,8 +71,8 @@ use ragnarok_packets::{
 };
 use renderer::InterfaceRenderer;
 #[cfg(feature = "debug")]
-use wgpu::{Device, Queue};
-use wgpu::{Dx12Compiler, Instance, InstanceFlags, MemoryHints};
+use wgpu::Queue;
+use wgpu::{Device, Dx12Compiler, Instance, InstanceFlags, MemoryHints};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::WindowEvent;
@@ -139,7 +139,6 @@ fn main() {
 
 struct Client {
     window: Option<Arc<Window>>,
-    #[cfg(feature = "debug")]
     device: Arc<Device>,
     #[cfg(feature = "debug")]
     queue: Arc<Queue>,
@@ -541,7 +540,6 @@ impl Client {
 
         Self {
             window: None,
-            #[cfg(feature = "debug")]
             device,
             #[cfg(feature = "debug")]
             queue,
@@ -2279,7 +2277,7 @@ impl Client {
 
         if self.high_quality_interface.consume_changed() {
             let high_quality_interface = *self.high_quality_interface.get();
-            self.font_loader.borrow_mut().clear();
+            self.font_loader.borrow_mut().clear(&self.device);
             self.interface_renderer.update_high_quality_interface(high_quality_interface);
             self.graphics_engine.set_high_quality_interface(high_quality_interface);
             update_interface = true;

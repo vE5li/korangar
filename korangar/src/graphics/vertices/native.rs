@@ -1,4 +1,4 @@
-use cgmath::{InnerSpace, Point3, Vector2, Vector3};
+use cgmath::{EuclideanSpace, InnerSpace, Point2, Point3, Vector2, Vector3};
 use derive_new::new;
 use korangar_util::texture_atlas::AtlasAllocation;
 
@@ -21,7 +21,7 @@ impl NativeModelVertex {
         ModelVertex::new(
             self.position,
             self.normal,
-            allocation.map_to_atlas(self.texture_coordinates),
+            allocation.map_to_atlas(Point2::from_vec(self.texture_coordinates)).to_vec(),
             self.color,
             self.wind_affinity,
         )

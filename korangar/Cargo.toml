@@ -8,6 +8,7 @@ bumpalo = { workspace = true, features = ["allocator_api"] }
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["mint", "serde"] }
 chrono = { workspace = true }
+cosmic-text = { workspace = true }
 derive-new = { workspace = true }
 hashbrown = { workspace = true }
 image = { workspace = true, features = ["bmp", "png", "tga", "rayon"] }
@@ -29,7 +30,6 @@ rand = { workspace = true }
 random_color = { workspace = true, optional = true }
 rayon = { workspace = true }
 ron = { workspace = true }
-rusttype = { workspace = true, features = ["gpu_cache"] }
 serde = { workspace = true }
 serde-xml-rs = { workspace = true }
 spin_sleep = { workspace = true }

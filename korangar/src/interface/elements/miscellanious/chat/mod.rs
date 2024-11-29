@@ -55,10 +55,11 @@ impl Element<InterfaceSettings> for Chat {
         for message in self.messages.get().iter() {
             height += self
                 .font_loader
-                .borrow()
+                .borrow_mut()
                 .get_text_dimensions(
                     &message.text,
                     theme.chat.font_size.get().scaled(application.get_scaling()),
+                    1.0,
                     placement_resolver.get_available().width,
                 )
                 .height
@@ -90,18 +91,6 @@ impl Element<InterfaceSettings> for Chat {
         let mut offset = 0.0;
 
         for message in self.messages.get().iter() {
-            let text = &message.text;
-
-            renderer.render_text(
-                text,
-                ScreenPosition {
-                    left: 0.2,
-                    top: offset + 0.2,
-                },
-                Color::BLACK,
-                theme.chat.font_size.get(),
-            );
-
             let message_color = match message.color {
                 korangar_networking::MessageColor::Rgb { red, green, blue } => Color::rgb_u8(red, green, blue),
                 korangar_networking::MessageColor::Broadcast => theme.chat.broadcast_color.get(),
@@ -113,7 +102,7 @@ impl Element<InterfaceSettings> for Chat {
             // Dividing by the scaling is done to counteract the scaling being applied
             // twice per message. It's not the cleanest solution but it works.
             offset += renderer.render_text(
-                text,
+                &message.text,
                 ScreenPosition::only_top(offset),
                 message_color,
                 theme.chat.font_size.get(),

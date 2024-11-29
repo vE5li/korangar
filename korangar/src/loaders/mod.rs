@@ -16,7 +16,7 @@ mod texture;
 pub use self::action::*;
 pub use self::animation::*;
 pub use self::effect::EffectLoader;
-pub use self::font::{FontLoader, FontSize, Scaling};
+pub use self::font::{FontLoader, FontSize, GlyphInstruction, Scaling, TextLayout};
 pub use self::gamefile::*;
 pub use self::map::{MapLoader, MAP_TILE_SIZE};
 pub use self::model::*;

@@ -45,6 +45,8 @@ struct VertexOutput {
     @location(3) color: vec3<f32>,
 }
 
+const MIP_SCALE: f32 = 0.25;
+const ALPHA_CUTOFF: f32 = 0.4;
 const TILE_SIZE: u32 = 16;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
@@ -59,6 +61,8 @@ const TILE_SIZE: u32 = 16;
 @group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var texture: texture_2d<f32>;
+
+override MSAA_ACTIVATED: bool;
 
 @vertex
 fn vs_main(
@@ -87,8 +91,16 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
-    let alpha_channel = textureSample(texture, nearest_sampler, input.texture_coordinates).a;
+    var diffuse_color: vec4<f32>;
+    var alpha_channel: f32;
+
+    if (MSAA_ACTIVATED) {
+        diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
+        alpha_channel = diffuse_color.a;
+    } else {
+        diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
+        alpha_channel = textureSampleLevel(texture, nearest_sampler, input.texture_coordinates, 0.0).a;
+    }
 
     // Calculate which tile this fragment belongs to
     let pixel_position = vec2<u32>(floor(input.position.xy));
@@ -100,11 +112,26 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Get the number of lights affecting this tile
     let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
 
-    if (alpha_channel == 0.0) {
-        discard;
-    }
+    var base_color: vec3<f32>;
 
-    var base_color = diffuse_color.rgb * input.color;
+    if (MSAA_ACTIVATED) {
+        // Apply mip level scaling for better mipmap coverage
+        let texture_size = vec2<f32>(textureDimensions(texture, 0));
+        alpha_channel = saturate(alpha_channel * (1.0 + max(0.0, calculate_mip_level(input.texture_coordinates * texture_size)) * MIP_SCALE));
+
+        // Apply screen-space derivative scaling for better alpha to coverage anti-aliasing
+        alpha_channel = saturate((alpha_channel - ALPHA_CUTOFF) / max(fwidth(alpha_channel), 0.0001) + 0.5);
+
+        // Re-apply alpha pre-multiply
+        base_color = select(diffuse_color.rgb, diffuse_color.rgb / diffuse_color.a, diffuse_color.a > 0.0);
+        base_color = base_color * alpha_channel * input.color;
+    } else {
+        if (alpha_channel == 0.0) {
+            discard;
+        }
+
+        base_color = diffuse_color.rgb * input.color;
+    }
 
     // Directional light
     let light_percent = clamp(dot(normalize(-directional_light.direction.xyz), input.normal), 0.0, 1.0);
@@ -156,4 +183,11 @@ fn clip_to_screen_space(ndc: vec2<f32>) -> vec2<f32> {
     let u = (ndc.x + 1.0) / 2.0;
     let v = (1.0 - ndc.y) / 2.0;
     return vec2<f32>(u, v);
+}
+
+fn calculate_mip_level(texture_coordinate: vec2<f32>) -> f32 {
+    let dx = dpdx(texture_coordinate);
+    let dy = dpdy(texture_coordinate);
+    let delta_max_squared = max(dot(dx, dx), dot(dy, dy));
+    return max(0.0, 0.5 * log2(delta_max_squared));
 }

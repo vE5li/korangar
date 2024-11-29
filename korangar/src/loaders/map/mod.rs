@@ -65,7 +65,7 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader, "map", true);
+        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader, "map", true, true);
         let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
 
         let map_file_name = format!("data\\{}.rsw", resource_file);

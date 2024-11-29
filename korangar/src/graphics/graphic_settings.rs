@@ -131,7 +131,7 @@ impl Default for GraphicsSettings {
             vsync: true,
             limit_framerate: LimitFramerate::Unlimited,
             triple_buffering: true,
-            texture_filtering: TextureSamplerType::Linear,
+            texture_filtering: TextureSamplerType::Anisotropic(4),
             msaa: Msaa::X4,
             screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
             shadow_detail: ShadowDetail::High,

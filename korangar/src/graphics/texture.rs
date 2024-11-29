@@ -4,11 +4,11 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use derive_new::new;
 use hashbrown::HashMap;
+use image::RgbaImage;
 use korangar_util::container::Cacheable;
-use wgpu::util::{DeviceExt, TextureDataOrder};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, Device, Extent3d, Queue, ShaderStages, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
+    BindingType, Device, Extent3d, ImageDataLayout, Queue, ShaderStages, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat,
     TextureSampleType, TextureUsages, TextureView, TextureViewDescriptor, TextureViewDimension,
 };
 
@@ -72,10 +72,24 @@ impl Texture {
         }
     }
 
-    pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, data: &[u8]) -> Self {
+    /// This function doesn't upload mip-map data. Mip maps should be written
+    /// using the `MipMapRenderPassContext` & `Lanczos3Drawer`.
+    pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, image: RgbaImage) -> Self {
         let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
-        let texture = device.create_texture_with_data(queue, descriptor, TextureDataOrder::LayerMajor, data);
+        let texture = device.create_texture(descriptor);
+
+        queue.write_texture(
+            texture.as_image_copy(),
+            image.as_raw(),
+            ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4 * descriptor.size.width),
+                rows_per_image: Some(descriptor.size.height),
+            },
+            descriptor.size,
+        );
+
         let texture_view = texture.create_view(&TextureViewDescriptor {
             label: descriptor.label,
             ..Default::default()

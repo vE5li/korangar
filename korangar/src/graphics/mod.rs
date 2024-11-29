@@ -22,6 +22,7 @@ use std::sync::{Arc, OnceLock};
 
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Matrix4, SquareMatrix, Zero};
+use image::RgbaImage;
 use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
@@ -39,6 +40,7 @@ pub use self::error::error_handler;
 pub use self::frame_pacer::*;
 pub use self::graphic_settings::*;
 pub use self::instruction::*;
+pub use self::passes::{Lanczos3Drawer, MipMapRenderPassContext};
 pub use self::picker_target::PickerTarget;
 pub use self::projection::*;
 #[cfg(feature = "debug")]
@@ -383,7 +385,7 @@ impl GlobalContext {
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                 view_formats: Default::default(),
             },
-            &[255, 255, 255, 255],
+            RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap(),
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
         let screen_textures = Self::create_screen_size_textures(device, screen_size, msaa, screen_space_anti_aliasing);

@@ -1,6 +1,7 @@
 use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::Arc;
 
+use image::RgbaImage;
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_interface::elements::PrototypeElement;
@@ -167,7 +168,7 @@ impl SpriteLoader {
                         usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                         view_formats: &[],
                     },
-                    &image_data.data,
+                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data).unwrap(),
                 );
                 Arc::new(texture)
             })

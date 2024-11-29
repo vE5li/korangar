@@ -6,9 +6,10 @@ use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
     BindingType, BlendState, BufferAddress, BufferBindingType, BufferUsages, ColorTargetState, ColorWrites, CommandEncoder,
-    CompareFunction, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState, PipelineCompilationOptions,
-    PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass, RenderPipeline, RenderPipelineDescriptor,
-    ShaderModule, ShaderModuleDescriptor, ShaderStages, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState, VertexStepMode,
+    CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState, FrontFace, MultisampleState,
+    PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, Queue, RenderPass, RenderPipeline,
+    RenderPipelineDescriptor, ShaderModule, ShaderModuleDescriptor, ShaderStages, StencilState, VertexAttribute, VertexBufferLayout,
+    VertexFormat, VertexState, VertexStepMode,
 };
 
 use crate::graphics::passes::forward::ForwardRenderPassContext;
@@ -290,19 +291,30 @@ impl ForwardModelDrawer {
         pipeline_layout: &PipelineLayout,
         polygon_mode: PolygonMode,
     ) -> RenderPipeline {
+        let msaa_activated = msaa.multisampling_activated();
+
+        let mut constants = std::collections::HashMap::new();
+        constants.insert("MSAA_ACTIVATED".to_string(), f64::from(u32::from(msaa_activated)));
+
         device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
             layout: Some(pipeline_layout),
             vertex: VertexState {
                 module: shader_module,
                 entry_point: Some("vs_main"),
-                compilation_options: PipelineCompilationOptions::default(),
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
                 buffers: &[ModelVertex::buffer_layout(), instance_index_buffer_layout],
             },
             fragment: Some(FragmentState {
                 module: shader_module,
                 entry_point: Some("fs_main"),
-                compilation_options: PipelineCompilationOptions::default(),
+                compilation_options: PipelineCompilationOptions {
+                    constants: &constants,
+                    ..Default::default()
+                },
                 targets: &[Some(ColorTargetState {
                     format: render_pass_context.color_attachment_formats()[0],
                     blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
@@ -316,16 +328,21 @@ impl ForwardModelDrawer {
                 polygon_mode,
                 ..Default::default()
             },
-            multisample: MultisampleState {
-                count: msaa.sample_count(),
-                ..Default::default()
+            multisample: if msaa_activated {
+                MultisampleState {
+                    count: msaa.sample_count(),
+                    alpha_to_coverage_enabled: true,
+                    ..Default::default()
+                }
+            } else {
+                MultisampleState::default()
             },
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
                 depth_write_enabled: true,
                 depth_compare: CompareFunction::Greater,
-                stencil: Default::default(),
-                bias: Default::default(),
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
             }),
             cache: None,
         })

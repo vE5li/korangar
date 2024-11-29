@@ -31,3 +31,5 @@ pub const FALLBACK_TGA_FILE: &str = "missing.tga";
 pub const FALLBACK_MODEL_FILE: &str = "missing.rsm";
 pub const FALLBACK_SPRITE_FILE: &str = "npc\\missing.spr";
 pub const FALLBACK_ACTIONS_FILE: &str = "npc\\missing.act";
+/// The level of mip maps we optimize for (1 base + 3 mip map levels).
+pub const MIP_LEVELS: u32 = 4;

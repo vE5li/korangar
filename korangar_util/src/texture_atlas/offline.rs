@@ -1,7 +1,9 @@
 //! A simple texture atlas for deferred offline generation.
 
+use std::num::NonZeroU32;
+
 use cgmath::{EuclideanSpace, Point2, Vector2};
-use image::{imageops, RgbaImage};
+use image::{imageops, Rgba, RgbaImage};
 
 use super::AtlasAllocation;
 use crate::container::{SecondarySimpleSlab, SimpleSlab};
@@ -41,16 +43,32 @@ pub struct OfflineTextureAtlas {
     allocations: SecondarySimpleSlab<AllocationId, AtlasAllocation>,
     image: Option<RgbaImage>,
     add_padding: bool,
+    mip_level_count: u32,
+    padding: u32,
 }
 
 struct DeferredAllocation {
     image: RgbaImage,
-    size: Vector2<u32>,
+    original_size: Vector2<u32>,
+    padded_size: Vector2<u32>,
 }
 
 impl OfflineTextureAtlas {
-    /// Creates a new texture atlas.
-    pub fn new(add_padding: bool) -> Self {
+    /// Creates a new texture atlas. If `mip_level_count` is defined, the
+    /// padding and the atlas texture itself is properly chosen to be compatible
+    /// for the given `mip_level_count`.
+    pub fn new(add_padding: bool, mip_level_count: Option<NonZeroU32>) -> Self {
+        let mip_level_count = mip_level_count.map(|count| count.get()).unwrap_or(1);
+        let padding = if add_padding {
+            if mip_level_count > 1 {
+                2 << (mip_level_count - 1)
+            } else {
+                2
+            }
+        } else {
+            0
+        };
+
         OfflineTextureAtlas {
             size: Vector2::new(0, 0),
             free_rects: Vec::default(),
@@ -58,6 +76,8 @@ impl OfflineTextureAtlas {
             allocations: SecondarySimpleSlab::default(),
             image: None,
             add_padding,
+            mip_level_count,
+            padding,
         }
     }
 
@@ -69,21 +89,35 @@ impl OfflineTextureAtlas {
         }
 
         let (x, y) = image.dimensions();
-
-        let size = if self.add_padding {
-            // We add two pixel at each side for texture not bleeding into each other.
-            // We copy one pixel later from the edges of the image into the padding, because
-            // how GPU sampling works. The other pixel ist not filled and is mainly done,
-            // because in some empty textures there could occur bleed in extreme angles
-            // otherwise.
-            Vector2::new(x + 4, y + 4)
-        } else {
-            Vector2::new(x, y)
-        };
+        let original_size = Vector2::new(x, y);
+        let padded_size = self.calculate_size(original_size);
 
         self.deferred_allocation
-            .insert(DeferredAllocation { image, size })
+            .insert(DeferredAllocation {
+                image,
+                padded_size,
+                original_size,
+            })
             .expect("deferred allocation slab is full")
+    }
+
+    fn calculate_size(&self, mut size: Vector2<u32>) -> Vector2<u32> {
+        if self.mip_level_count > 1 {
+            let alignment = 1 << (self.mip_level_count - 1);
+
+            if self.padding > 0 {
+                size.x += self.padding * 2;
+                size.y += self.padding * 2;
+            }
+
+            size.x = ((size.x + alignment - 1) / alignment) * alignment;
+            size.y = ((size.y + alignment - 1) / alignment) * alignment;
+        } else if self.padding > 0 {
+            size.x += self.padding * 2;
+            size.y += self.padding * 2;
+        }
+
+        size
     }
 
     /// Returns the allocation for the given allocation ID, once data was
@@ -102,10 +136,10 @@ impl OfflineTextureAtlas {
 
         // DESCSS (Descending Short Side Sort)
         deferred_allocations.sort_unstable_by(|a, b| {
-            let a_short_side = a.1.size.x.min(a.1.size.y);
-            let b_short_side = b.1.size.x.min(b.1.size.y);
-            let a_long_side = a.1.size.x.max(a.1.size.y);
-            let b_long_side = b.1.size.x.max(b.1.size.y);
+            let a_short_side = a.1.padded_size.x.min(a.1.padded_size.y);
+            let b_short_side = b.1.padded_size.x.min(b.1.padded_size.y);
+            let a_long_side = a.1.padded_size.x.max(a.1.padded_size.y);
+            let b_long_side = b.1.padded_size.x.max(b.1.padded_size.y);
 
             b_short_side.cmp(&a_short_side).then_with(|| b_long_side.cmp(&a_long_side))
         });
@@ -122,21 +156,31 @@ impl OfflineTextureAtlas {
             temp_allocations.clear();
 
             for (allocation_id, alloc) in deferred_allocations.iter() {
-                if let Some(allocation) = self.allocate(alloc.size) {
+                if let Some(allocation) = self.allocate(alloc.padded_size, alloc.original_size) {
                     temp_allocations.push((*allocation_id, allocation));
                 } else {
                     success = false;
-                    let current_area = width * height;
-                    let adjusted_area = (current_area as f32 * EFFICIENCY_FACTOR) as u32;
-                    let side = (adjusted_area as f32).sqrt() as u32;
-                    width = side;
-                    height = side;
+
+                    if self.mip_level_count > 1 {
+                        if width <= height {
+                            width *= 2
+                        } else {
+                            height *= 2
+                        }
+                    } else {
+                        let current_area = width * height;
+                        let adjusted_area = (current_area as f32 * EFFICIENCY_FACTOR) as u32;
+                        let side = (adjusted_area as f32).sqrt() as u32;
+                        width = side;
+                        height = side;
+                    }
+
                     break;
                 }
             }
         }
 
-        self.image = Some(RgbaImage::new(width, height));
+        self.image = Some(RgbaImage::from_pixel(width, height, Rgba([255, 0, 255, 255])));
         for (id, allocation) in temp_allocations {
             let (_, deferred_allocation) = deferred_allocations.iter().find(|(alloc_id, _)| *alloc_id == id).unwrap();
             self.write_image_data(&allocation, &deferred_allocation.image);
@@ -159,32 +203,54 @@ impl OfflineTextureAtlas {
     }
 
     fn estimate_initial_size(&self, deferred_allocations: &[(AllocationId, DeferredAllocation)]) -> (u32, u32) {
-        let total_area: u32 = deferred_allocations.iter().map(|r| r.1.size.x * r.1.size.y).sum();
-        let adjusted_area = (total_area as f32 * EFFICIENCY_FACTOR) as u32;
-        let side = (adjusted_area as f32).sqrt() as u32;
-        (side, side)
+        let total_area: u32 = deferred_allocations.iter().map(|r| r.1.padded_size.x * r.1.padded_size.y).sum();
+
+        if self.mip_level_count > 1 {
+            let mut width = 128;
+            let mut height = 128;
+            let mut expand_width = true;
+
+            while (width * height) < total_area {
+                if expand_width {
+                    width *= 2;
+                    expand_width = false;
+                } else {
+                    height *= 2;
+                    expand_width = true;
+                }
+            }
+
+            (width, height)
+        } else {
+            let adjusted_area = (total_area as f32 * EFFICIENCY_FACTOR) as u32;
+            let side = (adjusted_area as f32).sqrt() as u32;
+            (side, side)
+        }
     }
 
-    fn allocate(&mut self, size: Vector2<u32>) -> Option<AtlasAllocation> {
-        let best_rect_index = self.find_best_rectangle(size)?;
-        let free_rect = self.free_rects.remove(best_rect_index);
+    fn allocate(&mut self, padded_size: Vector2<u32>, original_size: Vector2<u32>) -> Option<AtlasAllocation> {
+        let best_rect_index = self.find_best_rectangle(padded_size)?;
+        let mut free_rect = self.free_rects.remove(best_rect_index);
 
-        let allocation = if self.add_padding {
-            AtlasAllocation {
-                rectangle: Rectangle::new(
-                    Point2::new(free_rect.min.x + 2, free_rect.min.y + 2),
-                    Point2::new(free_rect.min.x + size.x - 2, free_rect.min.y + size.y - 2),
-                ),
-                atlas_size: self.size,
-            }
+        if self.mip_level_count > 1 {
+            let alignment = 1 << (self.mip_level_count - 1);
+            free_rect.min.x = ((free_rect.min.x + self.padding + alignment - 1) & !(alignment - 1)).saturating_sub(self.padding);
+            free_rect.min.y = ((free_rect.min.y + self.padding + alignment - 1) & !(alignment - 1)).saturating_sub(self.padding);
+        }
+
+        let used_rect = Rectangle::new(free_rect.min, free_rect.min + padded_size);
+
+        let image_position = if self.add_padding {
+            Point2::new(used_rect.min.x + self.padding, used_rect.min.y + self.padding)
         } else {
-            AtlasAllocation {
-                rectangle: Rectangle::new(free_rect.min, free_rect.min + size),
-                atlas_size: self.size,
-            }
+            used_rect.min
         };
 
-        let used_rect = Rectangle::new(free_rect.min, free_rect.min + size);
+        let allocation = AtlasAllocation {
+            rectangle: Rectangle::new(image_position, image_position + original_size),
+            atlas_size: self.size,
+        };
+
         let (f_prime, f_double_prime) = self.maxrects_split(free_rect, used_rect);
         self.free_rects.extend([f_prime, f_double_prime].into_iter().flatten());
 
@@ -266,44 +332,86 @@ impl OfflineTextureAtlas {
             allocation.rectangle.min.y as _,
         );
 
-        if self.add_padding {
+        if self.padding > 0 {
             let width = allocation.rectangle.width();
             let height = allocation.rectangle.height();
 
-            // Top padding
             for x in 0..width {
                 let color = image.get_pixel(x, 0);
-                atlas_image.put_pixel(allocation.rectangle.min.x + x, allocation.rectangle.min.y - 1, *color);
+                for dy in 1..=self.padding {
+                    atlas_image.put_pixel(
+                        allocation.rectangle.min.x + x,
+                        allocation.rectangle.min.y.saturating_sub(dy),
+                        *color,
+                    );
+                }
             }
 
-            // Bottom padding
             for x in 0..width {
                 let color = image.get_pixel(x, height - 1);
-                atlas_image.put_pixel(allocation.rectangle.min.x + x, allocation.rectangle.max.y, *color);
+                for dy in 0..self.padding {
+                    atlas_image.put_pixel(allocation.rectangle.min.x + x, allocation.rectangle.max.y + dy, *color);
+                }
             }
 
-            // Left padding
             for y in 0..height {
                 let color = image.get_pixel(0, y);
-                atlas_image.put_pixel(allocation.rectangle.min.x - 1, allocation.rectangle.min.y + y, *color);
+                for dx in 1..=self.padding {
+                    atlas_image.put_pixel(
+                        allocation.rectangle.min.x.saturating_sub(dx),
+                        allocation.rectangle.min.y + y,
+                        *color,
+                    );
+                }
             }
 
-            // Right padding
             for y in 0..height {
                 let color = image.get_pixel(width - 1, y);
-                atlas_image.put_pixel(allocation.rectangle.max.x, allocation.rectangle.min.y + y, *color);
+                for dx in 0..self.padding {
+                    atlas_image.put_pixel(allocation.rectangle.max.x + dx, allocation.rectangle.min.y + y, *color);
+                }
             }
 
-            // Corner padding
             let top_left = image.get_pixel(0, 0);
             let top_right = image.get_pixel(width - 1, 0);
             let bottom_left = image.get_pixel(0, height - 1);
             let bottom_right = image.get_pixel(width - 1, height - 1);
 
-            atlas_image.put_pixel(allocation.rectangle.min.x - 1, allocation.rectangle.min.y - 1, *top_left);
-            atlas_image.put_pixel(allocation.rectangle.max.x, allocation.rectangle.min.y - 1, *top_right);
-            atlas_image.put_pixel(allocation.rectangle.min.x - 1, allocation.rectangle.max.y, *bottom_left);
-            atlas_image.put_pixel(allocation.rectangle.max.x, allocation.rectangle.max.y, *bottom_right);
+            for dy in 1..=self.padding {
+                for dx in 1..=self.padding {
+                    atlas_image.put_pixel(
+                        allocation.rectangle.min.x.saturating_sub(dx),
+                        allocation.rectangle.min.y.saturating_sub(dy),
+                        *top_left,
+                    );
+                }
+            }
+
+            for dy in 1..=self.padding {
+                for dx in 0..self.padding {
+                    atlas_image.put_pixel(
+                        allocation.rectangle.max.x + dx,
+                        allocation.rectangle.min.y.saturating_sub(dy),
+                        *top_right,
+                    );
+                }
+            }
+
+            for dy in 0..self.padding {
+                for dx in 1..=self.padding {
+                    atlas_image.put_pixel(
+                        allocation.rectangle.min.x.saturating_sub(dx),
+                        allocation.rectangle.max.y + dy,
+                        *bottom_left,
+                    );
+                }
+            }
+
+            for dy in 0..self.padding {
+                for dx in 0..self.padding {
+                    atlas_image.put_pixel(allocation.rectangle.max.x + dx, allocation.rectangle.max.y + dy, *bottom_right);
+                }
+            }
         }
     }
 }
@@ -345,7 +453,7 @@ mod tests {
 
     #[test]
     fn test_allocate_single_rectangle() {
-        let mut atlas = OfflineTextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false, NonZeroU32::new(1));
 
         let image = RgbaImage::new(100, 100);
         let id = atlas.register_image(image);
@@ -361,7 +469,7 @@ mod tests {
 
     #[test]
     fn test_multiple_allocations() {
-        let mut atlas = OfflineTextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false, NonZeroU32::new(1));
         let id1 = atlas.register_image(RgbaImage::new(100, 100));
         let id2 = atlas.register_image(RgbaImage::new(200, 200));
         let id3 = atlas.register_image(RgbaImage::new(300, 300));
@@ -381,7 +489,7 @@ mod tests {
 
     #[test]
     fn test_no_rectangle_overlap() {
-        let mut atlas = OfflineTextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false, NonZeroU32::new(1));
         let mut ids = Vec::new();
 
         for _ in 0..10 {
@@ -408,7 +516,7 @@ mod tests {
 
     #[test]
     fn test_no_rectangle_overlap_varied_sizes() {
-        let mut atlas = OfflineTextureAtlas::new(false);
+        let mut atlas = OfflineTextureAtlas::new(false, NonZeroU32::new(1));
         let sizes = [(50, 50), (200, 200), (100, 100), (300, 100), (100, 300), (25, 25), (400, 400)];
 
         let mut ids = Vec::new();
@@ -442,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_atlas_with_padding() {
-        let mut atlas = OfflineTextureAtlas::new(true);
+        let mut atlas = OfflineTextureAtlas::new(true, NonZeroU32::new(1));
         let image = RgbaImage::from_pixel(10, 10, Rgba([255, 0, 0, 255]));
         let id = atlas.register_image(image);
         atlas.build_atlas();

@@ -3,17 +3,20 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
 use hashbrown::HashMap;
-use image::{EncodableLayout, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
+use image::{ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use korangar_util::FileLoader;
-use wgpu::{Device, Extent3d, Queue, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
+use wgpu::{
+    CommandEncoderDescriptor, Device, Extent3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
+    TextureViewDescriptor, TextureViewDimension,
+};
 
 use super::error::LoadError;
-use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE};
-use crate::graphics::Texture;
+use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
+use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
 use crate::loaders::GameFileLoader;
 
 const MAX_CACHE_COUNT: u32 = 512;
@@ -23,15 +26,21 @@ pub struct TextureLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
+    mip_map_render_context: MipMapRenderPassContext,
+    lanczos3_drawer: Lanczos3Drawer,
     cache: Mutex<SimpleCache<String, Arc<Texture>>>,
 }
 
 impl TextureLoader {
     pub fn new(device: Arc<Device>, queue: Arc<Queue>, game_file_loader: Arc<GameFileLoader>) -> Self {
+        let lanczos3_drawer = Lanczos3Drawer::new(&device);
+
         Self {
             device,
             queue,
             game_file_loader,
+            mip_map_render_context: MipMapRenderPassContext::default(),
+            lanczos3_drawer,
             cache: Mutex::new(SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
@@ -57,8 +66,61 @@ impl TextureLoader {
                 usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
-            image.as_bytes(),
+            image,
         );
+        Arc::new(texture)
+    }
+
+    fn create_with_mip_maps(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+        let texture = Texture::new_with_data(
+            &self.device,
+            &self.queue,
+            &TextureDescriptor {
+                label: Some(name),
+                size: Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: MIP_LEVELS,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8UnormSrgb,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            },
+            image,
+        );
+
+        let mut mip_views = Vec::with_capacity(MIP_LEVELS as usize);
+
+        for level in 0..MIP_LEVELS {
+            let view = texture.get_texture().create_view(&TextureViewDescriptor {
+                label: Some(&format!("mip map level {level}")),
+                format: None,
+                dimension: Some(TextureViewDimension::D2),
+                aspect: TextureAspect::All,
+                base_mip_level: level,
+                mip_level_count: Some(1),
+                base_array_layer: 0,
+                array_layer_count: Some(1),
+            });
+            mip_views.push(view);
+        }
+
+        let mut encoder = self.device.create_command_encoder(&CommandEncoderDescriptor {
+            label: Some("TextureLoader"),
+        });
+
+        for index in 0..(MIP_LEVELS - 1) as usize {
+            let mut pass = self
+                .mip_map_render_context
+                .create_pass(&self.device, &mut encoder, &mip_views[index], &mip_views[index + 1]);
+            self.lanczos3_drawer.draw(&mut pass);
+        }
+
+        self.queue.submit(Some(encoder.finish()));
+
         Arc::new(texture)
     }
 
@@ -177,6 +239,7 @@ pub struct TextureAtlasFactory {
     texture_loader: Arc<TextureLoader>,
     texture_atlas: OfflineTextureAtlas,
     lookup: HashMap<String, AllocationId>,
+    create_mip_map: bool,
 }
 
 impl TextureAtlasFactory {
@@ -187,7 +250,7 @@ impl TextureAtlasFactory {
         add_padding: bool,
         paths: &[&str],
     ) -> (Vec<AtlasAllocation>, Arc<Texture>) {
-        let mut factory = Self::new(texture_loader, name, add_padding);
+        let mut factory = Self::new(texture_loader, name, add_padding, false);
 
         let mut ids: Vec<AllocationId> = paths.iter().map(|path| factory.register(path)).collect();
         factory.build_atlas();
@@ -198,12 +261,15 @@ impl TextureAtlasFactory {
         (mapping, texture)
     }
 
-    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>, add_padding: bool) -> Self {
+    pub fn new(texture_loader: Arc<TextureLoader>, name: impl Into<String>, add_padding: bool, create_mip_map: bool) -> Self {
+        let mip_level_count = if create_mip_map { NonZeroU32::new(MIP_LEVELS) } else { None };
+
         Self {
             name: name.into(),
             texture_loader,
-            texture_atlas: OfflineTextureAtlas::new(add_padding),
+            texture_atlas: OfflineTextureAtlas::new(add_padding, mip_level_count),
             lookup: HashMap::default(),
+            create_mip_map,
         }
     }
 
@@ -230,7 +296,12 @@ impl TextureAtlasFactory {
     }
 
     pub fn upload_texture_atlas_texture(self) -> Arc<Texture> {
-        self.texture_loader
-            .create(&format!("{} texture atlas", self.name), self.texture_atlas.get_atlas())
+        if self.create_mip_map {
+            self.texture_loader
+                .create_with_mip_maps(&format!("{} texture atlas", self.name), self.texture_atlas.get_atlas())
+        } else {
+            self.texture_loader
+                .create(&format!("{} texture atlas", self.name), self.texture_atlas.get_atlas())
+        }
     }
 }

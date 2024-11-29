@@ -5,7 +5,7 @@ use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, ComputePassDescriptor, 
 
 use super::{BindGroupCount, ComputePassContext};
 use crate::graphics::GlobalContext;
-const PASS_NAME: &str = "light culling pass pass";
+const PASS_NAME: &str = "light culling compute pass";
 
 pub(crate) struct LightCullingPassContext {}
 

@@ -461,7 +461,7 @@ impl Map {
         &'a self,
         entities: &'a [Entity],
         marker_identifier: MarkerIdentifier,
-    ) -> &dyn PrototypeWindow<InterfaceSettings> {
+    ) -> &'a dyn PrototypeWindow<InterfaceSettings> {
         match marker_identifier {
             MarkerIdentifier::Object(key) => self.objects.get(ObjectKey::new(key)).unwrap(),
             MarkerIdentifier::LightSource(key) => self.light_sources.get(LightSourceKey::new(key)).unwrap(),

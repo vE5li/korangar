@@ -103,7 +103,8 @@ end
             .unwrap()
             .to_str()
             .unwrap()
-            .replace("CHONCHON", "chocho") // TODO: find a way to do this properly
+            .replace("CHONCHON", "chocho") // TODO: find a way to do this
+                                           // properly
     }
 
     // TODO: move this to a different class that utilizes the script loader

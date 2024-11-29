@@ -42,16 +42,14 @@ impl FriendView {
     }
 
     fn friend_to_element(friend: &Friend) -> ElementCell<InterfaceSettings> {
-        let elements = vec![
-            ButtonBuilder::new()
-                .with_text("remove")
-                .with_event(UserEvent::RemoveFriend {
-                    account_id: friend.account_id,
-                    character_id: friend.character_id,
-                })
-                .build()
-                .wrap(),
-        ];
+        let elements = vec![ButtonBuilder::new()
+            .with_text("remove")
+            .with_event(UserEvent::RemoveFriend {
+                account_id: friend.account_id,
+                character_id: friend.character_id,
+            })
+            .build()
+            .wrap()];
 
         Expandable::new(friend.name.clone(), elements, false).wrap()
     }

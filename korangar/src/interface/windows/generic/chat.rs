@@ -89,13 +89,11 @@ impl PrototypeWindow<InterfaceSettings> for ChatWindow {
                 .build()
                 .wrap(),
             ScrollView::new(
-                vec![
-                    ChatBuilder::new()
-                        .with_messages(self.messages.clone())
-                        .with_font_loader(self.font_loader.clone())
-                        .build()
-                        .wrap(),
-                ],
+                vec![ChatBuilder::new()
+                    .with_messages(self.messages.clone())
+                    .with_font_loader(self.font_loader.clone())
+                    .build()
+                    .wrap()],
                 size_bound!(100%, !),
             )
             .wrap(),

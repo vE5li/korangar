@@ -21,12 +21,10 @@ impl PrototypeWindow<InterfaceSettings> for ErrorWindow {
         application: &InterfaceSettings,
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
-        let elements = vec![
-            Text::default()
-                .with_text(self.message.clone())
-                .with_foreground_color(|_| Color::rgb_u8(220, 100, 100))
-                .wrap(),
-        ];
+        let elements = vec![Text::default()
+            .with_text(self.message.clone())
+            .with_foreground_color(|_| Color::rgb_u8(220, 100, 100))
+            .wrap()];
 
         WindowBuilder::new()
             .with_title("Error".to_string())

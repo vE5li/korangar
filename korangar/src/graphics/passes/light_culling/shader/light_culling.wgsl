@@ -6,7 +6,7 @@ struct GlobalUniforms {
     indicator_positions: mat4x4<f32>,
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
-    screen_size: vec2<u32>,
+    forward_size: vec2<u32>,
     interface_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
@@ -36,8 +36,8 @@ const MAX_LIGHTS_PER_TILE: u32 = 256;
 
 @compute @workgroup_size(8, 8, 1)
 fn cs_main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    let tile_count_x = (global_uniforms.screen_size.x + TILE_SIZE - 1u) / TILE_SIZE;
-    let tile_count_y = (global_uniforms.screen_size.y + TILE_SIZE - 1u) / TILE_SIZE;
+    let tile_count_x = (global_uniforms.forward_size.x + TILE_SIZE - 1u) / TILE_SIZE;
+    let tile_count_y = (global_uniforms.forward_size.y + TILE_SIZE - 1u) / TILE_SIZE;
 
     if (global_id.x >= tile_count_x || global_id.y >= tile_count_y) {
         return;
@@ -125,16 +125,16 @@ fn intersect_cone_sphere_aligned(
 }
 
 fn calculate_tile_vectors(tile_x: u32, tile_y: u32) -> mat4x3<f32> {
-    let screen_size = vec2<f32>(global_uniforms.screen_size);
+    let forward_size = vec2<f32>(global_uniforms.forward_size);
 
     // Calculate tile corners in screen space (0 to 1)
     let tile_min = vec2<f32>(
-        f32(tile_x * TILE_SIZE) / screen_size.x,
-        f32(tile_y * TILE_SIZE) / screen_size.y
+        f32(tile_x * TILE_SIZE) / forward_size.x,
+        f32(tile_y * TILE_SIZE) / forward_size.y
     );
     let tile_max = vec2<f32>(
-        f32((tile_x + 1u) * TILE_SIZE) / screen_size.x,
-        f32((tile_y + 1u) * TILE_SIZE) / screen_size.y
+        f32((tile_x + 1u) * TILE_SIZE) / forward_size.x,
+        f32((tile_y + 1u) * TILE_SIZE) / forward_size.y
     );
 
     // Convert to NDC space (-1 to 1)

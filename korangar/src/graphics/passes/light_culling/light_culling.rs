@@ -58,8 +58,8 @@ impl Dispatch<{ BindGroupCount::Two }> for LightCullingDispatcher {
     }
 }
 
-fn calculate_dispatch_size(screen_size: ScreenSize) -> (u32, u32) {
-    let (tiles_x, tiles_y) = calculate_light_tile_count(screen_size);
+fn calculate_dispatch_size(forward_size: ScreenSize) -> (u32, u32) {
+    let (tiles_x, tiles_y) = calculate_light_tile_count(forward_size);
 
     // Round up division by workgroup size (8)
     let dispatch_x = (tiles_x + 7) / 8;

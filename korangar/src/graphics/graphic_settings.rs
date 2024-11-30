@@ -5,6 +5,8 @@ use korangar_debug::logging::{print_debug, Colorize};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
+use crate::interface::layout::ScreenSize;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum LimitFramerate {
     Unlimited,
@@ -97,6 +99,40 @@ impl Msaa {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum Ssaa {
+    Off,
+    X2,
+    X3,
+    X4,
+}
+
+impl Display for Ssaa {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Ssaa::Off => "Off".fmt(f),
+            Ssaa::X2 => "x2".fmt(f),
+            Ssaa::X3 => "x3".fmt(f),
+            Ssaa::X4 => "x4".fmt(f),
+        }
+    }
+}
+
+impl Ssaa {
+    pub fn calculate_size(self, base_size: ScreenSize) -> ScreenSize {
+        match self {
+            Ssaa::Off => base_size,
+            Ssaa::X2 => base_size * f32::sqrt(2.0),
+            Ssaa::X3 => base_size * f32::sqrt(3.0),
+            Ssaa::X4 => base_size * 2.0,
+        }
+    }
+
+    pub fn supersampling_activated(self) -> bool {
+        self != Ssaa::Off
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ScreenSpaceAntiAliasing {
     Off,
     Fxaa,
@@ -120,6 +156,7 @@ pub struct GraphicsSettings {
     pub triple_buffering: bool,
     pub texture_filtering: TextureSamplerType,
     pub msaa: Msaa,
+    pub ssaa: Ssaa,
     pub screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     pub shadow_detail: ShadowDetail,
     pub high_quality_interface: bool,
@@ -133,9 +170,10 @@ impl Default for GraphicsSettings {
             triple_buffering: true,
             texture_filtering: TextureSamplerType::Anisotropic(4),
             msaa: Msaa::X4,
+            ssaa: Ssaa::Off,
             screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
             shadow_detail: ShadowDetail::High,
-            high_quality_interface: false,
+            high_quality_interface: true,
         }
     }
 }

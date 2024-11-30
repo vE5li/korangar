@@ -191,6 +191,7 @@ struct Client {
     texture_filtering: MappedRemote<GraphicsSettings, TextureSamplerType>,
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
     msaa: MappedRemote<GraphicsSettings, Msaa>,
+    ssaa: MappedRemote<GraphicsSettings, Ssaa>,
     screen_space_anti_aliasing: MappedRemote<GraphicsSettings, ScreenSpaceAntiAliasing>,
     high_quality_interface: MappedRemote<GraphicsSettings, bool>,
     #[cfg(feature = "debug")]
@@ -276,6 +277,7 @@ impl Client {
             let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
             let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
             let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
+            let ssaa = graphics_settings.mapped(|settings| &settings.ssaa).new_remote();
             let screen_space_anti_aliasing = graphics_settings
                 .mapped(|settings| &settings.screen_space_anti_aliasing)
                 .new_remote();
@@ -586,6 +588,7 @@ impl Client {
             texture_filtering,
             shadow_detail,
             msaa,
+            ssaa,
             screen_space_anti_aliasing,
             high_quality_interface,
             #[cfg(feature = "debug")]
@@ -1485,6 +1488,7 @@ impl Client {
                         self.triple_buffering.clone_state(),
                         self.texture_filtering.clone_state(),
                         self.msaa.clone_state(),
+                        self.ssaa.clone_state(),
                         self.screen_space_anti_aliasing.clone_state(),
                         self.shadow_detail.clone_state(),
                         self.high_quality_interface.clone_state(),
@@ -2266,6 +2270,11 @@ impl Client {
             update_interface = true;
         }
 
+        if self.ssaa.consume_changed() {
+            self.graphics_engine.set_ssaa(*self.ssaa.get());
+            update_interface = true;
+        }
+
         if self.screen_space_anti_aliasing.consume_changed() {
             self.graphics_engine
                 .set_screen_space_anti_aliasing(*self.screen_space_anti_aliasing.get());
@@ -2327,6 +2336,7 @@ impl ApplicationHandler for Client {
                 *self.shadow_detail.get(),
                 *self.texture_filtering.get(),
                 *self.msaa.get(),
+                *self.ssaa.get(),
                 *self.screen_space_anti_aliasing.get(),
                 *self.high_quality_interface.get(),
             )

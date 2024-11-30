@@ -17,7 +17,7 @@ use winit::window::Window;
 
 use super::{
     AntiAliasingResource, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
-    ScreenSpaceAntiAliasing, ShadowDetail, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
+    ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
 };
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
@@ -144,6 +144,7 @@ impl GraphicsEngine {
         shadow_detail: ShadowDetail,
         texture_sampler_type: TextureSamplerType,
         msaa: Msaa,
+        ssaa: Ssaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
         high_quality_interface: bool,
     ) {
@@ -173,6 +174,7 @@ impl GraphicsEngine {
 
                     time_phase!("create contexts", {
                         let high_quality_interface = self.check_high_quality_interface_requirements(high_quality_interface, screen_size);
+                        let ssaa = self.check_ssaa_requirements(ssaa, screen_size);
 
                         let global_context = GlobalContext::new(
                             &self.device,
@@ -180,6 +182,7 @@ impl GraphicsEngine {
                             &self.texture_loader,
                             surface_texture_format,
                             msaa,
+                            ssaa,
                             screen_space_anti_aliasing,
                             screen_size,
                             shadow_detail,
@@ -409,6 +412,25 @@ impl GraphicsEngine {
         high_quality_interface
     }
 
+    fn check_ssaa_requirements(&self, mut ssaa: Ssaa, screen_size: ScreenSize) -> Ssaa {
+        if ssaa.supersampling_activated() {
+            let max_texture_dimension_2d = self.capabilities.get_max_texture_dimension_2d();
+            let forward_size = ssaa.calculate_size(screen_size);
+
+            if max_texture_dimension_2d < forward_size.width as u32 && max_texture_dimension_2d < forward_size.height as u32 {
+                ssaa = Ssaa::Off;
+
+                #[cfg(feature = "debug")]
+                print_debug!(
+                    "[{}] can't enable super sampling because texture would be too large",
+                    "error".red()
+                );
+            }
+        }
+
+        ssaa
+    }
+
     pub fn on_suspended(&mut self) {
         // Android devices are expected to drop their surface view.
         if cfg!(target_os = "android") {
@@ -532,6 +554,12 @@ impl GraphicsEngine {
         }
     }
 
+    pub fn set_ssaa(&mut self, ssaa: Ssaa) {
+        if let Some(engine_context) = self.engine_context.as_mut() {
+            engine_context.global_context.update_ssaa(&self.device, ssaa);
+        }
+    }
+
     pub fn set_shadow_detail(&mut self, shadow_detail: ShadowDetail) {
         if let Some(engine_context) = self.engine_context.as_mut() {
             engine_context
@@ -587,10 +615,21 @@ impl GraphicsEngine {
                 .map(|engine_context| engine_context.global_context.high_quality_interface)
                 .unwrap_or(false);
 
-            // We need to check if the high quality interface needs to be deactivated.
             if high_quality_interface && !self.check_high_quality_interface_requirements(high_quality_interface, screen_size) {
                 if let Some(engine_context) = self.engine_context.as_mut() {
                     engine_context.global_context.update_high_quality_interface(&self.device, false);
+                }
+            }
+
+            let ssaa = self
+                .engine_context
+                .as_ref()
+                .map(|engine_context| engine_context.global_context.ssaa)
+                .unwrap_or(Ssaa::Off);
+
+            if ssaa.supersampling_activated() && !self.check_ssaa_requirements(ssaa, screen_size).supersampling_activated() {
+                if let Some(engine_context) = self.engine_context.as_mut() {
+                    engine_context.global_context.update_ssaa(&self.device, Ssaa::Off);
                 }
             }
 
@@ -926,7 +965,7 @@ impl GraphicsEngine {
 
                 engine_context
                     .light_culling_dispatcher
-                    .dispatch(&mut compute_pass, engine_context.global_context.screen_size);
+                    .dispatch(&mut compute_pass, engine_context.global_context.forward_size);
 
                 drop(compute_pass);
 
@@ -963,38 +1002,36 @@ impl GraphicsEngine {
             });
 
             // Post Processing Pass
+            let render_pass = if let Some(supersampled_color_texture) = engine_context.global_context.supersampled_color_texture.as_ref() {
+                let mut render_pass = engine_context.post_processing_pass_context.create_pass(
+                    &mut post_processing_encoder,
+                    &engine_context.global_context,
+                    supersampled_color_texture,
+                );
+
+                let blitter_data = PostProcessingBlitterDrawData {
+                    target_texture_format: RENDER_TO_TEXTURE_FORMAT,
+                    source_texture: engine_context.global_context.get_forward_texture(),
+                    luma_in_alpha: false,
+                    alpha_blending: false,
+                };
+
+                engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
+
+                render_pass
+            } else {
+                engine_context.post_processing_pass_context.create_pass(
+                    &mut post_processing_encoder,
+                    &engine_context.global_context,
+                    engine_context.global_context.get_forward_texture(),
+                )
+            };
+
             let mut render_pass = match &engine_context.global_context.screen_space_anti_aliasing {
-                ScreenSpaceAntiAliasing::Off => {
-                    match engine_context.global_context.resolved_color_texture.as_ref() {
-                        Some(resolved_color_texture) => {
-                            // We need to resolve the multi sampled texture.
-                            let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                                &mut post_processing_encoder,
-                                &engine_context.global_context,
-                                resolved_color_texture,
-                            );
-
-                            let blitter_data = PostProcessingBlitterDrawData {
-                                target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                                source_texture: &engine_context.global_context.forward_color_texture,
-                                luma_in_alpha: false,
-                                alpha_blending: false,
-                            };
-                            engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
-
-                            render_pass
-                        }
-                        None => {
-                            // We can re-use the forward color texture.
-                            engine_context.post_processing_pass_context.create_pass(
-                                &mut post_processing_encoder,
-                                &engine_context.global_context,
-                                &engine_context.global_context.forward_color_texture,
-                            )
-                        }
-                    }
-                }
+                ScreenSpaceAntiAliasing::Off => render_pass,
                 ScreenSpaceAntiAliasing::Fxaa => {
+                    drop(render_pass);
+
                     let AntiAliasingResource::Fxaa(fxaa_resources) = &engine_context.global_context.anti_aliasing_resources else {
                         panic!("fxaa resources not set")
                     };
@@ -1008,7 +1045,7 @@ impl GraphicsEngine {
 
                     let blitter_data = PostProcessingBlitterDrawData {
                         target_texture_format: fxaa_resources.color_with_luma_texture.get_format(),
-                        source_texture: &engine_context.global_context.forward_color_texture,
+                        source_texture: engine_context.global_context.get_color_texture(),
                         luma_in_alpha: true,
                         alpha_blending: false,
                     };
@@ -1016,12 +1053,10 @@ impl GraphicsEngine {
 
                     drop(render_pass);
 
-                    let color_texture = engine_context.global_context.get_color_texture();
-
                     let mut render_pass = engine_context.post_processing_pass_context.create_pass(
                         &mut post_processing_encoder,
                         &engine_context.global_context,
-                        color_texture,
+                        engine_context.global_context.get_color_texture(),
                     );
 
                     engine_context
@@ -1031,25 +1066,10 @@ impl GraphicsEngine {
                     render_pass
                 }
                 ScreenSpaceAntiAliasing::Cmaa2 => {
+                    drop(render_pass);
+
                     let AntiAliasingResource::Cmaa2(cmaa2_resources) = &engine_context.global_context.anti_aliasing_resources else {
                         panic!("cmaa2 resources not set")
-                    };
-
-                    if let Some(resolved_color_texture) = engine_context.global_context.resolved_color_texture.as_ref() {
-                        // We need to resolve the MSAA texture.
-                        let mut render_pass = engine_context.post_processing_pass_context.create_pass(
-                            &mut post_processing_encoder,
-                            &engine_context.global_context,
-                            resolved_color_texture,
-                        );
-
-                        let blitter_data = PostProcessingBlitterDrawData {
-                            target_texture_format: RENDER_TO_TEXTURE_FORMAT,
-                            source_texture: &engine_context.global_context.forward_color_texture,
-                            luma_in_alpha: false,
-                            alpha_blending: false,
-                        };
-                        engine_context.post_processing_blitter_drawer.draw(&mut render_pass, blitter_data);
                     };
 
                     let mut compute_pass =
@@ -1091,12 +1111,10 @@ impl GraphicsEngine {
 
                     drop(compute_pass);
 
-                    let color_texture = engine_context.global_context.get_color_texture();
-
                     engine_context.post_processing_pass_context.create_pass(
                         &mut post_processing_encoder,
                         &engine_context.global_context,
-                        color_texture,
+                        engine_context.global_context.get_color_texture(),
                     )
                 }
             };
@@ -1149,8 +1167,9 @@ impl GraphicsEngine {
                 .post_processing_rectangle_drawer
                 .draw(&mut render_pass, rectangle_data);
 
-            // We now can do the final blit to the surface texture.
+            // We can now do the final blit to the surface texture.
             drop(render_pass);
+
             let mut render_pass = engine_context.screen_blit_pass_context.create_pass(
                 &mut post_processing_encoder,
                 &engine_context.global_context,

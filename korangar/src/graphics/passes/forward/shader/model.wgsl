@@ -62,7 +62,7 @@ const TILE_SIZE: u32 = 16;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var texture: texture_2d<f32>;
 
-override MSAA_ACTIVATED: bool;
+override ALPHA_TO_COVERAGE_ACTIVATED: bool;
 
 @vertex
 fn vs_main(
@@ -94,7 +94,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     var diffuse_color: vec4<f32>;
     var alpha_channel: f32;
 
-    if (MSAA_ACTIVATED) {
+    if (ALPHA_TO_COVERAGE_ACTIVATED) {
         diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
         alpha_channel = diffuse_color.a;
     } else {
@@ -112,25 +112,23 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Get the number of lights affecting this tile
     let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
 
-    var base_color: vec3<f32>;
+    var base_color = diffuse_color.rgb * input.color;
 
-    if (MSAA_ACTIVATED) {
+    if (ALPHA_TO_COVERAGE_ACTIVATED) {
         // Apply mip level scaling for better mipmap coverage
         let texture_size = vec2<f32>(textureDimensions(texture, 0));
-        alpha_channel = saturate(alpha_channel * (1.0 + max(0.0, calculate_mip_level(input.texture_coordinates * texture_size)) * MIP_SCALE));
+        let coverage = saturate(alpha_channel * (1.0 + max(0.0, calculate_mip_level(input.texture_coordinates * texture_size)) * MIP_SCALE));
 
         // Apply screen-space derivative scaling for better alpha to coverage anti-aliasing
-        alpha_channel = saturate((alpha_channel - ALPHA_CUTOFF) / max(fwidth(alpha_channel), 0.0001) + 0.5);
+        alpha_channel = saturate((coverage - ALPHA_CUTOFF) / max(fwidth(coverage), 0.0001) + 0.5);
+    }
 
-        // Re-apply alpha pre-multiply
-        base_color = select(diffuse_color.rgb, diffuse_color.rgb / diffuse_color.a, diffuse_color.a > 0.0);
-        base_color = base_color * alpha_channel * input.color;
-    } else {
-        if (alpha_channel == 0.0) {
-            discard;
-        }
+    if (alpha_channel == 0.0) {
+        discard;
+    }
 
-        base_color = diffuse_color.rgb * input.color;
+    if (ALPHA_TO_COVERAGE_ACTIVATED) {
+        alpha_channel = diffuse_color.a;
     }
 
     // Directional light

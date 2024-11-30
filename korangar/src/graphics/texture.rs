@@ -20,6 +20,7 @@ pub struct Texture {
     id: u64,
     label: Option<String>,
     byte_size: usize,
+    transparent: bool,
     texture: wgpu::Texture,
     texture_view: TextureView,
     bind_group: BindGroup,
@@ -41,7 +42,7 @@ impl Debug for Texture {
 }
 
 impl Texture {
-    pub fn new(device: &Device, descriptor: &TextureDescriptor) -> Self {
+    pub fn new(device: &Device, descriptor: &TextureDescriptor, transparent: bool) -> Self {
         let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(descriptor);
@@ -65,6 +66,7 @@ impl Texture {
         Self {
             id,
             byte_size,
+            transparent,
             label,
             texture,
             texture_view,
@@ -74,7 +76,7 @@ impl Texture {
 
     /// This function doesn't upload mip-map data. Mip maps should be written
     /// using the `MipMapRenderPassContext` & `Lanczos3Drawer`.
-    pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, image: RgbaImage) -> Self {
+    pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, image: RgbaImage, transparent: bool) -> Self {
         let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(descriptor);
@@ -110,6 +112,7 @@ impl Texture {
         Self {
             id,
             label,
+            transparent,
             byte_size,
             texture,
             texture_view,
@@ -123,6 +126,12 @@ impl Texture {
 
     pub fn get_byte_size(&self) -> usize {
         self.byte_size
+    }
+
+    /// If  `true` a texture contains pixels that are neither fully opaque nor
+    /// fully transparent.
+    pub fn is_transparent(&self) -> bool {
+        self.transparent
     }
 
     pub fn get_size(&self) -> Extent3d {

@@ -9,13 +9,14 @@ use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
-use ragnarok_formats::model::{ModelData, ModelString, NodeData};
+use ragnarok_formats::model::{ModelData, NodeData};
 use ragnarok_formats::version::InternalVersion;
 
 use super::error::LoadError;
 use super::FALLBACK_MODEL_FILE;
 use crate::graphics::{Color, NativeModelVertex};
 use crate::loaders::map::DeferredVertexGeneration;
+use crate::loaders::texture::TextureAtlasEntry;
 use crate::loaders::{GameFileLoader, TextureAtlasFactory};
 use crate::world::{Model, Node};
 
@@ -136,21 +137,27 @@ impl ModelLoader {
         nodes: &[NodeData],
         vertex_offset: &mut usize,
         native_vertices: &mut Vec<NativeModelVertex>,
-        model_texture_mapping: &[i32],
+        model_texture_mapping: &[ModelTexture],
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
-        root_node_name: &ModelString<40>,
         reverse_order: bool,
     ) -> Node {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
         let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order);
 
+        let mut transparent = false;
+
         // Map the node texture index to the model texture index.
         let node_texture_mapping: Vec<i32> = current_node
             .texture_indices
             .iter()
-            .map(|&index| model_texture_mapping[index as usize])
+            .map(|&index| {
+                let model_texture = model_texture_mapping[index as usize];
+                transparent |= model_texture.transparent;
+                model_texture.index
+            })
             .collect();
+
         node_native_vertices
             .iter_mut()
             .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
@@ -183,7 +190,6 @@ impl ModelLoader {
                     model_texture_mapping,
                     &box_transform_matrix,
                     main_bounding_box,
-                    root_node_name,
                     reverse_order,
                 )
             })
@@ -191,6 +197,7 @@ impl ModelLoader {
 
         Node::new(
             transform_matrix,
+            transparent,
             node_vertex_offset,
             node_vertex_count,
             child_nodes,
@@ -269,12 +276,20 @@ impl ModelLoader {
             return self.load(texture_atlas_factory, vertex_offset, FALLBACK_MODEL_FILE, reverse_order);
         }
 
-        let texture_allocation: Vec<AllocationId> = model_data
+        let texture_allocation: Vec<TextureAtlasEntry> = model_data
             .texture_names
             .iter()
             .map(|texture_name| texture_atlas_factory.register(texture_name.as_ref()))
             .collect();
-        let texture_mapping: Vec<i32> = (0..model_data.texture_names.len()).map(|index| index as i32).collect();
+
+        let texture_mapping: Vec<ModelTexture> = texture_allocation
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| ModelTexture {
+                index: index as i32,
+                transparent: entry.transparent,
+            })
+            .collect();
 
         let root_node_name = &model_data.root_node_name.clone().unwrap();
         let root_node = model_data
@@ -294,7 +309,6 @@ impl ModelLoader {
             &texture_mapping,
             &Matrix4::identity(),
             &mut bounding_box,
-            root_node_name,
             reverse_order,
         );
         Self::calculate_transformation_matrix(&mut root_node, true, bounding_box, Matrix4::identity());
@@ -306,6 +320,8 @@ impl ModelLoader {
             model_data,
         );
 
+        let texture_allocation: Vec<AllocationId> = texture_allocation.iter().map(|entry| entry.allocation_id).collect();
+
         let deferred = DeferredVertexGeneration {
             native_model_vertices,
             texture_allocation,
@@ -316,4 +332,10 @@ impl ModelLoader {
 
         Ok((model, deferred))
     }
+}
+
+#[derive(Copy, Clone)]
+struct ModelTexture {
+    index: i32,
+    transparent: bool,
 }

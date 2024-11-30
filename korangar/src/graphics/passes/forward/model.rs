@@ -16,7 +16,7 @@ use crate::graphics::passes::forward::ForwardRenderPassContext;
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DrawIndirectArgs, Drawer, ModelBatchDrawData, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelVertex, Msaa, Prepare, RenderInstruction, Texture};
+use crate::graphics::{Buffer, Capabilities, GlobalContext, ModelBatch, ModelVertex, Msaa, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/model.wgsl");
 #[cfg(feature = "debug")]
@@ -38,12 +38,15 @@ pub(crate) struct ForwardModelDrawer {
     command_buffer: Buffer<DrawIndirectArgs>,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    pipeline: RenderPipeline,
+    opaque_pipeline: RenderPipeline,
+    transparent_pipeline: RenderPipeline,
     #[cfg(feature = "debug")]
     wireframe_pipeline: RenderPipeline,
     instance_data: Vec<InstanceData>,
     instance_indices: Vec<u32>,
     draw_commands: Vec<DrawIndirectArgs>,
+    opaque_batches: Vec<ModelBatch>,
+    transparent_batches: Vec<ModelBatch>,
 }
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardModelDrawer {
@@ -132,6 +135,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 instance_index_buffer_layout.clone(),
                 &pipeline_layout,
                 PolygonMode::Line,
+                false,
             )
         } else {
             Self::create_pipeline(
@@ -142,10 +146,22 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 instance_index_buffer_layout.clone(),
                 &pipeline_layout,
                 PolygonMode::Fill,
+                false,
             )
         };
 
-        let pipeline = Self::create_pipeline(
+        let opaque_pipeline = Self::create_pipeline(
+            device,
+            render_pass_context,
+            global_context.msaa,
+            &shader_module,
+            instance_index_buffer_layout.clone(),
+            &pipeline_layout,
+            PolygonMode::Fill,
+            false,
+        );
+
+        let transparent_pipeline = Self::create_pipeline(
             device,
             render_pass_context,
             global_context.msaa,
@@ -153,6 +169,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             instance_index_buffer_layout,
             &pipeline_layout,
             PolygonMode::Fill,
+            true,
         );
 
         Self {
@@ -162,60 +179,98 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
             command_buffer,
             bind_group_layout,
             bind_group,
-            pipeline,
+            opaque_pipeline,
+            transparent_pipeline,
             #[cfg(feature = "debug")]
             wireframe_pipeline,
             instance_data: Vec::default(),
             instance_indices: Vec::default(),
             draw_commands: Vec::default(),
+            opaque_batches: Vec::default(),
+            transparent_batches: Vec::default(),
         }
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if draw_data.batches.is_empty() {
+        if self.opaque_batches.is_empty() && self.transparent_batches.is_empty() {
             return;
         }
 
-        #[cfg(feature = "debug")]
-        if draw_data.show_wireframe {
-            pass.set_pipeline(&self.wireframe_pipeline);
-        } else {
-            pass.set_pipeline(&self.pipeline);
-        }
+        fn process_batches(
+            pass: &mut RenderPass<'_>,
+            batches: &[ModelBatch],
+            draw_data: &ModelBatchDrawData,
+            instance_index_vertex_buffer: &Buffer<u32>,
+            command_buffer: &Buffer<DrawIndirectArgs>,
+            multi_draw_indirect_support: bool,
+        ) {
+            for batch in batches {
+                pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
+                pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
+                pass.set_vertex_buffer(1, instance_index_vertex_buffer.slice(..));
 
-        #[cfg(not(feature = "debug"))]
-        pass.set_pipeline(&self.pipeline);
+                if multi_draw_indirect_support {
+                    pass.multi_draw_indirect(
+                        command_buffer.get_buffer(),
+                        (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
+                        batch.count as u32,
+                    );
+                } else {
+                    let start = batch.offset;
+                    let end = start + batch.count;
 
-        pass.set_bind_group(2, &self.bind_group, &[]);
+                    for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
+                        let vertex_start = instruction.vertex_offset as u32;
+                        let vertex_end = vertex_start + instruction.vertex_count as u32;
+                        let index = (start + index) as u32;
 
-        for batch in draw_data.batches.iter() {
-            if batch.count == 0 {
-                continue;
-            }
-
-            pass.set_bind_group(3, batch.texture.get_bind_group(), &[]);
-            pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
-            pass.set_vertex_buffer(1, self.instance_index_vertex_buffer.slice(..));
-
-            if self.multi_draw_indirect_support {
-                pass.multi_draw_indirect(
-                    self.command_buffer.get_buffer(),
-                    (batch.offset * size_of::<DrawIndirectArgs>()) as BufferAddress,
-                    batch.count as u32,
-                );
-            } else {
-                let start = batch.offset;
-                let end = start + batch.count;
-
-                for (index, instruction) in draw_data.instructions[start..end].iter().enumerate() {
-                    let vertex_start = instruction.vertex_offset as u32;
-                    let vertex_end = vertex_start + instruction.vertex_count as u32;
-                    let index = (start + index) as u32;
-
-                    pass.draw(vertex_start..vertex_end, index..index + 1);
+                        pass.draw(vertex_start..vertex_end, index..index + 1);
+                    }
                 }
             }
         }
+
+        pass.set_bind_group(2, &self.bind_group, &[]);
+
+        #[cfg(feature = "debug")]
+        let opaque_pipeline = if draw_data.show_wireframe {
+            &self.wireframe_pipeline
+        } else {
+            &self.opaque_pipeline
+        };
+        #[cfg(not(feature = "debug"))]
+        let opaque_pipeline = &self.opaque_pipeline;
+
+        pass.set_pipeline(opaque_pipeline);
+
+        process_batches(
+            pass,
+            &self.opaque_batches,
+            &draw_data,
+            &self.instance_index_vertex_buffer,
+            &self.command_buffer,
+            self.multi_draw_indirect_support,
+        );
+
+        #[cfg(feature = "debug")]
+        let transparent_pipeline = if draw_data.show_wireframe {
+            &self.wireframe_pipeline
+        } else {
+            &self.transparent_pipeline
+        };
+        #[cfg(not(feature = "debug"))]
+        let transparent_pipeline = &self.transparent_pipeline;
+
+        pass.set_pipeline(transparent_pipeline);
+
+        process_batches(
+            pass,
+            &self.transparent_batches,
+            &draw_data,
+            &self.instance_index_vertex_buffer,
+            &self.command_buffer,
+            self.multi_draw_indirect_support,
+        );
     }
 }
 
@@ -230,6 +285,44 @@ impl Prepare for ForwardModelDrawer {
         self.instance_data.clear();
         self.instance_indices.clear();
         self.draw_commands.clear();
+        self.opaque_batches.clear();
+        self.transparent_batches.clear();
+
+        // We assume that batches inside instructions are sorted by transparency (first
+        // opaque, then transparent models).
+        for batch in instructions.model_batches {
+            let start = batch.offset;
+            let end = batch.offset + batch.count;
+
+            let relative_transparent_start = instructions.models[start..end].iter().position(|model| model.transparent);
+
+            if let Some(relative_transparent_start) = relative_transparent_start {
+                let absolute_transparent_start = start + relative_transparent_start;
+                let opaque_count = relative_transparent_start;
+                let transparent_count = end - absolute_transparent_start;
+
+                self.opaque_batches.push(ModelBatch {
+                    offset: batch.offset,
+                    count: opaque_count,
+                    texture: batch.texture.clone(),
+                    vertex_buffer: batch.vertex_buffer.clone(),
+                });
+
+                self.transparent_batches.push(ModelBatch {
+                    offset: absolute_transparent_start,
+                    count: transparent_count,
+                    texture: batch.texture.clone(),
+                    vertex_buffer: batch.vertex_buffer.clone(),
+                });
+            } else {
+                self.opaque_batches.push(ModelBatch {
+                    offset: batch.offset,
+                    count: batch.count,
+                    texture: batch.texture.clone(),
+                    vertex_buffer: batch.vertex_buffer.clone(),
+                });
+            }
+        }
 
         for instruction in instructions.models.iter() {
             let instance_index = self.instance_data.len();
@@ -290,14 +383,18 @@ impl ForwardModelDrawer {
         instance_index_buffer_layout: VertexBufferLayout,
         pipeline_layout: &PipelineLayout,
         polygon_mode: PolygonMode,
+        transparent: bool,
     ) -> RenderPipeline {
-        let msaa_activated = msaa.multisampling_activated();
+        let alpha_to_coverage_activated = msaa.multisampling_activated() && transparent;
 
         let mut constants = std::collections::HashMap::new();
-        constants.insert("MSAA_ACTIVATED".to_string(), f64::from(u32::from(msaa_activated)));
+        constants.insert(
+            "ALPHA_TO_COVERAGE_ACTIVATED".to_string(),
+            f64::from(u32::from(alpha_to_coverage_activated)),
+        );
 
         device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some(DRAWER_NAME),
+            label: Some(&format!("{DRAWER_NAME} transparent: {transparent}")),
             layout: Some(pipeline_layout),
             vertex: VertexState {
                 module: shader_module,
@@ -328,10 +425,10 @@ impl ForwardModelDrawer {
                 polygon_mode,
                 ..Default::default()
             },
-            multisample: if msaa_activated {
+            multisample: if msaa.multisampling_activated() {
                 MultisampleState {
                     count: msaa.sample_count(),
-                    alpha_to_coverage_enabled: true,
+                    alpha_to_coverage_enabled: !transparent,
                     ..Default::default()
                 }
             } else {

@@ -17,7 +17,6 @@ use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-#[cfg(feature = "debug")]
 use crate::Camera;
 
 #[derive(PrototypeElement, PrototypeWindow, new)]
@@ -29,8 +28,8 @@ pub struct Object {
 }
 
 impl Object {
-    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, client_tick: ClientTick) {
-        self.model.render_geometry(instructions, &self.transform, client_tick);
+    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, client_tick: ClientTick, camera: &dyn Camera) {
+        self.model.render_geometry(instructions, &self.transform, client_tick, camera);
     }
 
     pub fn get_bounding_box_matrix(&self) -> Matrix4<f32> {

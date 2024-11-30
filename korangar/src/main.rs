@@ -1945,8 +1945,12 @@ impl Client {
             let offset = self.directional_shadow_model_instructions.len();
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-            self.map
-                .render_objects(&mut self.directional_shadow_model_instructions, &object_set, client_tick);
+            self.map.render_objects(
+                &mut self.directional_shadow_model_instructions,
+                &object_set,
+                client_tick,
+                &self.directional_shadow_camera,
+            );
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
             self.map.render_ground(&mut self.directional_shadow_model_instructions);
@@ -2015,7 +2019,8 @@ impl Client {
             let offset = self.model_instructions.len();
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-            self.map.render_objects(&mut self.model_instructions, &object_set, client_tick);
+            self.map
+                .render_objects(&mut self.model_instructions, &object_set, client_tick, current_camera);
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
             self.map.render_ground(&mut self.model_instructions);
@@ -2214,7 +2219,7 @@ impl Client {
             point_light_shadow_caster: &self.point_light_with_shadow_instructions,
             point_light: &self.point_light_instructions,
             model_batches: &self.model_batches,
-            models: &self.model_instructions,
+            models: &mut self.model_instructions,
             entities: &mut self.entity_instructions,
             directional_model_batches: &self.directional_shadow_model_batches,
             directional_shadow_models: &self.directional_shadow_model_instructions,

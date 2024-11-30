@@ -17,6 +17,7 @@ use crate::graphics::Color;
 #[cfg(feature = "debug")]
 use crate::graphics::DebugAabbInstruction;
 use crate::graphics::ModelInstruction;
+use crate::world::Camera;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
@@ -27,8 +28,14 @@ pub struct Model {
 }
 
 impl Model {
-    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, transform: &Transform, client_tick: ClientTick) {
-        self.root_node.render_geometry(instructions, transform, client_tick);
+    pub fn render_geometry(
+        &self,
+        instructions: &mut Vec<ModelInstruction>,
+        transform: &Transform,
+        client_tick: ClientTick,
+        camera: &dyn Camera,
+    ) {
+        self.root_node.render_geometry(instructions, transform, client_tick, camera);
     }
 
     #[cfg(feature = "debug")]

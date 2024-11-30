@@ -251,7 +251,7 @@ impl PointLightSet<'_> {
                 let model_offset = point_shadow_model_instructions.len();
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_objects))]
-                map.render_objects(point_shadow_model_instructions, &object_set, client_tick);
+                map.render_objects(point_shadow_model_instructions, &object_set, client_tick, point_shadow_camera);
 
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_map))]
                 map.render_ground(point_shadow_model_instructions);

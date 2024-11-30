@@ -241,10 +241,16 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_objects(&self, instructions: &mut Vec<ModelInstruction>, object_set: &ResourceSet<ObjectKey>, client_tick: ClientTick) {
+    pub fn render_objects(
+        &self,
+        instructions: &mut Vec<ModelInstruction>,
+        object_set: &ResourceSet<ObjectKey>,
+        client_tick: ClientTick,
+        camera: &dyn Camera,
+    ) {
         for object_key in object_set.iterate_visible().copied() {
             if let Some(object) = self.objects.get(object_key) {
-                object.render_geometry(instructions, client_tick);
+                object.render_geometry(instructions, client_tick, camera);
             }
         }
     }
@@ -255,6 +261,8 @@ impl Map {
             model_matrix: Matrix4::identity(),
             vertex_offset: self.ground_vertex_offset,
             vertex_count: self.ground_vertex_count,
+            distance: f32::MAX,
+            transparent: false,
         });
     }
 
@@ -416,6 +424,8 @@ impl Map {
             model_matrix: Matrix4::identity(),
             vertex_offset: 0,
             vertex_count,
+            distance: f32::MAX,
+            transparent: true,
         });
 
         model_batches.push(ModelBatch {
@@ -444,6 +454,8 @@ impl Map {
                     model_matrix: Matrix4::identity(),
                     vertex_offset: 0,
                     vertex_count,
+                    distance: f32::MAX,
+                    transparent: true,
                 });
 
                 model_batches.push(ModelBatch {

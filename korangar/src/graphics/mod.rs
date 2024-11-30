@@ -390,6 +390,7 @@ impl GlobalContext {
                 view_formats: Default::default(),
             },
             RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap(),
+            false,
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
         let forward_textures = Self::create_forward_textures(device, forward_size, msaa, ssaa, screen_space_anti_aliasing);

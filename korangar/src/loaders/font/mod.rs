@@ -154,20 +154,24 @@ impl FontLoader {
     }
 
     fn create_texture_atlas_texture(device: &Device, cache_size: Vector2<u32>) -> Texture {
-        Texture::new(device, &TextureDescriptor {
-            label: Some("Texture Atlas"),
-            size: Extent3d {
-                width: cache_size.x,
-                height: cache_size.y,
-                depth_or_array_layers: 1,
+        Texture::new(
+            device,
+            &TextureDescriptor {
+                label: Some("Texture Atlas"),
+                size: Extent3d {
+                    width: cache_size.x,
+                    height: cache_size.y,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::R8Unorm,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
             },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: TextureDimension::D2,
-            format: TextureFormat::R8Unorm,
-            usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-            view_formats: &[],
-        })
+            true,
+        )
     }
 
     // TODO: NHA Call this when we change the scale factor of the application.

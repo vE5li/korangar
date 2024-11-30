@@ -3,7 +3,7 @@ use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
-use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, TextureSamplerType};
+use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, TextureSamplerType};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
@@ -14,6 +14,7 @@ pub struct GraphicsSettingsWindow<
     TripleBuffering,
     TextureFiltering,
     Multisampling,
+    Supersampling,
     ScreenAntiAliasing,
     Shadow,
     HighQualityInterface,
@@ -23,6 +24,7 @@ pub struct GraphicsSettingsWindow<
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Multisampling: TrackedState<Msaa> + 'static,
+    Supersampling: TrackedState<Ssaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
@@ -34,18 +36,30 @@ pub struct GraphicsSettingsWindow<
     triple_buffering: TripleBuffering,
     texture_filtering: TextureFiltering,
     msaa: Multisampling,
+    ssaa: Supersampling,
     screen_space_anti_aliasing: ScreenAntiAliasing,
     shadow_detail: Shadow,
     high_quality_interface: HighQualityInterface,
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow, HighQualityInterface>
+impl<
+        Vsync,
+        FramerateLimit,
+        TripleBuffering,
+        TextureFiltering,
+        Multisampling,
+        Supersampling,
+        ScreenAntiAliasing,
+        Shadow,
+        HighQualityInterface,
+    >
     GraphicsSettingsWindow<
         Vsync,
         FramerateLimit,
         TripleBuffering,
         TextureFiltering,
         Multisampling,
+        Supersampling,
         ScreenAntiAliasing,
         Shadow,
         HighQualityInterface,
@@ -56,6 +70,7 @@ where
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Multisampling: TrackedState<Msaa> + 'static,
+    Supersampling: TrackedState<Ssaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
@@ -70,6 +85,7 @@ where
         triple_buffering: TripleBuffering,
         texture_filtering: TextureFiltering,
         msaa: Multisampling,
+        ssaa: Supersampling,
         screen_space_anti_aliasing: ScreenAntiAliasing,
         shadow_detail: Shadow,
         high_quality_interface: HighQualityInterface,
@@ -82,6 +98,7 @@ where
             triple_buffering,
             texture_filtering,
             msaa,
+            ssaa,
             screen_space_anti_aliasing,
             shadow_detail,
             high_quality_interface,
@@ -89,14 +106,24 @@ where
     }
 }
 
-impl<Vsync, FramerateLimit, TripleBuffering, TextureFiltering, Multisampling, ScreenAntiAliasing, Shadow, HighQualityInterface>
-    PrototypeWindow<InterfaceSettings>
+impl<
+        Vsync,
+        FramerateLimit,
+        TripleBuffering,
+        TextureFiltering,
+        Multisampling,
+        Supersampling,
+        ScreenAntiAliasing,
+        Shadow,
+        HighQualityInterface,
+    > PrototypeWindow<InterfaceSettings>
     for GraphicsSettingsWindow<
         Vsync,
         FramerateLimit,
         TripleBuffering,
         TextureFiltering,
         Multisampling,
+        Supersampling,
         ScreenAntiAliasing,
         Shadow,
         HighQualityInterface,
@@ -107,6 +134,7 @@ where
     TripleBuffering: TrackedStateBinary<bool>,
     TextureFiltering: TrackedState<TextureSamplerType> + 'static,
     Multisampling: TrackedState<Msaa> + 'static,
+    Supersampling: TrackedState<Ssaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
     Shadow: TrackedState<ShadowDetail> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
@@ -144,10 +172,17 @@ where
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),
-            Text::default().with_text("MSAA").with_width(dimension_bound!(50%)).wrap(),
+            Text::default().with_text("Multisampling").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
                 .with_options(self.supported_msaa.clone())
                 .with_selected(self.msaa.clone())
+                .with_event(Box::new(Vec::new))
+                .with_width(dimension_bound!(!))
+                .wrap(),
+            Text::default().with_text("Supersampling").with_width(dimension_bound!(50%)).wrap(),
+            PickList::default()
+                .with_options(vec![("Off", Ssaa::Off), ("x2", Ssaa::X2), ("x3", Ssaa::X3), ("x4", Ssaa::X4)])
+                .with_selected(self.ssaa.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),

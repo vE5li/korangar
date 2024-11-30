@@ -6,7 +6,7 @@ struct GlobalUniforms {
     indicator_positions: mat4x4<f32>,
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
-    screen_size: vec2<u32>,
+    forward_size: vec2<u32>,
     interface_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
@@ -140,7 +140,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let pixel_position = vec2<u32>(floor(input.position.xy));
     let tile_x = pixel_position.x / TILE_SIZE;
     let tile_y = pixel_position.y / TILE_SIZE;
-    let tile_count_x = (global_uniforms.screen_size.x + TILE_SIZE - 1u) / TILE_SIZE;
+    let tile_count_x = (global_uniforms.forward_size.x + TILE_SIZE - 1u) / TILE_SIZE;
     let tile_index = tile_y * tile_count_x + tile_x;
 
     // Get the number of lights affecting this tile

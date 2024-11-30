@@ -65,7 +65,6 @@ const LIGHT_TILE_SIZE: u32 = 16;
 /// re-use the forward color texture, if possible.
 pub const RENDER_TO_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
 pub const RENDER_TO_TEXTURE_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
-
 pub const INTERFACE_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 pub const FXAA_COLOR_LUMA_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 
@@ -103,7 +102,7 @@ pub(crate) struct GlobalUniforms {
     indicator_positions: [[f32; 4]; 4],
     indicator_color: [f32; 4],
     ambient_color: [f32; 4],
-    screen_size: [u32; 2],
+    forward_size: [u32; 2],
     interface_size: [u32; 2],
     pointer_position: [u32; 2],
     animation_timer: f32,
@@ -152,6 +151,7 @@ pub(crate) struct TileLightIndices {
 pub(crate) struct GlobalContext {
     pub(crate) surface_texture_format: TextureFormat,
     pub(crate) msaa: Msaa,
+    pub(crate) ssaa: Ssaa,
     pub(crate) screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     pub(crate) high_quality_interface: bool,
     pub(crate) solid_pixel_texture: Arc<Texture>,
@@ -161,6 +161,7 @@ pub(crate) struct GlobalContext {
     pub(crate) picker_depth_texture: AttachmentTexture,
     pub(crate) forward_color_texture: AttachmentTexture,
     pub(crate) resolved_color_texture: Option<AttachmentTexture>,
+    pub(crate) supersampled_color_texture: Option<AttachmentTexture>,
     pub(crate) interface_buffer_texture: AttachmentTexture,
     pub(crate) directional_shadow_map_texture: AttachmentTexture,
     pub(crate) point_shadow_map_textures: CubeArrayTexture,
@@ -182,6 +183,7 @@ pub(crate) struct GlobalContext {
     #[cfg(feature = "debug")]
     pub(crate) debug_bind_group: BindGroup,
     pub(crate) screen_size: ScreenSize,
+    pub(crate) forward_size: ScreenSize,
     pub(crate) interface_size: ScreenSize,
     pub(crate) directional_shadow_size: ScreenSize,
     pub(crate) point_shadow_size: ScreenSize,
@@ -240,7 +242,7 @@ impl Prepare for GlobalContext {
             indicator_positions: indicator_positions.into(),
             indicator_color: indicator_color.components_linear(),
             ambient_color: ambient_light_color.components_linear(),
-            screen_size: [self.screen_size.width as u32, self.screen_size.height as u32],
+            forward_size: [self.forward_size.width as u32, self.forward_size.height as u32],
             interface_size: [self.interface_size.width as u32, self.interface_size.height as u32],
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
             animation_timer: instructions.uniforms.animation_timer,
@@ -362,12 +364,14 @@ impl GlobalContext {
         texture_loader: &TextureLoader,
         surface_texture_format: TextureFormat,
         msaa: Msaa,
+        ssaa: Ssaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
         screen_size: ScreenSize,
         shadow_detail: ShadowDetail,
         texture_sampler: TextureSamplerType,
         high_quality_interface: bool,
     ) -> Self {
+        let forward_size = ssaa.calculate_size(screen_size);
         let interface_size = if high_quality_interface { screen_size * 2.0 } else { screen_size };
         let directional_shadow_size = ScreenSize::uniform(shadow_detail.directional_shadow_resolution() as f32);
         let point_shadow_size = ScreenSize::uniform(shadow_detail.point_shadow_resolution() as f32);
@@ -388,10 +392,12 @@ impl GlobalContext {
             RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap(),
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
-        let screen_textures = Self::create_screen_size_textures(device, screen_size, msaa, screen_space_anti_aliasing);
+        let forward_textures = Self::create_forward_textures(device, forward_size, msaa, ssaa, screen_space_anti_aliasing);
+        let picker_textures = Self::create_picker_textures(device, screen_size);
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
-        let resolved_color_texture = Self::create_resolved_color_texture(device, screen_size, msaa, screen_space_anti_aliasing);
+        let resolved_color_texture = Self::create_resolved_color_texture(device, forward_size, msaa, ssaa, screen_space_anti_aliasing);
+        let supersampled_color_texture = Self::create_supersampled_texture(device, screen_size, ssaa, screen_space_anti_aliasing);
         let interface_buffer_texture = Self::create_interface_texture(device, interface_size);
 
         let picker_value_buffer = Buffer::with_capacity(
@@ -430,7 +436,7 @@ impl GlobalContext {
             (128 * size_of::<PointLightData>()) as _,
         );
 
-        let tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, screen_size);
+        let tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, forward_size);
 
         let nearest_sampler = create_new_sampler(device, "nearest", TextureSamplerType::Nearest);
         let linear_sampler = create_new_sampler(device, "linear", TextureSamplerType::Linear);
@@ -449,7 +455,7 @@ impl GlobalContext {
         let light_culling_bind_group = Self::create_light_culling_bind_group(
             device,
             &point_light_data_buffer,
-            &screen_textures.tile_light_count_texture,
+            &forward_textures.tile_light_count_texture,
             &tile_light_indices_buffer,
         );
 
@@ -457,7 +463,7 @@ impl GlobalContext {
             device,
             &directional_light_uniforms_buffer,
             &point_light_data_buffer,
-            &screen_textures.tile_light_count_texture,
+            &forward_textures.tile_light_count_texture,
             &tile_light_indices_buffer,
             &directional_shadow_map_texture,
             &point_shadow_map_textures,
@@ -467,28 +473,30 @@ impl GlobalContext {
         let debug_bind_group = Self::create_debug_bind_group(
             device,
             &debug_uniforms_buffer,
-            &screen_textures.picker_buffer_texture,
+            &picker_textures.picker_buffer_texture,
             &directional_shadow_map_texture,
-            &screen_textures.tile_light_count_texture,
+            &forward_textures.tile_light_count_texture,
             &point_shadow_map_textures,
         );
 
         Self {
             surface_texture_format,
             msaa,
+            ssaa,
             screen_space_anti_aliasing,
             high_quality_interface,
             solid_pixel_texture,
             walk_indicator_texture,
-            forward_depth_texture: screen_textures.forward_depth_texture,
-            picker_buffer_texture: screen_textures.picker_buffer_texture,
-            picker_depth_texture: screen_textures.picker_depth_texture,
-            forward_color_texture: screen_textures.forward_color_texture,
+            forward_depth_texture: forward_textures.forward_depth_texture,
+            picker_buffer_texture: picker_textures.picker_buffer_texture,
+            picker_depth_texture: picker_textures.picker_depth_texture,
+            forward_color_texture: forward_textures.forward_color_texture,
             resolved_color_texture,
+            supersampled_color_texture,
             interface_buffer_texture,
             directional_shadow_map_texture,
             point_shadow_map_textures,
-            tile_light_count_texture: screen_textures.tile_light_count_texture,
+            tile_light_count_texture: forward_textures.tile_light_count_texture,
             global_uniforms_buffer,
             forward_bind_group,
             #[cfg(feature = "debug")]
@@ -506,6 +514,7 @@ impl GlobalContext {
             global_bind_group,
             light_culling_bind_group,
             screen_size,
+            forward_size,
             interface_size,
             directional_shadow_size,
             point_shadow_size,
@@ -518,15 +527,45 @@ impl GlobalContext {
     }
 
     fn get_color_texture(&self) -> &AttachmentTexture {
+        self.supersampled_color_texture
+            .as_ref()
+            .unwrap_or_else(|| self.resolved_color_texture.as_ref().unwrap_or(&self.forward_color_texture))
+    }
+
+    fn get_forward_texture(&self) -> &AttachmentTexture {
         self.resolved_color_texture.as_ref().unwrap_or(&self.forward_color_texture)
     }
 
-    fn create_screen_size_textures(
+    fn create_forward_textures(
         device: &Device,
-        screen_size: ScreenSize,
+        forward_size: ScreenSize,
         msaa: Msaa,
+        ssaa: Ssaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
-    ) -> ScreenSizeTextures {
+    ) -> ForwardTextures {
+        let texture_type = match !msaa.multisampling_activated()
+            && !ssaa.supersampling_activated()
+            && screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2
+        {
+            true => AttachmentTextureType::ColorStorageAttachment,
+            false => AttachmentTextureType::ColorAttachment,
+        };
+
+        let factory = AttachmentTextureFactory::new(device, forward_size, msaa.sample_count(), None);
+        let forward_color_texture = factory.new_attachment("forward color", RENDER_TO_TEXTURE_FORMAT, texture_type);
+        let forward_depth_texture = factory.new_attachment("forward depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
+        let (tile_x, tile_y) = calculate_light_tile_count(forward_size);
+
+        let tile_light_count_texture = StorageTexture::new(device, "tile light count texture", tile_x, tile_y, TextureFormat::R32Uint);
+
+        ForwardTextures {
+            forward_depth_texture,
+            forward_color_texture,
+            tile_light_count_texture,
+        }
+    }
+
+    fn create_picker_textures(device: &Device, screen_size: ScreenSize) -> PickerTextures {
         // Since we need to copy from the picker attachment to read the picker value, we
         // need to align both attachments properly to the requirements of
         // COPY_BYTES_PER_ROW_ALIGNMENT.
@@ -543,38 +582,48 @@ impl GlobalContext {
         );
         let picker_depth_texture = picker_factory.new_attachment("depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
 
-        let (forward_color_texture, forward_depth_texture) =
-            Self::create_forward_texture(device, screen_size, msaa, screen_space_anti_aliasing);
-
-        let (tile_x, tile_y) = calculate_light_tile_count(screen_size);
-
-        let tile_light_count_texture = StorageTexture::new(device, "tile light count texture", tile_x, tile_y, TextureFormat::R32Uint);
-
-        ScreenSizeTextures {
-            forward_depth_texture,
+        PickerTextures {
             picker_buffer_texture,
             picker_depth_texture,
-            forward_color_texture,
-            tile_light_count_texture,
         }
     }
 
     fn create_resolved_color_texture(
         device: &Device,
-        screen_size: ScreenSize,
+        forward_size: ScreenSize,
         msaa: Msaa,
+        ssaa: Ssaa,
         screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     ) -> Option<AttachmentTexture> {
-        let need_texture = msaa.multisampling_activated();
+        let attachment_type = match !ssaa.supersampling_activated() && screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2 {
+            true => AttachmentTextureType::ColorStorageAttachment,
+            false => AttachmentTextureType::ColorAttachment,
+        };
+
+        match msaa.multisampling_activated() {
+            true => {
+                let attachment_factory = AttachmentTextureFactory::new(device, forward_size, 1, None);
+                Some(attachment_factory.new_attachment("resolved color", RENDER_TO_TEXTURE_FORMAT, attachment_type))
+            }
+            false => None,
+        }
+    }
+
+    fn create_supersampled_texture(
+        device: &Device,
+        screen_size: ScreenSize,
+        ssaa: Ssaa,
+        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
+    ) -> Option<AttachmentTexture> {
         let attachment_type = match screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2 {
             true => AttachmentTextureType::ColorStorageAttachment,
             false => AttachmentTextureType::ColorAttachment,
         };
 
-        match need_texture {
+        match ssaa.supersampling_activated() {
             true => {
                 let attachment_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
-                Some(attachment_factory.new_attachment("resolved color", RENDER_TO_TEXTURE_FORMAT, attachment_type))
+                Some(attachment_factory.new_attachment("supersampled color", RENDER_TO_TEXTURE_FORMAT, attachment_type))
             }
             false => None,
         }
@@ -590,23 +639,6 @@ impl GlobalContext {
         )
     }
 
-    fn create_forward_texture(
-        device: &Device,
-        screen_size: ScreenSize,
-        msaa: Msaa,
-        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
-    ) -> (AttachmentTexture, AttachmentTexture) {
-        let texture_type = match !msaa.multisampling_activated() && screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2 {
-            true => AttachmentTextureType::ColorStorageAttachment,
-            false => AttachmentTextureType::ColorAttachment,
-        };
-
-        let factory = AttachmentTextureFactory::new(device, screen_size, msaa.sample_count(), None);
-        let color_texture = factory.new_attachment("forward color", RENDER_TO_TEXTURE_FORMAT, texture_type);
-        let depth_texture = factory.new_attachment("forward depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
-        (color_texture, depth_texture)
-    }
-
     fn create_directional_shadow_texture(device: &Device, shadow_size: ScreenSize) -> AttachmentTexture {
         let shadow_factory = AttachmentTextureFactory::new(device, shadow_size, 1, None);
 
@@ -617,8 +649,8 @@ impl GlobalContext {
         )
     }
 
-    fn create_tile_light_indices_buffer(device: &Device, screen_size: ScreenSize) -> Buffer<TileLightIndices> {
-        let (tile_count_x, tile_count_y) = calculate_light_tile_count(screen_size);
+    fn create_tile_light_indices_buffer(device: &Device, forward_size: ScreenSize) -> Buffer<TileLightIndices> {
+        let (tile_count_x, tile_count_y) = calculate_light_tile_count(forward_size);
 
         Buffer::with_capacity(
             device,
@@ -731,33 +763,41 @@ impl GlobalContext {
 
     fn update_screen_size_resources(&mut self, device: &Device, screen_size: ScreenSize) {
         self.screen_size = screen_size;
+        self.forward_size = self.ssaa.calculate_size(self.screen_size);
         self.interface_size = if self.high_quality_interface {
             self.screen_size * 2.0
         } else {
             self.screen_size
         };
 
-        let ScreenSizeTextures {
+        let ForwardTextures {
             forward_color_texture,
             forward_depth_texture,
+            tile_light_count_texture,
+        } = Self::create_forward_textures(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        let PickerTextures {
             picker_buffer_texture,
             picker_depth_texture,
-            tile_light_count_texture,
-        } = Self::create_screen_size_textures(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
+        } = Self::create_picker_textures(device, self.screen_size);
 
         let resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
+            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        let supersampled_color_texture =
+            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
 
         self.forward_color_texture = forward_color_texture;
         self.forward_depth_texture = forward_depth_texture;
         self.picker_buffer_texture = picker_buffer_texture;
         self.picker_depth_texture = picker_depth_texture;
         self.resolved_color_texture = resolved_color_texture;
+        self.supersampled_color_texture = supersampled_color_texture;
         self.tile_light_count_texture = tile_light_count_texture;
 
         self.interface_buffer_texture = Self::create_interface_texture(device, self.interface_size);
 
-        self.tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, screen_size);
+        self.tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, self.forward_size);
 
         self.anti_aliasing_resources = Self::create_anti_aliasing_resources(device, self.screen_space_anti_aliasing, self.screen_size);
 
@@ -839,21 +879,62 @@ impl GlobalContext {
     fn update_msaa(&mut self, device: &Device, msaa: Msaa) {
         self.msaa = msaa;
 
-        (self.forward_color_texture, self.forward_depth_texture) =
-            Self::create_forward_texture(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
+        let ForwardTextures {
+            forward_color_texture,
+            forward_depth_texture,
+            tile_light_count_texture,
+        } = Self::create_forward_textures(device, self.screen_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        self.forward_color_texture = forward_color_texture;
+        self.forward_depth_texture = forward_depth_texture;
+        self.tile_light_count_texture = tile_light_count_texture;
 
         self.resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
+            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        self.supersampled_color_texture =
+            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
+    }
+
+    fn update_ssaa(&mut self, device: &Device, ssaa: Ssaa) {
+        self.ssaa = ssaa;
+        self.forward_size = self.ssaa.calculate_size(self.screen_size);
+
+        let ForwardTextures {
+            forward_color_texture,
+            forward_depth_texture,
+            tile_light_count_texture,
+        } = Self::create_forward_textures(device, self.screen_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        self.forward_color_texture = forward_color_texture;
+        self.forward_depth_texture = forward_depth_texture;
+        self.tile_light_count_texture = tile_light_count_texture;
+
+        self.resolved_color_texture =
+            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        self.supersampled_color_texture =
+            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
     }
 
     fn update_screen_space_anti_aliasing(&mut self, device: &Device, screen_space_anti_aliasing: ScreenSpaceAntiAliasing) {
         self.screen_space_anti_aliasing = screen_space_anti_aliasing;
 
-        (self.forward_color_texture, self.forward_depth_texture) =
-            Self::create_forward_texture(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
+        let ForwardTextures {
+            forward_color_texture,
+            forward_depth_texture,
+            tile_light_count_texture,
+        } = Self::create_forward_textures(device, self.screen_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        self.forward_color_texture = forward_color_texture;
+        self.forward_depth_texture = forward_depth_texture;
+        self.tile_light_count_texture = tile_light_count_texture;
 
         self.resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.screen_size, self.msaa, self.screen_space_anti_aliasing);
+            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+
+        self.supersampled_color_texture =
+            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
 
         self.anti_aliasing_resources = Self::create_anti_aliasing_resources(device, self.screen_space_anti_aliasing, self.screen_size);
     }
@@ -1375,17 +1456,20 @@ impl GlobalContext {
     }
 }
 
-fn calculate_light_tile_count(screen_size: ScreenSize) -> (u32, u32) {
-    let tile_count_x = (screen_size.width as u32 + LIGHT_TILE_SIZE - 1) / LIGHT_TILE_SIZE;
-    let tile_count_y = (screen_size.height as u32 + LIGHT_TILE_SIZE - 1) / LIGHT_TILE_SIZE;
+fn calculate_light_tile_count(forward_size: ScreenSize) -> (u32, u32) {
+    let tile_count_x = (forward_size.width as u32).div_ceil(LIGHT_TILE_SIZE);
+    let tile_count_y = (forward_size.height as u32).div_ceil(LIGHT_TILE_SIZE);
     (tile_count_x, tile_count_y)
 }
 
-struct ScreenSizeTextures {
-    forward_color_texture: AttachmentTexture,
-    forward_depth_texture: AttachmentTexture,
+struct PickerTextures {
     picker_buffer_texture: AttachmentTexture,
     picker_depth_texture: AttachmentTexture,
+}
+
+struct ForwardTextures {
+    forward_color_texture: AttachmentTexture,
+    forward_depth_texture: AttachmentTexture,
     tile_light_count_texture: StorageTexture,
 }
 

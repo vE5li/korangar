@@ -53,7 +53,10 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
             label: Some(PASS_NAME),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: global_context.forward_color_texture.get_texture_view(),
-                resolve_target: None,
+                resolve_target: global_context
+                    .resolved_color_texture
+                    .as_ref()
+                    .map(|texture| texture.get_texture_view()),
                 ops: Operations {
                     load: LoadOp::Clear(Color::BLACK),
                     store: StoreOp::Store,

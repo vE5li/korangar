@@ -169,6 +169,7 @@ impl SpriteLoader {
                         view_formats: &[],
                     },
                     RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data).unwrap(),
+                    false,
                 );
                 Arc::new(texture)
             })

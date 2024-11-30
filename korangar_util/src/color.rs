@@ -19,3 +19,9 @@ pub fn premultiply_alpha(srgba_bytes: &mut [u8]) {
         chunk[2] = f32_to_srgb8(blue);
     });
 }
+
+/// Returns `true` if the sRGBA gamma encoded pixel contains a pixel that has an
+/// alpha value neither 0 nor 255.
+pub fn contains_transparent_pixel(srgba_bytes: &[u8]) -> bool {
+    srgba_bytes.chunks_exact(4).any(|bytes| bytes[3] != 0 && bytes[3] != 255)
+}

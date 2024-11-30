@@ -99,7 +99,11 @@ impl MapLoader {
         let ground_texture_allocation: Vec<AllocationId> = ground_data
             .textures
             .iter()
-            .map(|texture_name| texture_atlas_factory.register(texture_name))
+            .map(|texture_name| {
+                let entry = texture_atlas_factory.register(texture_name);
+                debug_assert!(!entry.transparent, "found transparent ground texture");
+                entry.allocation_id
+            })
             .collect();
 
         deferred_vertex_generation.push(DeferredVertexGeneration {

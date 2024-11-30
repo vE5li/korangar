@@ -30,7 +30,7 @@ pub struct RenderInstruction<'a> {
     pub point_light_shadow_caster: &'a [PointShadowCasterInstruction],
     pub point_light: &'a [PointLightInstruction],
     pub model_batches: &'a [ModelBatch],
-    pub models: &'a [ModelInstruction],
+    pub models: &'a mut [ModelInstruction],
     pub entities: &'a mut [EntityInstruction],
     pub directional_model_batches: &'a [ModelBatch],
     pub directional_shadow_models: &'a [ModelInstruction],
@@ -170,6 +170,8 @@ pub struct ModelInstruction {
     pub model_matrix: Matrix4<f32>,
     pub vertex_offset: usize,
     pub vertex_count: usize,
+    pub distance: f32,
+    pub transparent: bool,
 }
 
 #[derive(Clone, Debug)]

@@ -1,4 +1,4 @@
-use cgmath::{EuclideanSpace, Matrix4, SquareMatrix};
+use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Transform as PointTransform};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
@@ -6,11 +6,13 @@ use ragnarok_formats::transform::Transform;
 use ragnarok_packets::ClientTick;
 
 use crate::graphics::ModelInstruction;
+use crate::world::Camera;
 
 #[derive(PrototypeElement, new)]
 pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
+    pub transparent: bool,
     pub vertex_offset: usize,
     pub vertex_count: usize,
     pub child_nodes: Vec<Node>,
@@ -56,15 +58,27 @@ impl Node {
             * animation_rotation_matrix
     }
 
-    pub fn render_geometry(&self, instructions: &mut Vec<ModelInstruction>, transform: &Transform, client_tick: ClientTick) {
+    pub fn render_geometry(
+        &self,
+        instructions: &mut Vec<ModelInstruction>,
+        transform: &Transform,
+        client_tick: ClientTick,
+        camera: &dyn Camera,
+    ) {
+        let model_matrix = self.world_matrix(transform, client_tick);
+        let position = model_matrix.transform_point(Point3::from_value(0.0));
+        let distance = camera.distance_to(position);
+
         instructions.push(ModelInstruction {
-            model_matrix: self.world_matrix(transform, client_tick),
+            model_matrix,
             vertex_offset: self.vertex_offset,
             vertex_count: self.vertex_count,
+            distance,
+            transparent: self.transparent,
         });
 
         self.child_nodes
             .iter()
-            .for_each(|node| node.render_geometry(instructions, transform, client_tick));
+            .for_each(|node| node.render_geometry(instructions, transform, client_tick, camera));
     }
 }

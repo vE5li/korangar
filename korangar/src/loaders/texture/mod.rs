@@ -6,6 +6,7 @@ use hashbrown::HashMap;
 use image::{ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
+use korangar_util::color::contains_transparent_pixel;
 use korangar_util::container::SimpleCache;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation, OfflineTextureAtlas};
 use korangar_util::FileLoader;
@@ -48,7 +49,7 @@ impl TextureLoader {
         }
     }
 
-    fn create(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+    fn create(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
@@ -67,11 +68,12 @@ impl TextureLoader {
                 view_formats: &[],
             },
             image,
+            transparent,
         );
         Arc::new(texture)
     }
 
-    fn create_with_mip_maps(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+    fn create_with_mip_maps(&self, name: &str, image: RgbaImage, transparent: bool) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
@@ -90,6 +92,7 @@ impl TextureLoader {
                 view_formats: &[],
             },
             image,
+            transparent,
         );
 
         let mut mip_views = Vec::with_capacity(MIP_LEVELS as usize);
@@ -125,8 +128,8 @@ impl TextureLoader {
     }
 
     fn load(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
-        let texture_data = self.load_texture_data(path)?;
-        let texture = self.create(path, texture_data);
+        let (texture_data, transparent) = self.load_texture_data(path)?;
+        let texture = self.create(path, texture_data, transparent);
         self.cache
             .lock()
             .as_mut()
@@ -136,7 +139,7 @@ impl TextureLoader {
         Ok(texture)
     }
 
-    pub fn load_texture_data(&self, path: &str) -> Result<RgbaImage, LoadError> {
+    pub fn load_texture_data(&self, path: &str) -> Result<(RgbaImage, bool), LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture data from {}", path.magenta()));
 
@@ -203,10 +206,15 @@ impl TextureLoader {
             _ => {}
         }
 
+        let transparent = match image_format == ImageFormat::Tga {
+            true => contains_transparent_pixel(image_buffer.as_raw()),
+            false => false,
+        };
+
         #[cfg(feature = "debug")]
         timer.stop();
 
-        Ok(image_buffer)
+        Ok((image_buffer, transparent))
     }
 
     pub fn get(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
@@ -238,8 +246,15 @@ pub struct TextureAtlasFactory {
     name: String,
     texture_loader: Arc<TextureLoader>,
     texture_atlas: OfflineTextureAtlas,
-    lookup: HashMap<String, AllocationId>,
+    lookup: HashMap<String, TextureAtlasEntry>,
     create_mip_map: bool,
+    transparent: bool,
+}
+
+#[derive(Copy, Clone)]
+pub struct TextureAtlasEntry {
+    pub allocation_id: AllocationId,
+    pub transparent: bool,
 }
 
 impl TextureAtlasFactory {
@@ -252,10 +267,13 @@ impl TextureAtlasFactory {
     ) -> (Vec<AtlasAllocation>, Arc<Texture>) {
         let mut factory = Self::new(texture_loader, name, add_padding, false);
 
-        let mut ids: Vec<AllocationId> = paths.iter().map(|path| factory.register(path)).collect();
+        let mut ids: Vec<TextureAtlasEntry> = paths.iter().map(|path| factory.register(path)).collect();
         factory.build_atlas();
 
-        let mapping = ids.drain(..).map(|id| factory.get_allocation(id).unwrap()).collect();
+        let mapping = ids
+            .drain(..)
+            .map(|entry| factory.get_allocation(entry.allocation_id).unwrap())
+            .collect();
         let texture = factory.upload_texture_atlas_texture();
 
         (mapping, texture)
@@ -270,21 +288,29 @@ impl TextureAtlasFactory {
             texture_atlas: OfflineTextureAtlas::new(add_padding, mip_level_count),
             lookup: HashMap::default(),
             create_mip_map,
+            transparent: false,
         }
     }
 
     /// Registers the given texture by its path. Will return an allocation ID
-    /// which can later be used to get the actual allocation.
-    pub fn register(&mut self, path: &str) -> AllocationId {
-        if let Some(allocation_id) = self.lookup.get(path).copied() {
-            return allocation_id;
+    /// which can later be used to get the actual allocation and flag that shows
+    /// if a texture contains transparent pixels.
+    pub fn register(&mut self, path: &str) -> TextureAtlasEntry {
+        if let Some(cached_entry) = self.lookup.get(path).copied() {
+            return cached_entry;
         }
 
-        let data = self.texture_loader.load_texture_data(path).expect("can't load texture data");
+        let (data, transparent) = self.texture_loader.load_texture_data(path).expect("can't load texture data");
+        self.transparent |= transparent;
         let allocation_id = self.texture_atlas.register_image(data);
-        self.lookup.insert(path.to_string(), allocation_id);
 
-        allocation_id
+        let entry = TextureAtlasEntry {
+            allocation_id,
+            transparent,
+        };
+        self.lookup.insert(path.to_string(), entry);
+
+        entry
     }
 
     pub fn get_allocation(&self, allocation_id: AllocationId) -> Option<AtlasAllocation> {
@@ -297,11 +323,17 @@ impl TextureAtlasFactory {
 
     pub fn upload_texture_atlas_texture(self) -> Arc<Texture> {
         if self.create_mip_map {
-            self.texture_loader
-                .create_with_mip_maps(&format!("{} texture atlas", self.name), self.texture_atlas.get_atlas())
+            self.texture_loader.create_with_mip_maps(
+                &format!("{} texture atlas", self.name),
+                self.texture_atlas.get_atlas(),
+                self.transparent,
+            )
         } else {
-            self.texture_loader
-                .create(&format!("{} texture atlas", self.name), self.texture_atlas.get_atlas())
+            self.texture_loader.create(
+                &format!("{} texture atlas", self.name),
+                self.texture_atlas.get_atlas(),
+                self.transparent,
+            )
         }
     }
 }

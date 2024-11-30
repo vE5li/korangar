@@ -693,9 +693,26 @@ impl GraphicsEngine {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn sort_instructions(instruction: &mut RenderInstruction) {
-        // We render entities back to front.
-        instruction.entities.sort_unstable_by(|a, b| b.distance.total_cmp(&a.distance));
+    fn sort_instructions(instructions: &mut RenderInstruction) {
+        // Back to front for entities.
+        instructions.entities.sort_unstable_by(|a, b| b.distance.total_cmp(&a.distance));
+
+        for batch in instructions.model_batches {
+            let start = batch.offset;
+            let end = batch.offset + batch.count;
+
+            instructions.models[start..end].sort_unstable_by(|a, b| {
+                match (a.transparent, b.transparent) {
+                    // Front to back for opaque models.
+                    (false, false) => a.distance.total_cmp(&b.distance),
+                    // Back to front for transparent models.
+                    (true, true) => b.distance.total_cmp(&a.distance),
+                    // Opaque objects come before transparent ones.
+                    (false, true) => std::cmp::Ordering::Less,
+                    (true, false) => std::cmp::Ordering::Greater,
+                }
+            });
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -982,13 +999,13 @@ impl GraphicsEngine {
                     show_wireframe: instruction.render_settings.show_wireframe,
                 };
 
-                engine_context.forward_model_drawer.draw(&mut render_pass, draw_data);
+                engine_context.forward_entity_drawer.draw(&mut render_pass, instruction.entities);
 
                 engine_context
                     .forward_indicator_drawer
                     .draw(&mut render_pass, instruction.indicator.as_ref());
 
-                engine_context.forward_entity_drawer.draw(&mut render_pass, instruction.entities);
+                engine_context.forward_model_drawer.draw(&mut render_pass, draw_data);
 
                 if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
                     engine_context.forward_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);

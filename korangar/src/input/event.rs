@@ -26,6 +26,7 @@ pub enum UserEvent {
     Exit,
     CameraZoom(f32),
     CameraRotate(f32),
+    CameraResetRotation,
     OpenMenuWindow,
     OpenInventoryWindow,
     OpenEquipmentWindow,

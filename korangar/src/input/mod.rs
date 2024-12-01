@@ -31,6 +31,12 @@ use crate::interface::resource::PartialMove;
 
 const MOUSE_SCOLL_MULTIPLIER: f32 = 30.0;
 const KEY_COUNT: usize = variant_count::<KeyCode>();
+const DOUBLE_CLICK_TIME_MS: u32 = 500;
+
+struct PreviousMouseButton {
+    button: MouseButton,
+    tick: ClientTick,
+}
 
 pub struct InputSystem {
     previous_mouse_position: ScreenPosition,
@@ -45,6 +51,7 @@ pub struct InputSystem {
     mouse_input_mode: MouseInputMode,
     input_buffer: Vec<char>,
     picker_value: Arc<AtomicU64>,
+    previous_mouse_button: PreviousMouseButton,
 }
 
 impl InputSystem {
@@ -63,6 +70,10 @@ impl InputSystem {
 
         let mouse_input_mode = MouseInputMode::None;
         let input_buffer = Vec::new();
+        let previous_mouse_button = PreviousMouseButton {
+            button: MouseButton::Left,
+            tick: ClientTick::new(0),
+        };
 
         Self {
             previous_mouse_position,
@@ -77,6 +88,7 @@ impl InputSystem {
             mouse_input_mode,
             input_buffer,
             picker_value,
+            previous_mouse_button,
         }
     }
 
@@ -310,6 +322,27 @@ impl InputSystem {
             && !lock_actions
         {
             self.mouse_input_mode = MouseInputMode::RotateCamera;
+        }
+
+        if self.right_mouse_button.pressed()
+            && self.previous_mouse_button.button == MouseButton::Right
+            && client_tick.0.saturating_sub(self.previous_mouse_button.tick.0) < DOUBLE_CLICK_TIME_MS
+        {
+            events.push(UserEvent::CameraResetRotation);
+        }
+
+        if self.right_mouse_button.pressed() && !matches!(self.mouse_input_mode, MouseInputMode::RotateCamera) {
+            self.previous_mouse_button = PreviousMouseButton {
+                button: MouseButton::Right,
+                tick: client_tick,
+            };
+        }
+
+        if self.left_mouse_button.pressed() {
+            self.previous_mouse_button = PreviousMouseButton {
+                button: MouseButton::Left,
+                tick: client_tick,
+            };
         }
 
         match &self.mouse_input_mode {

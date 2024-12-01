@@ -10,6 +10,7 @@ const ROTATION_SPEED: f32 = 0.01;
 const MINIMUM_ZOOM: f32 = 150.0;
 const MAXIMUM_ZOOM: f32 = 600.0;
 const DEFAULT_ZOOM: f32 = 400.0;
+const DEFAULT_ANGLE: f32 = FRAC_PI_2;
 const THRESHHOLD: f32 = 0.01;
 
 pub struct PlayerCamera {
@@ -31,7 +32,7 @@ impl PlayerCamera {
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
             world_to_screen_matrix: Matrix4::from_value(0.0),
-            view_angle: SmoothedValue::new(FRAC_PI_2, THRESHHOLD, 15.0),
+            view_angle: SmoothedValue::new(DEFAULT_ANGLE, THRESHHOLD, 15.0),
             zoom: SmoothedValue::new(DEFAULT_ZOOM, THRESHHOLD, 5.0),
             aspect_ratio: 0.0,
         }
@@ -55,6 +56,10 @@ impl PlayerCamera {
 
     pub fn soft_rotate(&mut self, rotation: f32) {
         self.view_angle.move_desired(rotation * ROTATION_SPEED);
+    }
+
+    pub fn reset_rotation(&mut self) {
+        self.view_angle.set_desired(DEFAULT_ANGLE);
     }
 
     pub fn update(&mut self, delta_time: f64) {

@@ -1445,6 +1445,7 @@ impl Client {
                 UserEvent::Exit => event_loop.exit(),
                 UserEvent::CameraZoom(factor) => self.player_camera.soft_zoom(factor),
                 UserEvent::CameraRotate(factor) => self.player_camera.soft_rotate(factor),
+                UserEvent::CameraResetRotation => self.player_camera.reset_rotation(),
                 UserEvent::OpenMenuWindow => {
                     if !self.entities.is_empty() {
                         self.interface.open_window(&self.application, &mut self.focus_state, &MenuWindow)

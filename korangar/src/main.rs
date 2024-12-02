@@ -686,6 +686,9 @@ impl Client {
         // previous image was presented. Moving this function to the end of the
         // function results in surface configuration errors under DX12.
         self.update_graphic_settings();
+
+        self.font_loader_maintenance();
+
         let frame = self.graphics_engine.wait_for_next_frame();
 
         #[cfg(feature = "debug")]
@@ -2299,6 +2302,15 @@ impl Client {
         }
 
         if update_interface {
+            self.interface.schedule_render();
+        }
+    }
+
+    fn font_loader_maintenance(&mut self) {
+        let mut font_loader = self.font_loader.borrow_mut();
+
+        if font_loader.is_full() {
+            font_loader.resize_or_clear(&self.device);
             self.interface.schedule_render();
         }
     }

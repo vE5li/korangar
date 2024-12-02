@@ -18,7 +18,7 @@ use wgpu::{
 
 use self::color_span_iterator::ColorSpanIterator;
 use super::GameFileLoader;
-use crate::graphics::{Color, Texture};
+use crate::graphics::{Color, Texture, MAX_TEXTURE_SIZE};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
 
@@ -130,6 +130,7 @@ pub struct FontLoader {
     swash_cache: SwashCache,
     glyph_cache: HashMap<CacheKey, GlyphCoordinate>,
     texture_atlas: OnlineTextureAtlas,
+    atlas_is_full: bool,
 }
 
 impl FontLoader {
@@ -150,6 +151,7 @@ impl FontLoader {
             swash_cache: SwashCache::new(),
             glyph_cache: HashMap::new(),
             texture_atlas: online_texture_atlas,
+            atlas_is_full: false,
         }
     }
 
@@ -172,6 +174,37 @@ impl FontLoader {
             },
             true,
         )
+    }
+
+    pub fn is_full(&self) -> bool {
+        self.atlas_is_full
+    }
+
+    pub fn resize_or_clear(&mut self, device: &Device) {
+        self.atlas_is_full = false;
+
+        let current_size = self.font_atlas.get_size();
+        let mut new_width = current_size.width;
+        let mut new_height = current_size.height;
+
+        if new_width <= new_height && new_width * 2 <= MAX_TEXTURE_SIZE {
+            new_width *= 2;
+        } else if new_height < new_width && new_height * 2 <= MAX_TEXTURE_SIZE {
+            new_height *= 2;
+        }
+
+        if new_width != current_size.width || new_height != current_size.height {
+            self.texture_atlas.clear();
+            self.glyph_cache.clear();
+
+            self.texture_atlas = OnlineTextureAtlas::new(new_width, new_height, true);
+            self.font_atlas = Self::create_texture_atlas_texture(device, Vector2::new(new_width, new_height));
+
+            #[cfg(feature = "debug")]
+            print_debug!("increased font atlas size to {}x{}", new_width, new_height);
+        } else {
+            self.clear(device);
+        }
     }
 
     // TODO: NHA Call this when we change the scale factor of the application.
@@ -275,8 +308,13 @@ impl FontLoader {
         }
 
         let Some(allocation) = self.texture_atlas.allocate(Vector2::new(width, height)) else {
-            #[cfg(feature = "debug")]
-            print_debug!("[{}] texture atlas is full", "error".red());
+            if !self.atlas_is_full {
+                self.atlas_is_full = true;
+
+                #[cfg(feature = "debug")]
+                print_debug!("[{}] texture atlas is full", "warning".yellow());
+            }
+
             return Err(());
         };
 

@@ -7,7 +7,10 @@ use wgpu::{Adapter, Features, Limits, TextureFormat, TextureFormatFeatureFlags};
 use crate::graphics::{Msaa, RENDER_TO_TEXTURE_DEPTH_FORMAT, RENDER_TO_TEXTURE_FORMAT};
 
 const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
-const MAX_TEXTURE_SIZE: u32 = 8192;
+
+/// The maximum texture size that is guaranteed by the graphic engine to be
+/// available.
+pub const MAX_TEXTURE_SIZE: u32 = 8192;
 
 pub struct Capabilities {
     supported_msaa: Vec<Msaa>,

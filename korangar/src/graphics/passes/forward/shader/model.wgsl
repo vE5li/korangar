@@ -121,14 +121,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
         // Apply screen-space derivative scaling for better alpha to coverage anti-aliasing
         alpha_channel = saturate((coverage - ALPHA_CUTOFF) / max(fwidth(coverage), 0.0001) + 0.5);
-    }
-
-    if (alpha_channel == 0.0) {
+    } else if (alpha_channel == 0.0) {
         discard;
-    }
-
-    if (ALPHA_TO_COVERAGE_ACTIVATED) {
-        alpha_channel = diffuse_color.a;
     }
 
     // Directional light

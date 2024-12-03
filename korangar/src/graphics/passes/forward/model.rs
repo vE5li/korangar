@@ -385,7 +385,7 @@ impl ForwardModelDrawer {
         polygon_mode: PolygonMode,
         transparent: bool,
     ) -> RenderPipeline {
-        let alpha_to_coverage_activated = msaa.multisampling_activated() && transparent;
+        let alpha_to_coverage_activated = msaa.multisampling_activated() && !transparent;
 
         let mut constants = std::collections::HashMap::new();
         constants.insert(
@@ -428,7 +428,7 @@ impl ForwardModelDrawer {
             multisample: if msaa.multisampling_activated() {
                 MultisampleState {
                     count: msaa.sample_count(),
-                    alpha_to_coverage_enabled: !transparent,
+                    alpha_to_coverage_enabled: alpha_to_coverage_activated,
                     ..Default::default()
                 }
             } else {

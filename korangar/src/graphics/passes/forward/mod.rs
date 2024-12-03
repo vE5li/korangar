@@ -66,7 +66,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
                 view: global_context.forward_depth_texture.get_texture_view(),
                 depth_ops: Some(Operations {
                     load: LoadOp::Clear(0.0),
-                    store: StoreOp::Store,
+                    store: StoreOp::Discard,
                 }),
                 stencil_ops: None,
             }),

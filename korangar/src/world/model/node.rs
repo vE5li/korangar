@@ -1,4 +1,4 @@
-use cgmath::{Array, EuclideanSpace, Matrix4, Point3, SquareMatrix, Transform as PointTransform};
+use cgmath::{EuclideanSpace, Matrix4, Point3, SquareMatrix, Transform as PointTransform};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use ragnarok_formats::model::RotationKeyframeData;
@@ -12,6 +12,8 @@ use crate::world::Camera;
 pub struct Node {
     #[hidden_element]
     pub transform_matrix: Matrix4<f32>,
+    #[hidden_element]
+    pub centroid: Point3<f32>,
     pub transparent: bool,
     pub vertex_offset: usize,
     pub vertex_count: usize,
@@ -66,7 +68,7 @@ impl Node {
         camera: &dyn Camera,
     ) {
         let model_matrix = self.world_matrix(transform, client_tick);
-        let position = model_matrix.transform_point(Point3::from_value(0.0));
+        let position = model_matrix.transform_point(self.centroid);
         let distance = camera.distance_to(position);
 
         instructions.push(ModelInstruction {

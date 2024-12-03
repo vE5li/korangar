@@ -21,7 +21,7 @@ use crate::world::Camera;
 
 #[derive(PrototypeElement, new)]
 pub struct Model {
-    pub root_node: Node,
+    pub root_nodes: Vec<Node>,
     pub bounding_box: AABB,
     #[cfg(feature = "debug")]
     pub model_data: ModelData,
@@ -35,7 +35,9 @@ impl Model {
         client_tick: ClientTick,
         camera: &dyn Camera,
     ) {
-        self.root_node.render_geometry(instructions, transform, client_tick, camera);
+        self.root_nodes
+            .iter()
+            .for_each(|node| node.render_geometry(instructions, transform, client_tick, camera));
     }
 
     #[cfg(feature = "debug")]

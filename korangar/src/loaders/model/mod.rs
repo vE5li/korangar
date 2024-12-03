@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
+use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
+use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::collision::AABB;
@@ -64,7 +65,7 @@ impl ModelLoader {
         }
     }
 
-    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool) -> Vec<NativeModelVertex> {
+    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool, transparent: bool) -> Vec<Vec<NativeModelVertex>> {
         let capacity = node.faces.iter().map(|face| if face.two_sided != 0 { 6 } else { 3 }).sum();
         let mut native_vertices = Vec::with_capacity(capacity);
 
@@ -108,7 +109,11 @@ impl ModelLoader {
             }
         }
 
-        native_vertices
+        if transparent {
+            Self::split_disconnected_meshes(&native_vertices)
+        } else {
+            vec![native_vertices]
+        }
     }
 
     fn calculate_matrices(node: &NodeData, parent_matrix: &Matrix4<f32>) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
@@ -128,6 +133,69 @@ impl ModelLoader {
         (main, transform, box_transform)
     }
 
+    // For nodes with that are transparent, we will split all disconnected meshed,
+    // so that we can properly depth sort them to be able to render transparent
+    // models correctly.
+    fn split_disconnected_meshes(vertices: &[NativeModelVertex]) -> Vec<Vec<NativeModelVertex>> {
+        // Step 1: Create an adjacency map for triangles.
+        let mut adjacency: HashMap<usize, HashSet<usize>> = HashMap::new();
+        let triangles: Vec<_> = vertices.chunks_exact(3).collect();
+
+        for (triangle1_index, triangle1) in triangles.iter().enumerate() {
+            for (triangle2_index, triangle2) in triangles.iter().enumerate() {
+                if triangle1_index != triangle2_index {
+                    let shares_vertex = triangle1.iter().any(|vertex1| {
+                        triangle2.iter().any(|vertex2| {
+                            const EPSILON: f32 = 1e-5;
+                            (vertex1.position.x - vertex2.position.x).abs() < EPSILON
+                                && (vertex1.position.y - vertex2.position.y).abs() < EPSILON
+                                && (vertex1.position.z - vertex2.position.z).abs() < EPSILON
+                        })
+                    });
+
+                    if shares_vertex {
+                        adjacency.entry(triangle1_index).or_default().insert(triangle2_index);
+                        adjacency.entry(triangle2_index).or_default().insert(triangle1_index);
+                    }
+                }
+            }
+        }
+
+        // Step 2: Find connected components using DFS.
+        let mut visited: HashSet<usize> = HashSet::new();
+        let mut submeshes: Vec<Vec<NativeModelVertex>> = Vec::new();
+
+        for triangle_index in 0..triangles.len() {
+            if visited.contains(&triangle_index) {
+                continue;
+            }
+
+            let mut component: Vec<NativeModelVertex> = Vec::new();
+            let mut stack = vec![triangle_index];
+
+            while let Some(current) = stack.pop() {
+                if visited.insert(current) {
+                    component.extend_from_slice(triangles[current]);
+
+                    if let Some(neighbors) = adjacency.get(&current) {
+                        stack.extend(neighbors.iter().filter(|&index| !visited.contains(index)));
+                    }
+                }
+            }
+
+            submeshes.push(component);
+        }
+
+        submeshes
+    }
+
+    fn calculate_centroid(vertices: &[NativeModelVertex]) -> Point3<f32> {
+        let sum = vertices.iter().fold(Vector3::new(0.0, 0.0, 0.0), |accumulator, vertex| {
+            accumulator + vertex.position.to_vec()
+        });
+        Point3::from_vec(sum / vertices.len() as f32)
+    }
+
     fn process_node_mesh(
         current_node: &NodeData,
         nodes: &[NodeData],
@@ -137,32 +205,8 @@ impl ModelLoader {
         parent_matrix: &Matrix4<f32>,
         main_bounding_box: &mut AABB,
         reverse_order: bool,
-    ) -> Node {
+    ) -> Vec<Node> {
         let (main_matrix, transform_matrix, box_transform_matrix) = Self::calculate_matrices(current_node, parent_matrix);
-        let mut node_native_vertices = Self::make_vertices(current_node, &main_matrix, reverse_order);
-
-        let mut transparent = false;
-
-        // Map the node texture index to the model texture index.
-        let node_texture_mapping: Vec<i32> = current_node
-            .texture_indices
-            .iter()
-            .map(|&index| {
-                let model_texture = model_texture_mapping[index as usize];
-                transparent |= model_texture.transparent;
-                model_texture.index
-            })
-            .collect();
-
-        node_native_vertices
-            .iter_mut()
-            .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
-
-        // Remember the vertex offset/count and gather node vertices.
-        let node_vertex_offset = *vertex_offset;
-        let node_vertex_count = node_native_vertices.len();
-        *vertex_offset += node_vertex_count;
-        native_vertices.extend(node_native_vertices);
 
         let box_matrix = box_transform_matrix * main_matrix;
         let bounding_box = AABB::from_vertices(
@@ -177,7 +221,7 @@ impl ModelLoader {
             .iter()
             .filter(|node| node.parent_node_name == current_node.node_name)
             .filter(|node| node.parent_node_name != node.node_name)
-            .map(|node| {
+            .flat_map(|node| {
                 Self::process_node_mesh(
                     node,
                     nodes,
@@ -191,14 +235,50 @@ impl ModelLoader {
             })
             .collect();
 
-        Node::new(
-            transform_matrix,
-            transparent,
-            node_vertex_offset,
-            node_vertex_count,
-            child_nodes,
-            current_node.rotation_keyframes.clone(),
-        )
+        let mut transparent = false;
+
+        // Map the node texture index to the model texture index.
+        let node_texture_mapping: Vec<i32> = current_node
+            .texture_indices
+            .iter()
+            .map(|&index| {
+                let model_texture = model_texture_mapping[index as usize];
+                transparent |= model_texture.transparent;
+                model_texture.index
+            })
+            .collect();
+
+        let mut sub_meshes = Self::make_vertices(current_node, &main_matrix, reverse_order, transparent);
+
+        let mut sub_nodes: Vec<Node> = sub_meshes
+            .iter_mut()
+            .map(|mesh| {
+                mesh.iter_mut()
+                    .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
+
+                // Remember the vertex offset/count and gather node vertices.
+                let node_vertex_offset = *vertex_offset;
+                let node_vertex_count = mesh.len();
+                *vertex_offset += node_vertex_count;
+                native_vertices.extend(mesh.iter());
+
+                let centroid = Self::calculate_centroid(mesh);
+
+                Node::new(
+                    transform_matrix,
+                    centroid,
+                    transparent,
+                    node_vertex_offset,
+                    node_vertex_count,
+                    vec![],
+                    current_node.rotation_keyframes.clone(),
+                )
+            })
+            .collect();
+
+        sub_nodes[0].child_nodes = child_nodes;
+
+        sub_nodes
     }
 
     pub fn calculate_transformation_matrix(node: &mut Node, is_root: bool, bounding_box: AABB, parent_matrix: Matrix4<f32>) {
@@ -297,7 +377,7 @@ impl ModelLoader {
         let mut native_model_vertices = Vec::<NativeModelVertex>::new();
 
         let mut bounding_box = AABB::uninitialized();
-        let mut root_node = Self::process_node_mesh(
+        let mut root_nodes = Self::process_node_mesh(
             root_node,
             &model_data.nodes,
             vertex_offset,
@@ -307,10 +387,11 @@ impl ModelLoader {
             &mut bounding_box,
             reverse_order,
         );
-        Self::calculate_transformation_matrix(&mut root_node, true, bounding_box, Matrix4::identity());
+
+        Self::calculate_transformation_matrix(&mut root_nodes[0], true, bounding_box, Matrix4::identity());
 
         let model = Model::new(
-            root_node,
+            root_nodes,
             bounding_box,
             #[cfg(feature = "debug")]
             model_data,

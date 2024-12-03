@@ -4,7 +4,7 @@ use korangar_util::texture_atlas::AtlasAllocation;
 
 use crate::graphics::{Color, ModelVertex};
 
-#[derive(new)]
+#[derive(Copy, Clone, new)]
 pub struct NativeModelVertex {
     pub position: Point3<f32>,
     pub normal: Vector3<f32>,

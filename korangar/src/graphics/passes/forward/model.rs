@@ -436,7 +436,7 @@ impl ForwardModelDrawer {
             },
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
-                depth_write_enabled: true,
+                depth_write_enabled: !transparent,
                 depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),

@@ -65,7 +65,8 @@ impl ModelLoader {
     }
 
     fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool) -> Vec<NativeModelVertex> {
-        let mut native_vertices = Vec::new();
+        let capacity = node.faces.iter().map(|face| if face.two_sided != 0 { 6 } else { 3 }).sum();
+        let mut native_vertices = Vec::with_capacity(capacity);
 
         let array: [f32; 3] = node.scale.unwrap().into();
         let reverse_node_order = array.into_iter().fold(1.0, |a, b| a * b).is_sign_negative();
@@ -75,21 +76,16 @@ impl ModelLoader {
         }
 
         for face in &node.faces {
-            // collect into tiny vec instead ?
-            let vertex_positions: Vec<Point3<f32>> = face
-                .vertex_position_indices
-                .iter()
-                .copied()
-                .map(|index| node.vertex_positions[index as usize])
-                .map(|position| multiply_matrix4_and_point3(main_matrix, position))
-                .collect();
+            let vertex_positions: [Point3<f32>; 3] = std::array::from_fn(|index| {
+                let position_index = face.vertex_position_indices[index];
+                let position = node.vertex_positions[position_index as usize];
+                multiply_matrix4_and_point3(main_matrix, position)
+            });
 
-            let texture_coordinates: Vec<Vector2<f32>> = face
-                .texture_coordinate_indices
-                .iter()
-                .copied()
-                .map(|index| node.texture_coordinates[index as usize].coordinates)
-                .collect();
+            let texture_coordinates: [Vector2<f32>; 3] = std::array::from_fn(|index| {
+                let coordinate_index = face.texture_coordinate_indices[index];
+                node.texture_coordinates[coordinate_index as usize].coordinates
+            });
 
             Self::add_vertices(
                 &mut native_vertices,

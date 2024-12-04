@@ -65,7 +65,7 @@ impl ModelLoader {
         }
     }
 
-    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool, transparent: bool) -> Vec<Vec<NativeModelVertex>> {
+    fn make_vertices(node: &NodeData, main_matrix: &Matrix4<f32>, reverse_order: bool, texture_transparency: Vec<bool>) -> Vec<SubMesh> {
         let capacity = node.faces.iter().map(|face| if face.two_sided != 0 { 6 } else { 3 }).sum();
         let mut native_vertices = Vec::with_capacity(capacity);
 
@@ -109,10 +109,13 @@ impl ModelLoader {
             }
         }
 
-        if transparent {
-            Self::split_disconnected_meshes(&native_vertices)
+        if texture_transparency.iter().any(|&t| t) {
+            Self::split_disconnected_meshes(&native_vertices, texture_transparency)
         } else {
-            vec![native_vertices]
+            vec![SubMesh {
+                transparent: false,
+                native_vertices,
+            }]
         }
     }
 
@@ -136,17 +139,22 @@ impl ModelLoader {
     // For nodes with that are transparent, we will split all disconnected meshed,
     // so that we can properly depth sort them to be able to render transparent
     // models correctly.
-    fn split_disconnected_meshes(vertices: &[NativeModelVertex]) -> Vec<Vec<NativeModelVertex>> {
-        // Step 1: Create an adjacency map for triangles.
+    fn split_disconnected_meshes(vertices: &[NativeModelVertex], texture_transparency: Vec<bool>) -> Vec<SubMesh> {
+        // Step 1: Split opaque and transparent vertices.
+        let (transparent_vertices, opaque_vertices): (Vec<NativeModelVertex>, Vec<NativeModelVertex>) = vertices
+            .iter()
+            .partition(|vertex| texture_transparency[vertex.texture_index as usize]);
+
+        // Step 2: Create an adjacency map for transparent triangles.
         let mut adjacency: HashMap<usize, HashSet<usize>> = HashMap::new();
-        let triangles: Vec<_> = vertices.chunks_exact(3).collect();
+        let triangles: Vec<_> = transparent_vertices.chunks_exact(3).collect();
 
         for (triangle1_index, triangle1) in triangles.iter().enumerate() {
             for (triangle2_index, triangle2) in triangles.iter().enumerate() {
                 if triangle1_index != triangle2_index {
                     let shares_vertex = triangle1.iter().any(|vertex1| {
                         triangle2.iter().any(|vertex2| {
-                            const EPSILON: f32 = 1e-5;
+                            const EPSILON: f32 = 1.0;
                             (vertex1.position.x - vertex2.position.x).abs() < EPSILON
                                 && (vertex1.position.y - vertex2.position.y).abs() < EPSILON
                                 && (vertex1.position.z - vertex2.position.z).abs() < EPSILON
@@ -161,21 +169,24 @@ impl ModelLoader {
             }
         }
 
-        // Step 2: Find connected components using DFS.
+        // Step 3: Find connected vertices using a depth first search.
         let mut visited: HashSet<usize> = HashSet::new();
-        let mut submeshes: Vec<Vec<NativeModelVertex>> = Vec::new();
+        let mut submeshes: Vec<SubMesh> = vec![SubMesh {
+            transparent: false,
+            native_vertices: opaque_vertices,
+        }];
 
         for triangle_index in 0..triangles.len() {
             if visited.contains(&triangle_index) {
                 continue;
             }
 
-            let mut component: Vec<NativeModelVertex> = Vec::new();
+            let mut native_vertices: Vec<NativeModelVertex> = Vec::new();
             let mut stack = vec![triangle_index];
 
             while let Some(current) = stack.pop() {
                 if visited.insert(current) {
-                    component.extend_from_slice(triangles[current]);
+                    native_vertices.extend_from_slice(triangles[current]);
 
                     if let Some(neighbors) = adjacency.get(&current) {
                         stack.extend(neighbors.iter().filter(|&index| !visited.contains(index)));
@@ -183,7 +194,10 @@ impl ModelLoader {
                 }
             }
 
-            submeshes.push(component);
+            submeshes.push(SubMesh {
+                transparent: true,
+                native_vertices,
+            });
         }
 
         submeshes
@@ -235,39 +249,37 @@ impl ModelLoader {
             })
             .collect();
 
-        let mut transparent = false;
-
         // Map the node texture index to the model texture index.
-        let node_texture_mapping: Vec<i32> = current_node
+        let (node_texture_mapping, texture_transparency): (Vec<i32>, Vec<bool>) = current_node
             .texture_indices
             .iter()
             .map(|&index| {
                 let model_texture = model_texture_mapping[index as usize];
-                transparent |= model_texture.transparent;
-                model_texture.index
+                (model_texture.index, model_texture.transparent)
             })
-            .collect();
+            .unzip();
 
-        let mut sub_meshes = Self::make_vertices(current_node, &main_matrix, reverse_order, transparent);
+        let mut sub_meshes = Self::make_vertices(current_node, &main_matrix, reverse_order, texture_transparency);
 
         let mut sub_nodes: Vec<Node> = sub_meshes
             .iter_mut()
             .map(|mesh| {
-                mesh.iter_mut()
+                mesh.native_vertices
+                    .iter_mut()
                     .for_each(|vertice| vertice.texture_index = node_texture_mapping[vertice.texture_index as usize]);
 
                 // Remember the vertex offset/count and gather node vertices.
                 let node_vertex_offset = *vertex_offset;
-                let node_vertex_count = mesh.len();
+                let node_vertex_count = mesh.native_vertices.len();
                 *vertex_offset += node_vertex_count;
-                native_vertices.extend(mesh.iter());
+                native_vertices.extend(mesh.native_vertices.iter());
 
-                let centroid = Self::calculate_centroid(mesh);
+                let centroid = Self::calculate_centroid(&mesh.native_vertices);
 
                 Node::new(
                     transform_matrix,
                     centroid,
-                    transparent,
+                    mesh.transparent,
                     node_vertex_offset,
                     node_vertex_count,
                     vec![],
@@ -415,4 +427,9 @@ impl ModelLoader {
 struct ModelTexture {
     index: i32,
     transparent: bool,
+}
+
+struct SubMesh {
+    transparent: bool,
+    native_vertices: Vec<NativeModelVertex>,
 }

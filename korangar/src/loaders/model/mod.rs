@@ -213,6 +213,7 @@ impl ModelLoader {
     fn process_node_mesh(
         current_node: &NodeData,
         nodes: &[NodeData],
+        processed_node_indices: &mut [bool],
         vertex_offset: &mut usize,
         native_vertices: &mut Vec<NativeModelVertex>,
         model_texture_mapping: &[ModelTexture],
@@ -231,14 +232,22 @@ impl ModelLoader {
         );
         main_bounding_box.extend(&bounding_box);
 
-        let child_nodes = nodes
+        let child_indices: Vec<usize> = nodes
             .iter()
-            .filter(|node| node.parent_node_name == current_node.node_name)
-            .filter(|node| node.parent_node_name != node.node_name)
-            .flat_map(|node| {
+            .enumerate()
+            .filter(|&(index, node)| {
+                node.parent_node_name == current_node.node_name && !std::mem::replace(&mut processed_node_indices[index], true)
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        let child_nodes: Vec<Node> = child_indices
+            .iter()
+            .flat_map(|&index| {
                 Self::process_node_mesh(
-                    node,
+                    &nodes[index],
                     nodes,
+                    processed_node_indices,
                     vertex_offset,
                     native_vertices,
                     model_texture_mapping,
@@ -380,11 +389,16 @@ impl ModelLoader {
             .collect();
 
         let root_node_name = &model_data.root_node_name.clone().unwrap();
-        let root_node = model_data
+
+        let (root_node_position, root_node) = model_data
             .nodes
             .iter()
-            .find(|node_data| &node_data.node_name == root_node_name)
+            .enumerate()
+            .find(|(_, node_data)| &node_data.node_name == root_node_name)
             .expect("failed to find main node");
+
+        let mut processed_node_indices = vec![false; model_data.nodes.len()];
+        processed_node_indices[root_node_position] = true;
 
         let mut native_model_vertices = Vec::<NativeModelVertex>::new();
 
@@ -392,6 +406,7 @@ impl ModelLoader {
         let mut root_nodes = Self::process_node_mesh(
             root_node,
             &model_data.nodes,
+            &mut processed_node_indices,
             vertex_offset,
             &mut native_model_vertices,
             &texture_mapping,

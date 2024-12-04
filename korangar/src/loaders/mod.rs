@@ -25,8 +25,9 @@ pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::sprite::*;
 pub use self::texture::{TextureAtlasFactory, TextureLoader};
 
-pub const FALLBACK_PNG_FILE: &str = "missing.png";
 pub const FALLBACK_BMP_FILE: &str = "missing.bmp";
+pub const FALLBACK_JPEG_FILE: &str = "missing.jpg";
+pub const FALLBACK_PNG_FILE: &str = "missing.png";
 pub const FALLBACK_TGA_FILE: &str = "missing.tga";
 pub const FALLBACK_MODEL_FILE: &str = "missing.rsm";
 pub const FALLBACK_SPRITE_FILE: &str = "npc\\missing.spr";

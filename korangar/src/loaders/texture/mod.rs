@@ -16,7 +16,7 @@ use wgpu::{
 };
 
 use super::error::LoadError;
-use super::{FALLBACK_BMP_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
+use super::{FALLBACK_BMP_FILE, FALLBACK_JPEG_FILE, FALLBACK_PNG_FILE, FALLBACK_TGA_FILE, MIP_LEVELS};
 use crate::graphics::{Lanczos3Drawer, MipMapRenderPassContext, Texture};
 use crate::loaders::GameFileLoader;
 
@@ -144,8 +144,9 @@ impl TextureLoader {
         let timer = Timer::new_dynamic(format!("load texture data from {}", path.magenta()));
 
         let image_format = match &path[path.len() - 4..] {
-            ".png" => ImageFormat::Png,
             ".bmp" | ".BMP" => ImageFormat::Bmp,
+            ".jpg" | ".JPG" => ImageFormat::Jpeg,
+            ".png" | ".PNG" => ImageFormat::Png,
             ".tga" | ".TGA" => ImageFormat::Tga,
             _ => {
                 #[cfg(feature = "debug")]
@@ -182,8 +183,9 @@ impl TextureLoader {
                 }
 
                 let fallback_path = match image_format {
-                    ImageFormat::Png => FALLBACK_PNG_FILE,
                     ImageFormat::Bmp => FALLBACK_BMP_FILE,
+                    ImageFormat::Jpeg => FALLBACK_JPEG_FILE,
+                    ImageFormat::Png => FALLBACK_PNG_FILE,
                     ImageFormat::Tga => FALLBACK_TGA_FILE,
                     _ => unreachable!(),
                 };

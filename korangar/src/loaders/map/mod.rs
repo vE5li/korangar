@@ -14,12 +14,12 @@ use korangar_util::container::SimpleSlab;
 use korangar_util::texture_atlas::{AllocationId, AtlasAllocation};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
-use ragnarok_formats::map::{GatData, GroundData, GroundTile, MapData, MapResources};
+use ragnarok_formats::map::{GatData, GroundData, MapData, MapResources};
 use ragnarok_formats::version::InternalVersion;
 use wgpu::{BufferUsages, Device, Queue};
 
 pub use self::vertices::MAP_TILE_SIZE;
-use self::vertices::{generate_tile_vertices, ground_water_vertices};
+use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
 use crate::loaders::{GameFileLoader, ModelLoader, TextureAtlasFactory, TextureLoader};
@@ -65,7 +65,7 @@ impl MapLoader {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load map from {}", &resource_file));
 
-        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader, "map", true, true);
+        let mut texture_atlas_factory = TextureAtlasFactory::new(texture_loader.clone(), "map", true, true);
         let mut deferred_vertex_generation: Vec<DeferredVertexGeneration> = Vec::new();
 
         let map_file_name = format!("data\\{}.rsw", resource_file);
@@ -85,12 +85,7 @@ impl MapLoader {
         #[cfg(not(feature = "debug"))]
         let (_, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
 
-        let water_level = -map_data
-            .water_settings
-            .as_ref()
-            .and_then(|settings| settings.water_level)
-            .unwrap_or_default();
-        let (ground_native_vertices, water_vertices) = ground_water_vertices(&ground_data, water_level);
+        let ground_native_vertices = ground_vertices(&ground_data);
 
         let ground_vertex_offset = 0;
         let ground_vertex_count = ground_native_vertices.len();
@@ -111,13 +106,26 @@ impl MapLoader {
             texture_allocation: ground_texture_allocation,
         });
 
-        let water_vertex_buffer = (!water_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "water", &water_vertices));
+        let water_textures: Option<Vec<Arc<Texture>>> =
+            map_data
+                .water_settings
+                .as_ref()
+                .and_then(|settings| settings.water_type)
+                .map(|water_type| {
+                    let water_paths = get_water_texture_paths(water_type);
+                    water_paths
+                        .iter()
+                        .map(|path| texture_loader.get(path).expect("Can't load water texture"))
+                        .collect()
+                });
+
         #[cfg(feature = "debug")]
         let tile_vertex_buffer = Arc::new(
             (!tile_vertices.is_empty())
                 .then(|| self.create_vertex_buffer(&resource_file, "tile", &tile_vertices))
                 .unwrap(),
         );
+
         let tile_picker_vertex_buffer =
             (!tile_picker_vertices.is_empty()).then(|| self.create_vertex_buffer(&resource_file, "tile picker", &tile_picker_vertices));
 
@@ -191,8 +199,8 @@ impl MapLoader {
             ground_vertex_offset,
             ground_vertex_count,
             vertex_buffer,
-            water_vertex_buffer,
             texture,
+            water_textures,
             objects,
             light_sources,
             map_data.resources.sound_sources,
@@ -287,20 +295,11 @@ fn parse_generic_data<Data: FromBytes>(resource_file: &str, game_file_loader: &G
     Ok(data)
 }
 
-pub trait GroundTileExt {
-    fn get_lowest_point(&self) -> f32;
-}
-
-impl GroundTileExt for GroundTile {
-    fn get_lowest_point(&self) -> f32 {
-        [
-            self.lower_right_height,
-            self.lower_left_height,
-            self.upper_left_height,
-            self.lower_right_height,
-        ]
-        .into_iter()
-        .reduce(f32::max)
-        .unwrap()
+fn get_water_texture_paths(water_type: i32) -> Vec<String> {
+    let mut paths = Vec::with_capacity(32);
+    for i in 0..32 {
+        let filename = format!("¿öÅÍ\\water{}{:02}.jpg", water_type, i);
+        paths.push(filename);
     }
+    paths
 }

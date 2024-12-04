@@ -4,11 +4,11 @@ use wgpu::{vertex_attr_array, VertexAttribute, VertexBufferLayout, VertexStepMod
 
 #[repr(C)]
 #[derive(Default, Debug, Clone, Copy, Zeroable, Pod)]
-pub struct WaterVertex {
+pub struct SimpleVertex {
     pub position: [f32; 3],
 }
 
-impl WaterVertex {
+impl SimpleVertex {
     pub fn new(position: Point3<f32>) -> Self {
         Self { position: position.into() }
     }

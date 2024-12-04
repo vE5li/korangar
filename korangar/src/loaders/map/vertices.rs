@@ -5,10 +5,9 @@ use cgmath::{Point3, Vector2};
 use korangar_util::texture_atlas::AtlasAllocation;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
-use super::GroundTileExt;
 #[cfg(feature = "debug")]
 use crate::graphics::Color;
-use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex, WaterVertex};
+use crate::graphics::{ModelVertex, NativeModelVertex, PickerTarget, TileVertex};
 
 pub const MAP_TILE_SIZE: f32 = 10.0;
 
@@ -20,9 +19,8 @@ pub enum Heights {
     LowerRight,
 }
 
-pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<NativeModelVertex>, Vec<WaterVertex>) {
+pub fn ground_vertices(ground_data: &GroundData) -> Vec<NativeModelVertex> {
     let mut native_ground_vertices = Vec::new();
-    let mut water_vertices = Vec::new();
 
     let width = ground_data.width as usize;
     let height = ground_data.height as usize;
@@ -154,28 +152,10 @@ pub fn ground_water_vertices(ground_data: &GroundData, water_level: f32) -> (Vec
                     ));
                 }
             }
-
-            if -current_tile.get_lowest_point() < water_level {
-                let first_position = Point3::new(x as f32 * MAP_TILE_SIZE, water_level, y as f32 * MAP_TILE_SIZE);
-                let second_position = Point3::new(MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE, water_level, y as f32 * MAP_TILE_SIZE);
-                let third_position = Point3::new(
-                    MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE,
-                    water_level,
-                    MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE,
-                );
-                let fourth_position = Point3::new(x as f32 * MAP_TILE_SIZE, water_level, MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE);
-
-                water_vertices.push(WaterVertex::new(first_position));
-                water_vertices.push(WaterVertex::new(second_position));
-                water_vertices.push(WaterVertex::new(third_position));
-
-                water_vertices.push(WaterVertex::new(first_position));
-                water_vertices.push(WaterVertex::new(third_position));
-                water_vertices.push(WaterVertex::new(fourth_position));
-            }
         }
     }
-    (native_ground_vertices, water_vertices)
+
+    native_ground_vertices
 }
 
 pub fn generate_tile_vertices(

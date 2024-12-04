@@ -26,9 +26,9 @@ use image::RgbaImage;
 use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
-    BindingType, BlendComponent, BlendFactor, BlendOperation, BlendState, BufferBindingType, BufferUsages, CommandEncoder, Device,
-    Extent3d, Queue, Sampler, SamplerBindingType, ShaderStages, StorageTextureAccess, TextureDescriptor, TextureDimension, TextureFormat,
-    TextureSampleType, TextureUsages, TextureViewDimension, COPY_BYTES_PER_ROW_ALIGNMENT,
+    BindingType, BufferBindingType, BufferUsages, CommandEncoder, Device, Extent3d, Queue, Sampler, SamplerBindingType, ShaderStages,
+    StorageTextureAccess, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType, TextureUsages, TextureViewDimension,
+    COPY_BYTES_PER_ROW_ALIGNMENT,
 };
 
 pub use self::buffer::Buffer;
@@ -70,19 +70,6 @@ pub const FXAA_COLOR_LUMA_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8Un
 
 pub const MAX_BUFFER_SIZE: u64 = 128 * 1024 * 1024;
 
-pub const WATER_ATTACHMENT_BLEND: BlendState = BlendState {
-    color: BlendComponent {
-        src_factor: BlendFactor::One,
-        dst_factor: BlendFactor::One,
-        operation: BlendOperation::ReverseSubtract,
-    },
-    alpha: BlendComponent {
-        src_factor: BlendFactor::One,
-        dst_factor: BlendFactor::One,
-        operation: BlendOperation::Max,
-    },
-};
-
 /// Trait to prepare all GPU data of contexts, computer and renderer.
 pub(crate) trait Prepare {
     /// Prepares the GPU data.
@@ -99,17 +86,18 @@ pub(crate) struct GlobalUniforms {
     view: [[f32; 4]; 4],
     inverse_view: [[f32; 4]; 4],
     inverse_projection: [[f32; 4]; 4],
+    inverse_view_projection: [[f32; 4]; 4],
     indicator_positions: [[f32; 4]; 4],
     indicator_color: [f32; 4],
     ambient_color: [f32; 4],
+    camera_position: [f32; 4],
     forward_size: [u32; 2],
     interface_size: [u32; 2],
     pointer_position: [u32; 2],
     animation_timer: f32,
     day_timer: f32,
-    water_level: f32,
     point_light_count: u32,
-    padding: [u32; 2],
+    padding: [u32; 3],
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -229,8 +217,10 @@ impl Prepare for GlobalContext {
                 )
             });
 
+        let view_projection = instructions.uniforms.projection_matrix * instructions.uniforms.view_matrix;
+
         self.global_uniforms = GlobalUniforms {
-            view_projection: (instructions.uniforms.projection_matrix * instructions.uniforms.view_matrix).into(),
+            view_projection: view_projection.into(),
             view: instructions.uniforms.view_matrix.into(),
             inverse_view: instructions.uniforms.view_matrix.invert().unwrap_or_else(Matrix4::identity).into(),
             inverse_projection: instructions
@@ -239,15 +229,16 @@ impl Prepare for GlobalContext {
                 .invert()
                 .unwrap_or_else(Matrix4::identity)
                 .into(),
+            inverse_view_projection: view_projection.invert().unwrap_or_else(Matrix4::identity).into(),
             indicator_positions: indicator_positions.into(),
             indicator_color: indicator_color.components_linear(),
             ambient_color: ambient_light_color.components_linear(),
+            camera_position: instructions.uniforms.camera_position.into(),
             forward_size: [self.forward_size.width as u32, self.forward_size.height as u32],
             interface_size: [self.interface_size.width as u32, self.interface_size.height as u32],
             pointer_position: [instructions.picker_position.left as u32, instructions.picker_position.top as u32],
             animation_timer: instructions.uniforms.animation_timer,
             day_timer: instructions.uniforms.day_timer,
-            water_level: instructions.uniforms.water_level,
             point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
             padding: Default::default(),
         };

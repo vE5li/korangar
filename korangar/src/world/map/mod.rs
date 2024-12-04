@@ -28,14 +28,14 @@ use super::{LightSourceExt, Model, PointLightSet};
 use crate::graphics::ModelBatch;
 #[cfg(feature = "debug")]
 use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, RenderSettings};
-use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture};
+use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, WaterInstruction};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
 #[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, WaterVertex, MAP_TILE_SIZE};
+use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, MAP_TILE_SIZE};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
 create_simple_key!(LightSourceKey, "Key to an light source inside the map");
@@ -120,8 +120,8 @@ pub struct Map {
     ground_vertex_offset: usize,
     ground_vertex_count: usize,
     vertex_buffer: Arc<Buffer<ModelVertex>>,
-    water_vertex_buffer: Option<Buffer<WaterVertex>>,
     texture: Arc<Texture>,
+    water_textures: Option<Vec<Arc<Texture>>>,
     objects: SimpleSlab<ObjectKey, Object>,
     light_sources: SimpleSlab<LightSourceKey, LightSource>,
     sound_sources: Vec<SoundSource>,
@@ -267,8 +267,40 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn render_water<'a, 'b>(&'a self, water_vertex_buffer: &'b mut Option<&'a Buffer<WaterVertex>>) {
-        *water_vertex_buffer = self.water_vertex_buffer.as_ref();
+    pub fn render_water<'a>(&'a self, water_instruction: &mut Option<WaterInstruction<'a>>, client_tick: ClientTick) {
+        if let Some(water_textures) = self.water_textures.as_ref()
+            && let Some(water_settings) = self.water_settings.as_ref()
+        {
+            let water_type = water_settings.water_type.unwrap_or_default();
+            let water_animation_speed = water_settings.water_animation_speed.unwrap_or_default();
+            let water_level = water_settings.water_level.unwrap_or_default();
+            let wave_speed = water_settings.wave_speed.unwrap_or_default();
+            let wave_amplitude = water_settings.wave_height.unwrap_or_default();
+            let wave_length = water_settings.wave_pitch.unwrap_or_default();
+
+            let water_opacity = match water_type {
+                4 | 6 => 1.0,
+                _ => 144.0 / 255.0,
+            };
+
+            let texture_repeat = match water_type {
+                4 | 6 => 16.0,
+                _ => 4.0,
+            };
+
+            let frame = client_tick.0 / (1000 / 60);
+            let water_texture_index = (frame / water_animation_speed) % water_textures.len() as u32;
+
+            *water_instruction = Some(WaterInstruction {
+                water_texture: &water_textures[water_texture_index as usize],
+                texture_repeat,
+                water_level,
+                wave_amplitude,
+                wave_speed,
+                wave_length,
+                water_opacity,
+            });
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -394,14 +426,6 @@ impl Map {
                 light_source.range,
             );
         }
-    }
-
-    #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_water_light(&self) -> f32 {
-        self.water_settings
-            .as_ref()
-            .and_then(|settings| settings.water_level)
-            .unwrap_or_default()
     }
 
     #[cfg(feature = "debug")]

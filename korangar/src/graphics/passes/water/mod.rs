@@ -1,44 +1,28 @@
-#[cfg(feature = "debug")]
-mod aabb;
-#[cfg(feature = "debug")]
-mod circle;
-mod entity;
-mod indicator;
-mod model;
+mod wave;
 
-#[cfg(feature = "debug")]
-pub(crate) use aabb::ForwardAabbDrawer;
-#[cfg(feature = "debug")]
-pub(crate) use circle::ForwardCircleDrawer;
-pub(crate) use entity::ForwardEntityDrawer;
-pub(crate) use indicator::ForwardIndicatorDrawer;
-pub(crate) use model::ForwardModelDrawer;
+pub(crate) use wave::WaterWaveDrawer;
 use wgpu::{
-    BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
-    RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,
+    BindGroupLayout, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment, RenderPassDescriptor,
+    StoreOp, TextureFormat,
 };
 
 use super::{BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, RenderPassContext};
 use crate::graphics::GlobalContext;
 use crate::loaders::TextureLoader;
-const PASS_NAME: &str = "forward render pass";
 
-pub(crate) struct ForwardRenderPassContext {
+const PASS_NAME: &str = "water render pass";
+
+pub(crate) struct WaterRenderPassContext {
     color_texture_format: TextureFormat,
-    depth_texture_format: TextureFormat,
 }
 
-impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardRenderPassContext {
+impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::None }> for WaterRenderPassContext {
     type PassData<'data> = Option<()>;
 
     fn new(_device: &Device, _queue: &Queue, _texture_loader: &TextureLoader, global_context: &GlobalContext) -> Self {
         let color_texture_format = global_context.forward_color_texture.get_format();
-        let depth_texture_format = global_context.forward_depth_texture.get_format();
 
-        Self {
-            color_texture_format,
-            depth_texture_format,
-        }
+        Self { color_texture_format }
     }
 
     fn create_pass<'encoder>(
@@ -56,18 +40,11 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
                     .as_ref()
                     .map(|texture| texture.get_texture_view()),
                 ops: Operations {
-                    load: LoadOp::Clear(Color::BLACK),
+                    load: LoadOp::Load,
                     store: StoreOp::Store,
                 },
             })],
-            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: global_context.forward_depth_texture.get_texture_view(),
-                depth_ops: Some(Operations {
-                    load: LoadOp::Clear(0.0),
-                    store: StoreOp::Store,
-                }),
-                stencil_ops: None,
-            }),
+            depth_stencil_attachment: None,
             timestamp_writes: None,
             occlusion_query_set: None,
         });
@@ -89,7 +66,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, {
         [self.color_texture_format]
     }
 
-    fn depth_attachment_output_format(&self) -> [TextureFormat; 1] {
-        [self.depth_texture_format]
+    fn depth_attachment_output_format(&self) -> [TextureFormat; 0] {
+        []
     }
 }

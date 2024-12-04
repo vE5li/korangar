@@ -1900,7 +1900,8 @@ impl Client {
         let collect_instructions_measurement = Profiler::start_measurement("collect instructions");
 
         let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
-        let water_level = self.map.get_water_light();
+        let camera_position = current_camera.camera_position().to_homogeneous();
+
         let ambient_light_color = self.map.get_ambient_light_color(day_timer);
         let (directional_light_view_matrix, directional_light_projection_matrix) =
             self.directional_shadow_camera.view_projection_matrices();
@@ -1911,7 +1912,7 @@ impl Client {
             top: mouse_position.top.clamp(0.0, window_size.y as f32),
         };
         let mut indicator_instruction = None;
-        let mut map_water_vertex_buffer = None;
+        let mut water_instruction = None;
 
         // Marker
         {
@@ -2055,7 +2056,7 @@ impl Client {
             self.map.render_entities(&mut self.entity_instructions, entities, current_camera);
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
-            self.map.render_water(&mut map_water_vertex_buffer);
+            self.map.render_water(&mut water_instruction, client_tick);
 
             #[cfg(feature = "debug")]
             if render_settings.show_bounding_boxes {
@@ -2204,9 +2205,9 @@ impl Client {
             uniforms: Uniforms {
                 view_matrix,
                 projection_matrix,
+                camera_position,
                 animation_timer,
                 day_timer,
-                water_level,
                 ambient_light_color,
             },
             indicator: indicator_instruction,
@@ -2230,8 +2231,8 @@ impl Client {
             point_shadow_models: &self.point_shadow_model_instructions,
             point_shadow_entities: &self.point_shadow_entity_instructions,
             effects: self.effect_renderer.get_instructions(),
+            water: water_instruction,
             map_picker_tile_vertex_buffer: self.map.get_tile_picker_vertex_buffer(),
-            map_water_vertex_buffer,
             font_atlas_texture: font_atlas.get_font_atlas(),
             #[cfg(feature = "debug")]
             render_settings: *self.render_settings.get(),

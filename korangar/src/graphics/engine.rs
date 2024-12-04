@@ -74,6 +74,7 @@ struct EngineContext {
     point_shadow_pass_context: PointShadowRenderPassContext,
     light_culling_pass_context: LightCullingPassContext,
     forward_pass_context: ForwardRenderPassContext,
+    water_pass_context: WaterRenderPassContext,
     cmaa2_pass_context: Cmaa2ComputePassContext,
     post_processing_pass_context: PostProcessingRenderPassContext,
     screen_blit_pass_context: ScreenBlitRenderPassContext,
@@ -91,7 +92,7 @@ struct EngineContext {
     forward_entity_drawer: ForwardEntityDrawer,
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
-    forward_water_drawer: ForwardWaterDrawer,
+    water_wave_drawer: WaterWaveDrawer,
     cmaa2_edge_colors_dispatcher: Cmaa2EdgeColorsDispatcher,
     cmaa2_calculate_dispatch_args_dispatcher: Cmaa2CalculateDispatchArgsDispatcher,
     cmaa2_process_candidates_dispatcher: Cmaa2ProcessCandidatesDispatcher,
@@ -201,6 +202,8 @@ impl GraphicsEngine {
                         let light_culling_pass_context = LightCullingPassContext::new(&self.device, &self.queue, &global_context);
                         let forward_pass_context =
                             ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
+                        let water_pass_context =
+                            WaterRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let cmaa2_pass_context = Cmaa2ComputePassContext::new(&self.device, &self.queue, &global_context);
                         let post_processing_pass_context =
                             PostProcessingRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
@@ -284,7 +287,6 @@ impl GraphicsEngine {
                             forward_indicator_drawer,
                             forward_model_drawer,
 
-                            forward_water_drawer,
                             #[cfg(feature = "debug")]
                             forward_aabb_drawer,
 
@@ -296,6 +298,13 @@ impl GraphicsEngine {
                             &self.queue,
                             &global_context,
                             &forward_pass_context,
+                        );
+                        let water_wave_drawer = WaterWaveDrawer::new(
+                            &self.capabilities,
+                            &self.device,
+                            &self.queue,
+                            &global_context,
+                            &water_pass_context,
                         );
                         let Cmaa2Resources {
                             cmaa2_edge_colors_dispatcher,
@@ -348,6 +357,7 @@ impl GraphicsEngine {
                         point_shadow_pass_context,
                         light_culling_pass_context,
                         forward_pass_context,
+                        water_pass_context,
                         cmaa2_pass_context,
                         post_processing_pass_context,
                         screen_blit_pass_context,
@@ -364,7 +374,7 @@ impl GraphicsEngine {
                         forward_entity_drawer,
                         forward_indicator_drawer,
                         forward_model_drawer,
-                        forward_water_drawer,
+                        water_wave_drawer,
                         cmaa2_edge_colors_dispatcher,
                         cmaa2_calculate_dispatch_args_dispatcher,
                         cmaa2_process_candidates_dispatcher,
@@ -492,7 +502,6 @@ impl GraphicsEngine {
                 forward_entity_drawer,
                 forward_indicator_drawer,
                 forward_model_drawer,
-                forward_water_drawer,
                 #[cfg(feature = "debug")]
                 forward_aabb_drawer,
                 #[cfg(feature = "debug")]
@@ -544,7 +553,15 @@ impl GraphicsEngine {
             engine_context.post_processing_fxaa_drawer = post_processing_fxaa_drawer;
             engine_context.post_processing_blitter_drawer = post_processing_blitter_drawer;
             engine_context.post_processing_rectangle_drawer = post_processing_rectangle_drawer;
-            engine_context.forward_water_drawer = forward_water_drawer;
+
+            engine_context.water_wave_drawer = WaterWaveDrawer::new(
+                &self.capabilities,
+                &self.device,
+                &self.queue,
+                &engine_context.global_context,
+                &engine_context.water_pass_context,
+            );
+
             #[cfg(feature = "debug")]
             {
                 engine_context.forward_aabb_drawer = forward_aabb_drawer;
@@ -770,6 +787,7 @@ impl GraphicsEngine {
             });
             scope.spawn(|_| {
                 context.interface_rectangle_drawer.prepare(&self.device, instruction);
+                context.water_wave_drawer.prepare(&self.device, instruction);
             });
             scope.spawn(|_| {
                 context.point_shadow_entity_drawer.prepare(&self.device, instruction);
@@ -816,6 +834,7 @@ impl GraphicsEngine {
         visitor.upload(&mut context.post_processing_effect_drawer);
         visitor.upload(&mut context.forward_entity_drawer);
         visitor.upload(&mut context.forward_model_drawer);
+        visitor.upload(&mut context.water_wave_drawer);
         visitor.upload(&mut context.post_processing_rectangle_drawer);
 
         #[cfg(feature = "debug")]
@@ -1007,14 +1026,23 @@ impl GraphicsEngine {
 
                 engine_context.forward_model_drawer.draw(&mut render_pass, draw_data);
 
-                if let Some(map_water_vertex_buffer) = instruction.map_water_vertex_buffer.as_ref() {
-                    engine_context.forward_water_drawer.draw(&mut render_pass, map_water_vertex_buffer);
-                }
-
                 #[cfg(feature = "debug")]
                 {
                     engine_context.forward_aabb_drawer.draw(&mut render_pass, None);
                     engine_context.forward_circle_drawer.draw(&mut render_pass, None);
+                }
+
+                if instruction.water.is_some() {
+                    drop(render_pass);
+
+                    let mut render_pass =
+                        engine_context
+                            .water_pass_context
+                            .create_pass(&mut forward_encoder, &engine_context.global_context, None);
+
+                    engine_context
+                        .water_wave_drawer
+                        .draw(&mut render_pass, &engine_context.global_context.forward_depth_texture);
                 }
             });
 
@@ -1227,10 +1255,8 @@ struct ForwardResources {
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
 
-    forward_water_drawer: ForwardWaterDrawer,
     #[cfg(feature = "debug")]
     forward_aabb_drawer: ForwardAabbDrawer,
-
     #[cfg(feature = "debug")]
     forward_circle_drawer: ForwardCircleDrawer,
 }
@@ -1246,7 +1272,6 @@ impl ForwardResources {
         let forward_entity_drawer = ForwardEntityDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         let forward_indicator_drawer = ForwardIndicatorDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         let forward_model_drawer = ForwardModelDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
-        let forward_water_drawer = ForwardWaterDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         #[cfg(feature = "debug")]
         let forward_aabb_drawer = ForwardAabbDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         #[cfg(feature = "debug")]
@@ -1256,7 +1281,6 @@ impl ForwardResources {
             forward_entity_drawer,
             forward_indicator_drawer,
             forward_model_drawer,
-            forward_water_drawer,
             #[cfg(feature = "debug")]
             forward_aabb_drawer,
             #[cfg(feature = "debug")]

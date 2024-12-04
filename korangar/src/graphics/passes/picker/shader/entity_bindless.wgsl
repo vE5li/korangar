@@ -3,15 +3,16 @@ struct GlobalUniforms {
     view: mat4x4<f32>,
     inverse_view: mat4x4<f32>,
     inverse_projection: mat4x4<f32>,
+    inverse_view_projection: mat4x4<f32>,
     indicator_positions: mat4x4<f32>,
     indicator_color: vec4<f32>,
     ambient_color: vec4<f32>,
+    camera_position: vec4<f32>,
     forward_size: vec2<u32>,
     interface_size: vec2<u32>,
     pointer_position: vec2<u32>,
     animation_timer: f32,
     day_timer: f32,
-    water_level: f32,
     point_light_count: u32,
 }
 

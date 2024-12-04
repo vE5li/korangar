@@ -8,6 +8,7 @@ mod picker;
 mod point_shadow;
 mod postprocessing;
 mod screen_blit;
+mod water;
 
 use std::marker::ConstParamTy;
 
@@ -22,6 +23,7 @@ pub(crate) use picker::*;
 pub(crate) use point_shadow::*;
 pub(crate) use postprocessing::*;
 pub(crate) use screen_blit::*;
+pub(crate) use water::*;
 use wgpu::{BindGroupLayout, CommandEncoder, ComputePass, Device, Queue, RenderPass, TextureFormat};
 
 use crate::graphics::{Capabilities, GlobalContext, ModelBatch, ModelInstruction};

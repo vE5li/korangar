@@ -14,7 +14,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, ForwardRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, WaterVertex};
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, SimpleVertex};
 use crate::Buffer;
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/aabb.wgsl");
@@ -30,7 +30,7 @@ struct InstanceData {
 }
 
 pub(crate) struct ForwardAabbDrawer {
-    vertex_buffer: Buffer<WaterVertex>,
+    vertex_buffer: Buffer<SimpleVertex>,
     index_buffer: Buffer<u16>,
     instance_data_buffer: Buffer<InstanceData>,
     bind_group_layout: BindGroupLayout,
@@ -55,14 +55,14 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         // Vertices are defined in world coordinates (Same as WGPU's NDC).
         let vertex_data = [
-            WaterVertex::new(Point3::new(-1.0, -1.0, -1.0)), // bottom left front
-            WaterVertex::new(Point3::new(-1.0, 1.0, -1.0)),  // top left front
-            WaterVertex::new(Point3::new(1.0, -1.0, -1.0)),  // bottom right front
-            WaterVertex::new(Point3::new(1.0, 1.0, -1.0)),   // top right front
-            WaterVertex::new(Point3::new(-1.0, -1.0, 1.0)),  // bottom left back
-            WaterVertex::new(Point3::new(-1.0, 1.0, 1.0)),   // top left back
-            WaterVertex::new(Point3::new(1.0, -1.0, 1.0)),   // bottom right back
-            WaterVertex::new(Point3::new(1.0, 1.0, 1.0)),    // top right back
+            SimpleVertex::new(Point3::new(-1.0, -1.0, -1.0)), // bottom left front
+            SimpleVertex::new(Point3::new(-1.0, 1.0, -1.0)),  // top left front
+            SimpleVertex::new(Point3::new(1.0, -1.0, -1.0)),  // bottom right front
+            SimpleVertex::new(Point3::new(1.0, 1.0, -1.0)),   // top right front
+            SimpleVertex::new(Point3::new(-1.0, -1.0, 1.0)),  // bottom left back
+            SimpleVertex::new(Point3::new(-1.0, 1.0, 1.0)),   // top left back
+            SimpleVertex::new(Point3::new(1.0, -1.0, 1.0)),   // bottom right back
+            SimpleVertex::new(Point3::new(1.0, 1.0, 1.0)),    // top right back
         ];
 
         let index_data: [u16; INDEX_COUNT] = [
@@ -125,7 +125,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
                 module: &shader_module,
                 entry_point: Some("vs_main"),
                 compilation_options: PipelineCompilationOptions::default(),
-                buffers: &[WaterVertex::buffer_layout()],
+                buffers: &[SimpleVertex::buffer_layout()],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,

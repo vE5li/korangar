@@ -11,7 +11,7 @@ chrono = { workspace = true }
 cosmic-text = { workspace = true }
 derive-new = { workspace = true }
 hashbrown = { workspace = true }
-image = { workspace = true, features = ["bmp", "png", "tga", "rayon"] }
+image = { workspace = true, features = ["bmp", "jpeg", "png", "tga", "rayon"] }
 korangar_audio = { workspace = true }
 korangar_debug = { workspace = true, optional = true }
 korangar_interface = { workspace = true, features = ["serde", "cgmath"] }

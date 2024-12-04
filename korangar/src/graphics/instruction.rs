@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use cgmath::{Matrix4, Point3, Vector2, Vector3};
+use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
 
@@ -8,7 +8,7 @@ use super::color::Color;
 use super::vertices::ModelVertex;
 #[cfg(feature = "debug")]
 use super::RenderSettings;
-use super::{Buffer, Texture, TileVertex, WaterVertex};
+use super::{Buffer, Texture, TileVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -38,8 +38,8 @@ pub struct RenderInstruction<'a> {
     pub point_shadow_models: &'a [ModelInstruction],
     pub point_shadow_entities: &'a [EntityInstruction],
     pub effects: &'a [EffectInstruction],
+    pub water: Option<WaterInstruction<'a>>,
     pub map_picker_tile_vertex_buffer: &'a Buffer<TileVertex>,
-    pub map_water_vertex_buffer: Option<&'a Buffer<WaterVertex>>,
     pub font_atlas_texture: &'a Texture,
     #[cfg(feature = "debug")]
     pub render_settings: RenderSettings,
@@ -55,10 +55,21 @@ pub struct RenderInstruction<'a> {
 pub struct Uniforms {
     pub view_matrix: Matrix4<f32>,
     pub projection_matrix: Matrix4<f32>,
+    pub camera_position: Vector4<f32>,
     pub animation_timer: f32,
     pub day_timer: f32,
-    pub water_level: f32,
     pub ambient_light_color: Color,
+}
+
+#[derive(Clone, Debug)]
+pub struct WaterInstruction<'a> {
+    pub water_texture: &'a Texture,
+    pub texture_repeat: f32,
+    pub water_level: f32,
+    pub wave_amplitude: f32,
+    pub wave_speed: f32,
+    pub wave_length: f32,
+    pub water_opacity: f32,
 }
 
 #[derive(Clone, Debug)]

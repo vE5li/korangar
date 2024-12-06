@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use cgmath::{Array, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{Array, Deg, Matrix3, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
 use korangar_audio::AudioEngine;
 #[cfg(feature = "debug")]
@@ -37,6 +37,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
+use crate::settings::LightningMode;
 use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, MAP_TILE_SIZE};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
@@ -382,26 +383,60 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_ambient_light_color(&self, day_timer: f32) -> Color {
-        let sun_offset = 0.0;
-        let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
-        color_from_channel(self.light_settings.ambient_color.to_owned().unwrap().into(), ambient_channels)
+    pub fn get_ambient_light_color(&self, lightning_mode: LightningMode, day_timer: f32) -> Color {
+        match lightning_mode {
+            LightningMode::Classic => self.light_settings.ambient_color.to_owned().unwrap().into(),
+            LightningMode::Enhanced => {
+                let sun_offset = 0.0;
+                let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
+                color_from_channel(self.light_settings.ambient_color.to_owned().unwrap().into(), ambient_channels)
+            }
+        }
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_directional_light(&self, day_timer: f32) -> (Vector3<f32>, Color) {
-        let light_direction = get_light_direction(day_timer);
-        let (directional_color, intensity) = get_directional_light_color_intensity(
-            self.light_settings.diffuse_color.to_owned().unwrap().into(),
-            self.light_settings.light_intensity.unwrap(),
-            day_timer,
-        );
-        let color = Color::rgb(
-            directional_color.red * intensity,
-            directional_color.green * intensity,
-            directional_color.blue * intensity,
-        );
-        (light_direction, color)
+    pub fn get_directional_light(&self, lightning_mode: LightningMode, day_timer: f32) -> (Vector3<f32>, Color) {
+        match lightning_mode {
+            LightningMode::Classic => {
+                let diffuse_color = self.light_settings.diffuse_color.to_owned().unwrap();
+                let light_latitude = self.light_settings.light_latitude.unwrap();
+                let light_longitude = self.light_settings.light_longitude.unwrap();
+                let light_direction = Self::compute_classic_directional_light_direction(light_latitude, light_longitude);
+                let color = Color::rgb(diffuse_color.red, diffuse_color.green, diffuse_color.blue);
+
+                (light_direction, color)
+            }
+            LightningMode::Enhanced => {
+                // TODO: NHA The final field in the light settings seems to be the
+                //       "shadow_map_alpha", as per RDW research. It's definitely not the
+                //       intensity of the directional light, because that would result in
+                //       improper lightning in classic mode.
+                let light_direction = get_light_direction(day_timer);
+                let (directional_color, intensity) = get_directional_light_color_intensity(
+                    self.light_settings.diffuse_color.to_owned().unwrap().into(),
+                    self.light_settings.shadow_map_alpha.unwrap(),
+                    day_timer,
+                );
+                let color = Color::rgb(
+                    directional_color.red * intensity,
+                    directional_color.green * intensity,
+                    directional_color.blue * intensity,
+                );
+                (light_direction, color)
+            }
+        }
+    }
+
+    fn compute_classic_directional_light_direction(latitude_degrees: i32, longitude_degrees: i32) -> Vector3<f32> {
+        let mut sun_ray_direction = Vector3::new(0.0, 1.0, 0.0);
+
+        let rotation_around_x = Matrix3::from_angle_x(Deg(-latitude_degrees as f32));
+        let rotation_around_y = Matrix3::from_angle_y(Deg(longitude_degrees as f32));
+
+        sun_ray_direction = rotation_around_x * sun_ray_direction;
+        sun_ray_direction = rotation_around_y * sun_ray_direction;
+
+        sun_ray_direction
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]

@@ -497,7 +497,7 @@ pub struct LightSettings {
     #[version_equals_or_above(1, 5)]
     pub ambient_color: Option<ColorRGB>,
     #[version_equals_or_above(1, 7)]
-    pub light_intensity: Option<f32>,
+    pub shadow_map_alpha: Option<f32>,
 }
 
 #[derive(Clone, ByteConvertable)]

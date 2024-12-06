@@ -14,6 +14,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
+    enhanced_lightning: u32,
 }
 
 struct DirectionalLightUniforms {
@@ -121,7 +122,7 @@ fn vs_main(
     // An offset is also added for frame parts not stay at the same depth.
     output.depth_offset = (frame_part_vertex.y - 1.0) * proportion_y + instance.extra_depth_offset;
     output.curvature = frame_part_vertex.x * proportion_x;
-    
+
     output.original_depth_offset = instance.depth_offset;
     output.original_curvature = instance.curvature;
     output.color = instance.color;
@@ -131,9 +132,10 @@ fn vs_main(
 @fragment
 fn fs_main(input: VertexOutput) -> FragmentOutput {
     let diffuse_color = textureSample(texture, texture_sampler, input.texture_coordinates);
-    let alpha_channel = textureSample(texture, nearest_sampler, input.texture_coordinates).a;
+    var alpha_channel = textureSample(texture, nearest_sampler, input.texture_coordinates).a;
+    alpha_channel *= input.color.a;
 
-    if (alpha_channel == 0.0 || input.color.a == 0.0) {
+    if (alpha_channel == 0.0) {
         discard;
     }
 
@@ -165,30 +167,29 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let clip_position = global_uniforms.view_projection * adjusted_world_position;
     let clamped_depth = clamp(clip_position.z / clip_position.w, 0.0, 1.0);
 
-    // Apply the color multiplier from the action
-    var base_color = diffuse_color.rgb * input.color.rgb;
-    var final_alpha = diffuse_color.a * input.color.a;
-
     // Ambient light
-    var final_color = base_color * global_uniforms.ambient_color.rgb;
+    var ambient_light_contribution = global_uniforms.ambient_color.rgb;
 
     // Directional light
-    let light_direction = normalize(-directional_light.direction.xyz);
-    let light_percent = dot(light_direction, normal);
-    let clamped_light = clamp(light_percent, 0.0, 1.0);
+    var light_percent = 1.0;
+
+    if (global_uniforms.enhanced_lightning != 0) {
+        let light_direction = normalize(-directional_light.direction.xyz);
+        light_percent = max(dot(light_direction, normal), 0.0);
+    }
 
     // Shadow calculation
     let light_position = directional_light.view_projection * adjusted_world_position;
     var light_coords = light_position.xyz / light_position.w;
-    let bias = clamp(0.0025 * tan(acos(clamped_light)), 0.0, 0.0005);
+    let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
 
     let uv = clip_to_screen_space(light_coords.xy);
     let shadow_map_depth = textureSample(shadow_map, linear_sampler, uv);
     let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
-
-    final_color += clamped_light * directional_light.color.rgb * base_color * visibility;
+    let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
     // Point lights
+    var point_light_contribution = vec3<f32>(0.0);
     for (var index = 0u; index < light_count; index++) {
         let light_index = tile_light_indices[tile_index].indices[index];
         let light = point_lights[light_index];
@@ -205,14 +206,38 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
             visibility = f32(mapped_distance - bias < shadow_map_depth);
         }
 
-        let attenuation = calculate_attenuation(light_distance, light.range) * visibility;
-        final_color += light_percent * light.color.rgb * diffuse_color.rgb * attenuation;
+        let intensity = 10.0;
+        let attenuation = calculate_attenuation(light_distance, light.range);
+        point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
+    }
+
+    let base_color = diffuse_color * input.color;
+    let light_contributions = saturate(ambient_light_contribution + directional_light_contribution + point_light_contribution);
+    var color = base_color.rgb * light_contributions;
+
+    if (global_uniforms.enhanced_lightning == 0) {
+        color = color_balance(color, -0.01, 0.0, 0.0);
     }
 
     var output: FragmentOutput;
-    output.fragment_color = vec4<f32>(final_color, final_alpha);
+    output.fragment_color = vec4<f32>(color, alpha_channel);
     output.frag_depth = clamped_depth;
     return output;
+}
+
+// Assuming inputs are in range [-1, 1] where:
+// -1 = full shift towards first color (Cyan/Magenta/Yellow)
+// +1 = full shift towards second color (Red/Green/Blue)
+fn color_balance(color: vec3<f32>, cyan_red: f32, magenta_green: f32, yellow_blue: f32) -> vec3<f32> {
+    let rgb = color;
+
+    let adjusted = vec3<f32>(
+        rgb.r + cyan_red,
+        rgb.g + magenta_green,
+        rgb.b + yellow_blue
+    );
+
+    return clamp(adjusted, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 // Quadratic attenuation with smooth falloff

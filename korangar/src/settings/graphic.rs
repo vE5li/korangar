@@ -7,6 +7,7 @@ use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetai
 
 #[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
+    pub lightning_mode: LightningMode,
     pub vsync: bool,
     pub limit_framerate: LimitFramerate,
     pub triple_buffering: bool,
@@ -21,6 +22,7 @@ pub struct GraphicsSettings {
 impl Default for GraphicsSettings {
     fn default() -> Self {
         Self {
+            lightning_mode: LightningMode::Enhanced,
             vsync: true,
             limit_framerate: LimitFramerate::Unlimited,
             triple_buffering: true,
@@ -68,4 +70,13 @@ impl Drop for GraphicsSettings {
     fn drop(&mut self) {
         self.save();
     }
+}
+
+/// The lightning mode used when rendering the game.
+#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LightningMode {
+    /// Mode that mimics the way the original client rendered the game.
+    Classic,
+    /// Mode that enabled all enhanced graphics features.
+    Enhanced,
 }

@@ -59,6 +59,7 @@ pub struct Uniforms {
     pub animation_timer: f32,
     pub day_timer: f32,
     pub ambient_light_color: Color,
+    pub enhanced_lightning: bool,
 }
 
 #[derive(Clone, Debug)]

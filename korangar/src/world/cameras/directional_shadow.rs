@@ -11,7 +11,7 @@ pub struct DirectionalShadowCamera {
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
     world_to_screen_matrix: Matrix4<f32>,
-    day_timer: f32,
+    light_direction: Vector3<f32>,
 }
 
 impl DirectionalShadowCamera {
@@ -25,7 +25,7 @@ impl DirectionalShadowCamera {
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
             world_to_screen_matrix: Matrix4::from_value(0.0),
-            day_timer: 0.0,
+            light_direction: Vector3::new(0.0, 0.0, 0.0),
         }
     }
 
@@ -33,14 +33,14 @@ impl DirectionalShadowCamera {
         self.focus_point = focus_point;
     }
 
-    pub fn update(&mut self, day_timer: f32) {
-        self.day_timer = day_timer;
+    pub fn update(&mut self, light_direction: Vector3<f32>) {
+        self.light_direction = light_direction;
     }
 }
 
 impl Camera for DirectionalShadowCamera {
     fn camera_position(&self) -> Point3<f32> {
-        let direction = crate::world::get_light_direction(self.day_timer).normalize();
+        let direction = self.light_direction.normalize();
         let scaled_direction = direction * 100.0;
         self.focus_point + scaled_direction
     }

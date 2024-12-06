@@ -14,6 +14,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
+    enhanced_lightning: u32,
 }
 
 struct DirectionalLightUniforms {
@@ -236,16 +237,18 @@ fn calculate_wave_color(hit_position: vec3<f32>) -> vec4<f32> {
     );
 
     var base_color = textureSample(texture, texture_sampler, texture_coordinates);
+    var final_color = base_color.rgb;
 
-    let normal = calculate_wave_normal(hit_position);
+    if (global_uniforms.enhanced_lightning != 0) {
+        // Directional light
+        let normal = calculate_wave_normal(hit_position);
+        let light_percent = clamp(dot(normalize(-directional_light.direction.xyz), normal), 0.0, 1.0);
+        let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
+        let directional_light = light_percent * directional_light.color.rgb;
 
-    // Directional light
-    let light_percent = clamp(dot(normalize(-directional_light.direction.xyz), normal), 0.0, 1.0);
-    let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
-    let directional_light = light_percent * directional_light.color.rgb * base_color.rgb;
+        final_color *= global_uniforms.ambient_color.rgb + directional_light.rgb;
+    }
 
-    // Combine base color, ambient light and directional light
-    var final_color = base_color.rgb * global_uniforms.ambient_color.rgb + directional_light.rgb;
     final_color *= water_wave_uniforms.water_opacity;
 
     return vec4<f32>(final_color, water_wave_uniforms.water_opacity);

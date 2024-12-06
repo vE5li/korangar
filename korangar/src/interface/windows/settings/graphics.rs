@@ -7,8 +7,10 @@ use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAlia
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
+use crate::settings::LightningMode;
 
 pub struct GraphicsSettingsWindow<
+    LightningRenderMode,
     Vsync,
     FramerateLimit,
     TripleBuffering,
@@ -19,6 +21,7 @@ pub struct GraphicsSettingsWindow<
     Shadow,
     HighQualityInterface,
 > where
+    LightningRenderMode: TrackedState<LightningMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -31,6 +34,7 @@ pub struct GraphicsSettingsWindow<
 {
     present_mode_info: PresentModeInfo,
     supported_msaa: Vec<(String, Msaa)>,
+    lightning_mode: LightningRenderMode,
     vsync: Vsync,
     limit_framerate: FramerateLimit,
     triple_buffering: TripleBuffering,
@@ -43,6 +47,7 @@ pub struct GraphicsSettingsWindow<
 }
 
 impl<
+        LightningRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -54,6 +59,7 @@ impl<
         HighQualityInterface,
     >
     GraphicsSettingsWindow<
+        LightningRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -65,6 +71,7 @@ impl<
         HighQualityInterface,
     >
 where
+    LightningRenderMode: TrackedState<LightningMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -80,6 +87,7 @@ where
     pub fn new(
         present_mode_info: PresentModeInfo,
         supported_msaa: Vec<(String, Msaa)>,
+        lightning_mode: LightningRenderMode,
         vsync: Vsync,
         limit_framerate: FramerateLimit,
         triple_buffering: TripleBuffering,
@@ -93,6 +101,7 @@ where
         Self {
             present_mode_info,
             supported_msaa,
+            lightning_mode,
             vsync,
             limit_framerate,
             triple_buffering,
@@ -107,6 +116,7 @@ where
 }
 
 impl<
+        LightningRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -118,6 +128,7 @@ impl<
         HighQualityInterface,
     > PrototypeWindow<InterfaceSettings>
     for GraphicsSettingsWindow<
+        LightningRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -129,6 +140,7 @@ impl<
         HighQualityInterface,
     >
 where
+    LightningRenderMode: TrackedState<LightningMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -150,6 +162,13 @@ where
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let mut elements = vec![
+            Text::default().with_text("Lightning mode").with_width(dimension_bound!(50%)).wrap(),
+            PickList::default()
+                .with_options(vec![("Classic", LightningMode::Classic), ("Enhanced", LightningMode::Enhanced)])
+                .with_selected(self.lightning_mode.clone())
+                .with_event(Box::new(Vec::new))
+                .with_width(dimension_bound!(!))
+                .wrap(),
             StateButtonBuilder::new()
                 .with_text("Triple buffering")
                 .with_event(self.triple_buffering.toggle_action())
@@ -225,7 +244,7 @@ where
         //       tooltip
         if self.present_mode_info.supports_immediate || self.present_mode_info.supports_mailbox {
             elements.insert(
-                0,
+                2,
                 StateButtonBuilder::new()
                     .with_text("Enable VSYNC")
                     .with_event(self.vsync.toggle_action())
@@ -234,7 +253,7 @@ where
                     .wrap(),
             );
             elements.insert(
-                1,
+                3,
                 Text::default()
                     .with_text("Limit framerate")
                     .with_width(dimension_bound!(50%))

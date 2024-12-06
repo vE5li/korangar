@@ -93,7 +93,8 @@ pub(crate) struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
-    padding: [u32; 3],
+    enhanced_lightning: u32,
+    padding: [u32; 2],
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -236,6 +237,7 @@ impl Prepare for GlobalContext {
             animation_timer: instructions.uniforms.animation_timer,
             day_timer: instructions.uniforms.day_timer,
             point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
+            enhanced_lightning: instructions.uniforms.enhanced_lightning as u32,
             padding: Default::default(),
         };
 

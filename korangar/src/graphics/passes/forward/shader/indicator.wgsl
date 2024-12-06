@@ -14,6 +14,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
+    enhanced_lightning: u32,
 }
 
 struct DirectionalLightUniforms {
@@ -66,7 +67,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let texel_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
+    let diffuse_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
 
     // Calculate which tile this fragment belongs to
     let pixel_position = vec2<u32>(floor(input.position.xy));
@@ -78,27 +79,31 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     // Get the number of lights affecting this tile
     let light_count = textureLoad(light_count_texture, vec2<u32>(tile_x, tile_y), 0).r;
 
-    if (texel_color.a < 0.1) {
+    if (diffuse_color.a < 0.1) {
         discard;
     }
 
-    var base_color = texel_color.rgb * global_uniforms.indicator_color.rgb;
+    let normal = normalize(input.normal);
+
+    // Ambient light
+    var ambient_light_contribution = global_uniforms.ambient_color.rgb;
 
     // Directional light
-    let light_percent = clamp(dot(normalize(-directional_light.direction.xyz), input.normal), 0.0, 1.0);
+    let light_direction = normalize(-directional_light.direction.xyz);
+    let light_percent = max(dot(light_direction, normal), 0.0);
+
+    // Shadow calculation
+    let light_position = directional_light.view_projection * input.world_position;
+    var light_coords = light_position.xyz / light_position.w;
     let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
 
-    let light_position = directional_light.view_projection * input.world_position;
-    let light_coords = light_position.xyz / light_position.w;
     let uv = clip_to_screen_space(light_coords.xy);
     let shadow_map_depth = textureSample(shadow_map, nearest_sampler, uv);
     let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
-    let directional_light = light_percent * directional_light.color.rgb * base_color * visibility;
-
-    // Combine base color, ambient light and directional light
-    var final_color = base_color * global_uniforms.ambient_color.rgb + directional_light;
+    let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
     // Point lights
+    var point_light_contribution = vec3<f32>(0.0);
     for (var index = 0u; index < light_count; index++) {
         let light_index = tile_light_indices[tile_index].indices[index];
         let light = point_lights[light_index];
@@ -115,11 +120,35 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             visibility = f32(mapped_distance - bias < shadow_map_depth);
         }
 
-        let attenuation = calculate_attenuation(light_distance, light.range) * visibility;
-        final_color += light_percent * light.color.rgb * base_color * attenuation;
+        let intensity = 10.0;
+        let attenuation = calculate_attenuation(light_distance, light.range);
+        point_light_contribution += (light.color.rgb * intensity) * light_percent * attenuation * visibility;
     }
 
-    return vec4<f32>(final_color, texel_color.a);
+    let base_color = diffuse_color * global_uniforms.indicator_color;
+    let light_contributions = saturate(ambient_light_contribution + directional_light_contribution + point_light_contribution);
+    var color = base_color.rgb * light_contributions;
+
+    if (global_uniforms.enhanced_lightning == 0) {
+        color = color_balance(color, -0.01, 0.0, 0.0);
+    }
+
+    return vec4<f32>(color, base_color.a);
+}
+
+// Assuming inputs are in range [-1, 1] where:
+// -1 = full shift towards first color (Cyan/Magenta/Yellow)
+// +1 = full shift towards second color (Red/Green/Blue)
+fn color_balance(color: vec3<f32>, cyan_red: f32, magenta_green: f32, yellow_blue: f32) -> vec3<f32> {
+    let rgb = color;
+
+    let adjusted = vec3<f32>(
+        rgb.r + cyan_red,
+        rgb.g + magenta_green,
+        rgb.b + yellow_blue
+    );
+
+    return clamp(adjusted, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 // Quadratic attenuation with smooth falloff

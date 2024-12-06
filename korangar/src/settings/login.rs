@@ -26,7 +26,7 @@ pub struct ServiceSettings {
 impl Serialize for ServiceSettings {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer,
+        S: Serializer,
     {
         let mut serde_state = Serializer::serialize_struct(serializer, "ServiceSettings", 4)?;
         SerializeStruct::serialize_field(

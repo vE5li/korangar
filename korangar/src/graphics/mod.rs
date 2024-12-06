@@ -5,14 +5,12 @@ mod engine;
 #[cfg(feature = "debug")]
 mod error;
 mod frame_pacer;
-mod graphic_settings;
 mod instruction;
 mod passes;
 mod picker_target;
 mod projection;
-#[cfg(feature = "debug")]
-mod render_settings;
 mod sampler;
+mod settings;
 mod surface;
 mod texture;
 mod vertices;
@@ -38,13 +36,11 @@ pub use self::engine::{GraphicsEngine, GraphicsEngineDescriptor};
 #[cfg(feature = "debug")]
 pub use self::error::error_handler;
 pub use self::frame_pacer::*;
-pub use self::graphic_settings::*;
 pub use self::instruction::*;
 pub use self::passes::{Lanczos3Drawer, MipMapRenderPassContext};
 pub use self::picker_target::PickerTarget;
 pub use self::projection::*;
-#[cfg(feature = "debug")]
-pub use self::render_settings::*;
+pub use self::settings::*;
 pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;

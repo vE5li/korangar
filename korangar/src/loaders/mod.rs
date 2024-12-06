@@ -1,7 +1,7 @@
 mod action;
 mod animation;
 mod archive;
-pub mod client;
+
 mod effect;
 pub mod error;
 mod font;

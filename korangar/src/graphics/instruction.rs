@@ -5,9 +5,9 @@ use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
 
 use super::color::Color;
-use super::vertices::ModelVertex;
 #[cfg(feature = "debug")]
-use super::RenderSettings;
+use super::settings::RenderSettings;
+use super::vertices::ModelVertex;
 use super::{Buffer, Texture, TileVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]

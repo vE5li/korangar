@@ -27,7 +27,9 @@ use super::{LightSourceExt, Model, PointLightSet};
 #[cfg(feature = "debug")]
 use crate::graphics::ModelBatch;
 #[cfg(feature = "debug")]
-use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, RenderSettings};
+use crate::graphics::RenderSettings;
+#[cfg(feature = "debug")]
+use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction};
 use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, WaterInstruction};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;

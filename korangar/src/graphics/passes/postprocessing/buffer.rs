@@ -9,7 +9,8 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, Drawer, PostProcessingRenderPassContext, RenderPassContext,
 };
-use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, RenderSettings, Texture};
+use crate::graphics::settings::RenderSettings;
+use crate::graphics::{Capabilities, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/buffer.wgsl");
 const DRAWER_NAME: &str = "post processing buffer";

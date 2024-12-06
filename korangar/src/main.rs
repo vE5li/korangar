@@ -24,7 +24,6 @@ macro_rules! time_phase {
     }
 }
 
-mod audio;
 mod graphics;
 mod input;
 #[macro_use]
@@ -32,6 +31,7 @@ mod interface;
 mod inventory;
 mod loaders;
 mod renderer;
+mod settings;
 mod system;
 mod world;
 
@@ -43,6 +43,8 @@ use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 
 use cgmath::{Vector2, Vector3};
+#[cfg(feature = "debug")]
+use graphics::RenderSettings;
 use image::{EncodableLayout, ImageFormat, ImageReader};
 use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
@@ -71,6 +73,7 @@ use ragnarok_packets::{
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
+use settings::AudioSettings;
 #[cfg(feature = "debug")]
 use wgpu::Queue;
 use wgpu::{Device, Dx12Compiler, Instance, InstanceFlags, MemoryHints};
@@ -81,7 +84,6 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
 use winit::window::{Icon, Window, WindowId};
 
-use crate::audio::*;
 use crate::graphics::*;
 use crate::input::{InputSystem, UserEvent};
 use crate::interface::application::InterfaceSettings;
@@ -98,6 +100,7 @@ use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{EffectRenderer, GameInterfaceRenderer};
+use crate::settings::GraphicsSettings;
 use crate::system::GameTimer;
 use crate::world::*;
 

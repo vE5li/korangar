@@ -14,8 +14,8 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::theme::InterfaceThemeKind;
 use crate::interface::windows::WindowCache;
-use crate::loaders::client::LoginSettings;
 use crate::loaders::ClientInfo;
+use crate::settings::LoginSettings;
 
 #[derive(new)]
 pub struct LoginWindow<'a> {

@@ -4,6 +4,7 @@ use std::rc::Rc;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum LinkedElementInner {
     Set(usize),
+    #[cfg(feature = "debug")]
     Hidden,
     Unset,
 }
@@ -24,6 +25,7 @@ impl LinkedElement {
         self.inner.set(LinkedElementInner::Set(element_address));
     }
 
+    #[cfg(feature = "debug")]
     pub fn link_hidden(&self) {
         self.inner.set(LinkedElementInner::Hidden);
     }
@@ -32,6 +34,7 @@ impl LinkedElement {
         self.inner.get() != LinkedElementInner::Unset
     }
 
+    #[cfg(feature = "debug")]
     pub fn is_hidden(&self) -> bool {
         self.inner.get() == LinkedElementInner::Hidden
     }

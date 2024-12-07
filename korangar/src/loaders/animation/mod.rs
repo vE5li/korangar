@@ -201,63 +201,63 @@ impl AnimationLoader {
             animations.push(Animation { frames });
         }
 
-        // The problem is that each frame of an action is not the same size
-        // and without size consistency, the proportion differ between frames,
-        // causing pixel offsets.
-        // To resolve this, we resized the frames to ensure
-        // identical frame size and origin point at (0,0) between frames.
-
-        // First, identify the bounding box that encompasses all motion
-        // frames.
-        let mut min_top = i32::MAX;
-        let mut max_bottom = 0;
-        let mut min_left = i32::MAX;
-        let mut max_right = 0;
+        // Generate bounding-box per action
         for action_index in 0..action_size {
-            animations[action_index].frames.iter().for_each(|frame| {
-                let center_x = (frame.size.x - 1) / 2;
-                min_left = min(min_left, frame.offset.x - center_x);
-                max_right = max(max_right, frame.offset.x + (frame.size.x - 1 - center_x));
+            // The problem is that each frame of an action is not the same size
+            // and without size consistency, the proportion differ between frames,
+            // causing pixel offsets.
+            // To resolve this, we resized the frames to ensure
+            // identical frame size and origin point at (0,0) between frames.
 
-                let center_y = (frame.size.y - 1) / 2;
-                min_top = min(min_top, frame.offset.y - center_y);
-                max_bottom = max(max_bottom, frame.offset.y + (frame.size.y - 1 - center_y));
-            });
-        }
-        // The player can change the sprite and causes an offset from a image to
-        // another.
-        if entity_type == EntityType::Player {
-            // Create a bounding box to standardize the size of the player sprite, ensuring
-            // that every sprite has the same proportion and that pixels are rendered in
-            // the correct position.
-            // The player sprite is generally 110 pixels, with an additional 40 pixels added
-            // for extra space, making the total height 150 pixels.
-            let extra_size = 20;
-            min_top = -80;
-            max_bottom = 30;
-            min_top -= extra_size;
-            max_bottom += extra_size;
-            min_left = -150;
-            max_right = 150;
-        }
+            // First, identify the bounding box that encompasses all motion
+            // frames.
+            let mut min_top = i32::MAX;
+            let mut max_bottom = 0;
+            let mut min_left = i32::MAX;
+            let mut max_right = 0;
 
-        fn calculate_new_size(min_top: i32, max_bottom: i32, min_left: i32, max_right: i32) -> Vector2<i32> {
-            // Create a rectangle centered on the y-axis, extending to the maximum of
-            // max_left and max_right.
-            let size_x = 2 * max(i32::abs(min_left), i32::abs(max_right)) + 1;
+            // The player can change the sprite and causes an offset from a image to
+            // another.
+            if entity_type == EntityType::Player {
+                // Create a bounding box to standardize the size of the player sprite, ensuring
+                // that every sprite has the same proportion and that pixels are rendered in
+                // the correct position.
+                // The player sprite is generally 110 pixels, with an additional 40 pixels added
+                // for extra space, making the total height 150 pixels.
+                let extra_size = 20;
+                min_top = -80;
+                max_bottom = 30;
+                min_top -= extra_size;
+                max_bottom += extra_size;
+                min_left = -150;
+                max_right = 150;
+            } else {
+                animations[action_index].frames.iter().for_each(|frame| {
+                    let center_x = (frame.size.x - 1) / 2;
+                    min_left = min(min_left, frame.offset.x - center_x);
+                    max_right = max(max_right, frame.offset.x + (frame.size.x - 1 - center_x));
 
-            // The size_y is defined to be odd, as it ranges from [0, 2k],
-            // resulting in a size of 2k+1.
-            let mut padding = 1;
-            if max_bottom % 2 == min_top % 2 {
-                padding = 0;
+                    let center_y = (frame.size.y - 1) / 2;
+                    min_top = min(min_top, frame.offset.y - center_y);
+                    max_bottom = max(max_bottom, frame.offset.y + (frame.size.y - 1 - center_y));
+                });
             }
-            let size_y = max_bottom - min_top + padding + 1;
 
-            return Vector2::new(size_x, size_y);
-        }
+            fn calculate_new_size(min_top: i32, max_bottom: i32, min_left: i32, max_right: i32) -> Vector2<i32> {
+                // Create a rectangle centered on the y-axis, extending to the maximum of
+                // max_left and max_right.
+                let size_x = 2 * max(i32::abs(min_left), i32::abs(max_right)) + 1;
 
-        for action_index in 0..action_size {
+                // The size_y is defined to be odd, as it ranges from [0, 2k],
+                // resulting in a size of 2k+1.
+                let mut padding = 1;
+                if max_bottom % 2 == min_top % 2 {
+                    padding = 0;
+                }
+                let size_y = max_bottom - min_top + padding + 1;
+
+                return Vector2::new(size_x, size_y);
+            }
             animations[action_index].frames.iter_mut().for_each(|frame| {
                 frame.size = calculate_new_size(min_top, max_bottom, min_left, max_right);
                 // Set the origin point at (0, 0) correctly by applying an offset in y by

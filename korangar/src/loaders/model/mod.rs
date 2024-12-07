@@ -443,7 +443,9 @@ impl ModelLoader {
             reverse_order,
         );
 
-        Self::calculate_transformation_matrix(&mut root_nodes[0], true, bounding_box, Matrix4::identity());
+        for root_node in root_nodes.iter_mut() {
+            Self::calculate_transformation_matrix(root_node, true, bounding_box, Matrix4::identity());
+        }
 
         let model = Model::new(
             root_nodes,

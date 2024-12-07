@@ -113,6 +113,14 @@ impl AABB {
             && self.max.z >= other.min.z
     }
 
+    /// Creates a new AABB that is expanded by a given margin in all directions.
+    pub fn expanded(&self, margin: f32) -> Self {
+        AABB {
+            min: Point3::new(self.min.x - margin, self.min.y - margin, self.min.z - margin),
+            max: Point3::new(self.max.x + margin, self.max.y + margin, self.max.z + margin),
+        }
+    }
+
     /// Expand the AABB to include a point.
     pub fn expand(&mut self, point: Point3<f32>) {
         self.min = self.min.zip(point, f32::min);
@@ -315,6 +323,15 @@ mod tests {
 
         assert_eq!(aabb.min(), Point3::new(f32::MAX, f32::MAX, f32::MAX));
         assert_eq!(aabb.max(), Point3::new(-f32::MAX, -f32::MAX, -f32::MAX));
+    }
+
+    #[test]
+    fn test_expanded() {
+        let aabb = AABB::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 1.0));
+        let expanded = aabb.expanded(0.5);
+
+        assert_eq!(expanded.min(), Point3::new(-0.5, -0.5, -0.5));
+        assert_eq!(expanded.max(), Point3::new(1.5, 1.5, 1.5));
     }
 
     #[test]

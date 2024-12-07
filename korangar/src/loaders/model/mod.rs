@@ -1,14 +1,14 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use cgmath::{EuclideanSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
+use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 use derive_new::new;
-use hashbrown::{HashMap, HashSet};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
-use korangar_util::collision::AABB;
+use korangar_util::collision::{KDTree, AABB};
 use korangar_util::math::multiply_matrix4_and_point3;
 use korangar_util::texture_atlas::AllocationId;
-use korangar_util::FileLoader;
+use korangar_util::{create_simple_key, FileLoader};
 use ragnarok_bytes::{ByteReader, FromBytes};
 use ragnarok_formats::model::{ModelData, NodeData};
 use ragnarok_formats::version::InternalVersion;
@@ -136,7 +136,7 @@ impl ModelLoader {
         (main, transform, box_transform)
     }
 
-    // For nodes with that are transparent, we will split all disconnected meshed,
+    // For nodes with that are transparent, we will split all disconnected meshes,
     // so that we can properly depth sort them to be able to render transparent
     // models correctly.
     fn split_disconnected_meshes(vertices: &[NativeModelVertex], texture_transparency: Vec<bool>) -> Vec<SubMesh> {
@@ -145,62 +145,90 @@ impl ModelLoader {
             .iter()
             .partition(|vertex| texture_transparency[vertex.texture_index as usize]);
 
-        // Step 2: Create an adjacency map for transparent triangles.
-        let mut adjacency: HashMap<usize, HashSet<usize>> = HashMap::new();
-        let triangles: Vec<_> = transparent_vertices.chunks_exact(3).collect();
-
-        for (triangle1_index, triangle1) in triangles.iter().enumerate() {
-            for (triangle2_index, triangle2) in triangles.iter().enumerate() {
-                if triangle1_index != triangle2_index {
-                    let shares_vertex = triangle1.iter().any(|vertex1| {
-                        triangle2.iter().any(|vertex2| {
-                            const EPSILON: f32 = 1.0;
-                            (vertex1.position.x - vertex2.position.x).abs() < EPSILON
-                                && (vertex1.position.y - vertex2.position.y).abs() < EPSILON
-                                && (vertex1.position.z - vertex2.position.z).abs() < EPSILON
-                        })
-                    });
-
-                    if shares_vertex {
-                        adjacency.entry(triangle1_index).or_default().insert(triangle2_index);
-                        adjacency.entry(triangle2_index).or_default().insert(triangle1_index);
-                    }
-                }
-            }
-        }
-
-        // Step 3: Find connected vertices using a depth first search.
-        let mut visited: HashSet<usize> = HashSet::new();
         let mut submeshes: Vec<SubMesh> = vec![SubMesh {
             transparent: false,
             native_vertices: opaque_vertices,
         }];
 
-        for triangle_index in 0..triangles.len() {
-            if visited.contains(&triangle_index) {
-                continue;
-            }
-
-            let mut native_vertices: Vec<NativeModelVertex> = Vec::new();
-            let mut stack = vec![triangle_index];
-
-            while let Some(current) = stack.pop() {
-                if visited.insert(current) {
-                    native_vertices.extend_from_slice(triangles[current]);
-
-                    if let Some(neighbors) = adjacency.get(&current) {
-                        stack.extend(neighbors.iter().filter(|&index| !visited.contains(index)));
-                    }
-                }
-            }
-
-            submeshes.push(SubMesh {
-                transparent: true,
-                native_vertices,
-            });
+        if transparent_vertices.is_empty() {
+            return submeshes;
         }
 
+        // Step 2: Create face AABBs and store them in a KD-tree.
+        let face_aabbs: Vec<(u32, AABB)> = transparent_vertices
+            .chunks_exact(3)
+            .enumerate()
+            .map(|(face_idx, face)| {
+                let aabb = Self::calculate_face_aabb(face);
+                (face_idx as u32, aabb)
+            })
+            .collect();
+        let kdtree = KDTree::from_objects(&face_aabbs);
+
+        // Step 3: For each face, query nearby faces and connect if touching. We use a
+        // KD-tree here, so that we don't need to compare each face against each other
+        // face, which would result in a quadratic time complexity.
+        let face_count = face_aabbs.len();
+        let mut disjoint_union_set = DisjointSetUnion::new(face_count);
+        let mut nearby_faces = Vec::new();
+
+        for (face_idx, face_aabb) in face_aabbs {
+            // Query slightly expanded AABB to catch touching faces.
+            const EPSILON: f32 = 0.1;
+            let query_aabb = face_aabb.expanded(EPSILON);
+
+            kdtree.query(&query_aabb, &mut nearby_faces);
+
+            for other_idx in nearby_faces.drain(..) {
+                if other_idx <= face_idx {
+                    // Skip faces we've already checked.
+                    continue;
+                }
+
+                let face_idx = face_idx as usize;
+                let other_idx = other_idx as usize;
+                let face = &transparent_vertices[face_idx * 3..(face_idx + 1) * 3];
+                let other_face = &transparent_vertices[other_idx * 3..(other_idx + 1) * 3];
+                if Self::faces_are_connected(face, other_face) {
+                    disjoint_union_set.union(face_idx, other_idx);
+                }
+            }
+        }
+
+        // Step 4: Group vertices by their connected faces.
+        let mut groups: HashMap<usize, Vec<NativeModelVertex>> = HashMap::new();
+
+        for index in 0..face_count {
+            let root = disjoint_union_set.find(index);
+            groups
+                .entry(root)
+                .or_default()
+                .extend_from_slice(&transparent_vertices[index * 3..(index + 1) * 3]);
+        }
+
+        submeshes.extend(groups.into_values().map(|vertices| SubMesh {
+            transparent: true,
+            native_vertices: vertices,
+        }));
+
         submeshes
+    }
+
+    fn calculate_face_aabb(face: &[NativeModelVertex]) -> AABB {
+        AABB::from_vertices(face.iter().map(|vertex| vertex.position))
+    }
+
+    fn faces_are_connected(face1: &[NativeModelVertex], face2: &[NativeModelVertex]) -> bool {
+        const CONNECTION_EPSILON: f32 = 0.01;
+        for vertex1 in face1 {
+            for vertex2 in face2 {
+                let distance = (vertex1.position - vertex2.position).magnitude();
+                if distance < CONNECTION_EPSILON {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn calculate_centroid(vertices: &[NativeModelVertex]) -> Point3<f32> {
@@ -444,7 +472,46 @@ struct ModelTexture {
     transparent: bool,
 }
 
+create_simple_key!(FaceKey);
+
 struct SubMesh {
     transparent: bool,
     native_vertices: Vec<NativeModelVertex>,
+}
+
+struct DisjointSetUnion {
+    parent: Vec<usize>,
+    rank: Vec<usize>,
+}
+
+impl DisjointSetUnion {
+    fn new(size: usize) -> Self {
+        Self {
+            parent: (0..size).collect(),
+            rank: vec![0; size],
+        }
+    }
+
+    fn find(&mut self, x: usize) -> usize {
+        if self.parent[x] != x {
+            self.parent[x] = self.find(self.parent[x]);
+        }
+        self.parent[x]
+    }
+
+    fn union(&mut self, x: usize, y: usize) {
+        let root_x = self.find(x);
+        let root_y = self.find(y);
+
+        if root_x != root_y {
+            match self.rank[root_x].cmp(&self.rank[root_y]) {
+                std::cmp::Ordering::Less => self.parent[root_x] = root_y,
+                std::cmp::Ordering::Greater => self.parent[root_y] = root_x,
+                std::cmp::Ordering::Equal => {
+                    self.parent[root_y] = root_x;
+                    self.rank[root_x] += 1;
+                }
+            }
+        }
+    }
 }

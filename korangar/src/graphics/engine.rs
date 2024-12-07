@@ -16,8 +16,8 @@ use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
 use super::{
-    AntiAliasingResource, Capabilities, FramePacer, FrameStage, GlobalContext, LimitFramerate, Msaa, Prepare, PresentModeInfo,
-    ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
+    AntiAliasingResource, Capabilities, EntityInstruction, FramePacer, FrameStage, GlobalContext, LimitFramerate, ModelInstruction, Msaa,
+    Prepare, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, Surface, TextureSamplerType, RENDER_TO_TEXTURE_FORMAT,
 };
 use crate::graphics::instruction::RenderInstruction;
 use crate::graphics::passes::*;
@@ -63,6 +63,8 @@ pub struct GraphicsEngine {
     texture_loader: Arc<TextureLoader>,
     engine_context: Option<EngineContext>,
     picker_value: Arc<AtomicU64>,
+    entity_sort_buffer: Vec<EntityInstruction>,
+    model_sort_buffer: Vec<ModelInstruction>,
 }
 
 struct EngineContext {
@@ -133,6 +135,8 @@ impl GraphicsEngine {
             texture_loader: descriptor.texture_loader,
             engine_context: None,
             picker_value: descriptor.picker_value,
+            entity_sort_buffer: vec![],
+            model_sort_buffer: vec![],
         }
     }
 
@@ -669,7 +673,7 @@ impl GraphicsEngine {
     pub fn render_next_frame(&mut self, frame: SurfaceTexture, mut instruction: RenderInstruction) {
         assert!(instruction.point_light_shadow_caster.len() <= NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS);
 
-        Self::sort_instructions(&mut instruction);
+        self.sort_instructions(&mut instruction);
 
         // Reclaim all staging buffers that the GPU has finished reading from.
         self.staging_belt.recall();
@@ -709,16 +713,21 @@ impl GraphicsEngine {
         self.frame_pacer.end_frame_stage(self.cpu_stage, Instant::now());
     }
 
+    /// We use glidesort here, since we need a stable sorting algorith, or else
+    /// we could get Z-fighting and also want to re-use the sorting buffers
+    /// between frames, so that we don't need to allocate each time.
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    fn sort_instructions(instructions: &mut RenderInstruction) {
+    fn sort_instructions(&mut self, instructions: &mut RenderInstruction) {
         // Back to front for entities.
-        instructions.entities.sort_unstable_by(|a, b| b.distance.total_cmp(&a.distance));
+        glidesort::sort_with_vec_by(instructions.entities, &mut self.entity_sort_buffer, |a, b| {
+            b.distance.total_cmp(&a.distance)
+        });
 
         for batch in instructions.model_batches {
             let start = batch.offset;
             let end = batch.offset + batch.count;
 
-            instructions.models[start..end].sort_unstable_by(|a, b| {
+            glidesort::sort_with_vec_by(&mut instructions.models[start..end], &mut self.model_sort_buffer, |a, b| {
                 match (a.transparent, b.transparent) {
                     // Front to back for opaque models.
                     (false, false) => a.distance.total_cmp(&b.distance),

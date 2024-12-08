@@ -43,7 +43,7 @@ pub(crate) fn create_new_sampler(device: &Device, label: &str, sampler_type: imp
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             mipmap_filter: FilterMode::Linear,
-            compare: Some(CompareFunction::Less),
+            compare: Some(CompareFunction::Greater),
             lod_min_clamp: 0.0,
             lod_max_clamp: 0.0,
             ..Default::default()

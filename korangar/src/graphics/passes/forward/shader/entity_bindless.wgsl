@@ -188,7 +188,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
 
     let uv = clip_to_screen_space(light_coords.xy);
     let shadow_map_depth = textureSample(shadow_map, linear_sampler, uv);
-    let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
+    let visibility = select(0.0, 1.0, light_coords.z + bias > shadow_map_depth);
     let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
     // Point lights

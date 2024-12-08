@@ -2,7 +2,7 @@ use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 use cgmath::{Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 
-use super::{Camera, MAXIMUM_ZOOM, MINIMUM_ZOOM};
+use super::Camera;
 use crate::graphics::perspective_reverse_lh;
 
 const DEFAULT_ZOOM: f32 = 150.0;

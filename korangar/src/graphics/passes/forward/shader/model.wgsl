@@ -150,7 +150,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
 
     let world_position = input.world_position.xyz / input.world_position.w;
-    shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z - bias);
+    shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
     let visibility = get_soft_shadows(world_position, shadow_coords, normal, light_direction);
     let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
@@ -169,6 +169,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             let shadow_map_depth = textureSample(point_shadow_maps, linear_sampler, flipped_light_direction, light.texture_index - 1);
             let bias = clamp(0.05 * tan(acos(light_percent)), 0.0, 0.005);
             let mapped_distance = light_distance / 255.9;
+            // TODO: NHA use reverse Z projection also for point shadows
             visibility = f32(mapped_distance - bias < shadow_map_depth);
         }
 

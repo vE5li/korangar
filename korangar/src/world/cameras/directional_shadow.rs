@@ -2,8 +2,8 @@ use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, SquareMatrix, Vector2, Vector3, Vector4};
 
-use super::{Camera, MAXIMUM_ZOOM, MINIMUM_ZOOM};
-use crate::graphics::orthographic_lh;
+use super::Camera;
+use crate::graphics::orthographic_reverse_lh;
 
 const FAR_PLANE: f32 = 500.0;
 const NEAR_PLANE: f32 = -1000.0;
@@ -77,7 +77,7 @@ impl Camera for DirectionalShadowCamera {
         self.bound_size = self.calculate_bounds();
         let bounds = Vector4::new(-self.bound_size, self.bound_size, -self.bound_size, self.bound_size);
 
-        self.projection_matrix = orthographic_lh(bounds.x, bounds.y, bounds.w, bounds.z, NEAR_PLANE, FAR_PLANE);
+        self.projection_matrix = orthographic_reverse_lh(bounds.x, bounds.y, bounds.w, bounds.z);
         self.view_matrix = Matrix4::look_at_lh(self.camera_position(), self.focus_point, self.look_up_vector);
         self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
     }

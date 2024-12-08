@@ -260,7 +260,7 @@ where
                     .wrap(),
             );
             elements.insert(
-                2,
+                4,
                 PickList::default()
                     .with_options(vec![
                         ("Unlimited", LimitFramerate::Unlimited),

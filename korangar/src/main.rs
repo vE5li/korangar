@@ -1829,7 +1829,13 @@ impl Client {
 
         self.start_camera.update(delta_time);
         self.player_camera.update(delta_time);
-        self.directional_shadow_camera.update(directional_light_direction);
+
+        let zoom_scale: f32 = match self.entities.is_empty() {
+            true => self.start_camera.get_zoom_scale(),
+            false => self.player_camera.get_zoom_scale(),
+        };
+
+        self.directional_shadow_camera.update(directional_light_direction, zoom_scale);
 
         #[cfg(feature = "debug")]
         update_cameras_measurement.stop();
@@ -1872,6 +1878,7 @@ impl Client {
         let (directional_light_view_matrix, directional_light_projection_matrix) =
             self.directional_shadow_camera.view_projection_matrices();
         let directional_light_matrix = directional_light_projection_matrix * directional_light_view_matrix;
+        let directional_light_bound_scale = self.directional_shadow_camera.bound_scale();
 
         #[cfg(feature = "debug")]
         matrices_measurement.stop();
@@ -2243,6 +2250,7 @@ impl Client {
                 view_projection_matrix: directional_light_matrix,
                 direction: directional_light_direction,
                 color: directional_light_color,
+                bound_scale: directional_light_bound_scale,
             },
             point_light_shadow_caster: &self.point_light_with_shadow_instructions,
             point_light: &self.point_light_instructions,

@@ -15,12 +15,14 @@ struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lightning: u32,
+    shadow_noise_seed: f32,
 }
 
 struct DirectionalLightUniforms {
     view_projection: mat4x4<f32>,
     color: vec4<f32>,
     direction: vec4<f32>,
+    bound_scale: f32,
 }
 
 struct PointLight {
@@ -50,17 +52,25 @@ struct VertexOutput {
 const MIP_SCALE: f32 = 0.25;
 const ALPHA_CUTOFF: f32 = 0.4;
 const TILE_SIZE: u32 = 16;
+const TAU: f32 = 6.28318548;
+const PCF_RADIUS: f32 = 0.03;
+const BLUR_SCALE: f32 = 0.01;
+const TOTAL_SAMPLE_COUNT: u32 = 32;
+const ESTIMATION_SAMPLE_COUNT: u32 = 8;
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(0) @binding(3) var texture_sampler: sampler;
+@group(0) @binding(4) var noise_sampler: sampler;
+@group(0) @binding(5) var shadow_map_sampler: sampler_comparison;
 @group(1) @binding(0) var<uniform> directional_light: DirectionalLightUniforms;
 @group(1) @binding(1) var shadow_map: texture_depth_2d;
 @group(1) @binding(2) var<storage, read> point_lights: array<PointLight>;
 @group(1) @binding(3) var light_count_texture: texture_2d<u32>;
 @group(1) @binding(4) var<storage, read> tile_light_indices: array<TileLightIndices>;
 @group(1) @binding(5) var point_shadow_maps: texture_depth_cube_array;
+@group(1) @binding(6) var blue_noise: texture_2d<f32>;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var texture: texture_2d<f32>;
 
@@ -135,13 +145,13 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let light_percent = max(dot(light_direction, normal), 0.0);
 
     // Shadow calculation
-    let light_position = directional_light.view_projection * input.world_position;
-    var light_coords = light_position.xyz / light_position.w;
+    let shadow_position = directional_light.view_projection * input.world_position;
+    var shadow_coords = shadow_position.xyz / shadow_position.w;
     let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
 
-    let uv = clip_to_screen_space(light_coords.xy);
-    let shadow_map_depth = textureSample(shadow_map, linear_sampler, uv);
-    let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
+    let world_position = input.world_position.xyz / input.world_position.w;
+    shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
+    let visibility = get_soft_shadows(world_position, shadow_coords, normal, light_direction);
     let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
     // Point lights
@@ -159,6 +169,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             let shadow_map_depth = textureSample(point_shadow_maps, linear_sampler, flipped_light_direction, light.texture_index - 1);
             let bias = clamp(0.05 * tan(acos(light_percent)), 0.0, 0.005);
             let mapped_distance = light_distance / 255.9;
+            // TODO: NHA use reverse Z projection also for point shadows
             visibility = f32(mapped_distance - bias < shadow_map_depth);
         }
 
@@ -211,4 +222,75 @@ fn calculate_mip_level(texture_coordinate: vec2<f32>) -> f32 {
     let dy = dpdy(texture_coordinate);
     let delta_max_squared = max(dot(dx, dx), dot(dy, dy));
     return max(0.0, 0.5 * log2(delta_max_squared));
+}
+
+fn get_jittered_offset(world_position: vec3<f32>, sample_index: u32, is_estimation: bool) -> vec2<f32> {
+    let sample_count = select(f32(TOTAL_SAMPLE_COUNT), f32(ESTIMATION_SAMPLE_COUNT), is_estimation);
+    let angle = (f32(sample_index) / sample_count) * TAU;
+
+    let random = global_uniforms.shadow_noise_seed;
+    let noise_coordinate = (world_position.xz + vec2<f32>(f32(sample_index) * random)) ;
+    let noise = textureSample(blue_noise, noise_sampler, noise_coordinate).xy;
+
+    var radius: f32;
+
+    if (is_estimation) {
+        // Estimation samples near the edge (0.8-1.0 range).
+        radius = (0.8 + noise.x * 0.2) * PCF_RADIUS;
+    } else {
+        // Regular samples distributed across the disk.
+        radius = sqrt(noise.x) * PCF_RADIUS;
+    }
+
+    // Calculate final offset
+    let offset = vec2<f32>(
+        cos(angle) * radius,
+        sin(angle) * radius
+    ) * BLUR_SCALE;
+
+    return offset;
+}
+
+fn get_soft_shadows(world_position: vec3<f32>, shadow_coords: vec3<f32>, normal: vec3<f32>, light_direction: vec3<f32>) -> f32 {
+    let filter_size = get_filter_size(shadow_coords);
+
+    var shadow = 0.0;
+
+    // Take the estimation samples at the edge.
+    for (var index = 0u; index < ESTIMATION_SAMPLE_COUNT; index++) {
+        let offset = get_jittered_offset(world_position, index, true) * filter_size;
+        shadow += textureSampleCompare(
+            shadow_map,
+            shadow_map_sampler,
+            shadow_coords.xy + offset,
+            shadow_coords.z
+        );
+    }
+    shadow *= (1.0/f32(ESTIMATION_SAMPLE_COUNT));
+
+    let NdotL = max(dot(normal, light_direction), 0.0);
+
+    // Check if we're in penumbra region.
+    if ((shadow - 1.0) * shadow * NdotL != 0.0) {
+        // Adjust weight for additional samples.
+        shadow *= f32(ESTIMATION_SAMPLE_COUNT) / f32(TOTAL_SAMPLE_COUNT);
+
+        // Take the rest of the samples.
+        for (var index = ESTIMATION_SAMPLE_COUNT; index < TOTAL_SAMPLE_COUNT; index++) {
+            let offset = get_jittered_offset(world_position, index, false) * filter_size;
+            shadow += textureSampleCompare(
+                shadow_map,
+                shadow_map_sampler,
+                shadow_coords.xy + offset,
+                shadow_coords.z
+            ) * (1.0 / f32(TOTAL_SAMPLE_COUNT));
+        }
+    }
+
+    return shadow;
+}
+
+fn get_filter_size(shadow_coords: vec3<f32>) -> vec2<f32> {
+    // Scale our sampling based on how much we've zoomed.
+    return vec2<f32>(1.0) * directional_light.bound_scale;
 }

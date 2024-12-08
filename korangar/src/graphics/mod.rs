@@ -105,6 +105,8 @@ pub(crate) struct DirectionalLightUniforms {
     view_projection: [[f32; 4]; 4],
     color: [f32; 4],
     direction: [f32; 4],
+    bound_scale: f32,
+    padding: [f32; 3],
 }
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -251,6 +253,8 @@ impl Prepare for GlobalContext {
             view_projection: instructions.directional_light_with_shadow.view_projection_matrix.into(),
             color: directional_light_color.components_linear(),
             direction: instructions.directional_light_with_shadow.direction.extend(0.0).into(),
+            bound_scale: instructions.directional_light_with_shadow.bound_scale,
+            padding: Default::default(),
         };
 
         for (instance_index, instruction) in instructions.point_light_shadow_caster.iter().enumerate() {

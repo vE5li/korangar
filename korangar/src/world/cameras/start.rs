@@ -2,7 +2,7 @@ use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
 
 use cgmath::{Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 
-use super::Camera;
+use super::{Camera, MAXIMUM_ZOOM, MINIMUM_ZOOM};
 use crate::graphics::perspective_reverse_lh;
 
 const DEFAULT_ZOOM: f32 = 150.0;
@@ -39,6 +39,11 @@ impl StartCamera {
 
     pub fn update(&mut self, delta_time: f64) {
         self.view_angle += delta_time as f32 * ROTATION_SPEED;
+    }
+
+    pub fn get_zoom_scale(&self) -> f32 {
+        // We don't have a zoom range for the start camera.
+        1.0
     }
 }
 

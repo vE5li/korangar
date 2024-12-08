@@ -2,13 +2,11 @@ use std::f32::consts::FRAC_PI_2;
 
 use cgmath::{InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
 
-use super::{Camera, SmoothedValue};
+use super::{Camera, SmoothedValue, MAXIMUM_ZOOM, MINIMUM_ZOOM};
 use crate::graphics::perspective_reverse_lh;
 
 const ZOOM_SPEED: f32 = 2.0;
 const ROTATION_SPEED: f32 = 0.01;
-const MINIMUM_ZOOM: f32 = 150.0;
-const MAXIMUM_ZOOM: f32 = 600.0;
 const DEFAULT_ZOOM: f32 = 400.0;
 const DEFAULT_ANGLE: f32 = FRAC_PI_2;
 const THRESHHOLD: f32 = 0.01;
@@ -48,6 +46,10 @@ impl PlayerCamera {
         self.focus_point.x.set_desired(position.x);
         self.focus_point.y.set_desired(position.y);
         self.focus_point.z.set_desired(position.z);
+    }
+
+    pub fn get_zoom_scale(&self) -> f32 {
+        (self.zoom.get_current() - MINIMUM_ZOOM) / (MAXIMUM_ZOOM - MINIMUM_ZOOM)
     }
 
     pub fn soft_zoom(&mut self, zoom_factor: f32) {

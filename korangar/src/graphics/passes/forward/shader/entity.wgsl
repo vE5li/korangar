@@ -21,6 +21,7 @@ struct DirectionalLightUniforms {
     view_projection: mat4x4<f32>,
     color: vec4<f32>,
     direction: vec4<f32>,
+    bound_scale: f32,
 }
 
 struct PointLight {

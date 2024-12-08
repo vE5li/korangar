@@ -10,7 +10,7 @@ const MAX_TEXTURES_PER_SHADER_STAGE: u32 = 1024;
 
 /// The maximum texture size that is guaranteed by the graphic engine to be
 /// available.
-pub const MAX_TEXTURE_SIZE: u32 = 8192;
+pub const MAX_TEXTURE_SIZE: u32 = 16384;
 
 pub struct Capabilities {
     supported_msaa: Vec<Msaa>,

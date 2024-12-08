@@ -78,6 +78,7 @@ pub struct DirectionalShadowCasterInstruction {
     pub view_projection_matrix: Matrix4<f32>,
     pub direction: Vector3<f32>,
     pub color: Color,
+    pub bound_scale: f32,
 }
 
 /// Right now point shadows can't cast shadows of models that are not part of

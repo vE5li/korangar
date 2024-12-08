@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use derive_new::new;
 use hashbrown::HashMap;
-use image::RgbaImage;
 use korangar_util::container::Cacheable;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
@@ -76,17 +75,18 @@ impl Texture {
 
     /// This function doesn't upload mip-map data. Mip maps should be written
     /// using the `MipMapRenderPassContext` & `Lanczos3Drawer`.
-    pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, image: RgbaImage, transparent: bool) -> Self {
+    pub fn new_with_data(device: &Device, queue: &Queue, descriptor: &TextureDescriptor, image_data: &[u8], transparent: bool) -> Self {
         let id = TEXTURE_ID.fetch_add(1, Ordering::Relaxed);
         let label = descriptor.label.map(|label| label.to_string());
         let texture = device.create_texture(descriptor);
+        let block_size = texture.format().block_copy_size(None).unwrap();
 
         queue.write_texture(
             texture.as_image_copy(),
-            image.as_raw(),
+            image_data,
             ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(4 * descriptor.size.width),
+                bytes_per_row: Some(descriptor.size.width * block_size),
                 rows_per_image: Some(descriptor.size.height),
             },
             descriptor.size,
@@ -107,7 +107,7 @@ impl Texture {
         });
 
         let size = texture.size();
-        let byte_size = size.width as usize * size.height as usize * texture.format().block_copy_size(None).unwrap() as usize;
+        let byte_size = size.width as usize * size.height as usize * block_size as usize;
 
         Self {
             id,

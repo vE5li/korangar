@@ -30,7 +30,13 @@ impl DirectionalShadowCamera {
     }
 
     pub fn set_focus_point(&mut self, focus_point: Point3<f32>) {
-        self.focus_point = focus_point;
+        // We need to snap the camera to a grid, or else shadows get too noisy.
+        let grid_size = 15.0;
+        self.focus_point = Point3::new(
+            (focus_point.x / grid_size).floor() * grid_size,
+            (focus_point.y / grid_size).floor() * grid_size,
+            (focus_point.z / grid_size).floor() * grid_size,
+        );
     }
 
     pub fn update(&mut self, light_direction: Vector3<f32>) {

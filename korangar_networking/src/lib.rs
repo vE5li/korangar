@@ -549,7 +549,10 @@ where
         packet_handler.register(|packet: RequestCharacterListSuccessPacket| NetworkEvent::CharacterList {
             characters: packet.character_information,
         })?;
-        packet_handler.register_noop::<Packet006b>()?;
+        packet_handler.register_noop::<CharacterListPacket>()?;
+        packet_handler.register_noop::<CharacterSlotPagePacket>()?;
+        packet_handler.register_noop::<CharacterBanListPacket>()?;
+        packet_handler.register_noop::<LoginPincodePacket>()?;
         packet_handler.register_noop::<Packet0b18>()?;
         packet_handler.register(|packet: CharacterSelectionSuccessPacket| {
             let login_data = CharacterServerLoginData {

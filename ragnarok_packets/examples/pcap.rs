@@ -187,7 +187,6 @@ fn main() {
         LoginFailedPacket,
         CharacterServerLoginSuccessPacket,
         RequestCharacterListSuccessPacket,
-        Packet006b,
         Packet0b18,
         CharacterSelectionSuccessPacket,
         CharacterSelectionFailedPacket,
@@ -202,6 +201,10 @@ fn main() {
     let mut server_character_handler = create_handler!(ServerType::Character, Direction::Outgoing, [
         CharacterServerKeepalivePacket,
         RequestCharacterListPacket,
+        CharacterListPacket,
+        CharacterSlotPagePacket,
+        CharacterBanListPacket,
+        LoginPincodePacket,
         SelectCharacterPacket,
         CreateCharacterPacket,
         DeleteCharacterPacket,

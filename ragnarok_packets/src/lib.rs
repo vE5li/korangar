@@ -279,8 +279,8 @@ pub struct CharacterServerLoginSuccessPacket {
     pub normal_slot_count: u8,
     pub vip_slot_count: u8,
     pub billing_slot_count: u8,
-    pub poducilble_slot_count: u8,
-    pub vaild_slot: u8,
+    pub producible_slot_count: u8,
+    pub valid_slot: u8,
     #[new_default]
     pub unused: [u8; 20],
 }
@@ -288,13 +288,48 @@ pub struct CharacterServerLoginSuccessPacket {
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
 #[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
 #[header(0x006B)]
-pub struct Packet006b {
-    pub unused: u16,
+#[variable_length]
+pub struct CharacterListPacket {
     pub maximum_slot_count: u8,
     pub available_slot_count: u8,
     pub vip_slot_count: u8,
     #[new_default]
     pub unknown: [u8; 20],
+    #[repeating_remaining]
+    pub character_information: Vec<CharacterInformation>,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x09A0)]
+pub struct CharacterSlotPagePacket {
+    pub page_quantity: u32,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x020D)]
+#[variable_length]
+pub struct CharacterBanListPacket {
+    #[repeating_remaining]
+    pub character_information: Vec<CharacterBanInformation>,
+}
+
+#[derive(Debug, Clone, ByteConvertable, FixedByteSize)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+pub struct CharacterBanInformation {
+    pub character_id: CharacterId,
+    #[length(20)]
+    pub ban_time: String,
+}
+
+#[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
+#[cfg_attr(feature = "interface", derive(korangar_interface::elements::PrototypeElement))]
+#[header(0x08B9)]
+pub struct LoginPincodePacket {
+    pub pincode_seed: u32,
+    pub account_id: AccountId,
+    pub state: u16,
 }
 
 #[derive(Debug, Clone, Packet, ServerPacket, CharacterServer)]
@@ -508,13 +543,13 @@ pub struct CharacterInformation {
     pub experience: i64,
     pub money: i32,
     pub job_experience: i64,
-    pub jop_level: i32,
+    pub job_level: i32,
     pub body_state: i32,
     pub health_state: i32,
     pub effect_state: i32,
     pub virtue: i32,
     pub honor: i32,
-    pub jobpoint: i16,
+    pub job_points: i16,
     pub health_points: i64,
     pub maximum_health_points: i64,
     pub spell_points: i64,

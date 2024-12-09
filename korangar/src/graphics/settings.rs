@@ -26,25 +26,37 @@ pub enum ShadowDetail {
     Low,
     Medium,
     High,
-    Ultra,
 }
 
 impl ShadowDetail {
     pub fn directional_shadow_resolution(self) -> u32 {
         match self {
-            ShadowDetail::Low => 512,
-            ShadowDetail::Medium => 1024,
-            ShadowDetail::High => 2048,
-            ShadowDetail::Ultra => 8192,
+            ShadowDetail::Low => 2048,
+            ShadowDetail::Medium => 4096,
+            ShadowDetail::High => 8192,
         }
     }
 
     pub fn point_shadow_resolution(self) -> u32 {
         match self {
-            ShadowDetail::Low => 64,
-            ShadowDetail::Medium => 128,
-            ShadowDetail::High => 256,
-            ShadowDetail::Ultra => 512,
+            ShadowDetail::Low => 128,
+            ShadowDetail::Medium => 256,
+            ShadowDetail::High => 512,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ShadowQuality {
+    Hard,
+    Soft,
+}
+
+impl From<ShadowQuality> for u32 {
+    fn from(value: ShadowQuality) -> Self {
+        match value {
+            ShadowQuality::Hard => 0,
+            ShadowQuality::Soft => 1,
         }
     }
 }

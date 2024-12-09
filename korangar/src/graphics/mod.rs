@@ -45,7 +45,7 @@ pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;
 use crate::graphics::passes::DispatchIndirectArgs;
-use crate::graphics::sampler::create_new_sampler;
+use crate::graphics::sampler::{create_new_sampler, SamplerType};
 use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
 use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
@@ -94,7 +94,8 @@ pub(crate) struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
-    padding: [u32; 2],
+    shadow_quality: u32,
+    padding: [u32; 1],
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -162,6 +163,7 @@ pub(crate) struct GlobalContext {
     pub(crate) nearest_sampler: Sampler,
     pub(crate) linear_sampler: Sampler,
     pub(crate) texture_sampler: Sampler,
+    pub(crate) shadow_map_sampler: Sampler,
     pub(crate) global_bind_group: BindGroup,
     pub(crate) light_culling_bind_group: BindGroup,
     pub(crate) forward_bind_group: BindGroup,
@@ -238,6 +240,7 @@ impl Prepare for GlobalContext {
             day_timer: instructions.uniforms.day_timer,
             point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,
+            shadow_quality: instructions.uniforms.shadow_quality.into(),
             padding: Default::default(),
         };
 
@@ -312,6 +315,7 @@ impl Prepare for GlobalContext {
                 &self.nearest_sampler,
                 &self.linear_sampler,
                 &self.texture_sampler,
+                &self.shadow_map_sampler,
             );
 
             self.light_culling_bind_group = Self::create_light_culling_bind_group(
@@ -378,7 +382,7 @@ impl GlobalContext {
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                 view_formats: Default::default(),
             },
-            RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap(),
+            RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap().as_raw(),
             false,
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
@@ -428,9 +432,10 @@ impl GlobalContext {
 
         let tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, forward_size);
 
-        let nearest_sampler = create_new_sampler(device, "nearest", TextureSamplerType::Nearest);
-        let linear_sampler = create_new_sampler(device, "linear", TextureSamplerType::Linear);
+        let nearest_sampler = create_new_sampler(device, "nearest", SamplerType::TextureNearest);
+        let linear_sampler = create_new_sampler(device, "linear", SamplerType::TextureLinear);
         let texture_sampler = create_new_sampler(device, "texture", texture_sampler);
+        let shadow_map_sampler = create_new_sampler(device, "shadow map", SamplerType::DepthCompare);
 
         let anti_aliasing_resources = Self::create_anti_aliasing_resources(device, screen_space_anti_aliasing, screen_size);
 
@@ -440,6 +445,7 @@ impl GlobalContext {
             &nearest_sampler,
             &linear_sampler,
             &texture_sampler,
+            &shadow_map_sampler,
         );
 
         let light_culling_bind_group = Self::create_light_culling_bind_group(
@@ -501,6 +507,7 @@ impl GlobalContext {
             nearest_sampler,
             linear_sampler,
             texture_sampler,
+            shadow_map_sampler,
             global_bind_group,
             light_culling_bind_group,
             screen_size,
@@ -863,6 +870,7 @@ impl GlobalContext {
             &self.nearest_sampler,
             &self.linear_sampler,
             &self.texture_sampler,
+            &self.shadow_map_sampler,
         );
     }
 
@@ -972,6 +980,12 @@ impl GlobalContext {
                         binding: 3,
                         visibility: ShaderStages::FRAGMENT,
                         ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Sampler(SamplerBindingType::Comparison),
                         count: None,
                     },
                 ],
@@ -1259,6 +1273,7 @@ impl GlobalContext {
         nearest_sampler: &Sampler,
         linear_sampler: &Sampler,
         texture_sampler: &Sampler,
+        shadow_sampler: &Sampler,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("global"),
@@ -1279,6 +1294,10 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 3,
                     resource: BindingResource::Sampler(texture_sampler),
+                },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: BindingResource::Sampler(shadow_sampler),
                 },
             ],
         })

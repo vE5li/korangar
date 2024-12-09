@@ -15,6 +15,7 @@ struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
+    shadow_quality: u32,
 }
 
 struct DirectionalLightUniforms {
@@ -55,6 +56,7 @@ const TILE_SIZE: u32 = 16;
 @group(0) @binding(1) var nearest_sampler: sampler;
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(0) @binding(3) var texture_sampler: sampler;
+@group(0) @binding(4) var shadow_map_sampler: sampler_comparison;
 @group(1) @binding(0) var<uniform> directional_light: DirectionalLightUniforms;
 @group(1) @binding(1) var shadow_map: texture_depth_2d;
 @group(1) @binding(2) var<storage, read> point_lights: array<PointLight>;
@@ -135,13 +137,29 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let light_percent = max(dot(light_direction, normal), 0.0);
 
     // Shadow calculation
-    let light_position = directional_light.view_projection * input.world_position;
-    var light_coords = light_position.xyz / light_position.w;
-    let bias = clamp(0.0025 * tan(acos(light_percent)), 0.0, 0.0005);
+    let shadow_position = directional_light.view_projection * input.world_position;
+    var shadow_coords = shadow_position.xyz / shadow_position.w;
+    let bias = get_oriented_bias(normal, light_direction);
+    let world_position = input.world_position.xyz / input.world_position.w;
+    shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
 
-    let uv = clip_to_screen_space(light_coords.xy);
-    let shadow_map_depth = textureSample(shadow_map, linear_sampler, uv);
-    let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
+    var visibility: f32;
+
+    switch (global_uniforms.shadow_quality) {
+        case 1u: {
+            let shadow_map_dimensions = textureDimensions(shadow_map);
+            visibility = get_soft_shadow(shadow_coords, shadow_map_dimensions);
+        }
+        default: {
+            visibility = textureSampleCompare(
+                      shadow_map,
+                      shadow_map_sampler,
+                      shadow_coords.xy,
+                      shadow_coords.z
+            );
+        }
+    }
+
     let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
     // Point lights
@@ -155,11 +173,17 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         var visibility = 1.0;
 
         if (light.texture_index != 0) {
-            let flipped_light_direction = vec3<f32>(light_direction.x, -light_direction.y, light_direction.z);
-            let shadow_map_depth = textureSample(point_shadow_maps, linear_sampler, flipped_light_direction, light.texture_index - 1);
-            let bias = clamp(0.05 * tan(acos(light_percent)), 0.0, 0.005);
-            let mapped_distance = light_distance / 255.9;
-            visibility = f32(mapped_distance - bias < shadow_map_depth);
+            let bias = 1.2;
+            let distance_to_light = linearToNonLinear(light_distance - bias);
+
+            let closest_distance = textureSample(
+                point_shadow_maps,
+                linear_sampler,
+                light_direction,
+                light.texture_index - 1
+            );
+
+            visibility = f32(distance_to_light > closest_distance);
         }
 
         let intensity = 10.0;
@@ -211,4 +235,63 @@ fn calculate_mip_level(texture_coordinate: vec2<f32>) -> f32 {
     let dy = dpdy(texture_coordinate);
     let delta_max_squared = max(dot(dx, dx), dot(dy, dy));
     return max(0.0, 0.5 * log2(delta_max_squared));
+}
+
+fn get_soft_shadow(shadow_coords: vec3<f32>, shadow_map_dimensions: vec2<u32>) -> f32 {
+    var gaussian_offset: i32;
+    switch (shadow_map_dimensions.x) {
+        case 8192u: {
+            gaussian_offset = 8;
+        }
+        case 4096u: {
+            gaussian_offset = 4;
+        }
+        default: {
+            gaussian_offset = 2;
+        }
+    }
+
+    let texel_size = vec2<f32>(1.0) / vec2<f32>(shadow_map_dimensions);
+    let depth = shadow_coords.z;
+    var shadow: f32 = 0.0;
+    var total_weight: f32 = 0.0;
+
+    let gaussian_offset_pow2 = f32(gaussian_offset * gaussian_offset);
+    let sigma_squared = gaussian_offset_pow2 * 0.25;
+    let weight_factor = 1.0 / (2.0 * sigma_squared);
+
+    for (var y: i32 = -gaussian_offset; y <= gaussian_offset; y += 2) {
+        for (var x: i32 = -gaussian_offset; x <= gaussian_offset; x += 2) {
+            let offset = vec2<f32>(f32(x), f32(y)) * texel_size;
+
+            // Calculate Gaussian weight based on distance from center.
+            let distance_squared = f32(x * x + y * y);
+            let weight = exp(-distance_squared * weight_factor);
+
+            let samples = textureGatherCompare(
+                shadow_map,
+                shadow_map_sampler,
+                shadow_coords.xy + offset,
+                depth
+            );
+
+            shadow += (samples.x + samples.y + samples.z + samples.w) * weight;
+            total_weight += 4.0 * weight;
+        }
+    }
+
+    return shadow / total_weight;
+}
+
+fn linearToNonLinear(linear_depth: f32) -> f32 {
+    const NEAR_PLANE = 0.1;
+    return NEAR_PLANE / (linear_depth + 1e-7);
+}
+
+// Based on "Shadow Techniques from Final Fantasy XVI" by Sammy Fatnassi (2023)
+fn get_oriented_bias(normal: vec3<f32>, light_direction: vec3<f32>) -> f32 {
+    let bias = 0.002;
+    let is_facing_light = dot(normal, light_direction) > 0.0;
+    // sic! We use reverse Z projection!
+    return select(-bias, bias, is_facing_light);
 }

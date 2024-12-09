@@ -16,7 +16,7 @@ use wgpu::{
 use crate::graphics::passes::{
     BindGroupCount, ColorAttachmentCount, DepthAttachmentCount, DirectionalShadowRenderPassContext, Drawer, RenderPassContext,
 };
-use crate::graphics::{Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture, NEAR_PLANE};
+use crate::graphics::{Buffer, Capabilities, EntityInstruction, GlobalContext, Prepare, RenderInstruction, Texture};
 
 const SHADER: ShaderModuleDescriptor = include_wgsl!("shader/entity.wgsl");
 const SHADER_BINDLESS: ShaderModuleDescriptor = include_wgsl!("shader/entity_bindless.wgsl");
@@ -145,28 +145,19 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             push_constant_ranges: &[],
         });
 
-        let mut constants = std::collections::HashMap::new();
-        constants.insert("near_plane".to_string(), NEAR_PLANE as f64);
-
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
             label: Some(DRAWER_NAME),
             layout: Some(&pipeline_layout),
             vertex: VertexState {
                 module: &shader_module,
                 entry_point: Some("vs_main"),
-                compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 buffers: &[],
             },
             fragment: Some(FragmentState {
                 module: &shader_module,
                 entry_point: Some("fs_main"),
-                compilation_options: PipelineCompilationOptions {
-                    constants: &constants,
-                    ..Default::default()
-                },
+                compilation_options: PipelineCompilationOptions::default(),
                 targets: &[],
             }),
             multiview: None,
@@ -175,7 +166,7 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
                 depth_write_enabled: true,
-                depth_compare: CompareFunction::Less,
+                depth_compare: CompareFunction::Greater,
                 stencil: StencilState::default(),
                 bias: DepthBiasState::default(),
             }),

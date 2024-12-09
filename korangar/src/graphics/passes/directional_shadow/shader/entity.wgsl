@@ -34,15 +34,10 @@ struct VertexOutput {
     @location(5) alpha: f32,
 }
 
-@group(0) @binding(1) var nearest_sampler: sampler;
+@group(0) @binding(3) var texture_sampler: sampler;
 @group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var texture: texture_2d<f32>;
-
-override near_plane: f32;
-
-// Small value to prevent division by zero.
-const epsilon: f32 = 1e-7;
 
 @vertex
 fn vs_main(
@@ -83,7 +78,7 @@ fn vs_main(
 
 @fragment
 fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
-    let diffuse_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
+    let diffuse_color = textureSampleLevel(texture, texture_sampler, input.texture_coordinates, 0.0);
     if (diffuse_color.a != 1.0 || input.alpha != 1.0) {
         discard;
     }
@@ -94,15 +89,13 @@ fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
     let scaled_depth_offset = sign_depth_offset * pow(input.depth_offset, 2.0) * input.original_depth_offset;
     let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
 
-    let linear_z: f32 = nonLinearToLinear(input.position.z);
-    // We add the offsets in linear view space.
-    let adjusted_linear_z: f32 = 2.0 + linear_z - scaled_curvature_offset - scaled_curvature_offset;
-    let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
-    let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
+    // Shadows use orthographic projections, so values are linear, but "compressed".
+    let absolute_depth = decompress_depth_ortho(input.position.z);
+    let adjusted_linear_z: f32 = 3.5 + absolute_depth - scaled_depth_offset - scaled_curvature_offset;
+    let depth = compress_depth_ortho(adjusted_linear_z);
+    let clamped_depth = clamp(depth, 0.0, 1.0);
 
-    return input.position.z;
-    // FIX: we don't even use any of the calculated values here! should it not be:
-    // return clamped_depth;
+    return clamped_depth;
 }
 
 // Optimized version of the following truth table:
@@ -136,10 +129,16 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v), depth, curve);
 }
 
-fn linearToNonLinear(linear_depth: f32) -> f32 {
-    return near_plane / (linear_depth + epsilon);
+fn decompress_depth_ortho(depth: f32) -> f32 {
+    let depth_scale = -pass_uniforms.view_projection[2][2];
+    let depth_far = pass_uniforms.view_projection[3][2];
+    let far = depth_far / depth_scale;
+    return far - depth / depth_scale;
 }
 
-fn nonLinearToLinear(non_linear_depth: f32) -> f32 {
-    return near_plane / (non_linear_depth + epsilon);
+fn compress_depth_ortho(depth: f32) -> f32 {
+    let depth_scale = -pass_uniforms.view_projection[2][2];
+    let depth_far = pass_uniforms.view_projection[3][2];
+    let far = depth_far / depth_scale;
+    return -depth * depth_scale + depth_far;
 }

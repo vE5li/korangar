@@ -34,8 +34,8 @@ impl Node {
         let last_step = &self.rotation_keyframes[last_keyframe_index];
         let next_step = &self.rotation_keyframes[(last_keyframe_index + 1) % self.rotation_keyframes.len()];
 
-        let total = next_step.frame - last_step.frame;
-        let offset = animation_tick - last_step.frame;
+        let total = next_step.frame.saturating_sub(last_step.frame);
+        let offset = animation_tick.saturating_sub(last_step.frame);
 
         let animation_elapsed = (1.0 / total as f32) * offset as f32;
         let current_rotation = last_step.quaternions.nlerp(next_step.quaternions, animation_elapsed);

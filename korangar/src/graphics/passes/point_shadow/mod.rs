@@ -93,7 +93,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
                     .point_shadow_map_textures
                     .get_texture_face_view(pass_data.shadow_caster_index, pass_data.face_index),
                 depth_ops: Some(Operations {
-                    load: LoadOp::Clear(1.0),
+                    load: LoadOp::Clear(0.0),
                     store: StoreOp::Store,
                 }),
                 stencil_ops: None,

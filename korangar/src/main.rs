@@ -196,6 +196,7 @@ struct Client {
     triple_buffering: MappedRemote<GraphicsSettings, bool>,
     texture_filtering: MappedRemote<GraphicsSettings, TextureSamplerType>,
     shadow_detail: MappedRemote<GraphicsSettings, ShadowDetail>,
+    shadow_quality: MappedRemote<GraphicsSettings, ShadowQuality>,
     msaa: MappedRemote<GraphicsSettings, Msaa>,
     ssaa: MappedRemote<GraphicsSettings, Ssaa>,
     screen_space_anti_aliasing: MappedRemote<GraphicsSettings, ScreenSpaceAntiAliasing>,
@@ -285,6 +286,7 @@ impl Client {
             let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
             let texture_filtering = graphics_settings.mapped(|settings| &settings.texture_filtering).new_remote();
             let shadow_detail = graphics_settings.mapped(|settings| &settings.shadow_detail).new_remote();
+            let shadow_quality = graphics_settings.mapped(|settings| &settings.shadow_quality).new_remote();
             let msaa = graphics_settings.mapped(|settings| &settings.msaa).new_remote();
             let ssaa = graphics_settings.mapped(|settings| &settings.ssaa).new_remote();
             let screen_space_anti_aliasing = graphics_settings
@@ -600,6 +602,7 @@ impl Client {
             triple_buffering,
             texture_filtering,
             shadow_detail,
+            shadow_quality,
             msaa,
             ssaa,
             screen_space_anti_aliasing,
@@ -1253,7 +1256,7 @@ impl Client {
                                 EffectCenter::Position(position),
                                 Vector3::new(0.0, 0.0, 0.0),
                                 PointLightId::new(unit_id as u32),
-                                Vector3::new(0.0, 3.0, 0.0),
+                                Vector3::new(0.0, 6.0, 0.0),
                                 Color::rgb_u8(255, 30, 0),
                                 60.0,
                                 true,
@@ -1274,7 +1277,7 @@ impl Client {
                                 EffectCenter::Position(position),
                                 Vector3::new(0.0, 0.0, 0.0),
                                 PointLightId::new(unit_id as u32),
-                                Vector3::new(0.0, 3.0, 0.0),
+                                Vector3::new(0.0, 6.0, 0.0),
                                 Color::rgb_u8(83, 220, 108),
                                 40.0,
                                 false,
@@ -1510,6 +1513,7 @@ impl Client {
                         self.ssaa.clone_state(),
                         self.screen_space_anti_aliasing.clone_state(),
                         self.shadow_detail.clone_state(),
+                        self.shadow_quality.clone_state(),
                         self.high_quality_interface.clone_state(),
                     ),
                 ),
@@ -1824,12 +1828,19 @@ impl Client {
         let update_cameras_measurement = Profiler::start_measurement("update cameras");
 
         let lighting_mode = *self.lighting_mode.get();
+        let shadow_quality = *self.shadow_quality.get();
         let ambient_light_color = self.map.get_ambient_light_color(lighting_mode, day_timer);
         let (directional_light_direction, directional_light_color) = self.map.get_directional_light(lighting_mode, day_timer);
 
         self.start_camera.update(delta_time);
         self.player_camera.update(delta_time);
-        self.directional_shadow_camera.update(directional_light_direction);
+
+        let zoom_scale: f32 = match self.entities.is_empty() {
+            true => self.start_camera.get_zoom_scale(),
+            false => self.player_camera.get_zoom_scale(),
+        };
+
+        self.directional_shadow_camera.update(directional_light_direction, zoom_scale);
 
         #[cfg(feature = "debug")]
         update_cameras_measurement.stop();
@@ -2233,6 +2244,7 @@ impl Client {
                 day_timer,
                 ambient_light_color,
                 enhanced_lighting: lighting_mode == LightingMode::Enhanced,
+                shadow_quality,
             },
             indicator: indicator_instruction,
             interface: interface_instructions.as_slice(),

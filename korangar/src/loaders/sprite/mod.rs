@@ -168,7 +168,9 @@ impl SpriteLoader {
                         usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                         view_formats: &[],
                     },
-                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data).unwrap(),
+                    RgbaImage::from_raw(image_data.width as u32, image_data.height as u32, image_data.data)
+                        .unwrap()
+                        .as_raw(),
                     false,
                 );
                 Arc::new(texture)

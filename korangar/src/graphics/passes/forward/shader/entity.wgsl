@@ -15,12 +15,14 @@ struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
+    shadow_quality: u32,
 }
 
 struct DirectionalLightUniforms {
     view_projection: mat4x4<f32>,
     color: vec4<f32>,
     direction: vec4<f32>,
+    bound_scale: f32,
 }
 
 struct PointLight {
@@ -185,7 +187,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
 
     let uv = clip_to_screen_space(light_coords.xy);
     let shadow_map_depth = textureSample(shadow_map, linear_sampler, uv);
-    let visibility = select(0.0, 1.0, light_coords.z - bias < shadow_map_depth);
+    let visibility = select(0.0, 1.0, light_coords.z + bias > shadow_map_depth);
     let directional_light_contribution = directional_light.color.rgb * light_percent * visibility;
 
     // Point lights

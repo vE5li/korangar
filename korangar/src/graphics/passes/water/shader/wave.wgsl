@@ -14,7 +14,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
-    enhanced_lightning: u32,
+    enhanced_lighting: u32,
 }
 
 struct DirectionalLightUniforms {
@@ -238,7 +238,7 @@ fn calculate_wave_color(hit_position: vec3<f32>) -> vec4<f32> {
     var base_color = textureSample(texture, texture_sampler, texture_coordinates);
     var final_color = base_color.rgb;
 
-    if (global_uniforms.enhanced_lightning != 0) {
+    if (global_uniforms.enhanced_lighting != 0) {
         // Directional light
         let normal = calculate_wave_normal(hit_position);
         let light_percent = clamp(dot(normalize(-directional_light.direction.xyz), normal), 0.0, 1.0);

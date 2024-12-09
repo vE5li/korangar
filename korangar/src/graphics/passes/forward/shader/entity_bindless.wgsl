@@ -14,7 +14,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
-    enhanced_lightning: u32,
+    enhanced_lighting: u32,
 }
 
 struct DirectionalLightUniforms {
@@ -175,7 +175,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     // Directional light
     var light_percent = 1.0;
 
-    if (global_uniforms.enhanced_lightning != 0) {
+    if (global_uniforms.enhanced_lighting != 0) {
         let light_direction = normalize(-directional_light.direction.xyz);
         light_percent = max(dot(light_direction, normal), 0.0);
     }
@@ -217,7 +217,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     let light_contributions = saturate(ambient_light_contribution + directional_light_contribution + point_light_contribution);
     var color = base_color.rgb * light_contributions;
 
-    if (global_uniforms.enhanced_lightning == 0) {
+    if (global_uniforms.enhanced_lighting == 0) {
         color = color_balance(color, -0.01, 0.0, 0.0);
     }
 

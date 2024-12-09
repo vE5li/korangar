@@ -100,7 +100,7 @@ use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
 use crate::renderer::{EffectRenderer, GameInterfaceRenderer};
-use crate::settings::{GraphicsSettings, LightningMode};
+use crate::settings::{GraphicsSettings, LightingMode};
 use crate::system::GameTimer;
 use crate::world::*;
 
@@ -190,7 +190,7 @@ struct Client {
     point_light_instructions: Vec<PointLightInstruction>,
 
     input_system: InputSystem,
-    lightning_mode: MappedRemote<GraphicsSettings, LightningMode>,
+    lighting_mode: MappedRemote<GraphicsSettings, LightingMode>,
     vsync: MappedRemote<GraphicsSettings, bool>,
     limit_framerate: MappedRemote<GraphicsSettings, LimitFramerate>,
     triple_buffering: MappedRemote<GraphicsSettings, bool>,
@@ -279,7 +279,7 @@ impl Client {
             let input_system = InputSystem::new(picker_value.clone());
             let graphics_settings = PlainTrackedState::new(GraphicsSettings::new());
 
-            let lightning_mode = graphics_settings.mapped(|settings| &settings.lightning_mode).new_remote();
+            let lighting_mode = graphics_settings.mapped(|settings| &settings.lighting_mode).new_remote();
             let vsync = graphics_settings.mapped(|settings| &settings.vsync).new_remote();
             let limit_framerate = graphics_settings.mapped(|settings| &settings.limit_framerate).new_remote();
             let triple_buffering = graphics_settings.mapped(|settings| &settings.triple_buffering).new_remote();
@@ -594,7 +594,7 @@ impl Client {
             point_light_with_shadow_instructions,
             point_light_instructions,
             input_system,
-            lightning_mode,
+            lighting_mode,
             vsync,
             limit_framerate,
             triple_buffering,
@@ -1501,7 +1501,7 @@ impl Client {
                     &GraphicsSettingsWindow::new(
                         self.graphics_engine.get_present_mode_info(),
                         self.graphics_engine.get_supported_msaa(),
-                        self.lightning_mode.clone_state(),
+                        self.lighting_mode.clone_state(),
                         self.vsync.clone_state(),
                         self.limit_framerate.clone_state(),
                         self.triple_buffering.clone_state(),
@@ -1823,9 +1823,9 @@ impl Client {
         #[cfg(feature = "debug")]
         let update_cameras_measurement = Profiler::start_measurement("update cameras");
 
-        let lightning_mode = *self.lightning_mode.get();
-        let ambient_light_color = self.map.get_ambient_light_color(lightning_mode, day_timer);
-        let (directional_light_direction, directional_light_color) = self.map.get_directional_light(lightning_mode, day_timer);
+        let lighting_mode = *self.lighting_mode.get();
+        let ambient_light_color = self.map.get_ambient_light_color(lighting_mode, day_timer);
+        let (directional_light_direction, directional_light_color) = self.map.get_directional_light(lighting_mode, day_timer);
 
         self.start_camera.update(delta_time);
         self.player_camera.update(delta_time);
@@ -1915,9 +1915,9 @@ impl Client {
             self.map
                 .register_point_lights(&mut self.point_light_manager, &mut self.point_light_set_buffer, current_camera);
 
-            match lightning_mode {
-                LightningMode::Classic => self.point_light_manager.create_point_light_set(0),
-                LightningMode::Enhanced => self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS),
+            match lighting_mode {
+                LightingMode::Classic => self.point_light_manager.create_point_light_set(0),
+                LightingMode::Enhanced => self.point_light_manager.create_point_light_set(NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS),
             }
         };
 
@@ -2232,7 +2232,7 @@ impl Client {
                 animation_timer,
                 day_timer,
                 ambient_light_color,
-                enhanced_lightning: lightning_mode == LightningMode::Enhanced,
+                enhanced_lighting: lighting_mode == LightingMode::Enhanced,
             },
             indicator: indicator_instruction,
             interface: interface_instructions.as_slice(),

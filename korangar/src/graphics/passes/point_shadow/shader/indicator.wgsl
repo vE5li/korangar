@@ -15,6 +15,7 @@ struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
+    shadow_quality: u32,
 }
 
 struct PassUniforms {
@@ -53,7 +54,12 @@ fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
         discard;
     }
 
-    return light_distance / 256.0;
+    return linearToNonLinear(light_distance);
+}
+
+fn linearToNonLinear(linear_depth: f32) -> f32 {
+    const NEAR_PLANE = 0.1;
+    return NEAR_PLANE / (linear_depth + 1e-7);
 }
 
 fn position_data(vertex_index: u32) -> vec4<f32> {

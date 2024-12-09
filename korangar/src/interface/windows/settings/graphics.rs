@@ -3,7 +3,9 @@ use korangar_interface::state::{TrackedState, TrackedStateBinary};
 use korangar_interface::windows::{PrototypeWindow, Window, WindowBuilder};
 use korangar_interface::{dimension_bound, size_bound};
 
-use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, TextureSamplerType};
+use crate::graphics::{
+    LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType,
+};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
@@ -18,7 +20,8 @@ pub struct GraphicsSettingsWindow<
     Multisampling,
     Supersampling,
     ScreenAntiAliasing,
-    Shadow,
+    ShadowResolution,
+    ShadowMode,
     HighQualityInterface,
 > where
     LightingRenderMode: TrackedState<LightingMode> + 'static,
@@ -29,7 +32,8 @@ pub struct GraphicsSettingsWindow<
     Multisampling: TrackedState<Msaa> + 'static,
     Supersampling: TrackedState<Ssaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
-    Shadow: TrackedState<ShadowDetail> + 'static,
+    ShadowResolution: TrackedState<ShadowDetail> + 'static,
+    ShadowMode: TrackedState<ShadowQuality> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
 {
     present_mode_info: PresentModeInfo,
@@ -42,7 +46,8 @@ pub struct GraphicsSettingsWindow<
     msaa: Multisampling,
     ssaa: Supersampling,
     screen_space_anti_aliasing: ScreenAntiAliasing,
-    shadow_detail: Shadow,
+    shadow_detail: ShadowResolution,
+    shadow_quality: ShadowMode,
     high_quality_interface: HighQualityInterface,
 }
 
@@ -55,7 +60,8 @@ impl<
         Multisampling,
         Supersampling,
         ScreenAntiAliasing,
-        Shadow,
+        ShadowResolution,
+        ShadowMode,
         HighQualityInterface,
     >
     GraphicsSettingsWindow<
@@ -67,7 +73,8 @@ impl<
         Multisampling,
         Supersampling,
         ScreenAntiAliasing,
-        Shadow,
+        ShadowResolution,
+        ShadowMode,
         HighQualityInterface,
     >
 where
@@ -79,7 +86,8 @@ where
     Multisampling: TrackedState<Msaa> + 'static,
     Supersampling: TrackedState<Ssaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
-    Shadow: TrackedState<ShadowDetail> + 'static,
+    ShadowResolution: TrackedState<ShadowDetail> + 'static,
+    ShadowMode: TrackedState<ShadowQuality> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
 {
     pub const WINDOW_CLASS: &'static str = "graphics_settings";
@@ -95,7 +103,8 @@ where
         msaa: Multisampling,
         ssaa: Supersampling,
         screen_space_anti_aliasing: ScreenAntiAliasing,
-        shadow_detail: Shadow,
+        shadow_detail: ShadowResolution,
+        shadow_quality: ShadowMode,
         high_quality_interface: HighQualityInterface,
     ) -> Self {
         Self {
@@ -110,6 +119,7 @@ where
             ssaa,
             screen_space_anti_aliasing,
             shadow_detail,
+            shadow_quality,
             high_quality_interface,
         }
     }
@@ -124,7 +134,8 @@ impl<
         Multisampling,
         Supersampling,
         ScreenAntiAliasing,
-        Shadow,
+        ShadowResolution,
+        ShadowMode,
         HighQualityInterface,
     > PrototypeWindow<InterfaceSettings>
     for GraphicsSettingsWindow<
@@ -136,7 +147,8 @@ impl<
         Multisampling,
         Supersampling,
         ScreenAntiAliasing,
-        Shadow,
+        ShadowResolution,
+        ShadowMode,
         HighQualityInterface,
     >
 where
@@ -148,7 +160,8 @@ where
     Multisampling: TrackedState<Msaa> + 'static,
     Supersampling: TrackedState<Ssaa> + 'static,
     ScreenAntiAliasing: TrackedState<ScreenSpaceAntiAliasing> + 'static,
-    Shadow: TrackedState<ShadowDetail> + 'static,
+    ShadowResolution: TrackedState<ShadowDetail> + 'static,
+    ShadowMode: TrackedState<ShadowQuality> + 'static,
     HighQualityInterface: TrackedStateBinary<bool>,
 {
     fn window_class(&self) -> Option<&str> {
@@ -225,9 +238,15 @@ where
                     ("Low", ShadowDetail::Low),
                     ("Medium", ShadowDetail::Medium),
                     ("High", ShadowDetail::High),
-                    ("Ultra", ShadowDetail::Ultra),
                 ])
                 .with_selected(self.shadow_detail.clone())
+                .with_event(Box::new(Vec::new))
+                .with_width(dimension_bound!(!))
+                .wrap(),
+            Text::default().with_text("Shadow quality").with_width(dimension_bound!(50%)).wrap(),
+            PickList::default()
+                .with_options(vec![("Hard", ShadowQuality::Hard), ("Soft", ShadowQuality::Soft)])
+                .with_selected(self.shadow_quality.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),

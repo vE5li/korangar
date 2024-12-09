@@ -3,7 +3,7 @@ use korangar_debug::logging::{print_debug, Colorize};
 use ron::ser::PrettyConfig;
 use serde::{Deserialize, Serialize};
 
-use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetail, Ssaa, TextureSamplerType};
+use crate::graphics::{LimitFramerate, Msaa, ScreenSpaceAntiAliasing, ShadowDetail, ShadowQuality, Ssaa, TextureSamplerType};
 
 #[derive(Serialize, Deserialize)]
 pub struct GraphicsSettings {
@@ -16,6 +16,7 @@ pub struct GraphicsSettings {
     pub ssaa: Ssaa,
     pub screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
     pub shadow_detail: ShadowDetail,
+    pub shadow_quality: ShadowQuality,
     pub high_quality_interface: bool,
 }
 
@@ -30,7 +31,8 @@ impl Default for GraphicsSettings {
             msaa: Msaa::X4,
             ssaa: Ssaa::Off,
             screen_space_anti_aliasing: ScreenSpaceAntiAliasing::Off,
-            shadow_detail: ShadowDetail::High,
+            shadow_detail: ShadowDetail::Medium,
+            shadow_quality: ShadowQuality::Soft,
             high_quality_interface: true,
         }
     }

@@ -1,6 +1,7 @@
 use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
 
 use super::Camera;
+use crate::graphics::perspective_reverse_lh;
 
 pub struct PointShadowCamera {
     camera_position: Point3<f32>,
@@ -12,14 +13,11 @@ pub struct PointShadowCamera {
 }
 
 impl PointShadowCamera {
-    const FAR_PLANE: f32 = 256.0;
-    const NEAR_PLANE: f32 = 0.1;
-
     pub fn new() -> Self {
         Self {
             camera_position: Point3::new(0.0, 0.0, 0.0),
-            view_direction: Vector3::new(1.0, 0.0, 0.0),
-            look_up_vector: Vector3::new(0.0, -1.0, 0.0),
+            view_direction: Vector3::unit_x(),
+            look_up_vector: Vector3::unit_y(),
             view_matrix: Matrix4::from_value(0.0),
             projection_matrix: Matrix4::from_value(0.0),
             world_to_screen_matrix: Matrix4::from_value(0.0),
@@ -32,12 +30,12 @@ impl PointShadowCamera {
 
     pub fn change_direction(&mut self, direction: u32) {
         (self.view_direction, self.look_up_vector) = match direction {
-            0 => (Vector3::new(-1.0, 0.0, 0.0), Vector3::new(0.0, -1.0, 0.0)),
-            1 => (Vector3::new(1.0, 0.0, 0.0), Vector3::new(0.0, -1.0, 0.0)),
-            2 => (Vector3::new(0.0, 1.0, 0.0), Vector3::new(0.0, 0.0, -1.0)),
-            3 => (Vector3::new(0.0, -1.0, 0.0), Vector3::new(0.0, 0.0, -1.0)),
-            4 => (Vector3::new(0.0, 0.0, -1.0), Vector3::new(0.0, -1.0, 0.0)),
-            5 => (Vector3::new(0.0, 0.0, 1.0), Vector3::new(0.0, -1.0, 0.0)),
+            0 => (Vector3::unit_x(), Vector3::unit_y()),
+            1 => (-Vector3::unit_x(), Vector3::unit_y()),
+            2 => (Vector3::unit_y(), Vector3::unit_z()),
+            3 => (-Vector3::unit_y(), -Vector3::unit_z()),
+            4 => (Vector3::unit_z(), Vector3::unit_y()),
+            5 => (-Vector3::unit_z(), Vector3::unit_y()),
             _ => panic!(),
         };
     }
@@ -53,7 +51,7 @@ impl Camera for PointShadowCamera {
     }
 
     fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
-        self.projection_matrix = cgmath::perspective(Deg(90.0), 1.0, Self::NEAR_PLANE, Self::FAR_PLANE);
+        self.projection_matrix = perspective_reverse_lh(Deg(90.0).into(), 1.0);
 
         self.view_matrix = Matrix4::look_at_lh(self.camera_position, self.focus_point(), self.look_up_vector);
 

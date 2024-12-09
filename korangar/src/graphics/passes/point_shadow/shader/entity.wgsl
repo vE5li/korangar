@@ -41,11 +41,6 @@ struct VertexOutput {
 @group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(3) @binding(0) var texture: texture_2d<f32>;
 
-override near_plane: f32;
-
-// Small value to prevent division by zero.
-const epsilon: f32 = 1e-7;
-
 @vertex
 fn vs_main(
     @builtin(vertex_index) vertex_index: u32,
@@ -91,23 +86,23 @@ fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
         discard;
     }
 
-    // FIX: Is this part of the code even used?
     // TODO: This is only a temporary change, we will fix the depth_offset later.
     // The idea for the temporary change is to create two parabolas to correct the plane inclination.
-    // let sign_depth_offset = select(2.0, -2.0, input.depth_offset < 0.0);
-    // let scaled_depth_offset = sign_depth_offset * pow(input.depth_offset, 2.0) * input.original_depth_offset;
-    // let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
+    let sign_depth_offset = select(2.0, -2.0, input.depth_offset < 0.0);
+    let scaled_depth_offset = sign_depth_offset * pow(input.depth_offset, 2.0) * input.original_depth_offset;
+    let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
 
-    // let linear_z: f32 = nonLinearToLinear(position.z);
-    // // We add the offsets in linear view space.
-    // let adjusted_linear_z: f32 = 2.0 + linear_z - scaled_curvature_offset - scaled_curvature_offset;
-    // let non_linear_z: f32 = linearToNonLinear(adjusted_linear_z);
-    // let clamped_depth = clamp(non_linear_z, 0.0, 1.0);
+    // Point shadows use a projection matrix, so depth is non-linear.
+    let absolute_depth = nonLinearToLinear(input.position.z);
+    let adjusted_linear_z: f32 = 3.5 + absolute_depth - scaled_depth_offset - scaled_curvature_offset;
 
-    let light_distance = length(input.world_position.xyz - pass_uniforms.light_position.xyz);
-    // return (light_distance / 256) + scaled_depth_offset;
+    // TODO: NHA We need to save the distance from this fragment position (with the adjusted depth value) to the light.
+    return 0.0;
+}
 
-    return light_distance;
+fn nonLinearToLinear(nonlinear_depth: f32) -> f32 {
+    const NEAR_PLANE = 0.1;
+    return NEAR_PLANE * (nonlinear_depth + 1e-7);
 }
 
 // Optimized version of the following truth table:
@@ -139,12 +134,4 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     let curve = x;
 
     return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v), depth, curve);
-}
-
-fn linearToNonLinear(linear_depth: f32) -> f32 {
-    return near_plane / (linear_depth + epsilon);
-}
-
-fn nonLinearToLinear(non_linear_depth: f32) -> f32 {
-    return near_plane / (non_linear_depth + epsilon);
 }

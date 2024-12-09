@@ -74,7 +74,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
             depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
                 view: global_context.directional_shadow_map_texture.get_texture_view(),
                 depth_ops: Some(Operations {
-                    load: LoadOp::Clear(1.0),
+                    load: LoadOp::Clear(0.0),
                     store: StoreOp::Store,
                 }),
                 stencil_ops: None,
@@ -105,7 +105,7 @@ impl RenderPassContext<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, 
                 label: Some(PASS_NAME),
                 entries: &[BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: ShaderStages::VERTEX,
+                    visibility: ShaderStages::VERTEX_FRAGMENT,
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,

@@ -15,6 +15,7 @@ struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
+    shadow_quality: u32,
 }
 
 struct PassUniforms {
@@ -28,7 +29,7 @@ struct VertexOutput {
 }
 
 @group(0) @binding(0) var<uniform> global_uniforms: GlobalUniforms;
-@group(0) @binding(1) var nearest_sampler: sampler;
+@group(0) @binding(3) var texture_sampler: sampler;
 @group(1) @binding(0) var<uniform> pass_uniforms: PassUniforms;
 @group(2) @binding(0) var texture: texture_2d<f32>;
 
@@ -42,7 +43,7 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let fragment_color = textureSample(texture, nearest_sampler, input.texture_coordinates);
+    let fragment_color = textureSampleLevel(texture, texture_sampler, input.texture_coordinates, 0.0);
 
     if (fragment_color.a < 0.1) {
         discard;

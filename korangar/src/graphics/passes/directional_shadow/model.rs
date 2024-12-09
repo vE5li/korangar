@@ -4,10 +4,10 @@ use bytemuck::{Pod, Zeroable};
 use wgpu::util::StagingBelt;
 use wgpu::{
     include_wgsl, BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry,
-    BindingType, BufferAddress, BufferBindingType, BufferUsages, CommandEncoder, CompareFunction, DepthStencilState, Device, FragmentState,
-    MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass, RenderPipeline,
-    RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, VertexAttribute, VertexBufferLayout, VertexFormat, VertexState,
-    VertexStepMode,
+    BindingType, BufferAddress, BufferBindingType, BufferUsages, CommandEncoder, CompareFunction, DepthBiasState, DepthStencilState,
+    Device, FragmentState, MultisampleState, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState, Queue, RenderPass,
+    RenderPipeline, RenderPipelineDescriptor, ShaderModuleDescriptor, ShaderStages, StencilState, VertexAttribute, VertexBufferLayout,
+    VertexFormat, VertexState, VertexStepMode,
 };
 
 use crate::graphics::passes::{
@@ -132,9 +132,9 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::None }, { DepthAtta
             depth_stencil: Some(DepthStencilState {
                 format: render_pass_context.depth_attachment_output_format()[0],
                 depth_write_enabled: true,
-                depth_compare: CompareFunction::Less,
-                stencil: Default::default(),
-                bias: Default::default(),
+                depth_compare: CompareFunction::Greater,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
             }),
             cache: None,
         });

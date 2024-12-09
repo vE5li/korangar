@@ -67,7 +67,7 @@ impl TextureLoader {
                 usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
-            image,
+            image.as_raw(),
             transparent,
         );
         Arc::new(texture)
@@ -91,7 +91,7 @@ impl TextureLoader {
                 usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
                 view_formats: &[],
             },
-            image,
+            image.as_raw(),
             transparent,
         );
 

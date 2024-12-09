@@ -8,7 +8,7 @@ use super::color::Color;
 #[cfg(feature = "debug")]
 use super::settings::RenderSettings;
 use super::vertices::ModelVertex;
-use super::{Buffer, Texture, TileVertex};
+use super::{Buffer, ShadowQuality, Texture, TileVertex};
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
@@ -60,6 +60,7 @@ pub struct Uniforms {
     pub day_timer: f32,
     pub ambient_light_color: Color,
     pub enhanced_lighting: bool,
+    pub shadow_quality: ShadowQuality,
 }
 
 #[derive(Clone, Debug)]
@@ -78,6 +79,7 @@ pub struct DirectionalShadowCasterInstruction {
     pub view_projection_matrix: Matrix4<f32>,
     pub direction: Vector3<f32>,
     pub color: Color,
+    pub bound_scale: f32,
 }
 
 /// Right now point shadows can't cast shadows of models that are not part of

@@ -40,6 +40,11 @@ impl StartCamera {
     pub fn update(&mut self, delta_time: f64) {
         self.view_angle += delta_time as f32 * ROTATION_SPEED;
     }
+
+    pub fn get_zoom_scale(&self) -> f32 {
+        // We don't have a zoom range for the start camera.
+        1.0
+    }
 }
 
 impl Camera for StartCamera {

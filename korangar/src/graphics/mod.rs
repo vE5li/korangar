@@ -21,6 +21,7 @@ use std::sync::{Arc, OnceLock};
 use bytemuck::{Pod, Zeroable};
 use cgmath::{Matrix4, SquareMatrix, Zero};
 use image::RgbaImage;
+use rand::random;
 use wgpu::util::StagingBelt;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource,
@@ -45,7 +46,7 @@ pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;
 use crate::graphics::passes::DispatchIndirectArgs;
-use crate::graphics::sampler::create_new_sampler;
+use crate::graphics::sampler::{create_new_sampler, SamplerType};
 use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
 use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
@@ -94,7 +95,8 @@ pub(crate) struct GlobalUniforms {
     day_timer: f32,
     point_light_count: u32,
     enhanced_lighting: u32,
-    padding: [u32; 2],
+    shadow_noise_seed: f32,
+    shadow_quality: u32,
 }
 
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
@@ -103,6 +105,8 @@ pub(crate) struct DirectionalLightUniforms {
     view_projection: [[f32; 4]; 4],
     color: [f32; 4],
     direction: [f32; 4],
+    bound_scale: f32,
+    padding: [f32; 3],
 }
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -141,6 +145,7 @@ pub(crate) struct GlobalContext {
     pub(crate) high_quality_interface: bool,
     pub(crate) solid_pixel_texture: Arc<Texture>,
     pub(crate) walk_indicator_texture: Arc<Texture>,
+    pub(crate) blue_noise_texture: Arc<Texture>,
     pub(crate) forward_depth_texture: AttachmentTexture,
     pub(crate) picker_buffer_texture: AttachmentTexture,
     pub(crate) picker_depth_texture: AttachmentTexture,
@@ -162,6 +167,8 @@ pub(crate) struct GlobalContext {
     pub(crate) nearest_sampler: Sampler,
     pub(crate) linear_sampler: Sampler,
     pub(crate) texture_sampler: Sampler,
+    pub(crate) noise_sampler: Sampler,
+    pub(crate) shadow_map_sampler: Sampler,
     pub(crate) global_bind_group: BindGroup,
     pub(crate) light_culling_bind_group: BindGroup,
     pub(crate) forward_bind_group: BindGroup,
@@ -238,13 +245,16 @@ impl Prepare for GlobalContext {
             day_timer: instructions.uniforms.day_timer,
             point_light_count: (instructions.point_light_shadow_caster.len() + instructions.point_light.len()) as u32,
             enhanced_lighting: instructions.uniforms.enhanced_lighting as u32,
-            padding: Default::default(),
+            shadow_noise_seed: random(),
+            shadow_quality: instructions.uniforms.shadow_quality.into(),
         };
 
         self.directional_light_uniforms = DirectionalLightUniforms {
             view_projection: instructions.directional_light_with_shadow.view_projection_matrix.into(),
             color: directional_light_color.components_linear(),
             direction: instructions.directional_light_with_shadow.direction.extend(0.0).into(),
+            bound_scale: instructions.directional_light_with_shadow.bound_scale,
+            padding: Default::default(),
         };
 
         for (instance_index, instruction) in instructions.point_light_shadow_caster.iter().enumerate() {
@@ -312,6 +322,8 @@ impl Prepare for GlobalContext {
                 &self.nearest_sampler,
                 &self.linear_sampler,
                 &self.texture_sampler,
+                &self.noise_sampler,
+                &self.shadow_map_sampler,
             );
 
             self.light_culling_bind_group = Self::create_light_culling_bind_group(
@@ -329,6 +341,7 @@ impl Prepare for GlobalContext {
                 &self.tile_light_indices_buffer,
                 &self.directional_shadow_map_texture,
                 &self.point_shadow_map_textures,
+                &self.blue_noise_texture,
             );
 
             #[cfg(feature = "debug")]
@@ -378,7 +391,28 @@ impl GlobalContext {
                 usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
                 view_formats: Default::default(),
             },
-            RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap(),
+            RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap().as_raw(),
+            false,
+        ));
+        let blue_noise_texture_data = texture_loader.load_gray_texture_data("blue_noise.tga").unwrap();
+        let blue_noise_texture = Arc::new(Texture::new_with_data(
+            device,
+            queue,
+            &TextureDescriptor {
+                label: Some("blue noise"),
+                size: Extent3d {
+                    width: blue_noise_texture_data.width(),
+                    height: blue_noise_texture_data.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::R8Unorm,
+                usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST,
+                view_formats: Default::default(),
+            },
+            blue_noise_texture_data.as_raw(),
             false,
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
@@ -428,9 +462,11 @@ impl GlobalContext {
 
         let tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, forward_size);
 
-        let nearest_sampler = create_new_sampler(device, "nearest", TextureSamplerType::Nearest);
-        let linear_sampler = create_new_sampler(device, "linear", TextureSamplerType::Linear);
+        let nearest_sampler = create_new_sampler(device, "nearest", SamplerType::TextureNearest);
+        let linear_sampler = create_new_sampler(device, "linear", SamplerType::TextureLinear);
         let texture_sampler = create_new_sampler(device, "texture", texture_sampler);
+        let noise_sampler = create_new_sampler(device, "noise", SamplerType::Noise);
+        let shadow_map_sampler = create_new_sampler(device, "shadow map", SamplerType::DepthCompare);
 
         let anti_aliasing_resources = Self::create_anti_aliasing_resources(device, screen_space_anti_aliasing, screen_size);
 
@@ -440,6 +476,8 @@ impl GlobalContext {
             &nearest_sampler,
             &linear_sampler,
             &texture_sampler,
+            &noise_sampler,
+            &shadow_map_sampler,
         );
 
         let light_culling_bind_group = Self::create_light_culling_bind_group(
@@ -457,6 +495,7 @@ impl GlobalContext {
             &tile_light_indices_buffer,
             &directional_shadow_map_texture,
             &point_shadow_map_textures,
+            &blue_noise_texture,
         );
 
         #[cfg(feature = "debug")]
@@ -477,6 +516,7 @@ impl GlobalContext {
             high_quality_interface,
             solid_pixel_texture,
             walk_indicator_texture,
+            blue_noise_texture,
             forward_depth_texture: forward_textures.forward_depth_texture,
             picker_buffer_texture: picker_textures.picker_buffer_texture,
             picker_depth_texture: picker_textures.picker_depth_texture,
@@ -501,6 +541,8 @@ impl GlobalContext {
             nearest_sampler,
             linear_sampler,
             texture_sampler,
+            noise_sampler,
+            shadow_map_sampler,
             global_bind_group,
             light_culling_bind_group,
             screen_size,
@@ -808,6 +850,7 @@ impl GlobalContext {
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
+            &self.blue_noise_texture,
         );
 
         #[cfg(feature = "debug")]
@@ -840,6 +883,7 @@ impl GlobalContext {
             &self.tile_light_indices_buffer,
             &self.directional_shadow_map_texture,
             &self.point_shadow_map_textures,
+            &self.blue_noise_texture,
         );
 
         #[cfg(feature = "debug")]
@@ -863,6 +907,8 @@ impl GlobalContext {
             &self.nearest_sampler,
             &self.linear_sampler,
             &self.texture_sampler,
+            &self.noise_sampler,
+            &self.shadow_map_sampler,
         );
     }
 
@@ -974,6 +1020,18 @@ impl GlobalContext {
                         ty: BindingType::Sampler(SamplerBindingType::Filtering),
                         count: None,
                     },
+                    BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 5,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Sampler(SamplerBindingType::Comparison),
+                        count: None,
+                    },
                 ],
             })
         })
@@ -1082,6 +1140,16 @@ impl GlobalContext {
                         ty: BindingType::Texture {
                             sample_type: TextureSampleType::Depth,
                             view_dimension: TextureViewDimension::CubeArray,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::D2,
                             multisampled: false,
                         },
                         count: None,
@@ -1259,6 +1327,8 @@ impl GlobalContext {
         nearest_sampler: &Sampler,
         linear_sampler: &Sampler,
         texture_sampler: &Sampler,
+        noise_sampler: &Sampler,
+        shadow_sampler: &Sampler,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("global"),
@@ -1279,6 +1349,14 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 3,
                     resource: BindingResource::Sampler(texture_sampler),
+                },
+                BindGroupEntry {
+                    binding: 4,
+                    resource: BindingResource::Sampler(noise_sampler),
+                },
+                BindGroupEntry {
+                    binding: 5,
+                    resource: BindingResource::Sampler(shadow_sampler),
                 },
             ],
         })
@@ -1318,6 +1396,7 @@ impl GlobalContext {
         tile_light_indices_buffer: &Buffer<TileLightIndices>,
         directional_shadow_map_texture: &AttachmentTexture,
         point_shadow_maps_texture: &CubeArrayTexture,
+        blue_noise_texture: &Texture,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some("forward"),
@@ -1346,6 +1425,10 @@ impl GlobalContext {
                 BindGroupEntry {
                     binding: 5,
                     resource: BindingResource::TextureView(point_shadow_maps_texture.get_texture_view()),
+                },
+                BindGroupEntry {
+                    binding: 6,
+                    resource: BindingResource::TextureView(blue_noise_texture.get_texture_view()),
                 },
             ],
         })

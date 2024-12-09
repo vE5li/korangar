@@ -20,6 +20,9 @@ pub use self::start::StartCamera;
 #[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
+const MAXIMUM_ZOOM: f32 = 600.0;
+const MINIMUM_ZOOM: f32 = 150.0;
+
 /// The world space has a left-handed coordinate system where the Y axis is up.
 ///
 /// +X is right.

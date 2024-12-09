@@ -14,7 +14,7 @@ struct GlobalUniforms {
     animation_timer: f32,
     day_timer: f32,
     point_light_count: u32,
-    enhanced_lightning: u32,
+    enhanced_lighting: u32,
 }
 
 struct InstanceData {

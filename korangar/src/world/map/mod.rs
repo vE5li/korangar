@@ -37,7 +37,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
-use crate::settings::LightningMode;
+use crate::settings::LightingMode;
 use crate::{Buffer, Color, GameFileLoader, ModelVertex, TileVertex, MAP_TILE_SIZE};
 
 create_simple_key!(ObjectKey, "Key to an object inside the map");
@@ -383,10 +383,10 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_ambient_light_color(&self, lightning_mode: LightningMode, day_timer: f32) -> Color {
-        match lightning_mode {
-            LightningMode::Classic => self.light_settings.ambient_color.to_owned().unwrap().into(),
-            LightningMode::Enhanced => {
+    pub fn get_ambient_light_color(&self, lighting_mode: LightingMode, day_timer: f32) -> Color {
+        match lighting_mode {
+            LightingMode::Classic => self.light_settings.ambient_color.to_owned().unwrap().into(),
+            LightingMode::Enhanced => {
                 let sun_offset = 0.0;
                 let ambient_channels = (get_channels(day_timer, sun_offset, [0.3, 0.2, 0.2]) * 0.55 + Vector3::from_value(0.65)) * 255.0;
                 color_from_channel(self.light_settings.ambient_color.to_owned().unwrap().into(), ambient_channels)
@@ -395,9 +395,9 @@ impl Map {
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile)]
-    pub fn get_directional_light(&self, lightning_mode: LightningMode, day_timer: f32) -> (Vector3<f32>, Color) {
-        match lightning_mode {
-            LightningMode::Classic => {
+    pub fn get_directional_light(&self, lighting_mode: LightingMode, day_timer: f32) -> (Vector3<f32>, Color) {
+        match lighting_mode {
+            LightingMode::Classic => {
                 let diffuse_color = self.light_settings.diffuse_color.to_owned().unwrap();
                 let light_latitude = self.light_settings.light_latitude.unwrap();
                 let light_longitude = self.light_settings.light_longitude.unwrap();
@@ -406,11 +406,11 @@ impl Map {
 
                 (light_direction, color)
             }
-            LightningMode::Enhanced => {
+            LightingMode::Enhanced => {
                 // TODO: NHA The final field in the light settings seems to be the
                 //       "shadow_map_alpha", as per RDW research. It's definitely not the
                 //       intensity of the directional light, because that would result in
-                //       improper lightning in classic mode.
+                //       improper lighting in classic mode.
                 let light_direction = get_light_direction(day_timer);
                 let (directional_color, intensity) = get_directional_light_color_intensity(
                     self.light_settings.diffuse_color.to_owned().unwrap().into(),

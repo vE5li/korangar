@@ -7,10 +7,10 @@ use crate::graphics::{LimitFramerate, Msaa, PresentModeInfo, ScreenSpaceAntiAlia
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::ScreenSize;
 use crate::interface::windows::WindowCache;
-use crate::settings::LightningMode;
+use crate::settings::LightingMode;
 
 pub struct GraphicsSettingsWindow<
-    LightningRenderMode,
+    LightingRenderMode,
     Vsync,
     FramerateLimit,
     TripleBuffering,
@@ -21,7 +21,7 @@ pub struct GraphicsSettingsWindow<
     Shadow,
     HighQualityInterface,
 > where
-    LightningRenderMode: TrackedState<LightningMode> + 'static,
+    LightingRenderMode: TrackedState<LightingMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -34,7 +34,7 @@ pub struct GraphicsSettingsWindow<
 {
     present_mode_info: PresentModeInfo,
     supported_msaa: Vec<(String, Msaa)>,
-    lightning_mode: LightningRenderMode,
+    lighting_mode: LightingRenderMode,
     vsync: Vsync,
     limit_framerate: FramerateLimit,
     triple_buffering: TripleBuffering,
@@ -47,7 +47,7 @@ pub struct GraphicsSettingsWindow<
 }
 
 impl<
-        LightningRenderMode,
+        LightingRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -59,7 +59,7 @@ impl<
         HighQualityInterface,
     >
     GraphicsSettingsWindow<
-        LightningRenderMode,
+        LightingRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -71,7 +71,7 @@ impl<
         HighQualityInterface,
     >
 where
-    LightningRenderMode: TrackedState<LightningMode> + 'static,
+    LightingRenderMode: TrackedState<LightingMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -87,7 +87,7 @@ where
     pub fn new(
         present_mode_info: PresentModeInfo,
         supported_msaa: Vec<(String, Msaa)>,
-        lightning_mode: LightningRenderMode,
+        lighting_mode: LightingRenderMode,
         vsync: Vsync,
         limit_framerate: FramerateLimit,
         triple_buffering: TripleBuffering,
@@ -101,7 +101,7 @@ where
         Self {
             present_mode_info,
             supported_msaa,
-            lightning_mode,
+            lighting_mode,
             vsync,
             limit_framerate,
             triple_buffering,
@@ -116,7 +116,7 @@ where
 }
 
 impl<
-        LightningRenderMode,
+        LightingRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -128,7 +128,7 @@ impl<
         HighQualityInterface,
     > PrototypeWindow<InterfaceSettings>
     for GraphicsSettingsWindow<
-        LightningRenderMode,
+        LightingRenderMode,
         Vsync,
         FramerateLimit,
         TripleBuffering,
@@ -140,7 +140,7 @@ impl<
         HighQualityInterface,
     >
 where
-    LightningRenderMode: TrackedState<LightningMode> + 'static,
+    LightingRenderMode: TrackedState<LightingMode> + 'static,
     Vsync: TrackedStateBinary<bool>,
     FramerateLimit: TrackedState<LimitFramerate> + 'static,
     TripleBuffering: TrackedStateBinary<bool>,
@@ -162,10 +162,10 @@ where
         available_space: ScreenSize,
     ) -> Window<InterfaceSettings> {
         let mut elements = vec![
-            Text::default().with_text("Lightning mode").with_width(dimension_bound!(50%)).wrap(),
+            Text::default().with_text("Lighting mode").with_width(dimension_bound!(50%)).wrap(),
             PickList::default()
-                .with_options(vec![("Classic", LightningMode::Classic), ("Enhanced", LightningMode::Enhanced)])
-                .with_selected(self.lightning_mode.clone())
+                .with_options(vec![("Classic", LightingMode::Classic), ("Enhanced", LightingMode::Enhanced)])
+                .with_selected(self.lighting_mode.clone())
                 .with_event(Box::new(Vec::new))
                 .with_width(dimension_bound!(!))
                 .wrap(),
@@ -260,7 +260,7 @@ where
                     .wrap(),
             );
             elements.insert(
-                2,
+                4,
                 PickList::default()
                     .with_options(vec![
                         ("Unlimited", LimitFramerate::Unlimited),

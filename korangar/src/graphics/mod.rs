@@ -354,6 +354,7 @@ impl GlobalContext {
     fn new(
         device: &Device,
         queue: &Queue,
+        capabilities: &Capabilities,
         texture_loader: &TextureLoader,
         surface_texture_format: TextureFormat,
         msaa: Msaa,
@@ -432,10 +433,10 @@ impl GlobalContext {
 
         let tile_light_indices_buffer = Self::create_tile_light_indices_buffer(device, forward_size);
 
-        let nearest_sampler = create_new_sampler(device, "nearest", SamplerType::TextureNearest);
-        let linear_sampler = create_new_sampler(device, "linear", SamplerType::TextureLinear);
-        let texture_sampler = create_new_sampler(device, "texture", texture_sampler);
-        let shadow_map_sampler = create_new_sampler(device, "shadow map", SamplerType::DepthCompare);
+        let nearest_sampler = create_new_sampler(device, capabilities, "nearest", SamplerType::TextureNearest);
+        let linear_sampler = create_new_sampler(device, capabilities, "linear", SamplerType::TextureLinear);
+        let texture_sampler = create_new_sampler(device, capabilities, "texture", texture_sampler);
+        let shadow_map_sampler = create_new_sampler(device, capabilities, "shadow map", SamplerType::DepthCompare);
 
         let anti_aliasing_resources = Self::create_anti_aliasing_resources(device, screen_space_anti_aliasing, screen_size);
 
@@ -862,8 +863,8 @@ impl GlobalContext {
         }
     }
 
-    fn update_texture_sampler(&mut self, device: &Device, texture_sampler_type: TextureSamplerType) {
-        self.texture_sampler = create_new_sampler(device, "texture", texture_sampler_type);
+    fn update_texture_sampler(&mut self, device: &Device, capabilities: &Capabilities, texture_sampler_type: TextureSamplerType) {
+        self.texture_sampler = create_new_sampler(device, capabilities, "texture", texture_sampler_type);
         self.global_bind_group = Self::create_global_bind_group(
             device,
             &self.global_uniforms_buffer,

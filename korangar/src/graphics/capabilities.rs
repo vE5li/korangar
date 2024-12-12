@@ -16,6 +16,7 @@ pub struct Capabilities {
     supported_msaa: Vec<Msaa>,
     bindless: bool,
     multidraw_indirect: bool,
+    clamp_to_border: bool,
     #[cfg(feature = "debug")]
     polygon_mode_line: bool,
     required_features: Features,
@@ -35,6 +36,7 @@ impl Capabilities {
             supported_msaa,
             bindless: false,
             multidraw_indirect: false,
+            clamp_to_border: false,
             #[cfg(feature = "debug")]
             polygon_mode_line: false,
             required_features: Features::TEXTURE_ADAPTER_SPECIFIC_FORMAT_FEATURES,
@@ -47,6 +49,8 @@ impl Capabilities {
 
         #[cfg(feature = "debug")]
         {
+            Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_BORDER);
+            Self::check_feature(adapter_features, Features::ADDRESS_MODE_CLAMP_TO_ZERO);
             Self::check_feature(adapter_features, Features::INDIRECT_FIRST_INSTANCE);
             Self::check_feature(adapter_features, Features::MULTI_DRAW_INDIRECT);
             Self::check_feature(adapter_features, Features::PARTIALLY_BOUND_BINDING_ARRAY);
@@ -74,6 +78,11 @@ impl Capabilities {
         if adapter_features.contains(Features::INDIRECT_FIRST_INSTANCE | Features::MULTI_DRAW_INDIRECT) {
             capabilities.multidraw_indirect = true;
             capabilities.required_features |= Features::INDIRECT_FIRST_INSTANCE | Features::MULTI_DRAW_INDIRECT;
+        }
+
+        if adapter_features.contains(Features::ADDRESS_MODE_CLAMP_TO_BORDER | Features::ADDRESS_MODE_CLAMP_TO_ZERO) {
+            capabilities.clamp_to_border = true;
+            capabilities.required_features |= Features::ADDRESS_MODE_CLAMP_TO_BORDER | Features::ADDRESS_MODE_CLAMP_TO_ZERO;
         }
 
         #[cfg(feature = "debug")]
@@ -118,6 +127,12 @@ impl Capabilities {
     /// support bindless fully.
     pub fn supports_bindless(&self) -> bool {
         self.bindless
+    }
+
+    /// Returns `true` if the backend allows clamping the border of a texture to
+    /// a specific value.
+    pub fn supports_clamp_to_border(&self) -> bool {
+        self.clamp_to_border
     }
 
     /// Returns `true` if the backend allows drawing triangles as lines

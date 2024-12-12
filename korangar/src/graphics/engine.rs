@@ -184,6 +184,7 @@ impl GraphicsEngine {
                         let global_context = GlobalContext::new(
                             &self.device,
                             &self.queue,
+                            &self.capabilities,
                             &self.texture_loader,
                             surface_texture_format,
                             msaa,
@@ -486,7 +487,7 @@ impl GraphicsEngine {
         if let Some(engine_context) = self.engine_context.as_mut() {
             engine_context
                 .global_context
-                .update_texture_sampler(&self.device, texture_sampler_type);
+                .update_texture_sampler(&self.device, &self.capabilities, texture_sampler_type);
         }
     }
 

@@ -1,8 +1,13 @@
-use wgpu::{CompareFunction, Device, FilterMode, Sampler, SamplerDescriptor};
+use wgpu::{AddressMode, CompareFunction, Device, FilterMode, Sampler, SamplerBorderColor, SamplerDescriptor};
 
-use crate::graphics::TextureSamplerType;
+use crate::graphics::{Capabilities, TextureSamplerType};
 
-pub(crate) fn create_new_sampler(device: &Device, label: &str, sampler_type: impl Into<SamplerType>) -> Sampler {
+pub(crate) fn create_new_sampler(
+    device: &Device,
+    capabilities: &Capabilities,
+    label: &str,
+    sampler_type: impl Into<SamplerType>,
+) -> Sampler {
     match sampler_type.into() {
         SamplerType::TextureNearest => device.create_sampler(&SamplerDescriptor {
             label: Some(label),
@@ -26,16 +31,24 @@ pub(crate) fn create_new_sampler(device: &Device, label: &str, sampler_type: imp
             anisotropy_clamp,
             ..Default::default()
         }),
-        SamplerType::DepthCompare => device.create_sampler(&SamplerDescriptor {
-            label: Some(label),
-            mag_filter: FilterMode::Linear,
-            min_filter: FilterMode::Linear,
-            mipmap_filter: FilterMode::Linear,
-            compare: Some(CompareFunction::Greater),
-            lod_min_clamp: 0.0,
-            lod_max_clamp: 0.0,
-            ..Default::default()
-        }),
+        SamplerType::DepthCompare => {
+            let mut descriptor = SamplerDescriptor {
+                label: Some(label),
+                mag_filter: FilterMode::Linear,
+                min_filter: FilterMode::Linear,
+                mipmap_filter: FilterMode::Linear,
+                compare: Some(CompareFunction::Greater),
+                ..Default::default()
+            };
+
+            if capabilities.supports_clamp_to_border() {
+                descriptor.address_mode_u = AddressMode::ClampToBorder;
+                descriptor.address_mode_v = AddressMode::ClampToBorder;
+                descriptor.border_color = Some(SamplerBorderColor::Zero);
+            }
+
+            device.create_sampler(&descriptor)
+        }
     }
 }
 

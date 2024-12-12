@@ -1,4 +1,4 @@
-use cgmath::{Matrix, Matrix4, Point3};
+use cgmath::{Matrix, Matrix4, Point3, Vector4};
 
 use super::{IntersectionClassification, Plane, Sphere, AABB};
 use crate::collision::Query;
@@ -18,27 +18,46 @@ impl Frustum {
     /// matrix, including projection, view-projection, or
     /// model-view-projection matrices.
     ///
-    /// The planes are extracted as follows:
+    /// The planes have the following order:
     ///
-    /// - Left:   row3 + row0
-    /// - Right:  row3 - row0
-    /// - Bottom: row3 + row1
-    /// - Top:    row3 - row1
-    /// - Near:   row3 + row2
-    /// - Far:    row3 - row2
-    ///
-    /// Where row{i} refers to the i-th row of the input matrix.
-    pub fn new(matrix: Matrix4<f32>) -> Self {
-        let planes = [
+    /// - Left
+    /// - Right
+    /// - Bottom
+    /// - Top
+    /// - Near
+    /// - Far
+    pub fn new(matrix: Matrix4<f32>, reverse_z: bool) -> Self {
+        let mut planes = [
             Plane::from_vec4(matrix.row(3) + matrix.row(0)).normalized(),
             Plane::from_vec4(matrix.row(3) - matrix.row(0)).normalized(),
             Plane::from_vec4(matrix.row(3) + matrix.row(1)).normalized(),
             Plane::from_vec4(matrix.row(3) - matrix.row(1)).normalized(),
-            Plane::from_vec4(matrix.row(3) + matrix.row(2)).normalized(),
-            Plane::from_vec4(matrix.row(3) - matrix.row(2)).normalized(),
+            if reverse_z {
+                Plane::from_vec4(matrix.row(3) - matrix.row(2)).normalized()
+            } else {
+                Plane::from_vec4(matrix.row(2)).normalized()
+            },
+            if reverse_z {
+                Plane::from_vec4(matrix.row(2)).normalized()
+            } else {
+                Plane::from_vec4(matrix.row(3) - matrix.row(2)).normalized()
+            },
         ];
 
-        Frustum { planes }
+        // Detect and handle infinite projection.
+        if (!reverse_z && matrix.w.z == 0.0) || (reverse_z && matrix.z.z == 0.0) {
+            let near_plane = planes[4];
+            let far_plane = Plane::from_vec4(Vector4::new(
+                -near_plane.normal().x,
+                -near_plane.normal().y,
+                -near_plane.normal().z,
+                f32::INFINITY,
+            ))
+            .normalized();
+            planes[5] = far_plane;
+        }
+
+        Self { planes }
     }
 
     /// Checks if a point is inside the frustum.
@@ -103,6 +122,19 @@ mod tests {
         )
     }
 
+    fn perspective_reverse_lh(vertical_fov: Rad<f32>, aspect_ratio: f32, near: f32) -> Matrix4<f32> {
+        let tangent = (vertical_fov / 2.0).tan();
+        let height = 1.0 / tangent;
+        let width = height / aspect_ratio;
+
+        Matrix4::from_cols(
+            Vector4::new(width, 0.0, 0.0, 0.0),
+            Vector4::new(0.0, height, 0.0, 0.0),
+            Vector4::new(0.0, 0.0, 0.0, 1.0),
+            Vector4::new(0.0, 0.0, near, 0.0),
+        )
+    }
+
     fn create_test_frustum() -> Frustum {
         let projection = perspective_lh_zo(Deg(90.0).into(), 1.0, 0.1, 100.0);
         let view = Matrix4::look_at_lh(
@@ -111,7 +143,7 @@ mod tests {
             Vector3::new(0.0, 1.0, 0.0),
         );
 
-        Frustum::new(projection * view)
+        Frustum::new(projection * view, false)
     }
 
     #[test]
@@ -231,5 +263,28 @@ mod tests {
     fn test_large_sphere_containing_frustum() {
         let frustum = create_test_frustum();
         assert!(frustum.intersects_sphere(&Sphere::new(Point3::new(0.0, 0.0, 0.0), 1000.0)));
+    }
+
+    #[test]
+    fn test_infinite_reverse_z_frustum() {
+        let near = 10.0;
+        let aspect_ratio = 16.0 / 9.0;
+        let fov = Deg(60.0).into();
+
+        let projection = perspective_reverse_lh(fov, aspect_ratio, near);
+        let view = Matrix4::look_at_lh(
+            Point3::new(0.0, 0.0, 50.0),
+            Point3::new(0.0, 0.0, 51.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        );
+
+        let frustum = Frustum::new(projection * view, true);
+
+        assert!(frustum.contains_point(Point3::new(0.0, 0.0, 61.0)));
+        assert!(!frustum.contains_point(Point3::new(0.0, 0.0, 59.0)));
+
+        assert!(frustum.contains_point(Point3::new(0.0, 0.0, 1000.0)));
+        assert!(frustum.contains_point(Point3::new(0.0, 0.0, 10000.0)));
+        assert!(frustum.contains_point(Point3::new(0.0, 0.0, 100000.0)));
     }
 }

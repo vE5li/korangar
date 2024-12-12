@@ -329,7 +329,7 @@ impl EffectBase for EffectWithLight {
 
     fn register_point_lights(&self, point_light_manager: &mut PointLightManager, camera: &dyn Camera) {
         let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let frustum = Frustum::new(projection_matrix * view_matrix);
+        let frustum = Frustum::new(projection_matrix * view_matrix, true);
 
         let light_position = self.center.to_position() + self.light_offset;
 

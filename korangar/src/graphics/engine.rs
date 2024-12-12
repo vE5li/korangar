@@ -77,7 +77,6 @@ struct EngineContext {
     light_culling_pass_context: LightCullingPassContext,
     forward_pass_context: ForwardRenderPassContext,
     water_pass_context: WaterRenderPassContext,
-    cmaa2_pass_context: Cmaa2ComputePassContext,
     post_processing_pass_context: PostProcessingRenderPassContext,
     screen_blit_pass_context: ScreenBlitRenderPassContext,
 
@@ -95,10 +94,6 @@ struct EngineContext {
     forward_indicator_drawer: ForwardIndicatorDrawer,
     forward_model_drawer: ForwardModelDrawer,
     water_wave_drawer: WaterWaveDrawer,
-    cmaa2_edge_colors_dispatcher: Cmaa2EdgeColorsDispatcher,
-    cmaa2_calculate_dispatch_args_dispatcher: Cmaa2CalculateDispatchArgsDispatcher,
-    cmaa2_process_candidates_dispatcher: Cmaa2ProcessCandidatesDispatcher,
-    cmaa2_deferred_color_apply_dispatcher: Cmaa2DeferredColorApplyDispatcher,
     post_processing_effect_drawer: PostProcessingEffectDrawer,
     post_processing_fxaa_drawer: PostProcessingFxaaDrawer,
     post_processing_blitter_drawer: PostProcessingBlitterDrawer,
@@ -208,7 +203,6 @@ impl GraphicsEngine {
                             ForwardRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let water_pass_context =
                             WaterRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
-                        let cmaa2_pass_context = Cmaa2ComputePassContext::new(&self.device, &self.queue, &global_context);
                         let post_processing_pass_context =
                             PostProcessingRenderPassContext::new(&self.device, &self.queue, &self.texture_loader, &global_context);
                         let screen_blit_pass_context =
@@ -310,18 +304,6 @@ impl GraphicsEngine {
                             &global_context,
                             &water_pass_context,
                         );
-                        let Cmaa2Resources {
-                            cmaa2_edge_colors_dispatcher,
-                            cmaa2_calculate_dispatch_args_dispatcher,
-                            cmaa2_process_candidates_dispatcher,
-                            cmaa2_deferred_color_apply_dispatcher,
-                        } = Cmaa2Resources::create(
-                            &self.capabilities,
-                            &self.device,
-                            &self.queue,
-                            &global_context,
-                            &cmaa2_pass_context,
-                        );
                         let PostProcessingResources {
                             post_processing_effect_drawer,
                             post_processing_fxaa_drawer,
@@ -362,7 +344,6 @@ impl GraphicsEngine {
                         light_culling_pass_context,
                         forward_pass_context,
                         water_pass_context,
-                        cmaa2_pass_context,
                         post_processing_pass_context,
                         screen_blit_pass_context,
                         interface_rectangle_drawer,
@@ -379,10 +360,6 @@ impl GraphicsEngine {
                         forward_indicator_drawer,
                         forward_model_drawer,
                         water_wave_drawer,
-                        cmaa2_edge_colors_dispatcher,
-                        cmaa2_calculate_dispatch_args_dispatcher,
-                        cmaa2_process_candidates_dispatcher,
-                        cmaa2_deferred_color_apply_dispatcher,
                         post_processing_effect_drawer,
                         post_processing_fxaa_drawer,
                         post_processing_blitter_drawer,
@@ -518,19 +495,6 @@ impl GraphicsEngine {
                 &engine_context.forward_pass_context,
             );
 
-            let Cmaa2Resources {
-                cmaa2_edge_colors_dispatcher,
-                cmaa2_calculate_dispatch_args_dispatcher,
-                cmaa2_process_candidates_dispatcher,
-                cmaa2_deferred_color_apply_dispatcher,
-            } = Cmaa2Resources::create(
-                &self.capabilities,
-                &self.device,
-                &self.queue,
-                &engine_context.global_context,
-                &engine_context.cmaa2_pass_context,
-            );
-
             let PostProcessingResources {
                 post_processing_effect_drawer,
                 post_processing_fxaa_drawer,
@@ -549,10 +513,6 @@ impl GraphicsEngine {
             engine_context.forward_entity_drawer = forward_entity_drawer;
             engine_context.forward_indicator_drawer = forward_indicator_drawer;
             engine_context.forward_model_drawer = forward_model_drawer;
-            engine_context.cmaa2_edge_colors_dispatcher = cmaa2_edge_colors_dispatcher;
-            engine_context.cmaa2_calculate_dispatch_args_dispatcher = cmaa2_calculate_dispatch_args_dispatcher;
-            engine_context.cmaa2_process_candidates_dispatcher = cmaa2_process_candidates_dispatcher;
-            engine_context.cmaa2_deferred_color_apply_dispatcher = cmaa2_deferred_color_apply_dispatcher;
             engine_context.post_processing_effect_drawer = post_processing_effect_drawer;
             engine_context.post_processing_fxaa_drawer = post_processing_fxaa_drawer;
             engine_context.post_processing_blitter_drawer = post_processing_blitter_drawer;
@@ -1119,58 +1079,6 @@ impl GraphicsEngine {
 
                     render_pass
                 }
-                ScreenSpaceAntiAliasing::Cmaa2 => {
-                    drop(render_pass);
-
-                    let AntiAliasingResource::Cmaa2(cmaa2_resources) = &engine_context.global_context.anti_aliasing_resources else {
-                        panic!("cmaa2 resources not set")
-                    };
-
-                    let mut compute_pass =
-                        engine_context
-                            .cmaa2_pass_context
-                            .create_pass(&mut post_processing_encoder, &engine_context.global_context, None);
-
-                    let color_input_texture = engine_context.global_context.get_color_texture();
-
-                    engine_context
-                        .cmaa2_edge_colors_dispatcher
-                        .dispatch(&mut compute_pass, color_input_texture);
-
-                    engine_context
-                        .cmaa2_calculate_dispatch_args_dispatcher
-                        .dispatch(&mut compute_pass, Cmaa2CalculateDispatchArgsDispatchData::ProcessCandidates);
-
-                    let process_candidates_data = Cmaa2ProcessCandidatesDispatcherDispatchData {
-                        color_input_texture,
-                        dispatch_indirect_args_buffer: &cmaa2_resources.indirect_buffer,
-                    };
-                    engine_context
-                        .cmaa2_process_candidates_dispatcher
-                        .dispatch(&mut compute_pass, process_candidates_data);
-
-                    engine_context
-                        .cmaa2_calculate_dispatch_args_dispatcher
-                        .dispatch(&mut compute_pass, Cmaa2CalculateDispatchArgsDispatchData::DeferredColorApply);
-
-                    let output_bind_group = &GlobalContext::create_cmaa2_output_bind_group(&self.device, color_input_texture);
-
-                    let deferred_color_apply_data = Cmaa2DeferredColorApplyDispatchData {
-                        dispatch_indirect_args_buffer: &cmaa2_resources.indirect_buffer,
-                        output_bind_group,
-                    };
-                    engine_context
-                        .cmaa2_deferred_color_apply_dispatcher
-                        .dispatch(&mut compute_pass, deferred_color_apply_data);
-
-                    drop(compute_pass);
-
-                    engine_context.post_processing_pass_context.create_pass(
-                        &mut post_processing_encoder,
-                        &engine_context.global_context,
-                        engine_context.global_context.get_color_texture(),
-                    )
-                }
             };
 
             let rectangle_data = PostProcessingRectangleDrawData {
@@ -1294,38 +1202,6 @@ impl ForwardResources {
             forward_aabb_drawer,
             #[cfg(feature = "debug")]
             forward_circle_drawer,
-        }
-    }
-}
-
-struct Cmaa2Resources {
-    cmaa2_edge_colors_dispatcher: Cmaa2EdgeColorsDispatcher,
-    cmaa2_calculate_dispatch_args_dispatcher: Cmaa2CalculateDispatchArgsDispatcher,
-    cmaa2_process_candidates_dispatcher: Cmaa2ProcessCandidatesDispatcher,
-    cmaa2_deferred_color_apply_dispatcher: Cmaa2DeferredColorApplyDispatcher,
-}
-
-impl Cmaa2Resources {
-    fn create(
-        capabilities: &Capabilities,
-        device: &Device,
-        queue: &Queue,
-        global_context: &GlobalContext,
-        cmaa2_pass_context: &Cmaa2ComputePassContext,
-    ) -> Self {
-        let cmaa2_edge_colors_dispatcher = Cmaa2EdgeColorsDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
-        let cmaa2_calculate_dispatch_args_dispatcher =
-            Cmaa2CalculateDispatchArgsDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
-        let cmaa2_process_candidates_dispatcher =
-            Cmaa2ProcessCandidatesDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
-        let cmaa2_deferred_color_apply_dispatcher =
-            Cmaa2DeferredColorApplyDispatcher::new(capabilities, device, queue, global_context, cmaa2_pass_context);
-
-        Self {
-            cmaa2_edge_colors_dispatcher,
-            cmaa2_calculate_dispatch_args_dispatcher,
-            cmaa2_process_candidates_dispatcher,
-            cmaa2_deferred_color_apply_dispatcher,
         }
     }
 }

@@ -226,7 +226,6 @@ where
                 .with_options(vec![
                     ("Off", ScreenSpaceAntiAliasing::Off),
                     ("FXAA", ScreenSpaceAntiAliasing::Fxaa),
-                    ("CMAA2", ScreenSpaceAntiAliasing::Cmaa2),
                 ])
                 .with_selected(self.screen_space_anti_aliasing.clone())
                 .with_event(Box::new(Vec::new))

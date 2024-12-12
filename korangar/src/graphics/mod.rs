@@ -44,7 +44,6 @@ pub use self::settings::*;
 pub use self::surface::*;
 pub use self::texture::*;
 pub use self::vertices::*;
-use crate::graphics::passes::DispatchIndirectArgs;
 use crate::graphics::sampler::{create_new_sampler, SamplerType};
 use crate::interface::layout::ScreenSize;
 use crate::loaders::TextureLoader;
@@ -53,18 +52,10 @@ use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 /// The size of a tile in pixel of the tile based light culling.
 const LIGHT_TILE_SIZE: u32 = 16;
 
-/// This texture format needs following requirements:
-///  - Store alpha (forward shader)
-///  - Usable as storage texture (post-processing shader)
-///
-/// Bot requirements are needed at the same time, since we want to be able to
-/// re-use the forward color texture, if possible.
-pub const RENDER_TO_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba16Float;
+pub const RENDER_TO_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 pub const RENDER_TO_TEXTURE_DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 pub const INTERFACE_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
 pub const FXAA_COLOR_LUMA_TEXTURE_FORMAT: TextureFormat = TextureFormat::Rgba8UnormSrgb;
-
-pub const MAX_BUFFER_SIZE: u64 = 128 * 1024 * 1024;
 
 /// Trait to prepare all GPU data of contexts, computer and renderer.
 pub(crate) trait Prepare {
@@ -386,12 +377,12 @@ impl GlobalContext {
             false,
         ));
         let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
-        let forward_textures = Self::create_forward_textures(device, forward_size, msaa, ssaa, screen_space_anti_aliasing);
+        let forward_textures = Self::create_forward_textures(device, forward_size, msaa);
         let picker_textures = Self::create_picker_textures(device, screen_size);
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);
         let point_shadow_map_textures = Self::create_point_shadow_textures(device, point_shadow_size);
-        let resolved_color_texture = Self::create_resolved_color_texture(device, forward_size, msaa, ssaa, screen_space_anti_aliasing);
-        let supersampled_color_texture = Self::create_supersampled_texture(device, screen_size, ssaa, screen_space_anti_aliasing);
+        let resolved_color_texture = Self::create_resolved_color_texture(device, forward_size, msaa);
+        let supersampled_color_texture = Self::create_supersampled_texture(device, screen_size, ssaa);
         let interface_buffer_texture = Self::create_interface_texture(device, interface_size);
 
         let picker_value_buffer = Buffer::with_capacity(
@@ -533,23 +524,13 @@ impl GlobalContext {
         self.resolved_color_texture.as_ref().unwrap_or(&self.forward_color_texture)
     }
 
-    fn create_forward_textures(
-        device: &Device,
-        forward_size: ScreenSize,
-        msaa: Msaa,
-        ssaa: Ssaa,
-        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
-    ) -> ForwardTextures {
-        let texture_type = match !msaa.multisampling_activated()
-            && !ssaa.supersampling_activated()
-            && screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2
-        {
-            true => AttachmentTextureType::ColorStorageAttachment,
-            false => AttachmentTextureType::ColorAttachment,
-        };
-
+    fn create_forward_textures(device: &Device, forward_size: ScreenSize, msaa: Msaa) -> ForwardTextures {
         let factory = AttachmentTextureFactory::new(device, forward_size, msaa.sample_count(), None);
-        let forward_color_texture = factory.new_attachment("forward color", RENDER_TO_TEXTURE_FORMAT, texture_type);
+        let forward_color_texture = factory.new_attachment(
+            "forward color",
+            RENDER_TO_TEXTURE_FORMAT,
+            AttachmentTextureType::ColorAttachment,
+        );
         let forward_depth_texture = factory.new_attachment("forward depth", RENDER_TO_TEXTURE_DEPTH_FORMAT, AttachmentTextureType::Depth);
         let (tile_x, tile_y) = calculate_light_tile_count(forward_size);
 
@@ -585,42 +566,29 @@ impl GlobalContext {
         }
     }
 
-    fn create_resolved_color_texture(
-        device: &Device,
-        forward_size: ScreenSize,
-        msaa: Msaa,
-        ssaa: Ssaa,
-        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
-    ) -> Option<AttachmentTexture> {
-        let attachment_type = match !ssaa.supersampling_activated() && screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2 {
-            true => AttachmentTextureType::ColorStorageAttachment,
-            false => AttachmentTextureType::ColorAttachment,
-        };
-
+    fn create_resolved_color_texture(device: &Device, forward_size: ScreenSize, msaa: Msaa) -> Option<AttachmentTexture> {
         match msaa.multisampling_activated() {
             true => {
                 let attachment_factory = AttachmentTextureFactory::new(device, forward_size, 1, None);
-                Some(attachment_factory.new_attachment("resolved color", RENDER_TO_TEXTURE_FORMAT, attachment_type))
+                Some(attachment_factory.new_attachment(
+                    "resolved color",
+                    RENDER_TO_TEXTURE_FORMAT,
+                    AttachmentTextureType::ColorAttachment,
+                ))
             }
             false => None,
         }
     }
 
-    fn create_supersampled_texture(
-        device: &Device,
-        screen_size: ScreenSize,
-        ssaa: Ssaa,
-        screen_space_anti_aliasing: ScreenSpaceAntiAliasing,
-    ) -> Option<AttachmentTexture> {
-        let attachment_type = match screen_space_anti_aliasing == ScreenSpaceAntiAliasing::Cmaa2 {
-            true => AttachmentTextureType::ColorStorageAttachment,
-            false => AttachmentTextureType::ColorAttachment,
-        };
-
+    fn create_supersampled_texture(device: &Device, screen_size: ScreenSize, ssaa: Ssaa) -> Option<AttachmentTexture> {
         match ssaa.supersampling_activated() {
             true => {
                 let attachment_factory = AttachmentTextureFactory::new(device, screen_size, 1, None);
-                Some(attachment_factory.new_attachment("supersampled color", RENDER_TO_TEXTURE_FORMAT, attachment_type))
+                Some(attachment_factory.new_attachment(
+                    "supersampled color",
+                    RENDER_TO_TEXTURE_FORMAT,
+                    AttachmentTextureType::ColorAttachment,
+                ))
             }
             false => None,
         }
@@ -685,76 +653,6 @@ impl GlobalContext {
                 let resources = FxaaResources { color_with_luma_texture };
                 AntiAliasingResource::Fxaa(Box::new(resources))
             }
-            ScreenSpaceAntiAliasing::Cmaa2 => {
-                let width = screen_size.width as usize;
-                let height = screen_size.height as usize;
-
-                let max_shape_candidates = width * height / 4;
-                let max_deferred_blend_items = width * height / 2;
-                let max_deferred_blend_locations = (width * height + 3) / 6;
-
-                let edges_textures = StorageTexture::new(
-                    device,
-                    "cmaa2 edges",
-                    (width as u32 + 1) / 2,
-                    height as u32,
-                    TextureFormat::R8Uint,
-                );
-                let control_buffer = Buffer::with_capacity(device, "cmaa2 control", BufferUsages::STORAGE, (4 * size_of::<u32>()) as _);
-                let indirect_buffer = Buffer::with_capacity(
-                    device,
-                    "cmaa2 indirect",
-                    BufferUsages::STORAGE | BufferUsages::INDIRECT,
-                    size_of::<DispatchIndirectArgs>() as _,
-                ) as _;
-                let shape_candidates_buffer = Buffer::with_capacity(
-                    device,
-                    "cmaa2 candidates",
-                    BufferUsages::STORAGE,
-                    ((max_shape_candidates.max(1) * size_of::<u32>()) as u64).min(MAX_BUFFER_SIZE),
-                );
-                let deferred_blend_item_list_heads_buffer = Buffer::with_capacity(
-                    device,
-                    "cmaa2 deferred blend item list heads",
-                    BufferUsages::STORAGE,
-                    (((((width + 1) / 2) * ((height + 1) / 2)).max(1) * size_of::<u32>()) as u64).min(MAX_BUFFER_SIZE),
-                );
-                let deferred_blend_item_list_buffer = Buffer::with_capacity(
-                    device,
-                    "cmaa2 deferred blend item list",
-                    BufferUsages::STORAGE,
-                    ((max_deferred_blend_items.max(1) * size_of::<[u32; 2]>()) as u64).min(MAX_BUFFER_SIZE),
-                );
-                let deferred_blend_location_list_buffer = Buffer::with_capacity(
-                    device,
-                    "cmaa2 deferred blend location list",
-                    BufferUsages::STORAGE,
-                    ((max_deferred_blend_locations.max(1) * size_of::<u32>()) as u64).min(MAX_BUFFER_SIZE),
-                );
-
-                let bind_group = Self::create_cmaa2_bind_group(
-                    device,
-                    &edges_textures,
-                    &control_buffer,
-                    &shape_candidates_buffer,
-                    &indirect_buffer,
-                    &deferred_blend_item_list_heads_buffer,
-                    &deferred_blend_item_list_buffer,
-                    &deferred_blend_location_list_buffer,
-                );
-
-                let resources = Cmaa2Resources {
-                    _edges_textures: edges_textures,
-                    _control_buffer: control_buffer,
-                    _shape_candidates_buffer: shape_candidates_buffer,
-                    indirect_buffer,
-                    _deferred_blend_item_list_heads_buffer: deferred_blend_item_list_heads_buffer,
-                    _deferred_blend_item_list_buffer: deferred_blend_item_list_buffer,
-                    _deferred_blend_location_list_buffer: deferred_blend_location_list_buffer,
-                    bind_group,
-                };
-                AntiAliasingResource::Cmaa2(Box::new(resources))
-            }
         }
     }
 
@@ -771,18 +669,16 @@ impl GlobalContext {
             forward_color_texture,
             forward_depth_texture,
             tile_light_count_texture,
-        } = Self::create_forward_textures(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+        } = Self::create_forward_textures(device, self.forward_size, self.msaa);
 
         let PickerTextures {
             picker_buffer_texture,
             picker_depth_texture,
         } = Self::create_picker_textures(device, self.screen_size);
 
-        let resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+        let resolved_color_texture = Self::create_resolved_color_texture(device, self.forward_size, self.msaa);
 
-        let supersampled_color_texture =
-            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
+        let supersampled_color_texture = Self::create_supersampled_texture(device, self.screen_size, self.ssaa);
 
         self.forward_color_texture = forward_color_texture;
         self.forward_depth_texture = forward_depth_texture;
@@ -881,59 +777,22 @@ impl GlobalContext {
             forward_color_texture,
             forward_depth_texture,
             tile_light_count_texture,
-        } = Self::create_forward_textures(device, self.screen_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
+        } = Self::create_forward_textures(device, self.screen_size, self.msaa);
 
         self.forward_color_texture = forward_color_texture;
         self.forward_depth_texture = forward_depth_texture;
         self.tile_light_count_texture = tile_light_count_texture;
-
-        self.resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
-
-        self.supersampled_color_texture =
-            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
+        self.resolved_color_texture = Self::create_resolved_color_texture(device, self.forward_size, self.msaa);
     }
 
     fn update_ssaa(&mut self, device: &Device, ssaa: Ssaa) {
         self.ssaa = ssaa;
         self.forward_size = self.ssaa.calculate_size(self.screen_size);
-
-        let ForwardTextures {
-            forward_color_texture,
-            forward_depth_texture,
-            tile_light_count_texture,
-        } = Self::create_forward_textures(device, self.screen_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
-
-        self.forward_color_texture = forward_color_texture;
-        self.forward_depth_texture = forward_depth_texture;
-        self.tile_light_count_texture = tile_light_count_texture;
-
-        self.resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
-
-        self.supersampled_color_texture =
-            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
+        self.supersampled_color_texture = Self::create_supersampled_texture(device, self.screen_size, self.ssaa);
     }
 
     fn update_screen_space_anti_aliasing(&mut self, device: &Device, screen_space_anti_aliasing: ScreenSpaceAntiAliasing) {
         self.screen_space_anti_aliasing = screen_space_anti_aliasing;
-
-        let ForwardTextures {
-            forward_color_texture,
-            forward_depth_texture,
-            tile_light_count_texture,
-        } = Self::create_forward_textures(device, self.screen_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
-
-        self.forward_color_texture = forward_color_texture;
-        self.forward_depth_texture = forward_depth_texture;
-        self.tile_light_count_texture = tile_light_count_texture;
-
-        self.resolved_color_texture =
-            Self::create_resolved_color_texture(device, self.forward_size, self.msaa, self.ssaa, self.screen_space_anti_aliasing);
-
-        self.supersampled_color_texture =
-            Self::create_supersampled_texture(device, self.screen_size, self.ssaa, self.screen_space_anti_aliasing);
-
         self.anti_aliasing_resources = Self::create_anti_aliasing_resources(device, self.screen_space_anti_aliasing, self.screen_size);
     }
 
@@ -1105,106 +964,6 @@ impl GlobalContext {
         })
     }
 
-    fn cmaa2_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
-        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
-        LAYOUT.get_or_init(|| {
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("cmaa2"),
-                entries: &[
-                    BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::StorageTexture {
-                            access: StorageTextureAccess::ReadWrite,
-                            format: TextureFormat::R8Uint,
-                            view_dimension: TextureViewDimension::D2,
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 1,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(size_of::<u32>() as _),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(size_of::<u32>() as _),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(size_of::<DispatchIndirectArgs>() as _),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 4,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(size_of::<u32>() as _),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 5,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(size_of::<[u32; 2]>() as _),
-                        },
-                        count: None,
-                    },
-                    BindGroupLayoutEntry {
-                        binding: 6,
-                        visibility: ShaderStages::COMPUTE,
-                        ty: BindingType::Buffer {
-                            ty: BufferBindingType::Storage { read_only: false },
-                            has_dynamic_offset: false,
-                            min_binding_size: NonZeroU64::new(size_of::<u32>() as _),
-                        },
-                        count: None,
-                    },
-                ],
-            })
-        })
-    }
-
-    fn cmaa2_output_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
-        static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
-        LAYOUT.get_or_init(|| {
-            device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-                label: Some("cmaa2 output"),
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::COMPUTE,
-                    ty: BindingType::StorageTexture {
-                        access: StorageTextureAccess::WriteOnly,
-                        format: RENDER_TO_TEXTURE_FORMAT,
-                        view_dimension: TextureViewDimension::D2,
-                    },
-                    count: None,
-                }],
-            })
-        })
-    }
-
     #[cfg(feature = "debug")]
     fn debug_bind_group_layout(device: &Device) -> &'static BindGroupLayout {
         static LAYOUT: OnceLock<BindGroupLayout> = OnceLock::new();
@@ -1370,63 +1129,6 @@ impl GlobalContext {
         })
     }
 
-    fn create_cmaa2_bind_group(
-        device: &Device,
-        edges_textures: &StorageTexture,
-        control_buffer: &Buffer<u32>,
-        shape_candidates_buffer: &Buffer<u32>,
-        indirect_buffer: &Buffer<DispatchIndirectArgs>,
-        deferred_blend_item_list_heads_buffer: &Buffer<u32>,
-        deferred_blend_item_list_buffer: &Buffer<[u32; 2]>,
-        deferred_blend_location_list_buffer: &Buffer<u32>,
-    ) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label: Some("cmaa2"),
-            layout: Self::cmaa2_bind_group_layout(device),
-            entries: &[
-                BindGroupEntry {
-                    binding: 0,
-                    resource: BindingResource::TextureView(edges_textures.get_texture_view()),
-                },
-                BindGroupEntry {
-                    binding: 1,
-                    resource: control_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 2,
-                    resource: shape_candidates_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 3,
-                    resource: indirect_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 4,
-                    resource: deferred_blend_item_list_heads_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 5,
-                    resource: deferred_blend_item_list_buffer.as_entire_binding(),
-                },
-                BindGroupEntry {
-                    binding: 6,
-                    resource: deferred_blend_location_list_buffer.as_entire_binding(),
-                },
-            ],
-        })
-    }
-
-    fn create_cmaa2_output_bind_group(device: &Device, output_color_texture: &AttachmentTexture) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label: Some("cmaa2 output"),
-            layout: Self::cmaa2_output_bind_group_layout(device),
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: BindingResource::TextureView(output_color_texture.get_texture_view()),
-            }],
-        })
-    }
-
     #[cfg(feature = "debug")]
     fn create_debug_bind_group(
         device: &Device,
@@ -1485,24 +1187,8 @@ struct ForwardTextures {
 pub(crate) enum AntiAliasingResource {
     None,
     Fxaa(Box<FxaaResources>),
-    Cmaa2(Box<Cmaa2Resources>),
 }
 
 pub(crate) struct FxaaResources {
     color_with_luma_texture: AttachmentTexture,
-}
-
-pub(crate) struct Cmaa2Resources {
-    _edges_textures: StorageTexture,
-    /// Holds three values used for atomic counters:
-    ///  - 0: Shape candidate count
-    ///  - 1: Blend location count
-    ///  - 2: Deferred blend item count
-    _control_buffer: Buffer<u32>,
-    _shape_candidates_buffer: Buffer<u32>,
-    indirect_buffer: Buffer<DispatchIndirectArgs>,
-    _deferred_blend_item_list_heads_buffer: Buffer<u32>,
-    _deferred_blend_item_list_buffer: Buffer<[u32; 2]>,
-    _deferred_blend_location_list_buffer: Buffer<u32>,
-    bind_group: BindGroup,
 }

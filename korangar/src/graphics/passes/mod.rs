@@ -1,4 +1,3 @@
-mod cmaa2;
 mod directional_shadow;
 mod forward;
 mod interface;
@@ -13,7 +12,6 @@ mod water;
 use std::marker::ConstParamTy;
 
 use bytemuck::{Pod, Zeroable};
-pub(crate) use cmaa2::*;
 pub(crate) use directional_shadow::*;
 pub(crate) use forward::*;
 pub(crate) use interface::*;
@@ -138,15 +136,6 @@ pub(crate) struct DrawIndirectArgs {
     instance_count: u32,
     first_vertex: u32,
     first_instance: u32,
-}
-
-/// We reimplement the WGPU type, since we want to have bytemuck support.
-#[repr(C)]
-#[derive(Copy, Clone, Pod, Zeroable)]
-pub(crate) struct DispatchIndirectArgs {
-    x: u32,
-    y: u32,
-    z: u32,
 }
 
 /// A batch of models that share a specific texture group and model vertex

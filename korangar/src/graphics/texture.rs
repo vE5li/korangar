@@ -280,7 +280,6 @@ impl CubeArrayTexture {
 pub(crate) enum AttachmentTextureType {
     PickerAttachment,
     ColorAttachment,
-    ColorStorageAttachment,
     DepthAttachment,
     Depth,
 }
@@ -292,9 +291,6 @@ impl From<AttachmentTextureType> for TextureUsages {
                 TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT | TextureUsages::COPY_SRC
             }
             AttachmentTextureType::ColorAttachment => TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
-            AttachmentTextureType::ColorStorageAttachment => {
-                TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT | TextureUsages::STORAGE_BINDING
-            }
             AttachmentTextureType::DepthAttachment => TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
             AttachmentTextureType::Depth => TextureUsages::TEXTURE_BINDING | TextureUsages::RENDER_ATTACHMENT,
         }

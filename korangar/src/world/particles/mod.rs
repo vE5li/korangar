@@ -47,8 +47,7 @@ impl Particle for DamageNumber {
     }
 
     fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -80,8 +79,7 @@ impl Particle for HealNumber {
     }
 
     fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -120,8 +118,7 @@ impl QuestIcon {
     }
 
     fn render(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, window_size: ScreenSize, scaling_factor: f32) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,

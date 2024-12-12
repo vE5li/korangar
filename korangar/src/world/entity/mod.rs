@@ -854,8 +854,7 @@ impl Player {
     }
 
     pub fn render_status(&self, renderer: &GameInterfaceRenderer, camera: &dyn Camera, theme: &GameTheme, window_size: ScreenSize) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.common.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,
@@ -984,8 +983,7 @@ impl Npc {
             return;
         }
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = (projection_matrix * view_matrix) * self.common.position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * self.common.position.to_homogeneous();
         let screen_position = camera.clip_to_screen_space(clip_space_position);
         let final_position = ScreenPosition {
             left: screen_position.x * window_size.width,

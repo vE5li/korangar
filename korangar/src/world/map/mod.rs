@@ -214,8 +214,7 @@ impl Map {
             });
         }
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let frustum = Frustum::new(projection_matrix * view_matrix, true);
+        let frustum = Frustum::new(camera.view_projection_matrix(), true);
 
         object_set.create_set(|visible_objects| {
             self.object_kdtree.query(&frustum, visible_objects);
@@ -446,8 +445,7 @@ impl Map {
         light_source_set_buffer: &mut ResourceSetBuffer<LightSourceKey>,
         camera: &dyn Camera,
     ) {
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let frustum = Frustum::new(projection_matrix * view_matrix, true);
+        let frustum = Frustum::new(camera.view_projection_matrix(), true);
 
         let set = light_source_set_buffer.create_set(|buffer| {
             self.light_source_kdtree.query(&frustum, buffer);

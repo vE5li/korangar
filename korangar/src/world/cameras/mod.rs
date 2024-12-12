@@ -20,8 +20,8 @@ pub use self::start::StartCamera;
 #[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
-const MAXIMUM_ZOOM: f32 = 600.0;
-const MINIMUM_ZOOM: f32 = 150.0;
+const MAXIMUM_CAMERA_DISTANCE: f32 = 600.0;
+const MINIMUM_CAMERA_DISTANCE: f32 = 150.0;
 
 /// The world space has a left-handed coordinate system where the Y axis is up.
 ///
@@ -33,10 +33,12 @@ pub trait Camera {
     fn focus_point(&self) -> Point3<f32>;
     fn generate_view_projection(&mut self, window_size: Vector2<usize>);
     fn look_up_vector(&self) -> Vector3<f32>;
+
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>);
 
-    #[cfg(feature = "debug")]
-    fn world_to_screen_matrix(&self) -> Matrix4<f32>;
+    fn view_projection_matrix(&self) -> Matrix4<f32>;
+
+    fn view_direction(&self) -> Vector3<f32>;
 
     fn billboard_matrix(&self, position: Point3<f32>, origin: Point3<f32>, size: Vector2<f32>) -> Matrix4<f32> {
         let view_direction = self.view_direction();
@@ -66,13 +68,13 @@ pub trait Camera {
         let right_vector = self.look_up_vector().cross(view_direction).normalize();
         let up_vector = view_direction.cross(right_vector).normalize();
 
-        let world_to_screen_matrix = self.world_to_screen_matrix();
+        let view_projection_matrix = self.view_projection_matrix();
 
         let top_left_vector = up_vector - right_vector;
         let bottom_right_vector = right_vector - up_vector;
 
-        let top_left_position = world_to_screen_matrix * (position + top_left_vector * size).to_homogeneous();
-        let bottom_right_position = world_to_screen_matrix * (position + bottom_right_vector * size).to_homogeneous();
+        let top_left_position = view_projection_matrix * (position + top_left_vector * size).to_homogeneous();
+        let bottom_right_position = view_projection_matrix * (position + bottom_right_vector * size).to_homogeneous();
 
         (top_left_position, bottom_right_position)
     }
@@ -156,12 +158,6 @@ pub trait Camera {
         };
 
         (screen_position, screen_size)
-    }
-
-    fn view_direction(&self) -> Vector3<f32> {
-        let focus_position = self.focus_point().to_vec();
-        let camera_position = self.camera_position().to_vec();
-        (focus_position - camera_position).normalize()
     }
 }
 

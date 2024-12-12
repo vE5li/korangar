@@ -48,8 +48,7 @@ impl EffectRenderer {
     ) {
         const EFFECT_ORIGIN: Vector2<f32> = Vector2::new(319.0, 291.0);
 
-        let (view_matrix, projection_matrix) = camera.view_projection_matrices();
-        let clip_space_position = projection_matrix * view_matrix * position.to_homogeneous();
+        let clip_space_position = camera.view_projection_matrix() * position.to_homogeneous();
         let screen_space_position = camera.clip_to_screen_space(clip_space_position);
 
         let half_screen = Vector2::new(self.window_size.width / 2.0, self.window_size.height / 2.0);

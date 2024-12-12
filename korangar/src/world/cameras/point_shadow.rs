@@ -1,7 +1,9 @@
-use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector2, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Vector2, Vector3, Zero};
 
 use super::Camera;
 use crate::graphics::perspective_reverse_lh;
+
+const VERTICAL_FOV: Deg<f32> = Deg(90.0);
 
 pub struct PointShadowCamera {
     camera_position: Point3<f32>,
@@ -9,7 +11,7 @@ pub struct PointShadowCamera {
     look_up_vector: Vector3<f32>,
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
-    world_to_screen_matrix: Matrix4<f32>,
+    view_projection_matrix: Matrix4<f32>,
 }
 
 impl PointShadowCamera {
@@ -18,9 +20,9 @@ impl PointShadowCamera {
             camera_position: Point3::new(0.0, 0.0, 0.0),
             view_direction: Vector3::unit_x(),
             look_up_vector: Vector3::unit_y(),
-            view_matrix: Matrix4::from_value(0.0),
-            projection_matrix: Matrix4::from_value(0.0),
-            world_to_screen_matrix: Matrix4::from_value(0.0),
+            view_matrix: Matrix4::zero(),
+            projection_matrix: Matrix4::zero(),
+            view_projection_matrix: Matrix4::zero(),
         }
     }
 
@@ -51,11 +53,9 @@ impl Camera for PointShadowCamera {
     }
 
     fn generate_view_projection(&mut self, _window_size: Vector2<usize>) {
-        self.projection_matrix = perspective_reverse_lh(Deg(90.0).into(), 1.0);
-
-        self.view_matrix = Matrix4::look_at_lh(self.camera_position, self.focus_point(), self.look_up_vector);
-
-        self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
+        self.view_matrix = Matrix4::look_to_lh(self.camera_position, self.view_direction, self.look_up_vector);
+        self.projection_matrix = perspective_reverse_lh(VERTICAL_FOV, 1.0);
+        self.view_projection_matrix = self.projection_matrix * self.view_matrix;
     }
 
     fn look_up_vector(&self) -> Vector3<f32> {
@@ -66,9 +66,8 @@ impl Camera for PointShadowCamera {
         (self.view_matrix, self.projection_matrix)
     }
 
-    #[cfg(feature = "debug")]
-    fn world_to_screen_matrix(&self) -> Matrix4<f32> {
-        self.world_to_screen_matrix
+    fn view_projection_matrix(&self) -> Matrix4<f32> {
+        self.view_projection_matrix
     }
 
     fn view_direction(&self) -> Vector3<f32> {

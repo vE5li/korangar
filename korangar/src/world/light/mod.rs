@@ -245,8 +245,7 @@ impl PointLightSet<'_> {
                 point_shadow_camera.change_direction(face_index);
                 point_shadow_camera.generate_view_projection(Vector2::zero());
 
-                let (view_matrix, projection_matrix) = point_shadow_camera.view_projection_matrices();
-                view_projection_matrices[face_index as usize] = projection_matrix * view_matrix;
+                view_projection_matrices[face_index as usize] = point_shadow_camera.view_projection_matrix();
 
                 let model_offset = point_shadow_model_instructions.len();
 

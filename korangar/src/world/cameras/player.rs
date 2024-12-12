@@ -1,38 +1,39 @@
-use std::f32::consts::FRAC_PI_2;
+use cgmath::{Array, Deg, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation, Rotation3, Vector2, Vector3, Zero};
 
-use cgmath::{InnerSpace, Matrix4, Point3, Rad, SquareMatrix, Vector2, Vector3};
-
-use super::{Camera, SmoothedValue, MAXIMUM_ZOOM, MINIMUM_ZOOM};
+use super::{Camera, SmoothedValue, MAXIMUM_CAMERA_DISTANCE, MINIMUM_CAMERA_DISTANCE};
 use crate::graphics::perspective_reverse_lh;
 
 const ZOOM_SPEED: f32 = 2.0;
 const ROTATION_SPEED: f32 = 0.01;
-const DEFAULT_ZOOM: f32 = 400.0;
-const DEFAULT_ANGLE: f32 = FRAC_PI_2;
-const THRESHHOLD: f32 = 0.01;
+const DEFAULT_DISTANCE: f32 = 400.0;
+const DEFAULT_ANGLE: f32 = 180_f32.to_radians();
+const CAMERA_PITCH: Deg<f32> = Deg(-50.0);
+const VERTICAL_FOV: Deg<f32> = Deg(15.0);
+const THRESHOLD: f32 = 0.01;
+const LOOK_UP: Vector3<f32> = Vector3::new(0.0, 1.0, 0.0);
 
 pub struct PlayerCamera {
     focus_point: Point3<SmoothedValue>,
-    look_up_vector: Vector3<f32>,
+    camera_position: Point3<f32>,
+    view_direction: Vector3<f32>,
+    view_angle: SmoothedValue,
+    camera_distance: SmoothedValue,
     view_matrix: Matrix4<f32>,
     projection_matrix: Matrix4<f32>,
-    world_to_screen_matrix: Matrix4<f32>,
-    view_angle: SmoothedValue,
-    zoom: SmoothedValue,
-    aspect_ratio: f32,
+    view_projection_matrix: Matrix4<f32>,
 }
 
 impl PlayerCamera {
     pub fn new() -> Self {
         Self {
-            focus_point: [SmoothedValue::new(0.0, THRESHHOLD, 5.0); 3].into(),
-            look_up_vector: Vector3::new(0.0, 1.0, 0.0),
-            view_matrix: Matrix4::from_value(0.0),
-            projection_matrix: Matrix4::from_value(0.0),
-            world_to_screen_matrix: Matrix4::from_value(0.0),
-            view_angle: SmoothedValue::new(DEFAULT_ANGLE, THRESHHOLD, 15.0),
-            zoom: SmoothedValue::new(DEFAULT_ZOOM, THRESHHOLD, 5.0),
-            aspect_ratio: 0.0,
+            focus_point: [SmoothedValue::new(0.0, THRESHOLD, 5.0); 3].into(),
+            camera_position: Point3::from_value(0.0),
+            view_direction: Vector3::zero(),
+            view_angle: SmoothedValue::new(DEFAULT_ANGLE, THRESHOLD, 15.0),
+            camera_distance: SmoothedValue::new(DEFAULT_DISTANCE, THRESHOLD, 5.0),
+            view_matrix: Matrix4::zero(),
+            projection_matrix: Matrix4::zero(),
+            view_projection_matrix: Matrix4::zero(),
         }
     }
 
@@ -49,11 +50,12 @@ impl PlayerCamera {
     }
 
     pub fn get_zoom_scale(&self) -> f32 {
-        (self.zoom.get_current() - MINIMUM_ZOOM) / (MAXIMUM_ZOOM - MINIMUM_ZOOM)
+        (self.camera_distance.get_current() - MINIMUM_CAMERA_DISTANCE) / (MAXIMUM_CAMERA_DISTANCE - MINIMUM_CAMERA_DISTANCE)
     }
 
     pub fn soft_zoom(&mut self, zoom_factor: f32) {
-        self.zoom.move_desired_clamp(zoom_factor * ZOOM_SPEED, MINIMUM_ZOOM, MAXIMUM_ZOOM);
+        self.camera_distance
+            .move_desired_clamp(zoom_factor * ZOOM_SPEED, MINIMUM_CAMERA_DISTANCE, MAXIMUM_CAMERA_DISTANCE);
     }
 
     pub fn soft_rotate(&mut self, rotation: f32) {
@@ -68,20 +70,26 @@ impl PlayerCamera {
         self.focus_point.x.update(delta_time);
         self.focus_point.y.update(delta_time);
         self.focus_point.z.update(delta_time);
-        self.zoom.update(delta_time);
+        self.camera_distance.update(delta_time);
         self.view_angle.update(delta_time);
+
+        let view_distance = self.camera_distance.get_current();
+        let view_angle = self.view_angle.get_current();
+
+        let pitch_rotation = Quaternion::from_angle_x(CAMERA_PITCH);
+        let yaw_rotation = Quaternion::from_angle_y(Rad(view_angle));
+        let rotation = yaw_rotation * pitch_rotation;
+        let base_offset = Vector3::new(0.0, 0.0, view_distance);
+        let rotated_offset = rotation.rotate_vector(base_offset);
+
+        self.camera_position = self.focus_point() + rotated_offset;
+        self.view_direction = -rotated_offset.normalize();
     }
 }
 
 impl Camera for PlayerCamera {
     fn camera_position(&self) -> Point3<f32> {
-        let zoom = self.zoom.get_current();
-        let view_angle = self.view_angle.get_current();
-        Point3::new(
-            self.focus_point.x.get_current() + zoom * view_angle.cos(),
-            self.focus_point.y.get_current() + zoom,
-            self.focus_point.z.get_current() + -zoom * view_angle.sin(),
-        )
+        self.camera_position
     }
 
     fn focus_point(&self) -> Point3<f32> {
@@ -89,35 +97,25 @@ impl Camera for PlayerCamera {
     }
 
     fn generate_view_projection(&mut self, window_size: Vector2<usize>) {
-        self.aspect_ratio = window_size.x as f32 / window_size.y as f32;
-        self.projection_matrix = perspective_reverse_lh(Rad(0.2617), self.aspect_ratio);
-
-        let camera_position = self.camera_position();
-        self.view_matrix = Matrix4::look_at_lh(camera_position, self.focus_point(), self.look_up_vector);
-
-        self.world_to_screen_matrix = self.projection_matrix * self.view_matrix;
+        let aspect_ratio = window_size.x as f32 / window_size.y as f32;
+        self.view_matrix = Matrix4::look_to_lh(self.camera_position, self.view_direction, LOOK_UP);
+        self.projection_matrix = perspective_reverse_lh(VERTICAL_FOV, aspect_ratio);
+        self.view_projection_matrix = self.projection_matrix * self.view_matrix;
     }
 
     fn look_up_vector(&self) -> Vector3<f32> {
-        self.look_up_vector
+        LOOK_UP
     }
 
     fn view_projection_matrices(&self) -> (Matrix4<f32>, Matrix4<f32>) {
         (self.view_matrix, self.projection_matrix)
     }
 
-    #[cfg(feature = "debug")]
-    fn world_to_screen_matrix(&self) -> Matrix4<f32> {
-        self.world_to_screen_matrix
+    fn view_projection_matrix(&self) -> Matrix4<f32> {
+        self.view_projection_matrix
     }
 
     fn view_direction(&self) -> Vector3<f32> {
-        let camera_position = self.camera_position();
-        Vector3::new(
-            self.focus_point.x.get_current() - camera_position.x,
-            self.focus_point.y.get_current() - camera_position.y,
-            self.focus_point.z.get_current() - camera_position.z,
-        )
-        .normalize()
+        self.view_direction
     }
 }

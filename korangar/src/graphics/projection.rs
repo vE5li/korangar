@@ -33,8 +33,8 @@ pub fn orthographic_reverse_lh(left: f32, right: f32, bottom: f32, top: f32, nea
 /// This function generates a matrix that transforms from left-handed, y-up
 /// world space to left-handed, y-up clip space with a depth range of 1.0 (near)
 /// to 0.0 (far).
-pub fn perspective_reverse_lh(vertical_fov: Rad<f32>, aspect_ratio: f32) -> Matrix4<f32> {
-    let tangent = (vertical_fov / 2.0).tan();
+pub fn perspective_reverse_lh(vertical_fov: impl Into<Rad<f32>>, aspect_ratio: f32) -> Matrix4<f32> {
+    let tangent = (vertical_fov.into() / 2.0).tan();
     let height = 1.0 / tangent;
     let width = height / aspect_ratio;
 

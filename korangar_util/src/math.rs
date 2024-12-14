@@ -9,6 +9,11 @@ pub fn multiply_matrix4_and_point3(matrix: &Matrix4<f32>, vector: Point3<f32>) -
     Point3::from_vec((adjusted_vector / adjusted_vector.w).truncate())
 }
 
+/// Simple linear interpolation.
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
 #[cfg(test)]
 mod tests {
     use cgmath::{assert_relative_eq, EuclideanSpace, Matrix4, Point3};

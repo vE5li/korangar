@@ -48,11 +48,6 @@ impl StartCamera {
         self.camera_position = self.focus_point + rotated_offset;
         self.view_direction = -rotated_offset.normalize();
     }
-
-    pub fn get_zoom_scale(&self) -> f32 {
-        // The start camera has a fixed zoom.
-        1.0
-    }
 }
 
 impl Camera for StartCamera {

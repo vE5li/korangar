@@ -1,6 +1,4 @@
-use std::f32::consts::FRAC_PI_2;
-
-use cgmath::{EuclideanSpace, InnerSpace, Matrix4, Point3, Vector2, Vector3, Vector4, Zero};
+use cgmath::{InnerSpace, Matrix4, Point3, Vector2, Vector3, Zero};
 
 use super::Camera;
 use crate::graphics::orthographic_reverse_lh;
@@ -92,39 +90,5 @@ impl Camera for DirectionalShadowCamera {
 
     fn view_direction(&self) -> Vector3<f32> {
         self.view_direction
-    }
-
-    fn calculate_depth_offset_and_curvature(&self, world_matrix: &Matrix4<f32>, sprite_height: f32, sprite_width: f32) -> (f32, f32) {
-        const OFFSET_FACTOR: f32 = 10.0;
-        const CURVATURE_FACTOR: f32 = 8.0;
-
-        let sprite_height = -2.0 * sprite_height;
-
-        let sprite_position = world_matrix * Vector4::new(0.0, 0.0, 0.0, 1.0);
-        let camera_position = self.camera_position().to_vec().extend(1.0);
-        let view_direction = self.view_direction().extend(0.0);
-
-        // Calculate angle from the camera to the sprite in against the x/z plane.
-        let camera_to_sprite = (sprite_position - camera_position).normalize();
-        let vertical_axis = Vector4::unit_y();
-        let sprite_angle = camera_to_sprite.angle(vertical_axis).0;
-
-        // Adjust the angle to make 0.0 degrees the horizon.
-        let sprite_angle = (sprite_angle - FRAC_PI_2).to_degrees();
-        let angle_progress = sprite_angle / -90.0;
-
-        // Calculate offset point in the opposite view direction.
-        let offset_magnitude = OFFSET_FACTOR * sprite_height * angle_progress;
-        let offset_point = sprite_position - view_direction * offset_magnitude;
-
-        // Calculate linear depth offset in view space.
-        let (view_matrix, _) = self.view_projection_matrices();
-        let sprite_view = view_matrix * sprite_position;
-        let offset_view = view_matrix * offset_point;
-        let depth_offset = offset_view.z - sprite_view.z;
-
-        let curvature = CURVATURE_FACTOR * sprite_width;
-
-        (depth_offset, curvature)
     }
 }

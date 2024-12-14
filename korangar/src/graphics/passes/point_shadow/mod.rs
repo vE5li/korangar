@@ -5,6 +5,7 @@ mod model;
 use std::sync::OnceLock;
 
 use bytemuck::{Pod, Zeroable};
+use cgmath::{Matrix4, SquareMatrix};
 pub(crate) use entity::PointShadowEntityDrawer;
 pub(crate) use indicator::PointShadowIndicatorDrawer;
 pub(crate) use model::PointShadowModelDrawer;
@@ -27,6 +28,8 @@ const NUMBER_FACES: usize = 6;
 #[repr(C)]
 struct PassUniforms {
     view_projection: [[f32; 4]; 4],
+    view: [[f32; 4]; 4],
+    inverse_view: [[f32; 4]; 4],
     light_position: [f32; 4],
     animation_timer: f32,
     padding: [u32; 3],
@@ -148,6 +151,8 @@ impl Prepare for PointShadowRenderPassContext {
         let uniforms = instructions.point_light_shadow_caster.iter().flat_map(|caster| {
             (0..NUMBER_FACES).map(|face_index| PassUniforms {
                 view_projection: caster.view_projection_matrices[face_index].into(),
+                view: caster.view_matrices[face_index].into(),
+                inverse_view: caster.view_matrices[face_index].invert().unwrap_or(Matrix4::identity()).into(),
                 light_position: caster.position.to_homogeneous().into(),
                 animation_timer: instructions.uniforms.animation_timer,
                 padding: Default::default(),

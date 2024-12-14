@@ -6,6 +6,7 @@ use std::num::NonZeroU64;
 use std::sync::OnceLock;
 
 use bytemuck::{Pod, Zeroable};
+use cgmath::{Matrix4, SquareMatrix};
 pub(crate) use entity::DirectionalShadowEntityDrawer;
 pub(crate) use indicator::DirectionalShadowIndicatorDrawer;
 pub(crate) use model::DirectionalShadowModelDrawer;
@@ -26,6 +27,8 @@ const PASS_NAME: &str = "directional shadow render pass";
 #[repr(C)]
 struct PassUniforms {
     view_projection: [[f32; 4]; 4],
+    view: [[f32; 4]; 4],
+    inverse_view: [[f32; 4]; 4],
     animation_timer: f32,
     padding: [u32; 3],
 }
@@ -132,6 +135,13 @@ impl Prepare for DirectionalShadowRenderPassContext {
     fn prepare(&mut self, _device: &Device, instructions: &RenderInstruction) {
         self.uniforms_data = PassUniforms {
             view_projection: instructions.directional_light_with_shadow.view_projection_matrix.into(),
+            view: instructions.directional_light_with_shadow.view_matrix.into(),
+            inverse_view: instructions
+                .directional_light_with_shadow
+                .view_matrix
+                .invert()
+                .unwrap_or(Matrix4::identity())
+                .into(),
             animation_timer: instructions.uniforms.animation_timer,
             padding: Default::default(),
         };

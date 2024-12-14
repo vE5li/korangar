@@ -1,5 +1,7 @@
 struct PassUniforms {
     view_projection: mat4x4<f32>,
+    view: mat4x4<f32>,
+    inverse_view: mat4x4<f32>,
     light_position: vec4<f32>,
     animation_timer: f32
 }
@@ -21,8 +23,6 @@ struct InstanceData {
 struct Vertex {
     position: vec3<f32>,
     texture_coordinates: vec2<f32>,
-    depth_multiplier: f32,
-    curvature_multiplier: f32,
 }
 
 struct VertexOutput {
@@ -70,7 +70,7 @@ fn vs_main(
     // Because we have to transform the vertex of the frame part, we can't use the depth and curvature
     // directly and are using the fact, that y / depth and x / curvature correlate to each other.
     // An offset is also added for frame parts not stay at the same depth.
-    output.depth_offset = (frame_part_vertex.y - 1.0) * proportion_y + instance.extra_depth_offset;
+    output.depth_offset = frame_part_vertex.y * proportion_y + instance.extra_depth_offset;
     output.curvature = frame_part_vertex.x * proportion_x;
 
     output.original_depth_offset = instance.depth_offset;
@@ -86,39 +86,29 @@ fn fs_main(input: VertexOutput) -> @builtin(frag_depth) f32 {
         discard;
     }
 
-    // TODO: This is only a temporary change, we will fix the depth_offset later.
-    // The idea for the temporary change is to create two parabolas to correct the plane inclination.
-    let sign_depth_offset = select(2.0, -2.0, input.depth_offset < 0.0);
-    let scaled_depth_offset = sign_depth_offset * pow(input.depth_offset, 2.0) * input.original_depth_offset;
-    let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
+    // Adjust the sprite as if it was standing upright
+    let depth_offset = input.depth_offset * input.original_depth_offset;
+    let curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
+    let view_position = pass_uniforms.view * input.world_position;
+    let adjusted_view_position = view_position - vec4<f32>(0.0, 0.0, depth_offset + curvature_offset, 0.0);
+    let adjusted_world_position = pass_uniforms.inverse_view * adjusted_view_position;
+    let light_distance = length(adjusted_world_position.xyz - pass_uniforms.light_position.xyz);
 
-    // Point shadows use a projection matrix, so depth is non-linear.
-    let absolute_depth = nonLinearToLinear(input.position.z);
-    let adjusted_linear_z: f32 = 3.5 + absolute_depth - scaled_depth_offset - scaled_curvature_offset;
-
-    // TODO: NHA We need to save the distance from this fragment position (with the adjusted depth value) to the light.
-    return 0.0;
-}
-
-fn nonLinearToLinear(nonlinear_depth: f32) -> f32 {
-    const NEAR_PLANE = 0.1;
-    return NEAR_PLANE * (nonlinear_depth + 1e-7);
+    return linearToNonLinear(light_distance);
 }
 
 // Optimized version of the following truth table:
 //
-// vertex_index  x  y  z  u  v   d   c
-// 0            -1  2  1  0  0   1  -1
-// 1            -1  0  1  0  1  -1  -1
-// 2             1  2  1  1  0   1   1
-// 3             1  2  1  1  0   1   1
-// 4            -1  0  1  0  1  -1  -1
-// 5             1  0  1  1  1  -1   1
+// vertex_index  x  y  z  u  v
+// 0            -1  2  1  0  0
+// 1            -1  0  1  0  1
+// 2             1  2  1  1  0
+// 3             1  2  1  1  0
+// 4            -1  0  1  0  1
+// 5             1  0  1  1  1
 //
 // (x,y,z) are the vertex position
 // (u,v) are the UV coordinates
-// (depth) is the depth multiplier
-// (curve) is the curvature multiplier
 fn vertex_data(vertex_index: u32) -> Vertex {
     let index = 1u << vertex_index;
 
@@ -130,8 +120,11 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     let z = 1.0;
     let u = f32(1 - case0);
     let v = f32(1 - case1);
-    let depth = y - 1.0;
-    let curve = x;
 
-    return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v), depth, curve);
+    return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v));
+}
+
+fn linearToNonLinear(linear_depth: f32) -> f32 {
+    const NEAR_PLANE = 0.1;
+    return NEAR_PLANE / (linear_depth + 1e-7);
 }

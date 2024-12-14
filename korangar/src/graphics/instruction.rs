@@ -77,6 +77,7 @@ pub struct WaterInstruction<'a> {
 #[derive(Clone, Debug)]
 pub struct DirectionalShadowCasterInstruction {
     pub view_projection_matrix: Matrix4<f32>,
+    pub view_matrix: Matrix4<f32>,
     pub direction: Vector3<f32>,
     pub color: Color,
 }
@@ -86,6 +87,7 @@ pub struct DirectionalShadowCasterInstruction {
 #[derive(Clone, Debug)]
 pub struct PointShadowCasterInstruction {
     pub view_projection_matrices: [Matrix4<f32>; 6],
+    pub view_matrices: [Matrix4<f32>; 6],
     pub position: Point3<f32>,
     pub color: Color,
     pub range: f32,

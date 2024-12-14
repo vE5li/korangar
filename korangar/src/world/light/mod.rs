@@ -66,6 +66,7 @@ impl PointLight {
         &self,
         instructions: &mut Vec<PointShadowCasterInstruction>,
         view_projection_matrices: [Matrix4<f32>; 6],
+        view_matrices: [Matrix4<f32>; 6],
         model_texture: Arc<Texture>,
         model_vertex_buffer: Arc<Buffer<ModelVertex>>,
         entity_offset: [usize; 6],
@@ -75,6 +76,7 @@ impl PointLight {
     ) {
         instructions.push(PointShadowCasterInstruction {
             view_projection_matrices,
+            view_matrices,
             position: self.position,
             color: self.color,
             range: self.range,
@@ -228,6 +230,8 @@ impl PointLightSet<'_> {
             point_shadow_camera.set_camera_position(point_light.position);
 
             let mut view_projection_matrices = [Matrix4::identity(); NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
+            let mut view_matrices = [Matrix4::identity(); NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
+
             let entity_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let entity_counts = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
             let mut model_offsets = [0; NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS];
@@ -246,6 +250,7 @@ impl PointLightSet<'_> {
                 point_shadow_camera.generate_view_projection(Vector2::zero());
 
                 view_projection_matrices[face_index as usize] = point_shadow_camera.view_projection_matrix();
+                (view_matrices[face_index as usize], _) = point_shadow_camera.view_projection_matrices();
 
                 let model_offset = point_shadow_model_instructions.len();
 
@@ -262,6 +267,7 @@ impl PointLightSet<'_> {
             point_light.render_with_shadows(
                 point_light_with_shadow_instructions,
                 view_projection_matrices,
+                view_matrices,
                 map.get_texture().clone(),
                 map.get_model_vertex_buffer().clone(),
                 entity_offsets,

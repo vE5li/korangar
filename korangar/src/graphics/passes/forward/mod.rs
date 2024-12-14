@@ -5,6 +5,8 @@ mod circle;
 mod entity;
 mod indicator;
 mod model;
+#[cfg(feature = "debug")]
+mod rectangle;
 
 #[cfg(feature = "debug")]
 pub(crate) use aabb::ForwardAabbDrawer;
@@ -13,6 +15,8 @@ pub(crate) use circle::ForwardCircleDrawer;
 pub(crate) use entity::ForwardEntityDrawer;
 pub(crate) use indicator::ForwardIndicatorDrawer;
 pub(crate) use model::ForwardModelDrawer;
+#[cfg(feature = "debug")]
+pub(crate) use rectangle::ForwardRectangleDrawer;
 use wgpu::{
     BindGroupLayout, Color, CommandEncoder, Device, LoadOp, Operations, Queue, RenderPass, RenderPassColorAttachment,
     RenderPassDepthStencilAttachment, RenderPassDescriptor, StoreOp, TextureFormat,

@@ -13,6 +13,8 @@ use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Se
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
+#[cfg(feature = "debug")]
+use crate::graphics::DebugRectangleInstruction;
 use crate::graphics::EntityInstruction;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
@@ -26,7 +28,7 @@ use crate::renderer::MarkerRenderer;
 use crate::world::MarkerIdentifier;
 use crate::world::{AnimationData, Camera, Map};
 #[cfg(feature = "debug")]
-use crate::{Buffer, ModelVertex};
+use crate::{Buffer, Color, ModelVertex};
 
 const MALE_HAIR_LOOKUP: &[usize] = &[2, 2, 1, 7, 5, 4, 3, 6, 8, 9, 10, 12, 11];
 const FEMALE_HAIR_LOOKUP: &[usize] = &[2, 2, 4, 7, 1, 5, 3, 6, 12, 10, 9, 11, 8];
@@ -775,6 +777,19 @@ impl Common {
     }
 
     #[cfg(feature = "debug")]
+    pub fn render_debug(&self, instructions: &mut Vec<DebugRectangleInstruction>, camera: &dyn Camera) {
+        self.animation_data.render_debug(
+            instructions,
+            camera,
+            self.position,
+            &self.animation_state,
+            self.head_direction,
+            Color::rgb_u8(255, 0, 0),
+            Color::rgb_u8(0, 255, 0),
+        );
+    }
+
+    #[cfg(feature = "debug")]
     pub fn render_marker(
         &self,
         renderer: &mut impl MarkerRenderer,
@@ -1131,6 +1146,11 @@ impl Entity {
 
     pub fn render(&self, instructions: &mut Vec<EntityInstruction>, camera: &dyn Camera, add_to_picker: bool) {
         self.get_common().render(instructions, camera, add_to_picker);
+    }
+
+    #[cfg(feature = "debug")]
+    pub fn render_debug(&self, instructions: &mut Vec<DebugRectangleInstruction>, camera: &dyn Camera) {
+        self.get_common().render_debug(instructions, camera);
     }
 
     #[cfg(feature = "debug")]

@@ -176,6 +176,10 @@ pub struct RenderSettings {
     #[new(value = "true")]
     pub show_entities: bool,
     #[new(value = "true")]
+    pub show_entities_paper: bool,
+    #[new(default)]
+    pub show_entities_debug: bool,
+    #[new(value = "true")]
     pub show_water: bool,
     #[new(value = "true")]
     pub show_indicators: bool,

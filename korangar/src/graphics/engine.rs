@@ -104,6 +104,8 @@ struct EngineContext {
     #[cfg(feature = "debug")]
     forward_circle_drawer: ForwardCircleDrawer,
     #[cfg(feature = "debug")]
+    forward_rectangle_drawer: ForwardRectangleDrawer,
+    #[cfg(feature = "debug")]
     post_processing_buffer_drawer: PostProcessingBufferDrawer,
     #[cfg(feature = "debug")]
     picker_marker_drawer: PickerMarkerDrawer,
@@ -288,9 +290,10 @@ impl GraphicsEngine {
 
                             #[cfg(feature = "debug")]
                             forward_aabb_drawer,
-
                             #[cfg(feature = "debug")]
                             forward_circle_drawer,
+                            #[cfg(feature = "debug")]
+                            forward_rectangle_drawer,
                         } = ForwardResources::create(
                             &self.capabilities,
                             &self.device,
@@ -370,6 +373,8 @@ impl GraphicsEngine {
                         forward_aabb_drawer,
                         #[cfg(feature = "debug")]
                         forward_circle_drawer,
+                        #[cfg(feature = "debug")]
+                        forward_rectangle_drawer,
                         #[cfg(feature = "debug")]
                         post_processing_buffer_drawer,
                         #[cfg(feature = "debug")]
@@ -488,6 +493,8 @@ impl GraphicsEngine {
                 forward_aabb_drawer,
                 #[cfg(feature = "debug")]
                 forward_circle_drawer,
+                #[cfg(feature = "debug")]
+                forward_rectangle_drawer,
             } = ForwardResources::create(
                 &self.capabilities,
                 &self.device,
@@ -531,6 +538,7 @@ impl GraphicsEngine {
             {
                 engine_context.forward_aabb_drawer = forward_aabb_drawer;
                 engine_context.forward_circle_drawer = forward_circle_drawer;
+                engine_context.forward_rectangle_drawer = forward_rectangle_drawer;
                 engine_context.post_processing_buffer_drawer = post_processing_buffer_drawer;
             }
         }
@@ -776,6 +784,7 @@ impl GraphicsEngine {
             scope.spawn(|_| {
                 context.post_processing_buffer_drawer.prepare(&self.device, instruction);
                 context.forward_circle_drawer.prepare(&self.device, instruction);
+                context.forward_rectangle_drawer.prepare(&self.device, instruction);
             });
 
             context.global_context.prepare(&self.device, instruction);
@@ -812,6 +821,7 @@ impl GraphicsEngine {
             visitor.upload(&mut context.forward_aabb_drawer);
             visitor.upload(&mut context.post_processing_buffer_drawer);
             visitor.upload(&mut context.forward_circle_drawer);
+            visitor.upload(&mut context.forward_rectangle_drawer);
             visitor.upload(&mut context.picker_marker_drawer);
         }
 
@@ -1000,6 +1010,7 @@ impl GraphicsEngine {
                 {
                     engine_context.forward_aabb_drawer.draw(&mut render_pass, None);
                     engine_context.forward_circle_drawer.draw(&mut render_pass, None);
+                    engine_context.forward_rectangle_drawer.draw(&mut render_pass, None);
                 }
 
                 if instruction.water.is_some() {
@@ -1177,6 +1188,8 @@ struct ForwardResources {
     forward_aabb_drawer: ForwardAabbDrawer,
     #[cfg(feature = "debug")]
     forward_circle_drawer: ForwardCircleDrawer,
+    #[cfg(feature = "debug")]
+    forward_rectangle_drawer: ForwardRectangleDrawer,
 }
 
 impl ForwardResources {
@@ -1194,6 +1207,8 @@ impl ForwardResources {
         let forward_aabb_drawer = ForwardAabbDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
         #[cfg(feature = "debug")]
         let forward_circle_drawer = ForwardCircleDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
+        #[cfg(feature = "debug")]
+        let forward_rectangle_drawer = ForwardRectangleDrawer::new(capabilities, device, queue, global_context, forward_pass_context);
 
         Self {
             forward_entity_drawer,
@@ -1203,6 +1218,8 @@ impl ForwardResources {
             forward_aabb_drawer,
             #[cfg(feature = "debug")]
             forward_circle_drawer,
+            #[cfg(feature = "debug")]
+            forward_rectangle_drawer,
         }
     }
 }

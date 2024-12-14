@@ -29,7 +29,7 @@ use crate::graphics::ModelBatch;
 #[cfg(feature = "debug")]
 use crate::graphics::RenderSettings;
 #[cfg(feature = "debug")]
-use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction};
+use crate::graphics::{DebugAabbInstruction, DebugCircleInstruction, DebugRectangleInstruction};
 use crate::graphics::{EntityInstruction, IndicatorInstruction, ModelInstruction, Texture, WaterInstruction};
 #[cfg(feature = "debug")]
 use crate::interface::application::InterfaceSettings;
@@ -309,6 +309,14 @@ impl Map {
     pub fn render_entities(&self, instructions: &mut Vec<EntityInstruction>, entities: &[Entity], camera: &dyn Camera) {
         entities.iter().enumerate().for_each(|(index, entity)| {
             entity.render(instructions, camera, index != 0);
+        });
+    }
+
+    #[cfg(feature = "debug")]
+    #[korangar_debug::profile]
+    pub fn render_entities_debug(&self, instructions: &mut Vec<DebugRectangleInstruction>, entities: &[Entity], camera: &dyn Camera) {
+        entities.iter().for_each(|entity| {
+            entity.render_debug(instructions, camera);
         });
     }
 

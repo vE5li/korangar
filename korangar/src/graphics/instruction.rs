@@ -48,6 +48,8 @@ pub struct RenderInstruction<'a> {
     #[cfg(feature = "debug")]
     pub circles: &'a [DebugCircleInstruction],
     #[cfg(feature = "debug")]
+    pub rectangles: &'a [DebugRectangleInstruction],
+    #[cfg(feature = "debug")]
     pub marker: &'a [MarkerInstruction],
 }
 
@@ -237,4 +239,11 @@ pub struct DebugCircleInstruction {
     pub color: Color,
     pub screen_position: ScreenPosition,
     pub screen_size: ScreenSize,
+}
+
+#[cfg(feature = "debug")]
+#[derive(Copy, Clone, Debug)]
+pub struct DebugRectangleInstruction {
+    pub world: Matrix4<f32>,
+    pub color: Color,
 }

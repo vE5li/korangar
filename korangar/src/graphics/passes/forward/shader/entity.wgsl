@@ -52,8 +52,6 @@ struct TileLightIndices {
 struct Vertex {
     position: vec3<f32>,
     texture_coordinates: vec2<f32>,
-    depth_multiplier: f32,
-    curvature_multiplier: f32,
 }
 
 struct VertexOutput {
@@ -122,7 +120,7 @@ fn vs_main(
     // Because we have to transform the vertex of the frame part, we can't use the depth and curvature
     // directly and are using the fact, that y / depth and x / curvature correlate to each other.
     // An offset is also added for frame parts not stay at the same depth.
-    output.depth_offset = (frame_part_vertex.y - 1.0) * proportion_y + instance.extra_depth_offset;
+    output.depth_offset = frame_part_vertex.y * proportion_y + instance.extra_depth_offset;
     output.curvature = frame_part_vertex.x * proportion_x;
 
     output.original_depth_offset = instance.depth_offset;
@@ -153,21 +151,14 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
 
     let normal = normalize(input.normal);
 
-    // TODO: This is only a temporary change, we will fix the depth_offset later.
-    // The idea for the temporary change is to create two parabolas to correct the plane inclination.
-    let sign_depth_offset = select(2.0, -2.0, input.depth_offset < 0.0);
-    let scaled_depth_offset = sign_depth_offset * pow(input.depth_offset, 2.0) * input.original_depth_offset;
-    let scaled_curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
-
-    // Adjust world position in view space
+    // Adjust the sprite as if it was standing upright
+    let depth_offset = input.depth_offset * input.original_depth_offset;
+    let curvature_offset = (0.5 - pow(input.curvature, 2.0)) * input.original_curvature;
     let view_position = global_uniforms.view * input.world_position;
-    // Tha magic +2.0 is added, so that entities don't clip into the ground.
-    let adjusted_view_position = view_position - vec4<f32>(0.0, 0.0, scaled_depth_offset + scaled_curvature_offset + 2.0, 0.0);
+    let adjusted_view_position = view_position - vec4<f32>(0.0, 0.0, depth_offset + curvature_offset, 0.0);
     let adjusted_world_position = global_uniforms.inverse_view * adjusted_view_position;
-
-    // Depth adjustment calculation
     let clip_position = global_uniforms.view_projection * adjusted_world_position;
-    let clamped_depth = clamp(clip_position.z / clip_position.w, 0.0, 1.0);
+    let depth = saturate(clip_position.z / clip_position.w);
 
     // Ambient light
     var ambient_light_contribution = global_uniforms.ambient_color.rgb;
@@ -181,10 +172,9 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
     }
 
     // Shadow calculation
-    let shadow_position = directional_light.view_projection * input.world_position;
+    let shadow_position = directional_light.view_projection * adjusted_world_position;
     var shadow_coords = shadow_position.xyz / shadow_position.w;
-    let bias = 0.002;
-    let world_position = input.world_position.xyz / input.world_position.w;
+    let bias = 0.01;
     shadow_coords = vec3<f32>(clip_to_screen_space(shadow_coords.xy), shadow_coords.z + bias);
 
     var visibility: f32;
@@ -245,7 +235,7 @@ fn fs_main(input: VertexOutput) -> FragmentOutput {
 
     var output: FragmentOutput;
     output.fragment_color = vec4<f32>(color, alpha_channel);
-    output.frag_depth = clamped_depth;
+    output.frag_depth = depth;
     return output;
 }
 
@@ -280,18 +270,16 @@ fn clip_to_screen_space(ndc: vec2<f32>) -> vec2<f32> {
 
 // Optimized version of the following truth table:
 //
-// vertex_index  x  y  z  u  v   d   c
-// 0            -1  2  1  0  0   1  -1
-// 1            -1  0  1  0  1  -1  -1
-// 2             1  2  1  1  0   1   1
-// 3             1  2  1  1  0   1   1
-// 4            -1  0  1  0  1  -1  -1
-// 5             1  0  1  1  1  -1   1
+// vertex_index  x  y  z  u  v
+// 0            -1  2  1  0  0
+// 1            -1  0  1  0  1
+// 2             1  2  1  1  0
+// 3             1  2  1  1  0
+// 4            -1  0  1  0  1
+// 5             1  0  1  1  1
 //
 // (x,y,z) are the vertex position
 // (u,v) are the UV coordinates
-// (depth) is the depth multiplier
-// (curve) is the curvature multiplier
 fn vertex_data(vertex_index: u32) -> Vertex {
     let index = 1u << vertex_index;
 
@@ -303,10 +291,8 @@ fn vertex_data(vertex_index: u32) -> Vertex {
     let z = 1.0;
     let u = f32(1 - case0);
     let v = f32(1 - case1);
-    let depth = y - 1.0;
-    let curve = x;
 
-    return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v), depth, curve);
+    return Vertex(vec3<f32>(x, y, z), vec2<f32>(u, v));
 }
 
 fn rotateY(direction: vec3<f32>, angle: f32) -> vec3<f32> {

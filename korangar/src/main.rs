@@ -1882,7 +1882,7 @@ impl Client {
 
         let (directional_light_view_matrix, directional_light_projection_matrix) =
             self.directional_shadow_camera.view_projection_matrices();
-        let directional_light_matrix = directional_light_projection_matrix * directional_light_view_matrix;
+        let directional_light_view_projection_matrix = directional_light_projection_matrix * directional_light_view_matrix;
 
         #[cfg(feature = "debug")]
         matrices_measurement.stop();
@@ -2252,7 +2252,8 @@ impl Client {
             middle_layer_rectangles: middle_layer_instructions.as_slice(),
             top_layer_rectangles: top_layer_instructions.as_slice(),
             directional_light_with_shadow: DirectionalShadowCasterInstruction {
-                view_projection_matrix: directional_light_matrix,
+                view_projection_matrix: directional_light_view_projection_matrix,
+                view_matrix: directional_light_view_matrix,
                 direction: directional_light_direction,
                 color: directional_light_color,
             },

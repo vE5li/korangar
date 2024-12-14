@@ -78,7 +78,7 @@ use settings::AudioSettings;
 use wgpu::Queue;
 use wgpu::{Device, Dx12Compiler, Instance, InstanceFlags, MemoryHints};
 use winit::application::ApplicationHandler;
-use winit::dpi::PhysicalSize;
+use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::PhysicalKey;
@@ -113,6 +113,11 @@ const MAIN_MENU_CLICK_SOUND_EFFECT: &str = "¹öÆ°¼Ò¸®.wav";
 // through the graphics settings. For now I just chose an arbitrary smaller
 // number that should be playable on most devices.
 const NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS: usize = 6;
+
+const INITIAL_SCREEN_SIZE: ScreenSize = ScreenSize {
+    width: 1280.0,
+    height: 720.0,
+};
 
 static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 
@@ -271,12 +276,6 @@ struct Client {
 
 impl Client {
     fn init() -> Self {
-        // We don't know the window size yet, so these values are dummy values.
-        let initial_screen_size = ScreenSize {
-            width: 800.0,
-            height: 600.0,
-        };
-
         time_phase!("load settings", {
             let picker_value = Arc::new(AtomicU64::new(0));
             let input_system = InputSystem::new(picker_value.clone());
@@ -401,15 +400,15 @@ impl Client {
             });
 
             let interface_renderer = InterfaceRenderer::new(
-                initial_screen_size,
+                INITIAL_SCREEN_SIZE,
                 font_loader.clone(),
                 &texture_loader,
                 *high_quality_interface.get(),
             );
-            let bottom_interface_renderer = GameInterfaceRenderer::new(initial_screen_size, &texture_loader);
+            let bottom_interface_renderer = GameInterfaceRenderer::new(INITIAL_SCREEN_SIZE, &texture_loader);
             let middle_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
             let top_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
-            let effect_renderer = EffectRenderer::new(initial_screen_size);
+            let effect_renderer = EffectRenderer::new(INITIAL_SCREEN_SIZE);
             #[cfg(feature = "debug")]
             let debug_marker_renderer = DebugMarkerRenderer::new();
 
@@ -446,7 +445,7 @@ impl Client {
 
         time_phase!("initialize interface", {
             let application = InterfaceSettings::load_or_default();
-            let mut interface = Interface::new(initial_screen_size);
+            let mut interface = Interface::new(INITIAL_SCREEN_SIZE);
             let mut focus_state = FocusState::default();
             let mouse_cursor = MouseCursor::new(&mut sprite_loader, &mut action_loader);
             let dialog_system = DialogSystem::default();
@@ -1843,12 +1842,12 @@ impl Client {
         self.start_camera.update(delta_time);
         self.player_camera.update(delta_time);
 
-        let zoom_scale: f32 = match self.entities.is_empty() {
-            true => self.start_camera.get_zoom_scale(),
-            false => self.player_camera.get_zoom_scale(),
+        let view_direction = match self.entities.is_empty() {
+            true => self.start_camera.view_direction(),
+            false => self.player_camera.view_direction(),
         };
 
-        self.directional_shadow_camera.update(directional_light_direction, zoom_scale);
+        self.directional_shadow_camera.update(directional_light_direction, view_direction);
 
         #[cfg(feature = "debug")]
         update_cameras_measurement.stop();
@@ -2389,7 +2388,13 @@ impl ApplicationHandler for Client {
                 assert_eq!(image_buffer.width(), image_buffer.height(), "icon must be square");
                 let icon = Icon::from_rgba(image_data, image_buffer.width(), image_buffer.height()).unwrap();
 
-                let window_attributes = Window::default_attributes().with_title(CLIENT_NAME).with_window_icon(Some(icon));
+                let window_attributes = Window::default_attributes()
+                    .with_inner_size(LogicalSize {
+                        width: INITIAL_SCREEN_SIZE.width,
+                        height: INITIAL_SCREEN_SIZE.height,
+                    })
+                    .with_title(CLIENT_NAME)
+                    .with_window_icon(Some(icon));
                 let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
                 let backend_name = self.graphics_engine.get_backend_name();

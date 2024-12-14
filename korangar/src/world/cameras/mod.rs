@@ -20,7 +20,7 @@ pub use self::start::StartCamera;
 #[cfg(feature = "debug")]
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 
-const MAXIMUM_CAMERA_DISTANCE: f32 = 600.0;
+const MAXIMUM_CAMERA_DISTANCE: f32 = 500.0;
 const MINIMUM_CAMERA_DISTANCE: f32 = 150.0;
 
 /// The world space has a left-handed coordinate system where the Y axis is up.

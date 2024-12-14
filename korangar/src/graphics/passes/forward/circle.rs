@@ -149,7 +149,7 @@ impl Prepare for ForwardCircleDrawer {
         for instruction in instructions.circles.iter() {
             self.instance_data.push(InstanceData {
                 position: instruction.position.to_homogeneous().into(),
-                color: instruction.color.into(),
+                color: instruction.color.components_linear(),
                 screen_position: instruction.screen_position.into(),
                 screen_size: instruction.screen_size.into(),
             });

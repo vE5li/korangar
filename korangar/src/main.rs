@@ -177,6 +177,8 @@ struct Client {
     aabb_instructions: Vec<DebugAabbInstruction>,
     #[cfg(feature = "debug")]
     circle_instructions: Vec<DebugCircleInstruction>,
+    #[cfg(feature = "debug")]
+    rectangle_instructions: Vec<DebugRectangleInstruction>,
     model_batches: Vec<ModelBatch>,
     model_instructions: Vec<ModelInstruction>,
     entity_instructions: Vec<EntityInstruction>,
@@ -415,6 +417,8 @@ impl Client {
             let aabb_instructions = Vec::default();
             #[cfg(feature = "debug")]
             let circle_instructions = Vec::default();
+            #[cfg(feature = "debug")]
+            let rectangle_instructions = Vec::default();
             let model_batches = Vec::default();
             let model_instructions = Vec::default();
             let entity_instructions = Vec::default();
@@ -584,6 +588,8 @@ impl Client {
             aabb_instructions,
             #[cfg(feature = "debug")]
             circle_instructions,
+            #[cfg(feature = "debug")]
+            rectangle_instructions,
             model_batches,
             model_instructions,
             entity_instructions,
@@ -684,6 +690,8 @@ impl Client {
         self.aabb_instructions.clear();
         #[cfg(feature = "debug")]
         self.circle_instructions.clear();
+        #[cfg(feature = "debug")]
+        self.rectangle_instructions.clear();
         self.model_batches.clear();
         self.model_instructions.clear();
         self.entity_instructions.clear();
@@ -2086,8 +2094,20 @@ impl Client {
                 &self.pathing_texture,
             );
 
+            let entity_camera = match true {
+                #[cfg(feature = "debug")]
+                _ if self.render_settings.get().show_entities_paper => &self.player_camera,
+                _ => current_camera,
+            };
+
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-            self.map.render_entities(&mut self.entity_instructions, entities, current_camera);
+            self.map.render_entities(&mut self.entity_instructions, entities, entity_camera);
+
+            #[cfg(feature = "debug")]
+            if render_settings.show_entities_debug {
+                self.map
+                    .render_entities_debug(&mut self.rectangle_instructions, entities, entity_camera);
+            }
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
             self.map.render_water(&mut water_instruction, client_tick);
@@ -2277,6 +2297,8 @@ impl Client {
             aabb: &self.aabb_instructions,
             #[cfg(feature = "debug")]
             circles: &self.circle_instructions,
+            #[cfg(feature = "debug")]
+            rectangles: &self.rectangle_instructions,
             #[cfg(feature = "debug")]
             marker: self.debug_marker_renderer.get_instructions(),
         };

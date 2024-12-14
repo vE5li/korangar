@@ -194,7 +194,7 @@ impl Prepare for ForwardAabbDrawer {
         for instruction in instructions.aabb.iter() {
             self.instance_data.push(InstanceData {
                 world: instruction.world.into(),
-                color: instruction.color.into(),
+                color: instruction.color.components_linear(),
             });
         }
     }

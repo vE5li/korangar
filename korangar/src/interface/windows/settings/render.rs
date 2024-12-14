@@ -26,6 +26,8 @@ fn general_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCe
         render_state_button("show wireframe", settings.mapped(|settings| &settings.show_wireframe)),
         render_state_button("frustum culling", settings.mapped(|settings| &settings.frustum_culling)),
         render_state_button("show bounding boxes", settings.mapped(|settings| &settings.show_bounding_boxes)),
+        render_state_button("show entities debug", settings.mapped(|settings| &settings.show_entities_debug)),
+        render_state_button("show entities paper", settings.mapped(|settings| &settings.show_entities_paper)),
     ];
 
     Expandable::new("general".to_string(), buttons, true).wrap()

@@ -25,6 +25,7 @@ struct DirectionalLightUniforms {
 }
 
 struct WaterWaveUniforms {
+    water_bounds: vec4<f32>,
     texture_repeat: f32,
     water_level: f32,
     wave_amplitude: f32,
@@ -104,11 +105,17 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         wave_phase_speed = sqrt(GRAVITY / wave_frequency);
 
         let distance = find_wave_intersection(ray_origin, ray_direction, max_distance, max_wave_height);
+        let hit_position = ray_origin + ray_direction * distance;
 
-        if (distance < 0.0 || distance > max_distance) {
+        if (distance < 0.0 ||
+            distance > max_distance ||
+            hit_position.x < water_wave_uniforms.water_bounds.x ||
+            hit_position.z < water_wave_uniforms.water_bounds.y ||
+            hit_position.x > water_wave_uniforms.water_bounds.z ||
+            hit_position.z > water_wave_uniforms.water_bounds.w
+        ) {
             discard;
         } else {
-            let hit_position = ray_origin + ray_direction * distance;
             color = calculate_wave_color(hit_position);
         }
     }
@@ -127,11 +134,6 @@ fn find_wave_intersection(ray_origin: vec3<f32>, ray_direction: vec3<f32>, max_d
     if (water_wave_uniforms.wave_amplitude == 0.0) {
         // We found a flat water plane.
         return ray_plane_intersection(ray_origin, ray_direction, -water_wave_uniforms.water_level);
-    }
-
-    if (max_distance >= 1e30) {
-        // We look outside of the scene.
-        return -1.0;
     }
 
     let initial_guess = ray_plane_intersection(ray_origin, ray_direction, max_wave_height);

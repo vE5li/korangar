@@ -46,3 +46,9 @@ impl<N: BaseNum> PartialEq for Rectangle<N> {
         self.min == other.min && self.max == other.max
     }
 }
+
+impl<N> From<Rectangle<N>> for [N; 4] {
+    fn from(value: Rectangle<N>) -> Self {
+        [value.min.x, value.min.y, value.max.x, value.max.y]
+    }
+}

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use cgmath::{Matrix4, Point3, Vector2, Vector3, Vector4};
+use korangar_util::Rectangle;
 use ragnarok_packets::EntityId;
 use wgpu::BlendFactor;
 
@@ -68,6 +69,7 @@ pub struct Uniforms {
 #[derive(Clone, Debug)]
 pub struct WaterInstruction<'a> {
     pub water_texture: &'a Texture,
+    pub water_bounds: Rectangle<f32>,
     pub texture_repeat: f32,
     pub water_level: f32,
     pub wave_amplitude: f32,

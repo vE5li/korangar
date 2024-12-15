@@ -20,12 +20,14 @@ const DRAWER_NAME: &str = "water wave";
 #[derive(Copy, Clone, Default, Pod, Zeroable)]
 #[repr(C)]
 struct WaterWaveUniforms {
+    water_bounds: [f32; 4],
     texture_repeat: f32,
     water_level: f32,
     wave_amplitude: f32,
     wave_speed: f32,
     wave_length: f32,
     water_opacity: f32,
+    padding: [u32; 2],
 }
 
 pub(crate) struct WaterWaveDrawer {
@@ -157,12 +159,14 @@ impl Prepare for WaterWaveDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
         if let Some(instruction) = instructions.water.as_ref() {
             self.uniforms = WaterWaveUniforms {
+                water_bounds: instruction.water_bounds.into(),
                 texture_repeat: instruction.texture_repeat,
                 water_level: instruction.water_level,
                 wave_amplitude: instruction.wave_amplitude,
                 wave_speed: instruction.wave_speed,
                 wave_length: instruction.wave_length,
                 water_opacity: instruction.water_opacity,
+                padding: Default::default(),
             };
             self.bind_group = Self::create_bind_group(
                 device,

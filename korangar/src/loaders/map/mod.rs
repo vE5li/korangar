@@ -3,7 +3,7 @@ mod vertices;
 use std::sync::Arc;
 
 use bytemuck::Pod;
-use cgmath::Vector3;
+use cgmath::{Array, Point2, Vector3};
 use derive_new::new;
 use hashbrown::HashMap;
 use korangar_audio::AudioEngine;
@@ -85,7 +85,13 @@ impl MapLoader {
         #[cfg(not(feature = "debug"))]
         let (_, tile_picker_vertices) = generate_tile_vertices(&mut gat_data);
 
-        let ground_native_vertices = ground_vertices(&ground_data);
+        let water_level = -map_data
+            .water_settings
+            .as_ref()
+            .and_then(|settings| settings.water_level)
+            .unwrap_or_default();
+
+        let (ground_native_vertices, water_bounds) = ground_vertices(&ground_data, water_level);
 
         let ground_vertex_offset = 0;
         let ground_vertex_count = ground_native_vertices.len();
@@ -190,10 +196,17 @@ impl MapLoader {
         let light_sources_kdtree = KDTree::from_objects(&light_source_spheres);
         let background_music_track_name = self.audio_engine.get_track_for_map(&map_file_name);
 
+        // There are maps that don't have water tiles but have water settings. In such
+        // cases we will set the water settings to `None`
+        let water_settings = map_data
+            .water_settings
+            .filter(|_| !(water_bounds.min == Point2::from_value(f32::MAX) && water_bounds.max == Point2::from_value(f32::MIN)));
+
         let map = Map::new(
             gat_data.map_width as usize,
             gat_data.map_height as usize,
-            map_data.water_settings,
+            water_settings,
+            water_bounds,
             map_data.light_settings,
             gat_data.tiles,
             ground_vertex_offset,

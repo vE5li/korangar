@@ -1,8 +1,9 @@
 #[cfg(feature = "debug")]
-use cgmath::{EuclideanSpace, Point2};
-use cgmath::{Point3, Vector2};
+use cgmath::EuclideanSpace;
+use cgmath::{Array, Point2, Point3, Vector2};
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
+use korangar_util::Rectangle;
 use ragnarok_formats::map::{GatData, GroundData, GroundTile, SurfaceType};
 
 #[cfg(feature = "debug")]
@@ -19,8 +20,11 @@ pub enum Heights {
     LowerRight,
 }
 
-pub fn ground_vertices(ground_data: &GroundData) -> Vec<NativeModelVertex> {
+pub fn ground_vertices(ground_data: &GroundData, water_level: f32) -> (Vec<NativeModelVertex>, Rectangle<f32>) {
     let mut native_ground_vertices = Vec::new();
+
+    let mut water_bound_min = Point2::from_value(f32::MAX);
+    let mut water_bound_max = Point2::from_value(f32::MIN);
 
     let width = ground_data.width as usize;
     let height = ground_data.height as usize;
@@ -151,11 +155,32 @@ pub fn ground_vertices(ground_data: &GroundData) -> Vec<NativeModelVertex> {
                         0.0,
                     ));
                 }
+
+                if -current_tile.get_lowest_point() < water_level {
+                    let first_position = Point2::new(x as f32 * MAP_TILE_SIZE, y as f32 * MAP_TILE_SIZE);
+                    let second_position = Point2::new(MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE, y as f32 * MAP_TILE_SIZE);
+                    let third_position = Point2::new(
+                        MAP_TILE_SIZE + x as f32 * MAP_TILE_SIZE,
+                        MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE,
+                    );
+                    let fourth_position = Point2::new(x as f32 * MAP_TILE_SIZE, MAP_TILE_SIZE + y as f32 * MAP_TILE_SIZE);
+
+                    [first_position, second_position, third_position, fourth_position]
+                        .iter()
+                        .for_each(|position| {
+                            water_bound_min.x = f32::min(water_bound_min.x, position.x);
+                            water_bound_min.y = f32::min(water_bound_min.y, position.y);
+                            water_bound_max.x = f32::max(water_bound_max.x, position.x);
+                            water_bound_max.y = f32::max(water_bound_max.y, position.y);
+                        });
+                }
             }
         }
     }
 
-    native_ground_vertices
+    let water_bounds = Rectangle::new(water_bound_min, water_bound_max);
+
+    (native_ground_vertices, water_bounds)
 }
 
 pub fn generate_tile_vertices(
@@ -318,5 +343,23 @@ pub fn neighbor_tile_index(surface_type: SurfaceType) -> Vector2<usize> {
         SurfaceType::Front => Vector2::new(0, 1),
         SurfaceType::Right => Vector2::new(1, 0),
         SurfaceType::Top => Vector2::new(0, 0),
+    }
+}
+
+pub trait GroundTileExt {
+    fn get_lowest_point(&self) -> f32;
+}
+
+impl GroundTileExt for GroundTile {
+    fn get_lowest_point(&self) -> f32 {
+        [
+            self.lower_right_height,
+            self.lower_left_height,
+            self.upper_left_height,
+            self.lower_right_height,
+        ]
+        .into_iter()
+        .reduce(f32::max)
+        .unwrap()
     }
 }

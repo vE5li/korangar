@@ -29,10 +29,16 @@ pub enum MouseCursorState {
     Unsure3,
 }
 
+impl Into<usize> for MouseCursorState {
+    fn into(self) -> usize {
+        self as usize
+    }
+}
+
 pub struct MouseCursor {
     sprite: Arc<Sprite>,
     actions: Arc<Actions>,
-    animation_state: AnimationState,
+    animation_state: AnimationState<MouseCursorState>,
     shown: bool,
 }
 
@@ -40,7 +46,7 @@ impl MouseCursor {
     pub fn new(sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader) -> Self {
         let sprite = sprite_loader.get("cursors.spr").unwrap();
         let actions = action_loader.get("cursors.act").unwrap();
-        let animation_state = AnimationState::new(ClientTick(0));
+        let animation_state = AnimationState::new(MouseCursorState::Default, ClientTick(0));
         let shown = true;
 
         Self {
@@ -70,13 +76,11 @@ impl MouseCursor {
     }
 
     pub fn set_state(&mut self, state: MouseCursorState, client_tick: ClientTick) {
-        let new_state = state as usize;
-
-        if self.animation_state.action != new_state {
+        if self.animation_state.action != state {
             self.animation_state.start_time = client_tick;
         }
 
-        self.animation_state.action = new_state;
+        self.animation_state.action = state;
     }
 
     #[cfg_attr(feature = "debug", korangar_debug::profile("render mouse cursor"))]
@@ -116,7 +120,7 @@ impl MouseCursor {
 
         // TODO: figure out how this is actually supposed to work
         let direction = match self.animation_state.action {
-            0 | 2 | 4 => 0,
+            MouseCursorState::Default | MouseCursorState::Click | MouseCursorState::RotateCamera => 0,
             _ => 7,
         };
 

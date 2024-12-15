@@ -20,7 +20,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{ActionLoader, AnimationLoader, AnimationState, ScriptLoader, SpriteLoader};
+use crate::loaders::{ActionLoader, ActionType, AnimationLoader, AnimationState, ScriptLoader, SpriteLoader};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -325,7 +325,7 @@ impl Common {
             .get(sprite_loader, action_loader, entity_type, &entity_part_files)
             .unwrap();
         let details = ResourceState::Unavailable;
-        let animation_state = AnimationState::new(client_tick);
+        let animation_state = AnimationState::new(ActionType::Idle, client_tick);
 
         let mut common = Self {
             grid_position,
@@ -551,7 +551,7 @@ impl Common {
             if steps.len() > 1 {
                 self.active_movement = Movement::new(steps, starting_timestamp.0).into();
 
-                if self.animation_state.action != 1 {
+                if self.animation_state.action != ActionType::Walk {
                     self.animation_state.walk(self.movement_speed, starting_timestamp);
                 }
             }

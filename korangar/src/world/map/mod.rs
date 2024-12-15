@@ -9,7 +9,7 @@ use korangar_audio::AudioEngine;
 use korangar_interface::windows::PrototypeWindow;
 use korangar_util::collision::{Frustum, KDTree, Sphere, AABB};
 use korangar_util::container::{SimpleKey, SimpleSlab};
-use korangar_util::create_simple_key;
+use korangar_util::{create_simple_key, Rectangle};
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
 #[cfg(feature = "debug")]
@@ -118,6 +118,7 @@ pub struct Map {
     width: usize,
     height: usize,
     water_settings: Option<WaterSettings>,
+    water_bounds: Rectangle<f32>,
     light_settings: LightSettings,
     tiles: Vec<Tile>,
     ground_vertex_offset: usize,
@@ -141,6 +142,10 @@ pub struct Map {
 }
 
 impl Map {
+    pub fn water_bounds(&self) -> Rectangle<f32> {
+        self.water_bounds
+    }
+
     pub fn x_in_bounds(&self, x: usize) -> bool {
         x <= self.width
     }
@@ -295,6 +300,7 @@ impl Map {
 
             *water_instruction = Some(WaterInstruction {
                 water_texture: &water_textures[water_texture_index as usize],
+                water_bounds: self.water_bounds(),
                 texture_repeat,
                 water_level,
                 wave_amplitude,

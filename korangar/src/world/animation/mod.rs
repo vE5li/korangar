@@ -8,7 +8,7 @@ use ragnarok_packets::EntityId;
 #[cfg(feature = "debug")]
 use crate::graphics::DebugRectangleInstruction;
 use crate::graphics::{Color, EntityInstruction};
-use crate::loaders::{Actions, AnimationState, Sprite};
+use crate::loaders::{ActionType, Actions, AnimationState, Sprite};
 use crate::world::{Camera, EntityType};
 
 const TILE_SIZE: f32 = 10.0;
@@ -86,7 +86,7 @@ impl AnimationData {
     pub fn get_frame(&self, animation_state: &AnimationState, camera: &dyn Camera, head_direction: usize) -> &AnimationFrame {
         let camera_direction = camera.camera_direction();
         let direction = (camera_direction + head_direction) % 8;
-        let aa = animation_state.action * 8 + direction;
+        let aa = animation_state.action as usize * 8 + direction;
         let delay = self.delays[aa % self.delays.len()];
         let animation = &self.animations[aa % self.animations.len()];
 
@@ -106,7 +106,7 @@ impl AnimationData {
         let mut frame = &animation.frames[time];
 
         // Remove Doridori animation from Player
-        if self.entity_type == EntityType::Player && animation_state.action == 0 {
+        if self.entity_type == EntityType::Player && animation_state.action == ActionType::Idle {
             frame = &animation.frames[0];
         }
         return frame;

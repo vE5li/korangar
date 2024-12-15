@@ -25,10 +25,23 @@ use crate::renderer::SpriteRenderer;
 const MAX_CACHE_COUNT: u32 = 256;
 const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
 
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum ActionType {
+    #[default]
+    Idle = 0,
+    Walk = 1,
+    Dead = 8,
+}
+
+impl Into<usize> for ActionType {
+    fn into(self) -> usize {
+        self as usize
+    }
+}
+
 #[derive(Clone, Debug, new)]
-pub struct AnimationState {
-    #[new(default)]
-    pub action: usize,
+pub struct AnimationState<T = ActionType> {
+    pub action: T,
     pub start_time: ClientTick,
     #[new(default)]
     pub time: u32,
@@ -38,28 +51,30 @@ pub struct AnimationState {
     pub factor: Option<f32>,
 }
 
-impl AnimationState {
+impl AnimationState<ActionType> {
     pub fn idle(&mut self, client_tick: ClientTick) {
-        self.action = 0;
+        self.action = ActionType::Idle;
         self.start_time = client_tick;
         self.duration = None;
         self.factor = None;
     }
 
     pub fn walk(&mut self, movement_speed: usize, client_tick: ClientTick) {
-        self.action = 1;
+        self.action = ActionType::Walk;
         self.start_time = client_tick;
         self.duration = None;
         self.factor = Some(movement_speed as f32 * 100.0 / 150.0);
     }
 
     pub fn dead(&mut self, client_tick: ClientTick) {
-        self.action = 8;
+        self.action = ActionType::Dead;
         self.start_time = client_tick;
         self.duration = None;
         self.factor = None;
     }
+}
 
+impl<T> AnimationState<T> {
     pub fn update(&mut self, client_tick: ClientTick) {
         let mut time = client_tick.0.saturating_sub(self.start_time.0);
 
@@ -90,18 +105,20 @@ pub struct Actions {
 }
 
 impl Actions {
-    pub fn render(
+    pub fn render<T>(
         &self,
         renderer: &impl SpriteRenderer,
         sprite: &Sprite,
-        animation_state: &AnimationState,
+        animation_state: &AnimationState<T>,
         position: ScreenPosition,
         camera_direction: usize,
         color: Color,
         application: &InterfaceSettings,
-    ) {
+    ) where
+        T: Into<usize> + Copy,
+    {
         let direction = camera_direction % 8;
-        let aa = animation_state.action * 8 + direction;
+        let aa = animation_state.action.into() * 8 + direction;
         let a = &self.actions[aa % self.actions.len()];
         let delay = self.delays[aa % self.delays.len()];
 

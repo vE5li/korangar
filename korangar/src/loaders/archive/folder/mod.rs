@@ -70,11 +70,6 @@ impl Archive for FolderArchive {
 }
 
 impl Writable for FolderArchive {
-    fn create(&mut self) {
-        fs::create_dir_all(&self.folder_path)
-            .unwrap_or_else(|_| panic!("error creating folder {} for FolderArchive", self.folder_path.display()));
-    }
-
     fn add_file(&mut self, file_path: &str, file_data: Vec<u8>) {
         let normalized_asset_path = Self::os_specific_path(file_path);
         let full_path = self.folder_path.join(normalized_asset_path);

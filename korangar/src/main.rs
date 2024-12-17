@@ -2394,7 +2394,8 @@ impl ApplicationHandler for Client {
                         height: INITIAL_SCREEN_SIZE.height,
                     })
                     .with_title(CLIENT_NAME)
-                    .with_window_icon(Some(icon));
+                    .with_window_icon(Some(icon))
+                    .with_visible(false);
                 let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
                 let backend_name = self.graphics_engine.get_backend_name();
@@ -2410,9 +2411,9 @@ impl ApplicationHandler for Client {
 
         // Android devices need to drop the surface on suspend, so we might need to
         // re-create it.
-        if let Some(window) = self.window.clone() {
+        if let Some(window) = self.window.as_ref() {
             self.graphics_engine.on_resume(
-                window,
+                window.clone(),
                 *self.triple_buffering.get(),
                 *self.vsync.get(),
                 *self.limit_framerate.get(),
@@ -2422,7 +2423,9 @@ impl ApplicationHandler for Client {
                 *self.ssaa.get(),
                 *self.screen_space_anti_aliasing.get(),
                 *self.high_quality_interface.get(),
-            )
+            );
+
+            window.set_visible(true);
         }
 
         if *self.mute_on_focus_loss.get() {
@@ -2490,6 +2493,10 @@ impl ApplicationHandler for Client {
 
     fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
         self.graphics_engine.on_suspended();
+
+        if let Some(window) = self.window.as_ref() {
+            window.set_visible(false);
+        }
 
         if *self.mute_on_focus_loss.get() {
             self.audio_engine.mute(true);

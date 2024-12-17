@@ -88,14 +88,19 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
     switch (instance.rectangle_type) {
         case 1u: {
+            // SDF
+            let pixel = textureSample(texture, linear_sampler, input.texture_coordinates);
+            color *= vec4(pixel.rgb, saturate((pixel.a - 0.5) * 2.0 / fwidth(pixel.a)));
+        }
+        case 2u: {
             // Sprite (linear filtering)
             color *= textureSample(texture, linear_sampler, input.texture_coordinates);
         }
-        case 2u: {
+        case 3u: {
             // Sprite (nearest filtering)
             color *= textureSample(texture, nearest_sampler, input.texture_coordinates);
         }
-        case 3u: {
+        case 4u: {
             // Text (coverage)
             color *= textureSample(font_atlas, nearest_sampler, input.texture_coordinates).r;
         }
@@ -155,13 +160,13 @@ fn rectangle_with_rounded_edges(
             let sample_distance = rectangle_sdf(relative_position + offset, half_size, corner_radius);
             total += step(0.0, -sample_distance);
         }
-        alpha = total * (1.0/9.0);
+        alpha = total * (1.0 / 9.0);
     }
 
     return color * alpha;
 }
 
-// 8-point Poisson Disk pattern
+// 8-point Poisson Disk pattern that showed the best performance / quality characteristic.
 const SAMPLE_OFFSETS: array<vec2<f32>, 8> = array<vec2<f32>, 8>(
     vec2<f32>( 0.924,  0.382) * 0.5,
     vec2<f32>( 0.382,  0.924) * 0.5,

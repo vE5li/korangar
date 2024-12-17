@@ -43,8 +43,8 @@ pub(crate) struct InstanceData {
     screen_size: [f32; 2],
     texture_position: [f32; 2],
     texture_size: [f32; 2],
+    rectangle_type: u32,
     texture_index: i32,
-    linear_filtering: u32,
     padding: [u32; 2],
 }
 
@@ -215,12 +215,16 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
             pass.set_bind_group(2, self.solid_pixel_texture.get_bind_group(), &[]);
 
             for (index, instruction) in draw_data.instructions.iter().enumerate() {
-                if let RectangleInstruction::Sprite { texture, .. } = instruction
-                    && texture.get_id() != current_texture_id
-                {
-                    current_texture_id = texture.get_id();
-                    pass.set_bind_group(2, texture.get_bind_group(), &[]);
+                match instruction {
+                    RectangleInstruction::Sdf { texture, .. } | RectangleInstruction::Sprite { texture, .. }
+                        if texture.get_id() != current_texture_id =>
+                    {
+                        current_texture_id = texture.get_id();
+                        pass.set_bind_group(2, texture.get_bind_group(), &[]);
+                    }
+                    _ => {}
                 }
+
                 let index = offset + index as u32;
 
                 pass.draw(0..6, index..index + 1);
@@ -274,18 +278,17 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 screen_size: (*screen_size).into(),
                                 texture_position: [0.0; 2],
                                 texture_size: [0.0; 2],
+                                rectangle_type: 0,
                                 texture_index: -1,
-                                linear_filtering: 0,
                                 padding: Default::default(),
                             });
                         }
-                        RectangleInstruction::Sprite {
+                        RectangleInstruction::Sdf {
                             screen_position,
                             screen_size,
                             color,
                             texture_position,
                             texture_size,
-                            linear_filtering,
                             texture,
                         } => {
                             let mut texture_index = texture_views.len() as i32;
@@ -305,8 +308,41 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 screen_size: (*screen_size).into(),
                                 texture_position: (*texture_position).into(),
                                 texture_size: (*texture_size).into(),
+                                rectangle_type: 1,
                                 texture_index,
-                                linear_filtering: *linear_filtering as u32,
+                                padding: Default::default(),
+                            });
+                        }
+                        RectangleInstruction::Sprite {
+                            screen_position,
+                            screen_size,
+                            color,
+                            texture_position,
+                            texture_size,
+                            linear_filtering,
+                            texture,
+                        } => {
+                            let rectangle_type = if *linear_filtering { 2 } else { 3 };
+
+                            let mut texture_index = texture_views.len() as i32;
+                            let id = texture.get_id();
+                            let potential_index = self.lookup.get(&id);
+
+                            if let Some(potential_index) = potential_index {
+                                texture_index = *potential_index;
+                            } else {
+                                self.lookup.insert(id, texture_index);
+                                texture_views.push(texture.get_texture_view());
+                            }
+
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: (*texture_position).into(),
+                                texture_size: (*texture_size).into(),
+                                rectangle_type,
+                                texture_index,
                                 padding: Default::default(),
                             });
                         }
@@ -348,8 +384,27 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 screen_size: (*screen_size).into(),
                                 texture_position: [0.0; 2],
                                 texture_size: [0.0; 2],
+                                rectangle_type: 0,
                                 texture_index: -1,
-                                linear_filtering: 0,
+                                padding: Default::default(),
+                            });
+                        }
+                        RectangleInstruction::Sdf {
+                            screen_position,
+                            screen_size,
+                            color,
+                            texture_position,
+                            texture_size,
+                            texture: _,
+                        } => {
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: (*texture_position).into(),
+                                texture_size: (*texture_size).into(),
+                                rectangle_type: 1,
+                                texture_index: 0,
                                 padding: Default::default(),
                             });
                         }
@@ -362,14 +417,16 @@ impl Prepare for PostProcessingRectangleDrawer {
                             linear_filtering,
                             texture: _,
                         } => {
+                            let rectangle_type = if *linear_filtering { 2 } else { 3 };
+
                             self.instance_data.push(InstanceData {
                                 color: color.components_linear(),
                                 screen_position: (*screen_position).into(),
                                 screen_size: (*screen_size).into(),
                                 texture_position: (*texture_position).into(),
                                 texture_size: (*texture_size).into(),
+                                rectangle_type,
                                 texture_index: 0,
-                                linear_filtering: *linear_filtering as u32,
                                 padding: Default::default(),
                             });
                         }

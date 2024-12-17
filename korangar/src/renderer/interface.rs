@@ -15,8 +15,8 @@ use crate::renderer::SpriteRenderer;
 pub struct InterfaceRenderer {
     instructions: RefCell<Vec<InterfaceRectangleInstruction>>,
     font_loader: Rc<RefCell<FontLoader>>,
-    checked_box_texture: Arc<Texture>,
-    unchecked_box_texture: Arc<Texture>,
+    filled_box_texture: Arc<Texture>,
+    unfilled_box_texture: Arc<Texture>,
     expanded_arrow_texture: Arc<Texture>,
     collapsed_arrow_texture: Arc<Texture>,
     window_size: ScreenSize,
@@ -33,8 +33,8 @@ impl InterfaceRenderer {
     ) -> Self {
         let instructions = RefCell::new(Vec::default());
 
-        let checked_box_texture = texture_loader.get("checked_box.png").unwrap();
-        let unchecked_box_texture = texture_loader.get("unchecked_box.png").unwrap();
+        let filled_box_texture = texture_loader.get("filled_box.png").unwrap();
+        let unfilled_box_texture = texture_loader.get("unfilled_box.png").unwrap();
         let expanded_arrow_texture = texture_loader.get("expanded_arrow.png").unwrap();
         let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png").unwrap();
 
@@ -43,8 +43,8 @@ impl InterfaceRenderer {
         Self {
             instructions,
             font_loader,
-            checked_box_texture,
-            unchecked_box_texture,
+            filled_box_texture,
+            unfilled_box_texture,
             expanded_arrow_texture,
             collapsed_arrow_texture,
             window_size,
@@ -182,7 +182,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         );
 
         if self.high_quality_interface {
-            size.y = size.y / 2;
+            size.y /= 2;
         }
 
         size.y as f32
@@ -197,11 +197,11 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         checked: bool,
     ) {
         let texture = match checked {
-            true => self.checked_box_texture.clone(),
-            false => self.unchecked_box_texture.clone(),
+            true => self.filled_box_texture.clone(),
+            false => self.unfilled_box_texture.clone(),
         };
 
-        self.render_sprite(texture, position, size, clip, color, true);
+        self.render_sdf(texture, position, size, clip, color);
     }
 
     fn render_expand_arrow(
@@ -217,7 +217,7 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
             false => self.collapsed_arrow_texture.clone(),
         };
 
-        self.render_sprite(texture, position, size, clip, color, true);
+        self.render_sdf(texture, position, size, clip, color);
     }
 }
 
@@ -248,6 +248,26 @@ impl SpriteRenderer for InterfaceRenderer {
             corner_radius,
             texture,
             smooth,
+        });
+    }
+
+    fn render_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, mut screen_clip: ScreenClip, color: Color) {
+        if self.high_quality_interface {
+            screen_clip = screen_clip * 2.0;
+        }
+
+        // Normalize screen_position and screen_size in range 0.0 and 1.0.
+        let screen_position = position / self.window_size;
+        let screen_size = size / self.window_size;
+        let corner_radius = CornerRadius::default();
+
+        self.instructions.borrow_mut().push(InterfaceRectangleInstruction::Sdf {
+            screen_position,
+            screen_size,
+            screen_clip,
+            color,
+            corner_radius,
+            texture,
         });
     }
 }

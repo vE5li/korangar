@@ -46,7 +46,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         case 1u: {
             // SDF
             let pixel = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
-            return vec4(pixel.rgb, saturate((pixel.a - 0.5) * 2.0 / fwidth(pixel.a))) * instance.color;
+            let alpha = step(0.5, pixel.a);
+            return vec4(pixel.rgb * alpha, alpha) * instance.color;
         }
         case 2u: {
             // Sprite (linear filtering)

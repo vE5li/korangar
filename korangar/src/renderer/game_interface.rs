@@ -266,13 +266,12 @@ impl MarkerRenderer for GameInterfaceRenderer {
                 MarkerIdentifier::Shadow(..) => (&self.shadow_marker_texture, Color::rgb_u8(170, 170, 170)),
             };
 
-            self.instructions.borrow_mut().push(RectangleInstruction::Sprite {
+            self.instructions.borrow_mut().push(RectangleInstruction::Sdf {
                 screen_position,
                 screen_size,
                 color,
                 texture_position: Vector2::new(0.0, 0.0),
                 texture_size: Vector2::new(1.0, 1.0),
-                linear_filtering: true,
                 texture: texture.clone(),
             });
         }

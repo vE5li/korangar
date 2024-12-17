@@ -88,14 +88,19 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
     switch (instance.rectangle_type) {
         case 1u: {
+            // SDF
+            let pixel = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
+            color *= vec4(pixel.rgb, saturate((pixel.a - 0.5) * 2.0 / fwidth(pixel.a)));
+        }
+        case 2u: {
             // Sprite (linear filtering)
             color *= textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
         }
-        case 2u: {
+        case 3u: {
             // Sprite (nearest filtering)
             color *= textureSample(textures[instance.texture_index], nearest_sampler, input.texture_coordinates);
         }
-        case 3u: {
+        case 4u: {
             // Text (coverage)
             color *= textureSample(font_atlas, nearest_sampler, input.texture_coordinates).r;
         }

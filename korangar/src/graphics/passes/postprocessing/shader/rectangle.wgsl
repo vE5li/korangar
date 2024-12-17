@@ -4,8 +4,8 @@ struct InstanceData {
     screen_size: vec2<f32>,
     texture_position: vec2<f32>,
     texture_size: vec2<f32>,
+    rectangle_type: u32,
     texture_index: i32,
-    linear_filtering: u32,
 }
 
 struct VertexOutput {
@@ -42,14 +42,24 @@ fn vs_main(
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let instance = instance_data[input.instance_index];
 
-    if instance.texture_index == -1 {
-        return instance.color;
-    }
-
-    if instance.linear_filtering == 0 {
-        return textureSample(texture, nearest_sampler, input.texture_coordinates) * instance.color;
-    } else {
-        return textureSample(texture, linear_sampler, input.texture_coordinates) * instance.color;
+    switch (instance.rectangle_type) {
+        case 1u: {
+            // SDF
+            let pixel = textureSample(texture, linear_sampler, input.texture_coordinates);
+            return vec4(pixel.rgb, saturate((pixel.a - 0.5) * 2.0 / fwidth(pixel.a))) * instance.color;
+        }
+        case 2u: {
+            // Sprite (linear filtering)
+            return textureSample(texture, linear_sampler, input.texture_coordinates) * instance.color;
+        }
+        case 3u: {
+            // Sprite (nearest filtering)
+            return textureSample(texture, nearest_sampler, input.texture_coordinates) * instance.color;
+        }
+        default: {
+            // Solid
+            return instance.color;
+        }
     }
 }
 

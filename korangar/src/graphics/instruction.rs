@@ -121,6 +121,14 @@ pub enum RectangleInstruction {
         screen_size: ScreenSize,
         color: Color,
     },
+    Sdf {
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        color: Color,
+        texture_position: Vector2<f32>,
+        texture_size: Vector2<f32>,
+        texture: Arc<Texture>,
+    },
     Sprite {
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
@@ -140,6 +148,14 @@ pub enum InterfaceRectangleInstruction {
         screen_clip: ScreenClip,
         color: Color,
         corner_radius: CornerRadius,
+    },
+    Sdf {
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        screen_clip: ScreenClip,
+        color: Color,
+        corner_radius: CornerRadius,
+        texture: Arc<Texture>,
     },
     Sprite {
         screen_position: ScreenPosition,

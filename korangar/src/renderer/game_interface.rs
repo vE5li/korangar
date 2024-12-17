@@ -49,6 +49,37 @@ impl SpriteRenderer for GameInterfaceRenderer {
     ) {
         self.render_indexed(texture, position, size, color, 1, 0, smooth);
     }
+
+    fn render_sdf(
+        &self,
+        texture: Arc<Texture>,
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        _screen_clip: ScreenClip,
+        color: Color,
+    ) {
+        let screen_position = ScreenPosition {
+            left: screen_position.left / self.window_size.width,
+            top: screen_position.top / self.window_size.height,
+        };
+
+        let screen_size = ScreenSize {
+            width: screen_size.width / self.window_size.width,
+            height: screen_size.height / self.window_size.height,
+        };
+
+        let texture_position = Vector2::new(0.0, 0.0);
+        let texture_size = Vector2::new(1.0, 1.0);
+
+        self.instructions.borrow_mut().push(RectangleInstruction::Sdf {
+            screen_position,
+            screen_size,
+            color,
+            texture_position,
+            texture_size,
+            texture,
+        });
+    }
 }
 
 impl GameInterfaceRenderer {

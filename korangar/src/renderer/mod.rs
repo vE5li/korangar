@@ -34,6 +34,8 @@ pub trait SpriteRenderer {
         color: Color,
         smooth: bool,
     );
+
+    fn render_sdf(&self, texture: Arc<Texture>, position: ScreenPosition, size: ScreenSize, screen_clip: ScreenClip, color: Color);
 }
 
 /// Trait to render markers.

@@ -991,12 +991,17 @@ impl GraphicsEngine {
                         .forward_pass_context
                         .create_pass(&mut forward_encoder, &engine_context.global_context, None);
 
-                let draw_data = ModelBatchDrawData {
+                let batch_data = &ModelBatchDrawData {
                     batches: instruction.model_batches,
                     instructions: instruction.models,
                     #[cfg(feature = "debug")]
                     show_wireframe: instruction.render_settings.show_wireframe,
                 };
+
+                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                    batch_data,
+                    draw_transparent: false,
+                });
 
                 engine_context.forward_entity_drawer.draw(&mut render_pass, instruction.entities);
 
@@ -1004,7 +1009,10 @@ impl GraphicsEngine {
                     .forward_indicator_drawer
                     .draw(&mut render_pass, instruction.indicator.as_ref());
 
-                engine_context.forward_model_drawer.draw(&mut render_pass, draw_data);
+                engine_context.forward_model_drawer.draw(&mut render_pass, ForwardModelDrawData {
+                    batch_data,
+                    draw_transparent: true,
+                });
 
                 #[cfg(feature = "debug")]
                 {

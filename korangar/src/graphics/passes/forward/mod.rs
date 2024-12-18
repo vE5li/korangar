@@ -14,7 +14,7 @@ pub(crate) use aabb::ForwardAabbDrawer;
 pub(crate) use circle::ForwardCircleDrawer;
 pub(crate) use entity::ForwardEntityDrawer;
 pub(crate) use indicator::ForwardIndicatorDrawer;
-pub(crate) use model::ForwardModelDrawer;
+pub(crate) use model::{ForwardModelDrawData, ForwardModelDrawer};
 #[cfg(feature = "debug")]
 pub(crate) use rectangle::ForwardRectangleDrawer;
 use wgpu::{

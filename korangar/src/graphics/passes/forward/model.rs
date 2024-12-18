@@ -31,6 +31,11 @@ struct InstanceData {
     inv_world: [[f32; 4]; 4],
 }
 
+pub(crate) struct ForwardModelDrawData<'a> {
+    pub(crate) batch_data: &'a ModelBatchDrawData<'a>,
+    pub(crate) draw_transparent: bool,
+}
+
 pub(crate) struct ForwardModelDrawer {
     multi_draw_indirect_support: bool,
     instance_data_buffer: Buffer<InstanceData>,
@@ -51,7 +56,7 @@ pub(crate) struct ForwardModelDrawer {
 
 impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttachmentCount::One }> for ForwardModelDrawer {
     type Context = ForwardRenderPassContext;
-    type DrawData<'data> = ModelBatchDrawData<'data>;
+    type DrawData<'data> = ForwardModelDrawData<'data>;
 
     fn new(
         capabilities: &Capabilities,
@@ -192,7 +197,9 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
     }
 
     fn draw(&mut self, pass: &mut RenderPass<'_>, draw_data: Self::DrawData<'_>) {
-        if self.opaque_batches.is_empty() && self.transparent_batches.is_empty() {
+        if (!draw_data.draw_transparent && self.opaque_batches.is_empty())
+            || (draw_data.draw_transparent && self.transparent_batches.is_empty())
+        {
             return;
         }
 
@@ -232,45 +239,50 @@ impl Drawer<{ BindGroupCount::Two }, { ColorAttachmentCount::One }, { DepthAttac
 
         pass.set_bind_group(2, &self.bind_group, &[]);
 
-        #[cfg(feature = "debug")]
-        let opaque_pipeline = if draw_data.show_wireframe {
-            &self.wireframe_pipeline
-        } else {
-            &self.opaque_pipeline
-        };
-        #[cfg(not(feature = "debug"))]
-        let opaque_pipeline = &self.opaque_pipeline;
+        match draw_data.draw_transparent {
+            false => {
+                #[cfg(feature = "debug")]
+                let opaque_pipeline = if draw_data.batch_data.show_wireframe {
+                    &self.wireframe_pipeline
+                } else {
+                    &self.opaque_pipeline
+                };
+                #[cfg(not(feature = "debug"))]
+                let opaque_pipeline = &self.opaque_pipeline;
 
-        pass.set_pipeline(opaque_pipeline);
+                pass.set_pipeline(opaque_pipeline);
 
-        process_batches(
-            pass,
-            &self.opaque_batches,
-            &draw_data,
-            &self.instance_index_vertex_buffer,
-            &self.command_buffer,
-            self.multi_draw_indirect_support,
-        );
+                process_batches(
+                    pass,
+                    &self.opaque_batches,
+                    &draw_data.batch_data,
+                    &self.instance_index_vertex_buffer,
+                    &self.command_buffer,
+                    self.multi_draw_indirect_support,
+                );
+            }
+            true => {
+                #[cfg(feature = "debug")]
+                let transparent_pipeline = if draw_data.batch_data.show_wireframe {
+                    &self.wireframe_pipeline
+                } else {
+                    &self.transparent_pipeline
+                };
+                #[cfg(not(feature = "debug"))]
+                let transparent_pipeline = &self.transparent_pipeline;
 
-        #[cfg(feature = "debug")]
-        let transparent_pipeline = if draw_data.show_wireframe {
-            &self.wireframe_pipeline
-        } else {
-            &self.transparent_pipeline
-        };
-        #[cfg(not(feature = "debug"))]
-        let transparent_pipeline = &self.transparent_pipeline;
+                pass.set_pipeline(transparent_pipeline);
 
-        pass.set_pipeline(transparent_pipeline);
-
-        process_batches(
-            pass,
-            &self.transparent_batches,
-            &draw_data,
-            &self.instance_index_vertex_buffer,
-            &self.command_buffer,
-            self.multi_draw_indirect_support,
-        );
+                process_batches(
+                    pass,
+                    &self.transparent_batches,
+                    &draw_data.batch_data,
+                    &self.instance_index_vertex_buffer,
+                    &self.command_buffer,
+                    self.multi_draw_indirect_support,
+                );
+            }
+        }
     }
 }
 

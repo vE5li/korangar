@@ -8,7 +8,7 @@ use korangar_interface::application::Application;
 use crate::graphics::{Color, InterfaceRectangleInstruction, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{CornerRadius, ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontLoader, GlyphInstruction, TextLayout, TextureLoader};
+use crate::loaders::{FontLoader, GlyphInstruction, ImageType, TextLayout, TextureLoader};
 use crate::renderer::SpriteRenderer;
 
 /// Renders the interface provided by 'korangar_interface'.
@@ -33,10 +33,10 @@ impl InterfaceRenderer {
     ) -> Self {
         let instructions = RefCell::new(Vec::default());
 
-        let filled_box_texture = texture_loader.get("filled_box.png").unwrap();
-        let unfilled_box_texture = texture_loader.get("unfilled_box.png").unwrap();
-        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png").unwrap();
-        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png").unwrap();
+        let filled_box_texture = texture_loader.get("filled_box.png", ImageType::Grayscale).unwrap();
+        let unfilled_box_texture = texture_loader.get("unfilled_box.png", ImageType::Grayscale).unwrap();
+        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", ImageType::Grayscale).unwrap();
+        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", ImageType::Grayscale).unwrap();
 
         let interface_size = if high_quality_interface { window_size * 2.0 } else { window_size };
 

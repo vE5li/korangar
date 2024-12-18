@@ -38,29 +38,61 @@ fn vs_main(
     return output;
 }
 
+/// The range of the SDF border defines the outline of an SDF. msdfgen calls this pxrange.
+/// We normaly use pxrange of 8 px when creating 64x64 SDFs, which results in an out border of 4 px in texture space.
+const BORDER_WIDTH: f32 = 0.5;
+const EDGE_VALUE: f32 = 0.5;
+
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     let instance = instance_data[input.instance_index];
 
+    var color: vec4<f32> = instance.color;
+
     switch (instance.rectangle_type) {
         case 1u: {
             // SDF
-            let pixel = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
-            return vec4(pixel.rgb, saturate((pixel.a - 0.5) * 2.0 / fwidth(pixel.a))) * instance.color;
+            let distance = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates).r;
+            let aa_width = fwidth(distance);
+
+            color *= vec4(step(EDGE_VALUE, distance));
+
+            // Outside outline
+            if (distance > EDGE_VALUE - BORDER_WIDTH && distance < EDGE_VALUE) {
+                let bias = 0.1;
+                let border_max = (EDGE_VALUE - BORDER_WIDTH) + bias;
+
+                // Transition from transparent to black outline
+                let outer_alpha = smoothstep(
+                    border_max,
+                    border_max + aa_width,
+                    distance
+                );
+                color = vec4<f32>(0.0, 0.0, 0.0, outer_alpha);
+            }
+            // Inside outline
+            else if (distance >= EDGE_VALUE && distance < EDGE_VALUE + aa_width) {
+                // Transition from black outline to fill color
+                let inner_blend = smoothstep(
+                    EDGE_VALUE,
+                    EDGE_VALUE + aa_width,
+                    distance
+                );
+                color = mix(vec4<f32>(0.0, 0.0, 0.0, 1.0), instance.color, inner_blend);
+            }
         }
         case 2u: {
             // Sprite (linear filtering)
-            return textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates) * instance.color;
+            color *= textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
         }
         case 3u: {
             // Sprite (nearest filtering)
-            return textureSample(textures[instance.texture_index], nearest_sampler, input.texture_coordinates) * instance.color;
+            color *= textureSample(textures[instance.texture_index], nearest_sampler, input.texture_coordinates);
         }
-        default: {
-            // Solid
-            return instance.color;
-        }
+        default: {}
     }
+
+    return color;
 }
 
 // Optimized version of the following truth table:

@@ -3,7 +3,7 @@ use std::num::{NonZeroU32, NonZeroUsize};
 use std::sync::{Arc, Mutex};
 
 use hashbrown::HashMap;
-use image::{ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
+use image::{GrayImage, ImageBuffer, ImageFormat, ImageReader, Rgba, RgbaImage};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
 use korangar_util::color::contains_transparent_pixel;
@@ -23,13 +23,19 @@ use crate::loaders::GameFileLoader;
 const MAX_CACHE_COUNT: u32 = 512;
 const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum ImageType {
+    Color,
+    Grayscale,
+}
+
 pub struct TextureLoader {
     device: Arc<Device>,
     queue: Arc<Queue>,
     game_file_loader: Arc<GameFileLoader>,
     mip_map_render_context: MipMapRenderPassContext,
     lanczos3_drawer: Lanczos3Drawer,
-    cache: Mutex<SimpleCache<String, Arc<Texture>>>,
+    cache: Mutex<SimpleCache<(String, ImageType), Arc<Texture>>>,
 }
 
 impl TextureLoader {
@@ -69,6 +75,30 @@ impl TextureLoader {
             },
             image.as_raw(),
             transparent,
+        );
+        Arc::new(texture)
+    }
+
+    pub fn create_grayscale(&self, name: &str, image: GrayImage) -> Arc<Texture> {
+        let texture = Texture::new_with_data(
+            &self.device,
+            &self.queue,
+            &TextureDescriptor {
+                label: Some(name),
+                size: Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::R8Unorm,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            image.as_raw(),
+            false,
         );
         Arc::new(texture)
     }
@@ -127,14 +157,23 @@ impl TextureLoader {
         Arc::new(texture)
     }
 
-    fn load(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
-        let (texture_data, transparent) = self.load_texture_data(path)?;
-        let texture = self.create(path, texture_data, transparent);
+    fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
+        let texture = match image_type {
+            ImageType::Color => {
+                let (texture_data, transparent) = self.load_texture_data(path)?;
+                self.create(path, texture_data, transparent)
+            }
+            ImageType::Grayscale => {
+                let texture_data = self.load_grayscale_texture_data(path)?;
+                self.create_grayscale(path, texture_data)
+            }
+        };
+
         self.cache
             .lock()
             .as_mut()
             .unwrap()
-            .insert(path.to_string(), texture.clone())
+            .insert((path.to_string(), image_type), texture.clone())
             .unwrap();
         Ok(texture)
     }
@@ -219,14 +258,71 @@ impl TextureLoader {
         Ok((image_buffer, transparent))
     }
 
-    pub fn get(&self, path: &str) -> Result<Arc<Texture>, LoadError> {
+    pub fn load_grayscale_texture_data(&self, path: &str) -> Result<GrayImage, LoadError> {
+        #[cfg(feature = "debug")]
+        let timer = Timer::new_dynamic(format!("load grayscale texture data from {}", path.magenta()));
+
+        let image_format = match &path[path.len() - 4..] {
+            ".png" | ".PNG" => ImageFormat::Png,
+            ".tga" | ".TGA" => ImageFormat::Tga,
+            _ => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("File with unknown image format found: {:?}", path);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.load_grayscale_texture_data(FALLBACK_PNG_FILE);
+            }
+        };
+
+        let file_data = match self.game_file_loader.get(&format!("data\\texture\\{path}")) {
+            Ok(file_data) => file_data,
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to load image: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                return self.load_grayscale_texture_data(FALLBACK_PNG_FILE);
+            }
+        };
+        let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
+
+        let image_buffer = match reader.decode() {
+            Ok(image) => image.to_luma8(),
+            Err(_error) => {
+                #[cfg(feature = "debug")]
+                {
+                    print_debug!("Failed to decode image: {:?}", _error);
+                    print_debug!("Replacing with fallback");
+                }
+
+                let fallback_path = match image_format {
+                    ImageFormat::Png => FALLBACK_PNG_FILE,
+                    ImageFormat::Tga => FALLBACK_TGA_FILE,
+                    _ => unreachable!(),
+                };
+
+                return self.load_grayscale_texture_data(fallback_path);
+            }
+        };
+
+        #[cfg(feature = "debug")]
+        timer.stop();
+
+        Ok(image_buffer)
+    }
+
+    pub fn get(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let mut lock = self.cache.lock();
-        match lock.as_mut().unwrap().get(path) {
+        match lock.as_mut().unwrap().get(&(path.into(), image_type)) {
             Some(texture) => Ok(texture.clone()),
             None => {
                 // We need to drop to avoid a deadlock here.
                 drop(lock);
-                self.load(path)
+                self.load(path, image_type)
             }
         }
     }

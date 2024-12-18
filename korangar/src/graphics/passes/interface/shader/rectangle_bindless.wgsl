@@ -89,8 +89,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
     switch (instance.rectangle_type) {
         case 1u: {
             // SDF
-            let pixel = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
-            color *= vec4(pixel.rgb, saturate((pixel.a - 0.5) * 2.0 / fwidth(pixel.a)));
+            let distance = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates).r;
+            color *= vec4(saturate((distance - 0.5) * 2.0 / fwidth(distance)));
         }
         case 2u: {
             // Sprite (linear filtering)

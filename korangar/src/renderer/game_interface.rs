@@ -8,7 +8,7 @@ use korangar_interface::application::FontSizeTrait;
 
 use crate::graphics::{Color, RectangleInstruction, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontSize, TextureLoader};
+use crate::loaders::{FontSize, ImageType, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::renderer::SpriteRenderer;
@@ -85,19 +85,19 @@ impl SpriteRenderer for GameInterfaceRenderer {
 impl GameInterfaceRenderer {
     pub fn new(window_size: ScreenSize, texture_loader: &TextureLoader) -> Self {
         let instructions = RefCell::new(Vec::new());
-        let font_map_texture = texture_loader.get("font.png").unwrap();
+        let font_map_texture = texture_loader.get("font.png", ImageType::Color).unwrap();
         #[cfg(feature = "debug")]
-        let object_marker_texture = texture_loader.get("marker_object.png").unwrap();
+        let object_marker_texture = texture_loader.get("marker_object.png", ImageType::Grayscale).unwrap();
         #[cfg(feature = "debug")]
-        let light_source_marker_texture = texture_loader.get("marker_light.png").unwrap();
+        let light_source_marker_texture = texture_loader.get("marker_light.png", ImageType::Grayscale).unwrap();
         #[cfg(feature = "debug")]
-        let sound_source_marker_texture = texture_loader.get("marker_sound.png").unwrap();
+        let sound_source_marker_texture = texture_loader.get("marker_sound.png", ImageType::Grayscale).unwrap();
         #[cfg(feature = "debug")]
-        let effect_source_marker_texture = texture_loader.get("marker_effect.png").unwrap();
+        let effect_source_marker_texture = texture_loader.get("marker_effect.png", ImageType::Grayscale).unwrap();
         #[cfg(feature = "debug")]
-        let entity_marker_texture = texture_loader.get("marker_entity.png").unwrap();
+        let entity_marker_texture = texture_loader.get("marker_entity.png", ImageType::Grayscale).unwrap();
         #[cfg(feature = "debug")]
-        let shadow_marker_texture = texture_loader.get("marker_shadow.png").unwrap();
+        let shadow_marker_texture = texture_loader.get("marker_shadow.png", ImageType::Grayscale).unwrap();
 
         Self {
             instructions,
@@ -266,13 +266,12 @@ impl MarkerRenderer for GameInterfaceRenderer {
                 MarkerIdentifier::Shadow(..) => (&self.shadow_marker_texture, Color::rgb_u8(170, 170, 170)),
             };
 
-            self.instructions.borrow_mut().push(RectangleInstruction::Sprite {
+            self.instructions.borrow_mut().push(RectangleInstruction::Sdf {
                 screen_position,
                 screen_size,
                 color,
                 texture_position: Vector2::new(0.0, 0.0),
                 texture_size: Vector2::new(1.0, 1.0),
-                linear_filtering: true,
                 texture: texture.clone(),
             });
         }

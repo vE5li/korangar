@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 
 use crate::graphics::{Color, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::TextureLoader;
+use crate::loaders::{ImageType, TextureLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
 use crate::world::Camera;
 use crate::{Entity, Map};
@@ -102,10 +102,10 @@ impl QuestIcon {
             + Vector3::new(0.0, 25.0, 0.0); // TODO: get height of the entity as offset
         let effect_id = quest_effect.effect as usize;
         let texture = texture_loader
-            .get(&format!(
-                "À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp",
-                effect_id, 1 /* 1 - 3 */
-            ))
+            .get(
+                &format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\minimap\\quest_{}_{}.bmp", effect_id, 1), /* 1 - 3 */
+                ImageType::Color,
+            )
             .unwrap();
         let color = match quest_effect.color {
             QuestColor::Yellow => Color::rgb_u8(200, 200, 30),

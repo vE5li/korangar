@@ -12,7 +12,7 @@ use ragnarok_formats::version::InternalVersion;
 use wgpu::BlendFactor;
 
 use super::error::LoadError;
-use super::TextureLoader;
+use super::{ImageType, TextureLoader};
 use crate::graphics::Color;
 use crate::loaders::GameFileLoader;
 use crate::world::{AnimationType, Effect, Frame, FrameType, Layer, MultiTexturePresent};
@@ -70,7 +70,7 @@ impl EffectLoader {
                             .into_iter()
                             .map(|name| {
                                 let path = format!("effect\\{}{}", prefix, name.name);
-                                texture_loader.get(&path).unwrap()
+                                texture_loader.get(&path, ImageType::Color).unwrap()
                             })
                             .collect(),
                         {

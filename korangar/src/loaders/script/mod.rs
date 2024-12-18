@@ -5,7 +5,7 @@ use korangar_util::FileLoader;
 use mlua::Lua;
 use ragnarok_packets::ItemId;
 
-use super::TextureLoader;
+use super::{ImageType, TextureLoader};
 use crate::graphics::Texture;
 use crate::loaders::GameFileLoader;
 
@@ -152,7 +152,7 @@ end
 
         let resource_name = self.get_item_resource_from_id(item.item_id, is_identified);
         let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
-        let texture = texture_loader.get(&full_path).unwrap();
+        let texture = texture_loader.get(&full_path, ImageType::Color).unwrap();
         let name = self.get_item_name_from_id(item.item_id, is_identified);
 
         let metadata = ResourceMetadata { texture, name };
@@ -163,7 +163,7 @@ end
     pub fn load_market_item_metadata(&self, texture_loader: &TextureLoader, item: ShopItem<NoMetadata>) -> ShopItem<ResourceMetadata> {
         let resource_name = self.get_item_resource_from_id(item.item_id, true);
         let full_path = format!("À¯ÀúÀÎÅÍÆäÀÌ½º\\item\\{resource_name}.bmp");
-        let texture = texture_loader.get(&full_path).unwrap();
+        let texture = texture_loader.get(&full_path, ImageType::Color).unwrap();
         let name = self.get_item_name_from_id(item.item_id, true);
 
         let metadata = ResourceMetadata { texture, name };

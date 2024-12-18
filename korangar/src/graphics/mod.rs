@@ -46,7 +46,7 @@ pub use self::texture::*;
 pub use self::vertices::*;
 use crate::graphics::sampler::{create_new_sampler, SamplerType};
 use crate::interface::layout::ScreenSize;
-use crate::loaders::TextureLoader;
+use crate::loaders::{ImageType, TextureLoader};
 use crate::NUMBER_OF_POINT_LIGHTS_WITH_SHADOWS;
 
 /// The size of a tile in pixel of the tile based light culling.
@@ -377,7 +377,7 @@ impl GlobalContext {
             RgbaImage::from_raw(1, 1, vec![255, 255, 255, 255]).unwrap().as_raw(),
             false,
         ));
-        let walk_indicator_texture = texture_loader.get("grid.tga").unwrap();
+        let walk_indicator_texture = texture_loader.get("grid.tga", ImageType::Color).unwrap();
         let forward_textures = Self::create_forward_textures(device, forward_size, msaa);
         let picker_textures = Self::create_picker_textures(device, screen_size);
         let directional_shadow_map_texture = Self::create_directional_shadow_texture(device, directional_shadow_size);

@@ -23,7 +23,7 @@ pub use self::model::*;
 pub use self::script::{ResourceMetadata, ScriptLoader};
 pub use self::server::{load_client_info, ClientInfo, ServiceId};
 pub use self::sprite::*;
-pub use self::texture::{TextureAtlasFactory, TextureLoader};
+pub use self::texture::{ImageType, TextureAtlasFactory, TextureLoader};
 
 pub const FALLBACK_BMP_FILE: &str = "missing.bmp";
 pub const FALLBACK_JPEG_FILE: &str = "missing.jpg";

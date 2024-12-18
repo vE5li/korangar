@@ -22,7 +22,7 @@ pub use self::vertices::MAP_TILE_SIZE;
 use self::vertices::{generate_tile_vertices, ground_vertices};
 use super::error::LoadError;
 use crate::graphics::{Buffer, ModelVertex, NativeModelVertex, Texture};
-use crate::loaders::{GameFileLoader, ModelLoader, TextureAtlasFactory, TextureLoader};
+use crate::loaders::{GameFileLoader, ImageType, ModelLoader, TextureAtlasFactory, TextureLoader};
 use crate::world::{LightSourceKey, Model};
 use crate::{EffectSourceExt, LightSourceExt, Map, Object, ObjectKey, SoundSourceExt};
 
@@ -121,7 +121,7 @@ impl MapLoader {
                     let water_paths = get_water_texture_paths(water_type);
                     water_paths
                         .iter()
-                        .map(|path| texture_loader.get(path).expect("Can't load water texture"))
+                        .map(|path| texture_loader.get(path, ImageType::Color).expect("Can't load water texture"))
                         .collect()
                 });
 

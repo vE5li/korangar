@@ -1,14 +1,17 @@
 use std::cell::{Ref, RefCell};
+use std::rc::Rc;
 use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use cgmath::Point3;
-use cgmath::Vector2;
-use korangar_interface::application::FontSizeTrait;
+use cgmath::{EuclideanSpace, Vector2};
+use korangar_interface::application::FontSizeTraitExt;
 
 use crate::graphics::{Color, RectangleInstruction, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{FontSize, ImageType, TextureLoader};
+use crate::loaders::{FontLoader, FontSize, GlyphInstruction, Scaling, TextLayout};
+#[cfg(feature = "debug")]
+use crate::loaders::{ImageType, TextureLoader};
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 use crate::renderer::SpriteRenderer;
@@ -17,12 +20,20 @@ use crate::world::Camera;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
 
+#[derive(Copy, Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
+#[allow(unused)]
+pub enum AlignHorizontal {
+    Left,
+    Mid,
+}
+
 /// Renders the in-game interface (like the FPS counter, the mouse pointer or
 /// the health bars).
 pub struct GameInterfaceRenderer {
     instructions: RefCell<Vec<RectangleInstruction>>,
+    font_loader: Rc<RefCell<FontLoader>>,
     window_size: ScreenSize,
-    font_map_texture: Arc<Texture>,
+    scaling: Scaling,
     #[cfg(feature = "debug")]
     object_marker_texture: Arc<Texture>,
     #[cfg(feature = "debug")]
@@ -83,9 +94,14 @@ impl SpriteRenderer for GameInterfaceRenderer {
 }
 
 impl GameInterfaceRenderer {
-    pub fn new(window_size: ScreenSize, texture_loader: &TextureLoader) -> Self {
+    pub fn new(
+        window_size: ScreenSize,
+        scaling: Scaling,
+        font_loader: Rc<RefCell<FontLoader>>,
+        #[cfg(feature = "debug")] texture_loader: &TextureLoader,
+    ) -> Self {
         let instructions = RefCell::new(Vec::new());
-        let font_map_texture = texture_loader.get("font.png", ImageType::Color).unwrap();
+
         #[cfg(feature = "debug")]
         let object_marker_texture = texture_loader.get("marker_object.png", ImageType::Grayscale).unwrap();
         #[cfg(feature = "debug")]
@@ -101,8 +117,9 @@ impl GameInterfaceRenderer {
 
         Self {
             instructions,
+            font_loader,
             window_size,
-            font_map_texture,
+            scaling,
             #[cfg(feature = "debug")]
             object_marker_texture,
             #[cfg(feature = "debug")]
@@ -121,8 +138,9 @@ impl GameInterfaceRenderer {
     pub fn from_renderer(other: &Self) -> Self {
         Self {
             instructions: RefCell::new(Vec::default()),
+            font_loader: Rc::clone(&other.font_loader),
             window_size: other.window_size,
-            font_map_texture: other.font_map_texture.clone(),
+            scaling: other.scaling,
             #[cfg(feature = "debug")]
             object_marker_texture: other.object_marker_texture.clone(),
             #[cfg(feature = "debug")]
@@ -150,36 +168,64 @@ impl GameInterfaceRenderer {
         self.window_size = window_size;
     }
 
-    pub fn render_text(&self, text: &str, mut position: ScreenPosition, color: Color, font_size: FontSize) {
-        for character in text.as_bytes() {
-            let index = (*character as usize).saturating_sub(31);
-            self.render_indexed(
-                self.font_map_texture.clone(),
-                position,
-                ScreenSize::uniform(font_size.get_value()),
-                color,
-                10,
-                index,
-                true,
-            );
-            position.left += font_size.get_value() / 2.0;
-        }
+    pub fn update_scaling(&mut self, scaling: Scaling) {
+        self.scaling = scaling;
     }
 
-    pub fn render_damage_text(&self, text: &str, mut position: ScreenPosition, color: Color, font_size: f32) {
-        for character in text.as_bytes() {
-            let index = (*character as usize).saturating_sub(31);
-            self.render_indexed(
-                self.font_map_texture.clone(),
-                position,
-                ScreenSize::uniform(font_size),
-                color,
-                10,
-                index,
-                true,
-            );
-            position.left += font_size / 2.0;
-        }
+    pub fn render_text(
+        &self,
+        text: &str,
+        text_position: ScreenPosition,
+        color: Color,
+        font_size: FontSize,
+        align_horizontal: AlignHorizontal,
+    ) {
+        let font_size = font_size.scaled(self.scaling);
+
+        let TextLayout { glyphs, size } = self
+            .font_loader
+            .borrow_mut()
+            .get_msdf_text_layout(text, color, font_size, 1.0, f32::MAX);
+
+        let horizontal_offset = match align_horizontal {
+            AlignHorizontal::Left => 0.0,
+            AlignHorizontal::Mid => -size.x / 2.0,
+        };
+
+        let mut instructions = self.instructions.borrow_mut();
+
+        glyphs.iter().for_each(
+            |GlyphInstruction {
+                 position,
+                 texture_coordinate,
+                 color,
+             }| {
+                let screen_position = ScreenPosition {
+                    left: text_position.left + position.min.x + horizontal_offset,
+                    top: text_position.top + position.min.y,
+                } / self.window_size;
+
+                let screen_size = ScreenSize {
+                    width: position.width(),
+                    height: position.height(),
+                } / self.window_size;
+
+                let texture_position = texture_coordinate.min.to_vec();
+                let texture_size = texture_coordinate.max - texture_coordinate.min;
+
+                instructions.push(RectangleInstruction::MsdfText {
+                    screen_position,
+                    screen_size,
+                    color: *color,
+                    texture_position,
+                    texture_size,
+                });
+            },
+        );
+    }
+
+    pub fn render_damage_text(&self, text: &str, position: ScreenPosition, color: Color, font_size: FontSize) {
+        self.render_text(text, position, color, font_size, AlignHorizontal::Mid);
     }
 
     pub fn render_bar(&self, position: ScreenPosition, size: ScreenSize, color: Color, maximum: f32, current: f32) {

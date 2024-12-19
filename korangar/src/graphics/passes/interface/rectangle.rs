@@ -381,7 +381,7 @@ impl Prepare for InterfaceRectangleDrawer {
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
                 &texture_views,
-                instructions.font_atlas_texture.get_texture_view(),
+                instructions.msdf_font_map_texture.get_texture_view(),
             )
         } else {
             for instruction in instructions.interface.iter() {
@@ -480,7 +480,7 @@ impl Prepare for InterfaceRectangleDrawer {
                 device,
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
-                instructions.font_atlas_texture.get_texture_view(),
+                instructions.msdf_font_map_texture.get_texture_view(),
             )
         }
     }
@@ -497,7 +497,7 @@ impl InterfaceRectangleDrawer {
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
         texture_views: &[&TextureView],
-        font_atlas_texture_view: &TextureView,
+        msdf_font_map: &TextureView,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -513,7 +513,7 @@ impl InterfaceRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: BindingResource::TextureView(font_atlas_texture_view),
+                    resource: BindingResource::TextureView(msdf_font_map),
                 },
             ],
         })
@@ -523,7 +523,7 @@ impl InterfaceRectangleDrawer {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
-        font_atlas_texture_view: &TextureView,
+        msdf_font_map: &TextureView,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -535,7 +535,7 @@ impl InterfaceRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(font_atlas_texture_view),
+                    resource: BindingResource::TextureView(msdf_font_map),
                 },
             ],
         })

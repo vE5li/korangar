@@ -41,7 +41,7 @@ pub struct RenderInstruction<'a> {
     pub effects: &'a [EffectInstruction],
     pub water: Option<WaterInstruction<'a>>,
     pub map_picker_tile_vertex_buffer: &'a Buffer<TileVertex>,
-    pub font_atlas_texture: &'a Texture,
+    pub font_map_texture: &'a Texture,
     #[cfg(feature = "debug")]
     pub render_settings: RenderSettings,
     #[cfg(feature = "debug")]
@@ -121,14 +121,6 @@ pub enum RectangleInstruction {
         screen_size: ScreenSize,
         color: Color,
     },
-    Sdf {
-        screen_position: ScreenPosition,
-        screen_size: ScreenSize,
-        color: Color,
-        texture_position: Vector2<f32>,
-        texture_size: Vector2<f32>,
-        texture: Arc<Texture>,
-    },
     Sprite {
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
@@ -137,6 +129,21 @@ pub enum RectangleInstruction {
         texture_size: Vector2<f32>,
         linear_filtering: bool,
         texture: Arc<Texture>,
+    },
+    Sdf {
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        color: Color,
+        texture_position: Vector2<f32>,
+        texture_size: Vector2<f32>,
+        texture: Arc<Texture>,
+    },
+    Text {
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        color: Color,
+        texture_position: Vector2<f32>,
+        texture_size: Vector2<f32>,
     },
 }
 
@@ -149,14 +156,6 @@ pub enum InterfaceRectangleInstruction {
         color: Color,
         corner_radius: CornerRadius,
     },
-    Sdf {
-        screen_position: ScreenPosition,
-        screen_size: ScreenSize,
-        screen_clip: ScreenClip,
-        color: Color,
-        corner_radius: CornerRadius,
-        texture: Arc<Texture>,
-    },
     Sprite {
         screen_position: ScreenPosition,
         screen_size: ScreenSize,
@@ -165,6 +164,14 @@ pub enum InterfaceRectangleInstruction {
         corner_radius: CornerRadius,
         texture: Arc<Texture>,
         smooth: bool,
+    },
+    Sdf {
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        screen_clip: ScreenClip,
+        color: Color,
+        corner_radius: CornerRadius,
+        texture: Arc<Texture>,
     },
     Text {
         screen_position: ScreenPosition,

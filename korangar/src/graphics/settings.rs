@@ -222,7 +222,7 @@ pub struct RenderSettings {
     #[new(default)]
     pub show_light_culling_count_buffer: bool,
     #[new(default)]
-    pub show_font_atlas: bool,
+    pub show_font_map: bool,
 }
 
 #[cfg(feature = "debug")]
@@ -232,6 +232,6 @@ impl RenderSettings {
             || self.show_picker_buffer
             || self.show_point_shadow_map.is_some()
             || self.show_light_culling_count_buffer
-            || self.show_font_atlas
+            || self.show_font_map
     }
 }

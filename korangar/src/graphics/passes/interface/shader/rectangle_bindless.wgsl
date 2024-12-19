@@ -42,12 +42,13 @@ struct VertexOutput {
 @group(0) @binding(2) var linear_sampler: sampler;
 @group(1) @binding(0) var<storage, read> instance_data: array<InstanceData>;
 @group(1) @binding(1) var textures: binding_array<texture_2d<f32>>;
-@group(1) @binding(2) var font_atlas: texture_2d<f32>;
+@group(1) @binding(2) var msdf_font_map: texture_2d<f32>;
 
-// Because of how sampling works, we need to add a bit breathing room
-// for the SDF function and then need to compensate for it.
 const BREATHING_ROOM = 0.5;
 const BORDER_THRESHOLD = 2.0;
+const EDGE_VALUE: f32 = 0.5;
+/// We use a pxrange of 6 px when creating MSDFs.
+const PXRANGE: f32 = 6.0;
 
 @vertex
 fn vs_main(
@@ -88,21 +89,25 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
     switch (instance.rectangle_type) {
         case 1u: {
-            // SDF
-            let distance = textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates).r;
-            color *= vec4(saturate((distance - 0.5) * 2.0 / fwidth(distance)));
-        }
-        case 2u: {
             // Sprite (linear filtering)
             color *= textureSample(textures[instance.texture_index], linear_sampler, input.texture_coordinates);
         }
-        case 3u: {
+        case 2u: {
             // Sprite (nearest filtering)
             color *= textureSample(textures[instance.texture_index], nearest_sampler, input.texture_coordinates);
         }
+        case 3u: {
+            // SDF
+            let texture = textures[instance.texture_index];
+            let distance = textureSample(texture, linear_sampler, input.texture_coordinates).r;
+            color *= vec4(saturate((distance - 0.5) * 2.0 / fwidth(distance)));
+        }
         case 4u: {
-            // Text (coverage)
-            color *= textureSample(font_atlas, nearest_sampler, input.texture_coordinates).r;
+            // Text
+            let distances = textureSample(msdf_font_map, linear_sampler, input.texture_coordinates);
+            let distance = median(distances.r, distances.g, distances.b) - EDGE_VALUE;
+            let texture_size = vec2<f32>(textureDimensions(msdf_font_map));
+            color = calculate_msdf(distance, texture_size, input.texture_coordinates, color);
         }
         default: {}
     }
@@ -114,6 +119,19 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         input.fragment_position,
         color
     );
+}
+
+fn calculate_msdf(
+    distance: f32,
+    texture_size: vec2<f32>,
+    texture_coordinates: vec2<f32>,
+    color: vec4<f32>
+) -> vec4<f32> {
+    let unit_range = (vec2<f32>(PXRANGE) / texture_size);
+    let screen_texture_size = vec2<f32>(1.0) / fwidth(texture_coordinates);
+    let screen_px_range = max(EDGE_VALUE * dot(unit_range, screen_texture_size), 1.0);
+
+    return color * saturate(distance * screen_px_range + EDGE_VALUE);
 }
 
 fn rectangle_with_rounded_edges(
@@ -220,4 +238,8 @@ fn rectangle_sdf(
     let shrunk_corner_position = half_size - corner_radius;
     let pixel_to_shrunk_corner = max(vec2<f32>(0.0), abs(relative_position) - shrunk_corner_position);
     return length(pixel_to_shrunk_corner) - corner_radius + BREATHING_ROOM;
+}
+
+fn median(r: f32, g: f32, b: f32) -> f32 {
+    return max(min(r, g), min(max(r, g), b));
 }

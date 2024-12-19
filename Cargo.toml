@@ -8,11 +8,12 @@ bumpalo = "3.16"
 bytemuck = "1.20"
 cgmath = "0.18"
 chrono = "0.4"
-cosmic-text = "0.12"
+cosmic-text = { version = "0.12", default-features = false }
 cpal = "0.15"
 derive-new = "0.7"
 etherparse = "0.16"
 fast-srgb8 = "1"
+flate2 = "1"
 glidesort = "0.1"
 hashbrown = "0.15"
 image = { version = "0.25", default-features = false }

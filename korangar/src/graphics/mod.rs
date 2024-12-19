@@ -115,7 +115,7 @@ pub(crate) struct DebugUniforms {
     show_directional_shadow_map: u32,
     show_point_shadow_map: u32,
     show_light_culling_count_buffer: u32,
-    show_font_atlas: u32,
+    show_font_map: u32,
 }
 
 #[derive(Copy, Clone, Pod, Zeroable)]
@@ -272,7 +272,7 @@ impl Prepare for GlobalContext {
                     .map(|value| value.get())
                     .unwrap_or(0),
                 show_light_culling_count_buffer: instructions.render_settings.show_light_culling_count_buffer as u32,
-                show_font_atlas: instructions.render_settings.show_font_atlas as u32,
+                show_font_map: instructions.render_settings.show_font_map as u32,
             };
         }
     }

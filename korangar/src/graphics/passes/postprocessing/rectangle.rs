@@ -115,30 +115,61 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
                         },
                         count: capabilities.get_max_texture_binding_array_count(),
                     },
+                    BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
                 ],
             })
         } else {
             device.create_bind_group_layout(&BindGroupLayoutDescriptor {
                 label: Some(DRAWER_NAME),
-                entries: &[BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::VERTEX_FRAGMENT,
-                    ty: BindingType::Buffer {
-                        ty: BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: NonZeroU64::new(size_of::<InstanceData>() as _),
+                entries: &[
+                    BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: ShaderStages::VERTEX_FRAGMENT,
+                        ty: BindingType::Buffer {
+                            ty: BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: NonZeroU64::new(size_of::<InstanceData>() as _),
+                        },
+                        count: None,
                     },
-                    count: None,
-                }],
+                    BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: ShaderStages::FRAGMENT,
+                        ty: BindingType::Texture {
+                            sample_type: TextureSampleType::Float { filterable: true },
+                            view_dimension: TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                ],
             })
         };
 
         let bind_group = if capabilities.supports_bindless() {
-            Self::create_bind_group_bindless(device, &bind_group_layout, &instance_data_buffer, &[global_context
-                .solid_pixel_texture
-                .get_texture_view()])
+            Self::create_bind_group_bindless(
+                device,
+                &bind_group_layout,
+                &instance_data_buffer,
+                &[global_context.solid_pixel_texture.get_texture_view()],
+                global_context.solid_pixel_texture.get_texture_view(),
+            )
         } else {
-            Self::create_bind_group(device, &bind_group_layout, &instance_data_buffer)
+            Self::create_bind_group(
+                device,
+                &bind_group_layout,
+                &instance_data_buffer,
+                global_context.solid_pixel_texture.get_texture_view(),
+            )
         };
 
         let pass_bind_group_layouts = Self::Context::bind_group_layout(device);
@@ -216,7 +247,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
             for (index, instruction) in draw_data.instructions.iter().enumerate() {
                 match instruction {
-                    RectangleInstruction::Sdf { texture, .. } | RectangleInstruction::Sprite { texture, .. }
+                    RectangleInstruction::Sprite { texture, .. } | RectangleInstruction::Sdf { texture, .. }
                         if texture.get_id() != current_texture_id =>
                     {
                         current_texture_id = texture.get_id();
@@ -283,6 +314,39 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 padding: Default::default(),
                             });
                         }
+                        RectangleInstruction::Sprite {
+                            screen_position,
+                            screen_size,
+                            color,
+                            texture_position,
+                            texture_size,
+                            linear_filtering,
+                            texture,
+                        } => {
+                            let rectangle_type = if *linear_filtering { 1 } else { 2 };
+
+                            let mut texture_index = texture_views.len() as i32;
+                            let id = texture.get_id();
+                            let potential_index = self.lookup.get(&id);
+
+                            if let Some(potential_index) = potential_index {
+                                texture_index = *potential_index;
+                            } else {
+                                self.lookup.insert(id, texture_index);
+                                texture_views.push(texture.get_texture_view());
+                            }
+
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: (*texture_position).into(),
+                                texture_size: (*texture_size).into(),
+                                rectangle_type,
+                                texture_index,
+                                padding: Default::default(),
+                            });
+                        }
                         RectangleInstruction::Sdf {
                             screen_position,
                             screen_size,
@@ -308,41 +372,26 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 screen_size: (*screen_size).into(),
                                 texture_position: (*texture_position).into(),
                                 texture_size: (*texture_size).into(),
-                                rectangle_type: 1,
+                                rectangle_type: 3,
                                 texture_index,
                                 padding: Default::default(),
                             });
                         }
-                        RectangleInstruction::Sprite {
+                        RectangleInstruction::Text {
                             screen_position,
                             screen_size,
                             color,
                             texture_position,
                             texture_size,
-                            linear_filtering,
-                            texture,
                         } => {
-                            let rectangle_type = if *linear_filtering { 2 } else { 3 };
-
-                            let mut texture_index = texture_views.len() as i32;
-                            let id = texture.get_id();
-                            let potential_index = self.lookup.get(&id);
-
-                            if let Some(potential_index) = potential_index {
-                                texture_index = *potential_index;
-                            } else {
-                                self.lookup.insert(id, texture_index);
-                                texture_views.push(texture.get_texture_view());
-                            }
-
                             self.instance_data.push(InstanceData {
                                 color: color.components_linear(),
                                 screen_position: (*screen_position).into(),
                                 screen_size: (*screen_size).into(),
                                 texture_position: (*texture_position).into(),
                                 texture_size: (*texture_size).into(),
-                                rectangle_type,
-                                texture_index,
+                                rectangle_type: 4,
+                                texture_index: -1,
                                 padding: Default::default(),
                             });
                         }
@@ -355,7 +404,13 @@ impl Prepare for PostProcessingRectangleDrawer {
             }
 
             self.instance_data_buffer.reserve(device, self.instance_data.len());
-            self.bind_group = Self::create_bind_group_bindless(device, &self.bind_group_layout, &self.instance_data_buffer, &texture_views);
+            self.bind_group = Self::create_bind_group_bindless(
+                device,
+                &self.bind_group_layout,
+                &self.instance_data_buffer,
+                &texture_views,
+                instructions.font_map_texture.get_texture_view(),
+            );
         } else {
             let mut offset = 0;
 
@@ -389,6 +444,28 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 padding: Default::default(),
                             });
                         }
+                        RectangleInstruction::Sprite {
+                            screen_position,
+                            screen_size,
+                            color,
+                            texture_position,
+                            texture_size,
+                            linear_filtering,
+                            texture: _,
+                        } => {
+                            let rectangle_type = if *linear_filtering { 1 } else { 2 };
+
+                            self.instance_data.push(InstanceData {
+                                color: color.components_linear(),
+                                screen_position: (*screen_position).into(),
+                                screen_size: (*screen_size).into(),
+                                texture_position: (*texture_position).into(),
+                                texture_size: (*texture_size).into(),
+                                rectangle_type,
+                                texture_index: 0,
+                                padding: Default::default(),
+                            });
+                        }
                         RectangleInstruction::Sdf {
                             screen_position,
                             screen_size,
@@ -403,30 +480,26 @@ impl Prepare for PostProcessingRectangleDrawer {
                                 screen_size: (*screen_size).into(),
                                 texture_position: (*texture_position).into(),
                                 texture_size: (*texture_size).into(),
-                                rectangle_type: 1,
+                                rectangle_type: 3,
                                 texture_index: 0,
                                 padding: Default::default(),
                             });
                         }
-                        RectangleInstruction::Sprite {
+                        RectangleInstruction::Text {
                             screen_position,
                             screen_size,
                             color,
                             texture_position,
                             texture_size,
-                            linear_filtering,
-                            texture: _,
                         } => {
-                            let rectangle_type = if *linear_filtering { 2 } else { 3 };
-
                             self.instance_data.push(InstanceData {
                                 color: color.components_linear(),
                                 screen_position: (*screen_position).into(),
                                 screen_size: (*screen_size).into(),
                                 texture_position: (*texture_position).into(),
                                 texture_size: (*texture_size).into(),
-                                rectangle_type,
-                                texture_index: 0,
+                                rectangle_type: 4,
+                                texture_index: -1,
                                 padding: Default::default(),
                             });
                         }
@@ -434,9 +507,13 @@ impl Prepare for PostProcessingRectangleDrawer {
                 }
             }
 
-            if self.instance_data_buffer.reserve(device, self.instance_data.len()) {
-                self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, &self.instance_data_buffer);
-            }
+            self.instance_data_buffer.reserve(device, self.instance_data.len());
+            self.bind_group = Self::create_bind_group(
+                device,
+                &self.bind_group_layout,
+                &self.instance_data_buffer,
+                instructions.font_map_texture.get_texture_view(),
+            );
         }
     }
 
@@ -452,6 +529,7 @@ impl PostProcessingRectangleDrawer {
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
         texture_views: &[&TextureView],
+        msdf_font_map_view: &TextureView,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -465,18 +543,33 @@ impl PostProcessingRectangleDrawer {
                     binding: 1,
                     resource: BindingResource::TextureViewArray(texture_views),
                 },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: BindingResource::TextureView(msdf_font_map_view),
+                },
             ],
         })
     }
 
-    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, instance_data_buffer: &Buffer<InstanceData>) -> BindGroup {
+    fn create_bind_group(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        instance_data_buffer: &Buffer<InstanceData>,
+        msdf_font_map_view: &TextureView,
+    ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
             layout: bind_group_layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: instance_data_buffer.as_entire_binding(),
-            }],
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: instance_data_buffer.as_entire_binding(),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(msdf_font_map_view),
+                },
+            ],
         })
     }
 }

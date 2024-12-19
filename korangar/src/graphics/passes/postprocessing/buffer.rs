@@ -114,7 +114,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
 impl Prepare for PostProcessingBufferDrawer {
     fn prepare(&mut self, device: &Device, instructions: &RenderInstruction) {
-        self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, instructions.font_atlas_texture);
+        self.bind_group = Self::create_bind_group(device, &self.bind_group_layout, instructions.font_map_texture);
     }
 
     fn upload(&mut self, _device: &Device, _staging_belt: &mut StagingBelt, _command_encoder: &mut CommandEncoder) {
@@ -123,13 +123,13 @@ impl Prepare for PostProcessingBufferDrawer {
 }
 
 impl PostProcessingBufferDrawer {
-    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, font_atlas: &Texture) -> BindGroup {
+    fn create_bind_group(device: &Device, bind_group_layout: &BindGroupLayout, font_map_texture: &Texture) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
             layout: bind_group_layout,
             entries: &[BindGroupEntry {
                 binding: 0,
-                resource: BindingResource::TextureView(font_atlas.get_texture_view()),
+                resource: BindingResource::TextureView(font_map_texture.get_texture_view()),
             }],
         })
     }

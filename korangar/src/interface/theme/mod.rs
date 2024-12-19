@@ -670,7 +670,7 @@ impl korangar_interface::theme::CloseButtonTheme<InterfaceSettings> for CloseBut
         self.font_size.get()
     }
 
-    fn size_bound(&self) -> korangar_interface::layout::SizeBound {
+    fn size_bound(&self) -> SizeBound {
         self.size_bound
     }
 }
@@ -691,7 +691,7 @@ impl Default for OverlayTheme {
                 ScreenPosition::default(),
                 ScreenPosition { left: 1000.0, top: 500.0 },
             ),
-            font_size: MutableRange::new(FontSize::new(18.0), FontSize::new(6.0), FontSize::new(50.0)),
+            font_size: MutableRange::new(FontSize::new(24.0), FontSize::new(6.0), FontSize::new(50.0)),
         }
     }
 }
@@ -739,8 +739,8 @@ impl korangar_interface::theme::SliderTheme<InterfaceSettings> for SliderTheme {
         self.knob_color.get()
     }
 
-    fn size_bound(&self) -> korangar_interface::layout::SizeBound {
-        self.size_bound.clone()
+    fn size_bound(&self) -> SizeBound {
+        self.size_bound
     }
 }
 

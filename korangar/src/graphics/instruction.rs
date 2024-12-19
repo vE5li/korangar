@@ -42,6 +42,7 @@ pub struct RenderInstruction<'a> {
     pub water: Option<WaterInstruction<'a>>,
     pub map_picker_tile_vertex_buffer: &'a Buffer<TileVertex>,
     pub font_atlas_texture: &'a Texture,
+    pub msdf_font_map_texture: &'a Texture,
     #[cfg(feature = "debug")]
     pub render_settings: RenderSettings,
     #[cfg(feature = "debug")]
@@ -137,6 +138,13 @@ pub enum RectangleInstruction {
         texture_size: Vector2<f32>,
         linear_filtering: bool,
         texture: Arc<Texture>,
+    },
+    MsdfText {
+        screen_position: ScreenPosition,
+        screen_size: ScreenSize,
+        color: Color,
+        texture_position: Vector2<f32>,
+        texture_size: Vector2<f32>,
     },
 }
 

@@ -1,10 +1,13 @@
 mod color_span_iterator;
+mod font_map_descriptor;
 
+use std::io::Cursor;
 use std::sync::Arc;
 
 use cgmath::{Array, Point2, Vector2};
 use cosmic_text::{Attrs, Buffer, CacheKey, Family, FontSystem, Metrics, PhysicalGlyph, Shaping, SwashCache, SwashContent};
 use hashbrown::HashMap;
+use image::{ImageFormat, ImageReader};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize};
 use korangar_interface::application::FontSizeTrait;
@@ -17,17 +20,20 @@ use wgpu::{
 };
 
 use self::color_span_iterator::ColorSpanIterator;
-use super::GameFileLoader;
+use super::{GameFileLoader, TextureLoader};
 use crate::graphics::{Color, Texture, MAX_TEXTURE_SIZE};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
+use crate::loaders::font::font_map_descriptor::FontMapDescriptor;
 
-const FONT_FILE_PATH: &str = "data\\WenQuanYiMicroHei.ttf";
-const FONT_FAMILY_NAME: &str = "WenQuanYi Micro Hei";
+const FONT_FILE_PATH: &str = "data\\font\\NotoSans.ttf";
+const FONT_MAP_DESCRIPTION_FILE_PATH: &str = "data\\font\\NotoSans.ron";
+const FONT_MAP_FILE_PATH: &str = "data\\font\\NotoSans.png";
+const FONT_FAMILY_NAME: &str = "Noto Sans";
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct FontSize(f32);
+pub struct FontSize(pub f32);
 
 impl ArrayType for FontSize {
     type Element = f32;
@@ -92,7 +98,7 @@ impl ElementDisplay for Scaling {
 }
 
 impl Scaling {
-    pub fn new(value: f32) -> Self {
+    pub const fn new(value: f32) -> Self {
         Self(value)
     }
 }
@@ -105,22 +111,22 @@ impl korangar_interface::application::ScalingTrait for Scaling {
 
 pub struct TextLayout {
     pub glyphs: Vec<GlyphInstruction>,
-    pub size: Vector2<i32>,
+    pub size: Vector2<f32>,
 }
 
 pub struct GlyphInstruction {
-    pub position: Rectangle<i32>,
+    pub position: Rectangle<f32>,
     pub texture_coordinate: Rectangle<f32>,
     pub color: Color,
 }
 
-#[derive(Copy, Clone)]
-struct GlyphCoordinate {
-    texture_coordinate: Rectangle<f32>,
-    width: i32,
-    height: i32,
-    offset_top: i32,
-    offset_left: i32,
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct GlyphCoordinate {
+    pub(crate) texture_coordinate: Rectangle<f32>,
+    pub(crate) width: f32,
+    pub(crate) height: f32,
+    pub(crate) offset_top: f32,
+    pub(crate) offset_left: f32,
 }
 
 pub struct FontLoader {
@@ -130,11 +136,13 @@ pub struct FontLoader {
     swash_cache: SwashCache,
     glyph_cache: HashMap<CacheKey, GlyphCoordinate>,
     texture_atlas: OnlineTextureAtlas,
+    msdf_font_map: Arc<Texture>,
+    msdf_glyph_cache: HashMap<u16, GlyphCoordinate>,
     atlas_is_full: bool,
 }
 
 impl FontLoader {
-    pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &GameFileLoader) -> Self {
+    pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &GameFileLoader, texture_loader: &TextureLoader) -> Self {
         let cache_size = Vector2::from_value(2048);
 
         let online_texture_atlas = OnlineTextureAtlas::new(cache_size.x, cache_size.y, true);
@@ -144,6 +152,19 @@ impl FontLoader {
         let mut font_system = FontSystem::new();
         font_system.db_mut().load_font_data(font_data);
 
+        let file_data = game_file_loader.get(FONT_MAP_FILE_PATH).unwrap();
+        let reader = ImageReader::with_format(Cursor::new(file_data), ImageFormat::Png);
+        let decoder = reader.decode().unwrap();
+        let rgba_image = decoder.into_rgba8();
+        let msdf_font_map = texture_loader.create_raw_rgba("font map", rgba_image);
+
+        let font_description_data = game_file_loader.get(FONT_MAP_DESCRIPTION_FILE_PATH).unwrap();
+        let font_description_string = String::from_utf8(font_description_data).unwrap();
+        let msdf_font_descriptor: FontMapDescriptor = ron::from_str(&font_description_string).unwrap();
+        msdf_font_descriptor.verify();
+
+        let msdf_glyph_cache = msdf_font_descriptor.parse_glyph_cache();
+
         Self {
             queue,
             font_atlas,
@@ -151,6 +172,8 @@ impl FontLoader {
             swash_cache: SwashCache::new(),
             glyph_cache: HashMap::new(),
             texture_atlas: online_texture_atlas,
+            msdf_font_map,
+            msdf_glyph_cache,
             atlas_is_full: false,
         }
     }
@@ -216,37 +239,35 @@ impl FontLoader {
     }
 
     pub fn get_text_dimensions(&mut self, text: &str, font_size: FontSize, line_height_scale: f32, available_width: f32) -> ScreenSize {
-        let TextLayout { size, .. } = self.get(text, Color::BLACK, font_size, line_height_scale, available_width);
+        let TextLayout { size, .. } = self.get_text_layout(text, Color::BLACK, font_size, line_height_scale, available_width);
 
         ScreenSize {
-            width: size.x as f32,
-            height: size.y as f32,
+            width: size.x,
+            height: size.y,
         }
     }
 
-    // TODO: NHA cosmic_text could help us to render text in boxes.
-    //       But that would need us to re-evaluate on how we render test in general.
-    //       We also don't really use the "line_height_scale", which would provide
-    //       an easy way to handle "line height".
-    pub fn get(
+    fn layout<F>(
         &mut self,
         text: &str,
         default_color: Color,
         font_size: FontSize,
         line_height_scale: f32,
         available_width: f32,
-    ) -> TextLayout {
+        get_coordinate: F,
+    ) -> TextLayout
+    where
+        F: Fn(&mut Self, &cosmic_text::LayoutGlyph) -> Option<GlyphCoordinate>,
+    {
         let mut glyphs = Vec::with_capacity(text.len());
-        let mut text_width = 0;
-        let mut text_height = 0;
+        let mut text_width = 0f32;
+        let mut text_height = 0f32;
 
         let metrics = Metrics::relative(font_size.0, line_height_scale);
         let mut buffer = Buffer::new(&mut self.font_system, metrics);
-
         let attributes = Attrs::new().family(Family::Name(FONT_FAMILY_NAME));
 
         buffer.set_size(&mut self.font_system, Some(available_width), None);
-
         buffer.set_rich_text(
             &mut self.font_system,
             ColorSpanIterator::new(text, default_color, attributes),
@@ -255,19 +276,17 @@ impl FontLoader {
         );
 
         for run in buffer.layout_runs() {
-            text_width = text_height.max(run.line_w.round() as i32);
+            text_width = text_height.max(run.line_w);
 
             for layout_glyph in run.glyphs.iter() {
                 let physical_glyph = layout_glyph.physical((0.0, 0.0), 1.0);
 
-                if !self.glyph_cache.contains_key(&physical_glyph.cache_key) && self.add_glyph_to_cache(&physical_glyph).is_err() {
+                let Some(glyph_coordinate) = get_coordinate(self, layout_glyph) else {
                     continue;
-                }
+                };
 
-                let glyph_coordinate = *self.glyph_cache.get(&physical_glyph.cache_key).unwrap();
-
-                let x = physical_glyph.x + glyph_coordinate.offset_left;
-                let y = run.line_y.round() as i32 + physical_glyph.y - glyph_coordinate.offset_top;
+                let x = physical_glyph.x as f32 + glyph_coordinate.offset_left;
+                let y = run.line_y + physical_glyph.y as f32 - glyph_coordinate.offset_top;
                 let width = glyph_coordinate.width;
                 let height = glyph_coordinate.height;
 
@@ -288,6 +307,60 @@ impl FontLoader {
             glyphs,
             size: Vector2::new(text_width, text_height),
         }
+    }
+
+    // TODO: NHA cosmic_text could help us to render text in boxes.
+    //       But that would need us to re-evaluate on how we render test in general.
+    //       We also don't really use the "line_height_scale", which would provide
+    //       an easy way to handle "line height".
+    pub fn get_text_layout(
+        &mut self,
+        text: &str,
+        default_color: Color,
+        font_size: FontSize,
+        line_height_scale: f32,
+        available_width: f32,
+    ) -> TextLayout {
+        self.layout(
+            text,
+            default_color,
+            font_size,
+            line_height_scale,
+            available_width,
+            |this, layout_glyph| {
+                let physical_glyph = layout_glyph.physical((0.0, 0.0), 1.0);
+                if !this.glyph_cache.contains_key(&physical_glyph.cache_key) && this.add_glyph_to_cache(&physical_glyph).is_err() {
+                    return None;
+                }
+                this.glyph_cache.get(&physical_glyph.cache_key).copied()
+            },
+        )
+    }
+
+    pub fn get_msdf_text_layout(
+        &mut self,
+        text: &str,
+        default_color: Color,
+        font_size: FontSize,
+        line_height_scale: f32,
+        available_width: f32,
+    ) -> TextLayout {
+        self.layout(
+            text,
+            default_color,
+            font_size,
+            line_height_scale,
+            available_width,
+            |this, layout_glyph| {
+                this.msdf_glyph_cache.get(&layout_glyph.glyph_id).copied().map(|mut glyph| {
+                    glyph.width *= font_size.0;
+                    glyph.height *= font_size.0;
+                    glyph.offset_left *= font_size.0;
+                    glyph.offset_top *= font_size.0;
+                    glyph
+                })
+            },
+        )
     }
 
     fn add_glyph_to_cache(&mut self, physical_glyph: &PhysicalGlyph) -> Result<(), ()> {
@@ -323,10 +396,10 @@ impl FontLoader {
                 allocation.map_to_atlas(Point2::from_value(0.0)),
                 allocation.map_to_atlas(Point2::from_value(1.0)),
             ),
-            width: width as i32,
-            height: height as i32,
-            offset_top: image.placement.top,
-            offset_left: image.placement.left,
+            width: width as f32,
+            height: height as f32,
+            offset_top: image.placement.top as f32,
+            offset_left: image.placement.left as f32,
         };
 
         self.glyph_cache.insert(physical_glyph.cache_key, glyph_coordinate);
@@ -358,8 +431,14 @@ impl FontLoader {
         Ok(())
     }
 
+    /// The texture of the dynamically allocated font atlas.
     pub fn get_font_atlas(&self) -> &Texture {
         &self.font_atlas
+    }
+
+    /// The texture of the static MSDF font map.
+    pub fn get_msdf_font_map(&self) -> &Texture {
+        &self.msdf_font_map
     }
 }
 

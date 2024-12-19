@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "debug")]
 use cgmath::SquareMatrix;
-use cgmath::{Matrix4, Rad, Vector2};
+use cgmath::{Array, Matrix4, Rad, Vector2};
 use korangar_util::container::SimpleCache;
 use num::Zero;
 
@@ -161,8 +161,6 @@ impl AnimationLoader {
                             offset,
                             frame_parts: vec![frame_part],
                             #[cfg(feature = "debug")]
-                            offset_matrix: Matrix4::identity(),
-                            #[cfg(feature = "debug")]
                             horizontal_matrix: Matrix4::identity(),
                             #[cfg(feature = "debug")]
                             vertical_matrix: Matrix4::identity(),
@@ -210,7 +208,7 @@ impl AnimationLoader {
         }
 
         // Generate bounding-box per action
-        for action_index in 0..action_size {
+        for animation in animations.iter_mut().take(action_size) {
             // The problem is that each frame of an action is not the same size
             // and without size consistency, the proportion differ between frames,
             // causing pixel offsets.
@@ -224,59 +222,58 @@ impl AnimationLoader {
             let mut min_left = i32::MAX;
             let mut max_right = 0;
 
-            // The player can change the sprite and causes an offset from a image to
-            // another.
-            if entity_type == EntityType::Player {
-                // Create a bounding box to standardize the size of the player sprite, ensuring
-                // that every sprite has the same proportion and that pixels are rendered in
-                // the correct position.
-                // The player sprite is generally 110 pixels, with an additional 40 pixels added
-                // for extra space, making the total height 150 pixels.
-                let extra_size = 20;
-                min_top = -90;
-                max_bottom = 20;
-                min_top -= extra_size;
-                max_bottom += extra_size;
-                min_left = -50;
-                max_right = 50;
-            } else {
-                animations[action_index].frames.iter().for_each(|frame| {
-                    let center_x = (frame.size.x - 1) / 2;
-                    min_left = min(min_left, frame.offset.x - center_x);
-                    max_right = max(max_right, frame.offset.x + (frame.size.x - 1 - center_x));
+            animation.frames.iter().for_each(|frame| {
+                let center_x = (frame.size.x - 1) / 2;
+                min_left = min(min_left, frame.offset.x - center_x);
+                max_right = max(max_right, frame.offset.x + (frame.size.x - 1 - center_x));
 
-                    let center_y = (frame.size.y - 1) / 2;
-                    min_top = min(min_top, frame.offset.y - center_y);
-                    max_bottom = max(max_bottom, frame.offset.y + (frame.size.y - 1 - center_y));
-                });
-            }
+                let center_y = (frame.size.y - 1) / 2;
+                min_top = min(min_top, frame.offset.y - center_y);
+                max_bottom = max(max_bottom, frame.offset.y + (frame.size.y - 1 - center_y));
+            });
 
-            animations[action_index].frames.iter_mut().for_each(|frame| {
+            // From here, the code start not using pixel coordinates (center of pixel
+            // coordinates), but instead pixel border + pixel center coordinates system.
+            // This also means that we start using float numbers.
+            // During rendering, the pixel border is required to determine the coordinates
+            // to display the billboard on the screen.
+            // This is the main reason to change the coordinate system.
+            // |x|x|x| - x represents the pixel center and | represents the pixel border.
+            // 'x' is in the format of numbers ending with .0 (e.g., X.0).
+            // '|' is in the format of numbers ending with .5 (e.g., X.5).
+            animation.frames.iter_mut().for_each(|frame| {
                 frame.size = calculate_new_size(min_top, max_bottom, min_left, max_right);
-                // Set the origin point at (0, 0) correctly by applying an offset in y by
-                // max_bottom.
+                // Set the bottom part of the image as (0, 0), to shift easily after rotation
                 frame.offset = Vector2::new(0, -max_bottom);
 
                 #[cfg(feature = "debug")]
                 get_cross_matrix(frame);
                 for frame_part in frame.frame_parts.iter_mut() {
-                    let frame_top_left = frame.offset - (frame.size - Vector2::new(1, 1)) / 2;
-                    let frame_part_top_left = frame_part.offset - (frame_part.size - Vector2::new(1, 1)) / 2;
+                    let frame_size = vector2_i32_to_f32(frame.size);
+                    let frame_origin = vector2_i32_to_f32(frame.offset);
+
+                    // The offset is used to shift to the pixel corner.
+                    let frame_top_left = Vector2::new(-frame_size.x / 2.0, -frame_size.y + 0.5);
+
+                    let frame_part_top_left_shift = vector2_i32_to_f32(-((frame_part.size - Vector2::new(1, 1)) / 2));
+                    let frame_part_offset = vector2_i32_to_f32(frame_part.offset);
+                    // The offset is used to shift from the pixel center to the pixel corner.
+                    let frame_part_top_left =
+                        (frame_origin + frame_part_offset + frame_part_top_left_shift) - Vector2::<f32>::from_value(0.5);
 
                     // Generate the key points of the frame rectangle.
                     let texture_frame_center = Vector2::new(0.0, 1.0);
-
                     // Generate the key points of the frame part rectangle.
                     // In the variables, we removed the term frame_part,
                     // but we are still working with the frame part.
-                    let new_vector = frame_part.size;
+                    let new_vector = vector2_i32_to_f32(frame_part.size);
                     let top_left = frame_part_top_left - frame_top_left;
-                    let bottom_left = top_left + new_vector.y * Vector2::<i32>::unit_y();
+                    let bottom_left = top_left + new_vector.y * Vector2::<f32>::unit_y();
                     let bottom_right = top_left + new_vector;
 
-                    let texture_top_left = convert_coordinates(top_left, frame.size);
-                    let texture_bottom_left = convert_coordinates(bottom_left, frame.size);
-                    let texture_bottom_right = convert_coordinates(bottom_right, frame.size);
+                    let texture_top_left = convert_coordinates(top_left, frame_size);
+                    let texture_bottom_left = convert_coordinates(bottom_left, frame_size);
+                    let texture_bottom_right = convert_coordinates(bottom_right, frame_size);
 
                     let rotation_matrix = calculate_recenter_rotation_matrix(texture_frame_center, -frame_part.angle);
                     let scale_matrix = calculate_scale_matrix(texture_top_left, texture_bottom_left, texture_bottom_right);
@@ -312,51 +309,43 @@ impl AnimationLoader {
     }
 }
 
+fn vector2_i32_to_f32(vector: Vector2<i32>) -> Vector2<f32> {
+    vector.map(|value| value as f32)
+}
+
 fn calculate_new_size(min_top: i32, max_bottom: i32, min_left: i32, max_right: i32) -> Vector2<i32> {
     // Create a rectangle centered on the y-axis, extending to the maximum of
     // max_left and max_right.
-    let size_x = 2 * max(i32::abs(min_left), i32::abs(max_right)) + 1;
+    let size_x = 2 * i32::abs(min_left).max(i32::abs(max_right)) + 1;
 
     // The size_y is defined to be odd, as it ranges from [0, 2k],
     // resulting in a size of 2k+1.
     let mut padding = 1;
-    if max_bottom % 2 == min_top % 2 {
+    if (max_bottom - min_top) % 2 == 0 {
         padding = 0;
     }
-    let size_y = max_bottom - min_top + padding + 1;
+    let size_y = max_bottom - min_top + 1 + padding;
 
-    return Vector2::new(size_x, size_y);
+    Vector2::new(size_x, size_y)
 }
 
 #[cfg(feature = "debug")]
 fn get_cross_matrix(frame: &mut AnimationFrame) {
-    let frame_top_left = frame.offset - (frame.size - Vector2::new(1, 1)) / 2;
-    let bounding_box_offset = Vector2::new(0, -(frame.size.y - 1) / 2) - frame.offset;
-    let bounding_box_top_left = bounding_box_offset - (frame.size - Vector2::new(1, 1)) / 2;
+    let frame_size = vector2_i32_to_f32(frame.size);
+    let frame_top_left = Vector2::new(-frame_size.x / 2.0, -frame_size.y + 0.5);
+    let frame_origin = vector2_i32_to_f32(frame.offset);
+    let bounding_box_origin = frame_origin - frame_top_left;
 
-    let new_vector = frame.size;
-    let top_left = bounding_box_top_left - frame_top_left;
-    let bottom_left = top_left + new_vector.y * Vector2::<i32>::unit_y();
-    let bottom_right = top_left + new_vector;
-
-    let texture_top_left = convert_coordinates(top_left, frame.size);
-    let texture_bottom_left = convert_coordinates(bottom_left, frame.size);
-    let texture_bottom_right = convert_coordinates(bottom_right, frame.size);
-    let translation_matrix = calculate_translation_matrix(texture_top_left, texture_bottom_left, texture_bottom_right);
-    frame.offset_matrix = translation_matrix;
-
-    let bounding_box_origin = Vector2::new((frame.size.x - 1) / 2, frame.size.y) + frame.offset;
-
-    let texture_top_left = convert_coordinates(Vector2::new(0, bounding_box_origin.y), frame.size);
-    let texture_bottom_left = convert_coordinates(Vector2::new(0, bounding_box_origin.y), frame.size);
-    let texture_bottom_right = convert_coordinates(Vector2::new(frame.size.x, bounding_box_origin.y), frame.size);
+    let texture_top_left = convert_coordinates(Vector2::new(0.0, bounding_box_origin.y), frame_size);
+    let texture_bottom_left = convert_coordinates(Vector2::new(0.0, bounding_box_origin.y), frame_size);
+    let texture_bottom_right = convert_coordinates(Vector2::new(frame_size.x, bounding_box_origin.y), frame_size);
     let scale_matrix = calculate_scale_matrix(texture_top_left, texture_bottom_left, texture_bottom_right);
     let translation_matrix = calculate_translation_matrix(texture_top_left, texture_bottom_left, texture_bottom_right);
     frame.horizontal_matrix = translation_matrix * scale_matrix;
 
-    let texture_top_left = convert_coordinates(Vector2::new(bounding_box_origin.x, 0), frame.size);
-    let texture_bottom_left = convert_coordinates(Vector2::new(bounding_box_origin.x, frame.size.y), frame.size);
-    let texture_bottom_right = convert_coordinates(Vector2::new(bounding_box_origin.x, frame.size.y), frame.size);
+    let texture_top_left = convert_coordinates(Vector2::new(bounding_box_origin.x, 0.0), frame_size);
+    let texture_bottom_left = convert_coordinates(Vector2::new(bounding_box_origin.x, frame_size.y), frame_size);
+    let texture_bottom_right = convert_coordinates(Vector2::new(bounding_box_origin.x, frame_size.y), frame_size);
     let scale_matrix = calculate_scale_matrix(texture_top_left, texture_bottom_left, texture_bottom_right);
     let translation_matrix = calculate_translation_matrix(texture_top_left, texture_bottom_left, texture_bottom_right);
     frame.vertical_matrix = translation_matrix * scale_matrix;
@@ -379,12 +368,12 @@ fn calculate_scale_matrix(
     texture_bottom_right: Vector2<f32>,
 ) -> Matrix4<f32> {
     // Scale the vertices (-1, 2), (-1, 0), (1, 2), (1, 0) to
-    // match the texture coordinates as specified above.
-    return Matrix4::from_nonuniform_scale(
+    // match the texture coordinates.
+    Matrix4::from_nonuniform_scale(
         (texture_bottom_right.x - texture_bottom_left.x) / 2.0,
         (texture_top_left.y - texture_bottom_left.y) / 2.0,
         1.0,
-    );
+    )
 }
 
 fn calculate_translation_matrix(
@@ -402,10 +391,10 @@ fn calculate_translation_matrix(
 /// This function converts to the "normalized" coordinates of a frame part
 /// inside the frame's bounding rectangle, defined by the vertices [-1, 0],
 /// [-1, 2], [1, 0], and [1, 2].
-fn convert_coordinates(coordinates: Vector2<i32>, size: Vector2<i32>) -> Vector2<f32> {
-    assert!(size.x != 0 && size.y != 0);
-    let x = (coordinates.x as f32 / size.x as f32 - 1.0 / 2.0) * 2.0;
-    let y = 2.0 - (coordinates.y as f32 / size.y as f32) * 2.0;
+fn convert_coordinates(coordinates: Vector2<f32>, size: Vector2<f32>) -> Vector2<f32> {
+    assert!(size.x != 0.0 && size.y != 0.0);
+    let x = (coordinates.x / size.x - 1.0 / 2.0) * 2.0;
+    let y = 2.0 - (coordinates.y / size.y) * 2.0;
     Vector2::<f32>::new(x, y)
 }
 
@@ -439,8 +428,6 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
             top_left: Vector2::zero(),
             offset: Vector2::zero(),
             frame_parts: vec![frame_part],
-            #[cfg(feature = "debug")]
-            offset_matrix: Matrix4::identity(),
             #[cfg(feature = "debug")]
             horizontal_matrix: Matrix4::identity(),
             #[cfg(feature = "debug")]
@@ -482,8 +469,6 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
         top_left: Vector2::zero(),
         offset: Vector2::new(top_left_x + (new_width - 1) / 2, top_left_y + (new_height - 1) / 2),
         frame_parts: new_frame_parts,
-        #[cfg(feature = "debug")]
-        offset_matrix: Matrix4::identity(),
         #[cfg(feature = "debug")]
         horizontal_matrix: Matrix4::identity(),
         #[cfg(feature = "debug")]

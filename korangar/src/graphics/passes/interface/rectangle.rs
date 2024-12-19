@@ -225,7 +225,7 @@ impl Drawer<{ BindGroupCount::One }, { ColorAttachmentCount::One }, { DepthAttac
 
             for (index, instruction) in draw_data.iter().enumerate() {
                 match instruction {
-                    InterfaceRectangleInstruction::Sdf { texture, .. } | InterfaceRectangleInstruction::Sprite { texture, .. }
+                    InterfaceRectangleInstruction::Sprite { texture, .. } | InterfaceRectangleInstruction::Sdf { texture, .. }
                         if texture.get_id() != current_texture_id =>
                     {
                         current_texture_id = texture.get_id();
@@ -280,6 +280,41 @@ impl Prepare for InterfaceRectangleDrawer {
                             padding: Default::default(),
                         });
                     }
+                    InterfaceRectangleInstruction::Sprite {
+                        screen_position,
+                        screen_size,
+                        screen_clip,
+                        color,
+                        corner_radius,
+                        texture,
+                        smooth,
+                    } => {
+                        let rectangle_type = if *smooth { 1 } else { 2 };
+
+                        let mut texture_index = texture_views.len() as i32;
+                        let id = texture.get_id();
+                        let potential_index = self.lookup.get(&id);
+
+                        if let Some(potential_index) = potential_index {
+                            texture_index = *potential_index;
+                        } else {
+                            self.lookup.insert(id, texture_index);
+                            texture_views.push(texture.get_texture_view());
+                        }
+
+                        self.instance_data.push(InstanceData {
+                            color: color.components_linear(),
+                            corner_radius: (*corner_radius).into(),
+                            screen_clip: (*screen_clip).into(),
+                            screen_position: (*screen_position).into(),
+                            screen_size: (*screen_size).into(),
+                            texture_position: [0.0, 0.0],
+                            texture_size: [1.0, 1.0],
+                            rectangle_type,
+                            texture_index,
+                            padding: Default::default(),
+                        });
+                    }
                     InterfaceRectangleInstruction::Sdf {
                         screen_position,
                         screen_size,
@@ -307,42 +342,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: [0.0, 0.0],
                             texture_size: [1.0, 1.0],
-                            rectangle_type: 1,
-                            texture_index,
-                            padding: Default::default(),
-                        });
-                    }
-                    InterfaceRectangleInstruction::Sprite {
-                        screen_position,
-                        screen_size,
-                        screen_clip,
-                        color,
-                        corner_radius,
-                        texture,
-                        smooth,
-                    } => {
-                        let rectangle_type = if *smooth { 2 } else { 3 };
-
-                        let mut texture_index = texture_views.len() as i32;
-                        let id = texture.get_id();
-                        let potential_index = self.lookup.get(&id);
-
-                        if let Some(potential_index) = potential_index {
-                            texture_index = *potential_index;
-                        } else {
-                            self.lookup.insert(id, texture_index);
-                            texture_views.push(texture.get_texture_view());
-                        }
-
-                        self.instance_data.push(InstanceData {
-                            color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
-                            screen_clip: (*screen_clip).into(),
-                            screen_position: (*screen_position).into(),
-                            screen_size: (*screen_size).into(),
-                            texture_position: [0.0, 0.0],
-                            texture_size: [1.0, 1.0],
-                            rectangle_type,
+                            rectangle_type: 3,
                             texture_index,
                             padding: Default::default(),
                         });
@@ -381,7 +381,7 @@ impl Prepare for InterfaceRectangleDrawer {
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
                 &texture_views,
-                instructions.font_atlas_texture.get_texture_view(),
+                instructions.font_map_texture.get_texture_view(),
             )
         } else {
             for instruction in instructions.interface.iter() {
@@ -406,6 +406,31 @@ impl Prepare for InterfaceRectangleDrawer {
                             padding: Default::default(),
                         });
                     }
+
+                    InterfaceRectangleInstruction::Sprite {
+                        screen_position,
+                        screen_size,
+                        screen_clip,
+                        color,
+                        corner_radius,
+                        texture: _,
+                        smooth,
+                    } => {
+                        let rectangle_type = if *smooth { 1 } else { 2 };
+
+                        self.instance_data.push(InstanceData {
+                            color: color.components_linear(),
+                            corner_radius: (*corner_radius).into(),
+                            screen_clip: (*screen_clip).into(),
+                            screen_position: (*screen_position).into(),
+                            screen_size: (*screen_size).into(),
+                            texture_position: [0.0, 0.0],
+                            texture_size: [1.0, 1.0],
+                            rectangle_type,
+                            texture_index: 0,
+                            padding: Default::default(),
+                        });
+                    }
                     InterfaceRectangleInstruction::Sdf {
                         screen_position,
                         screen_size,
@@ -422,31 +447,7 @@ impl Prepare for InterfaceRectangleDrawer {
                             screen_size: (*screen_size).into(),
                             texture_position: [0.0, 0.0],
                             texture_size: [1.0, 1.0],
-                            rectangle_type: 1,
-                            texture_index: 0,
-                            padding: Default::default(),
-                        });
-                    }
-                    InterfaceRectangleInstruction::Sprite {
-                        screen_position,
-                        screen_size,
-                        screen_clip,
-                        color,
-                        corner_radius,
-                        texture: _,
-                        smooth,
-                    } => {
-                        let rectangle_type = if *smooth { 2 } else { 3 };
-
-                        self.instance_data.push(InstanceData {
-                            color: color.components_linear(),
-                            corner_radius: (*corner_radius).into(),
-                            screen_clip: (*screen_clip).into(),
-                            screen_position: (*screen_position).into(),
-                            screen_size: (*screen_size).into(),
-                            texture_position: [0.0, 0.0],
-                            texture_size: [1.0, 1.0],
-                            rectangle_type,
+                            rectangle_type: 3,
                             texture_index: 0,
                             padding: Default::default(),
                         });
@@ -480,7 +481,7 @@ impl Prepare for InterfaceRectangleDrawer {
                 device,
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
-                instructions.font_atlas_texture.get_texture_view(),
+                instructions.font_map_texture.get_texture_view(),
             )
         }
     }
@@ -497,7 +498,7 @@ impl InterfaceRectangleDrawer {
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
         texture_views: &[&TextureView],
-        font_atlas_texture_view: &TextureView,
+        msdf_font_map: &TextureView,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -513,7 +514,7 @@ impl InterfaceRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 2,
-                    resource: BindingResource::TextureView(font_atlas_texture_view),
+                    resource: BindingResource::TextureView(msdf_font_map),
                 },
             ],
         })
@@ -523,7 +524,7 @@ impl InterfaceRectangleDrawer {
         device: &Device,
         bind_group_layout: &BindGroupLayout,
         instance_data_buffer: &Buffer<InstanceData>,
-        font_atlas_texture_view: &TextureView,
+        msdf_font_map: &TextureView,
     ) -> BindGroup {
         device.create_bind_group(&BindGroupDescriptor {
             label: Some(DRAWER_NAME),
@@ -535,7 +536,7 @@ impl InterfaceRectangleDrawer {
                 },
                 BindGroupEntry {
                     binding: 1,
-                    resource: BindingResource::TextureView(font_atlas_texture_view),
+                    resource: BindingResource::TextureView(msdf_font_map),
                 },
             ],
         })

@@ -108,7 +108,7 @@ fn buffers_expandable(settings: &PlainTrackedState<RenderSettings>) -> ElementCe
             "light cull count",
             settings.mapped(|settings| &settings.show_light_culling_count_buffer),
         ),
-        render_state_button("font atlas", settings.mapped(|settings| &settings.show_font_atlas)),
+        render_state_button("font map", settings.mapped(|settings| &settings.show_font_map)),
     ];
 
     Expandable::new("buffers".to_string(), setting_elements, true).wrap()

@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use cgmath::{Point3, Vector2, Vector3};
 use derive_new::new;
-use korangar_interface::application::ClipTraitExt;
+use korangar_interface::application::{ClipTraitExt, FontSizeTrait, ScalingTrait};
 use ragnarok_packets::{EntityId, QuestColor, QuestEffectPacket};
 use rand::{thread_rng, Rng};
 
 use crate::graphics::{Color, Texture};
 use crate::interface::layout::{ScreenClip, ScreenPosition, ScreenSize};
-use crate::loaders::{ImageType, TextureLoader};
+use crate::loaders::{FontSize, ImageType, Scaling, TextureLoader};
 use crate::renderer::{GameInterfaceRenderer, SpriteRenderer};
 use crate::world::Camera;
 use crate::{Entity, Map};
@@ -54,7 +54,7 @@ impl Particle for DamageNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(&self.damage_amount, final_position, Color::WHITE, 16.0);
+        renderer.render_damage_text(&self.damage_amount, final_position, Color::WHITE, FontSize::new(16.0));
     }
 }
 
@@ -86,7 +86,12 @@ impl Particle for HealNumber {
             top: screen_position.y * window_size.height,
         };
 
-        renderer.render_damage_text(&self.heal_amount, final_position, Color::rgb_u8(30, 255, 30), 16.0);
+        renderer.render_damage_text(
+            &self.heal_amount,
+            final_position,
+            Color::rgb_u8(30, 255, 30),
+            FontSize::new(16.0),
+        );
     }
 }
 
@@ -172,7 +177,7 @@ impl ParticleHolder {
         renderer: &GameInterfaceRenderer,
         camera: &dyn Camera,
         window_size: ScreenSize,
-        scaling_factor: f32,
+        scaling: Scaling,
         entities: &[Entity],
     ) {
         self.particles
@@ -182,6 +187,6 @@ impl ParticleHolder {
         entities
             .iter()
             .filter_map(|entity| self.quest_icons.get(&entity.get_entity_id()))
-            .for_each(|quest_icon| quest_icon.render(renderer, camera, window_size, scaling_factor));
+            .for_each(|quest_icon| quest_icon.render(renderer, camera, window_size, scaling.get_factor()));
     }
 }

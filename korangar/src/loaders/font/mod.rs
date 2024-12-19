@@ -1,33 +1,34 @@
 mod color_span_iterator;
+mod font_map_descriptor;
 
+use std::io::{Cursor, Read};
 use std::sync::Arc;
 
-use cgmath::{Array, Point2, Vector2};
-use cosmic_text::{Attrs, Buffer, CacheKey, Family, FontSystem, Metrics, PhysicalGlyph, Shaping, SwashCache, SwashContent};
+use cgmath::{Point2, Vector2};
+use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping};
+use flate2::bufread::GzDecoder;
 use hashbrown::HashMap;
-#[cfg(feature = "debug")]
-use korangar_debug::logging::{print_debug, Colorize};
+use image::{ImageFormat, ImageReader};
 use korangar_interface::application::FontSizeTrait;
 use korangar_interface::elements::ElementDisplay;
-use korangar_util::texture_atlas::OnlineTextureAtlas;
 use korangar_util::{FileLoader, Rectangle};
 use serde::{Deserialize, Serialize};
-use wgpu::{
-    Device, Extent3d, ImageCopyTexture, Origin3d, Queue, TextureAspect, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-};
 
 use self::color_span_iterator::ColorSpanIterator;
-use super::GameFileLoader;
-use crate::graphics::{Color, Texture, MAX_TEXTURE_SIZE};
+use self::font_map_descriptor::parse_glyph_cache;
+use super::{GameFileLoader, TextureLoader};
+use crate::graphics::{Color, Texture};
 use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ArrayType, ScreenSize};
 
-const FONT_FILE_PATH: &str = "data\\WenQuanYiMicroHei.ttf";
-const FONT_FAMILY_NAME: &str = "WenQuanYi Micro Hei";
+const FONT_FILE_PATH: &str = "data\\font\\NotoSans.ttf";
+const FONT_MAP_DESCRIPTION_FILE_PATH: &str = "data\\font\\NotoSans.csv.gz";
+const FONT_MAP_FILE_PATH: &str = "data\\font\\NotoSans.png";
+const FONT_FAMILY_NAME: &str = "Noto Sans";
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct FontSize(f32);
+pub struct FontSize(pub f32);
 
 impl ArrayType for FontSize {
     type Element = f32;
@@ -92,7 +93,7 @@ impl ElementDisplay for Scaling {
 }
 
 impl Scaling {
-    pub fn new(value: f32) -> Self {
+    pub const fn new(value: f32) -> Self {
         Self(value)
     }
 }
@@ -105,122 +106,68 @@ impl korangar_interface::application::ScalingTrait for Scaling {
 
 pub struct TextLayout {
     pub glyphs: Vec<GlyphInstruction>,
-    pub size: Vector2<i32>,
+    pub size: Vector2<f32>,
 }
 
 pub struct GlyphInstruction {
-    pub position: Rectangle<i32>,
+    pub position: Rectangle<f32>,
     pub texture_coordinate: Rectangle<f32>,
     pub color: Color,
 }
 
-#[derive(Copy, Clone)]
-struct GlyphCoordinate {
-    texture_coordinate: Rectangle<f32>,
-    width: i32,
-    height: i32,
-    offset_top: i32,
-    offset_left: i32,
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct GlyphCoordinate {
+    pub(crate) texture_coordinate: Rectangle<f32>,
+    pub(crate) width: f32,
+    pub(crate) height: f32,
+    pub(crate) offset_top: f32,
+    pub(crate) offset_left: f32,
 }
 
 pub struct FontLoader {
-    queue: Arc<Queue>,
-    font_atlas: Texture,
     font_system: FontSystem,
-    swash_cache: SwashCache,
-    glyph_cache: HashMap<CacheKey, GlyphCoordinate>,
-    texture_atlas: OnlineTextureAtlas,
-    atlas_is_full: bool,
+    font_map: Arc<Texture>,
+    glyph_cache: HashMap<u16, GlyphCoordinate>,
 }
 
 impl FontLoader {
-    pub fn new(device: &Device, queue: Arc<Queue>, game_file_loader: &GameFileLoader) -> Self {
-        let cache_size = Vector2::from_value(2048);
-
-        let online_texture_atlas = OnlineTextureAtlas::new(cache_size.x, cache_size.y, true);
-        let font_atlas = Self::create_texture_atlas_texture(device, cache_size);
+    pub fn new(game_file_loader: &GameFileLoader, texture_loader: &TextureLoader) -> Self {
         let font_data = game_file_loader.get(FONT_FILE_PATH).unwrap();
-
         let mut font_system = FontSystem::new();
         font_system.db_mut().load_font_data(font_data);
 
+        let font_map_data = game_file_loader.get(FONT_MAP_FILE_PATH).unwrap();
+        let font_map_reader = ImageReader::with_format(Cursor::new(font_map_data), ImageFormat::Png);
+        let font_map_decoder = font_map_reader.decode().unwrap();
+        let font_map_rgba_image = font_map_decoder.into_rgba8();
+        let font_map = texture_loader.create_msdf("font map", font_map_rgba_image);
+        let font_map_size = font_map.get_size();
+
+        let mut font_description_data = game_file_loader.get(FONT_MAP_DESCRIPTION_FILE_PATH).unwrap();
+
+        if FONT_MAP_DESCRIPTION_FILE_PATH.ends_with(".gz") {
+            let mut decoder = GzDecoder::new(&font_description_data[..]);
+            let mut data = Vec::with_capacity(font_description_data.len() * 2);
+            decoder.read_to_end(&mut data).unwrap();
+            font_description_data = data;
+        }
+
+        let font_description_content = String::from_utf8(font_description_data).unwrap();
+        let glyph_cache = parse_glyph_cache(font_description_content, font_map_size.width, font_map_size.height);
+
         Self {
-            queue,
-            font_atlas,
             font_system,
-            swash_cache: SwashCache::new(),
-            glyph_cache: HashMap::new(),
-            texture_atlas: online_texture_atlas,
-            atlas_is_full: false,
+            font_map,
+            glyph_cache,
         }
-    }
-
-    fn create_texture_atlas_texture(device: &Device, cache_size: Vector2<u32>) -> Texture {
-        Texture::new(
-            device,
-            &TextureDescriptor {
-                label: Some("Texture Atlas"),
-                size: Extent3d {
-                    width: cache_size.x,
-                    height: cache_size.y,
-                    depth_or_array_layers: 1,
-                },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: TextureDimension::D2,
-                format: TextureFormat::R8Unorm,
-                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
-                view_formats: &[],
-            },
-            true,
-        )
-    }
-
-    pub fn is_full(&self) -> bool {
-        self.atlas_is_full
-    }
-
-    pub fn resize_or_clear(&mut self, device: &Device) {
-        self.atlas_is_full = false;
-
-        let current_size = self.font_atlas.get_size();
-        let mut new_width = current_size.width;
-        let mut new_height = current_size.height;
-
-        if new_width <= new_height && new_width * 2 <= MAX_TEXTURE_SIZE {
-            new_width *= 2;
-        } else if new_height < new_width && new_height * 2 <= MAX_TEXTURE_SIZE {
-            new_height *= 2;
-        }
-
-        if new_width != current_size.width || new_height != current_size.height {
-            self.texture_atlas.clear();
-            self.glyph_cache.clear();
-
-            self.texture_atlas = OnlineTextureAtlas::new(new_width, new_height, true);
-            self.font_atlas = Self::create_texture_atlas_texture(device, Vector2::new(new_width, new_height));
-
-            #[cfg(feature = "debug")]
-            print_debug!("increased font atlas size to {}x{}", new_width, new_height);
-        } else {
-            self.clear(device);
-        }
-    }
-
-    // TODO: NHA Call this when we change the scale factor of the application.
-    pub fn clear(&mut self, device: &Device) {
-        self.texture_atlas.clear();
-        self.glyph_cache.clear();
-        let size = self.font_atlas.get_size();
-        self.font_atlas = Self::create_texture_atlas_texture(device, Vector2::new(size.width, size.height));
     }
 
     pub fn get_text_dimensions(&mut self, text: &str, font_size: FontSize, line_height_scale: f32, available_width: f32) -> ScreenSize {
-        let TextLayout { size, .. } = self.get(text, Color::BLACK, font_size, line_height_scale, available_width);
+        let TextLayout { size, .. } = self.get_text_layout(text, Color::BLACK, font_size, line_height_scale, available_width);
 
         ScreenSize {
-            width: size.x as f32,
-            height: size.y as f32,
+            width: size.x,
+            height: size.y,
         }
     }
 
@@ -228,7 +175,7 @@ impl FontLoader {
     //       But that would need us to re-evaluate on how we render test in general.
     //       We also don't really use the "line_height_scale", which would provide
     //       an easy way to handle "line height".
-    pub fn get(
+    pub fn get_text_layout(
         &mut self,
         text: &str,
         default_color: Color,
@@ -237,16 +184,14 @@ impl FontLoader {
         available_width: f32,
     ) -> TextLayout {
         let mut glyphs = Vec::with_capacity(text.len());
-        let mut text_width = 0;
-        let mut text_height = 0;
+        let mut text_width = 0f32;
+        let mut text_height = 0f32;
 
         let metrics = Metrics::relative(font_size.0, line_height_scale);
         let mut buffer = Buffer::new(&mut self.font_system, metrics);
-
         let attributes = Attrs::new().family(Family::Name(FONT_FAMILY_NAME));
 
         buffer.set_size(&mut self.font_system, Some(available_width), None);
-
         buffer.set_rich_text(
             &mut self.font_system,
             ColorSpanIterator::new(text, default_color, attributes),
@@ -255,23 +200,26 @@ impl FontLoader {
         );
 
         for run in buffer.layout_runs() {
-            text_width = text_height.max(run.line_w.round() as i32);
+            text_width = text_width.max(run.line_w);
+            text_height += run.line_height;
 
             for layout_glyph in run.glyphs.iter() {
                 let physical_glyph = layout_glyph.physical((0.0, 0.0), 1.0);
 
-                if !self.glyph_cache.contains_key(&physical_glyph.cache_key) && self.add_glyph_to_cache(&physical_glyph).is_err() {
+                let Some(glyph_coordinate) = self.glyph_cache.get(&layout_glyph.glyph_id).copied().map(|mut glyph| {
+                    glyph.width *= font_size.0;
+                    glyph.height *= font_size.0;
+                    glyph.offset_left *= font_size.0;
+                    glyph.offset_top *= font_size.0;
+                    glyph
+                }) else {
                     continue;
-                }
+                };
 
-                let glyph_coordinate = *self.glyph_cache.get(&physical_glyph.cache_key).unwrap();
-
-                let x = physical_glyph.x + glyph_coordinate.offset_left;
-                let y = run.line_y.round() as i32 + physical_glyph.y - glyph_coordinate.offset_top;
+                let x = physical_glyph.x as f32 + glyph_coordinate.offset_left;
+                let y = run.line_y + physical_glyph.y as f32 + glyph_coordinate.offset_top;
                 let width = glyph_coordinate.width;
                 let height = glyph_coordinate.height;
-
-                text_height = text_height.max(y + height);
 
                 let position = Rectangle::new(Point2::new(x, y), Point2::new(x + width, y + height));
                 let color = layout_glyph.color_opt.map(|color| color.into()).unwrap_or(default_color);
@@ -290,76 +238,9 @@ impl FontLoader {
         }
     }
 
-    fn add_glyph_to_cache(&mut self, physical_glyph: &PhysicalGlyph) -> Result<(), ()> {
-        let image = self
-            .swash_cache
-            .get_image_uncached(&mut self.font_system, physical_glyph.cache_key)
-            .expect("can't create glyph image");
-
-        let width = image.placement.width;
-        let height = image.placement.height;
-
-        // We only support rendering of glyphs that use an alpha mask.
-        // The other types are used for sub-pixel rendering, which cosmic-text
-        // currently doesn't expose and is also hard to do properly (since you need to
-        // know the sub-pixel layout of the monitor used).
-        if image.content != SwashContent::Mask || width == 0 || height == 0 {
-            return Err(());
-        }
-
-        let Some(allocation) = self.texture_atlas.allocate(Vector2::new(width, height)) else {
-            if !self.atlas_is_full {
-                self.atlas_is_full = true;
-
-                #[cfg(feature = "debug")]
-                print_debug!("[{}] texture atlas is full", "warning".yellow());
-            }
-
-            return Err(());
-        };
-
-        let glyph_coordinate = GlyphCoordinate {
-            texture_coordinate: Rectangle::new(
-                allocation.map_to_atlas(Point2::from_value(0.0)),
-                allocation.map_to_atlas(Point2::from_value(1.0)),
-            ),
-            width: width as i32,
-            height: height as i32,
-            offset_top: image.placement.top,
-            offset_left: image.placement.left,
-        };
-
-        self.glyph_cache.insert(physical_glyph.cache_key, glyph_coordinate);
-
-        self.queue.write_texture(
-            ImageCopyTexture {
-                texture: self.font_atlas.get_texture(),
-                mip_level: 0,
-                origin: Origin3d {
-                    x: allocation.rectangle.min.x,
-                    y: allocation.rectangle.min.y,
-                    z: 0,
-                },
-                aspect: TextureAspect::All,
-            },
-            &image.data,
-            wgpu::ImageDataLayout {
-                offset: 0,
-                bytes_per_row: Some(width),
-                rows_per_image: Some(height),
-            },
-            Extent3d {
-                width,
-                height,
-                depth_or_array_layers: 1,
-            },
-        );
-
-        Ok(())
-    }
-
-    pub fn get_font_atlas(&self) -> &Texture {
-        &self.font_atlas
+    /// The texture of the static font map.
+    pub fn get_font_map(&self) -> &Texture {
+        &self.font_map
     }
 }
 

@@ -26,7 +26,8 @@ const MAX_CACHE_SIZE: usize = 512 * 1024 * 1024;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ImageType {
     Color,
-    Grayscale,
+    Sdf,
+    Msdf,
 }
 
 pub struct TextureLoader {
@@ -79,7 +80,7 @@ impl TextureLoader {
         Arc::new(texture)
     }
 
-    pub fn create_grayscale(&self, name: &str, image: GrayImage) -> Arc<Texture> {
+    pub fn create_sdf(&self, name: &str, image: GrayImage) -> Arc<Texture> {
         let texture = Texture::new_with_data(
             &self.device,
             &self.queue,
@@ -94,6 +95,30 @@ impl TextureLoader {
                 sample_count: 1,
                 dimension: TextureDimension::D2,
                 format: TextureFormat::R8Unorm,
+                usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
+                view_formats: &[],
+            },
+            image.as_raw(),
+            false,
+        );
+        Arc::new(texture)
+    }
+
+    pub fn create_msdf(&self, name: &str, image: RgbaImage) -> Arc<Texture> {
+        let texture = Texture::new_with_data(
+            &self.device,
+            &self.queue,
+            &TextureDescriptor {
+                label: Some(name),
+                size: Extent3d {
+                    width: image.width(),
+                    height: image.height(),
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: TextureDimension::D2,
+                format: TextureFormat::Rgba8Unorm,
                 usage: TextureUsages::COPY_DST | TextureUsages::TEXTURE_BINDING,
                 view_formats: &[],
             },
@@ -160,12 +185,16 @@ impl TextureLoader {
     fn load(&self, path: &str, image_type: ImageType) -> Result<Arc<Texture>, LoadError> {
         let texture = match image_type {
             ImageType::Color => {
-                let (texture_data, transparent) = self.load_texture_data(path)?;
+                let (texture_data, transparent) = self.load_texture_data(path, false)?;
                 self.create(path, texture_data, transparent)
             }
-            ImageType::Grayscale => {
+            ImageType::Sdf => {
                 let texture_data = self.load_grayscale_texture_data(path)?;
-                self.create_grayscale(path, texture_data)
+                self.create_sdf(path, texture_data)
+            }
+            ImageType::Msdf => {
+                let (texture_data, _) = self.load_texture_data(path, true)?;
+                self.create_msdf(path, texture_data)
             }
         };
 
@@ -175,10 +204,11 @@ impl TextureLoader {
             .unwrap()
             .insert((path.to_string(), image_type), texture.clone())
             .unwrap();
+
         Ok(texture)
     }
 
-    pub fn load_texture_data(&self, path: &str) -> Result<(RgbaImage, bool), LoadError> {
+    pub fn load_texture_data(&self, path: &str, raw: bool) -> Result<(RgbaImage, bool), LoadError> {
         #[cfg(feature = "debug")]
         let timer = Timer::new_dynamic(format!("load texture data from {}", path.magenta()));
 
@@ -194,7 +224,7 @@ impl TextureLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load_texture_data(FALLBACK_PNG_FILE);
+                return self.load_texture_data(FALLBACK_PNG_FILE, raw);
             }
         };
 
@@ -207,7 +237,7 @@ impl TextureLoader {
                     print_debug!("Replacing with fallback");
                 }
 
-                return self.load_texture_data(FALLBACK_PNG_FILE);
+                return self.load_texture_data(FALLBACK_PNG_FILE, raw);
             }
         };
         let reader = ImageReader::with_format(Cursor::new(file_data), image_format);
@@ -229,19 +259,19 @@ impl TextureLoader {
                     _ => unreachable!(),
                 };
 
-                return self.load_texture_data(fallback_path);
+                return self.load_texture_data(fallback_path, raw);
             }
         };
 
         match image_format {
-            ImageFormat::Bmp => {
+            ImageFormat::Bmp if !raw => {
                 // These numbers are taken from https://github.com/Duckwhale/RagnarokFileFormats
                 image_buffer
                     .pixels_mut()
                     .filter(|pixel| pixel.0[0] > 0xF0 && pixel.0[1] < 0x10 && pixel.0[2] > 0x0F)
                     .for_each(|pixel| *pixel = Rgba([0; 4]));
             }
-            ImageFormat::Png | ImageFormat::Tga => {
+            ImageFormat::Png | ImageFormat::Tga if !raw => {
                 image_buffer = premultiply_alpha(image_buffer);
             }
             _ => {}
@@ -398,7 +428,7 @@ impl TextureAtlasFactory {
             return cached_entry;
         }
 
-        let (data, transparent) = self.texture_loader.load_texture_data(path).expect("can't load texture data");
+        let (data, transparent) = self.texture_loader.load_texture_data(path, false).expect("can't load texture data");
         self.transparent |= transparent;
         let allocation_id = self.texture_atlas.register_image(data);
 

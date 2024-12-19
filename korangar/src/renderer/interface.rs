@@ -33,10 +33,10 @@ impl InterfaceRenderer {
     ) -> Self {
         let instructions = RefCell::new(Vec::default());
 
-        let filled_box_texture = texture_loader.get("filled_box.png", ImageType::Grayscale).unwrap();
-        let unfilled_box_texture = texture_loader.get("unfilled_box.png", ImageType::Grayscale).unwrap();
-        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", ImageType::Grayscale).unwrap();
-        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", ImageType::Grayscale).unwrap();
+        let filled_box_texture = texture_loader.get("filled_box.png", ImageType::Sdf).unwrap();
+        let unfilled_box_texture = texture_loader.get("unfilled_box.png", ImageType::Sdf).unwrap();
+        let expanded_arrow_texture = texture_loader.get("expanded_arrow.png", ImageType::Sdf).unwrap();
+        let collapsed_arrow_texture = texture_loader.get("collapsed_arrow.png", ImageType::Sdf).unwrap();
 
         let interface_size = if high_quality_interface { window_size * 2.0 } else { window_size };
 
@@ -146,10 +146,10 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
             font_size = font_size * 2.0;
         }
 
-        let TextLayout { glyphs, mut size } =
+        let TextLayout { glyphs, mut size, .. } =
             self.font_loader
                 .borrow_mut()
-                .get(text, color, font_size, 1.0, screen_clip.right - text_position.left);
+                .get_text_layout(text, color, font_size, 1.0, screen_clip.right - text_position.left);
 
         glyphs.iter().for_each(
             |GlyphInstruction {
@@ -158,13 +158,13 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
                  color,
              }| {
                 let screen_position = ScreenPosition {
-                    left: text_position.left + position.min.x as f32,
-                    top: text_position.top + position.min.y as f32,
+                    left: text_position.left + position.min.x,
+                    top: text_position.top + position.min.y,
                 } / self.interface_size;
 
                 let screen_size = ScreenSize {
-                    width: position.width() as f32,
-                    height: position.height() as f32,
+                    width: position.width(),
+                    height: position.height(),
                 } / self.interface_size;
 
                 let texture_position = texture_coordinate.min.to_vec();
@@ -182,10 +182,10 @@ impl korangar_interface::application::InterfaceRenderer<InterfaceSettings> for I
         );
 
         if self.high_quality_interface {
-            size.y /= 2;
+            size.y /= 2.0;
         }
 
-        size.y as f32
+        size.y
     }
 
     fn render_checkbox(

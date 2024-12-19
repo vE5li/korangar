@@ -53,9 +53,7 @@ use korangar_debug::logging::{print_debug, Colorize};
 use korangar_debug::profile_block;
 #[cfg(feature = "debug")]
 use korangar_debug::profiling::Profiler;
-#[cfg(feature = "debug")]
-use korangar_interface::application::{Application, FontSizeTraitExt, PositionTraitExt};
-use korangar_interface::application::{FocusState, FontSizeTrait};
+use korangar_interface::application::{Application, FocusState, FontSizeTrait, PositionTraitExt};
 use korangar_interface::state::{
     MappedRemote, PlainTrackedState, Remote, TrackedState, TrackedStateExt, TrackedStateTake, TrackedStateVec,
 };
@@ -75,8 +73,8 @@ use ragnarok_packets::{
 use renderer::InterfaceRenderer;
 use settings::AudioSettings;
 #[cfg(feature = "debug")]
-use wgpu::Queue;
-use wgpu::{Device, Dx12Compiler, Instance, InstanceFlags, MemoryHints};
+use wgpu::{Device, Queue};
+use wgpu::{Dx12Compiler, Instance, InstanceFlags, MemoryHints};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
@@ -99,7 +97,7 @@ use crate::inventory::{Hotbar, Inventory, SkillTree};
 use crate::loaders::*;
 #[cfg(feature = "debug")]
 use crate::renderer::DebugMarkerRenderer;
-use crate::renderer::{EffectRenderer, GameInterfaceRenderer};
+use crate::renderer::{AlignHorizontal, EffectRenderer, GameInterfaceRenderer};
 use crate::settings::{GraphicsSettings, LightingMode};
 use crate::system::GameTimer;
 use crate::world::*;
@@ -118,6 +116,8 @@ const INITIAL_SCREEN_SIZE: ScreenSize = ScreenSize {
     width: 1280.0,
     height: 720.0,
 };
+
+const INITIAL_SCALING_FACTOR: Scaling = Scaling::new(1.0);
 
 static ICON_DATA: &[u8] = include_bytes!("../archive/data/icon.png");
 
@@ -149,6 +149,7 @@ fn main() {
 
 struct Client {
     window: Option<Arc<Window>>,
+    #[cfg(feature = "debug")]
     device: Arc<Device>,
     #[cfg(feature = "debug")]
     queue: Arc<Queue>,
@@ -371,10 +372,10 @@ impl Client {
 
         time_phase!("create resource managers", {
             std::fs::create_dir_all("client/themes").unwrap();
-            let font_loader = Rc::new(RefCell::new(FontLoader::new(&device, queue.clone(), &game_file_loader)));
 
             let mut model_loader = ModelLoader::new(game_file_loader.clone());
             let texture_loader = Arc::new(TextureLoader::new(device.clone(), queue.clone(), game_file_loader.clone()));
+            let font_loader = Rc::new(RefCell::new(FontLoader::new(&game_file_loader, &texture_loader)));
             let mut map_loader = MapLoader::new(device.clone(), queue.clone(), game_file_loader.clone(), audio_engine.clone());
             let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
             let mut action_loader = ActionLoader::new(game_file_loader.clone());
@@ -405,7 +406,13 @@ impl Client {
                 &texture_loader,
                 *high_quality_interface.get(),
             );
-            let bottom_interface_renderer = GameInterfaceRenderer::new(INITIAL_SCREEN_SIZE, &texture_loader);
+            let bottom_interface_renderer = GameInterfaceRenderer::new(
+                INITIAL_SCREEN_SIZE,
+                INITIAL_SCALING_FACTOR,
+                font_loader.clone(),
+                #[cfg(feature = "debug")]
+                &texture_loader,
+            );
             let middle_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
             let top_interface_renderer = GameInterfaceRenderer::from_renderer(&bottom_interface_renderer);
             let effect_renderer = EffectRenderer::new(INITIAL_SCREEN_SIZE);
@@ -531,7 +538,7 @@ impl Client {
             ]);
 
             let welcome_string = format!(
-                "Welcome to ^ffff00★^000000 ^ff8800Korangar^000000 ^ffff00★^000000 version ^ff8800{}^000000!",
+                "Welcome to ^ff8800Korangar^000000 version ^ff8800{}^000000!",
                 env!("CARGO_PKG_VERSION")
             );
             let chat_messages = PlainTrackedState::new(vec![ChatMessage {
@@ -559,6 +566,7 @@ impl Client {
 
         Self {
             window: None,
+            #[cfg(feature = "debug")]
             device,
             #[cfg(feature = "debug")]
             queue,
@@ -711,7 +719,12 @@ impl Client {
         // function results in surface configuration errors under DX12.
         self.update_graphic_settings();
 
-        self.font_loader_maintenance();
+        // TODO: NHA We want to have an event or a remote setting that the scaling
+        //       changed.
+        let scaling = self.application.get_scaling();
+        self.bottom_interface_renderer.update_scaling(scaling);
+        self.middle_interface_renderer.update_scaling(scaling);
+        self.top_interface_renderer.update_scaling(scaling);
 
         let frame = self.graphics_engine.wait_for_next_frame();
 
@@ -2139,13 +2152,8 @@ impl Client {
                 );
             }
 
-            self.particle_holder.render(
-                &self.bottom_interface_renderer,
-                current_camera,
-                screen_size,
-                self.application.get_scaling_factor(),
-                entities,
-            );
+            self.particle_holder
+                .render(&self.bottom_interface_renderer, current_camera, screen_size, scaling, entities);
 
             self.effect_holder.render(&mut self.effect_renderer, current_camera);
 
@@ -2172,21 +2180,15 @@ impl Client {
                     if let Some(name) = &entity.get_details() {
                         let name = name.split('#').next().unwrap();
 
-                        let offset = ScreenPosition {
-                            left: name.len() as f32 * -3.0,
-                            top: 20.0,
-                        };
+                        let offset = ScreenPosition { left: 15.0, top: 15.0 }.scaled(scaling);
 
-                        // TODO: move variables into theme
                         self.middle_interface_renderer.render_text(
                             name,
-                            mouse_position + offset + ScreenPosition::uniform(1.0),
-                            Color::BLACK,
-                            FontSize::new(12.0),
+                            mouse_position + offset,
+                            Color::WHITE,
+                            FontSize::new(16.0),
+                            AlignHorizontal::Mid,
                         );
-
-                        self.middle_interface_renderer
-                            .render_text(name, mouse_position + offset, Color::WHITE, FontSize::new(12.0));
                     }
                 }
             }
@@ -2222,9 +2224,10 @@ impl Client {
 
                 self.top_interface_renderer.render_text(
                     &self.game_timer.last_frames_per_second().to_string(),
-                    game_theme.overlay.text_offset.get().scaled(self.application.get_scaling()),
+                    game_theme.overlay.text_offset.get(),
                     game_theme.overlay.foreground_color.get(),
-                    game_theme.overlay.font_size.get().scaled(self.application.get_scaling()),
+                    game_theme.overlay.font_size.get(),
+                    AlignHorizontal::Left,
                 );
             }
 
@@ -2249,7 +2252,7 @@ impl Client {
         let bottom_layer_instructions = self.bottom_interface_renderer.get_instructions();
         let middle_layer_instructions = self.middle_interface_renderer.get_instructions();
         let top_layer_instructions = self.top_interface_renderer.get_instructions();
-        let font_atlas = self.font_loader.borrow();
+        let font_loader = self.font_loader.borrow();
 
         let render_instruction = RenderInstruction {
             clear_interface,
@@ -2289,7 +2292,7 @@ impl Client {
             effects: self.effect_renderer.get_instructions(),
             water: water_instruction,
             map_picker_tile_vertex_buffer: self.map.get_tile_picker_vertex_buffer(),
-            font_atlas_texture: font_atlas.get_font_atlas(),
+            font_map_texture: font_loader.get_font_map(),
             #[cfg(feature = "debug")]
             render_settings: *self.render_settings.get(),
             #[cfg(feature = "debug")]
@@ -2354,22 +2357,12 @@ impl Client {
 
         if self.high_quality_interface.consume_changed() {
             let high_quality_interface = *self.high_quality_interface.get();
-            self.font_loader.borrow_mut().clear(&self.device);
             self.interface_renderer.update_high_quality_interface(high_quality_interface);
             self.graphics_engine.set_high_quality_interface(high_quality_interface);
             update_interface = true;
         }
 
         if update_interface {
-            self.interface.schedule_render();
-        }
-    }
-
-    fn font_loader_maintenance(&mut self) {
-        let mut font_loader = self.font_loader.borrow_mut();
-
-        if font_loader.is_full() {
-            font_loader.resize_or_clear(&self.device);
             self.interface.schedule_render();
         }
     }

@@ -3,7 +3,7 @@ struct DebugUniforms {
     show_directional_shadow_map: u32,
     show_point_shadow_map: u32,
     show_light_culling_count_buffer: u32,
-    show_font_atlas: u32,
+    show_font_map: u32,
 }
 
 struct VertexOutput {
@@ -19,7 +19,7 @@ const TILE_SIZE: u32 = 16;
 @group(1) @binding(2) var directional_shadow_map: texture_depth_2d;
 @group(1) @binding(3) var light_count_texture: texture_2d<u32>;
 @group(1) @binding(4) var point_shadow_maps: texture_depth_cube_array;
-@group(2) @binding(0) var font_atlas: texture_2d<f32>;
+@group(2) @binding(0) var font_map: texture_2d<f32>;
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
@@ -114,9 +114,9 @@ fn fs_main(
         output_color += color;
     }
 
-    if (debug_uniforms.show_font_atlas != 0u) {
-        let color = textureSample(font_atlas, nearest_sampler, clip_to_uv(fragment_position));
-        output_color += vec4<f32>(color.r, color.r, color.r, 1.0);
+    if (debug_uniforms.show_font_map != 0u) {
+        let color = textureSample(font_map, nearest_sampler, clip_to_uv(fragment_position)).rgb;
+        output_color += vec4<f32>(color, 1.0);
     }
 
     return output_color;

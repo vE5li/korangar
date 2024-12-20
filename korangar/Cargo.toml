@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+arrayvec = { workspace = true }
 bumpalo = { workspace = true, features = ["allocator_api"] }
 bytemuck = { workspace = true, features = ["derive", "extern_crate_std", "min_const_generics"] }
 cgmath = { workspace = true, features = ["mint", "serde"] }
@@ -23,7 +24,6 @@ lunify = { workspace = true }
 mlua = { workspace = true, features = ["lua51", "vendored"] }
 num = { workspace = true }
 option-ext = { workspace = true }
-pathfinding = { workspace = true }
 pollster = { workspace = true }
 ragnarok_bytes = { workspace = true, features = ["derive", "cgmath"] }
 ragnarok_formats = { workspace = true, features = ["interface"] }

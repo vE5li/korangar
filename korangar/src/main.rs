@@ -62,6 +62,7 @@ use korangar_networking::{
     DisconnectReason, HotkeyState, LoginServerLoginData, MessageColor, NetworkEvent, NetworkEventBuffer, NetworkingSystem, SellItem,
     ShopItem,
 };
+use korangar_util::pathing::PathFinder;
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
 #[cfg(not(feature = "debug"))]
@@ -252,6 +253,7 @@ struct Client {
     player_inventory: Inventory,
     player_skill_tree: SkillTree,
     hotbar: Hotbar,
+    path_finder: PathFinder,
 
     point_light_set_buffer: ResourceSetBuffer<LightSourceKey>,
     directional_shadow_object_set_buffer: ResourceSetBuffer<ObjectKey>,
@@ -510,6 +512,7 @@ impl Client {
             let player_inventory = Inventory::default();
             let player_skill_tree = SkillTree::default();
             let hotbar = Hotbar::default();
+            let path_finder = PathFinder::default();
 
             let point_light_set_buffer = ResourceSetBuffer::default();
             let directional_shadow_object_set_buffer = ResourceSetBuffer::default();
@@ -658,6 +661,7 @@ impl Client {
             player_inventory,
             player_skill_tree,
             hotbar,
+            path_finder,
             point_light_set_buffer,
             directional_shadow_object_set_buffer,
             point_shadow_object_set_buffer,
@@ -956,6 +960,7 @@ impl Client {
                         &mut self.animation_loader,
                         &self.script_loader,
                         &self.map,
+                        &mut self.path_finder,
                         saved_login_data.account_id,
                         character_information,
                         WorldPosition { x: 0, y: 0 },
@@ -1023,6 +1028,7 @@ impl Client {
                         &mut self.animation_loader,
                         &self.script_loader,
                         &self.map,
+                        &mut self.path_finder,
                         entity_appeared_data,
                         client_tick,
                     );
@@ -1060,7 +1066,7 @@ impl Client {
                         let position_from = Vector2::new(position_from.x, position_from.y);
                         let position_to = Vector2::new(position_to.x, position_to.y);
 
-                        entity.move_from_to(&self.map, position_from, position_to, starting_timestamp);
+                        entity.move_from_to(&self.map, &mut self.path_finder, position_from, position_to, starting_timestamp);
                         #[cfg(feature = "debug")]
                         entity.generate_pathing_mesh(&self.device, &self.queue, &self.map, &self.pathing_texture_mapping);
                     }
@@ -1068,7 +1074,7 @@ impl Client {
                 NetworkEvent::PlayerMove(position_from, position_to, starting_timestamp) => {
                     let position_from = Vector2::new(position_from.x, position_from.y);
                     let position_to = Vector2::new(position_to.x, position_to.y);
-                    self.entities[0].move_from_to(&self.map, position_from, position_to, starting_timestamp);
+                    self.entities[0].move_from_to(&self.map, &mut self.path_finder, position_from, position_to, starting_timestamp);
 
                     #[cfg(feature = "debug")]
                     self.entities[0].generate_pathing_mesh(&self.device, &self.queue, &self.map, &self.pathing_texture_mapping);

@@ -7,6 +7,7 @@ pub mod color;
 pub mod container;
 mod loader;
 pub mod math;
+pub mod pathing;
 mod rectangle;
 pub mod texture_atlas;
 

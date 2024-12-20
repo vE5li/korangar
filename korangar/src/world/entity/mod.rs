@@ -1,14 +1,15 @@
 use std::string::String;
 use std::sync::Arc;
 
+use arrayvec::ArrayVec;
 use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace};
 use derive_new::new;
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
+use korangar_util::pathing::{PathFinder, MAX_WALK_PATH_SIZE};
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
-use ragnarok_formats::map::TileFlags;
 use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
@@ -51,12 +52,18 @@ impl<T> ResourceState<T> {
 #[derive(new, PrototypeElement)]
 pub struct Movement {
     #[hidden_element]
-    steps: Vec<(Vector2<usize>, u32)>,
+    steps: ArrayVec<Step, MAX_WALK_PATH_SIZE>,
     starting_timestamp: u32,
     #[cfg(feature = "debug")]
     #[new(default)]
     #[hidden_element]
     pub pathing_vertex_buffer: Option<Arc<Buffer<ModelVertex>>>,
+}
+
+#[derive(Copy, Clone)]
+pub struct Step {
+    arrival_position: Vector2<usize>,
+    arrival_timestamp: u32,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -292,6 +299,7 @@ impl Common {
         animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
+        path_finder: &mut PathFinder,
         entity_data: EntityData,
         client_tick: ClientTick,
     ) -> Self {
@@ -347,7 +355,7 @@ impl Common {
         if let Some(destination) = entity_data.destination {
             let position_from = Vector2::new(entity_data.position.x, entity_data.position.y);
             let position_to = Vector2::new(destination.x, destination.y);
-            common.move_from_to(map, position_from, position_to, client_tick);
+            common.move_from_to(map, path_finder, position_from, position_to, client_tick);
         }
 
         common
@@ -377,20 +385,20 @@ impl Common {
         if let Some(active_movement) = self.active_movement.take() {
             let last_step = active_movement.steps.last().unwrap();
 
-            if client_tick.0 > last_step.1 {
-                let position = Vector2::new(last_step.0.x, last_step.0.y);
+            if client_tick.0 > last_step.arrival_timestamp {
+                let position = Vector2::new(last_step.arrival_position.x, last_step.arrival_position.y);
                 self.set_position(map, position, client_tick);
             } else {
                 let mut last_step_index = 0;
-                while active_movement.steps[last_step_index + 1].1 < client_tick.0 {
+                while active_movement.steps[last_step_index + 1].arrival_timestamp < client_tick.0 {
                     last_step_index += 1;
                 }
 
                 let last_step = active_movement.steps[last_step_index];
                 let next_step = active_movement.steps[last_step_index + 1];
 
-                let last_step_position = last_step.0.map(|value| value as isize);
-                let next_step_position = next_step.0.map(|value| value as isize);
+                let last_step_position = last_step.arrival_position.map(|value| value as isize);
+                let next_step_position = next_step.arrival_position.map(|value| value as isize);
 
                 let array = last_step_position - next_step_position;
                 let array: &[isize; 2] = array.as_ref();
@@ -406,12 +414,12 @@ impl Common {
                     _ => panic!("impossible step"),
                 };
 
-                let last_step_position = map.get_world_position(last_step.0).to_vec();
-                let next_step_position = map.get_world_position(next_step.0).to_vec();
+                let last_step_position = map.get_world_position(last_step.arrival_position).to_vec();
+                let next_step_position = map.get_world_position(next_step.arrival_position).to_vec();
 
-                let clamped_tick = u32::max(last_step.1, client_tick.0);
-                let total = next_step.1 - last_step.1;
-                let offset = clamped_tick - last_step.1;
+                let clamped_tick = u32::max(last_step.arrival_timestamp, client_tick.0);
+                let total = next_step.arrival_timestamp - last_step.arrival_timestamp;
+                let offset = clamped_tick - last_step.arrival_timestamp;
 
                 let movement_elapsed = (1.0 / total as f32) * offset as f32;
                 let position = last_step_position.lerp(next_step_position, movement_elapsed);
@@ -424,125 +432,52 @@ impl Common {
         self.animation_state.update(client_tick);
     }
 
-    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: ClientTick) {
-        use pathfinding::prelude::astar;
-
-        #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-        struct Pos(usize, usize);
-
-        impl Pos {
-            fn successors(&self, map: &Map) -> Vec<Pos> {
-                let &Pos(x, y) = self;
-                let mut successors = Vec::new();
-
-                if map.x_in_bounds(x + 1) {
-                    successors.push(Pos(x + 1, y));
-                }
-
-                if x > 0 {
-                    successors.push(Pos(x - 1, y));
-                }
-
-                if map.y_in_bounds(y + 1) {
-                    successors.push(Pos(x, y + 1));
-                }
-
-                if y > 0 {
-                    successors.push(Pos(x, y - 1));
-                }
-
-                if map.x_in_bounds(x + 1)
-                    && map.y_in_bounds(y + 1)
-                    && map.get_tile(Vector2::new(x + 1, y)).flags.contains(TileFlags::WALKABLE)
-                    && map.get_tile(Vector2::new(x, y + 1)).flags.contains(TileFlags::WALKABLE)
-                {
-                    successors.push(Pos(x + 1, y + 1));
-                }
-
-                if x > 0
-                    && map.y_in_bounds(y + 1)
-                    && map.get_tile(Vector2::new(x - 1, y)).flags.contains(TileFlags::WALKABLE)
-                    && map.get_tile(Vector2::new(x, y + 1)).flags.contains(TileFlags::WALKABLE)
-                {
-                    successors.push(Pos(x - 1, y + 1));
-                }
-
-                if map.x_in_bounds(x + 1)
-                    && y > 0
-                    && map.get_tile(Vector2::new(x + 1, y)).flags.contains(TileFlags::WALKABLE)
-                    && map.get_tile(Vector2::new(x, y - 1)).flags.contains(TileFlags::WALKABLE)
-                {
-                    successors.push(Pos(x + 1, y - 1));
-                }
-
-                if x > 0
-                    && y > 0
-                    && map.get_tile(Vector2::new(x - 1, y)).flags.contains(TileFlags::WALKABLE)
-                    && map.get_tile(Vector2::new(x, y - 1)).flags.contains(TileFlags::WALKABLE)
-                {
-                    successors.push(Pos(x - 1, y - 1));
-                }
-
-                let successors = successors
-                    .drain(..)
-                    .filter(|Pos(x, y)| map.get_tile(Vector2::new(*x, *y)).flags.contains(TileFlags::WALKABLE))
-                    .collect::<Vec<Pos>>();
-
-                successors
+    pub fn move_from_to(
+        &mut self,
+        map: &Map,
+        path_finder: &mut PathFinder,
+        start: Vector2<usize>,
+        goal: Vector2<usize>,
+        starting_timestamp: ClientTick,
+    ) {
+        if let Some(path) = path_finder.find_walkable_path(map, start, goal) {
+            if path.len() <= 1 {
+                return;
             }
 
-            fn convert_to_vector(self) -> Vector2<usize> {
-                Vector2::new(self.0, self.1)
-            }
-        }
-
-        let result = astar(
-            &Pos(from.x, from.y),
-            |position| position.successors(map).into_iter().map(|position| (position, 0)),
-            |position| -> usize {
-                // Values taken from rAthena.
-                const MOVE_COST: usize = 10;
-                const DIAGONAL_MOVE_COST: usize = 14;
-
-                let distance_x = usize::abs_diff(position.0, to.x);
-                let distance_y = usize::abs_diff(position.1, to.y);
-
-                let straight_moves = usize::abs_diff(distance_x, distance_y);
-                let diagonal_moves = usize::min(distance_x, distance_y);
-
-                DIAGONAL_MOVE_COST * diagonal_moves + MOVE_COST * straight_moves
-            },
-            |position| *position == Pos(to.x, to.y),
-        )
-        .map(|x| x.0);
-
-        if let Some(path) = result {
             let mut last_timestamp = starting_timestamp.0;
             let mut last_position: Option<Vector2<usize>> = None;
 
-            let steps: Vec<(Vector2<usize>, u32)> = path
-                .into_iter()
-                .map(|pos| {
+            let steps: ArrayVec<Step, MAX_WALK_PATH_SIZE> = path
+                .iter()
+                .map(|&step| {
                     if let Some(position) = last_position {
                         const DIAGONAL_MULTIPLIER: f32 = 1.4;
 
-                        let speed = match position.x == pos.0 || position.y == pos.1 {
-                            // true means we are moving orthogonally
+                        let speed = match position.x == step.x || position.y == step.y {
+                            // `true` means we are moving orthogonally
                             true => self.movement_speed as u32,
-                            // false means we are moving diagonally
+                            // `false` means we are moving diagonally
                             false => (self.movement_speed as f32 * DIAGONAL_MULTIPLIER) as u32,
                         };
 
-                        let arrival_position = pos.convert_to_vector();
+                        let arrival_position = step;
                         let arrival_timestamp = last_timestamp + speed;
 
                         last_timestamp = arrival_timestamp;
                         last_position = Some(arrival_position);
 
-                        (arrival_position, arrival_timestamp)
+                        Step {
+                            arrival_position,
+                            arrival_timestamp,
+                        }
                     } else {
-                        last_position = Some(from);
-                        (from, last_timestamp)
+                        last_position = Some(start);
+
+                        Step {
+                            arrival_position: start,
+                            arrival_timestamp: last_timestamp,
+                        }
                     }
                 })
                 .collect();
@@ -559,7 +494,7 @@ impl Common {
     }
 
     #[cfg(feature = "debug")]
-    fn pathing_texture_coordinates(steps: &Vec<(Vector2<usize>, u32)>, step: Vector2<usize>, index: usize) -> ([Vector2<f32>; 4], i32) {
+    fn pathing_texture_coordinates(steps: &[Step], step: Vector2<usize>, index: usize) -> ([Vector2<f32>; 4], i32) {
         if steps.len() - 1 == index {
             return (
                 [
@@ -572,7 +507,7 @@ impl Common {
             );
         }
 
-        let delta = steps[index + 1].0.map(|component| component as isize) - step.map(|component| component as isize);
+        let delta = steps[index + 1].arrival_position.map(|component| component as isize) - step.map(|component| component as isize);
 
         match delta {
             Vector2 { x: 1, y: 0 } => (
@@ -670,9 +605,12 @@ impl Common {
             _ => Color::WHITE,
         };
 
-        for (index, (step, _)) in active_movement.steps.iter().cloned().enumerate() {
-            let tile = map.get_tile(step);
-            let offset = Vector2::new(step.x as f32 * HALF_TILE_SIZE, step.y as f32 * HALF_TILE_SIZE);
+        for (index, Step { arrival_position, .. }) in active_movement.steps.iter().copied().enumerate() {
+            let tile = map.get_tile(arrival_position);
+            let offset = Vector2::new(
+                arrival_position.x as f32 * HALF_TILE_SIZE,
+                arrival_position.y as f32 * HALF_TILE_SIZE,
+            );
 
             let first_position = Point3::new(offset.x, tile.upper_left_height + PATHING_MESH_OFFSET, offset.y);
             let second_position = Point3::new(
@@ -694,7 +632,7 @@ impl Common {
             let first_normal = NativeModelVertex::calculate_normal(first_position, second_position, third_position);
             let second_normal = NativeModelVertex::calculate_normal(fourth_position, first_position, third_position);
 
-            let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, step, index);
+            let (texture_coordinates, texture_index) = Self::pathing_texture_coordinates(&active_movement.steps, arrival_position, index);
 
             native_pathing_vertices.push(NativeModelVertex::new(
                 first_position,
@@ -818,6 +756,7 @@ impl Player {
         animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
+        path_finder: &mut PathFinder,
         account_id: AccountId,
         character_information: CharacterInformation,
         player_position: WorldPosition,
@@ -834,6 +773,7 @@ impl Player {
             animation_loader,
             script_loader,
             map,
+            path_finder,
             EntityData::from_character(account_id, character_information, player_position),
             client_tick,
         );
@@ -969,6 +909,7 @@ impl Npc {
         animation_loader: &mut AnimationLoader,
         script_loader: &ScriptLoader,
         map: &Map,
+        path_finder: &mut PathFinder,
         entity_data: EntityData,
         client_tick: ClientTick,
     ) -> Self {
@@ -978,6 +919,7 @@ impl Npc {
             animation_loader,
             script_loader,
             map,
+            path_finder,
             entity_data,
             client_tick,
         );
@@ -1134,8 +1076,15 @@ impl Entity {
         self.get_common_mut().update(map, delta_time, client_tick);
     }
 
-    pub fn move_from_to(&mut self, map: &Map, from: Vector2<usize>, to: Vector2<usize>, starting_timestamp: ClientTick) {
-        self.get_common_mut().move_from_to(map, from, to, starting_timestamp);
+    pub fn move_from_to(
+        &mut self,
+        map: &Map,
+        path_finder: &mut PathFinder,
+        from: Vector2<usize>,
+        to: Vector2<usize>,
+        starting_timestamp: ClientTick,
+    ) {
+        self.get_common_mut().move_from_to(map, path_finder, from, to, starting_timestamp);
     }
 
     #[cfg(feature = "debug")]

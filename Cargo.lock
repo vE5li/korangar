@@ -688,18 +688,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deprecate-until"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3767f826efbbe5a5ae093920b58b43b01734202be697e1354914e862e8e704"
-dependencies = [
- "proc-macro2",
- "quote",
- "semver",
- "syn",
-]
-
-[[package]]
 name = "derive-new"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1491,15 +1479,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "integer-sqrt"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "276ec31bcb4a9ee45f58bec6f9ec700ae4cf4f4f8f2fa7e06cb406bd5ffdd770"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "interface_procedural"
 version = "0.1.0"
 dependencies = [
@@ -1626,6 +1605,7 @@ dependencies = [
 name = "korangar"
 version = "0.1.0"
 dependencies = [
+ "arrayvec",
  "bumpalo",
  "bytemuck",
  "cgmath",
@@ -1645,7 +1625,6 @@ dependencies = [
  "mlua",
  "num",
  "option-ext",
- "pathfinding",
  "pollster",
  "ragnarok_bytes",
  "ragnarok_formats",
@@ -2529,20 +2508,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pathfinding"
-version = "4.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cff69f3ba9d0346c1dbe1248fc2ed4523567b683d1b6ff4144a6b3583369082"
-dependencies = [
- "deprecate-until",
- "indexmap",
- "integer-sqrt",
- "num-traits",
- "rustc-hash 2.0.0",
- "thiserror",
-]
-
-[[package]]
 name = "pcap"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3186,12 +3151,6 @@ name = "self_cell"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d369a96f978623eb3dc28807c4852d6cc617fed53da5d3c400feff1ef34a714a"
-
-[[package]]
-name = "semver"
-version = "1.0.23"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "send_wrapper"

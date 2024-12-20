@@ -9,6 +9,7 @@ use korangar_audio::AudioEngine;
 use korangar_interface::windows::PrototypeWindow;
 use korangar_util::collision::{Frustum, KDTree, Sphere, AABB};
 use korangar_util::container::{SimpleKey, SimpleSlab};
+use korangar_util::pathing::Traversable;
 use korangar_util::{create_simple_key, Rectangle};
 #[cfg(feature = "debug")]
 use option_ext::OptionExt;
@@ -144,14 +145,6 @@ pub struct Map {
 impl Map {
     pub fn water_bounds(&self) -> Rectangle<f32> {
         self.water_bounds
-    }
-
-    pub fn x_in_bounds(&self, x: usize) -> bool {
-        x <= self.width
-    }
-
-    pub fn y_in_bounds(&self, y: usize) -> bool {
-        y <= self.height
     }
 
     pub fn get_world_position(&self, position: Vector2<usize>) -> Point3<f32> {
@@ -738,5 +731,21 @@ impl Map {
 
         let (screen_position, screen_size) = camera.screen_position_size(top_left_position, bottom_right_position);
         Some((screen_position, screen_size))
+    }
+}
+
+impl Traversable for Map {
+    fn is_walkable(&self, position: Vector2<usize>) -> bool {
+        self.tiles
+            .get(position.x + position.y * self.width)
+            .map(|tile| tile.flags.contains(TileFlags::WALKABLE))
+            .unwrap_or(false)
+    }
+
+    fn is_snipeable(&self, position: Vector2<usize>) -> bool {
+        self.tiles
+            .get(position.x + position.y * self.width)
+            .map(|tile| tile.flags.contains(TileFlags::SNIPABLE))
+            .unwrap_or(false)
     }
 }

@@ -65,16 +65,19 @@ impl<T: FromBytes, const SIZE: usize> FromBytes for [T; SIZE] {
 
 impl FromBytes for String {
     fn from_bytes<Meta>(byte_reader: &mut ByteReader<Meta>) -> ConversionResult<Self> {
-        let mut value = String::new();
+        let mut value = Vec::<u8>::new();
 
         while let Ok(byte) = byte_reader.byte::<Self>() {
             match byte {
                 0 => break,
-                byte => value.push(byte as char),
+                byte => value.push(byte),
             }
         }
+        let result = String::from_utf8(value)
+            .map_err(|error| error.into_bytes())
+            .unwrap_or_else(|error| error.iter().map(|byte| *byte as char).collect());
 
-        Ok(value)
+        Ok(result)
     }
 }
 

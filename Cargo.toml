@@ -6,7 +6,7 @@ members = ["korangar", "ragnarok_*", "korangar_*"]
 arrayvec = "0.7"
 bitflags = "2.6"
 bumpalo = "3.16"
-bytemuck = "1.20"
+bytemuck = "1.21"
 cgmath = "0.18"
 chrono = "0.4"
 cosmic-text = { version = "0.12", default-features = false }
@@ -43,9 +43,9 @@ reqwest = "0.12"
 ron = "0.8"
 serde = "1.0"
 serde-xml-rs = "0.6"
-spin_sleep = "1.2"
+spin_sleep = "1.3"
 syn = "2.0"
-tokio = { version = "1.41", default-features = false }
+tokio = { version = "1.42", default-features = false }
 walkdir = "2.5"
 wgpu = "23.0"
 winit = "0.30"

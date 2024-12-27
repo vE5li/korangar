@@ -11,7 +11,7 @@ pub use ragnarok_procedural::{CharacterServer, ClientPacket, LoginServer, MapSer
 #[cfg(not(feature = "derive"))]
 use ragnarok_procedural::{CharacterServer, ClientPacket, LoginServer, MapServer, Packet, ServerPacket};
 
-pub use self::position::{WorldPosition, WorldPosition2};
+pub use self::position::{Direction, WorldPosition, WorldPosition2};
 
 // To make proc macros work in korangar_interface.
 extern crate self as ragnarok_packets;

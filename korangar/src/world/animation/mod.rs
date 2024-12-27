@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::container::Cacheable;
-use ragnarok_packets::EntityId;
+use ragnarok_packets::{Direction, EntityId};
 
 #[cfg(feature = "debug")]
 use crate::graphics::DebugRectangleInstruction;
@@ -82,10 +82,10 @@ impl Default for AnimationFramePart {
 }
 
 impl AnimationData {
-    pub fn get_frame(&self, animation_state: &AnimationState, camera: &dyn Camera, head_direction: usize) -> &AnimationFrame {
+    pub fn get_frame(&self, animation_state: &AnimationState, camera: &dyn Camera, direction: Direction) -> &AnimationFrame {
         let camera_direction = camera.camera_direction();
-        let direction = (camera_direction + head_direction) % 8;
-        let animation_action_index = animation_state.action as usize * 8 + direction;
+        let direction_usize = (camera_direction + usize::from(direction)) & 7;
+        let animation_action_index = animation_state.action as usize * 8 + direction_usize;
 
         let delay_index = animation_action_index % self.delays.len();
         let animation_index = animation_action_index % self.animations.len();
@@ -143,9 +143,9 @@ impl AnimationData {
         entity_id: EntityId,
         entity_position: Point3<f32>,
         animation_state: &AnimationState,
-        head_direction: usize,
+        direction: Direction,
     ) {
-        let frame = self.get_frame(animation_state, camera, head_direction);
+        let frame = self.get_frame(animation_state, camera, direction);
         let world_matrix = self.calculate_world_matrix(camera, frame, entity_position);
 
         for (index, frame_part) in frame.frame_parts.iter().enumerate() {
@@ -187,11 +187,11 @@ impl AnimationData {
         camera: &dyn Camera,
         entity_position: Point3<f32>,
         animation_state: &AnimationState,
-        head_direction: usize,
+        direction: Direction,
         color_external: Color,
         color_internal: Color,
     ) {
-        let frame = self.get_frame(animation_state, camera, head_direction);
+        let frame = self.get_frame(animation_state, camera, direction);
         let world_matrix = self.calculate_world_matrix(camera, frame, entity_position);
         instructions.push(DebugRectangleInstruction {
             world: world_matrix,

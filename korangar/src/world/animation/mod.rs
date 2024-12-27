@@ -8,7 +8,7 @@ use ragnarok_packets::EntityId;
 #[cfg(feature = "debug")]
 use crate::graphics::DebugRectangleInstruction;
 use crate::graphics::{Color, EntityInstruction};
-use crate::loaders::{ActionType, Actions, AnimationState, Sprite};
+use crate::loaders::{ActionEvent, ActionType, Actions, AnimationState, Sprite};
 use crate::world::{Camera, EntityType};
 
 const TILE_SIZE: f32 = 10.0;
@@ -43,6 +43,7 @@ pub struct Animation {
 
 #[derive(Clone)]
 pub struct AnimationFrame {
+    pub event: Option<ActionEvent>,
     pub offset: Vector2<i32>,
     pub top_left: Vector2<i32>,
     pub size: Vector2<i32>,
@@ -84,9 +85,13 @@ impl AnimationData {
     pub fn get_frame(&self, animation_state: &AnimationState, camera: &dyn Camera, head_direction: usize) -> &AnimationFrame {
         let camera_direction = camera.camera_direction();
         let direction = (camera_direction + head_direction) % 8;
-        let aa = animation_state.action as usize * 8 + direction;
-        let delay = self.delays[aa % self.delays.len()];
-        let animation = &self.animations[aa % self.animations.len()];
+        let animation_action_index = animation_state.action as usize * 8 + direction;
+
+        let delay_index = animation_action_index % self.delays.len();
+        let animation_index = animation_action_index % self.animations.len();
+
+        let delay = self.delays[delay_index];
+        let animation = &self.animations[animation_index];
 
         let factor = animation_state
             .factor
@@ -100,14 +105,14 @@ impl AnimationData {
 
         // TODO: Work out how to avoid losing digits when casting time to an f32. When
         //       fixed remove set_start_time in MouseCursor.
-        let time = frame_time as usize % animation.frames.len();
-        let mut frame = &animation.frames[time];
+        let frame_index = frame_time as usize % animation.frames.len();
 
         // Remove Doridori animation from Player
         if self.entity_type == EntityType::Player && animation_state.action == ActionType::Idle {
-            frame = &animation.frames[0];
+            &animation.frames[0]
+        } else {
+            &animation.frames[frame_index]
         }
-        frame
     }
 
     pub fn calculate_world_matrix(&self, camera: &dyn Camera, frame: &AnimationFrame, entity_position: Point3<f32>) -> Matrix4<f32> {
@@ -134,11 +139,11 @@ impl AnimationData {
         &self,
         instructions: &mut Vec<EntityInstruction>,
         camera: &dyn Camera,
+        add_to_picker: bool,
         entity_id: EntityId,
         entity_position: Point3<f32>,
         animation_state: &AnimationState,
         head_direction: usize,
-        add_to_picker: bool,
     ) {
         let frame = self.get_frame(animation_state, camera, head_direction);
         let world_matrix = self.calculate_world_matrix(camera, frame, entity_position);

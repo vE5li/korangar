@@ -9,7 +9,7 @@ use korangar_util::container::SimpleCache;
 use num::Zero;
 
 use super::error::LoadError;
-use crate::loaders::{ActionLoader, SpriteLoader};
+use crate::loaders::{ActionEvent, ActionLoader, SpriteLoader};
 use crate::world::{Animation, AnimationData, AnimationFrame, AnimationFramePart, AnimationPair};
 use crate::{Color, EntityType};
 
@@ -155,7 +155,18 @@ impl AnimationLoader {
                             color,
                             ..Default::default()
                         };
+
+                        let event: Option<ActionEvent> = if let Some(event_id) = motion.event_id
+                            && event_id != -1
+                            && let Some(event) = animation_pair.actions.events.get(event_id as usize).copied()
+                        {
+                            Some(event)
+                        } else {
+                            None
+                        };
+
                         let frame = AnimationFrame {
+                            event,
                             size,
                             top_left: Vector2::zero(),
                             offset,
@@ -423,7 +434,9 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
             },
             ..Default::default()
         };
+
         let frame = AnimationFrame {
+            event: None,
             size: Vector2::new(1, 1),
             top_left: Vector2::zero(),
             offset: Vector2::zero(),
@@ -433,6 +446,7 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
             #[cfg(feature = "debug")]
             vertical_matrix: Matrix4::identity(),
         };
+
         return frame;
     }
 
@@ -454,6 +468,8 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
         new_frame_parts.append(&mut frame.frame_parts);
     }
 
+    let event = frames.iter().filter_map(|frame| frame.event).next();
+
     // The origin is set at (0,0).
     //
     // The top-left point of the rectangle is calculated as
@@ -465,6 +481,7 @@ fn merge_frame(frames: &mut [AnimationFrame]) -> AnimationFrame {
     // The new offset is calculated as
     // center_point - origin.
     AnimationFrame {
+        event,
         size: Vector2::new(new_width, new_height),
         top_left: Vector2::zero(),
         offset: Vector2::new(top_left_x + (new_width - 1) / 2, top_left_y + (new_height - 1) / 2),

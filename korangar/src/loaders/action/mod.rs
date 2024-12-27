@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use cgmath::{Array, Vector2};
 use derive_new::new;
+use korangar_audio::{AudioEngine, SoundEffectKey};
 #[cfg(feature = "debug")]
 use korangar_debug::logging::{print_debug, Colorize, Timer};
-use korangar_interface::elements::PrototypeElement;
+use korangar_interface::elements::{ElementCell, PrototypeElement};
 use korangar_util::container::{Cacheable, SimpleCache};
 use korangar_util::FileLoader;
 use ragnarok_bytes::{ByteReader, FromBytes};
@@ -25,6 +26,11 @@ use crate::renderer::SpriteRenderer;
 const MAX_CACHE_COUNT: u32 = 256;
 const MAX_CACHE_SIZE: usize = 64 * 1024 * 1024;
 
+// TODO: NHA The numeric value of action types are based on the EntityType!
+//       For example "Dead" is 8 for the PC and 4 for a monster.
+//       This means we need to refactor the AnimationState, so that the mouse
+//       uses a different animation state struct (since we can't do simple usize
+//       conversions).
 #[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum ActionType {
     #[default]
@@ -36,6 +42,26 @@ pub enum ActionType {
 impl From<ActionType> for usize {
     fn from(value: ActionType) -> Self {
         value as usize
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum ActionEvent {
+    /// Start playing a WAV sound file.
+    Sound { key: SoundEffectKey },
+    /// An attack event when the "flinch" animation is played.
+    Attack,
+    /// Start playing a WAV sound file.
+    Unknown,
+}
+
+impl PrototypeElement<InterfaceSettings> for ActionEvent {
+    fn to_element(&self, display: String) -> ElementCell<InterfaceSettings> {
+        match self {
+            Self::Sound { .. } => PrototypeElement::to_element(&"Sound", display),
+            Self::Attack => PrototypeElement::to_element(&"Attack", display),
+            Self::Unknown => PrototypeElement::to_element(&"Unknown", display),
+        }
     }
 }
 
@@ -100,6 +126,8 @@ impl<T> AnimationState<T> {
 pub struct Actions {
     pub actions: Vec<Action>,
     pub delays: Vec<f32>,
+    #[hidden_element]
+    pub events: Vec<ActionEvent>,
     #[cfg(feature = "debug")]
     actions_data: ActionsData,
 }
@@ -118,9 +146,9 @@ impl Actions {
         T: Into<usize> + Copy,
     {
         let direction = camera_direction % 8;
-        let aa = animation_state.action.into() * 8 + direction;
-        let a = &self.actions[aa % self.actions.len()];
-        let delay = self.delays[aa % self.delays.len()];
+        let animation_action = animation_state.action.into() * 8 + direction;
+        let action = &self.actions[animation_action % self.actions.len()];
+        let delay = self.delays[animation_action % self.delays.len()];
 
         let factor = animation_state
             .factor
@@ -129,14 +157,14 @@ impl Actions {
 
         let frame = animation_state
             .duration
-            .map(|duration| animation_state.time * a.motions.len() as u32 / duration)
+            .map(|duration| animation_state.time * action.motions.len() as u32 / duration)
             .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
-        // TODO: work out how to avoid losing digits when casting timg to an f32. When
+        // TODO: work out how to avoid losing digits when casting timing to an f32. When
         // fixed remove set_start_time in MouseCursor.
 
-        let fs = &a.motions[frame as usize % a.motions.len()];
+        let motion = &action.motions[frame as usize % action.motions.len()];
 
-        for sprite_clip in &fs.sprite_clips {
+        for sprite_clip in &motion.sprite_clips {
             // `get` instead of a direct index in case a fallback was loaded
             let Some(texture) = sprite.textures.get(sprite_clip.sprite_number as usize) else {
                 return;
@@ -186,13 +214,15 @@ impl Cacheable for Actions {
 
 pub struct ActionLoader {
     game_file_loader: Arc<GameFileLoader>,
+    audio_engine: Arc<AudioEngine<GameFileLoader>>,
     cache: SimpleCache<String, Arc<Actions>>,
 }
 
 impl ActionLoader {
-    pub fn new(game_file_loader: Arc<GameFileLoader>) -> Self {
+    pub fn new(game_file_loader: Arc<GameFileLoader>, audio_engine: Arc<AudioEngine<GameFileLoader>>) -> Self {
         Self {
             game_file_loader,
+            audio_engine,
             cache: SimpleCache::new(
                 NonZeroU32::new(MAX_CACHE_COUNT).unwrap(),
                 NonZeroUsize::new(MAX_CACHE_SIZE).unwrap(),
@@ -231,6 +261,24 @@ impl ActionLoader {
             }
         };
 
+        let events: Vec<ActionEvent> = actions_data
+            .events
+            .iter()
+            .enumerate()
+            .map(|(_index, event)| {
+                if event.name.ends_with(".wav") {
+                    let key = self.audio_engine.load(&event.name);
+                    ActionEvent::Sound { key }
+                } else if event.name == "atk" || event.name == "atk.txt" {
+                    ActionEvent::Attack
+                } else {
+                    #[cfg(feature = "debug")]
+                    print_debug!("Found unknown event at index `{}`: {:?}", _index, event.name);
+                    ActionEvent::Unknown
+                }
+            })
+            .collect();
+
         #[cfg(feature = "debug")]
         let saved_actions_data = actions_data.clone();
 
@@ -241,6 +289,7 @@ impl ActionLoader {
         let sprite = Arc::new(Actions {
             actions: actions_data.actions,
             delays,
+            events,
             #[cfg(feature = "debug")]
             actions_data: saved_actions_data,
         });

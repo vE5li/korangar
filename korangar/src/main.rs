@@ -370,6 +370,7 @@ impl Client {
             let mute_on_focus_loss = audio_settings.mapped(|settings| &settings.mute_on_focus_loss).new_remote();
 
             let audio_engine = Arc::new(AudioEngine::new(game_file_loader.clone()));
+            audio_engine.set_background_music_volume(0.1);
         });
 
         time_phase!("create resource managers", {
@@ -380,7 +381,7 @@ impl Client {
             let font_loader = Rc::new(RefCell::new(FontLoader::new(&game_file_loader, &texture_loader)));
             let mut map_loader = MapLoader::new(device.clone(), queue.clone(), game_file_loader.clone(), audio_engine.clone());
             let mut sprite_loader = SpriteLoader::new(device.clone(), queue.clone(), game_file_loader.clone());
-            let mut action_loader = ActionLoader::new(game_file_loader.clone());
+            let mut action_loader = ActionLoader::new(game_file_loader.clone(), audio_engine.clone());
             let effect_loader = EffectLoader::new(game_file_loader.clone());
             let animation_loader = AnimationLoader::new();
 
@@ -1835,65 +1836,47 @@ impl Client {
         user_event_measurement.stop();
 
         #[cfg(feature = "debug")]
-        let update_entities_measurement = Profiler::start_measurement("update entities");
-
-        self.entities
-            .iter_mut()
-            .for_each(|entity| entity.update(&self.map, delta_time as f32, client_tick));
-
-        #[cfg(feature = "debug")]
-        update_entities_measurement.stop();
-
-        if !self.entities.is_empty() {
-            let player_position = self.entities[0].get_position();
-            self.player_camera.set_smoothed_focus_point(player_position);
-            self.directional_shadow_camera.set_focus_point(self.player_camera.focus_point());
-        }
-
-        #[cfg(feature = "debug")]
-        let update_cameras_measurement = Profiler::start_measurement("update cameras");
-
-        let lighting_mode = *self.lighting_mode.get();
-        let shadow_quality = *self.shadow_quality.get();
-        let ambient_light_color = self.map.get_ambient_light_color(lighting_mode, day_timer);
-        let (directional_light_direction, directional_light_color) = self.map.get_directional_light(lighting_mode, day_timer);
-
-        self.start_camera.update(delta_time);
-        self.player_camera.update(delta_time);
-
-        let view_direction = match self.entities.is_empty() {
-            true => self.start_camera.view_direction(),
-            false => self.player_camera.view_direction(),
-        };
-
-        self.directional_shadow_camera.update(directional_light_direction, view_direction);
-
-        #[cfg(feature = "debug")]
-        update_cameras_measurement.stop();
-
-        self.particle_holder.update(delta_time as f32);
-        self.effect_holder.update(&self.entities, delta_time as f32);
-
-        let (clear_interface, render_interface) = self
-            .interface
-            .update(&self.application, self.font_loader.clone(), &mut self.focus_state);
-        self.mouse_cursor.update(client_tick);
-
-        #[cfg(feature = "debug")]
-        let matrices_measurement = Profiler::start_measurement("generate view and projection matrices");
+        let update_main_camera_measurement = Profiler::start_measurement("update main camera");
 
         let window_size = self.graphics_engine.get_window_size();
         let screen_size: ScreenSize = window_size.into();
 
         if self.entities.is_empty() {
+            self.start_camera.update(delta_time);
             self.start_camera.generate_view_projection(window_size);
+        } else {
+            self.player_camera.update(delta_time);
+            self.player_camera.generate_view_projection(window_size);
         }
 
-        self.player_camera.generate_view_projection(window_size);
-        self.directional_shadow_camera.generate_view_projection(window_size);
         #[cfg(feature = "debug")]
         if self.render_settings.get().use_debug_camera {
             self.debug_camera.generate_view_projection(window_size);
+        }
+
+        #[cfg(feature = "debug")]
+        update_main_camera_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let update_entities_measurement = Profiler::start_measurement("update entities");
+
+        {
+            let current_camera: &(dyn Camera + Send + Sync) = match self.entities.is_empty() {
+                #[cfg(feature = "debug")]
+                _ if self.render_settings.get().use_debug_camera => &self.debug_camera,
+                true => &self.start_camera,
+                false => &self.player_camera,
+            };
+
+            self.entities
+                .iter_mut()
+                .for_each(|entity| entity.update(&self.audio_engine, &self.map, current_camera, client_tick));
+        }
+
+        if !self.entities.is_empty() {
+            let player_position = self.entities[0].get_position();
+            self.player_camera.set_smoothed_focus_point(player_position);
+            self.directional_shadow_camera.set_focus_point(self.player_camera.focus_point());
         }
 
         let current_camera: &(dyn Camera + Send + Sync) = match self.entities.is_empty() {
@@ -1906,12 +1889,27 @@ impl Client {
         let (view_matrix, projection_matrix) = current_camera.view_projection_matrices();
         let camera_position = current_camera.camera_position().to_homogeneous();
 
+        #[cfg(feature = "debug")]
+        update_entities_measurement.stop();
+
+        #[cfg(feature = "debug")]
+        let update_shadow_camera_measurement = Profiler::start_measurement("update directional shadow camera");
+
+        let lighting_mode = *self.lighting_mode.get();
+        let shadow_quality = *self.shadow_quality.get();
+        let ambient_light_color = self.map.get_ambient_light_color(lighting_mode, day_timer);
+        let (directional_light_direction, directional_light_color) = self.map.get_directional_light(lighting_mode, day_timer);
+
+        self.directional_shadow_camera
+            .update(directional_light_direction, current_camera.view_direction());
+        self.directional_shadow_camera.generate_view_projection(window_size);
+
         let (directional_light_view_matrix, directional_light_projection_matrix) =
             self.directional_shadow_camera.view_projection_matrices();
         let directional_light_view_projection_matrix = directional_light_projection_matrix * directional_light_view_matrix;
 
         #[cfg(feature = "debug")]
-        matrices_measurement.stop();
+        update_shadow_camera_measurement.stop();
 
         #[cfg(feature = "debug")]
         let frame_measurement = Profiler::start_measurement("update audio engine");
@@ -1921,7 +1919,7 @@ impl Client {
         let listener = current_camera.focus_point() + EAR_HEIGHT;
 
         self.audio_engine
-            .set_ambient_listener(listener, current_camera.view_direction(), current_camera.look_up_vector());
+            .set_spatial_listener(listener, current_camera.view_direction(), current_camera.look_up_vector());
         self.audio_engine.update();
 
         #[cfg(feature = "debug")]
@@ -1930,10 +1928,18 @@ impl Client {
         #[cfg(feature = "debug")]
         let prepare_frame_measurement = Profiler::start_measurement("prepare frame");
 
+        self.particle_holder.update(delta_time as f32);
+        self.effect_holder.update(&self.entities, delta_time as f32);
+
+        let (clear_interface, render_interface) = self
+            .interface
+            .update(&self.application, self.font_loader.clone(), &mut self.focus_state);
+        self.mouse_cursor.update(client_tick);
+
         #[cfg(feature = "debug")]
         let render_settings = &*self.render_settings.get();
         let walk_indicator_color = self.application.get_game_theme().indicator.walking.get();
-        let entities = &self.entities[..];
+
         #[cfg(feature = "debug")]
         let hovered_marker_identifier = match mouse_target {
             Some(PickerTarget::Marker(marker_identifier)) => Some(marker_identifier),
@@ -1981,7 +1987,7 @@ impl Client {
                 &mut self.debug_marker_renderer,
                 current_camera,
                 render_settings,
-                entities,
+                &self.entities,
                 &point_light_set,
                 hovered_marker_identifier,
             );
@@ -1991,7 +1997,7 @@ impl Client {
                 &mut self.middle_interface_renderer,
                 current_camera,
                 render_settings,
-                entities,
+                &self.entities,
                 &point_light_set,
                 hovered_marker_identifier,
             );
@@ -2048,7 +2054,7 @@ impl Client {
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
             self.map.render_entities(
                 &mut self.directional_shadow_entity_instructions,
-                entities,
+                &mut self.entities,
                 &self.directional_shadow_camera,
             );
         }
@@ -2119,12 +2125,13 @@ impl Client {
             };
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_entities))]
-            self.map.render_entities(&mut self.entity_instructions, entities, entity_camera);
+            self.map
+                .render_entities(&mut self.entity_instructions, &mut self.entities, entity_camera);
 
             #[cfg(feature = "debug")]
             if render_settings.show_entities_debug {
                 self.map
-                    .render_entities_debug(&mut self.rectangle_instructions, entities, entity_camera);
+                    .render_entities_debug(&mut self.rectangle_instructions, &self.entities, entity_camera);
             }
 
             #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_water))]
@@ -2158,13 +2165,18 @@ impl Client {
                 );
             }
 
-            self.particle_holder
-                .render(&self.bottom_interface_renderer, current_camera, screen_size, scaling, entities);
+            self.particle_holder.render(
+                &self.bottom_interface_renderer,
+                current_camera,
+                screen_size,
+                scaling,
+                &self.entities,
+            );
 
             self.effect_holder.render(&mut self.effect_renderer, current_camera);
 
             if let Some(PickerTarget::Tile { x, y }) = mouse_target
-                && !entities.is_empty()
+                && !&self.entities.is_empty()
             {
                 #[cfg_attr(feature = "debug", korangar_debug::debug_condition(render_settings.show_indicators))]
                 self.map.render_walk_indicator(
@@ -2173,7 +2185,7 @@ impl Client {
                     Vector2::new(x as usize, y as usize),
                 );
             } else if let Some(PickerTarget::Entity(entity_id)) = mouse_target {
-                let entity = entities.iter().find(|entity| entity.get_entity_id() == entity_id);
+                let entity = &self.entities.iter().find(|entity| entity.get_entity_id() == entity_id);
 
                 if let Some(entity) = entity {
                     entity.render_status(
@@ -2199,11 +2211,11 @@ impl Client {
                 }
             }
 
-            if !entities.is_empty() {
+            if !&self.entities.is_empty() {
                 #[cfg(feature = "debug")]
                 profile_block!("render player status");
 
-                entities[0].render_status(
+                self.entities[0].render_status(
                     &self.middle_interface_renderer,
                     current_camera,
                     self.application.get_game_theme(),

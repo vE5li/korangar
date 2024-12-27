@@ -33,9 +33,9 @@ pub enum ActionType {
     Dead = 8,
 }
 
-impl Into<usize> for ActionType {
-    fn into(self) -> usize {
-        self as usize
+impl From<ActionType> for usize {
+    fn from(value: ActionType) -> Self {
+        value as usize
     }
 }
 

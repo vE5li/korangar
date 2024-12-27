@@ -29,9 +29,9 @@ pub enum MouseCursorState {
     Unsure3,
 }
 
-impl Into<usize> for MouseCursorState {
-    fn into(self) -> usize {
-        self as usize
+impl From<MouseCursorState> for usize {
+    fn from(value: MouseCursorState) -> Self {
+        value as usize
     }
 }
 

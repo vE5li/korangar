@@ -47,11 +47,17 @@ struct BackgroundMusicTrack {
     handle: StreamingSoundHandle<FromFileError>,
 }
 
+enum QueuedSoundEffectType {
+    Sound,
+    SpatialSound { position: Vector3<f32>, range: f32 },
+    AmbientSound { ambient_key: AmbientKey },
+}
+
 struct QueuedSoundEffect {
     /// The key of the sound that should be played.
     sound_effect_key: SoundEffectKey,
-    /// The optional key to the ambient sound emitter.
-    ambient: Option<AmbientKey>,
+    /// The type of the queued sound effect.
+    sound_type: QueuedSoundEffectType,
     /// The time this playback was queued.
     queued_time: Instant,
 }
@@ -101,9 +107,9 @@ pub struct AudioEngine<F> {
 
 struct EngineContext<F> {
     active_emitters: HashMap<AmbientKey, EmitterHandle>,
-    ambient_listener: ListenerHandle,
+    spatial_listener: ListenerHandle,
     ambient_sound: SimpleSlab<AmbientKey, AmbientSoundConfig>,
-    ambient_track: TrackHandle,
+    spatial_sound_effect_track: TrackHandle,
     async_response_receiver: Receiver<AsyncLoadResult>,
     async_response_sender: Sender<AsyncLoadResult>,
     background_music_track: TrackHandle,
@@ -147,11 +153,15 @@ impl<F: FileLoader> AudioEngine<F> {
             .add_sub_track(TrackBuilder::new())
             .expect("Can't create background music track");
         let sound_effect_track = manager.add_sub_track(TrackBuilder::new()).expect("Can't create sound effect track");
-        let ambient_track = manager.add_sub_track(TrackBuilder::new()).expect("Can't create ambient track");
+        let spatial_sound_effect_track = manager
+            .add_sub_track(TrackBuilder::new())
+            .expect("Can't create spatial sound effect track");
         let position = Vector3::new(0.0, 0.0, 0.0);
         let orientation = Quaternion::new(0.0, 0.0, 0.0, 0.0);
-        let ambient_listener = scene
-            .add_listener(position, orientation, ListenerSettings { track: ambient_track.id() })
+        let spatial_listener = scene
+            .add_listener(position, orientation, ListenerSettings {
+                track: spatial_sound_effect_track.id(),
+            })
             .expect("Can't create ambient listener");
         let loading_sound_effect = HashSet::new();
         let cache = SimpleCache::new(
@@ -166,9 +176,9 @@ impl<F: FileLoader> AudioEngine<F> {
 
         let engine_context = Mutex::new(EngineContext {
             active_emitters: HashMap::default(),
-            ambient_listener,
+            spatial_listener,
             ambient_sound: SimpleSlab::default(),
-            ambient_track,
+            spatial_sound_effect_track,
             async_response_receiver,
             async_response_sender,
             background_music_track,
@@ -265,9 +275,9 @@ impl<F: FileLoader> AudioEngine<F> {
         self.engine_context.lock().unwrap().set_sound_effect_volume(volume)
     }
 
-    /// Sets the volume of ambient sounds.
-    pub fn set_ambient_volume(&self, volume: impl Into<Value<Volume>>) {
-        self.engine_context.lock().unwrap().set_ambient_volume(volume)
+    /// Sets the volume of spatial sound effects.
+    pub fn set_spatial_sound_effect_volume(&self, volume: impl Into<Value<Volume>>) {
+        self.engine_context.lock().unwrap().set_spatial_sound_effect_volume(volume)
     }
 
     /// Plays the background music track. Fades out the currently playing
@@ -282,20 +292,32 @@ impl<F: FileLoader> AudioEngine<F> {
         self.engine_context.lock().unwrap().play_sound_effect(sound_effect_key)
     }
 
-    /// Sets the listener of the ambient sound. This is normally the camera's
-    /// position and orientation. This should update each frame.
-    pub fn set_ambient_listener(&self, position: Point3<f32>, view_direction: Vector3<f32>, look_up: Vector3<f32>) {
+    /// Plays a spatial sound effect, which will get removed automatically once
+    /// it finishes playing.
+    pub fn play_spatial_sound_effect(&self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
         self.engine_context
             .lock()
             .unwrap()
-            .set_ambient_listener(position, view_direction, look_up)
+            .play_spatial_sound_effect(sound_effect_key, position, range);
     }
 
-    /// Ambient sound loops and needs to be removed once the player it outside
-    /// the ambient sound range.
+    /// Sets the listener of the spatial sound. This is normally the camera's
+    /// position and orientation. This should update each frame.
+    pub fn set_spatial_listener(&self, position: Point3<f32>, view_direction: Vector3<f32>, look_up: Vector3<f32>) {
+        self.engine_context
+            .lock()
+            .unwrap()
+            .set_spatial_listener(position, view_direction, look_up)
+    }
+
+    /// Adds a static, spatial sound, that is used for ambient sound inside the
+    /// world.
     ///
     /// [`prepare_ambient_sound_world()`] must be called once all ambient sound
     /// have been added.
+    ///
+    /// [`clear_ambient_sound()`] must be called if the "map" or "level" is
+    /// switched.
     pub fn add_ambient_sound(
         &self,
         sound_effect_key: SoundEffectKey,
@@ -308,11 +330,6 @@ impl<F: FileLoader> AudioEngine<F> {
             .lock()
             .unwrap()
             .add_ambient_sound(sound_effect_key, position, range, volume, cycle)
-    }
-
-    /// Removes an ambient sound.
-    pub fn remove_ambient_sound(&self, ambient_key: AmbientKey) {
-        self.engine_context.lock().unwrap().remove_ambient_sound(ambient_key)
     }
 
     /// Removes all ambient sound emitters from the spatial scene.
@@ -354,8 +371,8 @@ impl<F: FileLoader> EngineContext<F> {
         });
     }
 
-    fn set_ambient_volume(&mut self, volume: impl Into<Value<Volume>>) {
-        self.ambient_track.set_volume(volume, Tween {
+    fn set_spatial_sound_effect_volume(&mut self, volume: impl Into<Value<Volume>>) {
+        self.spatial_sound_effect_track.set_volume(volume, Tween {
             duration: Duration::from_millis(500),
             ..Default::default()
         });
@@ -416,11 +433,56 @@ impl<F: FileLoader> EngineContext<F> {
             &self.sound_effect_paths,
             &mut self.queued_sound_effect,
             sound_effect_key,
-            None,
+            QueuedSoundEffectType::Sound,
         );
     }
 
-    fn set_ambient_listener(&mut self, position: Point3<f32>, view_direction: Vector3<f32>, look_up: Vector3<f32>) {
+    fn play_spatial_sound_effect(&mut self, sound_effect_key: SoundEffectKey, position: Point3<f32>, range: f32) {
+        // Kira uses a RH coordinate system, so we need to convert our LH vectors.
+        let position = Vector3::new(position.x, position.y, -position.z);
+
+        if let Some(data) = self
+            .cache
+            .get(&sound_effect_key)
+            .map(|cached_sound_effect| cached_sound_effect.0.clone())
+        {
+            let settings = EmitterSettings {
+                distances: EmitterDistances {
+                    min_distance: 5.0,
+                    max_distance: range,
+                },
+                attenuation_function: Some(Easing::Linear),
+                enable_spatialization: true,
+                persist_until_sounds_finish: true,
+            };
+
+            match self.scene.add_emitter(position, settings) {
+                Ok(emitter_handle) => {
+                    let data = adjust_ambient_sound(data, &emitter_handle, 1.0);
+
+                    if let Err(_error) = self.manager.play(data) {
+                        #[cfg(feature = "debug")]
+                        print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+                    }
+                }
+                Err(_error) => {
+                    #[cfg(feature = "debug")]
+                    print_debug!("[{}] can't add spatial sound emitter: {:?}", "error".red(), _error);
+                }
+            };
+        }
+
+        queue_sound_effect_playback(
+            self.game_file_loader.clone(),
+            self.async_response_sender.clone(),
+            &self.sound_effect_paths,
+            &mut self.queued_sound_effect,
+            sound_effect_key,
+            QueuedSoundEffectType::SpatialSound { position, range },
+        );
+    }
+
+    fn set_spatial_listener(&mut self, position: Point3<f32>, view_direction: Vector3<f32>, look_up: Vector3<f32>) {
         let listener = Sphere::new(position, 10.0);
 
         self.query_result.clear();
@@ -464,7 +526,7 @@ impl<F: FileLoader> EngineContext<F> {
                 .get(&sound_effect_key)
                 .map(|cached_sound_effect| cached_sound_effect.0.clone())
             {
-                let data = adjust_ambient_sound(data, &emitter_handle, sound_config);
+                let data = adjust_ambient_sound(data, &emitter_handle, sound_config.volume);
                 match self.manager.play(data.clone()) {
                     Ok(handle) => {
                         if let Some(cycle) = sound_config.cycle {
@@ -488,7 +550,7 @@ impl<F: FileLoader> EngineContext<F> {
                     &self.sound_effect_paths,
                     &mut self.queued_sound_effect,
                     sound_effect_key,
-                    Some(ambient_key),
+                    QueuedSoundEffectType::AmbientSound { ambient_key },
                 );
             }
 
@@ -525,8 +587,8 @@ impl<F: FileLoader> EngineContext<F> {
                 duration: Duration::from_millis(50),
                 ..Default::default()
             };
-            self.ambient_listener.set_position(position, tween);
-            self.ambient_listener.set_orientation(orientation, tween);
+            self.spatial_listener.set_position(position, tween);
+            self.spatial_listener.set_orientation(orientation, tween);
         }
     }
 
@@ -546,15 +608,6 @@ impl<F: FileLoader> EngineContext<F> {
                 cycle,
             })
             .expect("Ambient sound slab is full")
-    }
-
-    fn remove_ambient_sound(&mut self, ambient_key: AmbientKey) {
-        let _ = self.ambient_sound.remove(ambient_key);
-        if let Some(emitter) = self.active_emitters.remove(&ambient_key) {
-            // An emitter is removed from the spatial scene by dropping it. We make this
-            // explicit to express our intent.
-            drop(emitter);
-        }
     }
 
     fn clear_ambient_sound(&mut self) {
@@ -648,18 +701,44 @@ impl<F: FileLoader> EngineContext<F> {
                 return true;
             };
 
-            match queued.ambient {
-                None => {
+            match queued.sound_type {
+                QueuedSoundEffectType::Sound => {
                     if let Err(_error) = self.manager.play(data.output_destination(&self.sound_effect_track)) {
                         #[cfg(feature = "debug")]
                         print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
                     }
                 }
-                Some(ambient_key) => {
+                QueuedSoundEffectType::SpatialSound { position, range } => {
+                    let settings = EmitterSettings {
+                        distances: EmitterDistances {
+                            min_distance: 5.0,
+                            max_distance: range,
+                        },
+                        attenuation_function: Some(Easing::Linear),
+                        enable_spatialization: true,
+                        persist_until_sounds_finish: true,
+                    };
+
+                    match self.scene.add_emitter(position, settings) {
+                        Ok(emitter_handle) => {
+                            let data = adjust_ambient_sound(data, &emitter_handle, 1.0);
+
+                            if let Err(_error) = self.manager.play(data) {
+                                #[cfg(feature = "debug")]
+                                print_debug!("[{}] can't play sound effect: {:?}", "error".red(), _error);
+                            }
+                        }
+                        Err(_error) => {
+                            #[cfg(feature = "debug")]
+                            print_debug!("[{}] can't add spatial sound emitter: {:?}", "error".red(), _error);
+                        }
+                    };
+                }
+                QueuedSoundEffectType::AmbientSound { ambient_key } => {
                     if let Some(emitter_handle) = self.active_emitters.get(&ambient_key)
                         && let Some(sound_config) = self.ambient_sound.get(ambient_key)
                     {
-                        let data = adjust_ambient_sound(data, emitter_handle, sound_config);
+                        let data = adjust_ambient_sound(data, emitter_handle, sound_config.volume);
                         match self.manager.play(data.clone()) {
                             Ok(handle) => {
                                 if let Some(cycle) = sound_config.cycle {
@@ -721,11 +800,7 @@ impl<F: FileLoader> EngineContext<F> {
             }
         };
 
-        // TODO: NHA Remove volume offset once we have a proper volume control in place.
-        let data = data
-            .volume(Volume::Amplitude(0.1))
-            .output_destination(&self.background_music_track)
-            .loop_region(..);
+        let data = data.output_destination(&self.background_music_track).loop_region(..);
         let handle = match self.manager.play(data) {
             Ok(handle) => handle,
             Err(_error) => {
@@ -742,9 +817,9 @@ impl<F: FileLoader> EngineContext<F> {
     }
 }
 
-fn adjust_ambient_sound(mut data: StaticSoundData, emitter_handle: &EmitterHandle, sound_config: &AmbientSoundConfig) -> StaticSoundData {
+fn adjust_ambient_sound(mut data: StaticSoundData, emitter_handle: &EmitterHandle, volume: f32) -> StaticSoundData {
     // Kira does the volume mapping from linear to logarithmic for us.
-    data.settings.volume = Volume::Amplitude(sound_config.volume as f64).into();
+    data.settings.volume = Volume::Amplitude(volume as f64).into();
     data.output_destination(emitter_handle)
 }
 
@@ -754,7 +829,7 @@ fn queue_sound_effect_playback(
     sound_effect_paths: &GenerationalSlab<SoundEffectKey, String>,
     queued_sound_effect: &mut Vec<QueuedSoundEffect>,
     sound_effect_key: SoundEffectKey,
-    ambient: Option<AmbientKey>,
+    queued_sound_effect_type: QueuedSoundEffectType,
 ) -> bool {
     let Some(path) = sound_effect_paths.get(sound_effect_key).cloned() else {
         // This case could happen, if the sound effect was queued for deletion.
@@ -763,7 +838,7 @@ fn queue_sound_effect_playback(
 
     queued_sound_effect.push(QueuedSoundEffect {
         sound_effect_key,
-        ambient,
+        sound_type: queued_sound_effect_type,
         queued_time: Instant::now(),
     });
 

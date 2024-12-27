@@ -4,6 +4,7 @@ use std::sync::Arc;
 use arrayvec::ArrayVec;
 use cgmath::{EuclideanSpace, Point3, Vector2, VectorSpace};
 use derive_new::new;
+use korangar_audio::{AudioEngine, SoundEffectKey};
 use korangar_interface::elements::PrototypeElement;
 use korangar_interface::windows::{PrototypeWindow, Window};
 use korangar_networking::EntityData;
@@ -21,7 +22,7 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{ActionLoader, ActionType, AnimationLoader, AnimationState, ScriptLoader, SpriteLoader};
+use crate::loaders::{ActionEvent, ActionLoader, ActionType, AnimationLoader, AnimationState, GameFileLoader, ScriptLoader, SpriteLoader};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
@@ -33,6 +34,8 @@ use crate::{Buffer, Color, ModelVertex};
 
 const MALE_HAIR_LOOKUP: &[usize] = &[2, 2, 1, 7, 5, 4, 3, 6, 8, 9, 10, 12, 11];
 const FEMALE_HAIR_LOOKUP: &[usize] = &[2, 2, 4, 7, 1, 5, 3, 6, 12, 10, 9, 11, 8];
+const SOUND_COOLDOWN_DURATION: u32 = 200;
+const SPATIAL_SOUND_RANGE: f32 = 250.0;
 
 pub enum ResourceState<T> {
     Available(T),
@@ -75,6 +78,36 @@ pub enum EntityType {
     Monster,
 }
 
+#[derive(Copy, Clone, Default)]
+pub struct SoundState {
+    previous_key: Option<SoundEffectKey>,
+    last_played_at: Option<ClientTick>,
+}
+
+impl SoundState {
+    pub fn update(
+        &mut self,
+        audio_engine: &AudioEngine<GameFileLoader>,
+        position: Point3<f32>,
+        sound_effect_key: SoundEffectKey,
+        client_tick: ClientTick,
+    ) {
+        let should_play = if Some(sound_effect_key) == self.previous_key
+            && let Some(last_tick) = self.last_played_at
+        {
+            (client_tick.0.saturating_sub(last_tick.0)) >= SOUND_COOLDOWN_DURATION
+        } else {
+            true
+        };
+
+        if should_play {
+            audio_engine.play_spatial_sound_effect(sound_effect_key, position, SPATIAL_SOUND_RANGE);
+            self.last_played_at = Some(client_tick);
+            self.previous_key = Some(sound_effect_key);
+        }
+    }
+}
+
 #[derive(PrototypeElement)]
 pub struct Common {
     pub entity_id: EntityId,
@@ -95,6 +128,8 @@ pub struct Common {
     details: ResourceState<String>,
     #[hidden_element]
     animation_state: AnimationState,
+    #[hidden_element]
+    sound_state: SoundState,
 }
 
 #[cfg_attr(feature = "debug", korangar_debug::profile)]
@@ -350,6 +385,7 @@ impl Common {
             animation_data,
             details,
             animation_state,
+            sound_state: SoundState::default(),
         };
 
         if let Some(destination) = entity_data.destination {
@@ -374,14 +410,25 @@ impl Common {
             .unwrap();
     }
 
-    pub fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
-        self.grid_position = position;
-        self.position = map.get_world_position(position);
-        self.active_movement = None;
-        self.animation_state.idle(client_tick);
+    pub fn update(&mut self, audio_engine: &AudioEngine<GameFileLoader>, map: &Map, camera: &dyn Camera, client_tick: ClientTick) {
+        self.update_movement(map, client_tick);
+        self.animation_state.update(client_tick);
+
+        let frame = self.animation_data.get_frame(&self.animation_state, camera, self.head_direction);
+        match frame.event {
+            Some(ActionEvent::Sound { key }) => {
+                self.sound_state.update(audio_engine, self.position, key, client_tick);
+            }
+            Some(ActionEvent::Attack) => {
+                // TODO: NHA What do we need to do at this event? Other clients
+                //       are playing the attackers weapon attack sound using
+                //       this event.
+            }
+            None | Some(ActionEvent::Unknown) => { /* Nothing to do */ }
+        }
     }
 
-    pub fn update(&mut self, map: &Map, _delta_time: f32, client_tick: ClientTick) {
+    fn update_movement(&mut self, map: &Map, client_tick: ClientTick) {
         if let Some(active_movement) = self.active_movement.take() {
             let last_step = active_movement.steps.last().unwrap();
 
@@ -428,8 +475,13 @@ impl Common {
                 self.active_movement = active_movement.into();
             }
         }
+    }
 
-        self.animation_state.update(client_tick);
+    fn set_position(&mut self, map: &Map, position: Vector2<usize>, client_tick: ClientTick) {
+        self.grid_position = position;
+        self.position = map.get_world_position(position);
+        self.active_movement = None;
+        self.animation_state.idle(client_tick);
     }
 
     pub fn move_from_to(
@@ -691,7 +743,7 @@ impl Common {
             steps_vertex_buffer.write_exact(queue, pathing_vertices.as_slice());
         } else {
             let vertex_buffer = Arc::new(Buffer::with_data(
-                &device,
+                device,
                 queue,
                 "pathing vertex buffer",
                 BufferUsages::VERTEX | BufferUsages::COPY_DST,
@@ -706,11 +758,11 @@ impl Common {
         self.animation_data.render(
             instructions,
             camera,
+            add_to_picker,
             self.entity_id,
             self.position,
             &self.animation_state,
             self.head_direction,
-            add_to_picker,
         );
     }
 
@@ -1072,8 +1124,8 @@ impl Entity {
         common.maximum_health_points = maximum_health_points;
     }
 
-    pub fn update(&mut self, map: &Map, delta_time: f32, client_tick: ClientTick) {
-        self.get_common_mut().update(map, delta_time, client_tick);
+    pub fn update(&mut self, audio_engine: &AudioEngine<GameFileLoader>, map: &Map, camera: &dyn Camera, client_tick: ClientTick) {
+        self.get_common_mut().update(audio_engine, map, camera, client_tick);
     }
 
     pub fn move_from_to(

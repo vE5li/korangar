@@ -68,7 +68,7 @@ use korangar_util::texture_atlas::AtlasAllocation;
 #[cfg(not(feature = "debug"))]
 use ragnarok_packets::handler::NoPacketCallback;
 use ragnarok_packets::{
-    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, DisappearanceReason, Friend, HotbarSlot,
+    BuyShopItemsResult, CharacterId, CharacterInformation, CharacterServerInformation, Direction, DisappearanceReason, Friend, HotbarSlot,
     SellItemsResult, SkillId, SkillType, TilePosition, UnitId, WorldPosition,
 };
 use renderer::InterfaceRenderer;
@@ -964,7 +964,7 @@ impl Client {
                         &mut self.path_finder,
                         saved_login_data.account_id,
                         character_information,
-                        WorldPosition { x: 0, y: 0 },
+                        WorldPosition::origin(),
                         client_tick,
                     );
                     let player = Entity::Player(player);
@@ -1589,6 +1589,7 @@ impl Client {
                         let _ = self.networking_system.player_move(WorldPosition {
                             x: destination.x,
                             y: destination.y,
+                            direction: Direction::N,
                         });
                     }
                 }
@@ -1604,6 +1605,7 @@ impl Client {
                                 WorldPosition {
                                     x: position.x,
                                     y: position.y,
+                                    direction: Direction::N,
                                 }
                             }),
                             _ => Ok(()),

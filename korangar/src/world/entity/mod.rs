@@ -11,7 +11,7 @@ use korangar_networking::EntityData;
 use korangar_util::pathing::{PathFinder, MAX_WALK_PATH_SIZE};
 #[cfg(feature = "debug")]
 use korangar_util::texture_atlas::AtlasAllocation;
-use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, EntityId, Sex, StatusType, WorldPosition};
+use ragnarok_packets::{AccountId, CharacterInformation, ClientTick, Direction, EntityId, Sex, StatusType, WorldPosition};
 #[cfg(feature = "debug")]
 use wgpu::{BufferUsages, Device, Queue};
 
@@ -115,6 +115,7 @@ pub struct Common {
     pub health_points: usize,
     pub maximum_health_points: usize,
     pub movement_speed: usize,
+    pub direction: Direction,
     pub head_direction: usize,
     pub sex: Sex,
 
@@ -345,6 +346,7 @@ impl Common {
         let grid_position = Vector2::new(grid_position.x, grid_position.y);
         let position = map.get_world_position(grid_position);
         let head_direction = entity_data.head_direction;
+        let direction = entity_data.position.direction;
 
         let movement_speed = entity_data.movement_speed as usize;
         let health_points = entity_data.health_points as usize;
@@ -375,6 +377,7 @@ impl Common {
             position,
             entity_id,
             job_id,
+            direction,
             head_direction,
             sex,
             active_movement,
@@ -414,7 +417,7 @@ impl Common {
         self.update_movement(map, client_tick);
         self.animation_state.update(client_tick);
 
-        let frame = self.animation_data.get_frame(&self.animation_state, camera, self.head_direction);
+        let frame = self.animation_data.get_frame(&self.animation_state, camera, self.direction);
         match frame.event {
             Some(ActionEvent::Sound { key }) => {
                 self.sound_state.update(audio_engine, self.position, key, client_tick);
@@ -449,17 +452,7 @@ impl Common {
 
                 let array = last_step_position - next_step_position;
                 let array: &[isize; 2] = array.as_ref();
-                self.head_direction = match array {
-                    [0, 1] => 0,
-                    [1, 1] => 1,
-                    [1, 0] => 2,
-                    [1, -1] => 3,
-                    [0, -1] => 4,
-                    [-1, -1] => 5,
-                    [-1, 0] => 6,
-                    [-1, 1] => 7,
-                    _ => panic!("impossible step"),
-                };
+                self.direction = (*array).into();
 
                 let last_step_position = map.get_world_position(last_step.arrival_position).to_vec();
                 let next_step_position = map.get_world_position(next_step.arrival_position).to_vec();
@@ -762,7 +755,7 @@ impl Common {
             self.entity_id,
             self.position,
             &self.animation_state,
-            self.head_direction,
+            self.direction,
         );
     }
 
@@ -773,7 +766,7 @@ impl Common {
             camera,
             self.position,
             &self.animation_state,
-            self.head_direction,
+            self.direction,
             Color::rgb_u8(255, 0, 0),
             Color::rgb_u8(0, 255, 0),
         );

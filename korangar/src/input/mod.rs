@@ -326,7 +326,7 @@ impl InputSystem {
 
         if self.right_mouse_button.pressed()
             && self.previous_mouse_button.button == MouseButton::Right
-            && client_tick.0.saturating_sub(self.previous_mouse_button.tick.0) < DOUBLE_CLICK_TIME_MS
+            && client_tick.0.wrapping_sub(self.previous_mouse_button.tick.0) < DOUBLE_CLICK_TIME_MS
         {
             events.push(UserEvent::CameraResetRotation);
         }

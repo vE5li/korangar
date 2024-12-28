@@ -108,7 +108,7 @@ impl SoundState {
         let should_play = if Some(sound_effect_key) == self.previous_key
             && let Some(last_tick) = self.last_played_at
         {
-            (client_tick.0.saturating_sub(last_tick.0)) >= SOUND_COOLDOWN_DURATION
+            (client_tick.0.wrapping_sub(last_tick.0)) >= SOUND_COOLDOWN_DURATION
         } else {
             true
         };

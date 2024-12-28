@@ -994,9 +994,6 @@ impl Client {
 
                     self.particle_holder.clear();
                     let _ = self.networking_system.map_loaded();
-                    // TODO: This is just a workaround until I find a better solution to make the
-                    // cursor always look correct.
-                    self.mouse_cursor.set_start_time(client_tick);
                     self.game_timer.set_client_tick(client_tick);
                 }
                 NetworkEvent::CharacterCreated { character_information } => {
@@ -1106,10 +1103,6 @@ impl Client {
                     self.effect_holder.clear();
                     self.point_light_manager.clear();
                     let _ = self.networking_system.map_loaded();
-
-                    // TODO: This is just a workaround until I find a better solution to make the
-                    // cursor always look correct.
-                    self.mouse_cursor.set_start_time(client_tick);
                 }
                 NetworkEvent::SetPlayerPosition(player_position) => {
                     let player_position = Vector2::new(player_position.x, player_position.y);
@@ -1195,7 +1188,7 @@ impl Client {
                 }
                 NetworkEvent::SkillTree(skill_information) => {
                     self.player_skill_tree
-                        .fill(&mut self.sprite_loader, &mut self.action_loader, skill_information);
+                        .fill(&mut self.sprite_loader, &mut self.action_loader, skill_information, client_tick);
                 }
                 NetworkEvent::UpdateEquippedPosition { index, equipped_position } => {
                     self.player_inventory.update_equipped_position(index, equipped_position);

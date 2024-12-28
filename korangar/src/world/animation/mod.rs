@@ -3,16 +3,120 @@ use std::sync::Arc;
 use cgmath::{Array, Matrix4, Point3, Transform, Vector2, Vector3, Zero};
 use korangar_interface::elements::PrototypeElement;
 use korangar_util::container::Cacheable;
-use ragnarok_packets::{Direction, EntityId};
+use ragnarok_packets::{ClientTick, Direction, EntityId};
 
 #[cfg(feature = "debug")]
 use crate::graphics::DebugRectangleInstruction;
 use crate::graphics::{Color, EntityInstruction};
-use crate::loaders::{ActionEvent, ActionType, Actions, AnimationState, Sprite};
-use crate::world::{Camera, EntityType};
+use crate::loaders::Sprite;
+use crate::world::{ActionEvent, Actions, Camera, EntityType};
 
 const TILE_SIZE: f32 = 10.0;
 const SPRITE_SCALE: f32 = 1.4;
+
+#[allow(dead_code)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum AnimationActionType {
+    Attack1,
+    Attack2,
+    Attack3,
+    Die,
+    Freeze1,
+    Freeze2,
+    Hurt,
+    #[default]
+    Idle,
+    Pickup,
+    ReadyFight,
+    Sit,
+    Skill,
+    Special,
+    Walk,
+}
+
+impl AnimationActionType {
+    pub fn action_base_offset(&self, entity_type: EntityType) -> usize {
+        match entity_type {
+            EntityType::Hidden | EntityType::Player => match self {
+                AnimationActionType::Idle => 0,
+                AnimationActionType::Walk => 1,
+                AnimationActionType::Sit => 2,
+                AnimationActionType::Pickup => 3,
+                AnimationActionType::ReadyFight => 4,
+                AnimationActionType::Attack1 => 5,
+                AnimationActionType::Hurt => 6,
+                AnimationActionType::Freeze1 => 7,
+                AnimationActionType::Die => 8,
+                AnimationActionType::Freeze2 => 9,
+                AnimationActionType::Attack2 => 10,
+                AnimationActionType::Attack3 => 11,
+                AnimationActionType::Skill => 12,
+                _ => 0,
+            },
+            EntityType::Npc | EntityType::Monster => match self {
+                AnimationActionType::Idle => 0,
+                AnimationActionType::Walk => 1,
+                AnimationActionType::Attack1 => 2,
+                AnimationActionType::Hurt => 3,
+                AnimationActionType::Die => 4,
+                _ => 0,
+            },
+            EntityType::Warp => 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AnimationState {
+    pub action_type: AnimationActionType,
+    pub action_base_offset: usize,
+    pub start_time: ClientTick,
+    pub time: u32,
+    pub duration: Option<u32>,
+    pub factor: Option<f32>,
+}
+
+impl AnimationState {
+    pub fn new(entity_type: EntityType, start_time: ClientTick) -> Self {
+        let action_type = AnimationActionType::Idle;
+        Self {
+            action_type,
+            action_base_offset: action_type.action_base_offset(entity_type),
+            start_time,
+            time: 0,
+            duration: None,
+            factor: None,
+        }
+    }
+
+    pub fn idle(&mut self, entity_type: EntityType, client_tick: ClientTick) {
+        self.action_type = AnimationActionType::Idle;
+        self.action_base_offset = self.action_type.action_base_offset(entity_type);
+        self.start_time = client_tick;
+        self.duration = None;
+        self.factor = None;
+    }
+
+    pub fn walk(&mut self, entity_type: EntityType, movement_speed: usize, client_tick: ClientTick) {
+        self.action_type = AnimationActionType::Walk;
+        self.action_base_offset = self.action_type.action_base_offset(entity_type);
+        self.start_time = client_tick;
+        self.duration = None;
+        self.factor = Some(movement_speed as f32 * 100.0 / 150.0 / 5.0);
+    }
+
+    pub fn dead(&mut self, entity_type: EntityType, client_tick: ClientTick) {
+        self.action_type = AnimationActionType::Die;
+        self.action_base_offset = self.action_type.action_base_offset(entity_type);
+        self.start_time = client_tick;
+        self.duration = None;
+        self.factor = None;
+    }
+
+    pub fn update(&mut self, client_tick: ClientTick) {
+        self.time = client_tick.0.wrapping_sub(self.start_time.0);
+    }
+}
 
 #[derive(Clone, PrototypeElement)]
 pub struct AnimationData {
@@ -84,8 +188,8 @@ impl Default for AnimationFramePart {
 impl AnimationData {
     pub fn get_frame(&self, animation_state: &AnimationState, camera: &dyn Camera, direction: Direction) -> &AnimationFrame {
         let camera_direction = camera.camera_direction();
-        let direction_usize = (camera_direction + usize::from(direction)) & 7;
-        let animation_action_index = animation_state.action as usize * 8 + direction_usize;
+        let direction = (camera_direction + usize::from(direction)) & 7;
+        let animation_action_index = animation_state.action_type.action_base_offset(self.entity_type) * 8 + direction;
 
         let delay_index = animation_action_index % self.delays.len();
         let animation_index = animation_action_index % self.animations.len();
@@ -93,22 +197,17 @@ impl AnimationData {
         let delay = self.delays[delay_index];
         let animation = &self.animations[animation_index];
 
-        let factor = animation_state
-            .factor
-            .map(|factor| delay * (factor / 5.0))
-            .unwrap_or_else(|| delay * 50.0);
+        let factor = animation_state.factor.map(|factor| delay * factor).unwrap_or_else(|| delay * 50.0);
 
         let frame_time = animation_state
             .duration
             .map(|duration| animation_state.time * animation.frames.len() as u32 / duration)
             .unwrap_or_else(|| (animation_state.time as f32 / factor) as u32);
 
-        // TODO: Work out how to avoid losing digits when casting time to an f32. When
-        //       fixed remove set_start_time in MouseCursor.
         let frame_index = frame_time as usize % animation.frames.len();
 
         // Remove Doridori animation from Player
-        if self.entity_type == EntityType::Player && animation_state.action == ActionType::Idle {
+        if self.entity_type == EntityType::Player && animation_state.action_type == AnimationActionType::Idle {
             &animation.frames[0]
         } else {
             &animation.frames[frame_index]

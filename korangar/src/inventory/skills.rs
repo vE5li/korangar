@@ -3,7 +3,8 @@ use std::sync::Arc;
 use korangar_interface::state::{PlainRemote, PlainTrackedState, TrackedState};
 use ragnarok_packets::{ClientTick, SkillId, SkillInformation, SkillLevel, SkillType};
 
-use crate::loaders::{ActionLoader, ActionType, Actions, AnimationState, Sprite, SpriteLoader};
+use crate::loaders::{ActionLoader, Sprite, SpriteLoader};
+use crate::world::{Actions, SpriteAnimationState};
 
 #[derive(Clone, Debug)]
 pub struct Skill {
@@ -13,7 +14,7 @@ pub struct Skill {
     pub skill_name: String,
     pub sprite: Arc<Sprite>,
     pub actions: Arc<Actions>,
-    pub animation_state: AnimationState,
+    pub animation_state: SpriteAnimationState,
 }
 
 #[derive(Default)]
@@ -22,7 +23,13 @@ pub struct SkillTree {
 }
 
 impl SkillTree {
-    pub fn fill(&mut self, sprite_loader: &mut SpriteLoader, action_loader: &mut ActionLoader, skill_data: Vec<SkillInformation>) {
+    pub fn fill(
+        &mut self,
+        sprite_loader: &mut SpriteLoader,
+        action_loader: &mut ActionLoader,
+        skill_data: Vec<SkillInformation>,
+        client_tick: ClientTick,
+    ) {
         let skills = skill_data
             .into_iter()
             .map(|skill_data| {
@@ -37,8 +44,7 @@ impl SkillTree {
                     skill_name: skill_data.skill_name,
                     sprite,
                     actions,
-                    // FIX: give correct client tick
-                    animation_state: AnimationState::new(ActionType::Idle, ClientTick(0)),
+                    animation_state: SpriteAnimationState::new(client_tick),
                 }
             })
             .collect();

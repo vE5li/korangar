@@ -1,3 +1,4 @@
+mod action;
 mod animation;
 mod cameras;
 mod effect;
@@ -9,6 +10,7 @@ mod object;
 mod particles;
 mod sound;
 
+pub use self::action::*;
 pub use self::animation::*;
 pub use self::cameras::*;
 pub use self::effect::*;

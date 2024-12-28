@@ -22,13 +22,13 @@ use crate::interface::application::InterfaceSettings;
 use crate::interface::layout::{ScreenPosition, ScreenSize};
 use crate::interface::theme::GameTheme;
 use crate::interface::windows::WindowCache;
-use crate::loaders::{ActionEvent, ActionLoader, ActionType, AnimationLoader, AnimationState, GameFileLoader, ScriptLoader, SpriteLoader};
+use crate::loaders::{ActionLoader, AnimationLoader, GameFileLoader, ScriptLoader, SpriteLoader};
 use crate::renderer::GameInterfaceRenderer;
 #[cfg(feature = "debug")]
 use crate::renderer::MarkerRenderer;
 #[cfg(feature = "debug")]
 use crate::world::MarkerIdentifier;
-use crate::world::{AnimationData, Camera, Map};
+use crate::world::{ActionEvent, AnimationActionType, AnimationData, AnimationState, Camera, Map};
 #[cfg(feature = "debug")]
 use crate::{Buffer, Color, ModelVertex};
 
@@ -69,13 +69,26 @@ pub struct Step {
     arrival_timestamp: u32,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum EntityType {
-    Warp,
     Hidden,
-    Player,
-    Npc,
     Monster,
+    Npc,
+    Player,
+    Warp,
+}
+
+impl From<usize> for EntityType {
+    fn from(value: usize) -> Self {
+        match value {
+            45 => EntityType::Warp,
+            111 => EntityType::Hidden, // TODO: check that this is correct
+            0..=44 | 4000..=5999 => EntityType::Player,
+            46..=999 | 10000..=19999 => EntityType::Npc,
+            1000..=3999 | 20000..=29999 => EntityType::Monster,
+            _ => EntityType::Npc,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Default)]
@@ -354,23 +367,14 @@ impl Common {
         let sex = entity_data.sex;
 
         let active_movement = None;
-
-        let entity_type = match job_id {
-            45 => EntityType::Warp,
-            111 => EntityType::Hidden, // TODO: check that this is correct
-            // 111 | 139 => None,
-            0..=44 | 4000..=5999 => EntityType::Player,
-            46..=999 | 10000..=19999 => EntityType::Npc,
-            1000..=3999 | 20000..=29999 => EntityType::Monster,
-            _ => EntityType::Npc,
-        };
+        let entity_type = job_id.into();
 
         let entity_part_files = get_entity_part_files(script_loader, entity_type, job_id, sex, Some(head));
         let animation_data = animation_loader
             .get(sprite_loader, action_loader, entity_type, &entity_part_files)
             .unwrap();
         let details = ResourceState::Unavailable;
-        let animation_state = AnimationState::new(ActionType::Idle, client_tick);
+        let animation_state = AnimationState::new(entity_type, client_tick);
 
         let mut common = Self {
             grid_position,
@@ -474,7 +478,7 @@ impl Common {
         self.grid_position = position;
         self.position = map.get_world_position(position);
         self.active_movement = None;
-        self.animation_state.idle(client_tick);
+        self.animation_state.idle(self.entity_type, client_tick);
     }
 
     pub fn move_from_to(
@@ -531,8 +535,8 @@ impl Common {
             if steps.len() > 1 {
                 self.active_movement = Movement::new(steps, starting_timestamp.0).into();
 
-                if self.animation_state.action != ActionType::Walk {
-                    self.animation_state.walk(self.movement_speed, starting_timestamp);
+                if self.animation_state.action_type != AnimationActionType::Walk {
+                    self.animation_state.walk(self.entity_type, self.movement_speed, starting_timestamp);
                 }
             }
         }
@@ -1058,9 +1062,8 @@ impl Entity {
     }
 
     pub fn set_hair(&mut self, hair_id: usize) {
-        match self {
-            Self::Player(player) => player.hair_id = hair_id,
-            _ => (),
+        if let Self::Player(player) = self {
+            player.hair_id = hair_id
         }
     }
 
@@ -1104,11 +1107,13 @@ impl Entity {
     }
 
     pub fn set_dead(&mut self, client_tick: ClientTick) {
-        self.get_common_mut().animation_state.dead(client_tick);
+        let entity_type = self.get_entity_type();
+        self.get_common_mut().animation_state.dead(entity_type, client_tick);
     }
 
     pub fn set_idle(&mut self, client_tick: ClientTick) {
-        self.get_common_mut().animation_state.idle(client_tick);
+        let entity_type = self.get_entity_type();
+        self.get_common_mut().animation_state.idle(entity_type, client_tick);
     }
 
     pub fn update_health(&mut self, health_points: usize, maximum_health_points: usize) {

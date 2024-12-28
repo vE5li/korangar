@@ -9,8 +9,8 @@ use korangar_util::container::SimpleCache;
 use num::Zero;
 
 use super::error::LoadError;
-use crate::loaders::{ActionEvent, ActionLoader, SpriteLoader};
-use crate::world::{Animation, AnimationData, AnimationFrame, AnimationFramePart, AnimationPair};
+use crate::loaders::{ActionLoader, SpriteLoader};
+use crate::world::{ActionEvent, Animation, AnimationData, AnimationFrame, AnimationFramePart, AnimationPair};
 use crate::{Color, EntityType};
 
 const MAX_CACHE_COUNT: u32 = 256;

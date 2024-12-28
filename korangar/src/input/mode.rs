@@ -9,7 +9,8 @@ use crate::graphics::Texture;
 use crate::interface::application::InterfaceSettings;
 use crate::interface::resource::{ItemSource, SkillSource};
 use crate::inventory::Skill;
-use crate::loaders::{Actions, AnimationState, ResourceMetadata, Sprite};
+use crate::loaders::{ResourceMetadata, Sprite};
+use crate::world::{Actions, SpriteAnimationState};
 
 #[derive(Default)]
 pub enum MouseInputMode {
@@ -27,7 +28,7 @@ pub enum MouseInputMode {
 
 pub enum Grabbed {
     Texture(Arc<Texture>),
-    Action(Arc<Sprite>, Arc<Actions>, AnimationState),
+    Action(Arc<Sprite>, Arc<Actions>, SpriteAnimationState),
 }
 
 impl MouseInputMode {

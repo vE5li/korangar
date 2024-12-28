@@ -560,9 +560,8 @@ where
                 server_port: packet.map_server_port,
                 character_id: packet.character_id,
             };
-            let map_name = packet.map_name.strip_suffix(".gat").unwrap().to_owned();
 
-            NetworkEvent::CharacterSelected { login_data, map_name }
+            NetworkEvent::CharacterSelected { login_data }
         })?;
         packet_handler.register(|packet: CharacterSelectionFailedPacket| {
             let (reason, message) = match packet.reason {
@@ -998,12 +997,7 @@ where
         })?;
         packet_handler.register_noop::<Packet8302>()?;
         packet_handler.register_noop::<Packet0b18>()?;
-        packet_handler.register(|packet: MapServerLoginSuccessPacket| {
-            (
-                NetworkEvent::UpdateClientTick(packet.client_tick),
-                NetworkEvent::SetPlayerPosition(packet.position),
-            )
-        })?;
+        packet_handler.register(|packet: MapServerLoginSuccessPacket| NetworkEvent::UpdateClientTick(packet.client_tick))?;
         packet_handler.register(|packet: RestartResponsePacket| match packet.result {
             RestartResponseStatus::Ok => NetworkEvent::LoggedOut,
             RestartResponseStatus::Nothing => NetworkEvent::ChatMessage {

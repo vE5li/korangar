@@ -274,6 +274,10 @@ impl Prepare for PostProcessingRectangleDrawer {
             return;
         }
 
+        let Some(font_map_texture) = instructions.font_map_texture else {
+            return;
+        };
+
         self.instance_data.clear();
 
         if self.bindless_support {
@@ -409,7 +413,7 @@ impl Prepare for PostProcessingRectangleDrawer {
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
                 &texture_views,
-                instructions.font_map_texture.get_texture_view(),
+                font_map_texture.get_texture_view(),
             );
         } else {
             let mut offset = 0;
@@ -507,12 +511,11 @@ impl Prepare for PostProcessingRectangleDrawer {
                 }
             }
 
-            self.instance_data_buffer.reserve(device, self.instance_data.len());
             self.bind_group = Self::create_bind_group(
                 device,
                 &self.bind_group_layout,
                 &self.instance_data_buffer,
-                instructions.font_map_texture.get_texture_view(),
+                font_map_texture.get_texture_view(),
             );
         }
     }

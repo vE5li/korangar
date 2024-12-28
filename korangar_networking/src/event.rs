@@ -37,7 +37,6 @@ pub enum NetworkEvent {
     },
     CharacterSelected {
         login_data: CharacterServerLoginData,
-        map_name: String,
     },
     CharacterSelectionFailed {
         reason: UnifiedCharacterSelectionFailedReason,
@@ -126,7 +125,6 @@ pub enum NetworkEvent {
         account_id: AccountId,
         hair_id: u32,
     },
-    SetPlayerPosition(WorldPosition),
     LoggedOut,
     FriendRequest {
         requestee: Friend,
@@ -195,12 +193,6 @@ impl From<Option<NetworkEvent>> for NetworkEventList {
             Some(event) => Self(vec![event]),
             None => Self(Vec::new()),
         }
-    }
-}
-
-impl From<(NetworkEvent, NetworkEvent)> for NetworkEventList {
-    fn from(events: (NetworkEvent, NetworkEvent)) -> Self {
-        Self(vec![events.0, events.1])
     }
 }
 
